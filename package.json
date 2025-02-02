@@ -1,0 +1,26 @@
+{
+  "name": "superglue",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "packageManager": "npm@11.0.0",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "start": "turbo run start",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "clean": "turbo run clean"
+  },
+  "dependencies": {
+    "@superglue/shared": "0.1.0",
+    "dotenv": "^16.4.7",
+    "dotenv-cli": "^8.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "turbo": "^2.3.4",
+    "typescript": "^5.0.0"
+  }
+}

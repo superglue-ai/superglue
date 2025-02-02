@@ -1,0 +1,263 @@
+scalar JSONSchema
+scalar JSON
+scalar JSONata
+scalar DateTime
+
+interface BaseConfig {
+  id: ID!
+  version: String
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+union ConfigType = ApiConfig | ExtractConfig | TransformConfig
+
+type ApiConfig implements BaseConfig {
+  # BaseConfig
+  id: ID!
+  version: String
+  createdAt: DateTime
+  updatedAt: DateTime
+
+  # Specific implementation
+  urlHost: String!
+  urlPath: String
+  instruction: String!
+  method: HttpMethod
+  queryParams: JSON
+  headers: JSON
+  body: String
+  documentationUrl: String
+  responseSchema: JSONSchema
+  responseMapping: JSONata
+  authentication: AuthType
+  pagination: Pagination
+  dataPath: String
+}
+
+type ExtractConfig implements BaseConfig {  
+  # BaseConfig
+  id: ID!
+  version: String
+  createdAt: DateTime
+  updatedAt: DateTime
+
+  # Specific implementation
+  urlHost: String!
+  urlPath: String
+  queryParams: JSON
+  instruction: String!
+  method: HttpMethod
+  headers: JSON
+  body: String
+  documentationUrl: String
+  decompressionMethod: DecompressionMethod
+  authentication: AuthType
+  fileType: FileType
+  dataPath: String
+}
+
+type TransformConfig implements BaseConfig {
+  # BaseConfig
+  id: ID!
+  version: String
+  createdAt: DateTime
+  updatedAt: DateTime
+
+  # Specific implementation
+  responseSchema: JSONSchema
+  responseMapping: JSONata
+}
+
+type RunResult {
+  id: ID!
+  success: Boolean!
+  data: JSON
+  error: String
+  startedAt: DateTime!
+  completedAt: DateTime!
+  config: ConfigType
+}
+
+type Pagination {
+  type: PaginationType!
+  pageSize: Int
+}
+
+type RunList {
+  items: [RunResult!]!
+  total: Int!
+}
+
+type ApiList {
+  items: [ApiConfig!]!
+  total: Int!
+}
+
+type TransformList {
+  items: [TransformConfig!]!
+  total: Int!
+}
+
+type ExtractList {
+  items: [ExtractConfig!]!
+  total: Int!
+}
+
+enum AuthType {
+  NONE
+  HEADER
+  QUERY_PARAM
+  OAUTH2
+}
+
+enum DecompressionMethod {
+  GZIP
+  DEFLATE
+  NONE
+  AUTO
+  ZIP
+}
+
+enum HttpMethod {
+  GET
+  POST
+  PUT
+  DELETE
+  PATCH
+  HEAD
+  OPTIONS
+}
+
+enum CacheMode {
+  ENABLED
+  READONLY
+  WRITEONLY
+  DISABLED
+}
+
+enum PaginationType {
+  OFFSET_BASED
+  PAGE_BASED
+  DISABLED
+}
+
+enum FileType {
+  CSV
+  JSON
+  XML
+  AUTO
+}
+
+input PaginationInput {
+  type: PaginationType!
+  pageSize: Int
+}
+
+input ApiInput {
+  urlHost: String!
+  urlPath: String
+  instruction: String!
+  queryParams: JSON
+  method: HttpMethod
+  headers: JSON
+  body: String
+  documentationUrl: String
+  responseSchema: JSONSchema
+  responseMapping: JSONata
+  authentication: AuthType
+  pagination: PaginationInput
+  dataPath: String
+  version: String
+}
+
+input ExtractInput {
+  urlHost: String!
+  urlPath: String
+  queryParams: JSON
+  instruction: String!
+  method: HttpMethod
+  headers: JSON
+  body: String
+  documentationUrl: String
+  decompressionMethod: DecompressionMethod
+  fileType: FileType
+  authentication: AuthType
+  dataPath: String
+  version: String
+}
+
+input TransformInput {
+  instruction: String!
+  responseSchema: JSONSchema!
+  responseMapping: JSONata
+  version: String
+}
+
+input RequestOptions {
+  cacheMode: CacheMode
+  timeout: Int
+  retries: Int
+  retryDelay: Int
+  webhookUrl: String
+}
+
+input ApiInputRequest @oneOf {
+  endpoint: ApiInput
+  id: ID
+}
+
+input ExtractInputRequest @oneOf {
+  endpoint: ExtractInput
+  id: ID
+}
+
+input TransformInputRequest @oneOf {
+  endpoint: TransformInput
+  id: ID
+}
+
+type Query {
+  listRuns(limit: Int = 10, offset: Int = 0): RunList!
+  listApis(limit: Int = 10, offset: Int = 0): ApiList!
+  listTransforms(limit: Int = 10, offset: Int = 0): TransformList!
+  listExtracts(limit: Int = 10, offset: Int = 0): ExtractList!
+  
+  getRun(id: ID!): RunResult
+  getApi(id: ID!): ApiConfig
+  getTransform(id: ID!): TransformConfig
+  getExtract(id: ID!): ExtractConfig
+}
+
+type Mutation {
+  call(
+    input: ApiInputRequest!
+    payload: JSON
+    credentials: JSON
+    options: RequestOptions
+  ): RunResult!
+  
+  extract(
+    input: ExtractInputRequest!
+    payload: JSON
+    credentials: JSON
+    options: RequestOptions
+  ): RunResult!
+  
+  transform(
+    input: TransformInputRequest!
+    data: JSON!
+    options: RequestOptions
+  ): RunResult!
+  
+  upsertApi(id: ID!, input: JSON!): ApiConfig!
+  deleteApi(id: ID!): Boolean!
+
+  createApi(input: JSON!): ApiConfig!
+
+  upsertExtraction(id: ID!, input: JSON!): ExtractConfig!
+  deleteExtraction(id: ID!): Boolean!
+  
+  upsertTransformation(id: ID!, input: JSON!): TransformConfig!
+  deleteTransformation(id: ID!): Boolean!
+}

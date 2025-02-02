@@ -1,0 +1,13 @@
+services:
+  superglue:
+    build: .
+    ports:
+      - "3000:3000"
+      - "3001:3001"
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

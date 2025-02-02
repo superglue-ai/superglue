@@ -1,0 +1,245 @@
+[
+    {
+      "id": "stripe-customers-list",
+      "url": "https://api.stripe.com/v1/customers",
+      "method": "GET",
+      "instruction": "Retrieve all customers with their subscription status",
+      "headers": {
+        "Authorization": "Bearer {STRIPE_API_KEY}",
+        "Stripe-Version": "2023-10-16"
+      },
+      "responseSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "email": { "type": "string" },
+                "name": { "type": "string" },
+                "subscriptions": { "type": "object" }
+              }
+            }
+          }
+        }
+      },
+      "responseMapping": "$.data.{id: id, customerEmail: email, customerName: name}",
+      "authentication": "HEADER",
+      "pagination": {
+        "type": "OFFSET_BASED",
+        "pageSize": 100
+      },
+      "documentationUrl": "https://stripe.com/docs/api/customers/list",
+      "updatedAt": "2024-03-21"
+    },
+    {
+      "id": "stripe-charges-list",
+      "url": "https://api.stripe.com/v1/charges",
+      "method": "GET",
+      "instruction": "Fetch recent payment charges with customer details",
+      "headers": {
+        "Authorization": "Bearer {STRIPE_API_KEY}",
+        "Stripe-Version": "2023-10-16"
+      },
+      "responseSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "amount": { "type": "number" },
+                "status": { "type": "string" },
+                "customer": { "type": "string" }
+              }
+            }
+          }
+        }
+      },
+      "responseMapping": "$.data.{chargeId: id, amount: amount/100, status: status}",
+      "authentication": "HEADER",
+      "pagination": {
+        "type": "OFFSET_BASED",
+        "pageSize": 50
+      },
+      "updatedAt": "2024-03-21"
+    },
+    {
+      "id": "quickbooks-invoices-query",
+      "url": "https://quickbooks.api.intuit.com/v3/company/{COMPANY_ID}/query",
+      "method": "POST",
+      "instruction": "Retrieve all invoices from the last 30 days",
+      "headers": {
+        "Authorization": "Bearer {QB_ACCESS_TOKEN}",
+        "Accept": "application/json"
+      },
+      "body": "SELECT * FROM Invoice WHERE MetaData.CreateTime > '{LAST_30_DAYS}'",
+      "contentType": "application/text",
+      "responseSchema": {
+        "type": "object",
+        "properties": {
+          "QueryResponse": {
+            "type": "object",
+            "properties": {
+              "Invoice": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "Id": { "type": "string" },
+                    "CustomerRef": { "type": "object" },
+                    "TotalAmt": { "type": "number" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "responseMapping": "$.QueryResponse.Invoice.{id: Id, customerId: CustomerRef.value, amount: TotalAmt}",
+      "authentication": "OAUTH2",
+      "documentationUrl": "https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/invoice",
+      "updatedAt": "2024-03-21"
+    },
+    {
+      "id": "quickbooks-customers-list",
+      "url": "https://quickbooks.api.intuit.com/v3/company/{COMPANY_ID}/customer",
+      "method": "GET",
+      "instruction": "Get all active customers",
+      "headers": {
+        "Authorization": "Bearer {QB_ACCESS_TOKEN}",
+        "Accept": "application/json"
+      },
+      "responseSchema": {
+        "type": "object",
+        "properties": {
+          "Customer": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "Id": { "type": "string" },
+                "DisplayName": { "type": "string" },
+                "Active": { "type": "boolean" }
+              }
+            }
+          }
+        }
+      },
+      "responseMapping": "$.Customer[Active=true].{id: Id, name: DisplayName}",
+      "authentication": "OAUTH2",
+      "updatedAt": "2024-03-21"
+    },
+    {
+      "id": "odoo-inventory-products",
+      "url": "https://{ODOO_HOST}/api/v1/product.product",
+      "method": "xmlrpc",
+      "instruction": "Retrieve all products with their current stock levels",
+      "headers": {
+        "Authorization": "Bearer {ODOO_API_KEY}",
+        "Content-Type": "application/json"
+      },
+      "responseSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "integer" },
+                "name": { "type": "string" },
+                "default_code": { "type": "string" },
+                "qty_available": { "type": "number" },
+                "virtual_available": { "type": "number" }
+              }
+            }
+          }
+        }
+      },
+      "responseMapping": "$.results.{productId: id, productName: name, sku: default_code, currentStock: qty_available, forecastedStock: virtual_available}",
+      "authentication": "HEADER",
+      "pagination": {
+        "type": "OFFSET_BASED",
+        "pageSize": 100
+      },
+      "documentationUrl": "https://www.odoo.com/documentation/16.0/developer/api/external_api.html",
+      "updatedAt": "2024-03-21"
+    },
+    {
+      "id": "odoo-purchase-orders",
+      "url": "https://{ODOO_HOST}/api/v1/purchase.order",
+      "method": "xmlrpc",
+      "instruction": "Fetch all purchase orders with their status",
+      "headers": {
+        "Authorization": "Bearer {ODOO_API_KEY}",
+        "Content-Type": "application/json"
+      },
+      "responseSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "integer" },
+                "name": { "type": "string" },
+                "partner_id": { "type": "integer" },
+                "state": { "type": "string" },
+                "amount_total": { "type": "number" },
+                "date_order": { "type": "string" }
+              }
+            }
+          }
+        }
+      },
+      "responseMapping": "$.results.{orderId: id, reference: name, supplierId: partner_id, status: state, total: amount_total, orderDate: date_order}",
+      "authentication": "HEADER",
+      "pagination": {
+        "type": "OFFSET_BASED",
+        "pageSize": 50
+      },
+      "updatedAt": "2024-03-21"
+    },
+    {
+      "id": "odoo-stock-movements",
+      "url": "https://{ODOO_HOST}/api/v1/stock.move",
+      "method": "xmlrpc",
+      "instruction": "Get recent stock movements and transfers",
+      "headers": {
+        "Authorization": "Bearer {ODOO_API_KEY}",
+        "Content-Type": "application/json"
+      },
+      "responseSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "integer" },
+                "product_id": { "type": "integer" },
+                "product_qty": { "type": "number" },
+                "location_id": { "type": "integer" },
+                "location_dest_id": { "type": "integer" },
+                "state": { "type": "string" }
+              }
+            }
+          }
+        }
+      },
+      "responseMapping": "$.results.{moveId: id, productId: product_id, quantity: product_qty, fromLocation: location_id, toLocation: location_dest_id, status: state}",
+      "authentication": "HEADER",
+      "pagination": {
+        "type": "OFFSET_BASED",
+        "pageSize": 100
+      },
+      "updatedAt": "2024-03-21"
+    }
+]

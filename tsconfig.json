@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "rootDirs": ["src"],
+    "outDir": "dist",
+    "lib": ["es2020"],
+    "target": "es2020",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "esModuleInterop": true,
+    "types": ["node"],
+    "skipLibCheck": true,
+    "sourceMap": true, // This enables source map generation
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["*"],
+      "@superglue/*": ["packages/*/"],
+      "@core/*": ["packages/core/*"],
+      "@shared/*": ["packages/shared/*"],
+      "@web/*": ["packages/web/*"]
+    }
+  }
+}
+  
