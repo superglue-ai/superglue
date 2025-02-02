@@ -1,7 +1,7 @@
 # superglue
 
-superglue is an open source tool to transform data fetched from external systems using LLM-generated mappings. 
-superglue acts as a proxy that enforces data formats, consistency, and error handling.
+superglue is a proxy for your data tasks, automatically transforming data into exactly the format your system needs.
+With superglue, you can automate data extraction & transformation from any source.
 
 [![GitHub](https://img.shields.io/github/license/superglue-ai/superglue)](https://github.com/superglue-ai/superglue/blob/main/LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/superglue-ai/superglue)](https://github.com/superglue-ai/superglue/stargazers)
@@ -53,7 +53,8 @@ const superglue = new SuperglueClient({
 });
 
 const config = {
-  url: "https://futuramaapi.com/graphql",
+  urlHost: "https://futuramaapi.com",
+  urlPath: "/graphql",
   instruction: "get all characters from the show",
   responseSchema: {
     type: "object",
