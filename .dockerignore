@@ -1,0 +1,30 @@
+# Dependencies
+node_modules
+**/node_modules
+
+# Debug logs
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+
+# Build outputs
+dist
+**/dist
+**/.next
+**/.turbo
+
+# Environment and local files
+.env
+**/.env
+.env.*
+.DS_Store
+
+# Version control
+.git
+.gitignore
+
+# IDE
+.vscode
+
+# Documentation
+README.md
