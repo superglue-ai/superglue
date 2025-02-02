@@ -7,7 +7,7 @@ With superglue, you can automate data extraction & transformation from any sourc
 [![GitHub stars](https://img.shields.io/github/stars/superglue-ai/superglue)](https://github.com/superglue-ai/superglue/stargazers)
 [![Client SDK](https://img.shields.io/npm/v/@superglue/superglue)](https://www.npmjs.com/package/@superglue/superglue)
 [![Docker](https://img.shields.io/docker/pulls/superglueai/superglue)](https://hub.docker.com/r/superglueai/superglue)
-[![Discord](https://img.shields.io/discord/1234567890?color=7289da&label=Discord&logo=discord&logoColor=white)](https://discord.gg/cDWGsJvY3t)
+[![Discord](https://img.shields.io/discord/1234567890?color=7289da&label=Discord&logo=discord&logoColor=white)](https://discord.gg/SKRYYQEp)
 
 ## 🎯 Common Use Cases
 
@@ -238,5 +238,5 @@ superglue is GPL licensed. The superglue client SDKs are MIT licensed. See [LICE
 ## 🙋‍♂️ Support
 
 - 📧 Email: stefan@superglue.cloud
-- 💬 Discord: [Join our community](https://discord.gg/cDWGsJvY3t)
+- 💬 Discord: [Join our community](https://discord.gg/SKRYYQEp)
 - 🐛 Issues: [GitHub Issues](https://github.com/superglue-ai/superglue/issues)
