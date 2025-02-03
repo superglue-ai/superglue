@@ -1,4 +1,7 @@
-# Mutations
+---
+title: 'Mutations'
+description: 'Mutations are used to execute operations and manage configs.'
+---
 
 ## Execute Operations
 

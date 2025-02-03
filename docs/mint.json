@@ -17,35 +17,24 @@
   },
   "topbarLinks": [
     {
-      "name": "Support",
-      "url": "mailto:hi@mintlify.com"
+      "name": "Talk to us",
+      "url": "https://calendar.app.google/Ae4i88qcuR6hyaER6"
     }
   ],
   "topbarCtaButton": {
-    "name": "Dashboard",
-    "url": "https://dashboard.mintlify.com"
+    "name": "Dashboard [Beta]",
+    "url": "https://dashboard.superglue.cloud"
   },
-  "tabs": [
-    {
-      "name": "API Reference",
-      "url": "api-reference"
-    }
-  ],
   "anchors": [
     {
-      "name": "Documentation",
-      "icon": "book-open-cover",
-      "url": "https://mintlify.com/docs"
+      "name": "GitHub",
+      "icon": "github",
+      "url": "https://github.com/superglue-ai/superglue"
     },
     {
-      "name": "Community",
-      "icon": "slack",
-      "url": "https://mintlify.com/community"
-    },
-    {
-      "name": "Blog",
-      "icon": "newspaper",
-      "url": "https://mintlify.com/blog"
+      "name": "Discord",
+      "icon": "discord",
+      "url": "https://discord.gg/SKRYYQEp"
     }
   ],
   "navigation": [
@@ -57,9 +46,16 @@
       ]
     },
     {
+      "group": "Cookbook",
+      "pages": [
+        "cookbook/shopify"
+      ]
+    },
+    {
       "group": "API Reference",
       "pages": [
         "api-reference/overview",
+        "api-reference/quickstart",
         "api-reference/types",
         "api-reference/queries",
         "api-reference/mutations"
@@ -79,8 +75,7 @@
     }
   ],
   "footerSocials": {
-    "x": "https://x.com/mintlify",
-    "github": "https://github.com/mintlify",
-    "linkedin": "https://linkedin.com/company/mintlify"
+    "github": "https://github.com/superglue-ai/superglue",
+    "linkedin": "https://www.linkedin.com/company/superglue-ai/"
   }
 }
