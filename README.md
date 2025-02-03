@@ -1,15 +1,12 @@
-# superglue
+# welcome to superglue 🍯
 
-superglue is an API translator. It extracts, maps and transforms data into exactly the format your system needs.
-With superglue, you can automate data extraction & transformation from any source.
+superglue is an API translator. 
+let it extract, map and transform data into exactly the format your system needs. with superglue, you can automate data extraction & transformation from any source.
 
-[![GitHub](https://img.shields.io/github/license/superglue-ai/superglue)](https://github.com/superglue-ai/superglue/blob/main/LICENSE)
-[![GitHub stars](https://img.shields.io/github/stars/superglue-ai/superglue)](https://github.com/superglue-ai/superglue/stargazers)
-[![Client SDK](https://img.shields.io/npm/v/@superglue/superglue)](https://www.npmjs.com/package/@superglue/superglue)
-[![Docker](https://img.shields.io/docker/pulls/superglueai/superglue)](https://hub.docker.com/r/superglueai/superglue)
-[![Discord](https://img.shields.io/discord/1234567890?color=7289da&label=Discord&logo=discord&logoColor=white)](https://discord.gg/SKRYYQEp)
+- **lightweight ETL**
+- **one line of code to integrate**
 
-## 🚀 Key Features
+## key features
 
 - **LLM-Powered Data Mapping**: Automatically generate data transformations using large language models
 - **API Proxy**: Intercept and transform API responses in real-time with minimal added latency
@@ -19,22 +16,19 @@ With superglue, you can automate data extraction & transformation from any sourc
 - **Smart Pagination**: Handle different pagination styles automatically
 - **Caching & Retry Logic**: Built-in caching and configurable retry strategies
 
-## 🎯 Common Use Cases
+[![GitHub](https://img.shields.io/github/license/superglue-ai/superglue)](https://github.com/superglue-ai/superglue/blob/main/LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/superglue-ai/superglue)](https://github.com/superglue-ai/superglue/stargazers)
+[![Client SDK](https://img.shields.io/npm/v/@superglue/superglue)](https://www.npmjs.com/package/@superglue/superglue)
+[![Docker](https://img.shields.io/docker/pulls/superglueai/superglue)](https://hub.docker.com/r/superglueai/superglue)
+[![Discord](https://img.shields.io/discord/1234567890?color=7289da&label=Discord&logo=discord&logoColor=white)](https://discord.gg/SKRYYQEp)
+
+## common use cases
 
 - Unify supplier and customer data from multiple sources into a consistent format
 - Connect legacy systems to modern applications by transforming their data formats in real-time
 - Standardize log and transaction data from multiple sources
 
-## 📊 Use Case Example: Catalog Sync for an E-commerce Marketplace
-
-superglue can be used to sync product data from thousands of retailers, each with their own unique product data formats. Instead of writing custom adapters for each retailer:
-
-1. Define your desired data schema once
-2. Point superglue at the retailer's API
-3. superglue automatically generates the necessary transformations
-4. Receive standardized product data in your system's format
-
-## 🛠 Getting Started
+## Getting Started
 ### Hosted version
 
 1. Sign up for early access to the hosted version of superglue at [superglue.cloud](https://superglue.cloud)
@@ -231,7 +225,7 @@ flowchart TB
 
 [//]: # (We welcome contributions! Please see our [Contributing Guide]&#40;CONTRIBUTING.md&#41; for details.)
 
-## 📝 License
+## License
 
 superglue is GPL licensed. The superglue client SDKs are MIT licensed. See [LICENSE](LICENSE) for details.
 
