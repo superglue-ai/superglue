@@ -17,13 +17,13 @@
   },
   "topbarLinks": [
     {
-      "name": "Talk to us",
-      "url": "https://calendar.app.google/Ae4i88qcuR6hyaER6"
+      "name": "Dashboard [Beta]",
+      "url": "https://dashboard.superglue.cloud"
     }
   ],
   "topbarCtaButton": {
-    "name": "Dashboard [Beta]",
-    "url": "https://dashboard.superglue.cloud"
+    "name": "Talk to us",
+    "url": "https://calendar.app.google/Ae4i88qcuR6hyaER6"
   },
   "anchors": [
     {
