@@ -1,6 +1,6 @@
 import { ApiConfig, ApiInput, ExtractConfig, ExtractInput, TransformConfig, TransformInput, RunResult, DataStore } from "@superglue/shared";
 import objectHash from 'object-hash';
-import { getAllKeys } from './tools.js';
+import { getAllKeys } from '../utils/tools.js';
 
 export class MemoryStore implements DataStore {
   private storage: {

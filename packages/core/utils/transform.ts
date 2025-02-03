@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { PROMPT_MAPPING } from "./prompts.js";
-import {  applyJsonataWithValidation } from "./tools.js";
+import {  applyJsonataWithValidation, sample } from "./tools.js";
 import { ApiInput, DataStore, TransformConfig, TransformInput } from "@superglue/shared";
 import crypto from 'crypto';
 
@@ -123,25 +123,6 @@ ${error}
   return null;
 }
 
-function sample<T>(arr: any, sampleSize = 10): T[] {
-  if(!Array.isArray(arr)) {
-    return [arr];
-  }
-  const arrLength = arr.length;
-
-  if (arrLength <= sampleSize) {
-    return arr; // Return full array if less than or equal to sample size
-  }
-
-  const step = Math.floor(arrLength / sampleSize);
-  const result = [];
-
-  for (let i = 0; i < sampleSize; i++) {
-    result.push(arr[i * step]);
-  }
-
-  return result;
-}
 
 const jsonataSchema = {
   "$schema": "http://json-schema.org/draft-07/schema#",
