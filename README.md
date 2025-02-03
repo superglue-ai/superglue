@@ -7,7 +7,7 @@ With superglue, you can automate data extraction & transformation from any sourc
 [![GitHub stars](https://img.shields.io/github/stars/superglue-ai/superglue)](https://github.com/superglue-ai/superglue/stargazers)
 [![Client SDK](https://img.shields.io/npm/v/@superglue/superglue)](https://www.npmjs.com/package/@superglue/superglue)
 [![Docker](https://img.shields.io/docker/pulls/superglueai/superglue)](https://hub.docker.com/r/superglueai/superglue)
-[![Discord](https://img.shields.io/discord/1234567890?color=7289da&label=Discord&logo=discord&logoColor=white)](https://discord.gg/cDWGsJvY3t)
+[![Discord](https://img.shields.io/discord/1234567890?color=7289da&label=Discord&logo=discord&logoColor=white)](https://discord.gg/SKRYYQEp)
 
 ## 🎯 Common Use Cases
 
@@ -188,38 +188,28 @@ flowchart TB
     end
 
     subgraph SuperglueLayer[superglue]
-        P1[Extract Pipeline]
-        E1[LLM Transform Engine]
-        C1[Schema Validator]
-    end
-
-    subgraph Redis[Redis Mapping Cache]
-        R1[(Cache DB)]
+        P1[Extract]
+        E1[Transform]
+        C1[Validate]
     end
     
     subgraph YourSoftware[Your System]
-        CallScheduler[Call Scheduler]
-        DB[(Storage)]
     end
     
 
     %% Main data flow
-    A1 & A2 & A3 <--> SuperglueLayer
+    DataSources <--> SuperglueLayer
     P1 --> E1
     E1 --> C1
     SuperglueLayer <--> YourSoftware
-    SuperglueLayer <--> Redis
     
     %% Styling
     classDef sourceStyle fill:#f9f,stroke:#333,stroke-width:2px
     classDef superglueStyle fill:#bbf,stroke:#333,stroke-width:2px
-    classDef storageStyle fill:#bfb,stroke:#333,stroke-width:2px
     classDef supportStyle fill:#ffd,stroke:#333,stroke-width:2px
-    classDef redisStyle fill:#fff,stroke:#333,stroke-width:2px
     
     class DataSources sourceStyle
     class SuperglueLayer superglueStyle
-    class Redis redisStyle
     class YourSoftware supportStyle
 ```
 
@@ -238,5 +228,5 @@ superglue is GPL licensed. The superglue client SDKs are MIT licensed. See [LICE
 ## 🙋‍♂️ Support
 
 - 📧 Email: stefan@superglue.cloud
-- 💬 Discord: [Join our community](https://discord.gg/cDWGsJvY3t)
+- 💬 Discord: [Join our community](https://discord.gg/SKRYYQEp)
 - 🐛 Issues: [GitHub Issues](https://github.com/superglue-ai/superglue/issues)
