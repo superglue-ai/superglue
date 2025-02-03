@@ -1,9 +1,7 @@
 ---
-title: "Superglue Documentation"
-description: "Comprehensive guide and documentation for Superglue"
+title: "Welcome to Superglue 🍯"
+description: "Introduction to the Superglue Data Proxy"
 ---
-
-# Welcome to Superglue 🍯
 
 Superglue is an API translator that extracts, maps, and transforms data into the format your system needs. By leveraging the power of large language models, Superglue makes it simple to integrate and transform data from various sources with just one line of code.
 
@@ -11,60 +9,15 @@ Superglue is an API translator that extracts, maps, and transforms data into the
 
 Superglue simplifies data workflows by providing:
 
-- **Lightweight ETL**: Efficiently extract, transform, and load data with minimal overhead.
+- **Lightweight ETL**: Efficiently [extract](/api-reference/mutations#extract), transform, and load data with minimal overhead.
 - **One Line of Code Integration**: Quickly integrate Superglue into your application.
-- **LLM-Powered Data Mapping**: Automatically generate data transformations using advanced language models.
-- **API Proxy**: Seamlessly intercept and modify API responses in real-time.
-- **Flexible Authentication**: Supports header-based auth, API keys, OAuth2, and more.
-- **Smart Pagination**: Automatically handle a variety of pagination strategies.
-- **Caching & Retry Logic**: Achieve robust performance with built-in caching and retry mechanisms.
+- **LLM-Powered Data Mapping**: Automatically [transform](/api-reference/mutations#transform) data using advanced language models.
+- **API Proxy**: Seamlessly [intercept and modify API responses](/api-reference/mutations#call) in real-time.
+- **Flexible Authentication**: Supports [header-based auth, API keys, OAuth2](/api-reference/types#authtype), and more.
+- **Smart Pagination**: Automatically handle a variety of [pagination strategies](/api-reference/types#apiconfig).
+- **Caching & Retry Logic**: Achieve robust performance with built-in [caching](/api-reference/overview#cache-modes) and retry mechanisms.
 
-## Architecture
-
-Superglue is built with a modular architecture that connects data sources to your software stack via a dedicated transformation layer and caching system. The following diagram illustrates the core components and data flow:
-
-```mermaid
-flowchart TB
-    subgraph DataSources[External Data Sources]
-        A1[REST & GraphQL APIs]
-        A2[XML/JSON/CSV Files]
-        A3[Legacy System Interfaces]
-    end
-
-    subgraph SuperglueLayer[superglue]
-        P1[Extract Pipeline]
-        E1[LLM Transform Engine]
-        C1[Schema Validator]
-    end
-
-    subgraph Redis[Redis Mapping Cache]
-        R1[(Cache DB)]
-    end
-
-    subgraph YourSoftware[Your System]
-        CallScheduler[Call Scheduler]
-        DB[(Storage)]
-    end
-
-    %% Main data flow
-    A1 & A2 & A3 <--> SuperglueLayer
-    P1 --> E1
-    E1 --> C1
-    SuperglueLayer <--> YourSoftware
-    SuperglueLayer <--> Redis
-
-    %% Styling
-    classDef sourceStyle fill:#f9f,stroke:#333,stroke-width:2px
-    classDef superglueStyle fill:#bbf,stroke:#333,stroke-width:2px
-    classDef storageStyle fill:#bfb,stroke:#333,stroke-width:2px
-    classDef supportStyle fill:#ffd,stroke:#333,stroke-width:2px
-    classDef redisStyle fill:#fff,stroke:#333,stroke-width:2px
-
-    class DataSources sourceStyle
-    class SuperglueLayer superglueStyle
-    class Redis redisStyle
-    class YourSoftware supportStyle
-```
+For a detailed look at how Superglue works under the hood, check out our [Architecture](/architecture) page.
 
 ## Getting Started
 
@@ -119,88 +72,7 @@ You can use Superglue either as a hosted service or deploy it yourself using Doc
 
 ### Self-Hosted Version
 
-Deploy your own instance of Superglue for complete control.
-
-1. **Pull the Docker Image**
-
-   ```bash
-   docker pull superglueai/superglue
-   ```
-
-2. **Create an Environment File**  
-   Create a `.env` file with the following configuration:
-
-   ```env
-   # Server Configuration
-   GRAPHQL_PORT=3000             # Port for the Superglue server
-   WEB_PORT=3001                 # Port for the web dashboard
-   AUTH_TOKEN=your-auth-token    # Token for API access
-
-   # Datastore Configuration (choose one)
-   DATASTORE_TYPE=redis          # Use "redis" for persistent storage or "memory" for quick setups
-
-   # If using Redis:
-   REDIS_HOST=localhost
-   REDIS_PORT=6379
-   REDIS_USERNAME=default
-   REDIS_PASSWORD=secret
-
-   # OpenAI Configuration
-   OPENAI_API_KEY=sk-...         # Your OpenAI API key
-   OPENAI_MODEL=gpt-4o-2024-11-20 # Recommended OpenAI model
-   ```
-
-3. **Start the Superglue Server**
-
-   Run the Docker container:
-
-   ```bash
-   docker run -d \
-     --name superglue \
-     --env-file .env \
-     -p 3000:3000 \
-     -p 3001:3001 \
-     superglueai/superglue
-   ```
-
-4. **Verify the Installation**
-
-   Confirm that the server is running:
-
-   ```bash
-   curl http://localhost:3000/health
-   ```
-
-   You should see:
-
-   ```plaintext
-   OK
-   ```
-
-5. **Access the Dashboard**  
-   Open your browser at [http://localhost:3001/](http://localhost:3001/) to create and manage API configurations.
-
-6. **Local API Call Example**
-
-   Use the client SDK to execute an API call against your local instance:
-
-   ```javascript
-   import { SuperglueClient } from "@superglue/superglue";
-
-   const superglue = new SuperglueClient({
-     endpoint: "http://localhost:3000",
-     apiKey: "your-auth-token"
-   });
-
-   const config = {
-     urlHost: "https://futuramaapi.com",
-     urlPath: "/graphql",
-     instruction: "get all characters from the show",
-   };
-
-   const result = await superglue.call({ endpoint: config });
-   console.log(JSON.stringify(result.data, null, 2));
-   ```
+For complete control over your data processing pipeline, you can deploy your own instance of Superglue. See our comprehensive [Self-Hosting Guide](/self-hosting) for detailed instructions on deployment, configuration, and maintenance.
 
 ## Requirements
 
