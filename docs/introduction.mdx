@@ -1,107 +1,103 @@
 ---
 title: "Welcome to Superglue 🍯"
-description: "Introduction to the Superglue Data Proxy"
+description: "A developer-first data/API translator"
 ---
 
-Superglue is an API translator that extracts, maps, and transforms data into the format your system needs. By leveraging the power of large language models, Superglue makes it simple to integrate and transform data from various sources with just one line of code.
+superglue is an intelligent data proxy that translates between any API or data format. It automatically extracts and maps data into exactly the format your system needs, all through natural language instructions. With superglue, you can automate data extraction & transformation from any data source or API. 
 
-## Overview
+## Core Functionality
 
-Superglue simplifies data workflows by providing:
+- Transforms data sources into your target schema
+- Handles extraction, validation, and transformation automatically
+- Creates deterministic transformation instructions
+- Validates output against JSON schemas
+- Supports monitoring, error handling, self-healing out of the box
+- Use as a drop-in replacement for any API integration or ETL pipeline
 
-- **Lightweight ETL**: Efficiently [extract](/api-reference/mutations#extract), transform, and load data with minimal overhead.
-- **One Line of Code Integration**: Quickly integrate Superglue into your application.
-- **LLM-Powered Data Mapping**: Automatically [transform](/api-reference/mutations#transform) data using advanced language models.
-- **API Proxy**: Seamlessly [intercept and modify API responses](/api-reference/mutations#call) in real-time.
-- **Flexible Authentication**: Supports [header-based auth, API keys, OAuth2](/api-reference/types#authtype), and more.
-- **Smart Pagination**: Automatically handle a variety of [pagination strategies](/api-reference/types#apiconfig).
-- **Caching & Retry Logic**: Achieve robust performance with built-in [caching](/api-reference/overview#cache-modes) and retry mechanisms.
+## Core Features
 
-For a detailed look at how Superglue works under the hood, check out our [Architecture](/architecture) page.
+- **Transform Any API Response**: Convert data between formats using plain English instructions
+```javascript
+// Example: Transform a REST API response into your desired schema
+const result = await superglue.call({
+  endpoint: {
+    urlHost: "https://api.example.com",
+    instruction: "extract the user's full name and email, convert dates to ISO format",
+    responseSchema: {
+      name: { type: "string" },
+      email: { type: "string" },
+      joinedAt: { type: "string", format: "date-time" }
+    }
+  }
+});
+```
 
-## Getting Started
+- **Built-in API Infrastructure**: 
+  - Automatic pagination handling
+  - Configurable retry logic and rate limiting
+  - Response caching with Redis
+  - Multiple auth methods (API keys, OAuth2, custom headers)
 
-You can use Superglue either as a hosted service or deploy it yourself using Docker.
+## Quick Start
 
-### Hosted Version
+1. **Get API Access**
+```bash
+# Install the SDK
+npm install @superglue/superglue
 
-1. **Sign Up for Early Access**  
-   Visit [superglue.cloud](https://superglue.cloud) to request early access to the hosted version.
+# Get your API key at superglue.cloud
+```
 
-2. **Install the Client SDK**  
-   Install the Superglue JavaScript/TypeScript client:
+2. **Make Your First Call**
+```typescript
+import { SuperglueClient } from "@superglue/superglue";
 
-   ```bash
-   npm install @superglue/superglue
-   ```
+const superglue = new SuperglueClient({
+  apiKey: "YOUR_API_KEY"
+});
 
-3. **Configure Your First API Call**  
-   Create a basic API call configuration:
+// Transform any API response with a single call
+const result = await superglue.call({
+  endpoint: {
+    urlHost: "https://api.example.com/users",
+    instruction: "get all users and format their names in Title Case",
+    responseSchema: {
+      users: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            name: { type: "string" },
+            email: { type: "string" }
+          }
+        }
+      }
+    }
+  }
+});
+```
 
-   ```javascript
-   import { SuperglueClient } from "@superglue/superglue";
+## Next Steps
 
-   const superglue = new SuperglueClient({
-     apiKey: "YOUR_API_KEY"
-   });
-
-   const config = {
-     urlHost: "https://futuramaapi.com",
-     urlPath: "/graphql",
-     instruction: "get all characters from the show",
-     responseSchema: {
-       type: "object",
-       properties: {
-         characters: {
-           type: "array",
-           items: {
-             type: "object",
-             properties: {
-               name: { type: "string" },
-               species: { type: "string", description: "lowercased" }
-             }
-           }
-         }
-       }
-     }
-   };
-
-   const result = await superglue.call({ endpoint: config });
-   console.log(JSON.stringify(result.data, null, 2));
-   ```
-
-### Self-Hosted Version
-
-For complete control over your data processing pipeline, you can deploy your own instance of Superglue. See our comprehensive [Self-Hosting Guide](/self-hosting) for detailed instructions on deployment, configuration, and maintenance.
+- See [example use cases](/examples) for common integration patterns
+- Learn about [advanced configuration](/api-reference/overview)
+- Check out our [self-hosting guide](/self-hosting) for deploying your own instance
 
 ## Requirements
 
-- **Docker**: Version 20.10.0 or higher (when self-hosting).
-- **Redis**: Version 6.0 or higher (for persistent storage).
-- **OpenAI API Key**: Access to the recommended OpenAI model (e.g., gpt-4o-2024-11-20).
+- Node.js 16+ for the client SDK
+- For self-hosting:
+  - Docker 20.10.0+
+  - Redis 6.0+
+  - OpenAI API key
 
-## Key Features Recap
+## Support & Resources
 
-- **LLM-Powered Data Mapping**: Automatically generate data transformations with LLMs.
-- **Real-Time API Proxy**: Intercept and modify API responses instantly.
-- **File Processing**: Support for CSV, JSON, XML, and automatic decompression.
-- **Schema Validation**: Validate responses against defined JSON schemas.
-- **Flexible Authentication**: Integrates various authentication methods.
-- **Smart Pagination**: Manages multiple pagination strategies effortlessly.
-- **Caching & Retry Logic**: Enhances performance with built-in caching and retry strategies.
-
-## License
-
-Superglue is licensed under the GNU General Public License (GPL) for the core product while the client SDKs are MIT licensed. See [LICENSE](LICENSE) for more details.
-
-## Support
-
-If you need help or want to contribute, please reach out via:
-
-- **Email**: stefan@superglue.cloud
-- **Discord**: [Join our community](https://discord.gg/SKRYYQEp)
-- **GitHub Issues**: [Report issues or contribute](https://github.com/superglue-ai/superglue/issues)
+- [API Reference](/api-reference/overview)
+- [GitHub Repository](https://github.com/superglue-ai/superglue)
+- [Discord Community](https://discord.gg/SKRYYQEp)
+- Email: stefan@superglue.cloud
 
 ---
 
-Superglue is designed to make data transformation and API integration effortless. Start building smarter applications today with one simple integration.
+Ready to simplify your API integrations? [Get started now](https://superglue.cloud)
