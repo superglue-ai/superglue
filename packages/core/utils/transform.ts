@@ -109,7 +109,7 @@ ${error}
         `);
     }
 
-    console.log("validation succeeded", content.jsonata);
+    console.log("validation succeeded", content?.jsonata);
     // Unwrap the data property
     return content;
 
