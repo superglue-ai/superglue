@@ -46,9 +46,11 @@
       ]
     },
     {
-      "group": "Cookbook",
+      "group": "Guides & Examples",
       "pages": [
-        "cookbook/shopify"
+        "guides/self-hosting",
+        "guides/architecture",
+        "guides/shopify"
       ]
     },
     {
@@ -59,18 +61,6 @@
         "api-reference/types",
         "api-reference/queries",
         "api-reference/mutations"
-      ]
-    },
-    {
-      "group": "Development",
-      "pages": [
-        "development"
-      ]
-    },
-    {
-      "group": "Snippets",
-      "pages": [
-        "snippets/snippet-intro"
       ]
     }
   ],

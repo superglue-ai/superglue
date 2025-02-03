@@ -1,0 +1,49 @@
+---
+title: "Understanding Superglue's Architecture"
+description: "See how Superglue works under the hood"
+---
+
+Superglue is built with a modular architecture that connects data sources to your software stack via a dedicated transformation layer and caching system. The following diagram illustrates the core components and data flow:
+
+```mermaid
+flowchart TB
+    subgraph DataSources[External Data Sources]
+        A1[REST & GraphQL APIs]
+        A2[XML/JSON/CSV Files]
+        A3[Legacy System Interfaces]
+    end
+
+    subgraph SuperglueLayer[superglue]
+        P1[Extract Pipeline]
+        E1[LLM Transform Engine]
+        C1[Schema Validator]
+    end
+
+    subgraph Redis[Redis Mapping Cache]
+        R1[(Cache DB)]
+    end
+
+    subgraph YourSoftware[Your System]
+        CallScheduler[Call Scheduler]
+        DB[(Storage)]
+    end
+
+    %% Main data flow
+    A1 & A2 & A3 <--> SuperglueLayer
+    P1 --> E1
+    E1 --> C1
+    SuperglueLayer <--> YourSoftware
+    SuperglueLayer <--> Redis
+
+    %% Styling
+    classDef sourceStyle fill:#f9f,stroke:#333,stroke-width:2px
+    classDef superglueStyle fill:#bbf,stroke:#333,stroke-width:2px
+    classDef storageStyle fill:#bfb,stroke:#333,stroke-width:2px
+    classDef supportStyle fill:#ffd,stroke:#333,stroke-width:2px
+    classDef redisStyle fill:#fff,stroke:#333,stroke-width:2px
+
+    class DataSources sourceStyle
+    class SuperglueLayer superglueStyle
+    class Redis redisStyle
+    class YourSoftware supportStyle
+``` 
