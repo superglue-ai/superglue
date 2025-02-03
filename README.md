@@ -28,7 +28,7 @@ let it extract, map and transform data into exactly the format your system needs
 - Connect legacy systems to modern applications by transforming their data formats in real-time
 - Standardize log and transaction data from multiple sources
 
-## getting Started
+## getting started
 ### hosted version
 
 1. Sign up for early access to the hosted version of superglue at [superglue.cloud](https://superglue.cloud)
