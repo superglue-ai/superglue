@@ -95,9 +95,13 @@ export function applyAuthFormat(format: string, credentials: Record<string, stri
 export function getAllKeys(obj: any): string[] {
   let keys: string[] = [];
   for (const key in obj) {
-    keys.push(key);
+    keys.push(`${typeof obj[key]}:${key}`);
     if (obj[key] && typeof obj[key] === 'object') {
-      keys = keys.concat(getAllKeys(obj[key]));
+      if (Array.isArray(obj[key])) {
+        keys = keys.concat(...obj[key].map(item => getAllKeys(item)));
+      } else {
+        keys = keys.concat(getAllKeys(obj[key]));
+      }
     }
   }
   return keys.sort();
