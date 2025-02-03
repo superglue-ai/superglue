@@ -6,6 +6,57 @@ let it extract, map and transform data into exactly the format your system needs
 - **lightweight ETL**
 - **one line of code to integrate**
 
+ ## 🔄 architecture
+
+```mermaid
+flowchart TB
+    subgraph DataSources[External Data Sources]
+        A1[REST & GraphQL APIs]
+        A2[XML/JSON/CSV Files]
+        A3[Legacy System Interfaces]
+    end
+
+    subgraph SuperglueLayer[superglue]
+        P1[Extract Pipeline]
+        E1[LLM Transform Engine]
+        C1[Schema Validator]
+    end
+
+    subgraph Redis[Redis Mapping Cache]
+        R1[(Cache DB)]
+    end
+    
+    subgraph YourSoftware[Your System]
+        CallScheduler[Call Scheduler]
+        DB[(Storage)]
+    end
+    
+
+    %% Main data flow
+    A1 & A2 & A3 <--> SuperglueLayer
+    P1 --> E1
+    E1 --> C1
+    SuperglueLayer <--> YourSoftware
+    SuperglueLayer <--> Redis
+    
+    %% Styling
+    classDef sourceStyle fill:#f9f,stroke:#333,stroke-width:2px
+    classDef superglueStyle fill:#bbf,stroke:#333,stroke-width:2px
+    classDef storageStyle fill:#bfb,stroke:#333,stroke-width:2px
+    classDef supportStyle fill:#ffd,stroke:#333,stroke-width:2px
+    classDef redisStyle fill:#fff,stroke:#333,stroke-width:2px
+    
+    class DataSources sourceStyle
+    class SuperglueLayer superglueStyle
+    class Redis redisStyle
+    class YourSoftware supportStyle
+```
+[![GitHub](https://img.shields.io/github/license/superglue-ai/superglue)](https://github.com/superglue-ai/superglue/blob/main/LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/superglue-ai/superglue)](https://github.com/superglue-ai/superglue/stargazers)
+[![Client SDK](https://img.shields.io/npm/v/@superglue/superglue)](https://www.npmjs.com/package/@superglue/superglue)
+[![Docker](https://img.shields.io/docker/pulls/superglueai/superglue)](https://hub.docker.com/r/superglueai/superglue)
+[![Discord](https://img.shields.io/discord/1234567890?color=7289da&label=Discord&logo=discord&logoColor=white)](https://discord.gg/SKRYYQEp)
+
 ## key features
 
 - **LLM-Powered Data Mapping**: Automatically generate data transformations using large language models
@@ -15,12 +66,6 @@ let it extract, map and transform data into exactly the format your system needs
 - **Flexible Authentication**: Support for various auth methods including header auth, api keys, oauth, and more
 - **Smart Pagination**: Handle different pagination styles automatically
 - **Caching & Retry Logic**: Built-in caching and configurable retry strategies
-
-[![GitHub](https://img.shields.io/github/license/superglue-ai/superglue)](https://github.com/superglue-ai/superglue/blob/main/LICENSE)
-[![GitHub stars](https://img.shields.io/github/stars/superglue-ai/superglue)](https://github.com/superglue-ai/superglue/stargazers)
-[![Client SDK](https://img.shields.io/npm/v/@superglue/superglue)](https://www.npmjs.com/package/@superglue/superglue)
-[![Docker](https://img.shields.io/docker/pulls/superglueai/superglue)](https://hub.docker.com/r/superglueai/superglue)
-[![Discord](https://img.shields.io/discord/1234567890?color=7289da&label=Discord&logo=discord&logoColor=white)](https://discord.gg/SKRYYQEp)
 
 ## common use cases
 
@@ -170,52 +215,6 @@ console.log(JSON.stringify(result.data, null, 2));
 - Docker 20.10.0 or higher
 - For persistent storage: Redis 6.0 or higher
 - OpenAI API key with access to the specified model
-
-## 🔄 architecture
-
-```mermaid
-flowchart TB
-    subgraph DataSources[External Data Sources]
-        A1[REST & GraphQL APIs]
-        A2[XML/JSON/CSV Files]
-        A3[Legacy System Interfaces]
-    end
-
-    subgraph SuperglueLayer[superglue]
-        P1[Extract Pipeline]
-        E1[LLM Transform Engine]
-        C1[Schema Validator]
-    end
-
-    subgraph Redis[Redis Mapping Cache]
-        R1[(Cache DB)]
-    end
-    
-    subgraph YourSoftware[Your System]
-        CallScheduler[Call Scheduler]
-        DB[(Storage)]
-    end
-    
-
-    %% Main data flow
-    A1 & A2 & A3 <--> SuperglueLayer
-    P1 --> E1
-    E1 --> C1
-    SuperglueLayer <--> YourSoftware
-    SuperglueLayer <--> Redis
-    
-    %% Styling
-    classDef sourceStyle fill:#f9f,stroke:#333,stroke-width:2px
-    classDef superglueStyle fill:#bbf,stroke:#333,stroke-width:2px
-    classDef storageStyle fill:#bfb,stroke:#333,stroke-width:2px
-    classDef supportStyle fill:#ffd,stroke:#333,stroke-width:2px
-    classDef redisStyle fill:#fff,stroke:#333,stroke-width:2px
-    
-    class DataSources sourceStyle
-    class SuperglueLayer superglueStyle
-    class Redis redisStyle
-    class YourSoftware supportStyle
-```
 
 [//]: # (## 📖 Documentation)
 
