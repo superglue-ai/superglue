@@ -1,3 +1,8 @@
+---
+title: 'Shopify'
+description: 'Cookbook for Shopify Product Catalog Extraction'
+---
+
 # Quickstart Guide
 
 This guide demonstrates how to use Superglue to transform Shopify product data into a standardized format.

@@ -1,4 +1,7 @@
-# Queries
+---
+title: 'Queries'
+description: 'Queries are used to retrieve configs and logs.'
+---
 
 ## List Operations
 

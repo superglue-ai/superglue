@@ -1,4 +1,7 @@
-# Core API Reference
+---
+title: 'Overview'
+description: 'Overview of the superglue GraphQL API'
+---
 
 The Core API provides GraphQL endpoints for managing API configurations, data extraction, and transformations. The API is built around three main concepts:
 - **API Calls**: Execute and transform API requests
