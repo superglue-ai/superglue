@@ -28,8 +28,8 @@ let it extract, map and transform data into exactly the format your system needs
 - Connect legacy systems to modern applications by transforming their data formats in real-time
 - Standardize log and transaction data from multiple sources
 
-## Getting Started
-### Hosted version
+## getting Started
+### hosted version
 
 1. Sign up for early access to the hosted version of superglue at [superglue.cloud](https://superglue.cloud)
 
@@ -84,7 +84,7 @@ output:
 */
 ```
 
-### Self-hosted version
+### self-hosted version
 
 Run your own instance of superglue using Docker:
 
@@ -166,12 +166,12 @@ const result2 = await superglue.call({id: "futurama-api"});
 console.log(JSON.stringify(result.data, null, 2));
 ```
 
-#### Requirements
+#### requirements
 - Docker 20.10.0 or higher
 - For persistent storage: Redis 6.0 or higher
 - OpenAI API key with access to the specified model
 
-## 🔄 Architecture
+## 🔄 architecture
 
 ```mermaid
 flowchart TB
@@ -225,11 +225,11 @@ flowchart TB
 
 [//]: # (We welcome contributions! Please see our [Contributing Guide]&#40;CONTRIBUTING.md&#41; for details.)
 
-## License
+## license
 
 superglue is GPL licensed. The superglue client SDKs are MIT licensed. See [LICENSE](LICENSE) for details.
 
-## 🙋‍♂️ Support
+## 🙋‍♂️ support
 
 - 📧 Email: stefan@superglue.cloud
 - 💬 Discord: [Join our community](https://discord.gg/SKRYYQEp)
