@@ -67,20 +67,14 @@ AUTH_TOKEN=your-auth-token    # Token for API access
 DATASTORE_TYPE=redis          # Use "redis" for persistent storage
 
 # Redis Configuration
-REDIS_HOST=redis             # Service name from docker-compose
+REDIS_HOST=localhost             # Service name from docker-compose
 REDIS_PORT=6379
 REDIS_USERNAME=default
 REDIS_PASSWORD=your-secure-password
 
 # OpenAI Configuration
 OPENAI_API_KEY=sk-...         # Your OpenAI API key
-OPENAI_MODEL=gpt-4-0125-preview # Recommended OpenAI model
-
-# Optional Configuration
-LOG_LEVEL=info               # debug, info, warn, or error
-RATE_LIMIT_REQUESTS=100      # Requests per minute
-CACHE_TTL=3600              # Cache lifetime in seconds
-MAX_CONCURRENT_REQUESTS=50   # Maximum parallel requests
+OPENAI_MODEL=gpt-4o-2024-11-20  # OpenAI model to use. We recommend gpt-4o-2024-11-20
 ```
 
 3. **Start the Services**
@@ -143,7 +137,6 @@ Expected response: `OK`
 
 - **Dashboard**: `http://localhost:3001/`
 - **GraphQL Playground**: `http://localhost:3000/graphql`
-- **Metrics**: `http://localhost:3000/metrics` (Prometheus format)
 
 ## Security Considerations
 
@@ -182,16 +175,6 @@ Recommended minimum resources:
 - 4GB RAM
 - 20GB storage
 
-### Caching Strategy
-
-Configure caching based on your needs:
-
-```env
-CACHE_TTL=3600                # Default cache lifetime
-CACHE_STRATEGY=intelligent    # Options: none, simple, intelligent
-MAX_CACHE_SIZE=1000000       # Maximum cache entries
-```
-
 ## Troubleshooting
 
 ### Common Issues
@@ -201,7 +184,7 @@ MAX_CACHE_SIZE=1000000       # Maximum cache entries
    - Verify network connectivity: `docker network inspect superglue-network`
 
 2. **Authentication Failed**
-   - Verify AUTH_TOKEN in requests
+   - Verify if the query params token or the Authorization Bearer is present and set to AUTH_TOKEN in the .env file
    - Check Redis credentials
 
 3. **High Memory Usage**
@@ -224,37 +207,6 @@ docker logs superglue-redis
 docker logs -f superglue
 ```
 
-## Backup and Recovery
-
-### Redis Backup
-
-1. **Manual Backup**
-
-```bash
-docker exec superglue-redis redis-cli -a your-password SAVE
-```
-
-2. **Automated Backup**
-
-Create a backup script:
-
-```bash
-#!/bin/bash
-BACKUP_DIR="/path/to/backups"
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-
-docker exec superglue-redis redis-cli -a your-password SAVE
-docker cp superglue-redis:/data/dump.rdb "$BACKUP_DIR/dump_$TIMESTAMP.rdb"
-```
-
-### Recovery
-
-To restore from backup:
-
-1. Stop the containers
-2. Replace Redis dump file
-3. Restart the containers
-
 ## Upgrading
 
 1. **Pull Latest Image**
@@ -275,4 +227,4 @@ docker-compose up -d
 - **Documentation**: [Superglue Docs](https://docs.superglue.cloud)
 - **GitHub Issues**: [Report bugs](https://github.com/superglue-ai/superglue/issues)
 - **Discord Community**: [Join our Discord](https://discord.gg/SKRYYQEp)
-- **Email Support**: stefan@superglue.cloud 
+- **Email Support**: stefan@superglue.cloud
