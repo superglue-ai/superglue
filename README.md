@@ -1,6 +1,6 @@
 # superglue
 
-superglue is a proxy for your data tasks, automatically transforming data into exactly the format your system needs.
+superglue is an API translator. It extracts, maps and transforms data into exactly the format your system needs.
 With superglue, you can automate data extraction & transformation from any source.
 
 [![GitHub](https://img.shields.io/github/license/superglue-ai/superglue)](https://github.com/superglue-ai/superglue/blob/main/LICENSE)
@@ -8,12 +8,6 @@ With superglue, you can automate data extraction & transformation from any sourc
 [![Client SDK](https://img.shields.io/npm/v/@superglue/superglue)](https://www.npmjs.com/package/@superglue/superglue)
 [![Docker](https://img.shields.io/docker/pulls/superglueai/superglue)](https://hub.docker.com/r/superglueai/superglue)
 [![Discord](https://img.shields.io/discord/1234567890?color=7289da&label=Discord&logo=discord&logoColor=white)](https://discord.gg/SKRYYQEp)
-
-## 🎯 Common Use Cases
-
-- Unify supplier and customer data from multiple sources into a consistent format
-- Connect legacy systems to modern applications by transforming their data formats in real-time
-- Standardize log and transaction data from multiple sources
 
 ## 🚀 Key Features
 
@@ -24,6 +18,12 @@ With superglue, you can automate data extraction & transformation from any sourc
 - **Flexible Authentication**: Support for various auth methods including header auth, api keys, oauth, and more
 - **Smart Pagination**: Handle different pagination styles automatically
 - **Caching & Retry Logic**: Built-in caching and configurable retry strategies
+
+## 🎯 Common Use Cases
+
+- Unify supplier and customer data from multiple sources into a consistent format
+- Connect legacy systems to modern applications by transforming their data formats in real-time
+- Standardize log and transaction data from multiple sources
 
 ## 📊 Use Case Example: Catalog Sync for an E-commerce Marketplace
 
