@@ -1,7 +1,7 @@
 import { createClient, RedisClientType } from 'redis';
 import { ApiConfig, ApiInput, ExtractConfig, ExtractInput, TransformConfig, TransformInput, RunResult } from "@superglue/shared";
 import objectHash from 'object-hash';
-import { getAllKeys } from './tools.js';
+import { getAllKeys } from '../utils/tools.js';
 import { DataStore } from '@superglue/shared';
 
 export class RedisService implements DataStore {
