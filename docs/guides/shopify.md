@@ -1,89 +1,68 @@
 ---
-title: 'Shopify'
+title: 'Example 1: Product Data from Shopify'
 description: 'Cookbook for Shopify Product Catalog Extraction'
 ---
 
-# Quickstart Guide
+When you're building an application that needs Shopify product data, you typically face a few challenges:
+- The Shopify API returns a complex data structure that might not match your needs
+- You need to handle pagination, variants, and images
+- You want to transform the data into your own format
 
-This guide demonstrates how to use Superglue to transform Shopify product data into a standardized format.
+Let's see how superglue makes this easy.
 
 ## Installation
 
 ```bash
-npm install @superglue/superglue
+npm install @superglue/client
+
+# get early access to hosted version via https://superglue.cloud or [self-host](self-hosting).
 ```
 
-## Working Example: Shopify Product Data
+## Basic Product Extraction
 
-Let's transform a Shopify store's product data into a clean, standardized format that's easier to work with.
-
-### Basic Product Extraction
+Let's get started by importing the client and defining the schema that you need the data in. Then you can use the `call` method to fetch the product data and transform it. `call` just needs a configuration object that describes the data source and the output schema you want.
 
 ```typescript
-import { SuperglueClient } from "@superglue/superglue";
+import { SuperglueClient } from "@superglue/client";
 
+// Define the schema using Zod
+const productSchema = z.object({
+  products: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      url: z.string().describe("The full URL of the product including the shopify domain and the product handle"),
+      from_price: z.number().describe("Lowest variant price"),
+      variants: z.array(
+        z.object({
+          id: z.string(),
+          price: z.number(),
+          title: z.string(),
+        })
+      ),
+      images: z.array(
+        z.object({
+          url: z.string(),
+          number: z.number(),
+        })
+      ),
+    })
+  ),
+});
+
+// give the host url and some basic instruction
 const config = {
   urlHost: "https://hydrogen-preview.myshopify.com",
   urlPath: "/products.json",
-  instruction: "Extract product details including variants, normalize prices to numbers, and ensure consistent image URLs",
-  method: "GET",
-  responseSchema: {
-    type: "object",
-    properties: {
-      products: {
-        type: "array",
-        items: {
-          type: "object",
-          properties: {
-            id: { type: "string" },
-            title: { type: "string" },
-            url: { 
-                type: "string",
-                description: "The full URL of the product including the shopify domain and the product handle"
-            },
-            price: { 
-              type: "number",
-              description: "Lowest variant price"
-            },
-            variants: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  id: { type: "string" },
-                  sku: { type: "string" },
-                  price: { type: "number" },
-                  inventory_quantity: { type: "integer" },
-                  title: { type: "string" }
-                }
-              }
-            },
-            images: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  url: { type: "string" },
-                  alt: { type: "string" }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
+  instruction: "Extract product details including variants from all products from https://hydrogen-preview.myshopify.com.",
+  responseSchema: zodToJsonSchema(productSchema),
 };
 
 // Complete working script
 async function main() {
-  const superglue = new SuperglueClient({
-    apiKey: "your-auth-token"
-  });
-
   try {
     const result = await superglue.call({
-      endpoint: config
+      endpoint: config,
     });
 
     if (result.success) {
@@ -99,46 +78,101 @@ async function main() {
 }
 
 main();
+```
 
-/* Example Output:
+### What's Happening Here?
+
+1. **Schema Definition**: We define a simple schema that includes:
+   - Basic product info (id, title, url)
+   - Price information (lowest variant price)
+   - Variants with their prices
+   - Product images
+
+2. **Configuration**: The `config` object tells Superglue:
+   - Where to get the data (`urlHost` and `urlPath`)
+   - What to do with it (`instruction`)
+   - What format we want (`responseSchema`)
+
+Notice that superglue will automatically fill the missing parts of the configuration. For example, it will detect the required Http Method `GET` and handle pagination for you if instructed or detected.
+
+One quirk of the Shopify API is that it does not include a url field in the product object. It can be derived from the `handle` and the shopdomain. As long as the instruction includes the shopdomain, superglue will be able to derive the url using implicit knowledge about the Shopify API.
+
+3. **Execution**: When you run this code:
+   - First run: Superglue fetches the data and transforms it (~10-20 seconds)
+   - Subsequent runs: superglue will fetch the data from the source, while the transformation instructions are cached.(typically <100ms)
+
+### Understanding the Response
+
+The transformed data will look like this:
+```json
 {
   "products": [
     {
-      "id": "6857243132089",
-      "title": "The Multi-location Snowboard",
-      "url": "the-multi-location-snowboard",
-      "price": 749.95,
+      "id": "shop_123",
+      "title": "Classic T-Shirt",
+      "url": "https://hydrogen-preview.myshopify.com/products/classic-t-shirt",
+      "from_price": 19.99,
       "variants": [
         {
-          "id": "40145544159401",
-          "sku": "SNOW-742",
-          "price": 749.95,
-          "inventory_quantity": 10,
-          "title": "154cm"
+          "id": "var_456",
+          "price": 19.99,
+          "title": "Small / Black"
+        }
+        {
+          "id": "var_457",
+          "price": 29.99,
+          "title": "Large / Black"
         }
       ],
       "images": [
         {
-          "url": "https://cdn.shopify.com/s/files/1/0551/4566/0472/products/snowboard-1.jpg",
-          "alt": "The Multi-location Snowboard"
+          "url": "https://cdn.shopify.com/...",
+          "number": 1
         }
       ]
     }
   ]
 }
-*/
 ```
 
-### Handling Variants and Inventory
+The response will also include the used configuration, the applied mapping, and some metadata. 
+The generated JSONata mapping instruction will include the from_price which is derived from the lowest variant price. The url will be derived from the handle and the shopdomain. The complete JSONata mapping instruction will look something like this:
 
-Here's a more specific example focusing on inventory management:
+```jsonata
+{
+  "products": [
+    $.{
+      "id": $string(id),
+      "title": title,
+      "url": "https://hydrogen-preview.myshopify.com/products/" & handle,
+      "from_price": $min($map(variants, function($v) { $number($v.price) })),
+      "variants": [
+        variants.{
+          "id": $string(id),
+          "price": $number(price),
+          "title": title
+        }
+      ],
+      "images": [
+        images.{
+          "url": src,
+          "number": position
+        }
+      ]
+    }
+  ]
+}
+```
+
+## Handling Variants and Inventory
+
+The next example shows how to focus on inventory:
 
 ```typescript
 const inventoryConfig = {
   urlHost: "https://hydrogen-preview.myshopify.com",
   urlPath: "/products.json",
   instruction: "Extract product variants with inventory details, format as inventory items",
-  method: "GET",
   responseSchema: {
     type: "object",
     properties: {
@@ -147,14 +181,12 @@ const inventoryConfig = {
         items: {
           type: "object",
           properties: {
-            sku: { type: "string" },
             product_name: { type: "string" },
             variant_name: { type: "string" },
-            quantity: { type: "integer" },
+            weight: { type: "number" },
             price: { type: "number" },
             requires_shipping: { type: "boolean" }
           },
-          required: ["sku", "product_name", "quantity", "price"]
         }
       }
     }
@@ -165,43 +197,39 @@ const inventoryConfig = {
 const result = await superglue.call({
   endpoint: inventoryConfig
 });
+```
 
-/* Example Output:
+This configuration transforms Shopify's data into a flat inventory structure - perfect for stock management systems.
+
+The corresponding mapping instruction will look something like this:
+
+```
 {
   "inventory": [
-    {
-      "sku": "SNOW-742",
-      "product_name": "The Multi-location Snowboard",
-      "variant_name": "154cm",
-      "quantity": 10,
-      "price": 749.95,
-      "requires_shipping": true
-    },
-    {
-      "sku": "SNOW-743",
-      "product_name": "The Multi-location Snowboard",
-      "variant_name": "158cm",
-      "quantity": 8,
-      "price": 749.95,
-      "requires_shipping": true
+    $.variants.{
+      "product_name": %.title,
+      "variant_name": title,
+      "weight": $number(grams),
+      "price": $number(price),
+      "requires_shipping": requires_shipping
     }
   ]
 }
-*/
 ```
 
-### Processing Multiple Pages
+## Working with Pagination
 
-Shopify paginates results, so let's handle that:
+Shopify limits results to 250 products per page. Usually, superglue will automatically handle this for you. Since this specific part of the API is not well defined, you can also manually handle it by providing the `pagination` configuration. You could also just write it in the instruction, particularly if you are unsure aboute the exact pagination parameters.
 
 ```typescript
 const paginatedConfig = {
   urlHost: "https://hydrogen-preview.myshopify.com",
   urlPath: "/products.json",
+  instruction: "Extract product details including variants from all products from https://hydrogen-preview.myshopify.com.",
   method: "GET",
   pagination: {
     type: "PAGE_BASED",
-    pageSize: 50  // Shopify's default
+    pageSize: 50 // just to be safe
   },
   queryParams: {
     "limit": "{pageSize}",
@@ -210,60 +238,16 @@ const paginatedConfig = {
 };
 
 const result = await superglue.call({
-  endpoint: paginatedConfig,
-  options: {
-    timeout: 30000  // 30 seconds for larger datasets
-  }
+  endpoint: paginatedConfig
 });
 ```
 
-### Error Handling with Retries
-
-```typescript
-try {
-  const result = await superglue.call({
-    endpoint: config,
-    options: {
-      retries: 3,
-      retryDelay: 1000,  // 1 second between retries
-      timeout: 5000      // 5 second timeout
-    }
-  });
-
-  if (!result.success) {
-    if (result.error?.includes("rate limit")) {
-      console.error("Rate limited by Shopify");
-    } else {
-      console.error("API Error:", result.error);
-    }
-    return;
-  }
-
-  console.log(`Successfully processed ${result.data.products.length} products`);
-} catch (error) {
-  console.error("Failed to process products:", error.message);
-}
-```
-
-## Common Use Cases
-
-1. **Inventory Sync**
-   - Transform Shopify product data for your inventory system
-   - Normalize SKUs and variant structures
-   - Extract only in-stock items
-
-2. **Product Catalog**
-   - Create a clean product feed for marketing platforms
-   - Normalize image URLs and metadata
-   - Format prices consistently
-
-3. **Analytics**
-   - Extract product performance metrics
-   - Transform data for analytics platforms
-   - Aggregate variant data
+The pagination config automatically:
+- Fetches all pages
+- Combines the results
+- Handles rate limiting
 
 ## Next Steps
 
 - Check the [API Reference](./api-reference/types.md) for detailed type information
-- Learn about [Caching](./api-reference/overview.md#cache-modes) to optimize performance
 - Join our [Discord](https://discord.gg/SKRYYQEp) for support 
