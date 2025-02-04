@@ -14,7 +14,7 @@ export async function getDocumentation(documentationUrl: string, headers: Record
     try {
       const response = await axios.get(documentationUrl);
       const docData = response.data;
-      if (String(docData).toLowerCase().slice(0, 100) === "<html>") {
+      if (String(docData).toLowerCase().slice(0, 100).includes("<html>")) {
         documentation = NodeHtmlMarkdown.translate(docData);
       }
       else if(docData) {
