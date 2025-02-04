@@ -69,7 +69,7 @@ describe('transform utils', () => {
       
       (mockDataStore.getTransformConfigFromRequest as any).mockResolvedValue(cachedConfig);
       
-      const result = await prepareTransform(mockDataStore, true, sampleInput, {});
+      const result = await prepareTransform(mockDataStore, true, sampleInput, { product: { name: 'test' } });
       
       expect(result).toEqual({
         ...cachedConfig,
@@ -86,7 +86,7 @@ describe('transform utils', () => {
         responseMapping: 'test-mapping'
       };
       
-      const result = await prepareTransform(mockDataStore, false, input, {});
+      const result = await prepareTransform(mockDataStore, false, input, { product: { name: 'test' } });
       
       expect(result).toMatchObject({
         responseMapping: 'test-mapping',
