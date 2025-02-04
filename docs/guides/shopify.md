@@ -1,6 +1,6 @@
 ---
 title: 'Product Data from Shopify'
-description: 'Cookbook for Shopify Product Catalog Extraction'
+description: 'Guide for Shopify Product Catalog Extraction'
 ---
 
 When you're building an application that needs Shopify product data, you typically face a few challenges:
