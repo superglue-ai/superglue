@@ -96,13 +96,13 @@ main();
    - What to do with it (\`instruction\`)
    - What format we want (\`responseSchema\`)
 
-Notice that superglue will automatically fill the missing parts of the configuration. For example, it will detect the required Http Method \`GET\` and handle pagination for you if instructed or detected.
+Notice that superglue will automatically fill the missing parts of the configuration. For example, it will detect the required Http Method `GET` and handle pagination for you if instructed or detected.
 
-One quirk of the Shopify API is that it does not include a url field in the product object. It can be derived from the \`handle\` and the shopdomain. As long as the instruction includes the shopdomain, superglue will be able to derive the url using implicit knowledge about the Shopify API.
+One quirk of the Shopify API is that it does not include a url field in the product object. It can be derived from the `handle` and the shopdomain. As long as the instruction includes the shopdomain, superglue will be able to derive the url using implicit knowledge about the Shopify API.
 
 3. **Execution**: When you run this code:
    - First run: Superglue fetches the data and transforms it (~10-20 seconds)
-   - Subsequent runs: superglue will fetch the data from the source, while the transformation instructions are cached.(typically <100ms)
+   - Subsequent runs: superglue will fetch the data from the source, while the transformation instructions are cached.(typically \<100ms)
 
 ### Understanding the Response
 
@@ -223,7 +223,7 @@ The corresponding mapping instruction will look something like this:
 
 ## Working with Pagination
 
-Shopify limits results to 250 products per page. Usually, superglue will automatically handle this for you. Since this specific part of the API is not well defined, you can also manually handle it by providing the \`pagination\` configuration. You could also just write it in the instruction, particularly if you are unsure aboute the exact pagination parameters.
+Shopify limits results to 250 products per page. Usually, superglue will automatically handle this for you. Since this specific part of the API is not well defined, you can also manually handle it by providing the `pagination` configuration. You could also just write it in the instruction, particularly if you are unsure aboute the exact pagination parameters.
 
 ```typescript
 const paginatedConfig = {
