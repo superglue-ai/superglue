@@ -139,10 +139,10 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
 }
 
 async function generateApiConfig(apiConfig: Partial<ApiConfig>, documentation: string, vars: string[] = [], lastError: string | null = null): Promise<ApiConfig> {
+  console.log("Generating API config for " + apiConfig.urlHost);
   const schema = zodToJsonSchema(z.object({
     urlHost: z.string(),
     urlPath: z.string(),
-    port: z.number().optional(),
     queryParams: z.record(z.any()).optional(),
     method: z.enum(Object.values(HttpMethod) as [string, ...string[]]),
     headers: z.record(z.string()).optional(),
@@ -181,7 +181,7 @@ Instructions: ${apiConfig.instruction}
 
 Base URL: ${composeUrl(apiConfig.urlHost, apiConfig.urlPath)}
 
-Documentation: ${documentation}
+Documentation: ${String(documentation).slice(0, lastError ? 20000 : 10000)}
 
 Available variables: ${vars.join(", ")}
 
@@ -192,8 +192,33 @@ ${lastError ? `We tried it before, but it failed with the following error: ${las
   });
   console.log(completion.choices[0].message.content);
   const generatedConfig = JSON.parse(completion.choices[0].message.content);
+
+  // Check for any {var} in the generated config that isn't in available variables
+  const invalidVars = validateVariables(generatedConfig, vars);
+  
+  if (invalidVars.length > 0) {
+    throw new Error(`Generated config contains variables that are not available. Please remove them: ${invalidVars.join(', ')}`);
+  }
   return {
     ...generatedConfig,
     ...apiConfig,
   } as ApiConfig;
+}
+
+function validateVariables(generatedConfig: any, vars: string[]) {
+  vars = [
+    ...vars,
+    "page",
+    "limit",
+    "offset"
+  ]
+  const varMatches = [
+    generatedConfig.urlPath,
+    ...Object.values(generatedConfig.queryParams || {}),
+    ...Object.values(generatedConfig.headers || {}),
+    generatedConfig.body
+  ].join(' ').match(/\{([^}]+)\}/g) || [];
+  const usedVars = varMatches.map(match => match.slice(1, -1));
+  const invalidVars = usedVars.filter(v => !vars.includes(v));
+  return invalidVars;
 }
