@@ -223,7 +223,7 @@ The corresponding mapping instruction will look something like this:
 
 ## Working with Pagination
 
-Shopify limits results to 250 products per page. Usually, superglue will automatically handle this for you. Since this specific part of the API is not well defined, you can also manually handle it by providing the `pagination` configuration. You could also just write it in the instruction, particularly if you are unsure aboute the exact pagination parameters.
+Shopify limits results to 250 products per page. Usually, superglue will automatically handle this for you. Since this specific part of the API is not well defined, you can also manually handle it by providing the \`pagination\` configuration. You could also just write it in the instruction, particularly if you are unsure aboute the exact pagination parameters.
 
 ```typescript
 const paginatedConfig = {
