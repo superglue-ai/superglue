@@ -12,12 +12,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const config = {
-    superglueEndpoint: process.env.GRAPHQL_ENDPOINT || "http://localhost:" + process.env.GRAPHQL_PORT,
+    superglueEndpoint: process.env.GRAPHQL_ENDPOINT || ("http://localhost:" + process.env.GRAPHQL_PORT),
     superglueApiKey: process.env.NEXT_PUBLIC_SUPERGLUE_API_KEY || process.env.AUTH_TOKEN,
     postHogKey: nextConfig.env?.NEXT_PUBLIC_POSTHOG_KEY,
     postHogHost: nextConfig.env?.NEXT_PUBLIC_POSTHOG_HOST,
   }
-  
   return (
     <html lang="en" className={`dark ${geistSans.variable} ${geistMono.variable}`}>
       <body>
