@@ -2,6 +2,7 @@ import { ApiConfig, ApiInput, ExtractConfig, ExtractInput, TransformConfig, Tran
 import objectHash from 'object-hash';
 import { getAllKeys } from '../utils/tools.js';
 
+
 export class MemoryStore implements DataStore {
   private storage: {
     apis: Map<string, ApiConfig>;
