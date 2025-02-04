@@ -61,6 +61,7 @@ Create a `.env` file:
 # Server Configuration
 GRAPHQL_PORT=3000             # Port for the Superglue server
 WEB_PORT=3001                 # Port for the web dashboard
+GRAPHQL_ENDPOINT=https://graphql.superglue.cloud # Endpoint for the graphql api (used so the web dashboard knows where to find the server)
 AUTH_TOKEN=your-auth-token    # Token for API access
 
 # Datastore Configuration
