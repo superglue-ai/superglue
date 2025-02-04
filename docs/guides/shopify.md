@@ -1,5 +1,5 @@
 ---
-title: 'Example 1: Product Data from Shopify'
+title: 'Product Data from Shopify'
 description: 'Cookbook for Shopify Product Catalog Extraction'
 ---
 

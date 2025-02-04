@@ -1,5 +1,5 @@
 ---
-title: 'Example 2: Project Management Data from JIRA'
+title: 'Project Management Data from JIRA'
 description: 'Cookbook for JIRA Project and Task Extraction'
 ---
 
