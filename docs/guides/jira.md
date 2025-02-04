@@ -134,9 +134,9 @@ async function main() {
     });
 
     // Combine projects and tasks using the project_id field
-    const projects = projectResult.data.projects.map(p =\> ({
+    const projects = projectResult.data.projects.map(p => ({
       ...p,
-      tasks: taskResult.data.tasks.filter(t =\> t.project_id === p.id)
+      tasks: taskResult.data.tasks.filter(t => t.project_id === p.id)
     }));
     
     console.log(JSON.stringify(projects, null, 2));
