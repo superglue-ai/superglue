@@ -1,6 +1,6 @@
 ---
 title: 'Project Management Data from JIRA'
-description: 'Cookbook for JIRA Project and Task Extraction'
+description: 'Guide for JIRA Project and Task Extraction'
 ---
 
 When building applications that integrate with JIRA, you often need to:
