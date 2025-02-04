@@ -14,6 +14,7 @@ Let's see how superglue makes this easy.
 
 ```bash
 npm install @superglue/client
+npm install zod zod-to-json-schema
 
 # get early access to hosted version via https://superglue.cloud or [self-host](self-hosting).
 ```
@@ -24,6 +25,8 @@ Let's get started by importing the client and defining the schema that you need 
 
 ```typescript
 import { SuperglueClient } from "@superglue/client";
+import { z } from "zod";
+import { zodToJsonSchema } from "zod-to-json-schema";
 
 // Define the schema using Zod
 const productSchema = z.object({

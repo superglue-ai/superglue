@@ -53,7 +53,7 @@ flowchart TB
 ```
 [![GitHub](https://img.shields.io/github/license/superglue-ai/superglue)](https://github.com/superglue-ai/superglue/blob/main/LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/superglue-ai/superglue)](https://github.com/superglue-ai/superglue/stargazers)
-[![Client SDK](https://img.shields.io/npm/v/@superglue/superglue)](https://www.npmjs.com/package/@superglue/superglue)
+[![Client SDK](https://img.shields.io/npm/v/@superglue/client)](https://www.npmjs.com/package/@superglue/client)
 [![Docker](https://img.shields.io/docker/pulls/superglueai/superglue)](https://hub.docker.com/r/superglueai/superglue)
 [![Discord](https://img.shields.io/discord/1234567890?color=7289da&label=Discord&logo=discord&logoColor=white)](https://discord.gg/SKRYYQEp)
 
@@ -80,12 +80,12 @@ flowchart TB
 
 2. Install the superglue js/ts client:
 ```bash
-npm install @superglue/superglue
+npm install @superglue/client
 ```
 
 3. Configure your first api call:
 ```javascript
-import { SuperglueClient } from "@superglue/superglue";
+import { SuperglueClient } from "@superglue/client";
 
 const superglue = new SuperglueClient({
   apiKey: "************"
@@ -141,21 +141,22 @@ docker pull superglueai/superglue
 2. Create a `.env` file with the following configuration:
 ```env
 # Server Configuration
-GRAPHQL_PORT=3000             # Port to run the superglue server
-WEB_PORT=3001                 # Port to run the web dashboard 
-AUTH_TOKEN=your-auth-token    # Authentication token for API access
+GRAPHQL_ENDPOINT=http://localhost:3000 # Endpoint to run the superglue server (used so the web dashboard knows where to find the server)
+GRAPHQL_PORT=3000                 # Port to run the superglue server
+WEB_PORT=3001                     # Port to run the web dashboard 
+AUTH_TOKEN=your-auth-token        # Authentication token for API access
 
 # Datastore Configuration. Memory is faster but not persistent. Redis is slower but persistent.
 DATASTORE_TYPE=redis or memory
 # if redis
-REDIS_HOST=localhost          # Redis server hostname
-REDIS_PORT=6379               # Redis server port
-REDIS_USERNAME=default        # Redis username
-REDIS_PASSWORD=secret         # Redis password
+REDIS_HOST=localhost              # Redis server hostname
+REDIS_PORT=6379                   # Redis server port
+REDIS_USERNAME=default            # Redis username
+REDIS_PASSWORD=secret             # Redis password
 
 # OpenAI Configuration
-OPENAI_API_KEY=sk-...         # Your OpenAI API key
-OPENAI_MODEL=gpt-4o-2024-11-20  # OpenAI model to use. We recommend gpt-4o-2024-11-20
+OPENAI_API_KEY=sk-...             # Your OpenAI API key
+OPENAI_MODEL=gpt-4o-2024-11-20    # OpenAI model to use. We recommend gpt-4o-2024-11-20
 ```
 
 3. Start the server:
@@ -185,11 +186,11 @@ http://localhost:3001/
 
 6. run your first call:
 ```bash
-npm install @superglue/superglue
+npm install @superglue/client
 ```
 
 ```javascript
-import { SuperglueClient } from "@superglue/superglue";
+import { SuperglueClient } from "@superglue/client";
 
 const superglue = new SuperglueClient({
   endpoint: "http://localhost:3000",
