@@ -6,7 +6,7 @@ import http from 'http';
 import cors from 'cors';
 import { resolvers, typeDefs } from './graphql/graphql.js';
 import { handleQueryError, sessionId, telemetryClient, telemetryMiddleware } from './utils/telemetry.js';
-import { createDataStore } from './utils/datastore.js';
+import { createDataStore } from './datastore/datastore.js';
 
 // Constants
 const PORT = process.env.GRAPHQL_PORT || 3000;

@@ -1,10 +1,8 @@
 import { GraphQLResolveInfo } from "graphql";
-import { RedisService } from "./redis.js";
 import { RequestOptions } from "@superglue/shared";
 import axios, { AxiosRequestConfig } from "axios";
 import jsonata from "jsonata";
 import { Validator } from "jsonschema";
-import { createDataStore } from "./datastore.js";
 
 export function isRequested(field: string, info: GraphQLResolveInfo) {
     return info.fieldNodes.some(
@@ -138,4 +136,24 @@ export function replaceVariables(template: string, variables: Record<string, any
 
     return String(value);
   });
+}
+
+export function sample<T>(arr: any, sampleSize = 10): T[] {
+  if(!Array.isArray(arr)) {
+    return [arr];
+  }
+  const arrLength = arr.length;
+
+  if (arrLength <= sampleSize) {
+    return arr; // Return full array if less than or equal to sample size
+  }
+
+  const step = Math.floor(arrLength / sampleSize);
+  const result = [];
+
+  for (let i = 0; i < sampleSize; i++) {
+    result.push(arr[i * step]);
+  }
+
+  return result;
 }
