@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { prepareTransform } from "../../utils/transform.js";
 import { callEndpoint, prepareEndpoint } from "../../utils/api.js";
 import { notifyWebhook } from "../../utils/webhook.js";
-import { applyJsonataWithValidation } from "../../utils/tools.js";
+import { applyJsonataWithValidation, maskCredentials } from "../../utils/tools.js";
 
 export const callResolver = async (
   _: any,
@@ -49,19 +49,23 @@ export const callResolver = async (
     let retryCount = 0;
     let lastError: string | null = null;
     do {
-      // If we don't have a prepared endpoint yet and caching is enabled, try to get from cache
-      if (!preparedEndpoint && readCache && !lastError) {
-        preparedEndpoint = await context.datastore.getApiConfigFromRequest(endpoint, payload);
-      }
-      
-      // If still no prepared endpoint, generate one
-      if (!preparedEndpoint || lastError) {
-        preparedEndpoint = await prepareEndpoint(endpoint, payload, credentials, lastError);
-      }
       try {
+        // If we don't have a prepared endpoint yet and caching is enabled, try to get from cache
+        if (!preparedEndpoint && readCache && !lastError) {
+          preparedEndpoint = await context.datastore.getApiConfigFromRequest(endpoint, payload);
+        }
+        
+        // If still no prepared endpoint, generate one
+        if (!preparedEndpoint || lastError) {
+          preparedEndpoint = await prepareEndpoint(endpoint, payload, credentials, lastError);
+        }
         response = await callEndpoint(preparedEndpoint, payload, credentials, options);
+        if(!response.data || (Array.isArray(response.data) && response.data.length === 0) || (typeof response.data === 'object' && Object.keys(response.data).length === 0)) {
+          response = null;
+          throw new Error("No data returned from API. This could be due to a configuration error.");
+        }
       } catch (error) {
-        console.log(`API call failed.`);
+        console.log(`API call failed.`, error);
         lastError = error?.message || JSON.stringify(error || {});
       }
       retryCount++;
@@ -107,14 +111,15 @@ export const callResolver = async (
     context.datastore.createRun(result);
   
     return {...result, data: transformedResponse.data};
-  } catch (error) {    
+  } catch (error) {
+    const maskedError = maskCredentials(error.message, credentials);
     if (options?.webhookUrl) {
       await notifyWebhook(options.webhookUrl, callId, false, undefined, error.message);
     }
     const result = {
       id: callId,
       success: false,
-      error: error.message,
+      error: maskedError,
       config: preparedEndpoint,
       startedAt,
       completedAt: new Date(),

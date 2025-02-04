@@ -14,22 +14,23 @@ export async function getDocumentation(documentationUrl: string, headers: Record
     try {
       const response = await axios.get(documentationUrl);
       const docData = response.data;
-      if (String(docData).toLowerCase().includes("<html")) {
+      if (String(docData).toLowerCase().slice(0, 100) === "<html>") {
         documentation = NodeHtmlMarkdown.translate(docData);
       }
-      else {
-        documentation = docData;
+      else if(docData) {
+        documentation = typeof docData === 'object' ? JSON.stringify(docData) : String(docData);
       }
-      
-      if(documentationUrl.includes("graphql") || String(documentation).toLowerCase().includes("graphql")) {
-        const graphqlDocumentation = await getGraphQLSchema(documentationUrl, headers, queryParams);
-        if(graphqlDocumentation) {
-          documentation = [JSON.stringify(graphqlDocumentation), documentation].join("\n\n"); 
-        }
+      // If the documentation contains GraphQL, fetch the schema and add it to the documentation
+        if(documentationUrl.includes("graphql") || documentation.toLowerCase().includes("graphql")) {
+          const graphqlDocumentation = await getGraphQLSchema(documentationUrl, headers, queryParams);
+          if(graphqlDocumentation) {
+            documentation = [JSON.stringify(graphqlDocumentation), documentation].join("\n\n"); 
+          }
       }
     } catch (error) {
       console.error(`Failed to fetch documentation from ${documentationUrl}:`, error);
     }
+
 
     // If the documentation contains GraphQL, fetch the schema and add it to the documentation
     return documentation;
