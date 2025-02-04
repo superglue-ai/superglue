@@ -47,7 +47,7 @@ flowchart LR
 [![GitHub stars](https://img.shields.io/github/stars/superglue-ai/superglue)](https://github.com/superglue-ai/superglue/stargazers)
 [![Client SDK](https://img.shields.io/npm/v/@superglue/superglue)](https://www.npmjs.com/package/@superglue/superglue)
 [![Docker](https://img.shields.io/docker/pulls/superglueai/superglue)](https://hub.docker.com/r/superglueai/superglue)
-[![Discord](https://img.shields.io/discord/wzcgh7btxU?color=7289da&label=Discord&logo=discord&logoColor=white)](https://discord.gg/wzcgh7btxU)
+[![Discord](https://img.shields.io/discord/wzcgh7btxU?color=7289da&label=Discord&logo=discord&logoColor=white)](https://discord.gg/vUKnuhHtfW)
 [![Twitter](https://img.shields.io/twitter/follow/adinagoerres?style=social)](https://twitter.com/YOUR_TWITTER_HANDLE)
 [![Twitter](https://img.shields.io/twitter/follow/SFaistenauer?style=social)](https://twitter.com/YOUR_TWITTER_HANDLE)
 
@@ -227,7 +227,7 @@ superglue is GPL licensed. The superglue client SDKs are MIT licensed. See [LICE
 ## 🙋‍♂️ support
 
 - 📧 Email: stefan@superglue.cloud
-- 💬 Discord: [Join our community](https://discord.gg/wzcgj7btxU)
+- 💬 Discord: [Join our community](https://discord.gg/vUKnuhHtfW)
 - 🐛 Issues: [GitHub Issues](https://github.com/superglue-ai/superglue/issues)
 
 [![Twitter](https://img.shields.io/twitter/follow/superglue_d?style=social)](https://twitter.com/superglue_d)
