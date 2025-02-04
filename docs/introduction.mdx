@@ -1,0 +1,86 @@
+---
+title: "Welcome to Superglue 🍯"
+description: "An open-source data/API translator"
+---
+
+superglue is an intelligent data layer that translates between APIs or data sources. It automatically extracts and transforms structured data into exactly the format your application needs, all through natural language instructions. With superglue, you can automate data extraction & transformation from any data source or API. 
+
+## Core Functionality
+
+- Transforms data sources into your target schema
+- Handles extraction, validation, and transformation automatically
+- Creates deterministic transformation instructions
+- Validates output against JSON schemas
+- Supports monitoring, error handling, self-healing out of the box
+- Use as a drop-in replacement for any API integration or ETL pipeline
+
+## Quick Start
+
+1. **Get Access**
+
+Get your API key at https://superglue.cloud and sign up for early access to the hosted version.
+Alternatively, you can [self-host](/guides/self-hosting) superglue.
+
+2. **Install the SDK**
+```bash
+# Install the SDK
+npm install @superglue/client
+```
+
+3. **Make Your First Call**
+```typescript
+import { SuperglueClient } from "@superglue/client";
+
+const superglue = new SuperglueClient({
+  apiKey: "YOUR_API_KEY"
+});
+
+// Transform any API response with a single call
+const result = await superglue.call({
+  endpoint: {
+    urlHost: "https://futuramaapi.com",
+    instruction: "get all characters from the show from the graphql api",
+    documentation: "https://futuramaapi.com/graphql",
+    responseSchema: {
+      type: "object",
+      properties: {
+        characters: {
+          type: "array",  
+          items: {
+            type: "object",
+            properties: {
+              name: { type: "string" },
+              species: { type: "string", description: "lowercased" }
+            }
+          }
+        }
+      }
+    }
+  }
+});
+```
+
+## Next Steps
+
+- See [example use cases](/examples) for common integration patterns
+- Learn about [advanced configuration](/api-reference/overview)
+- Check out our [self-hosting guide](/self-hosting) for deploying your own instance
+
+## Requirements
+
+- Node.js 16+ for the client SDK
+- For self-hosting:
+  - Docker 20.10.0+
+  - Redis 6.0+
+  - OpenAI API key
+
+## Support & Resources
+
+- [API Reference](/api-reference/overview)
+- [GitHub Repository](https://github.com/superglue-ai/superglue)
+- [Discord Community](https://discord.gg/SKRYYQEp)
+- Email: stefan@superglue.cloud
+
+---
+
+Ready to simplify your API integrations? [Get started now](https://superglue.cloud)

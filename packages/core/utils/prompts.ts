@@ -5,6 +5,7 @@ Guidelines for creating JSONata mappings:
 1. Source References:
    - Use exact field paths from the source data, e.g. $.merchant_category
    - For constants, use string literals in single quotes, e.g. "'TRUE'"
+   - Jsonata will automatically extract all the fields from the current context. E.g. if you need all variants from all products, you can use $.products.variants. No need to do nested map reduce operations.
    - $. The variable with no name refers to the context value at any point in the input JSON hierarchy. E.g. if the current context is products.price, then $.currency is products.price.currency
    - %. The parent of the current context value. E.g. if the current context is products.variants.size and you want variant name, use %.name
 
@@ -16,6 +17,7 @@ Guidelines for creating JSONata mappings:
    - Avoid unnecessary array/string operations
    - Each mapping should be clear and concise
    - Use proper JSONata syntax for coalesce operations
+   - Do not use ~> to execute functions. Use the functions directly with the correct arguments or use $map(arr, $function) to apply a function to each element of an array.
 
 3. Array Handling:
    - For mapping to an array of objects, use the following patterns:
@@ -65,14 +67,19 @@ Guidelines for creating JSONata mappings:
       $join(array[, separator]) - Joins array elements into string
       $match(str, pattern[, limit]) - Returns array of regex matches
       $replace(str, pattern, replacement) - Replaces all occurrences of pattern
+      $number(arg) - Converts an argument to a number.
+      $min(arr) - Returns minimum number of a number array. E.g. $min($map($.variants.price, $number)) returns the minimum price of all variants.
+      $max(arr) - Returns maximum number of a number array. E.g. $max($map($.variants.price, $number)) returns the maximum price of all variants.
       $count(array) - Returns array length
-      $append(array1, array2) - Concatenates arrays
       $sort(array[, function]) - Sorts array
-      $reverse(array) - Reverses array order
       $distinct(array) - Removes duplicates
       $map(array, function) - Applies function to each element
       $filter(array, function) - Filters array based on predicate
 
+- Error handling:
+  - You might get information about a previous mapping attempt.
+  - If you get an error like "is not of a type(s) string/number/object", try to convert the source field, but also consider that the original field or one of its parent might be null. In this case, add a default value.
+  - if an object is optional but its fields required, you can add a test and default to {}, but do not set the inner fields to default null.
 
 Remember: The goal is to create valid JSONata expressions that accurately transform the source data structure into the required target structure.
 
