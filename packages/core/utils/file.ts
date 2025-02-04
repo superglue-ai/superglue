@@ -1,7 +1,7 @@
 import Papa from 'papaparse';
 import { gunzip, inflate } from 'zlib';
 import { promisify } from 'util';
-import sax from 'sax';
+import sax, { parser } from 'sax';
 import * as unzipper from 'unzipper';
 import { Readable } from 'stream';
 import { DecompressionMethod, FileType } from "@superglue/shared";
@@ -32,21 +32,19 @@ export async function decompressData(compressed: Buffer, method: DecompressionMe
   }
   
 export async function decompressZip(buffer: Buffer): Promise<Buffer> {
-    const zipStream = await unzipper.Open.buffer(buffer);
-    const firstFile = zipStream.files?.[0];
-
-    if (!firstFile) {
-        throw new Error("No files found in the ZIP archive.");
+    try {
+        const zipStream = await unzipper.Open.buffer(buffer);
+        const firstFile = zipStream.files?.[0];
+        const fileStream = firstFile.stream();
+        const chunks: Buffer[] = [];
+        for await (const chunk of fileStream) {
+            chunks.push(Buffer.from(chunk));
+        }
+        return Buffer.concat(chunks);
+    } catch (error) {
+        console.error("Error decompressing zip.", error);
+        throw "Error decompressing zip: " + error;
     }
-
-    const fileStream = firstFile.stream();
-
-    // Collect the stream data into a buffer
-    const chunks: Buffer[] = [];
-    for await (const chunk of fileStream) {
-        chunks.push(Buffer.from(chunk));
-    }
-    return Buffer.concat(chunks);
 }
 
 export async function parseFile(buffer: Buffer, fileType: FileType): Promise<any[]> {
@@ -127,7 +125,10 @@ async function parseXML(buffer: Buffer): Promise<any[]> {
     });
 
     parser.on('text', (text) => {
-        if (currentElement && text.trim().length > 0) {
+        if (!currentElement || text?.trim()?.length == 0) {
+            return;
+        }
+        
         if(Object.keys(currentElement)?.length > 0) {
             currentElement["__text"] = text.trim();
         }
@@ -140,29 +141,27 @@ async function parseXML(buffer: Buffer): Promise<any[]> {
         else {
             currentElement = text.trim();
         }
-        }
     });
 
     parser.on('closetag', (tagName) => {
-        // When closing a tag, pop from stack and push completed element to results
-        const cLocal = elementStack.pop();
+        const parentElement = elementStack.pop();
         if (elementStack.length > 0) {
-        const parentElement = elementStack[elementStack.length - 1];
-        if (currentElement) {
-            if(!parentElement[tagName]) {
-            parentElement[tagName] = currentElement;
-            }
-            else if(Array.isArray(currentElement[tagName])) {
-            currentElement[tagName].push(currentElement);
-            }
-            else {
-            currentElement[tagName] = [currentElement[tagName], currentElement];
-            }
-        }  
-        currentElement = parentElement;
-        } else {
-        results.push(cLocal);
-        currentElement = {};
+            if (currentElement) {
+                if(!parentElement[tagName]) {
+                    parentElement[tagName] = currentElement;
+                }
+                else if(Array.isArray(parentElement[tagName])) {
+                    parentElement[tagName].push(currentElement);
+                }
+                else {
+                    // Convert single value to array when second value is encountered
+                    parentElement[tagName] = [parentElement[tagName], currentElement];
+                }
+            }  
+            currentElement = parentElement;
+        } else if (currentElement && Object.keys(currentElement).length > 0) {
+            results.push(currentElement);
+            currentElement = {};
         }
     });
 
