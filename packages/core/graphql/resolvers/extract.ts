@@ -3,6 +3,7 @@ import { CacheMode, Context, ExtractConfig, ExtractInput, RequestOptions } from 
 import { v4 as uuidv4 } from 'uuid';
 import { notifyWebhook } from "../../utils/webhook.js";
 import { callExtract, prepareExtract } from "../../utils/extract.js";
+import { maskCredentials } from "../../utils/tools.js";
 
 export const extractResolver = async (
   _: any,
@@ -66,16 +67,17 @@ export const extractResolver = async (
     };
 
   } catch (error) {
+    const maskedError = maskCredentials(error.message, credentials);
     const completedAt = new Date();
     
     if (options?.webhookUrl) {
-      await notifyWebhook(options.webhookUrl, callId, false, undefined, error.message);
+      await notifyWebhook(options.webhookUrl, callId, false, undefined, maskedError);
     }
 
     return {
       id: callId,
       success: false,
-      error: error.message,
+      error: maskedError,
       configuration: preparedExtract || endpoint,
       startedAt,
       completedAt,

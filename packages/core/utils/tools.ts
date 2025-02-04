@@ -1,10 +1,8 @@
 import { GraphQLResolveInfo } from "graphql";
-import { RedisService } from "./redis.js";
 import { RequestOptions } from "@superglue/shared";
 import axios, { AxiosRequestConfig } from "axios";
 import jsonata from "jsonata";
 import { Validator } from "jsonschema";
-import { createDataStore } from "./datastore.js";
 
 export function isRequested(field: string, info: GraphQLResolveInfo) {
     return info.fieldNodes.some(
@@ -30,10 +28,13 @@ export async function applyJsonataWithValidation(data: any, expr: string, schema
   try {
     const result = await applyJsonata(data, expr);
     const validator = new Validator();
-    const requiredSchema = makeRequired(schema);
-    const validation = validator.validate(result, requiredSchema, { required: true });
+    const optionalSchema = addNullableToOptional(schema);
+    const validation = validator.validate(result, optionalSchema);
     if (!validation.valid) {
-      return { success: false, error: validation.errors.map(e => e.stack).join(', ') };
+      return { 
+        success: false, 
+        error: validation.errors.map(e => `${e.message} for ${e.property}: ${e.instance ? JSON.stringify(e.instance) : "undefined"}`).join('\n').slice(0, 5000) 
+      };
     }
     return { success: true, data: result };
   } catch (error) {
@@ -69,7 +70,6 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
   if(["GET", "HEAD", "DELETE", "OPTIONS"].includes(config.method!)) {
     config.data = undefined;
   }
-
   do {
     try {
       return await axios({
@@ -97,9 +97,13 @@ export function applyAuthFormat(format: string, credentials: Record<string, stri
 export function getAllKeys(obj: any): string[] {
   let keys: string[] = [];
   for (const key in obj) {
-    keys.push(key);
+    keys.push(`${typeof obj[key]}:${key}`);
     if (obj[key] && typeof obj[key] === 'object') {
-      keys = keys.concat(getAllKeys(obj[key]));
+      if (Array.isArray(obj[key])) {
+        keys = keys.concat(...obj[key].map(item => getAllKeys(item)));
+      } else {
+        keys = keys.concat(getAllKeys(obj[key]));
+      }
     }
   }
   return keys.sort();
@@ -138,4 +142,84 @@ export function replaceVariables(template: string, variables: Record<string, any
 
     return String(value);
   });
+}
+
+export function sample<T>(arr: any, sampleSize = 10): T[] {
+  if(!Array.isArray(arr)) {
+    return [arr];
+  }
+  const arrLength = arr.length;
+
+  if (arrLength <= sampleSize) {
+    return arr; // Return full array if less than or equal to sample size
+  }
+
+  const step = Math.floor(arrLength / sampleSize);
+  const result = [];
+
+  for (let i = 0; i < sampleSize; i++) {
+    result.push(arr[i * step]);
+  }
+
+  return result;
+}
+
+export function maskCredentials(message: string, credentials: Record<string, string>): string {
+  let maskedMessage = message;
+  Object.entries(credentials).forEach(([key, value]) => {
+    if (value && value.length > 0) {
+      // Use global flag to replace all occurrences
+      const regex = new RegExp(value, 'g');
+      maskedMessage = maskedMessage.replace(regex, `{masked_${key}}`);
+    }
+  });
+  return maskedMessage;
+}
+
+export function addNullableToOptional(schema: any): any {
+  if (!schema || typeof schema !== 'object') return schema;
+
+  const newSchema = { ...schema };
+
+  if (schema.type === 'object' && schema.properties) {
+    const required = new Set(schema.required || []);
+    newSchema.properties = Object.entries(schema.properties).reduce((acc, [key, value]) => ({
+      ...acc,
+      [key]: !required.has(key) ? makeNullable(value) : addNullableToOptional(value)
+    }), {});
+  }
+
+  if (schema.type === 'array' && schema.items) {
+    newSchema.items = addNullableToOptional(schema.items);
+  }
+
+  return newSchema;
+}
+
+function makeNullable(schema: any): any {
+  if (!schema || typeof schema !== 'object') return schema;
+  
+  const newSchema = { ...schema };
+  
+  if (Array.isArray(schema.type)) {
+    if (!schema.type.includes('null')) {
+      newSchema.type = [...schema.type, 'null'];
+    }
+  } else if (schema.type) {
+    newSchema.type = [schema.type, 'null'];
+  }
+  
+  // Recursively process nested properties
+  if (schema.properties) {
+    newSchema.properties = Object.entries(schema.properties).reduce((acc, [key, value]) => ({
+      ...acc,
+      [key]: makeNullable(value)
+    }), {});
+  }
+  
+  if (schema.items) {
+    newSchema.items = makeNullable(schema.items);
+  }
+  
+  return newSchema;
 }
