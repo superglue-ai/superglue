@@ -49,14 +49,14 @@
       "pages": [
         "guides/self-hosting",
         "guides/architecture",
-        "guides/shopify"
+        "guides/shopify",
+        "guides/jira"
       ]
     },
     {
       "group": "API Reference",
       "pages": [
         "api-reference/overview",
-        "api-reference/quickstart",
         "api-reference/types",
         "api-reference/queries",
         "api-reference/mutations"
