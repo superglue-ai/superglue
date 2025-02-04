@@ -25,6 +25,7 @@
       }
     },
     "globalEnv": [
+      "GRAPHQL_ENDPOINT",
       "GRAPHQL_PORT",
       "WEB_PORT",
       "DATASTORE_TYPE",

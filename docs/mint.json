@@ -1,0 +1,70 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "Superglue",
+  "logo": {
+    "dark": "/logo/dark.svg",
+    "light": "/logo/light.svg"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#6A0DAD",
+    "light": "#6A0DAD",
+    "dark": "#6A0DAD",
+    "anchors": {
+      "from": "#6A0DAD",
+      "to": "#6A0DAD"
+    }
+  },
+  "topbarLinks": [
+    {
+      "name": "Dashboard [Beta]",
+      "url": "https://dashboard.superglue.cloud"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Talk to us",
+    "url": "https://calendar.app.google/Ae4i88qcuR6hyaER6"
+  },
+  "anchors": [
+    {
+      "name": "GitHub",
+      "icon": "github",
+      "url": "https://github.com/superglue-ai/superglue"
+    },
+    {
+      "name": "Discord",
+      "icon": "discord",
+      "url": "https://discord.gg/SKRYYQEp"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "Getting Started",
+      "pages": [
+        "introduction"
+      ]
+    },
+    {
+      "group": "Guides & Examples",
+      "pages": [
+        "guides/self-hosting",
+        "guides/architecture",
+        "guides/shopify",
+        "guides/jira"
+      ]
+    },
+    {
+      "group": "API Reference",
+      "pages": [
+        "api-reference/overview",
+        "api-reference/types",
+        "api-reference/queries",
+        "api-reference/mutations"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "github": "https://github.com/superglue-ai/superglue",
+    "linkedin": "https://www.linkedin.com/company/superglue-ai/"
+  }
+}
