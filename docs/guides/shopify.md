@@ -1,7 +1,3 @@
----
-title: 'Product Data from Shopify'
-description: 'Guide for Shopify Product Catalog Extraction'
----
 
 When you're building an application that needs Shopify product data, you typically face a few challenges:
 - The Shopify API returns a complex data structure that might not match your needs
