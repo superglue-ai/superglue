@@ -14,6 +14,14 @@
       "start": {
         "cache": false,
         "persistent": true
+      },
+      "test": {
+        "dependsOn": ["@superglue/core#build"],
+        "outputs": []
+      },
+      "test:coverage": {
+        "dependsOn": ["@superglue/core#build"],
+        "outputs": ["coverage/**"]
       }
     },
     "globalEnv": [
