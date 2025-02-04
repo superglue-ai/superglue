@@ -1,79 +1,58 @@
-# welcome to superglue 🍯
 
-superglue is an API translator. 
-let it extract, map and transform data into exactly the format your system needs. with superglue, you can automate data extraction & transformation from any source.
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/be0e65d4-dcd8-4133-9841-b08799e087e7" width="350" alt="superglue_logo_white">
+</p>
 
-- **lightweight ETL**
-- **one line of code to integrate**
+<h1 align="center">data that speaks your language 🍯</h1>
 
- ## 🔄 architecture
+superglue is a data translator. let it extract, map and transform data into exactly the format you need.  
+with superglue, you can automate data integration from any source.
+
+
+
+
+🧚🏼‍♀️ lightweight ETL in one line of code
+
+🫡 coming soon: try our hosted version for instant data integration. [sign up here](https://superglue.cloud)
 
 ```mermaid
-flowchart TB
-    subgraph DataSources[External Data Sources]
-        A1[REST & GraphQL APIs]
-        A2[XML/JSON/CSV Files]
-        A3[Legacy System Interfaces]
+flowchart LR
+    subgraph Input[data sources]
+        A1[APIs]
+        A2[files]
+        A3[legacy systems]
     end
 
-    subgraph SuperglueLayer[superglue]
-        P1[Extract Pipeline]
-        E1[LLM Transform Engine]
-        C1[Schema Validator]
+    subgraph Process[data transformation]
+        T1[superglue engine]
     end
 
-    subgraph Redis[Redis Mapping Cache]
-        R1[(Cache DB)]
+    subgraph Output[destination]
+        D1[your system]
     end
-    
-    subgraph YourSoftware[Your System]
-        CallScheduler[Call Scheduler]
-        DB[(Storage)]
-    end
-    
 
-    %% Main data flow
-    A1 & A2 & A3 <--> SuperglueLayer
-    P1 --> E1
-    E1 --> C1
-    SuperglueLayer <--> YourSoftware
-    SuperglueLayer <--> Redis
-    
+    Input --> Process
+    Process --> Output
+
     %% Styling
     classDef sourceStyle fill:#f9f,stroke:#333,stroke-width:2px
-    classDef superglueStyle fill:#bbf,stroke:#333,stroke-width:2px
-    classDef storageStyle fill:#bfb,stroke:#333,stroke-width:2px
-    classDef supportStyle fill:#ffd,stroke:#333,stroke-width:2px
-    classDef redisStyle fill:#fff,stroke:#333,stroke-width:2px
-    
-    class DataSources sourceStyle
-    class SuperglueLayer superglueStyle
-    class Redis redisStyle
-    class YourSoftware supportStyle
+    classDef processStyle fill:#bbf,stroke:#333,stroke-width:2px
+    classDef outputStyle fill:#bfb,stroke:#333,stroke-width:2px
+
+    class Input sourceStyle
+    class Process processStyle
+    class Output outputStyle
 ```
 [![GitHub](https://img.shields.io/github/license/superglue-ai/superglue)](https://github.com/superglue-ai/superglue/blob/main/LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/superglue-ai/superglue)](https://github.com/superglue-ai/superglue/stargazers)
 [![Client SDK](https://img.shields.io/npm/v/@superglue/superglue)](https://www.npmjs.com/package/@superglue/superglue)
 [![Docker](https://img.shields.io/docker/pulls/superglueai/superglue)](https://hub.docker.com/r/superglueai/superglue)
-[![Discord](https://img.shields.io/discord/1234567890?color=7289da&label=Discord&logo=discord&logoColor=white)](https://discord.gg/SKRYYQEp)
+[![Discord](https://img.shields.io/discord/wzcgh7btxU?color=7289da&label=Discord&logo=discord&logoColor=white)](https://discord.gg/wzcgh7btxU)
+[![Twitter](https://img.shields.io/twitter/follow/adinagoerres?style=social)](https://twitter.com/YOUR_TWITTER_HANDLE)
+[![Twitter](https://img.shields.io/twitter/follow/SFaistenauer?style=social)](https://twitter.com/YOUR_TWITTER_HANDLE)
 
-## key features
 
-- **LLM-Powered Data Mapping**: Automatically generate data transformations using large language models
-- **API Proxy**: Intercept and transform API responses in real-time with minimal added latency
-- **File Processing**: Handle various file formats (CSV, JSON, XML) with automatic decompression
-- **Schema Validation**: Ensure data compliance with your specified schemas
-- **Flexible Authentication**: Support for various auth methods including header auth, api keys, oauth, and more
-- **Smart Pagination**: Handle different pagination styles automatically
-- **Caching & Retry Logic**: Built-in caching and configurable retry strategies
-
-## common use cases
-
-- Unify supplier and customer data from multiple sources into a consistent format
-- Connect legacy systems to modern applications by transforming their data formats in real-time
-- Standardize log and transaction data from multiple sources
-
-## getting started
+## quick start
 ### hosted version
 
 1. Sign up for early access to the hosted version of superglue at [superglue.cloud](https://superglue.cloud)
@@ -216,13 +195,30 @@ console.log(JSON.stringify(result.data, null, 2));
 - For persistent storage: Redis 6.0 or higher
 - OpenAI API key with access to the specified model
 
+## key features
+
+- **LLM-Powered Data Mapping**: Automatically generate data transformations using large language models
+- **API Proxy**: Intercept and transform API responses in real-time with minimal added latency
+- **File Processing**: Handle various file formats (CSV, JSON, XML) with automatic decompression
+- **Schema Validation**: Ensure data compliance with your specified schemas
+- **Flexible Authentication**: Support for various auth methods including header auth, api keys, oauth, and more
+- **Smart Pagination**: Handle different pagination styles automatically
+- **Caching & Retry Logic**: Built-in caching and configurable retry strategies
+
+## common use cases
+
+- Unify supplier and customer data from multiple sources into a consistent format
+- Connect legacy systems to modern applications by transforming their data formats in real-time
+- Standardize log and transaction data from multiple sources
+
 [//]: # (## 📖 Documentation)
 
 [//]: # (For detailed documentation, visit [docs.superglue.cloud]&#40;https://docs.superglue.cloud&#41;)
 
-[//]: # (## 🤝 Contributing)
+## 🤝 contributing
+We love contributions! Feel free to open issues for bugs or feature requests.
 
-[//]: # (We welcome contributions! Please see our [Contributing Guide]&#40;CONTRIBUTING.md&#41; for details.)
+[//]: # (To contribute to the docs, check out the /docs folder.)
 
 ## license
 
@@ -231,5 +227,8 @@ superglue is GPL licensed. The superglue client SDKs are MIT licensed. See [LICE
 ## 🙋‍♂️ support
 
 - 📧 Email: stefan@superglue.cloud
-- 💬 Discord: [Join our community](https://discord.gg/SKRYYQEp)
+- 💬 Discord: [Join our community](https://discord.gg/wzcgj7btxU)
 - 🐛 Issues: [GitHub Issues](https://github.com/superglue-ai/superglue/issues)
+
+[![Twitter](https://img.shields.io/twitter/follow/superglue_d?style=social)](https://twitter.com/superglue_d)
+
