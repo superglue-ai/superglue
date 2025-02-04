@@ -48,8 +48,8 @@ flowchart LR
 [![Client SDK](https://img.shields.io/npm/v/@superglue/client)](https://www.npmjs.com/package/@superglue/client)
 [![Docker](https://img.shields.io/docker/pulls/superglueai/superglue)](https://hub.docker.com/r/superglueai/superglue)
 [![Discord](https://img.shields.io/discord/wzcgh7btxU?color=7289da&label=Discord&logo=discord&logoColor=white)](https://discord.gg/vUKnuhHtfW)
-[![Twitter](https://img.shields.io/twitter/follow/adinagoerres?style=social)](https://twitter.com/YOUR_TWITTER_HANDLE)
-[![Twitter](https://img.shields.io/twitter/follow/SFaistenauer?style=social)](https://twitter.com/YOUR_TWITTER_HANDLE)
+[![Twitter](https://img.shields.io/twitter/follow/adinagoerres?style=social)](https://twitter.com/adinagoerres)
+[![Twitter](https://img.shields.io/twitter/follow/SFaistenauer?style=social)](https://twitter.com/sfaistenauer)
 
 
 ## quick start
