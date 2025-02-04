@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { PROMPT_MAPPING } from "./prompts.js";
-import {  applyJsonataWithValidation } from "./tools.js";
+import {  applyJsonataWithValidation, sample } from "./tools.js";
 import { ApiInput, DataStore, TransformConfig, TransformInput } from "@superglue/shared";
 import crypto from 'crypto';
 
@@ -10,15 +10,27 @@ export async function prepareTransform(
     input: ApiInput | TransformInput,
     data: any
   ): Promise<TransformConfig | null> {
-    if(!input.responseSchema || JSON.stringify(input.responseSchema) === '{}') {
+
+    // Check if the response schema is empty
+    if(!input.responseSchema || 
+      Object.keys(input.responseSchema).length === 0) {
       return null;
     }
 
+    // Check if the data is empty
+    if(!data || 
+      (Array.isArray(data) && data.length === 0) || 
+      (typeof data === 'object' && Object.keys(data).length === 0)) {
+      return null;
+    }
+
+    // Check if the transform config is cached
     if(fromCache) {
       const cached = await datastore.getTransformConfigFromRequest(input as TransformInput, data);
       if (cached) return { ...cached, ...input };
     }
-    
+
+    // Check if the response mapping is already generated
     if(input.responseMapping) {
       return { 
         id: crypto.randomUUID(),
@@ -29,8 +41,11 @@ export async function prepareTransform(
         ...input
       };
     }
-    const mapping = await generateMapping(input.responseSchema, data);
 
+    // Generate the response mapping
+    const mapping = await generateMapping(input.responseSchema, data, input.instruction);
+
+    // Check if the mapping is generated successfully
     if(mapping) {
       return { 
         id: crypto.randomUUID(),
@@ -46,7 +61,8 @@ export async function prepareTransform(
     return null;
   } 
 
-export async function generateMapping(schema: any, payload: any, retry = 0, error?: string): Promise<{jsonata: string, confidence: number, confidence_reasoning: string} | null> {
+export async function generateMapping(schema: any, payload: any, instruction?: string, retry = 0, error?: string): Promise<{jsonata: string, confidence: number, confidence_reasoning: string} | null> {
+  console.log("Generating mapping");
   try {
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
@@ -64,13 +80,13 @@ ${JSON.stringify(sample(payload), null, 2).slice(0,10000)}
 The output should be a jsonata expression with the following schema:
 ${JSON.stringify(schema, null, 2)}
 
-${error ? `We tried to generate the jsonata expression, but it failed with the following error:
-${error}
-` : ''}
+${error ? `We tried to generate the jsonata expression, but it failed with the following error: ${error}` : ''}
+
+${instruction ? `The instruction to get the source data was: ${instruction}` : ''}
 `
     const reasoning = await openai.chat.completions.create({
       model: process.env.OPENAI_MODEL,
-      temperature: 0.6,
+      temperature: 0.2,
       messages: [
         {
           role: "system",
@@ -109,39 +125,20 @@ ${error}
         `);
     }
 
-    console.log("validation succeeded", content.jsonata);
+    console.log("validation succeeded", content?.jsonata);
     // Unwrap the data property
     return content;
 
   } catch (error) {
       console.error('Error generating mapping:', error);
-      if(retry < 2) {
+      if(retry < 10) {
           console.log("retrying mapping generation, retry count: " + retry);
-          return generateMapping(schema, payload, retry + 1, error);
+          return generateMapping(schema, payload, instruction, retry + 1, error);
       }
   }
   return null;
 }
 
-function sample<T>(arr: any, sampleSize = 10): T[] {
-  if(!Array.isArray(arr)) {
-    return [arr];
-  }
-  const arrLength = arr.length;
-
-  if (arrLength <= sampleSize) {
-    return arr; // Return full array if less than or equal to sample size
-  }
-
-  const step = Math.floor(arrLength / sampleSize);
-  const result = [];
-
-  for (let i = 0; i < sampleSize; i++) {
-    result.push(arr[i * step]);
-  }
-
-  return result;
-}
 
 const jsonataSchema = {
   "$schema": "http://json-schema.org/draft-07/schema#",
