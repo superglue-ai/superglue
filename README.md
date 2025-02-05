@@ -5,15 +5,32 @@
 
 <h1 align="center">data that speaks your language 🍯</h1>
 
-superglue is a data translator. let it extract, map and transform data into exactly the format you need.  
-with superglue, you can automate data integration from any source.
+superglue translates data from external systems into exactly the format you need. It’s an open source proxy that automatically extracts, maps and transforms data so developers don’t have to write and maintain complex integration code.
 
+- 🔮 One-off LLM-powered translations: Generate deterministic, high-performance translation code.
+- 🩹 Self-healing: Detect format changes and update translations automatically.
+- 🚀 Fast deployment: Supports most APIs and data formats out of the box.
 
-
-
-🧚🏼‍♀️ lightweight ETL in one line of code
-
-🫡 coming soon: try our hosted version for instant data integration. [sign up here](https://superglue.cloud)
+<div align="center"  style="text-decoration: none;">
+  <a href="https://github.com/superglue-ai/superglue/blob/main/LICENSE" style="text-decoration: none;">
+    <img src="https://img.shields.io/github/license/superglue-ai/superglue?style=flat-square" alt="GitHub" style="max-width: 100%;">
+  </a>
+  <a href="https://www.ycombinator.com/companies/superglue" style="text-decoration: none;">
+    <img src="https://img.shields.io/badge/Y%20Combinator-W25-orange?style=flat-square" alt="Client SDK" style="max-width: 100%;">
+  </a>
+  <a href="https://www.npmjs.com/package/@superglue/client" style="text-decoration: none;">
+    <img src="https://img.shields.io/npm/v/@superglue/client?style=flat-square&logo=npm" alt="Client SDK" style="max-width: 100%;">
+  </a>
+  <a href="https://hub.docker.com/r/superglueai/superglue" style="text-decoration: none;">
+    <img src="https://img.shields.io/docker/pulls/superglueai/superglue?style=flat-square&logo=Docker" alt="Docker" style="max-width: 100%;">
+  </a>
+  <a href="https://twitter.com/adinagoerres" style="text-decoration: none;">
+    <img src="https://img.shields.io/twitter/follow/adinagoerres?style=flat-square&logo=X" alt="Twitter Adina" style="max-width: 100%;">
+  </a>
+  <a href="https://twitter.com/sfaistenauer" style="text-decoration: none;">
+    <img src="https://img.shields.io/twitter/follow/sfaistenauer?style=flat-square&logo=X" alt="Twitter Stefan" style="max-width: 100%;">
+  </a>
+</div>
 
 ```mermaid
 flowchart LR
@@ -43,14 +60,6 @@ flowchart LR
     class Process processStyle
     class Output outputStyle
 ```
-[![GitHub](https://img.shields.io/github/license/superglue-ai/superglue)](https://github.com/superglue-ai/superglue/blob/main/LICENSE)
-[![GitHub stars](https://img.shields.io/github/stars/superglue-ai/superglue)](https://github.com/superglue-ai/superglue/stargazers)
-[![Client SDK](https://img.shields.io/npm/v/@superglue/client)](https://www.npmjs.com/package/@superglue/client)
-[![Docker](https://img.shields.io/docker/pulls/superglueai/superglue)](https://hub.docker.com/r/superglueai/superglue)
-[![Discord](https://img.shields.io/discord/wzcgh7btxU?color=7289da&label=Discord&logo=discord&logoColor=white)](https://discord.gg/vUKnuhHtfW)
-[![Twitter](https://img.shields.io/twitter/follow/adinagoerres?style=social)](https://twitter.com/adinagoerres)
-[![Twitter](https://img.shields.io/twitter/follow/SFaistenauer?style=social)](https://twitter.com/sfaistenauer)
-
 
 ## quick start
 ### hosted version
@@ -120,9 +129,9 @@ docker pull superglueai/superglue
 2. Create a `.env` file with the following configuration:
 ```env
 # Server Configuration
-GRAPHQL_ENDPOINT=http://localhost:3000 # Endpoint to run the superglue server (used so the web dashboard knows where to find the server)
 GRAPHQL_PORT=3000                 # Port to run the superglue server
 WEB_PORT=3001                     # Port to run the web dashboard 
+GRAPHQL_ENDPOINT=http://localhost:3000 # Endpoint the web interface will connect to
 AUTH_TOKEN=your-auth-token        # Authentication token for API access
 
 # Datastore Configuration. Memory is faster but not persistent. Redis is slower but persistent.
@@ -152,10 +161,8 @@ docker run -d \
 ```bash
 curl http://localhost:3000/health
 > OK
-```
-or open the graphql playground:
-```bash
-http://localhost:3000/?token=your-auth-token
+
+# or open http://localhost:3000/?token=your-auth-token
 ```
 
 5. Open the dashboard to create your first configuration:
@@ -191,10 +198,6 @@ const result2 = await superglue.call({id: "futurama-api"});
 console.log(JSON.stringify(result.data, null, 2));
 ```
 
-#### requirements
-- Docker 20.10.0 or higher
-- For persistent storage: Redis 6.0 or higher
-- OpenAI API key with access to the specified model
 
 ## key features
 
@@ -206,15 +209,9 @@ console.log(JSON.stringify(result.data, null, 2));
 - **Smart Pagination**: Handle different pagination styles automatically
 - **Caching & Retry Logic**: Built-in caching and configurable retry strategies
 
-## common use cases
+## 📖 Documentation
 
-- Unify supplier and customer data from multiple sources into a consistent format
-- Connect legacy systems to modern applications by transforming their data formats in real-time
-- Standardize log and transaction data from multiple sources
-
-[//]: # (## 📖 Documentation)
-
-[//]: # (For detailed documentation, visit [docs.superglue.cloud]&#40;https://docs.superglue.cloud&#41;)
+For detailed documentation, visit [docs.superglue.cloud](https://docs.superglue.cloud).
 
 ## 🤝 contributing
 We love contributions! Feel free to open issues for bugs or feature requests.
@@ -227,7 +224,6 @@ superglue is GPL licensed. The superglue client SDKs are MIT licensed. See [LICE
 
 ## 🙋‍♂️ support
 
-- 📧 Email: stefan@superglue.cloud
 - 💬 Discord: [Join our community](https://discord.gg/vUKnuhHtfW)
 - 🐛 Issues: [GitHub Issues](https://github.com/superglue-ai/superglue/issues)
 
