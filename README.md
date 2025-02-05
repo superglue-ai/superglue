@@ -11,26 +11,20 @@ superglue translates data from external systems into exactly the format you need
 - 🩹 Self-healing: Detect format changes and update translations automatically.
 - 🚀 Fast deployment: Supports most APIs and data formats out of the box.
 
-<div align="center"  style="text-decoration: none;">
-  <a href="https://github.com/superglue-ai/superglue/blob/main/LICENSE" style="text-decoration: none;">
-    <img src="https://img.shields.io/github/license/superglue-ai/superglue?style=flat-square" alt="GitHub" style="max-width: 100%;">
-  </a>
-  <a href="https://www.ycombinator.com/companies/superglue" style="text-decoration: none;">
-    <img src="https://img.shields.io/badge/Y%20Combinator-W25-orange?style=flat-square" alt="Client SDK" style="max-width: 100%;">
-  </a>
-  <a href="https://www.npmjs.com/package/@superglue/client" style="text-decoration: none;">
-    <img src="https://img.shields.io/npm/v/@superglue/client?style=flat-square&logo=npm" alt="Client SDK" style="max-width: 100%;">
-  </a>
-  <a href="https://hub.docker.com/r/superglueai/superglue" style="text-decoration: none;">
-    <img src="https://img.shields.io/docker/pulls/superglueai/superglue?style=flat-square&logo=Docker" alt="Docker" style="max-width: 100%;">
-  </a>
-  <a href="https://twitter.com/adinagoerres" style="text-decoration: none;">
-    <img src="https://img.shields.io/twitter/follow/adinagoerres?style=flat-square&logo=X" alt="Twitter Adina" style="max-width: 100%;">
-  </a>
-  <a href="https://twitter.com/sfaistenauer" style="text-decoration: none;">
-    <img src="https://img.shields.io/twitter/follow/sfaistenauer?style=flat-square&logo=X" alt="Twitter Stefan" style="max-width: 100%;">
-  </a>
+
+<div align="center">
+
+
+![GitHub](https://img.shields.io/github/license/superglue-ai/superglue?style=flat-square)
+![Y Combinator](https://img.shields.io/badge/Y%20Combinator-W25-orange?style=flat-square)
+![Client SDK](https://img.shields.io/npm/v/@superglue/client?style=flat-square&logo=npm)
+![Docker](https://img.shields.io/docker/pulls/superglueai/superglue?style=flat-square&logo=Docker)
+![Twitter Adina](https://img.shields.io/twitter/follow/adinagoerres?style=flat-square&logo=X)
+![Twitter Stefan](https://img.shields.io/twitter/follow/sfaistenauer?style=flat-square&logo=X)
+
+
 </div>
+
 
 ```mermaid
 flowchart LR
