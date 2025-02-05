@@ -123,22 +123,31 @@ docker pull superglueai/superglue
 2. Create a `.env` file with the following configuration:
 ```env
 # Server Configuration
-GRAPHQL_PORT=3000                 # Port to run the superglue server
-WEB_PORT=3001                     # Port to run the web dashboard 
-GRAPHQL_ENDPOINT=http://localhost:3000 # Endpoint the web interface will connect to
-AUTH_TOKEN=your-auth-token        # Authentication token for API access
+
+# Port to run the superglue server
+GRAPHQL_PORT=3000
+
+# Port to run the web dashboard 
+WEB_PORT=3001
+
+# Endpoint the web interface will connect to
+GRAPHQL_ENDPOINT=http://localhost:3000
+
+# Authentication token for API access
+AUTH_TOKEN=your-auth-token
 
 # Datastore Configuration. Memory is faster but not persistent. Redis is slower but persistent.
 DATASTORE_TYPE=redis or memory
 # if redis
-REDIS_HOST=localhost              # Redis server hostname
-REDIS_PORT=6379                   # Redis server port
-REDIS_USERNAME=default            # Redis username
-REDIS_PASSWORD=secret             # Redis password
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_USERNAME=default
+REDIS_PASSWORD=secret
 
 # OpenAI Configuration
-OPENAI_API_KEY=sk-...             # Your OpenAI API key
-OPENAI_MODEL=gpt-4o-2024-11-20    # OpenAI model to use. We recommend gpt-4o-2024-11-20
+OPENAI_API_KEY=sk-...
+# OpenAI model to use. We recommend gpt-4o-2024-11-20
+OPENAI_MODEL=gpt-4o-2024-11-20
 ```
 
 3. Start the server:
