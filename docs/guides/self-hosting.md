@@ -59,23 +59,31 @@ Create a `.env` file:
 
 ```env
 # Server Configuration
-GRAPHQL_PORT=3000             # Port for the Superglue server
-WEB_PORT=3001                 # Port for the web dashboard
-GRAPHQL_ENDPOINT=https://graphql.superglue.cloud # Endpoint for the graphql api (used so the web dashboard knows where to find the server)
-AUTH_TOKEN=your-auth-token    # Token for API access
 
-# Datastore Configuration
-DATASTORE_TYPE=redis          # Use "redis" for persistent storage
+# Port to run the superglue server
+GRAPHQL_PORT=3000
 
-# Redis Configuration
-REDIS_HOST=localhost             # Service name from docker-compose
+# Port to run the web dashboard 
+WEB_PORT=3001
+
+# Endpoint the web interface will connect to
+GRAPHQL_ENDPOINT=http://localhost:3000
+
+# Authentication token for API access
+AUTH_TOKEN=your-auth-token
+
+# Datastore Configuration. Memory is faster but not persistent. Redis is slower but persistent.
+DATASTORE_TYPE=redis or memory
+# if redis
+REDIS_HOST=localhost
 REDIS_PORT=6379
 REDIS_USERNAME=default
-REDIS_PASSWORD=your-secure-password
+REDIS_PASSWORD=secret
 
 # OpenAI Configuration
-OPENAI_API_KEY=sk-...         # Your OpenAI API key
-OPENAI_MODEL=gpt-4o-2024-11-20  # OpenAI model to use. We recommend gpt-4o-2024-11-20
+OPENAI_API_KEY=sk-...
+# OpenAI model to use. We recommend gpt-4o-2024-11-20
+OPENAI_MODEL=gpt-4o-2024-11-20
 ```
 
 3. **Start the Services**
