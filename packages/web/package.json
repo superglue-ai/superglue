@@ -19,7 +19,7 @@
         "@radix-ui/react-tabs": "^1.1.2",
         "@radix-ui/react-toast": "^1.2.5",
         "@radix-ui/react-tooltip": "^1.1.7",
-        "@superglue/shared": "0.1.0",
+        "@superglue/shared": "file:../shared",
         "@superglue/superglue": "^2.2.0",
         "autoprefixer": "^10.4.20",
         "axios": "^1.7.9",

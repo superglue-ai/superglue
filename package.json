@@ -15,7 +15,7 @@
     "clean": "turbo run clean"
   },
   "dependencies": {
-    "@superglue/shared": "0.1.0",
+    "@superglue/shared": "file:packages/shared",
     "dotenv": "^16.4.7",
     "dotenv-cli": "^8.0.0"
   },
