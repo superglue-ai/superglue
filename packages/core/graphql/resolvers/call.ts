@@ -11,7 +11,7 @@ export const callResolver = async (
   { input, payload, credentials, options }: { 
     input: ApiInputRequest; 
     payload: any; 
-    credentials: Record<string, string>;
+    credentials?: Record<string, string>;
     options: RequestOptions; 
   },
   context: Context,
