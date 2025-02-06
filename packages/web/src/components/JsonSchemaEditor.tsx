@@ -214,8 +214,8 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center mb-4">
+    <div className="space-y-1">
+      <div className="flex justify-between items-center">
         <Label htmlFor="responseSchema">Set your desired response schema</Label>
         <div className="flex items-center gap-2">
           <Label htmlFor="editorMode" className="text-sm">Code Mode</Label>

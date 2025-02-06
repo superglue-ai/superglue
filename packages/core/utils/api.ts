@@ -212,13 +212,22 @@ function validateVariables(generatedConfig: any, vars: string[]) {
     "limit",
     "offset"
   ]
+  
+  // Helper function to find only template variables in a string
+  const findTemplateVars = (str: string) => {
+    if (!str) return [];
+    // Only match {varName} patterns that aren't within JSON quotes
+    const matches = str.match(/\{(\w+)\}/g) || [];
+    return matches.map(match => match.slice(1, -1));
+  };
+
   const varMatches = [
     generatedConfig.urlPath,
     ...Object.values(generatedConfig.queryParams || {}),
     ...Object.values(generatedConfig.headers || {}),
     generatedConfig.body
-  ].join(' ').match(/\{([^}]+)\}/g) || [];
-  const usedVars = varMatches.map(match => match.slice(1, -1));
-  const invalidVars = usedVars.filter(v => !vars.includes(v));
+  ].flatMap(value => findTemplateVars(String(value)));
+
+  const invalidVars = varMatches.filter(v => !vars.includes(v));
   return invalidVars;
 }
