@@ -34,6 +34,12 @@ describe('tools utility functions', () => {
       const variables = { name: 'John' }
       expect(replaceVariables(template, variables)).toBe('Hello John, John')
     })
+
+    it('should handle JSON template strings', () => {
+      const template = '{"user": "{name}", "details": {"age": {age}}}'
+      const variables = { name: 'John', age: 30 }
+      expect(replaceVariables(template, variables)).toBe('{"user": "John", "details": {"age": 30}}')
+    })
   })
 
   describe('applyJsonata', () => {
