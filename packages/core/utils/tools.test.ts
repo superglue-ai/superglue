@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { composeUrl, replaceVariables, applyJsonata, applyJsonataWithValidation, getAllKeys, applyAuthFormat, sample } from './tools.js'
+import { composeUrl, replaceVariables, applyJsonata, applyJsonataWithValidation, getAllKeys, applyAuthFormat, sample, maskCredentials } from './tools.js'
 
 describe('tools utility functions', () => {
   describe('composeUrl', () => {
@@ -167,6 +167,21 @@ describe('tools utility functions', () => {
       const arr = Array.from({ length: 100 }, (_, i) => i);
       const result = sample(arr, 5);
       expect(result).toHaveLength(5);
+    });
+  });
+
+  describe('maskCredentials', () => {
+    it('should mask credentials in message globally', () => {
+      const message = 'My password is 123456. Remember it is 123456! My username is admin.';
+      const credentials = { password: '123456', username: 'admin' };
+      const result = maskCredentials(message, credentials);
+      expect(result).toBe('My password is {masked_password}. Remember it is {masked_password}! My username is {masked_username}.');
+    });
+
+    it('should return message if no credentials are provided', () => {
+      const message = 'My password is 123456';
+      const result = maskCredentials(message);
+      expect(result).toBe(message);
     });
   });
 }) 
