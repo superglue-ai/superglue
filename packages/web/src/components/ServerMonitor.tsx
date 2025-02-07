@@ -10,7 +10,8 @@ export function ServerMonitor() {
   useEffect(() => {
     const checkServer = async () => {
       try {
-        const response = await fetch(`${serverConfig.superglueEndpoint}/health`);
+        const endpoint = serverConfig.superglueEndpoint.replace(/\/$/, '');
+        const response = await fetch(`${endpoint}/health`);
         if (!response.ok) {
           throw new Error("Server is down");
         }
