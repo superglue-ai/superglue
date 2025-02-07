@@ -9,6 +9,7 @@ env:
   DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
   DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
   IMAGE_NAME: superglueai/superglue
+  NODE_OPTIONS: "--max-old-space-size=4096" # Increase Node.js memory limit
 
 jobs:
   test:
