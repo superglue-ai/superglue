@@ -2,8 +2,6 @@ name: Node.js Tests
 
 on:
   workflow_call: # Makes this workflow reusable
-  push:
-    branches: [ main ]
   pull_request:
     branches: [ main ]
 
