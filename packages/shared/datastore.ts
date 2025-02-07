@@ -30,7 +30,7 @@ export interface DataStore {
   
     // Run Result Methods
     getRun(id: string): Promise<RunResult | null>;
-    listRuns(limit?: number, offset?: number): Promise<{ items: RunResult[], total: number }>;
+    listRuns(limit?: number, offset?: number, configId?: string): Promise<{ items: RunResult[], total: number }>;
     createRun(result: RunResult): Promise<RunResult>;
     deleteRun(id: string): Promise<boolean>;
   }

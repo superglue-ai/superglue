@@ -161,6 +161,44 @@ describe('MemoryStore', () => {
       const retrieved = await store.getRun(testRun.id);
       expect(retrieved).toBeNull();
     });
+
+    it('should list runs filtered by config ID', async () => {
+      const run1 = { ...testRun, id: 'run1', config: { ...testRun.config, id: 'config1' } };
+      const run2 = { ...testRun, id: 'run2', config: { ...testRun.config, id: 'config2' } };
+      const run3 = { ...testRun, id: 'run3', config: { ...testRun.config, id: 'config1' } };
+      
+      await store.createRun(run1);
+      await store.createRun(run2);
+      await store.createRun(run3);
+      
+      const { items, total } = await store.listRuns(10, 0, 'config1');
+      expect(items.length).toBe(2);
+      expect(total).toBe(3); // Total is still all runs
+      expect(items.map(run => run.id).sort()).toEqual(['run1', 'run3']);
+    });
+
+    it('should handle listing runs when configs have missing IDs', async () => {
+      const runWithoutConfigId = { 
+        ...testRun, 
+        id: 'run1', 
+        config: { ...testRun.config, id: undefined } 
+      };
+      const runWithConfigId = { 
+        ...testRun, 
+        id: 'run2', 
+        config: { ...testRun.config, id: 'config1' } 
+      };
+      
+      await store.createRun(runWithoutConfigId);
+      await store.createRun(runWithConfigId);
+      
+      const { items: filteredItems } = await store.listRuns(10, 0, 'config1');
+      expect(filteredItems.length).toBe(1);
+      expect(filteredItems[0].id).toBe('run2');
+
+      const { items: allItems } = await store.listRuns(10, 0);
+      expect(allItems.length).toBe(2);
+    });
   });
 
   describe('Utility operations', () => {

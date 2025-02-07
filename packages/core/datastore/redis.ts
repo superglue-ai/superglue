@@ -7,10 +7,11 @@ import { DataStore } from '@superglue/shared';
 export class RedisService implements DataStore {
   private redis: RedisClientType;
   private readonly RUN_PREFIX = 'run:';
+  private readonly RUNS_BY_CONFIG_PREFIX = 'runs:config:';
   private readonly API_PREFIX = 'api:';
   private readonly EXTRACT_PREFIX = 'extract:';
   private readonly TRANSFORM_PREFIX = 'transform:';
-  private readonly TTL = 60 * 60 * 24 * 30; // 30 days
+  private readonly TTL = 60 * 60 * 24 * 90; // 90 days
 
   constructor(config: { 
     host: string; 
@@ -175,56 +176,69 @@ export class RedisService implements DataStore {
     return parseWithId(data, id);
   }
 
-  async listRuns(limit: number = 10, offset: number = 0): Promise<{ items: RunResult[], total: number }> {
-    const runIds = await this.redis.zRange('runs:index', -offset - limit, -(offset + 1));
+  async listRuns(limit: number = 10, offset: number = 0, configId?: string): Promise<{ items: RunResult[], total: number }> {
+    // Build the pattern based on whether we have a configId
+    const pattern = configId 
+      ? `${this.RUN_PREFIX}${configId}:*`
+      : `${this.RUN_PREFIX}*`;
+      
+    // Get all matching keys
+    const keys = await this.redis.keys(pattern);
+    const total = keys.length;
     
+    if (total === 0) {
+      return { items: [], total: 0 };
+    }
+
+    // Get all matching runs data in parallel
     const runs = await Promise.all(
-      runIds.map(async (id) => {
-        const data = await this.redis.get(`${this.RUN_PREFIX}${id}`);
-        return parseWithId(data, id);
+      keys.map(async (key) => {
+        const data = await this.redis.get(key);
+        const runId = configId 
+          ? key.replace(`${this.RUN_PREFIX}${configId}:`, '')
+          : key.replace(this.RUN_PREFIX, '');
+        return parseWithId(data, runId);
       })
     );
-    return { items: runs.filter((run): run is RunResult => run !== null), total: runIds.length };
+
+    // Filter nulls, sort by startedAt, and apply pagination
+    const validRuns = runs
+      .filter((run): run is RunResult => run !== null)
+      .sort((a, b) => (b.startedAt?.getTime() ?? 0) - (a.startedAt?.getTime() ?? 0));
+
+    return {
+      items: validRuns.slice(offset, offset + limit),
+      total
+    };
   }
 
-  async deleteAllRuns(): Promise<void> {
-    const runIds = await this.redis.zRange('runs:index', 0, -1);
-    
-    const multi = this.redis.multi();
-    
-    // Delete all run records
-    for (const id of runIds) {
-      multi.del(`${this.RUN_PREFIX}${id}`);
+  async deleteAllRuns(): Promise<void> {    
+    // Get all run keys
+    for await (const key of this.redis.scanIterator({
+      MATCH: `${this.RUN_PREFIX}*`,
+      COUNT: 100
+    })) {
+      await this.redis.del(key);
     }
-    
-    // Delete the index
-    multi.del('runs:index');
-    
-    await multi.exec();
   }
 
   async createRun(run: RunResult): Promise<RunResult> {
-    const key = `${this.RUN_PREFIX}${run.id}`;
-    const timestamp = run.startedAt.getTime();
-    
-    const multi = this.redis.multi();
-    
-    multi.set(key, JSON.stringify(run), {
-        EX: this.TTL
+    // Include configId in key for faster filtering
+    const key = `${this.RUN_PREFIX}${run.config?.id}:${run.id}`;
+    await this.redis.set(key, JSON.stringify(run), {
+      EX: this.TTL
     });
-    
-    multi.zAdd('runs:index', {
-        score: timestamp,
-        value: run.id
-    });
-
-    await multi.exec();
     return run;
   }
 
   async deleteRun(id: string): Promise<boolean> {
-    const result = await this.redis.del(`${this.RUN_PREFIX}${id}`);
-    return result === 1;
+    // Since we don't know the configId, we need to scan for the key
+    const pattern = `${this.RUN_PREFIX}*${id}`;
+    for await (const key of this.redis.scanIterator({ MATCH: pattern })) {
+      await this.redis.del(key);
+      return true;
+    }
+    return false;
   }
 
   // Utility methods
@@ -249,5 +263,13 @@ export class RedisService implements DataStore {
 
 function parseWithId(data: string, id: string): any {
   if(!data) return null;
-  return { ...JSON.parse(data), id: id };
+  const parsed = JSON.parse(data);
+  return { 
+    ...parsed, 
+    ...(parsed.startedAt && { startedAt: new Date(parsed.startedAt) }), 
+    ...(parsed.completedAt && { completedAt: new Date(parsed.completedAt) }),
+    ...(parsed.createdAt && { createdAt: new Date(parsed.createdAt) }),
+    ...(parsed.updatedAt && { updatedAt: new Date(parsed.updatedAt) }),
+    id: id
+  };
 }
