@@ -122,6 +122,8 @@ export function composeUrl(host: string, path: string) {
 }
 
 export function replaceVariables(template: string, variables: Record<string, any>): string {
+  if (!template) return "";
+  
   const variableNames = Object.keys(variables);
   const pattern = new RegExp(`\\{(${variableNames.join('|')})(?:\\.(\\w+))*\\}`, 'g');
   
