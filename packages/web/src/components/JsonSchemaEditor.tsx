@@ -12,6 +12,12 @@ import {
 } from "@/src/components/ui/select";
 import { Switch } from "@/src/components/ui/switch";
 import { Plus, Trash2, ChevronRight, ListPlus } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/src/components/ui/tooltip";
 
 interface JsonSchemaEditorProps {
   value: string;
@@ -76,8 +82,19 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
     const isRoot = path.length === 0;
     const isEditing = editingField === path.join('.');
     
+    // Add this helper function to check if field is required
+    const isFieldRequired = () => {
+      if (isRoot || isArrayChild) return false;
+      const parentPath = path.slice(0, -2);
+      let parent = visualSchema;
+      for (const segment of parentPath) {
+        parent = parent[segment];
+      }
+      return parent.required?.includes(fieldName) || false;
+    };
+
     return (
-      <div key={fieldName} className="space-y-1 pl-2 border-l-2 border-gray-400 mb-2 max-h-full">
+      <div key={fieldName} className="space-y-1 pl-2 border-l-2 border-gray-400 mb-2">
         {!isRoot && (
           <div className="flex items-center gap-2">
             {isEditing && !isArrayChild ? (
@@ -91,6 +108,13 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
                   }
                   const properties = current[path[path.length - 2]];
                   const newPath = [...path.slice(0, -1), e.target.value].join('.');
+
+                  // Update the required array if this field is required
+                  if (current.required?.includes(fieldName)) {
+                    current.required = current.required.map((f: string) => 
+                      f === fieldName ? e.target.value : f
+                    );
+                  }
 
                   const newProperties: Record<string, any> = {};
                   Object.keys(properties).forEach(key => {
@@ -106,7 +130,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
                   onChange(JSON.stringify(newSchema, null, 2));
                   setEditingField(newPath);
                 }}
-                className="w-48"
+                className="w-48 min-h-[32px]"
                 placeholder="Field name"
                 autoFocus
                 onBlur={() => setEditingField(null)}
@@ -114,10 +138,13 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
               />
             ) : (!isArrayChild &&(
               <div 
-                className={`w-48 px-2 py-0.5 rounded hover:bg-secondary cursor-pointer text-[14px]`}
+                className={`w-48 px-2 py-0.5 min-h-[32px] rounded hover:bg-secondary cursor-pointer text-[14px] flex items-center gap-0.5`}
                 onClick={() => setEditingField(path.join('.'))}
               >
                 {fieldName}
+                {isFieldRequired() && (
+                  <span className="text-red-500 text-[18px] font-bold" title="Required field">*</span>
+                )}
               </div>
             ))}
             <Select
@@ -131,12 +158,58 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
                 ))}
               </SelectContent>
             </Select>
+
             <Input
               value={schema.description || ''}
               onChange={(e) => updateVisualSchema([...path, 'description'], e.target.value)}
               className="flex-1"
               placeholder="Description"
             />
+            {!isRoot && !isArrayChild && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="relative z-10">
+                      <Switch
+                        id={`required-${path.join('-')}`}
+                        checked={isFieldRequired()}
+                        onCheckedChange={(checked) => {
+                          const parentPath = path.slice(0, -2);
+                          const newSchema = { ...visualSchema };
+                          let parent = newSchema;
+                          for (const segment of parentPath) {
+                            parent = parent[segment];
+                          }
+                          
+                          if (checked) {
+                            parent.required = [...(parent.required || []), fieldName];
+                          } else {
+                            parent.required = (parent.required || []).filter((f: string) => f !== fieldName);
+                            if (parent.required.length === 0) {
+                              delete parent.required;
+                            }
+                          }
+                          
+                          setVisualSchema(newSchema);
+                          onChange(JSON.stringify(newSchema, null, 2));
+                        }}
+                        className="peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                      />
+                      <span className="pointer-events-none absolute flex h-4 w-4 items-center justify-center rounded-full bg-background shadow-lg ring-0 transition-transform peer-data-[state=checked]:translate-x-4 peer-data-[state=unchecked]:translate-x-0 left-[2px] top-[2px]">
+                        {isFieldRequired() ? (
+                          <span className="text-red-500 text-[16px] font-bold leading-none mt-2">*</span>
+                        ) : (
+                          <span className="text-muted-foreground text-[12px] font-semibold leading-none">?</span>
+                        )}
+                      </span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="z-50">
+                    {isFieldRequired() ? 'Make field optional' : 'Make field required'}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
             {path.length > 0 && (
               <Button
                 variant="ghost"
@@ -214,7 +287,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
   };
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-1 h-full flex-1 flex flex-col mb-4 h-full">
       <div className="flex justify-between items-center">
         <Label htmlFor="responseSchema">Set your desired response schema</Label>
         <div className="flex items-center gap-2">
@@ -223,18 +296,17 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
         </div>
       </div>
 
-      <div className="h-[400px] border rounded-md relative">
+      <div className="flex-1 border rounded-md relative">
         {isCodeMode ? (
           <Textarea
             id="responseSchema"
             value={value}
             onChange={(e) => onChange(e.target.value)}
             placeholder="{}"
-            className="h-full font-mono border-0"
-            required
+            className="font-mono border-0 h-full"
           />
         ) : (
-          <div className="p-4 h-full overflow-y-auto overflow-x-hidden">
+          <div className="p-4 h-full">
             {Object.keys(visualSchema).length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                 <p className="mb-4">No schema defined yet</p>
