@@ -7,6 +7,10 @@ export const getApiResolver = async (
     context: Context,
     info: GraphQLResolveInfo
   ) => {
+    if(!id) {
+      throw new Error("id is required");
+    }
+
     const config = await context.datastore.getApiConfig(id);
     if(!config) throw new Error(`api config with id ${id} not found`);
     return config;
@@ -18,6 +22,10 @@ export const getTransformResolver = async (
     context: Context,
     info: GraphQLResolveInfo
   ) => {
+    if(!id) {
+      throw new Error("id is required");
+    }
+
     const config = await context.datastore.getTransformConfig(id);
     if(!config) throw new Error(`transform config with id ${id} not found`);
     return config;
@@ -29,6 +37,10 @@ export const getExtractResolver = async (
     context: Context,
     info: GraphQLResolveInfo
   ) => {
+    if(!id) {
+      throw new Error("id is required");
+    }
+
     const config = await context.datastore.getExtractConfig(id);
     if(!config) throw new Error(`extract config with id ${id} not found`);
     return config;
@@ -40,6 +52,10 @@ export const getRunResolver = async (
   context: Context,
   info: GraphQLResolveInfo
 ) => {
+  if(!id) {
+    throw new Error("id is required");
+  }
+  
   const run = await context.datastore.getRun(id);
   if(!run) throw new Error(`run with id ${id} not found`);
   return run;

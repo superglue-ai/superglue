@@ -7,6 +7,9 @@ export const upsertApiResolver = async (
     context: Context,
     info: GraphQLResolveInfo
   ) => {
+    if(!id) {
+      throw new Error("id is required");
+    }
     // override id with the id from the input
     const oldConfig = await context.datastore.getApiConfig(id);
 
@@ -52,6 +55,9 @@ export const upsertTransformResolver = async (
     context: Context,
     info: GraphQLResolveInfo
   ) => {
+    if(!id) {
+      throw new Error("id is required");
+    }
     const oldConfig = await context.datastore.getTransformConfig(id);
     const config = { 
       id: id,
@@ -70,6 +76,9 @@ export const upsertExtractResolver = async (
     context: Context,
     info: GraphQLResolveInfo
   ) => {
+    if(!id) {
+      throw new Error("id is required");
+    }
     const oldConfig = await context.datastore.getExtractConfig(id);
     const config = { 
       id: id,
