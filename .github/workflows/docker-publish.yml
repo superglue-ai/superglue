@@ -11,7 +11,11 @@ env:
   IMAGE_NAME: superglueai/superglue
 
 jobs:
+  test:
+    uses: ./.github/workflows/node-test.yml
+
   build-and-push:
+    needs: test
     runs-on: ubuntu-latest
     
     steps:
