@@ -8,7 +8,8 @@ export async function prepareTransform(
     datastore: DataStore,
     fromCache: boolean,
     input: ApiInput | TransformInput,
-    data: any
+    data: any,
+    orgId?: string
   ): Promise<TransformConfig | null> {
 
     // Check if the response schema is empty
@@ -26,7 +27,7 @@ export async function prepareTransform(
 
     // Check if the transform config is cached
     if(fromCache) {
-      const cached = await datastore.getTransformConfigFromRequest(input as TransformInput, data);
+      const cached = await datastore.getTransformConfigFromRequest(input as TransformInput, data, orgId);
       if (cached) return { ...cached, ...input };
     }
 
@@ -62,12 +63,11 @@ export async function prepareTransform(
   } 
 
 export async function generateMapping(schema: any, payload: any, instruction?: string, retry = 0, error?: string): Promise<{jsonata: string, confidence: number, confidence_reasoning: string} | null> {
-  console.log("Generating mapping");
+  console.log("generating mapping from schema");
   try {
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
     });
-    console.log("generating mapping", schema);
     const userPrompt = 
 `
 
@@ -112,7 +112,7 @@ ${instruction ? `The instruction to get the source data was: ${instruction}` : '
     const transformation = await applyJsonataWithValidation(payload, content.jsonata, schema);
 
     if(!transformation.success) {
-      console.log("validation failed", transformation.error);
+      console.log("validation failed", String(transformation?.error).substring(0, 100));
       throw new Error(
         `Validation failed:
         ${transformation.error}

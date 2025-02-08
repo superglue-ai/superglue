@@ -17,4 +17,9 @@ export default defineConfig({
       ],
     },
   },
+  envDir: '../../',
+  esbuild: false,
+  build: {
+    sourcemap: true,
+  }
 })

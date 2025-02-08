@@ -1,9 +1,9 @@
+import { CacheMode, Context, RequestOptions, TransformConfig, TransformInput } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
-import { CacheMode, Context, TransformConfig, TransformInput, RequestOptions } from "@superglue/shared";
 import { v4 as uuidv4 } from 'uuid';
+import { applyJsonataWithValidation } from "../../utils/tools.js";
 import { prepareTransform } from "../../utils/transform.js";
 import { notifyWebhook } from "../../utils/webhook.js";
-import { applyJsonataWithValidation } from "../../utils/tools.js";
 
 export const transformResolver = async (
   _: any,
@@ -22,7 +22,7 @@ export const transformResolver = async (
   let preparedTransform: TransformConfig | null = null;
   try {
     // Transform response
-    preparedTransform = await prepareTransform(context.datastore, readCache, input, data);
+    preparedTransform = await prepareTransform(context.datastore, readCache, input, data, context.orgId);
     if(!preparedTransform || !preparedTransform.responseMapping) {
       throw new Error("Mapping could not be resolved");
     }
@@ -34,7 +34,7 @@ export const transformResolver = async (
 
     // Save configuration if requested
     if(writeCache) {
-      context.datastore.saveTransformConfig(input, data, preparedTransform);
+      context.datastore.saveTransformConfig(input, data, preparedTransform, context.orgId);
     }
     const completedAt = new Date();
 
