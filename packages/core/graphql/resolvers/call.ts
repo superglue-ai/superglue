@@ -1,10 +1,10 @@
+import { ApiConfig, ApiInput, ApiInputRequest, CacheMode, Context, RequestOptions } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
-import { ApiConfig, ApiInput, ApiInputRequest, CacheMode, RequestOptions, Context } from "@superglue/shared";
 import { v4 as uuidv4 } from 'uuid';
-import { prepareTransform } from "../../utils/transform.js";
 import { callEndpoint, prepareEndpoint } from "../../utils/api.js";
-import { notifyWebhook } from "../../utils/webhook.js";
 import { applyJsonataWithValidation, maskCredentials } from "../../utils/tools.js";
+import { prepareTransform } from "../../utils/transform.js";
+import { notifyWebhook } from "../../utils/webhook.js";
 
 export const callResolver = async (
   _: any,
@@ -32,7 +32,7 @@ export const callResolver = async (
       if (!readCache) {
         throw new Error("Cannot lookup by ID when cache is disabled");
       }
-      const cachedEndpoint = await context.datastore.getApiConfig(input.id);
+      const cachedEndpoint = await context.datastore.getApiConfig(input.id, context.orgId);
       if (!cachedEndpoint) {
         throw new Error(`No configuration found for ID: ${input.id}`);
       }
@@ -52,7 +52,7 @@ export const callResolver = async (
       try {
         // If we don't have a prepared endpoint yet and caching is enabled, try to get from cache
         if (!preparedEndpoint && readCache && !lastError) {
-          preparedEndpoint = await context.datastore.getApiConfigFromRequest(endpoint, payload);
+          preparedEndpoint = await context.datastore.getApiConfigFromRequest(endpoint, payload, context.orgId);
         }
         
         // If still no prepared endpoint, generate one
@@ -90,9 +90,9 @@ export const callResolver = async (
     const config = { ...preparedEndpoint, responseMapping: responseMapping};
     if(writeCache) {
       if(input.id) {
-        context.datastore.upsertApiConfig(input.id, config);
+        context.datastore.upsertApiConfig(input.id, config, context.orgId);
       } else {
-        context.datastore.saveApiConfig(endpoint, payload, config);
+        context.datastore.saveApiConfig(endpoint, payload, config, context.orgId);
       }
     }
 
@@ -108,7 +108,7 @@ export const callResolver = async (
       startedAt,
       completedAt: new Date(),
     };
-    context.datastore.createRun(result);
+    context.datastore.createRun(result, context.orgId);
   
     return {...result, data: transformedResponse.data};
   } catch (error) {
@@ -124,7 +124,7 @@ export const callResolver = async (
       startedAt,
       completedAt: new Date(),
     };
-    context.datastore.createRun(result);
+    context.datastore.createRun(result, context.orgId);
     return result;
   }
 };

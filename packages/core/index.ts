@@ -1,16 +1,19 @@
 import { ApolloServer } from '@apollo/server';
 import { expressMiddleware } from '@apollo/server/express4';
 import { ApolloServerPluginLandingPageLocalDefault } from '@apollo/server/plugin/landingPage/default';
+import cors from 'cors';
 import express from 'express';
 import http from 'http';
-import cors from 'cors';
-import { resolvers, typeDefs } from './graphql/graphql.js';
-import { handleQueryError, sessionId, telemetryClient, telemetryMiddleware } from './utils/telemetry.js';
 import { createDataStore } from './datastore/datastore.js';
+import { resolvers, typeDefs } from './graphql/graphql.js';
+import { handleQueryError, telemetryClient, telemetryMiddleware } from './utils/telemetry.js';
+import { SupabaseKeyManager } from './auth/supabaseKeyManager.js';
+import { LocalKeyManager } from './auth/localKeyManager.js';
 
 // Constants
 const PORT = process.env.GRAPHQL_PORT || 3000;
-const AUTH_TOKEN = process.env.AUTH_TOKEN;
+const authManager = process.env.AUTH_TOKEN ? new LocalKeyManager() : new SupabaseKeyManager();
+
 const DEBUG = process.env.DEBUG === 'true';
 export const DEFAULT_QUERY = `
 query Query {
@@ -62,22 +65,35 @@ const contextConfig = {
       !req.body.query.includes("__schema") && DEBUG) {
       console.log(`${req.body.query}`);
     }
-    return { datastore: datastore };
+    return { 
+      datastore: datastore,
+      orgId: req.orgId || ''
+    };
   }
 };
 
+// Authentication Helper Function to cache API keys
+
 // Authentication Middleware
-const authMiddleware = (req, res, next) => {
+const authMiddleware = async (req, res, next) => {
   if(req.path === '/health') {
     return res.status(200).send('OK');
   }
+
   const token = req.headers?.authorization?.split(" ")?.[1]?.trim() || req.query.token;
-  
-  if (!token || token !== AUTH_TOKEN) {
+  if(!token) {
     console.log(`Authentication failed for token: ${token}`);
     return res.status(401).send(getAuthErrorHTML(token));
   }
-  next();
+
+  const authResult = await authManager.authenticate(token);
+
+  if (!authResult.success) {
+    console.log(`Authentication failed for token: ${token}`);
+    return res.status(401).send(getAuthErrorHTML(token));
+  }
+  req.orgId = authResult.orgId;
+  return next();
 };
 
 // Helper Functions

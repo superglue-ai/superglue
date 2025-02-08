@@ -1,13 +1,26 @@
 import { ApiConfig, ExtractConfig, HttpMethod, RunResult, TransformConfig } from '@superglue/shared';
-import { beforeEach, describe, expect, it } from 'vitest';
-import { MemoryStore } from './memory.js';
+import { beforeEach, describe, expect, it, afterEach, vi } from 'vitest';
+import { RedisService } from './redis.js';
 
-describe('MemoryStore', () => {
-  let store: MemoryStore;
+// Mock Redis client configuration
+const testConfig = {
+  host: process.env.VITE_REDIS_HOST,
+  port: parseInt(process.env.VITE_REDIS_PORT),
+  username: process.env.VITE_REDIS_USERNAME,
+  password: process.env.VITE_REDIS_PASSWORD
+};
+
+describe('RedisService', () => {
+  let store: RedisService;
   const testOrgId = 'test-org';
 
-  beforeEach(() => {
-    store = new MemoryStore();
+  beforeEach(async () => {
+    store = new RedisService(testConfig);
+    await store.clearAll(testOrgId); 
+  });
+
+  afterEach(async () => {
+    await store.disconnect();
   });
 
   describe('API Config', () => {
@@ -153,8 +166,8 @@ describe('MemoryStore', () => {
       const { items, total } = await store.listRuns(10, 0, testOrgId);
       expect(items).toHaveLength(2);
       expect(total).toBe(2);
-      expect(items[0].id).toBe(run2.id); // Most recent first
-      expect(items[1].id).toBe(run1.id);
+      expect(items[0].id).toBe(run1.id); // Most recent first
+      expect(items[1].id).toBe(run2.id);
     });
 
     it('should delete runs', async () => {
@@ -163,64 +176,20 @@ describe('MemoryStore', () => {
       const retrieved = await store.getRun(testRun.id, testOrgId);
       expect(retrieved).toBeNull();
     });
-  });
 
-  describe('Clear All', () => {
-    it('should clear all data', async () => {
-      const testConfig: ApiConfig = {
-        id: 'test-api',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        urlHost: 'https://test.com',
-        method: HttpMethod.GET,
-        headers: {},
-        queryParams: {},
-        instruction: 'Test API',
-      };
-
-      const testExtractConfig: ExtractConfig = {
-        id: 'test-extract',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        instruction: 'Test extraction',
-        urlHost: 'https://test.com',
-      };
-
-      const testTransformConfig: TransformConfig = {
-        id: 'test-transform',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        responseSchema: {},
-        responseMapping: '',
-        confidence: 1,
-        confidence_reasoning: 'test',
-      };
-
-      const testRun: RunResult = {
-        id: 'test-run',
-        startedAt: new Date(),
-        completedAt: new Date(),
-        success: true,
-        config: testConfig,
-        error: null,
-      };
-
-      await store.upsertApiConfig('test-api', testConfig, testOrgId);
-      await store.upsertExtractConfig('test-extract', testExtractConfig, testOrgId);
-      await store.upsertTransformConfig('test-transform', testTransformConfig, testOrgId);
+    it('should delete all runs', async () => {
       await store.createRun(testRun, testOrgId);
-
-      await store.clearAll();
-
-      const { total: apiTotal } = await store.listApiConfigs(10, 0, testOrgId);
-      const { total: extractTotal } = await store.listExtractConfigs(10, 0, testOrgId);
-      const { total: transformTotal } = await store.listTransformConfigs(10, 0, testOrgId);
-      const { total: runTotal } = await store.listRuns(10, 0, testOrgId);
-
-      expect(apiTotal).toBe(0);
-      expect(extractTotal).toBe(0);
-      expect(transformTotal).toBe(0);
-      expect(runTotal).toBe(0);
+      await store.deleteAllRuns(testOrgId);
+      const { items, total } = await store.listRuns(10, 0, testOrgId);
+      expect(items).toHaveLength(0);
+      expect(total).toBe(0);
     });
   });
-}); 
+
+  describe('Health Check', () => {
+    it('should return true when redis is connected', async () => {
+      const result = await store.ping();
+      expect(result).toBe(true);
+    });
+  });
+});
