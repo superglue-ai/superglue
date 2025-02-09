@@ -7,7 +7,7 @@ describe('SupabaseKeyManager', () => {
   const mockEnv = {
     NEXT_PUBLIC_SUPABASE_URL: 'http://test.com',
     NEXT_PUBLIC_SUPABASE_ANON_KEY: 'test-anon-key',
-    NEXT_PUBLIC_PRIV_SUPABASE_SERVICE_ROLE_KEY: 'test-service-key'
+    PRIV_SUPABASE_SERVICE_ROLE_KEY: 'test-service-key'
   };
   let keyManager: SupabaseKeyManager;
 
