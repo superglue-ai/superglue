@@ -166,7 +166,11 @@ export function sample<T>(arr: any, sampleSize = 10): T[] {
   return result;
 }
 
-export function maskCredentials(message: string, credentials: Record<string, string>): string {
+export function maskCredentials(message: string, credentials?: Record<string, string>): string {
+  if (!credentials) {
+    return message;
+  }
+
   let maskedMessage = message;
   Object.entries(credentials).forEach(([key, value]) => {
     if (value && value.length > 0) {
