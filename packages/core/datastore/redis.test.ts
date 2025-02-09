@@ -15,12 +15,21 @@ describe('RedisService', () => {
   const testOrgId = 'test-org';
 
   beforeEach(async () => {
-    store = new RedisService(testConfig);
-    await store.clearAll(testOrgId); 
+    try {
+      store = new RedisService(testConfig);
+      await store.clearAll(testOrgId);
+    } catch (error) {
+      console.error('Failed to connect to Redis:', error);
+      throw error;
+    }
   });
 
   afterEach(async () => {
-    await store.disconnect();
+    try {
+      await store.disconnect();
+    } catch (error) {
+      console.error('Failed to disconnect from Redis:', error);
+    }
   });
 
   describe('API Config', () => {
