@@ -172,11 +172,11 @@ describe('RedisService', () => {
       await store.createRun(run1, testOrgId);
       await store.createRun(run2, testOrgId);
 
-      const { items, total } = await store.listRuns(10, 0, testOrgId);
+      const { items, total } = await store.listRuns(10, 0, null, testOrgId);
       expect(items).toHaveLength(2);
       expect(total).toBe(2);
-      expect(items[0].id).toBe(run1.id); // Most recent first
-      expect(items[1].id).toBe(run2.id);
+      expect(items[0].id).toBe(run2.id); // Most recent first
+      expect(items[1].id).toBe(run1.id);
     });
 
     it('should delete runs', async () => {
@@ -189,7 +189,7 @@ describe('RedisService', () => {
     it('should delete all runs', async () => {
       await store.createRun(testRun, testOrgId);
       await store.deleteAllRuns(testOrgId);
-      const { items, total } = await store.listRuns(10, 0, testOrgId);
+      const { items, total } = await store.listRuns(10, 0, null, testOrgId);
       expect(items).toHaveLength(0);
       expect(total).toBe(0);
     });

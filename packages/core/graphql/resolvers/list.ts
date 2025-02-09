@@ -37,6 +37,6 @@ export const listRunsResolver = async (
   context: Context,
   info: GraphQLResolveInfo
 ) => {
-  const result = await context.datastore.listRuns(limit, offset, context.orgId, configId);
+  const result = await context.datastore.listRuns(limit, offset, configId, context.orgId);
   return result;
 };
