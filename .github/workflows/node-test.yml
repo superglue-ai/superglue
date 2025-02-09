@@ -22,14 +22,14 @@ jobs:
       with:
         node-version: '20.x'
         cache: 'npm'
-        
-    - name: Debug Redis connection
-      run: |
-        echo "Testing Redis connection..."
-        nc -zv $VITE_REDIS_HOST $VITE_REDIS_PORT
-        
+                
     - name: Install dependencies
       run: npm ci
       
     - name: Run tests
-      run: npm run test
+      run: |
+        VITE_REDIS_HOST=$VITE_REDIS_HOST \
+        VITE_REDIS_PORT=$VITE_REDIS_PORT \
+        VITE_REDIS_USERNAME=$VITE_REDIS_USERNAME \
+        VITE_REDIS_PASSWORD=$VITE_REDIS_PASSWORD \
+        npm run test
