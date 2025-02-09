@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Layout, History, Database, Settings, Code, AlertCircle, Shield } from "lucide-react";
+import { Layout, History } from "lucide-react";
 
 const navItems = [
   { icon: Layout, label: 'Configurations', href: '/' },
