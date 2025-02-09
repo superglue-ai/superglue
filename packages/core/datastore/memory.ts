@@ -174,7 +174,7 @@ export class MemoryStore implements DataStore {
     return run;
   }
 
-  async listRuns(limit: number = 10, offset: number = 0, orgId: string, configId?: string): Promise<{ items: RunResult[], total: number }> {
+  async listRuns(limit: number = 10, offset: number = 0, configId?: string, orgId?: string): Promise<{ items: RunResult[], total: number }> {
     const index = this.storage.runsIndex.get(orgId) || [];
     const runIds = index
       .filter(entry => !configId || entry.configId === configId)
@@ -190,7 +190,7 @@ export class MemoryStore implements DataStore {
     return { items, total: index.length };
   }
 
-  async deleteRun(id: string, orgId: string): Promise<void> {
+  async deleteRun(id: string, orgId: string): Promise<boolean> {
     const key = this.getKey('run', id, orgId);
     const deleted = this.storage.runs.delete(key);
     
@@ -201,6 +201,7 @@ export class MemoryStore implements DataStore {
         index.splice(entryIndex, 1);
       }
     }
+    return deleted;
   }
 
   async deleteAllRuns(orgId: string): Promise<void> {
