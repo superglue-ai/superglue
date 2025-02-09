@@ -11,7 +11,7 @@ import {
   TableRow,
 } from "@/src/components/ui/table";
 import { RunResult } from '@superglue/shared';
-import { useConfig } from '../config-context';
+import { useConfig } from '@/src/app/config-context';
 import { SuperglueClient } from '@superglue/superglue';
 const RunsTable = () => {
   const router = useRouter();

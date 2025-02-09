@@ -21,7 +21,7 @@ import {
 } from "@/src/components/ui/sheet"
 import ApiConfigDetail from './[id]/page';
 import { ApiConfig } from '@superglue/shared';
-import { useConfig } from '../config-context';
+import { useConfig } from '@/src/app/config-context';
 import { SuperglueClient } from '@superglue/superglue';
 const ConfigTable = () => {
   const router = useRouter();
