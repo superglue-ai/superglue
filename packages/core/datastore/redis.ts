@@ -6,10 +6,11 @@ import { getAllKeys } from '../utils/tools.js';
 export class RedisService implements DataStore {
   private redis: RedisClientType;
   private readonly RUN_PREFIX = 'run:';
+  private readonly RUNS_BY_CONFIG_PREFIX = 'runs:config:';
   private readonly API_PREFIX = 'api:';
   private readonly EXTRACT_PREFIX = 'extract:';
   private readonly TRANSFORM_PREFIX = 'transform:';
-  private readonly TTL = 60 * 60 * 24 * 30; // 30 days
+  private readonly TTL = 60 * 60 * 24 * 90; // 90 days
 
   constructor(config: { 
     host: string; 
@@ -182,16 +183,41 @@ export class RedisService implements DataStore {
     return parseWithId(data, id);
   }
 
-  async listRuns(limit: number = 10, offset: number = 0, orgId?: string): Promise<{ items: RunResult[], total: number }> {
-    const runIds = await this.redis.zRange(`${orgId}:runs:index`, -offset - limit, -(offset + 1));
+  async listRuns(limit: number = 10, offset: number = 0, orgId?: string, configId?: string): Promise<{ items: RunResult[], total: number }> {
+    // Build the pattern based on whether we have a configId
+    const prefix = this.getPattern(this.TRANSFORM_PREFIX, orgId);
+    const pattern = configId 
+      ? `${prefix}${configId}:*`
+      : `${prefix}*`;
+      
+    // Get all matching keys
+    const keys = await this.redis.keys(pattern);
+    const total = keys.length;
     
+    if (total === 0) {
+      return { items: [], total: 0 };
+    }
+
+    // Get all matching runs data in parallel
     const runs = await Promise.all(
-      runIds.map(async (id) => {
-        const data = await this.redis.get(this.getKey(this.RUN_PREFIX, id, orgId));
-        return parseWithId(data, id);
+      keys.map(async (key) => {
+        const data = await this.redis.get(key);
+        const runId = configId 
+          ? key.replace(`${prefix}${configId}:`, '')
+          : key.replace(prefix, '');
+        return parseWithId(data, runId);
       })
     );
-    return { items: runs.filter((run): run is RunResult => run !== null), total: runIds.length };
+
+    // Filter nulls, sort by startedAt, and apply pagination
+    const validRuns = runs
+      .filter((run): run is RunResult => run !== null)
+      .sort((a, b) => (b.startedAt?.getTime() ?? 0) - (a.startedAt?.getTime() ?? 0));
+
+    return {
+      items: validRuns.slice(offset, offset + limit),
+      total
+    };
   }
 
   async deleteAllRuns(orgId: string): Promise<void> {
@@ -211,7 +237,7 @@ export class RedisService implements DataStore {
   }
 
   async createRun(run: RunResult, orgId?: string): Promise<RunResult> {
-    const key = this.getKey(this.RUN_PREFIX, run.id, orgId);
+    const key = `${orgId}:${this.RUN_PREFIX}${run.config?.id}:${run.id}`;
     const timestamp = run.startedAt.getTime();
     
     const multi = this.redis.multi();
@@ -224,13 +250,17 @@ export class RedisService implements DataStore {
         score: timestamp,
         value: run.id
     });
-
-    await multi.exec();
     return run;
   }
 
-  async deleteRun(id: string, orgId?: string): Promise<void> {
-    await this.redis.del(this.getKey(this.RUN_PREFIX, id, orgId));
+  async deleteRun(id: string, orgId?: string): Promise<boolean> {
+    // Since we don't know the configId, we need to scan for the key
+    const pattern = `${orgId}:${this.RUN_PREFIX}*${id}`;
+    for await (const key of this.redis.scanIterator({ MATCH: pattern })) {
+      await this.redis.del(key);
+      return true;
+    }
+    return false;
   }
 
   // Utility methods

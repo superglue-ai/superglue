@@ -8,7 +8,7 @@ export class MemoryStore implements DataStore {
     extracts: Map<string, ExtractConfig>;
     transforms: Map<string, TransformConfig>;
     runs: Map<string, RunResult>;
-    runsIndex: Map<string, { id: string; timestamp: number; }[]>;
+    runsIndex: Map<string, { id: string; timestamp: number; configId: string }[]>;
   };
 
   constructor() {
@@ -166,16 +166,20 @@ export class MemoryStore implements DataStore {
     const index = this.storage.runsIndex.get(orgId)!;
     index.push({
       id: run.id,
-      timestamp: run.startedAt.getTime()
+      timestamp: run.startedAt.getTime(),
+      configId: run.config.id
     });
     index.sort((a, b) => b.timestamp - a.timestamp);
     
     return run;
   }
 
-  async listRuns(limit: number = 10, offset: number = 0, orgId: string): Promise<{ items: RunResult[], total: number }> {
+  async listRuns(limit: number = 10, offset: number = 0, orgId: string, configId?: string): Promise<{ items: RunResult[], total: number }> {
     const index = this.storage.runsIndex.get(orgId) || [];
-    const runIds = index.slice(offset, offset + limit).map(entry => entry.id);
+    const runIds = index
+      .filter(entry => !configId || entry.configId === configId)
+      .slice(offset, offset + limit)
+      .map(entry => entry.id);
     
     const items = runIds.map(id => {
       const key = this.getKey('run', id, orgId);

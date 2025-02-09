@@ -44,7 +44,7 @@ import {
   TooltipTrigger,
 } from "@/src/components/ui/tooltip";
 import { useConfig } from '@/src/app/config-context';
-import { SuperglueClient } from '@superglue/superglue';
+import { SuperglueClient } from '@superglue/client';
 import {
   AlertDialog,
   AlertDialogAction,
