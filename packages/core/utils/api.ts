@@ -190,7 +190,6 @@ ${lastError ? `We tried it before, but it failed with the following error: ${las
       }
     ]
   });
-  console.log(completion.choices[0].message.content);
   const generatedConfig = JSON.parse(completion.choices[0].message.content);
 
   // Check for any {var} in the generated config that isn't in available variables

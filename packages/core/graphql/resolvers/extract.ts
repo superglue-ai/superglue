@@ -1,9 +1,9 @@
-import { GraphQLResolveInfo } from "graphql";
 import { CacheMode, Context, ExtractConfig, ExtractInput, RequestOptions } from "@superglue/shared";
+import { GraphQLResolveInfo } from "graphql";
 import { v4 as uuidv4 } from 'uuid';
-import { notifyWebhook } from "../../utils/webhook.js";
 import { callExtract, prepareExtract } from "../../utils/extract.js";
 import { maskCredentials } from "../../utils/tools.js";
+import { notifyWebhook } from "../../utils/webhook.js";
 
 export const extractResolver = async (
   _: any,
@@ -28,12 +28,12 @@ export const extractResolver = async (
     let lastError: string | null = null;
     do {
       preparedExtract = readCache ? 
-        await context.datastore.getExtractConfigFromRequest(endpoint, payload) : null;
+        await context.datastore.getExtractConfigFromRequest(endpoint, payload, context.orgId) : null;
       preparedExtract = preparedExtract || 
         await prepareExtract(endpoint, payload, credentials, lastError);
       try {
         response = await callExtract(preparedExtract, payload, credentials, options);
-        } catch (error) {
+      } catch (error) {
         console.log(`Extract call failed with status ${error.status}. Retrying...`);
         lastError = error?.message || JSON.stringify(error || {});
       }
@@ -44,10 +44,9 @@ export const extractResolver = async (
       throw new Error(`API call failed after ${retryCount} retries. Last error: ${lastError}`);
     }
 
-    
     // Save configuration if requested
     if(writeCache) {
-      context.datastore.saveExtractConfig(endpoint, payload, { ...preparedExtract});
+      context.datastore.saveExtractConfig(endpoint, payload, { ...preparedExtract}, context.orgId);
     }
     const completedAt = new Date();
 
