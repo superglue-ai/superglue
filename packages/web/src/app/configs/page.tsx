@@ -19,7 +19,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/src/components/ui/sheet"
-import ApiConfigDetail from './[id]/page';
+import ApiConfigDetail from '@/src/app/configs/[id]/page';
 import { ApiConfig } from '@superglue/shared';
 import { useConfig } from '@/src/app/config-context';
 import { SuperglueClient } from '@superglue/superglue';
