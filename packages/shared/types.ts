@@ -3,6 +3,7 @@ import { DataStore } from "./datastore.js";
 
 export type Context = {
   datastore: DataStore;
+  orgId: string;
 };
 
 export enum HttpMethod {
