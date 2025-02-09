@@ -1,12 +1,12 @@
 "use client"
 import { usePathname } from 'next/navigation'
-import { ConfigProvider } from './config-context'
-import { Sidebar } from '../components/Sidebar'
-import { CSPostHogProvider } from './providers'
+import { ConfigProvider } from '@/src/app/config-context'
+import { Sidebar } from '@/src/components/Sidebar'
+import { CSPostHogProvider } from '@/src/app/providers'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Toaster } from '../components/ui/toaster'
-import { ServerMonitor } from '../components/ServerMonitor'
-import { geistSans, geistMono } from './fonts'
+import { Toaster } from '@/src/components/ui/toaster'
+import { ServerMonitor } from '@/src/components/ServerMonitor'
+import { geistSans, geistMono } from '@/src/app/fonts'
 
 export function ClientWrapper({ children, config }: { children: React.ReactNode, config: any }) {
   const pathname = usePathname() 
