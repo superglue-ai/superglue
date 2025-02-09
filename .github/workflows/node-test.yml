@@ -23,6 +23,13 @@ jobs:
         node-version: '20.x'
         cache: 'npm'
         
+    - name: Debug environment variables
+      run: |
+        if [ -n "$VITE_REDIS_HOST" ]; then echo "VITE_REDIS_HOST is set"; else echo "VITE_REDIS_HOST is not set"; fi
+        if [ -n "$VITE_REDIS_PORT" ]; then echo "VITE_REDIS_PORT is set"; else echo "VITE_REDIS_PORT is not set"; fi
+        if [ -n "$VITE_REDIS_USERNAME" ]; then echo "VITE_REDIS_USERNAME is set"; else echo "VITE_REDIS_USERNAME is not set"; fi
+        if [ -n "$VITE_REDIS_PASSWORD" ]; then echo "VITE_REDIS_PASSWORD is set"; else echo "VITE_REDIS_PASSWORD is not set"; fi
+        
     - name: Install dependencies
       run: npm ci
       
