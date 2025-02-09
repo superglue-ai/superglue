@@ -8,7 +8,12 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-
+    env:
+      VITE_REDIS_HOST: ${{ secrets.REDIS_HOST }}
+      VITE_REDIS_PORT: ${{ secrets.REDIS_PORT }}
+      VITE_REDIS_USERNAME: ${{ secrets.REDIS_USERNAME }}
+      VITE_REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+      
     steps:
     - uses: actions/checkout@v3
     
