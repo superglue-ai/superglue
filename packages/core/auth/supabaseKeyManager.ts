@@ -15,19 +15,17 @@ export class SupabaseKeyManager implements ApiKeyManager {
   }
 
   public async getApiKeys(): Promise<{ orgId: string; key: string }[]> {
-    // Check cache first
-    if (this.cachedApiKeys.length > 0) {
-      return this.cachedApiKeys;
-    }
-
-    // If cache is empty or expired, refresh the keys
-    await this.refreshApiKeys();
     return this.cachedApiKeys;
   }
 
   public async authenticate(apiKey: string): Promise<{ orgId: string; success: boolean }> {
-    const keys = await this.getApiKeys();
-    const key = keys.find(k => k.key === apiKey);
+    let keys = await this.getApiKeys();
+    let key = keys.find(k => k.key === apiKey);
+    if (!key) {
+      await this.refreshApiKeys();
+      keys = await this.getApiKeys();
+      key = keys.find(k => k.key === apiKey);
+    }
     return { orgId: key?.orgId || '', success: !!key };
   }
 
