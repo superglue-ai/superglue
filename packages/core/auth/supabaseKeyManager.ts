@@ -64,9 +64,6 @@ export class SupabaseKeyManager implements ApiKeyManager {
 
   private async refreshApiKeys(): Promise<void> {
     try {
-      if (Date.now() - this.lastFetchTime < this.API_KEY_CACHE_TTL) {
-        return;
-      }
       this.cachedApiKeys = await this.fetchApiKeys();
       this.lastFetchTime = Date.now();
     } catch (error) {
