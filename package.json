@@ -16,9 +16,6 @@
   },
   "dependencies": {
     "@superglue/client": "^2.3.4",
-    "@superglue/core": "file:packages/core",
-    "@superglue/shared": "file:packages/shared",
-    "@superglue/web": "file:packages/web",
     "dotenv": "^16.4.7",
     "dotenv-cli": "^8.0.0"
   },

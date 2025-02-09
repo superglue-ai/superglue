@@ -1,4 +1,4 @@
-import "@/src/globals.css";
+import "./globals.css";
 import nextConfig from "@/next.config";
 import { ClientWrapper } from "@/src/app/client-layout";
 import { geistSans, geistMono } from '@/src/app/fonts'
