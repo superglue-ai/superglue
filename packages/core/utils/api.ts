@@ -181,7 +181,7 @@ Instructions: ${apiConfig.instruction}
 
 Base URL: ${composeUrl(apiConfig.urlHost, apiConfig.urlPath)}
 
-Documentation: ${String(documentation).slice(0, lastError ? 20000 : 10000)}
+Documentation: ${String(documentation).slice(0, 10000)}
 
 Available variables: ${vars.join(", ")}
 
