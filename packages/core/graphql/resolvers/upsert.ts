@@ -27,13 +27,13 @@ export const upsertApiResolver = async (
     }
 
     const config = { 
-      method: input.method || oldConfig?.method || HttpMethod.GET,
       urlHost: input.urlHost || oldConfig?.urlHost || '',
       urlPath: input.urlPath || oldConfig?.urlPath || '',
       instruction: input.instruction || oldConfig?.instruction || '',
       createdAt: input.createdAt || oldConfig?.createdAt || new Date(),
       updatedAt: new Date(),
       id: id,
+      method: input.method || oldConfig?.method,
       queryParams: input.queryParams || oldConfig?.queryParams,
       headers: input.headers || oldConfig?.headers,
       body: input.body || oldConfig?.body,
@@ -82,12 +82,12 @@ export const upsertExtractResolver = async (
     const oldConfig = await context.datastore.getExtractConfig(id, context.orgId);
     const config = { 
       id: id,
-      method: input.method || oldConfig?.method || HttpMethod.GET,
       urlHost: input.urlHost || oldConfig?.urlHost || '',
       urlPath: input.urlPath || oldConfig?.urlPath || '',
       instruction: input.instruction || oldConfig?.instruction || '',
       createdAt: oldConfig?.createdAt || new Date(),
       updatedAt: new Date(),
+      method: input.method || oldConfig?.method,
       queryParams: input.queryParams || oldConfig?.queryParams,
       headers: input.headers || oldConfig?.headers,
       body: input.body || oldConfig?.body,
