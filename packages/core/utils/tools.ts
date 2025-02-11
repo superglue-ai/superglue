@@ -142,6 +142,10 @@ export function replaceVariables(template: string, variables: Record<string, any
       return match; // Keep original if final value is invalid
     }
 
+    if(Array.isArray(value)) {
+      return JSON.stringify(value);
+    }
+    
     return String(value);
   });
 }

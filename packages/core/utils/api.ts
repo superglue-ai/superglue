@@ -146,7 +146,7 @@ async function generateApiConfig(apiConfig: Partial<ApiConfig>, documentation: s
     queryParams: z.record(z.any()).optional(),
     method: z.enum(Object.values(HttpMethod) as [string, ...string[]]),
     headers: z.record(z.string()).optional(),
-    body: z.string().optional(),
+    body: z.string().optional().describe("Format as JSON if not instructed otherwise."),
     authentication: z.enum(Object.values(AuthType) as [string, ...string[]]),
     dataPath: z.string().optional().describe("The path to the data you want to extract from the response. E.g. products.variants.size"),
     pagination: z.object({
