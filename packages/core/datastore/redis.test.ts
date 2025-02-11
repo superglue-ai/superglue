@@ -9,6 +9,10 @@ const testConfig = {
   username: process.env.VITE_REDIS_USERNAME,
   password: process.env.VITE_REDIS_PASSWORD
 };
+if (!testConfig.host || !testConfig.port || !testConfig.username || !testConfig.password) {
+  console.warn('Redis configuration is not set. Skipping tests.');
+  process.exit(0);
+}
 
 describe('RedisService', () => {
   let store: RedisService;
