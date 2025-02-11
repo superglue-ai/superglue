@@ -27,9 +27,12 @@ jobs:
       run: npm ci
       
     - name: Run tests
-      run: |
-        VITE_REDIS_HOST=$VITE_REDIS_HOST \
-        VITE_REDIS_PORT=$VITE_REDIS_PORT \
-        VITE_REDIS_USERNAME=$VITE_REDIS_USERNAME \
-        VITE_REDIS_PASSWORD=$VITE_REDIS_PASSWORD \
-        npm run test
+      run: npm run test
+      env:
+        REDIS_HOST: ${{ secrets.REDIS_HOST }}
+        REDIS_PORT: ${{ secrets.REDIS_PORT }}
+        REDIS_USERNAME: ${{ secrets.REDIS_USERNAME }}
+        REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+        NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+        PRIV_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.PRIV_SUPABASE_SERVICE_ROLE_KEY }}
