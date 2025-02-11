@@ -15,26 +15,24 @@ export class SupabaseKeyManager implements ApiKeyManager {
   }
 
   public async getApiKeys(): Promise<{ orgId: string; key: string }[]> {
-    // Check cache first
-    if (this.cachedApiKeys.length > 0) {
-      return this.cachedApiKeys;
-    }
-
-    // If cache is empty or expired, refresh the keys
-    await this.refreshApiKeys();
     return this.cachedApiKeys;
   }
 
   public async authenticate(apiKey: string): Promise<{ orgId: string; success: boolean }> {
-    const keys = await this.getApiKeys();
-    const key = keys.find(k => k.key === apiKey);
+    let keys = await this.getApiKeys();
+    let key = keys.find(k => k.key === apiKey);
+    if (!key) {
+      await this.refreshApiKeys();
+      keys = await this.getApiKeys();
+      key = keys.find(k => k.key === apiKey);
+    }
     return { orgId: key?.orgId || '', success: !!key };
   }
 
   private async fetchApiKeys(): Promise<{ orgId: string; key: string }[]> {
     const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    const SUPABASE_SERVICE_ROLE_KEY = process.env.NEXT_PUBLIC_PRIV_SUPABASE_SERVICE_ROLE_KEY;
+    const SUPABASE_SERVICE_ROLE_KEY = process.env.PRIV_SUPABASE_SERVICE_ROLE_KEY;
 
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_SERVICE_ROLE_KEY) {
       console.error('Missing required Supabase environment variables');
@@ -66,9 +64,6 @@ export class SupabaseKeyManager implements ApiKeyManager {
 
   private async refreshApiKeys(): Promise<void> {
     try {
-      if (Date.now() - this.lastFetchTime < this.API_KEY_CACHE_TTL) {
-        return;
-      }
       this.cachedApiKeys = await this.fetchApiKeys();
       this.lastFetchTime = Date.now();
     } catch (error) {

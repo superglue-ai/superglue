@@ -98,4 +98,8 @@ export const API_PROMPT = `You are an API configuration assistant. Generate API 
       e.g. headers: {
         "X-Page": "{page}"
       }
+- to insert arrays, use the following format:
+  e.g. body: {
+    "items": {items}
+  }
 `;

@@ -1,50 +1,8 @@
 'use client'
 
-import React from 'react';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft, Info } from 'lucide-react';
-import { Button } from "@/src/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/src/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/src/components/ui/select";
-import { Input } from "@/src/components/ui/input";
-import { Label } from "@/src/components/ui/label";
-import { Textarea } from "@/src/components/ui/textarea";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/src/components/ui/tabs";
-import JsonSchemaEditor from "@/src/components/JsonSchemaEditor";
-import { ApiConfig, ApiInput, AuthType, CacheMode, HttpMethod, PaginationType } from '@superglue/shared';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/src/components/ui/dialog";
-import { useToast } from "@/src/hooks/use-toast";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/src/components/ui/tooltip";
 import { useConfig } from '@/src/app/config-context';
-import { SuperglueClient } from '@superglue/superglue';
+import { ApiPlayground } from '@/src/components/apiPlayground';
+import JsonSchemaEditor from "@/src/components/JsonSchemaEditor";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -55,7 +13,49 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/src/components/ui/alert-dialog";
-import { ApiPlayground } from '@/src/components/apiPlayground';
+import { Button } from "@/src/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/src/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/src/components/ui/dialog";
+import { Input } from "@/src/components/ui/input";
+import { Label } from "@/src/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/src/components/ui/select";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/src/components/ui/tabs";
+import { Textarea } from "@/src/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/src/components/ui/tooltip";
+import { useToast } from "@/src/hooks/use-toast";
+import { isJsonEmpty } from '@/src/lib/utils';
+import { ApiConfig, ApiInput, AuthType, CacheMode, HttpMethod, PaginationType, SuperglueClient } from '@superglue/client';
+import { ArrowLeft, Info } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import React from 'react';
 
 const HTTP_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'];
 const AUTH_TYPES = ['NONE', 'HEADER', 'QUERY_PARAM', 'OAUTH2'];
@@ -222,13 +222,13 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
     // Optional fields
     const optionalFields = {
       urlPath: formData.urlPath,
-      headers: formData.headers ? JSON.parse(formData.headers) : undefined,
-      queryParams: formData.queryParams ? JSON.parse(formData.queryParams) : undefined,
+      headers: isJsonEmpty(formData.headers) ? undefined : JSON.parse(formData.headers),
+      queryParams: isJsonEmpty(formData.queryParams) ? undefined : JSON.parse(formData.queryParams),
       body: formData.body,
       dataPath: formData.dataPath,
       method: formData.method !== "auto" ? formData.method as HttpMethod : undefined,
       authentication: formData.authentication !== "auto" ? formData.authentication as AuthType : undefined,
-      responseSchema: formData.responseSchema ? JSON.parse(formData.responseSchema) : undefined,
+      responseSchema: isJsonEmpty(formData.responseSchema) ? undefined : JSON.parse(formData.responseSchema),
       responseMapping: formData.responseMapping ? String(formData.responseMapping) : undefined,
       documentationUrl: formData.documentationUrl,
       pagination: formData.paginationType !== "auto" ? {
