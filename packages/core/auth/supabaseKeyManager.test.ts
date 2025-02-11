@@ -44,7 +44,11 @@ describe('SupabaseKeyManager', () => {
       ok: true,
       json: async () => mockData
     });
-
+    // to fetch the keys immediately
+    const testAuth = await keyManager.authenticate(mockData[0].key);
+    const testAuth2 = await keyManager.authenticate(mockData[1].key);
+    expect(testAuth).toEqual({ orgId: '1', success: true });
+    expect(testAuth2).toEqual({ orgId: '', success: false });
     const result = await keyManager.getApiKeys();
     expect(result).toEqual([
       { orgId: '1', key: 'key1' },
@@ -55,10 +59,13 @@ describe('SupabaseKeyManager', () => {
   it('should return empty array and log error when environment variables are missing', async () => {
     process.env = {};
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    
-    const result = await keyManager.getApiKeys();
-    
-    expect(result).toEqual([]);
+    const mockData = [
+      { org_id: '1', key: 'key1', is_active: true }
+    ];
+    const keyManagerTest = new SupabaseKeyManager();
+    await keyManagerTest.authenticate(mockData[0].key);
+    const keys = await keyManagerTest.getApiKeys();
+    expect(keys).toEqual([]);
     expect(consoleSpy).toHaveBeenCalledWith('Missing required Supabase environment variables');
     
     consoleSpy.mockRestore();
@@ -76,22 +83,19 @@ describe('SupabaseKeyManager', () => {
 
   it('should cache results and not fetch again within TTL', async () => {
     const mockData = [
-      { org_id: '1', key: 'key1', is_active: true }
+      { org_id: '1', key: 'key1', is_active: true },
+      { org_id: '2', key: 'key2', is_active: true }
     ];
 
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => mockData
     });
-
-    // First call should fetch
-    await keyManager.getApiKeys();
-    // Second call should use cache
-    await keyManager.getApiKeys();
-    // Third call should use cache
-    await keyManager.getApiKeys();
-    // Fourth call should use cache
-    await keyManager.getApiKeys();
+    await keyManager.authenticate(mockData[0].key);
+    await keyManager.authenticate(mockData[0].key);
+    await keyManager.authenticate(mockData[1].key);
+    await keyManager.authenticate(mockData[1].key);
+    await keyManager.authenticate(mockData[1].key);
 
     // one call plus interval call
     expect(mockFetch).toHaveBeenCalledTimes(2);
