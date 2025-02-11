@@ -9,7 +9,7 @@ export class RedisService implements DataStore {
   private readonly API_PREFIX = 'api:';
   private readonly EXTRACT_PREFIX = 'extract:';
   private readonly TRANSFORM_PREFIX = 'transform:';
-  private readonly TTL = 60 * 60 * 24 * 30; // 30 days
+  private readonly TTL = 60 * 60 * 24 * 90; // 90 days
 
   constructor(config: { 
     host: string; 
@@ -35,11 +35,18 @@ export class RedisService implements DataStore {
   }
 
   private getKey(prefix: string, id: string, orgId: string): string {
-    return `${orgId}:${prefix}${id}`;
+    return `${orgId ? `${orgId}:` : ''}${prefix}${id}`;
   }
 
   private getPattern(prefix: string, orgId?: string): string {
     return `${orgId ? `${orgId}:` : ''}${prefix}*`;
+  }
+
+  private getRunsByConfigPattern(prefix: string, configId: string, orgId?: string): string {
+    return `${orgId ? `${orgId}:` : ''}${prefix}${configId}:*`;
+  }
+  private getRunByIdPattern(prefix: string, id: string, orgId?: string): string {
+    return `${orgId ? `${orgId}:` : ''}${prefix}*:${id}`;
   }
 
   // API Config Methods
@@ -178,64 +185,75 @@ export class RedisService implements DataStore {
   }
 
   async getRun(id: string, orgId?: string): Promise<RunResult | null> {
-    const data = await this.redis.get(this.getKey(this.RUN_PREFIX, id, orgId));
+    const pattern = this.getRunByIdPattern(this.RUN_PREFIX, id, orgId);
+    const keys = await this.redis.keys(pattern);
+    if (keys.length === 0) {
+      return null;
+    }
+    const data = await this.redis.get(keys[0]);
     return parseWithId(data, id);
   }
 
-  async listRuns(limit: number = 10, offset: number = 0, orgId?: string): Promise<{ items: RunResult[], total: number }> {
-    const runIds = await this.redis.zRange(`${orgId}:runs:index`, -offset - limit, -(offset + 1));
+  async listRuns(limit: number = 10, offset: number = 0, configId?: string, orgId?: string): Promise<{ items: RunResult[], total: number }> {
+    const pattern = configId 
+      ? this.getRunsByConfigPattern(this.RUN_PREFIX, configId, orgId)
+      : this.getPattern(this.RUN_PREFIX, orgId);
     
+    const keys = await this.redis.keys(pattern);
+    const total = keys.length;
+    
+    if (total === 0) {
+      return { items: [], total: 0 };
+    }
+
     const runs = await Promise.all(
-      runIds.map(async (id) => {
-        const data = await this.redis.get(this.getKey(this.RUN_PREFIX, id, orgId));
-        return parseWithId(data, id);
+      keys.map(async (key) => {
+        const data = await this.redis.get(key);
+        const runId = key.split(':').pop()!;
+        return parseWithId(data, runId);
       })
     );
-    return { items: runs.filter((run): run is RunResult => run !== null), total: runIds.length };
+
+    const validRuns = runs
+      .filter((run): run is RunResult => run !== null)
+      .sort((a, b) => (b.startedAt?.getTime() ?? 0) - (a.startedAt?.getTime() ?? 0));
+
+    return {
+      items: validRuns.slice(offset, offset + limit),
+      total
+    };
   }
 
   async deleteAllRuns(orgId: string): Promise<void> {
-    const runIds = await this.redis.zRange(`${orgId}:runs:index`, 0, -1);
+    const pattern = this.getPattern(this.RUN_PREFIX, orgId);
+    const keys = await this.redis.keys(pattern);
     
-    const multi = this.redis.multi();
-    
-    // Delete all run records
-    for (const id of runIds) {
-      multi.del(this.getKey(this.RUN_PREFIX, id, orgId));
+    if (keys.length > 0) {
+      await this.redis.del(keys);
     }
-    
-    // Delete the index
-    multi.del(`${orgId}:runs:index`);
-    
-    await multi.exec();
   }
 
   async createRun(run: RunResult, orgId?: string): Promise<RunResult> {
-    const key = this.getKey(this.RUN_PREFIX, run.id, orgId);
-    const timestamp = run.startedAt.getTime();
-    
-    const multi = this.redis.multi();
-    
-    multi.set(key, JSON.stringify(run), {
-        EX: this.TTL
+    const key = this.getKey(this.RUN_PREFIX, `${run.config?.id}:${run.id}`, orgId);
+    await this.redis.set(key, JSON.stringify(run), {
+      EX: this.TTL
     });
-    
-    multi.zAdd(`${orgId}:runs:index`, {
-        score: timestamp,
-        value: run.id
-    });
-
-    await multi.exec();
     return run;
   }
 
-  async deleteRun(id: string, orgId?: string): Promise<void> {
-    await this.redis.del(this.getKey(this.RUN_PREFIX, id, orgId));
+  async deleteRun(id: string, orgId?: string): Promise<boolean> {
+    const pattern = this.getRunByIdPattern(this.RUN_PREFIX, id, orgId);
+    const keys = await this.redis.keys(pattern);
+    if (keys.length === 0) {
+      return null;
+    }
+    const result = await this.redis.del(keys[0]);
+    return result > 0;
   }
 
   // Utility methods
   async clearAll(orgId: string): Promise<void> {
-    const pattern = `${orgId}:*`;
+    const pattern = `${orgId ? `${orgId}:` : ''}*`;
     const keys = await this.redis.keys(pattern);
     if (keys.length > 0) {
       await this.redis.del(keys);

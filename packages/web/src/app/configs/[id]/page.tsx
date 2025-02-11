@@ -12,8 +12,8 @@ import {
 } from "@/src/components/ui/accordion";
 import { composeUrl } from '@/src/lib/utils';
 import { ApiConfig } from '@superglue/shared';
-import { useConfig } from '../../config-context';
-import { SuperglueClient } from '@superglue/superglue';
+import { useConfig } from '@/src/app/config-context';
+import { SuperglueClient } from '@superglue/client';
 
 const ApiConfigDetail = ({ id, onClose }: { id?: string; onClose?: () => void }) => {
   const router = useRouter();

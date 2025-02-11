@@ -15,19 +15,28 @@ export const telemetryClient = !isTelemetryDisabled && !isDebug ?
     { host: config.posthog.host }
   ) : null;
 
+if(telemetryClient) {
+  console.log("superglue uses telemetry to understand how many users are using the platform. See self-hosting guide for more info.");
+}
+
 export const telemetryMiddleware = (req, res, next) => {
+  if(!telemetryClient) {
+    return next();
+  }
+
   if(req?.body?.query && !(req.body.query.includes("IntrospectionQuery") || req.body.query.includes("__schema"))) {
     // we track the query, but NOT the variables or the response
     // the query just contains the superglue endpoint that you call, e.g. "listCalls", 
     // but not which actual endpoint you call or what payload / auth you use
-    telemetryClient?.capture({
-        distinctId: sessionId,
+
+    telemetryClient.capture({
+        distinctId: req.orgId || sessionId,
         event: 'query',
         properties: {
           query: req.body.query
         }
       });
-      }
+    }
   next();
 };
 

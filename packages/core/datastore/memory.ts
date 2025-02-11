@@ -8,7 +8,7 @@ export class MemoryStore implements DataStore {
     extracts: Map<string, ExtractConfig>;
     transforms: Map<string, TransformConfig>;
     runs: Map<string, RunResult>;
-    runsIndex: Map<string, { id: string; timestamp: number; }[]>;
+    runsIndex: Map<string, { id: string; timestamp: number; configId: string }[]>;
   };
 
   constructor() {
@@ -28,7 +28,7 @@ export class MemoryStore implements DataStore {
   private getOrgItems<T>(map: Map<string, T>, prefix: string, orgId?: string): T[] {
     return Array.from(map.entries())
       .filter(([key]) => key.startsWith(`${orgId ? `${orgId}:` : ''}${prefix}:`))
-      .map(([key, value]) => ({ ...value, id: key.split(':')[2] })) as T[];
+      .map(([key, value]) => ({ ...value, id: key.split(':').pop() })) as T[];
   }
 
   // API Config Methods
@@ -39,9 +39,10 @@ export class MemoryStore implements DataStore {
   }
 
   async listApiConfigs(limit: number = 10, offset: number = 0, orgId?: string): Promise<{ items: ApiConfig[], total: number }> {
-    const items = this.getOrgItems(this.storage.apis, 'api', orgId)
+    const orgItems = this.getOrgItems(this.storage.apis, 'api', orgId);
+    const items = orgItems
       .slice(offset, offset + limit);
-    const total = this.getOrgItems(this.storage.apis, 'api', orgId).length;
+    const total = orgItems.length;
     return { items, total };
   }
 
@@ -166,16 +167,20 @@ export class MemoryStore implements DataStore {
     const index = this.storage.runsIndex.get(orgId)!;
     index.push({
       id: run.id,
-      timestamp: run.startedAt.getTime()
+      timestamp: run.startedAt.getTime(),
+      configId: run.config.id
     });
     index.sort((a, b) => b.timestamp - a.timestamp);
     
     return run;
   }
 
-  async listRuns(limit: number = 10, offset: number = 0, orgId: string): Promise<{ items: RunResult[], total: number }> {
+  async listRuns(limit: number = 10, offset: number = 0, configId?: string, orgId?: string): Promise<{ items: RunResult[], total: number }> {
     const index = this.storage.runsIndex.get(orgId) || [];
-    const runIds = index.slice(offset, offset + limit).map(entry => entry.id);
+    const runIds = index
+      .filter(entry => !configId || entry.configId === configId)
+      .slice(offset, offset + limit)
+      .map(entry => entry.id);
     
     const items = runIds.map(id => {
       const key = this.getKey('run', id, orgId);
@@ -186,7 +191,7 @@ export class MemoryStore implements DataStore {
     return { items, total: index.length };
   }
 
-  async deleteRun(id: string, orgId: string): Promise<void> {
+  async deleteRun(id: string, orgId: string): Promise<boolean> {
     const key = this.getKey('run', id, orgId);
     const deleted = this.storage.runs.delete(key);
     
@@ -197,6 +202,7 @@ export class MemoryStore implements DataStore {
         index.splice(entryIndex, 1);
       }
     }
+    return deleted;
   }
 
   async deleteAllRuns(orgId: string): Promise<void> {

@@ -218,7 +218,7 @@ input TransformInputRequest @oneOf {
 }
 
 type Query {
-  listRuns(limit: Int = 10, offset: Int = 0): RunList!
+  listRuns(limit: Int = 10, offset: Int = 0, configId: ID): RunList!
   listApis(limit: Int = 10, offset: Int = 0): ApiList!
   listTransforms(limit: Int = 10, offset: Int = 0): TransformList!
   listExtracts(limit: Int = 10, offset: Int = 0): ExtractList!

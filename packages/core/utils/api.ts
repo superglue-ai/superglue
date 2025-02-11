@@ -146,7 +146,7 @@ async function generateApiConfig(apiConfig: Partial<ApiConfig>, documentation: s
     queryParams: z.record(z.any()).optional(),
     method: z.enum(Object.values(HttpMethod) as [string, ...string[]]),
     headers: z.record(z.string()).optional(),
-    body: z.string().optional(),
+    body: z.string().optional().describe("Format as JSON if not instructed otherwise."),
     authentication: z.enum(Object.values(AuthType) as [string, ...string[]]),
     dataPath: z.string().optional().describe("The path to the data you want to extract from the response. E.g. products.variants.size"),
     pagination: z.object({
@@ -181,7 +181,7 @@ Instructions: ${apiConfig.instruction}
 
 Base URL: ${composeUrl(apiConfig.urlHost, apiConfig.urlPath)}
 
-Documentation: ${String(documentation).slice(0, lastError ? 20000 : 10000)}
+Documentation: ${String(documentation).slice(0, 10000)}
 
 Available variables: ${vars.join(", ")}
 
@@ -199,9 +199,23 @@ ${lastError ? `We tried it before, but it failed with the following error: ${las
     throw new Error(`Generated config contains variables that are not available. Please remove them: ${invalidVars.join(', ')}`);
   }
   return {
-    ...generatedConfig,
-    ...apiConfig,
-  } as ApiConfig;
+    urlHost: apiConfig.urlHost || generatedConfig.urlHost,
+    urlPath: apiConfig.urlPath || generatedConfig.urlPath,
+    instruction: apiConfig.instruction || generatedConfig.instruction,
+    method: apiConfig.method || generatedConfig.method,
+    queryParams: apiConfig.queryParams || generatedConfig.queryParams,
+    headers: apiConfig.headers || generatedConfig.headers,
+    body: apiConfig.body || generatedConfig.body,
+    authentication: apiConfig.authentication || generatedConfig.authentication,
+    pagination: apiConfig.pagination || generatedConfig.pagination,
+    dataPath: apiConfig.dataPath || generatedConfig.dataPath,
+    documentationUrl: apiConfig.documentationUrl,
+    responseSchema: apiConfig.responseSchema,
+    responseMapping: apiConfig.responseMapping,
+    createdAt: apiConfig.createdAt || new Date(),
+    updatedAt: new Date(),
+    id: apiConfig.id,
+    } as ApiConfig;
 }
 
 function validateVariables(generatedConfig: any, vars: string[]) {
