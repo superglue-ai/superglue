@@ -199,9 +199,23 @@ ${lastError ? `We tried it before, but it failed with the following error: ${las
     throw new Error(`Generated config contains variables that are not available. Please remove them: ${invalidVars.join(', ')}`);
   }
   return {
-    ...generatedConfig,
-    ...apiConfig,
-  } as ApiConfig;
+    urlHost: apiConfig.urlHost || generatedConfig.urlHost,
+    urlPath: apiConfig.urlPath || generatedConfig.urlPath,
+    instruction: apiConfig.instruction || generatedConfig.instruction,
+    method: apiConfig.method || generatedConfig.method,
+    queryParams: apiConfig.queryParams || generatedConfig.queryParams,
+    headers: apiConfig.headers || generatedConfig.headers,
+    body: apiConfig.body || generatedConfig.body,
+    authentication: apiConfig.authentication || generatedConfig.authentication,
+    pagination: apiConfig.pagination || generatedConfig.pagination,
+    dataPath: apiConfig.dataPath || generatedConfig.dataPath,
+    documentationUrl: apiConfig.documentationUrl,
+    responseSchema: apiConfig.responseSchema,
+    responseMapping: apiConfig.responseMapping,
+    createdAt: apiConfig.createdAt || new Date(),
+    updatedAt: new Date(),
+    id: apiConfig.id,
+    } as ApiConfig;
 }
 
 function validateVariables(generatedConfig: any, vars: string[]) {

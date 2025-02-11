@@ -28,7 +28,7 @@ export class MemoryStore implements DataStore {
   private getOrgItems<T>(map: Map<string, T>, prefix: string, orgId?: string): T[] {
     return Array.from(map.entries())
       .filter(([key]) => key.startsWith(`${orgId ? `${orgId}:` : ''}${prefix}:`))
-      .map(([key, value]) => ({ ...value, id: key.split(':')[2] })) as T[];
+      .map(([key, value]) => ({ ...value, id: key.split(':').pop() })) as T[];
   }
 
   // API Config Methods
@@ -39,9 +39,10 @@ export class MemoryStore implements DataStore {
   }
 
   async listApiConfigs(limit: number = 10, offset: number = 0, orgId?: string): Promise<{ items: ApiConfig[], total: number }> {
-    const items = this.getOrgItems(this.storage.apis, 'api', orgId)
+    const orgItems = this.getOrgItems(this.storage.apis, 'api', orgId);
+    const items = orgItems
       .slice(offset, offset + limit);
-    const total = this.getOrgItems(this.storage.apis, 'api', orgId).length;
+    const total = orgItems.length;
     return { items, total };
   }
 
