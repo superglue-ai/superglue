@@ -147,22 +147,21 @@ Expected response: `OK`
 - **Dashboard**: `http://localhost:3001/`
 - **GraphQL Playground**: `http://localhost:3000/graphql`
 
-## Security Considerations
+## Other Considerations
 
 1. **Network Security**
    - Use reverse proxy (nginx/traefik) for TLS termination
    - Implement IP whitelisting if needed
-   - Keep ports 3000 and 3001 private unless necessary
+   - Keep access to the dashboard private since it is not protected by auth, or implement nginx basic auth to protect it
 
 2. **Authentication**
    - Change default AUTH_TOKEN
    - Use strong Redis passwords
    - Rotate credentials regularly
 
-3. **Rate Limiting**
-   - Configure `RATE_LIMIT_REQUESTS` appropriately
-   - Monitor usage patterns
-   - Implement additional rate limiting at proxy level if needed
+3. **Telemetry**
+   - Superglue uses telemetry to understand how many users are using the platform.
+   - You can opt out by setting the DISABLE_TELEMETRY environment variable to true.
 
 ## Performance Tuning
 
