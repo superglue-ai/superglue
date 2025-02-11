@@ -25,6 +25,7 @@
   "type": "module",
   "dependencies": {
     "@apollo/server": "^4.11.2",
+    "@superglue/shared": "file:../shared",
     "axios": "^1.7.9",
     "console-stamp": "^3.1.2",
     "cors": "^2.8.5",
