@@ -13,5 +13,5 @@ export const generateSchemaResolver = async (
     }
     const schema = await generateSchema(instruction, responseData);
     
-    return JSON.stringify(schema);
+    return schema;
 };
