@@ -78,6 +78,6 @@ When a `webhookUrl` is provided in the options:
 - Failure: `POST` request with `{success: false, error: message}`
 
 See also:
-- [Types Reference](types.md) for detailed type definitions
-- [Queries](queries.md) for available queries
-- [Mutations](mutations.md) for available mutations 
+- [Types Reference](types) for detailed type definitions
+- [Queries](queries) for available queries
+- [Mutations](mutations) for available mutations 
