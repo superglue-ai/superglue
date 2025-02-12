@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { generateSchema } from './schema.js'
 
 describe('generateSchema', () => {
+  if (!process.env.OPENAI_API_KEY) {
+    it.skip('skips tests when OPENAI_API_KEY is not set', () => {})
+    return
+  }
   it('should generate a valid schema', async () => {
     const expectedSchema = {
       type: "object",
