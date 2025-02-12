@@ -103,3 +103,35 @@ export const API_PROMPT = `You are an API configuration assistant. Generate API 
     "items": {items}
   }
 `;
+
+export const GENERATE_SCHEMA_PROMPT = `You are a json schema generator assistant. Generate a JSON schema based on instructions and response data.
+If the response data is an array, make the schema an array of objects and name the array object "results".
+
+Make the schema as simple as possible.
+
+- The schema should be a JSON schema object.
+- The schema should be valid.
+
+Example:
+
+Instructions: Get me all characters with only their name
+Response data: [{"name": "Rick", "species": "Human"}, {"name": "Morty", "species": "Human"}]
+
+Schema:
+{
+  "type": "object",
+  "properties": {
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {"type": "string"}
+        },
+        "required": ["name"]
+      }
+    },
+    "required": ["results"]
+  }
+}
+`;
