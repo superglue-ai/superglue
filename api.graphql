@@ -227,6 +227,7 @@ type Query {
   getApi(id: ID!): ApiConfig
   getTransform(id: ID!): TransformConfig
   getExtract(id: ID!): ExtractConfig
+  generateSchema(instruction: String!, responseData: String): JSONSchema!
 }
 
 type Mutation {
