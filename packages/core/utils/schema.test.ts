@@ -1,10 +1,16 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { generateSchema } from './schema.js'
 
 describe('generateSchema', () => {
-  if (!process.env.OPENAI_API_KEY) {
-    it.skip('skips tests when OPENAI_API_KEY is not set', () => {})
+  vi.setConfig({ testTimeout: 20000 }) // 20 seconds timeout
+
+  if(!process.env.VITE_OPENAI_API_KEY) {
+    it('skips tests when VITE_OPENAI_API_KEY is not set', () => {})
     return
+  }
+  else {
+    process.env.OPENAI_API_KEY = process.env.VITE_OPENAI_API_KEY;
+    process.env.OPENAI_MODEL = process.env.VITE_OPENAI_MODEL || 'gpt-4o-2024-11-20';
   }
   it('should generate a valid schema', async () => {
     const expectedSchema = {
