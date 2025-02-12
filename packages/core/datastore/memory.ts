@@ -168,7 +168,7 @@ export class MemoryStore implements DataStore {
     index.push({
       id: run.id,
       timestamp: run.startedAt.getTime(),
-      configId: run.config.id
+      configId: run.config?.id
     });
     index.sort((a, b) => b.timestamp - a.timestamp);
     

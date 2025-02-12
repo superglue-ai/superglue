@@ -49,7 +49,8 @@ const apolloConfig = {
             console.error(errors);
           }
           if (errors && telemetryClient) {
-            handleQueryError(errors, requestContext.request.query);
+            const orgId = requestContext.contextValue.orgId;
+            handleQueryError(errors, requestContext.request.query, orgId);
           }
         }
       })
@@ -93,6 +94,7 @@ const authMiddleware = async (req, res, next) => {
     return res.status(401).send(getAuthErrorHTML(token));
   }
   req.orgId = authResult.orgId;
+  req.headers["orgId"] = authResult.orgId;
   return next();
 };
 
