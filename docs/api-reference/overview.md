@@ -19,11 +19,7 @@ The Core API provides GraphQL endpoints for managing API configurations, data ex
 
 ## Endpoint
 
-You can call the superglue GraphQL API via <code>https://graphql.superglue.cloud</code> or by not specifying an endpoint in the SDK. For the self-hosted version, the default port for the GraphQL interface is 3000.
-
-```http
-Authorization: Bearer YOUR_AUTH_TOKEN
-```
+You can call the superglue GraphQL API via [`https://graphql.superglue.cloud`](https://graphql.superglue.cloud) or by not specifying an endpoint in the SDK. For the self-hosted version, the default port for the GraphQL interface is 3000.
 
 ## Authentication
 
