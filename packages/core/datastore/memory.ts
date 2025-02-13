@@ -33,6 +33,7 @@ export class MemoryStore implements DataStore {
 
   // API Config Methods
   async getApiConfig(id: string, orgId: string): Promise<ApiConfig | null> {
+    if(!id) return null;
     const key = this.getKey('api', id, orgId);
     const config = this.storage.apis.get(key);
     return config ? { ...config, id } : null;
@@ -47,6 +48,7 @@ export class MemoryStore implements DataStore {
   }
 
   async saveApiConfig(request: ApiInput, payload: any, config: ApiConfig, orgId?: string): Promise<ApiConfig> {
+    if(!request) return null;
     const hash = objectHash({request, payloadKeys: getAllKeys(payload)});
     const key = this.getKey('api', hash, orgId);
     this.storage.apis.set(key, config);
@@ -54,6 +56,7 @@ export class MemoryStore implements DataStore {
   }
 
   async getApiConfigFromRequest(request: ApiInput, payload: any, orgId?: string): Promise<ApiConfig | null> {
+    if(!request) return null;
     const hash = objectHash({request, payloadKeys: getAllKeys(payload)});
     const key = this.getKey('api', hash, orgId);
     const config = this.storage.apis.get(key);
@@ -61,18 +64,21 @@ export class MemoryStore implements DataStore {
   }
 
   async upsertApiConfig(id: string, config: ApiConfig, orgId?: string): Promise<ApiConfig> {
+    if(!id || !config) return null;
     const key = this.getKey('api', id, orgId);
     this.storage.apis.set(key, config);
     return { ...config, id };
   }
 
   async deleteApiConfig(id: string, orgId: string): Promise<void> {
+    if(!id) return;
     const key = this.getKey('api', id, orgId);
     this.storage.apis.delete(key);
   }
 
   // Extract Config Methods
   async getExtractConfig(id: string, orgId: string): Promise<ExtractConfig | null> {
+    if(!id) return null;
     const key = this.getKey('extract', id, orgId);
     const config = this.storage.extracts.get(key);
     return config ? { ...config, id } : null;
@@ -86,6 +92,7 @@ export class MemoryStore implements DataStore {
   }
 
   async saveExtractConfig(request: ExtractInput, payload: any, config: ExtractConfig, orgId: string): Promise<ExtractConfig> {
+    if(!request) return null;
     const hash = objectHash({request, payloadKeys: getAllKeys(payload)});
     const key = this.getKey('extract', hash, orgId);
     this.storage.extracts.set(key, config);
@@ -93,6 +100,7 @@ export class MemoryStore implements DataStore {
   }
 
   async getExtractConfigFromRequest(request: ExtractInput, payload: any, orgId?: string): Promise<ExtractConfig | null> {
+    if(!request) return null;
     const hash = objectHash({request, payloadKeys: getAllKeys(payload)});
     const key = this.getKey('extract', hash, orgId);
     const config = this.storage.extracts.get(key);
@@ -100,18 +108,21 @@ export class MemoryStore implements DataStore {
   }
 
   async upsertExtractConfig(id: string, config: ExtractConfig, orgId: string): Promise<ExtractConfig> {
+    if(!id || !config) return null;
     const key = this.getKey('extract', id, orgId);
     this.storage.extracts.set(key, config);
     return { ...config, id };
   }
 
   async deleteExtractConfig(id: string, orgId: string): Promise<void> {
+    if(!id) return;
     const key = this.getKey('extract', id, orgId);
     this.storage.extracts.delete(key);
   }
 
   // Transform Config Methods
   async getTransformConfig(id: string, orgId: string): Promise<TransformConfig | null> {
+    if(!id) return null;
     const key = this.getKey('transform', id, orgId);
     const config = this.storage.transforms.get(key);
     return config ? { ...config, id } : null;
@@ -125,6 +136,7 @@ export class MemoryStore implements DataStore {
   }
 
   async saveTransformConfig(request: TransformInput, payload: any, config: TransformConfig, orgId?: string): Promise<TransformConfig> {
+    if(!request) return null;
     const hash = objectHash({request, payloadKeys: getAllKeys(payload)});
     const key = this.getKey('transform', hash, orgId);
     this.storage.transforms.set(key, config);
@@ -132,6 +144,7 @@ export class MemoryStore implements DataStore {
   }
 
   async getTransformConfigFromRequest(request: TransformInput, payload: any, orgId?: string): Promise<TransformConfig | null> {
+    if(!request) return null;
     const hash = objectHash({request, payloadKeys: getAllKeys(payload)});
     const key = this.getKey('transform', hash, orgId);
     const config = this.storage.transforms.get(key);
@@ -139,24 +152,28 @@ export class MemoryStore implements DataStore {
   }
 
   async upsertTransformConfig(id: string, config: TransformConfig, orgId: string): Promise<TransformConfig> {
+    if(!id || !config) return null;
     const key = this.getKey('transform', id, orgId);
     this.storage.transforms.set(key, config);
     return { ...config, id };
   }
 
   async deleteTransformConfig(id: string, orgId: string): Promise<void> {
+    if(!id) return;
     const key = this.getKey('transform', id, orgId);
     this.storage.transforms.delete(key);
   }
 
   // Run Result Methods
   async getRun(id: string, orgId: string): Promise<RunResult | null> {
+    if(!id) return null;
     const key = this.getKey('run', id, orgId);
     const run = this.storage.runs.get(key);
     return run ? { ...run, id } : null;
   }
 
   async createRun(run: RunResult, orgId: string): Promise<RunResult> {
+    if(!run) return null;
     const key = this.getKey('run', run.id, orgId);
     this.storage.runs.set(key, run);
     
@@ -192,6 +209,7 @@ export class MemoryStore implements DataStore {
   }
 
   async deleteRun(id: string, orgId: string): Promise<boolean> {
+    if(!id) return false;
     const key = this.getKey('run', id, orgId);
     const deleted = this.storage.runs.delete(key);
     
@@ -207,7 +225,7 @@ export class MemoryStore implements DataStore {
 
   async deleteAllRuns(orgId: string): Promise<void> {
     const keys = Array.from(this.storage.runs.keys())
-      .filter(key => key.startsWith(`${orgId}:run:`));
+      .filter(key => key.startsWith(`${orgId ? `${orgId}:` : ''}run:`));
     
     for (const key of keys) {
       this.storage.runs.delete(key);
