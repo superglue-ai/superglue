@@ -9,6 +9,7 @@ import { resolvers, typeDefs } from './graphql/graphql.js';
 import { handleQueryError, telemetryClient, telemetryMiddleware } from './utils/telemetry.js';
 import { SupabaseKeyManager } from './auth/supabaseKeyManager.js';
 import { LocalKeyManager } from './auth/localKeyManager.js';
+import { graphqlUploadExpress } from 'graphql-upload-minimal';
 
 // Constants
 const PORT = process.env.GRAPHQL_PORT || 3000;
@@ -17,7 +18,7 @@ const authManager = process.env.AUTH_TOKEN ? new LocalKeyManager() : new Supabas
 const DEBUG = process.env.DEBUG === 'true';
 export const DEFAULT_QUERY = `
 query Query {
-  listCalls(limit: 10) {
+  listRuns(limit: 10) {
     items {
       id
       status
@@ -33,6 +34,7 @@ const apolloConfig = {
   typeDefs,
   resolvers,
   introspection: true,
+  csrfPrevention: false,
   bodyParserOptions: { limit: "1024mb", type: "application/json" },
   plugins: [
     ApolloServerPluginLandingPageLocalDefault({ 
@@ -128,6 +130,7 @@ async function startServer() {
   app.use(cors());
   app.use(authMiddleware);
   app.use(telemetryMiddleware);
+  app.use(graphqlUploadExpress({ maxFileSize: 10000000, maxFiles: 1 }));
   app.use('/', expressMiddleware(server, contextConfig));
 
   // Start HTTP Server

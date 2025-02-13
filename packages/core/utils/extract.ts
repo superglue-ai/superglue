@@ -29,7 +29,7 @@ export async function prepareExtract(extractInput: ExtractInput, payload: any, c
     return computedExtractConfig;
 }
 
-export async function callExtract(extract: ExtractConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions): Promise<any[]> {
+export async function callExtract(extract: ExtractConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions): Promise<any> {
   const allVariables = { ...payload, ...credentials };
   const headers = Object.fromEntries(
     Object.entries(extract.headers || {}).map(([key, value]) => [key, replaceVariables(value, allVariables)])
@@ -52,7 +52,7 @@ export async function callExtract(extract: ExtractConfig, payload: Record<string
   const response = await callAxios(axiosConfig, options);
 
   if(![200, 201, 204].includes(response?.status) || response.data?.error) {
-    const error = JSON.stringify(response?.data?.error || response?.data);
+    const error = JSON.stringify(String(response?.data?.error || response?.data));
     const message = `${extract.method} ${url} failed with status ${response.status}. Response: ${error}
     Headers: ${JSON.stringify(headers)}
     Body: ${JSON.stringify(body)}
@@ -62,15 +62,19 @@ export async function callExtract(extract: ExtractConfig, payload: Record<string
   }
 
   let responseData = response.data;
-  if (extract.decompressionMethod && extract.decompressionMethod != DecompressionMethod.NONE) {
-    responseData = await decompressData(responseData, extract.decompressionMethod);
+  return responseData;
+}
+
+export async function processFile(data: Buffer, extractConfig: ExtractConfig) {
+  if (extractConfig.decompressionMethod && extractConfig.decompressionMethod != DecompressionMethod.NONE) {
+    data = await decompressData(data, extractConfig.decompressionMethod);
   }
 
-  let responseJSON = await parseFile(responseData, extract.fileType);
+  let responseJSON = await parseFile(data, extractConfig.fileType);
 
-  if (extract.dataPath) {
+  if (extractConfig.dataPath) {
     // Navigate to the specified data path
-    const pathParts = extract.dataPath.split('.');
+    const pathParts = extractConfig.dataPath.split('.');
     for (const part of pathParts) {
       responseJSON = responseJSON[part] || responseJSON;  
     }
