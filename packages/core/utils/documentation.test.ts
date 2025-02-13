@@ -142,5 +142,45 @@ describe('Documentation Utilities', () => {
       expect(result).toContain(docWithGraphQL);
       expect(result).toContain(JSON.stringify(mockSchema.__schema));
     });
+
+    it('should handle complex HTML with special characters and nested elements', async () => {
+      const complexHtmlDoc = `
+        <!DOCTYPE html>
+        <html class="documentation">
+          <body>
+            <div class="wrapper">
+              <h1>Complex &amp; Special Doc</h1>
+              <div class="nested">
+                <ul>
+                  <li>Item with <strong>bold</strong> and <em>italic</em></li>
+                  <li>Item with <code>inline code &lt;tags&gt;</code></li>
+                </ul>
+                <script>
+                  function test() {
+                    // Some code block
+                    return true;
+                  }
+                </script>
+                <table>
+                  <tr>
+                    <td>Cell 1 &copy;</td>
+                    <td>Cell 2 &reg;</td>
+                  </tr>
+                </table>
+              </div>
+            </div>
+          </body>
+        </html>
+      `;
+      
+      mockedAxios.get.mockResolvedValueOnce({ data: complexHtmlDoc });
+      
+      const result = await getDocumentation('https://api.example.com/docs', {}, {});
+      
+      expect(result).toContain('# Complex & Special Doc');
+      expect(result).toContain('Item with **bold** and _italic_');
+      expect(result).toContain('`inline code <tags>`');
+      expect(result).toContain('| Cell 1 © | Cell 2 ® |');
+    });
   });
 });
