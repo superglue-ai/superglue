@@ -36,8 +36,9 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
   let page = 1;
   let offset = 0;
   let hasMore = true;
+  let loopCounter = 0;
 
-  while (hasMore) {
+  while (hasMore && loopCounter <= 500) {
     // Generate pagination variables if enabled
     let paginationVars = {};
     if (endpoint.pagination?.type === PaginationType.PAGE_BASED) {
@@ -122,8 +123,9 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
       }
       if(JSON.stringify(responseData) !== JSON.stringify(allResults)) {
         allResults = allResults.concat(responseData);
+	hasMore = false;
       }
-  } 
+    } 
     else if(responseData && dataPathSuccess) {
       allResults.push(responseData);
       hasMore = false;
@@ -131,6 +133,7 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
     else {
       hasMore = false;
     }
+    loopCounter++;
   }
 
   return {
