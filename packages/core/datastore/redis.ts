@@ -51,6 +51,7 @@ export class RedisService implements DataStore {
 
   // API Config Methods
   async getApiConfig(id: string, orgId?: string): Promise<ApiConfig | null> {
+    if(!id) return null;
     const data = await this.redis.get(this.getKey(this.API_PREFIX, id, orgId));
     return parseWithId(data, id);
   }
@@ -71,6 +72,7 @@ export class RedisService implements DataStore {
   }
 
   async saveApiConfig(request: ApiInput, payload: any, config: ApiConfig, orgId?: string): Promise<ApiConfig> {
+    if(!request) return null;
     const hash = objectHash({request, payloadKeys: getAllKeys(payload)});
     const key = this.getKey(this.API_PREFIX, hash, orgId);
     await this.redis.set(key, JSON.stringify(config));
@@ -78,6 +80,7 @@ export class RedisService implements DataStore {
   }
 
   async getApiConfigFromRequest(request: ApiInput, payload: any, orgId?: string): Promise<ApiConfig | null> {
+    if(!request) return null;
     const hash = objectHash({request, payloadKeys: getAllKeys(payload)});
     const key = this.getKey(this.API_PREFIX, hash, orgId);
     const data = await this.redis.get(key);
@@ -85,6 +88,7 @@ export class RedisService implements DataStore {
   }
 
   async getExtractConfigFromRequest(request: ExtractInput, payload: any, orgId?: string): Promise<ExtractConfig | null> {
+    if(!request) return null;
     const hash = objectHash({request, payloadKeys: getAllKeys(payload)});
     const key = this.getKey(this.EXTRACT_PREFIX, hash, orgId);
     const data = await this.redis.get(key);
@@ -92,6 +96,7 @@ export class RedisService implements DataStore {
   }
 
   async getTransformConfigFromRequest(request: TransformInput, payload: any, orgId?: string): Promise<TransformConfig | null> {
+    if(!request) return null;
     const hash = objectHash({request, payloadKeys: getAllKeys(payload)});
     const key = this.getKey(this.TRANSFORM_PREFIX, hash, orgId);
     const data = await this.redis.get(key);
@@ -99,17 +104,20 @@ export class RedisService implements DataStore {
   }
 
   async upsertApiConfig(id: string, config: ApiConfig, orgId: string): Promise<ApiConfig> {
+    if(!id || !config) return null;
     const key = this.getKey(this.API_PREFIX, id, orgId);
     await this.redis.set(key, JSON.stringify(config));
     return config;
   }
 
   async deleteApiConfig(id: string, orgId: string): Promise<void> {
+    if(!id) return;
     await this.redis.del(this.getKey(this.API_PREFIX, id, orgId));
   }
 
   // Extract Methods
   async getExtractConfig(id: string, orgId: string): Promise<ExtractConfig | null> {
+    if(!id) return null;
     const data = await this.redis.get(this.getKey(this.EXTRACT_PREFIX, id, orgId));
     return parseWithId(data, id);
   }
@@ -130,6 +138,7 @@ export class RedisService implements DataStore {
   }
 
   async saveExtractConfig(request: ExtractInput, payload: any, config: ExtractConfig, orgId?: string): Promise<ExtractConfig> {
+    if(!request) return null;
     const hash = objectHash({request, payloadKeys: getAllKeys(payload)});
     const key = this.getKey(this.EXTRACT_PREFIX, hash, orgId);
     await this.redis.set(key, JSON.stringify(config));
@@ -137,17 +146,20 @@ export class RedisService implements DataStore {
   }
 
   async upsertExtractConfig(id: string, config: ExtractConfig, orgId?: string): Promise<ExtractConfig> {
+    if(!id || !config) return null;
     const key = this.getKey(this.EXTRACT_PREFIX, id, orgId);
     await this.redis.set(key, JSON.stringify(config));
     return config;
   }
 
   async deleteExtractConfig(id: string, orgId?: string): Promise<void> {
+    if(!id) return;
     await this.redis.del(this.getKey(this.EXTRACT_PREFIX, id, orgId));
   }
 
   // Transform Methods
   async getTransformConfig(id: string, orgId?: string): Promise<TransformConfig | null> {
+    if(!id) return null;
     const data = await this.redis.get(this.getKey(this.TRANSFORM_PREFIX, id, orgId));
     return parseWithId(data, id);
   }
@@ -168,6 +180,7 @@ export class RedisService implements DataStore {
   }
 
   async saveTransformConfig(request: TransformInput, payload: any, config: TransformConfig, orgId?: string): Promise<TransformConfig> {
+    if(!request) return null;
     const hash = objectHash({request, payloadKeys: getAllKeys(payload)});
     const key = this.getKey(this.TRANSFORM_PREFIX, hash, orgId);
     await this.redis.set(key, JSON.stringify(config));
@@ -175,16 +188,19 @@ export class RedisService implements DataStore {
   }
 
   async upsertTransformConfig(id: string, config: TransformConfig, orgId?: string): Promise<TransformConfig> {
+    if(!id || !config) return null;
     const key = this.getKey(this.TRANSFORM_PREFIX, id, orgId);
     await this.redis.set(key, JSON.stringify(config));
     return config;
   }
 
   async deleteTransformConfig(id: string, orgId?: string): Promise<void> {
+    if(!id) return;
     await this.redis.del(this.getKey(this.TRANSFORM_PREFIX, id, orgId));
   }
 
   async getRun(id: string, orgId?: string): Promise<RunResult | null> {
+    if(!id) return null;
     const pattern = this.getRunByIdPattern(this.RUN_PREFIX, id, orgId);
     const keys = await this.redis.keys(pattern);
     if (keys.length === 0) {
@@ -234,6 +250,7 @@ export class RedisService implements DataStore {
   }
 
   async createRun(run: RunResult, orgId?: string): Promise<RunResult> {
+    if(!run) return null;
     const key = this.getKey(this.RUN_PREFIX, `${run.config?.id}:${run.id}`, orgId);
     await this.redis.set(key, JSON.stringify(run), {
       EX: this.TTL
@@ -242,6 +259,7 @@ export class RedisService implements DataStore {
   }
 
   async deleteRun(id: string, orgId?: string): Promise<boolean> {
+    if(!id) return false;
     const pattern = this.getRunByIdPattern(this.RUN_PREFIX, id, orgId);
     const keys = await this.redis.keys(pattern);
     if (keys.length === 0) {
@@ -266,6 +284,7 @@ export class RedisService implements DataStore {
 
   // Health check
   async ping(): Promise<boolean> {
+    if(!this.redis) return false;
     try {
       const result = await this.redis.ping();
       return result === 'PONG';
