@@ -20,46 +20,32 @@ export const callResolver = async (
   const startedAt = new Date();
   const callId = uuidv4() as string;
 
-  let endpoint: ApiInput;
   let preparedEndpoint: ApiConfig;
 
   const readCache = options ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.READONLY : true;
   const writeCache = options ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.WRITEONLY : true;
 
   try {
-    if(input.id) {
-      // For direct ID lookups, require cache to be enabled
-      if (!readCache) {
-        throw new Error("Cannot lookup by ID when cache is disabled");
-      }
-      const cachedEndpoint = await context.datastore.getApiConfig(input.id, context.orgId);
-      if (!cachedEndpoint) {
-        throw new Error(`No configuration found for ID: ${input.id}`);
-      }
-      endpoint = cachedEndpoint;
-      preparedEndpoint = cachedEndpoint;
-    } else if(input.endpoint) {
-      endpoint = input.endpoint;
-    } else {
-      throw new Error("No endpoint or id provided");
-    }
-  
     // Resolve endpoint configuration from cache or prepare new one
     let response: any;
     let retryCount = 0;
     let lastError: string | null = null;
     do {
       try {
-        // If we don't have a prepared endpoint yet and caching is enabled, try to get from cache
-        if (!preparedEndpoint && readCache && !lastError) {
-          preparedEndpoint = await context.datastore.getApiConfigFromRequest(endpoint, payload, context.orgId);
+        if(readCache && !lastError) {
+          preparedEndpoint = await context.datastore.getApiConfig(input.id, context.orgId) || 
+            await context.datastore.getApiConfigFromRequest(input.endpoint, payload, context.orgId) 
         }
-        
-        // If still no prepared endpoint, generate one
-        if (!preparedEndpoint || lastError) {
-          preparedEndpoint = await prepareEndpoint(endpoint, payload, credentials, lastError);
+        else if(preparedEndpoint || input.endpoint) {
+          preparedEndpoint = await prepareEndpoint(preparedEndpoint || input.endpoint, payload, credentials, lastError);
         }
+
+        if(!preparedEndpoint) {
+          throw new Error("Did not find a valid endpoint configuration. If you did provide an id, please ensure cache reading is enabled.");
+        }
+
         response = await callEndpoint(preparedEndpoint, payload, credentials, options);
+
         if(!response.data || (Array.isArray(response.data) && response.data.length === 0) || (typeof response.data === 'object' && Object.keys(response.data).length === 0)) {
           response = null;
           throw new Error("No data returned from API. This could be due to a configuration error.");
@@ -91,8 +77,8 @@ export const callResolver = async (
     if(writeCache) {
       if(input.id) {
         context.datastore.upsertApiConfig(input.id, config, context.orgId);
-      } else {
-        context.datastore.saveApiConfig(endpoint, payload, config, context.orgId);
+      } else if(input.endpoint) {
+        context.datastore.saveApiConfig(input.endpoint, payload, config, context.orgId);
       }
     }
 
