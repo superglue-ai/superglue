@@ -121,9 +121,12 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
       if(responseData.length < endpoint.pagination?.pageSize) {
         hasMore = false;
       }
+      
       if(JSON.stringify(responseData) !== JSON.stringify(allResults)) {
         allResults = allResults.concat(responseData);
-	hasMore = false;
+      }
+      else {
+        hasMore = false;
       }
     } 
     else if(responseData && dataPathSuccess) {
