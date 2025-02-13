@@ -11,6 +11,9 @@ export const generateSchemaResolver = async (
     if(!instruction) {
       throw new Error("Instruction is required");
     }
+    if(responseData) {
+      responseData = String(responseData).slice(0, 1000);
+    }
     const schema = await generateSchema(instruction, responseData);
     
     return schema;

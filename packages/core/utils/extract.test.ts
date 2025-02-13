@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { prepareExtract, callExtract, Queue } from './extract.js';
+import { prepareExtract, callExtract, processFile, Queue } from './extract.js';
 import { callAxios } from './tools.js';
 import { getDocumentation } from './documentation.js';
 import { decompressData, parseFile } from './file.js';
@@ -102,7 +102,7 @@ describe('Extract Utils', () => {
       console.log('Variables:', credentials);
       
       const result = await callExtract(extract, {}, credentials, {});
-
+      const resultObj = await processFile(result, extract);
       expect(callAxios).toHaveBeenCalledWith(
         expect.objectContaining({
           headers: {
@@ -139,12 +139,13 @@ describe('Extract Utils', () => {
       };
 
       const result = await callExtract(extract, {}, {}, {});
+      const resultObj = await processFile(result, extract);
 
       expect(decompressData).toHaveBeenCalledWith(
         mockCompressedData,
         DecompressionMethod.GZIP
       );
-      expect(result).toEqual({ data: [1, 2, 3] });
+      expect(resultObj).toEqual({ data: [1, 2, 3] });
     });
 
     it('should throw error for non-200 response', async () => {
@@ -169,6 +170,113 @@ describe('Extract Utils', () => {
       await expect(callExtract(extract, {}, {}, {}))
         .rejects
         .toThrow('API call failed with status 404');
+    });
+
+    it('should handle Excel file response', async () => {
+      const mockExcelData = Buffer.from('mock excel data');
+      const mockParsedData = { sheet1: [{ name: 'John', age: 30 }] };
+      
+      (callAxios as any).mockResolvedValue({
+        status: 200,
+        data: mockExcelData
+      });
+      (parseFile as any).mockResolvedValue(mockParsedData);
+
+      const extract = {
+        id: 'test-id',
+        instruction: 'Fetch Excel data',
+        urlHost: 'https://api.example.com',
+        urlPath: '/data',
+        method: HttpMethod.GET,
+        headers: { 'Authorization': 'Bearer {token}' },
+        queryParams: { 'filter': '{filter}' },
+        dataPath: 'sheet1',
+        authentication: AuthType.HEADER,
+        fileType: FileType.EXCEL
+      };
+
+      const result = await callExtract(extract, {}, {}, {});
+      const resultObj = await processFile(result, extract);
+
+      expect(parseFile).toHaveBeenCalledWith(
+        mockExcelData,
+        FileType.EXCEL
+      );
+      expect(resultObj).toEqual([{ name: 'John', age: 30 }]);
+    });
+
+    it('should handle Excel file with multiple sheets', async () => {
+      const mockExcelData = Buffer.from('mock excel data');
+      const mockParsedData = {
+        sheet1: [{ name: 'John', age: 30 }],
+        sheet2: [{ city: 'New York', country: 'USA' }]
+      };
+      
+      (callAxios as any).mockResolvedValue({
+        status: 200,
+        data: mockExcelData
+      });
+      (parseFile as any).mockResolvedValue(mockParsedData);
+
+      const extract = {
+        id: 'test-id',
+        instruction: 'Fetch Excel data',
+        urlHost: 'https://api.example.com',
+        urlPath: '/data',
+        method: HttpMethod.GET,
+        headers: {},
+        authentication: AuthType.NONE,
+        fileType: FileType.EXCEL
+      };
+
+      const result = await callExtract(extract, {}, {}, {});
+      const resultObj = await processFile(result, extract);
+
+      expect(parseFile).toHaveBeenCalledWith(
+        mockExcelData,
+        FileType.EXCEL
+      );
+      // Without dataPath specified, should return all sheets
+      expect(resultObj).toEqual(mockParsedData);
+    });
+
+    it('should handle compressed Excel file', async () => {
+      const mockCompressedData = Buffer.from('compressed excel data');
+      const mockDecompressedData = Buffer.from('decompressed excel data');
+      const mockParsedData = { sheet1: [{ name: 'John', age: 30 }] };
+      
+      (callAxios as any).mockResolvedValue({
+        status: 200,
+        data: mockCompressedData
+      });
+      (decompressData as any).mockResolvedValue(mockDecompressedData);
+      (parseFile as any).mockResolvedValue(mockParsedData);
+
+      const extract = {
+        id: 'test-id',
+        instruction: 'Fetch compressed Excel data',
+        urlHost: 'https://api.example.com',
+        urlPath: '/data',
+        method: HttpMethod.GET,
+        headers: {},
+        authentication: AuthType.NONE,
+        decompressionMethod: DecompressionMethod.GZIP,
+        fileType: FileType.EXCEL,
+        dataPath: 'sheet1'
+      };
+
+      const result = await callExtract(extract, {}, {}, {});
+      const resultObj = await processFile(result, extract);
+
+      expect(decompressData).toHaveBeenCalledWith(
+        mockCompressedData,
+        DecompressionMethod.GZIP
+      );
+      expect(parseFile).toHaveBeenCalledWith(
+        mockDecompressedData,
+        FileType.EXCEL
+      );
+      expect(resultObj).toEqual([{ name: 'John', age: 30 }]);
     });
   });
 
