@@ -2,6 +2,7 @@ scalar JSONSchema
 scalar JSON
 scalar JSONata
 scalar DateTime
+scalar Upload
 
 interface BaseConfig {
   id: ID!
@@ -209,6 +210,7 @@ input ApiInputRequest @oneOf {
 
 input ExtractInputRequest @oneOf {
   endpoint: ExtractInput
+  file: Upload
   id: ID
 }
 
@@ -227,6 +229,7 @@ type Query {
   getApi(id: ID!): ApiConfig
   getTransform(id: ID!): TransformConfig
   getExtract(id: ID!): ExtractConfig
+
   generateSchema(instruction: String!, responseData: String): JSONSchema!
 }
 

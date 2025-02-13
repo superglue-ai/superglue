@@ -5,6 +5,7 @@ import sax, { parser } from 'sax';
 import * as unzipper from 'unzipper';
 import { Readable } from 'stream';
 import { DecompressionMethod, FileType } from "@superglue/shared";
+import * as XLSX from 'xlsx';
 
 
 
@@ -34,6 +35,12 @@ export async function decompressData(compressed: Buffer, method: DecompressionMe
 export async function decompressZip(buffer: Buffer): Promise<Buffer> {
     try {
         const zipStream = await unzipper.Open.buffer(buffer);
+        const isExcel = zipStream.files.some(f => 
+            f.path === '[Content_Types].xml' || f.path.startsWith('xl/')
+        );
+        if (isExcel) {
+            return buffer;
+        }
         const firstFile = zipStream.files?.[0];
         const fileStream = firstFile.stream();
         const chunks: Buffer[] = [];
@@ -58,6 +65,8 @@ export async function parseFile(buffer: Buffer, fileType: FileType): Promise<any
         case FileType.CSV: {
         return parseCSV(buffer);
         }
+        case FileType.EXCEL:
+            return parseExcel(buffer);
         default:
         throw new Error('Unsupported file type');
     }
@@ -67,30 +76,55 @@ async function parseCSV(buffer: Buffer): Promise<any[]> {
     const results: any[] = [];
     const delimiter = detectDelimiter(buffer);
     let current = 0;
+
+    // Convert the first part of the buffer to find the header row
+    const sampleSize = Math.min(buffer.length, 4096); // Use first 4KB for header detection
+    const sample = buffer.slice(0, sampleSize).toString('utf8');
+    const sampleRows = sample.split('\n').slice(0, 10);
+    
+    // Find the row with the most columns
+    const headerRowIndex = sampleRows
+        .reduce((maxIndex, row, currentIndex, rows) => 
+            (row.split(delimiter).length > rows[maxIndex].split(delimiter).length) 
+                ? currentIndex 
+                : maxIndex
+        , 0);
+    const headerValues = sampleRows[headerRowIndex].split(delimiter).map((value: string) => value.trim());
     return new Promise((resolve, reject) => {
-    Papa.parse(Readable.from(buffer), {
-        delimiter,
-        header: true,
-        skipEmptyLines: false,
-        worker: true,
-        step: (result, parser) => {
-        try { 
-            current++;
-            results.push(result.data);
-        } catch(error) {  
-            console.error("Error parsing CSV", error);
-            parser.abort();
-        }
-        },
-        complete: async () => {
-        console.log('Finished parsing CSV');
-        resolve(results);
-        },
-        error: async (error) => {
-        console.error('Failed parsing CSV');
-        reject(error);
-        },
-    });
+        Papa.parse(Readable.from(buffer), {
+            delimiter,
+            header: false,
+            skipEmptyLines: true,
+            worker: true,
+            transformHeader: (header, index) => {
+                // Use the detected header row's values
+                return headerValues[index]|| `Column${index + 1}`;
+            },
+            step: (result, parser) => {
+                try { 
+                    // Skip the detected header row since Papa.parse will use it as headers
+                    const dataObject: { [key: string]: any } = {};
+                    if (current > headerRowIndex) {
+                        for(let i = 0; i < headerValues.length; i++) {
+                            dataObject[headerValues[i]] = result.data[i];
+                        }
+                        results.push(dataObject);
+                    }
+                    current++;
+                } catch(error) {  
+                    console.error("Error parsing CSV", error);
+                    parser.abort();
+                }
+            },
+            complete: async () => {
+                console.log('Finished parsing CSV');
+                resolve(results);
+            },
+            error: async (error) => {
+                console.error('Failed parsing CSV');
+                reject(error);
+            },
+        });
     });
 }
     
@@ -184,10 +218,65 @@ async function parseXML(buffer: Buffer): Promise<any[]> {
     });
 }
 
-    
+async function parseExcel(buffer: Buffer): Promise<any[]> {
+    try {
+        const workbook = XLSX.read(buffer, { type: 'buffer' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        
+        // First, get all rows with original headers
+        const rawRows = XLSX.utils.sheet_to_json<any>(worksheet, { 
+            raw: false,
+            header: 1  // Use 1-based array indices for headers
+        });
+        if(!rawRows?.length) {
+            throw new Error('No rows found in Excel file');
+        }
+        // Find the row with max length from first 10 rows
+        const headerRowIndex = rawRows
+            .slice(0, 20)
+            .reduce((maxIndex, row, currentIndex, rows) => 
+                (row.length > rows[maxIndex]?.length || 0) ? currentIndex : maxIndex
+            , 0);
+
+        // Get headers from the detected row
+        const headers = rawRows[headerRowIndex].map((header: any) => 
+            header ? String(header).trim() : ''
+        );
+
+        // Process all rows after the header row
+        const processedRows = rawRows.slice(headerRowIndex + 1).map((row: any) => {
+            const obj: { [key: string]: any } = {};
+            headers.forEach((header: string, index: number) => {
+                if (header && row[index] !== undefined) {
+                    obj[header] = row[index];
+                }
+            });
+            return obj;
+        });
+
+        return processedRows;
+    } catch (error) {
+        console.error('Failed parsing Excel file:', error);
+        throw error;
+    }
+}
+
 async function detectFileType(buffer: Buffer): Promise<FileType> {
+    // Excel file signatures
+    const xlsxSignature = buffer.slice(0, 4).toString('hex');
+    if (xlsxSignature === '504b0304') { // XLSX files are ZIP files
+        try {
+            // Try to parse as XLSX
+            XLSX.read(buffer, { type: 'buffer' });
+            return FileType.EXCEL;
+        } catch {
+            // If XLSX parsing fails, continue with other detection
+        }
+    }
+
     // Create stream and readline interface
-    const sampleSize = Math.min(buffer.length, 1024); // Use the first 1KB or less if buffer is smaller
+    const sampleSize = Math.min(buffer.length, 1024);
     const sample = buffer.slice(0, sampleSize).toString('utf8');
 
     try {

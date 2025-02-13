@@ -8,6 +8,7 @@ import { listApisResolver, listExtractsResolver, listRunsResolver, listTransform
 import { JSONResolver, JSONSchemaResolver, JSONataResolver } from './resolvers/scalars.js';
 import { transformResolver } from './resolvers/transform.js';
 import { upsertApiResolver, upsertExtractResolver, upsertTransformResolver } from './resolvers/upsert.js';
+import { GraphQLUpload } from 'graphql-upload-minimal';
 
 export const resolvers = {
     Query: {
@@ -35,9 +36,11 @@ export const resolvers = {
     JSON: JSONResolver,
     JSONSchema: JSONSchemaResolver,
     JSONata: JSONataResolver,
+    Upload: GraphQLUpload,
     ConfigType: {
         __resolveType(obj: any, context: any, info: any) {
             // Get the parent field name from the path
+            // we need to fix this at some point
             const parentField = info.path.prev.key;
             
             switch (parentField) {
