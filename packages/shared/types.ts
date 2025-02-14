@@ -145,7 +145,7 @@ export type ExtractInputRequest = {
 
 export type TransformInputRequest = {
   id?: string;
-  endpoint: TransformInput;
+  endpoint?: TransformInput;
 };
 
 export type ExtractInput = {
