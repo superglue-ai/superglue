@@ -185,6 +185,11 @@ Instructions: ${apiConfig.instruction}
 
 Base URL: ${composeUrl(apiConfig.urlHost, apiConfig.urlPath)}
 
+Also, the user provided the following information, which is probably correct:
+${apiConfig.headers ? `Headers: ${JSON.stringify(apiConfig.headers)}` : ''}
+${apiConfig.queryParams ? `Query Params: ${JSON.stringify(apiConfig.queryParams)}` : ''}
+${apiConfig.body ? `Body: ${JSON.stringify(apiConfig.body)}` : ''}
+
 Documentation: ${String(documentation).slice(0, 10000)}
 
 Available variables: ${vars.join(", ")}
