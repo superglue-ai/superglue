@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeEach, afterEach, type Mocked } from 'vitest';
-import { prepareEndpoint, callEndpoint } from './api.js';
-import { ApiInput, HttpMethod, PaginationType, AuthType, ApiConfig } from '@superglue/shared';
-import * as tools from './tools.js';
+import { ApiConfig, ApiInput, AuthType, HttpMethod, PaginationType } from '@superglue/shared';
 import OpenAI from 'openai';
+import { afterEach, beforeEach, describe, expect, it, vi, type Mocked } from 'vitest';
+import { callEndpoint, prepareEndpoint } from './api.js';
+import * as tools from './tools.js';
 
 vi.mock('axios');
 vi.mock('openai');
@@ -64,7 +64,7 @@ describe('API Utilities', () => {
     it('should prepare endpoint configuration', async () => {
       const result = await prepareEndpoint(testInput, {}, {});
 
-      expect(result).toMatchObject({
+      expect(result.config).toMatchObject({
         urlHost: 'https://api.example.com',
         urlPath: 'v1/test',
         method: HttpMethod.GET,
@@ -74,6 +74,9 @@ describe('API Utilities', () => {
         createdAt: expect.any(Date),
         updatedAt: expect.any(Date)
       });
+
+      expect(result.messages).toBeInstanceOf(Array);
+      expect(result.messages).toHaveLength(3); // system, user, and assistant messages
 
       // Verify OpenAI was called correctly
       expect((OpenAI as any).prototype.chat.completions.create).toHaveBeenCalledWith(
