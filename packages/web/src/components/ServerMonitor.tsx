@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from 'react';
 import { useToast } from "@/src/hooks/use-toast"
-import { useConfig } from '../app/config-context';
+import { useConfig } from '@/src/app/config-context';
 export function ServerMonitor() {
   const [isServerDown, setIsServerDown] = useState(false);
   const { toast } = useToast()

@@ -1,8 +1,9 @@
 import { JSONSchema } from "openai/src/lib/jsonschema.js";
 import { DataStore } from "./datastore.js";
-
+import { FileUpload } from "graphql-upload-minimal";
 export type Context = {
   datastore: DataStore;
+  orgId: string;
 };
 
 export enum HttpMethod {
@@ -26,6 +27,7 @@ export enum FileType {
   CSV = "CSV",
   JSON = "JSON",
   XML = "XML",
+  EXCEL = "EXCEL",
   AUTO = "AUTO"
 }
 
@@ -138,6 +140,7 @@ export type ApiInputRequest = {
 export type ExtractInputRequest = {
   id?: string;
   endpoint: ExtractInput;
+  file?: Promise<FileUpload>;
 };
 
 export type TransformInputRequest = {

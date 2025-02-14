@@ -1,14 +1,14 @@
+import { CacheMode, Context, DecompressionMethod, ExtractConfig, ExtractInput, ExtractInputRequest, FileType, RequestOptions } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
-import { CacheMode, Context, ExtractConfig, ExtractInput, RequestOptions } from "@superglue/shared";
 import { v4 as uuidv4 } from 'uuid';
-import { notifyWebhook } from "../../utils/webhook.js";
-import { callExtract, prepareExtract } from "../../utils/extract.js";
+import { callExtract, prepareExtract, processFile } from "../../utils/extract.js";
 import { maskCredentials } from "../../utils/tools.js";
+import { notifyWebhook } from "../../utils/webhook.js";
 
 export const extractResolver = async (
   _: any,
-  { endpoint, payload, credentials, options }: { 
-    endpoint: ExtractInput; 
+  { input, payload, credentials, options }: { 
+    input: ExtractInputRequest; 
     payload: any; 
     credentials: Record<string, string>;
     options: RequestOptions; 
@@ -27,15 +27,37 @@ export const extractResolver = async (
     let retryCount = 0;
     let lastError: string | null = null;
     do {
-      preparedExtract = readCache ? 
-        await context.datastore.getExtractConfigFromRequest(endpoint, payload) : null;
-      preparedExtract = preparedExtract || 
-        await prepareExtract(endpoint, payload, credentials, lastError);
-      try {
-        response = await callExtract(preparedExtract, payload, credentials, options);
+      if(input.file) {
+        const { createReadStream, filename } = await input.file;
+        const stream = createReadStream();
+        const chunks: Buffer[] = [];
+        for await (const chunk of stream) {
+          chunks.push(chunk);
+        }
+        const buffer = Buffer.concat(chunks);
+        preparedExtract = {
+          id: input.id || uuidv4(),
+          urlHost: filename,
+          instruction: "extract from file",
+          decompressionMethod: DecompressionMethod.AUTO,
+          fileType: FileType.AUTO
+        };
+        response = await processFile(buffer, preparedExtract);
+      }
+      else {
+        preparedExtract = readCache ? 
+          await context.datastore.getExtractConfig(input.id, context.orgId) || 
+          await context.datastore.getExtractConfigFromRequest(input.endpoint, payload, context.orgId) 
+          : null;
+        preparedExtract = preparedExtract || 
+          await prepareExtract(input.endpoint, payload, credentials, lastError);
+        try {
+          const buffer = await callExtract(preparedExtract, payload, credentials, options);
+          response = await processFile(buffer, preparedExtract);
         } catch (error) {
-        console.log(`Extract call failed with status ${error.status}. Retrying...`);
-        lastError = error?.message || JSON.stringify(error || {});
+        console.log(`Extract call failed. Retrying...`);
+          lastError = error?.message || JSON.stringify(error || {});
+        }
       }
       retryCount++;
     } while (!response && retryCount < 5);
@@ -44,10 +66,13 @@ export const extractResolver = async (
       throw new Error(`API call failed after ${retryCount} retries. Last error: ${lastError}`);
     }
 
-    
     // Save configuration if requested
     if(writeCache) {
-      context.datastore.saveExtractConfig(endpoint, payload, { ...preparedExtract});
+      if(input.id) {
+        context.datastore.upsertExtractConfig(input.id, preparedExtract, context.orgId);
+      } else {
+        context.datastore.saveExtractConfig(input.endpoint, payload, preparedExtract, context.orgId);
+      }
     }
     const completedAt = new Date();
 
@@ -78,7 +103,7 @@ export const extractResolver = async (
       id: callId,
       success: false,
       error: maskedError,
-      configuration: preparedExtract || endpoint,
+      configuration: preparedExtract || input.endpoint,
       startedAt,
       completedAt,
     };

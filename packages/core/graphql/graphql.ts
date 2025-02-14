@@ -1,13 +1,14 @@
 import fs from 'fs';
-import { listExtractsResolver, listRunsResolver, listTransformsResolver } from './resolvers/list.js';
-import { getTransformResolver, getExtractResolver, getApiResolver, getRunResolver } from './resolvers/get.js';
 import { callResolver } from './resolvers/call.js';
 import { deleteApiResolver, deleteExtractResolver, deleteTransformResolver } from './resolvers/delete.js';
-import { listApisResolver } from './resolvers/list.js';
-import { JSONResolver, JSONSchemaResolver, JSONataResolver } from './resolvers/scalars.js';
 import { extractResolver } from './resolvers/extract.js';
+import { generateSchemaResolver } from './resolvers/generate.js';
+import { getApiResolver, getExtractResolver, getRunResolver, getTransformResolver } from './resolvers/get.js';
+import { listApisResolver, listExtractsResolver, listRunsResolver, listTransformsResolver } from './resolvers/list.js';
+import { JSONResolver, JSONSchemaResolver, JSONataResolver } from './resolvers/scalars.js';
 import { transformResolver } from './resolvers/transform.js';
-import { upsertTransformResolver, upsertExtractResolver, upsertApiResolver } from './resolvers/upsert.js';
+import { upsertApiResolver, upsertExtractResolver, upsertTransformResolver } from './resolvers/upsert.js';
+import { GraphQLUpload } from 'graphql-upload-minimal';
 
 export const resolvers = {
     Query: {
@@ -18,7 +19,8 @@ export const resolvers = {
         listTransforms: listTransformsResolver,
         getTransform: getTransformResolver,
         listExtracts: listExtractsResolver,
-        getExtract: getExtractResolver
+        getExtract: getExtractResolver,
+        generateSchema: generateSchemaResolver
     },
     Mutation: {
         call: callResolver,
@@ -34,9 +36,11 @@ export const resolvers = {
     JSON: JSONResolver,
     JSONSchema: JSONSchemaResolver,
     JSONata: JSONataResolver,
+    Upload: GraphQLUpload,
     ConfigType: {
         __resolveType(obj: any, context: any, info: any) {
             // Get the parent field name from the path
+            // we need to fix this at some point
             const parentField = info.path.prev.key;
             
             switch (parentField) {

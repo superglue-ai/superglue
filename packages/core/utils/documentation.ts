@@ -1,6 +1,6 @@
 import axios from "axios";
-import { NodeHtmlMarkdown } from "node-html-markdown";
 import { getIntrospectionQuery } from "graphql";
+import { NodeHtmlMarkdown } from "node-html-markdown";
 
 export async function getDocumentation(documentationUrl: string, headers: Record<string, string>, queryParams: Record<string, string>): Promise<string> {
     if(!documentationUrl) {

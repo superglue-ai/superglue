@@ -1,7 +1,7 @@
 import "./globals.css";
 import nextConfig from "@/next.config";
-import { ClientWrapper } from "./client-layout";
-import { geistSans, geistMono } from './fonts'
+import { ClientWrapper } from "@/src/app/client-layout";
+import { geistSans, geistMono } from '@/src/app/fonts'
 
 // we need to force dynamic to get the env vars at runtime
 export const dynamic = 'force-dynamic'

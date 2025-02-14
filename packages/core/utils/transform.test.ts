@@ -1,9 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { prepareTransform, generateMapping } from './transform.js';
-import { DataStore, TransformInput } from '@superglue/shared';
+import { TransformInput } from '@superglue/shared';
 import dotenv from 'dotenv';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyJsonataWithValidation } from './tools.js';
-import OpenAI from 'openai/index.mjs';
+import { generateMapping, prepareTransform } from './transform.js';
 
 // Define mockOpenAI at the top level
 const mockOpenAI = {
@@ -31,6 +30,7 @@ describe('transform utils', () => {
   });
 
   describe('prepareTransform', () => {
+    const testOrgId = 'test-org';
     const sampleInput: TransformInput = {
       instruction: 'get the full name from the user',
       responseSchema: {
@@ -52,7 +52,7 @@ describe('transform utils', () => {
         getTransformConfigFromRequest: vi.fn(),
       } as any;      
       const input = { ...sampleInput, responseSchema: {} };
-      const result = await prepareTransform(mockDataStore, false, input, {});
+      const result = await prepareTransform(mockDataStore, false, input, {}, testOrgId);
       expect(result).toBeNull();
     });
 
@@ -69,7 +69,7 @@ describe('transform utils', () => {
       
       (mockDataStore.getTransformConfigFromRequest as any).mockResolvedValue(cachedConfig);
       
-      const result = await prepareTransform(mockDataStore, true, sampleInput, { product: { name: 'test' } });
+      const result = await prepareTransform(mockDataStore, true, sampleInput, { product: { name: 'test' } }, testOrgId);
       
       expect(result).toEqual({
         ...cachedConfig,
@@ -86,7 +86,7 @@ describe('transform utils', () => {
         responseMapping: 'test-mapping'
       };
       
-      const result = await prepareTransform(mockDataStore, false, input, { product: { name: 'test' } });
+      const result = await prepareTransform(mockDataStore, false, input, { product: { name: 'test' } }, testOrgId);
       
       expect(result).toMatchObject({
         responseMapping: 'test-mapping',
@@ -113,7 +113,7 @@ describe('transform utils', () => {
               }
             }]
           });    
-      const transform = await prepareTransform(mockDataStore, false, sampleInput, samplePayload);
+      const transform = await prepareTransform(mockDataStore, false, sampleInput, samplePayload, testOrgId);
       const result = await applyJsonataWithValidation(samplePayload, transform.responseMapping, sampleInput.responseSchema);
       expect(result).toMatchObject({
         success: true,

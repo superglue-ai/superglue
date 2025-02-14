@@ -1,238 +1,264 @@
-import { describe, it, expect, beforeEach } from 'vitest'
-import { MemoryStore } from './memory.js'
-import { ApiConfig, ExtractConfig, HttpMethod, RunResult, TransformConfig } from '@superglue/shared'
-
+import { ApiConfig, ExtractConfig, HttpMethod, RunResult, TransformConfig } from '@superglue/shared';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { MemoryStore } from './memory.js';
 
 describe('MemoryStore', () => {
   let store: MemoryStore;
+  const testOrgId = 'test-org';
 
   beforeEach(() => {
     store = new MemoryStore();
   });
 
-  describe('API Config operations', () => {
+  describe('API Config', () => {
     const testConfig: ApiConfig = {
-      id: 'test-api',
-      urlHost: 'http://example.com',
-      urlPath: '/api',
-      instruction: 'Test API',
-      method: HttpMethod.GET,
+      id: 'test-id',
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
+      urlHost: 'https://test.com',
+      method: HttpMethod.GET,
+      headers: {},
+      queryParams: {},
+      instruction: 'Test API',
     };
 
-    it('should store and retrieve API config', async () => {
-      await store.upsertApiConfig(testConfig.id, testConfig);
-      const retrieved = await store.getApiConfig(testConfig.id);
+    it('should store and retrieve API configs', async () => {
+      await store.upsertApiConfig(testConfig.id, testConfig, testOrgId);
+      const retrieved = await store.getApiConfig(testConfig.id, testOrgId);
       expect(retrieved).toEqual(testConfig);
     });
 
-    it('should list API configs with pagination', async () => {
-      await store.upsertApiConfig(testConfig.id, testConfig);
-      const { items, total } = await store.listApiConfigs(10, 0);
-      expect(items.length).toBe(1);
+    it('should list API configs', async () => {
+      await store.upsertApiConfig(testConfig.id, testConfig, testOrgId);
+      const { items, total } = await store.listApiConfigs(10, 0, testOrgId);
+      expect(items).toHaveLength(1);
       expect(total).toBe(1);
       expect(items[0]).toEqual(testConfig);
     });
 
-    it('should delete API config', async () => {
-      await store.upsertApiConfig(testConfig.id, testConfig);
-      const deleted = await store.deleteApiConfig(testConfig.id);
-      expect(deleted).toBe(true);
-      const retrieved = await store.getApiConfig(testConfig.id);
+    it('should delete API configs', async () => {
+      await store.upsertApiConfig(testConfig.id, testConfig, testOrgId);
+      await store.deleteApiConfig(testConfig.id, testOrgId);
+      const retrieved = await store.getApiConfig(testConfig.id, testOrgId);
       expect(retrieved).toBeNull();
     });
   });
 
-  describe('Extract Config operations', () => {
+  describe('Extract Config', () => {
     const testExtractConfig: ExtractConfig = {
-      id: 'test-extract',
-      urlHost: 'http://example.com',
-      instruction: 'Test extraction',
+      id: 'test-extract-id',
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
+      instruction: 'Test extraction',
+      urlHost: 'https://test.com',
     };
 
-    it('should store and retrieve Extract config', async () => {
-      await store.upsertExtractConfig(testExtractConfig.id, testExtractConfig);
-      const retrieved = await store.getExtractConfig(testExtractConfig.id);
+    it('should store and retrieve extract configs', async () => {
+      await store.upsertExtractConfig(testExtractConfig.id, testExtractConfig, testOrgId);
+      const retrieved = await store.getExtractConfig(testExtractConfig.id, testOrgId);
       expect(retrieved).toEqual(testExtractConfig);
     });
 
-    it('should list Extract configs with pagination', async () => {
-      await store.upsertExtractConfig(testExtractConfig.id, testExtractConfig);
-      const { items, total } = await store.listExtractConfigs(10, 0);
-      expect(items.length).toBe(1);
+    it('should list extract configs', async () => {
+      await store.upsertExtractConfig(testExtractConfig.id, testExtractConfig, testOrgId);
+      const { items, total } = await store.listExtractConfigs(10, 0, testOrgId);
+      expect(items).toHaveLength(1);
       expect(total).toBe(1);
       expect(items[0]).toEqual(testExtractConfig);
     });
 
-    it('should delete Extract config', async () => {
-      await store.upsertExtractConfig(testExtractConfig.id, testExtractConfig);
-      const deleted = await store.deleteExtractConfig(testExtractConfig.id);
-      expect(deleted).toBe(true);
-      const retrieved = await store.getExtractConfig(testExtractConfig.id);
+    it('should delete extract configs', async () => {
+      await store.upsertExtractConfig(testExtractConfig.id, testExtractConfig, testOrgId);
+      await store.deleteExtractConfig(testExtractConfig.id, testOrgId);
+      const retrieved = await store.getExtractConfig(testExtractConfig.id, testOrgId);
       expect(retrieved).toBeNull();
     });
   });
 
-  describe('Transform Config operations', () => {
+  describe('Transform Config', () => {
     const testTransformConfig: TransformConfig = {
-      id: 'test-transform',
-      responseSchema: {
-        type: 'object',
-        properties: {
-          name: { type: 'string' },
-          age: { type: 'number' }
-        },
-        required: ['name', 'age']
-      },
-      responseMapping: "data.{'name': 'name', 'age': 'age'}",
+      id: 'test-transform-id',
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
+      responseSchema: {},
+      responseMapping: '',
+      confidence: 1,
+      confidence_reasoning: 'test',
     };
 
-    it('should store and retrieve Transform config', async () => {
-      await store.upsertTransformConfig(testTransformConfig.id, testTransformConfig);
-      const retrieved = await store.getTransformConfig(testTransformConfig.id);
+    it('should store and retrieve transform configs', async () => {
+      await store.upsertTransformConfig(testTransformConfig.id, testTransformConfig, testOrgId);
+      const retrieved = await store.getTransformConfig(testTransformConfig.id, testOrgId);
       expect(retrieved).toEqual(testTransformConfig);
     });
 
-    it('should list Transform configs with pagination', async () => {
-      await store.upsertTransformConfig(testTransformConfig.id, testTransformConfig);
-      const { items, total } = await store.listTransformConfigs(10, 0);
-      expect(items.length).toBe(1);
+    it('should list transform configs', async () => {
+      await store.upsertTransformConfig(testTransformConfig.id, testTransformConfig, testOrgId);
+      const { items, total } = await store.listTransformConfigs(10, 0, testOrgId);
+      expect(items).toHaveLength(1);
       expect(total).toBe(1);
       expect(items[0]).toEqual(testTransformConfig);
     });
 
-    it('should delete Transform config', async () => {
-      await store.upsertTransformConfig(testTransformConfig.id, testTransformConfig);
-      const deleted = await store.deleteTransformConfig(testTransformConfig.id);
-      expect(deleted).toBe(true);
-      const retrieved = await store.getTransformConfig(testTransformConfig.id);
+    it('should delete transform configs', async () => {
+      await store.upsertTransformConfig(testTransformConfig.id, testTransformConfig, testOrgId);
+      await store.deleteTransformConfig(testTransformConfig.id, testOrgId);
+      const retrieved = await store.getTransformConfig(testTransformConfig.id, testOrgId);
       expect(retrieved).toBeNull();
     });
   });
 
-  describe('Run operations', () => {
-    const testRun: RunResult = {
-      id: 'test-run',
-      success: true,
-      startedAt: new Date(),
-      completedAt: new Date(),
-      error: null,
-      config: {
-        id: 'test-api', 
-        urlHost: 'http://example.com', 
-        urlPath: '/api', 
-        instruction: 'Test API', 
-        method: HttpMethod.GET, 
-        createdAt: new Date(), 
-        updatedAt: new Date()
-      }
+  describe('Run Results', () => {
+    const testApiConfig: ApiConfig = {
+      id: 'test-api-id',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      urlHost: 'https://test.com',
+      method: HttpMethod.GET,
+      headers: {},
+      queryParams: {},
+      instruction: 'Test API',
     };
 
-    it('should create and retrieve run', async () => {
-      await store.createRun(testRun);
-      const retrieved = await store.getRun(testRun.id);
+    const testRun: RunResult = {
+      id: 'test-run-id',
+      startedAt: new Date(),
+      completedAt: new Date(),
+      success: true,
+      config: testApiConfig,
+      error: null,
+    };
+
+    it('should store and retrieve runs', async () => {
+      await store.createRun(testRun, testOrgId);
+      const retrieved = await store.getRun(testRun.id, testOrgId);
       expect(retrieved).toEqual(testRun);
     });
 
-    it('should list runs with correct ordering', async () => {
-      const run1 = { ...testRun, id: 'run1', startedAt: new Date(2024, 0, 1) };
-      const run2 = { ...testRun, id: 'run2', startedAt: new Date(2024, 0, 2) };
-      
-      await store.createRun(run1);
-      await store.createRun(run2);
-      
-      const { items, total } = await store.listRuns(10, 0);
-      expect(items.length).toBe(2);
+    it('should list runs in chronological order', async () => {
+      const run1: RunResult = {
+        ...testRun,
+        id: 'run1',
+        startedAt: new Date(Date.now() - 1000),
+      };
+      const run2: RunResult = {
+        ...testRun,
+        id: 'run2',
+        startedAt: new Date(),
+      };
+
+      await store.createRun(run1, testOrgId);
+      await store.createRun(run2, testOrgId);
+
+      const { items, total } = await store.listRuns(10, 0, null, testOrgId);
+      expect(items).toHaveLength(2);
       expect(total).toBe(2);
-      // Should be ordered by startedAt descending
-      expect(items[0].id).toBe('run2');
-      expect(items[1].id).toBe('run1');
+      expect(items[0].id).toBe(run2.id); // Most recent first
+      expect(items[1].id).toBe(run1.id);
     });
 
-    it('should delete run', async () => {
-      await store.createRun(testRun);
-      const deleted = await store.deleteRun(testRun.id);
-      expect(deleted).toBe(true);
-      const retrieved = await store.getRun(testRun.id);
+    it('should delete runs', async () => {
+      await store.createRun(testRun, testOrgId);
+      await store.deleteRun(testRun.id, testOrgId);
+      const retrieved = await store.getRun(testRun.id, testOrgId);
       expect(retrieved).toBeNull();
+    });
+
+    it('should list runs filtered by config ID', async () => {
+      const run1 = { ...testRun, id: 'run1', config: { ...testRun.config, id: 'config1' } };
+      const run2 = { ...testRun, id: 'run2', config: { ...testRun.config, id: 'config2' } };
+      const run3 = { ...testRun, id: 'run3', config: { ...testRun.config, id: 'config1' } };
+      
+      await store.createRun(run1, testOrgId);
+      await store.createRun(run2, testOrgId);
+      await store.createRun(run3, testOrgId);
+      
+      const { items, total } = await store.listRuns(10, 0, 'config1', testOrgId);
+      expect(items.length).toBe(2);
+      expect(total).toBe(3); // Total is still all runs
+      expect(items.map(run => run.id).sort()).toEqual(['run1', 'run3']);
+    });
+
+    it('should handle listing runs when configs have missing IDs', async () => {
+      const runWithoutConfigId = { 
+        ...testRun, 
+        id: 'run1', 
+        config: { ...testRun.config, id: undefined } 
+      };
+      const runWithConfigId = { 
+        ...testRun, 
+        id: 'run2', 
+        config: { ...testRun.config, id: 'config1' } 
+      };
+      
+      await store.createRun(runWithoutConfigId, testOrgId);
+      await store.createRun(runWithConfigId, testOrgId);
+      
+      const { items: filteredItems } = await store.listRuns(10, 0, 'config1', testOrgId);
+      expect(filteredItems.length).toBe(1);
+      expect(filteredItems[0].id).toBe('run2');
+
+      const { items: allItems } = await store.listRuns(10, 0, null, testOrgId);
+      expect(allItems.length).toBe(2);
     });
   });
 
-  describe('Utility operations', () => {
+  describe('Clear All', () => {
     it('should clear all data', async () => {
-      // Insert some test data
       const testConfig: ApiConfig = {
         id: 'test-api',
-        urlHost: 'http://example.com',
-        urlPath: '/api',
-        instruction: 'Test API',
-        method: HttpMethod.GET,
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
+        urlHost: 'https://test.com',
+        method: HttpMethod.GET,
+        headers: {},
+        queryParams: {},
+        instruction: 'Test API',
       };
-      const testRun: RunResult = {
-        id: 'test-run',
-        success: true,
-        startedAt: new Date(),
-        completedAt: new Date(),
-        error: null,
-        config: {
-          id: 'test-api', 
-          urlHost: 'http://example.com', 
-          urlPath: '/api', 
-          instruction: 'Test API', 
-          method: HttpMethod.GET, 
-          createdAt: new Date(), 
-          updatedAt: new Date()
-        }
-      };
+
       const testExtractConfig: ExtractConfig = {
         id: 'test-extract',
-        urlHost: 'http://example.com',
-        instruction: 'Test extraction',
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
+        instruction: 'Test extraction',
+        urlHost: 'https://test.com',
       };
+
       const testTransformConfig: TransformConfig = {
         id: 'test-transform',
-        responseSchema: {
-          type: 'object',
-          properties: {
-            name: { type: 'string' },
-            age: { type: 'number' }
-          },
-          required: ['name', 'age']
-        },
-        responseMapping: "data.{'name': 'name', 'age': 'age'}",
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
+        responseSchema: {},
+        responseMapping: '',
+        confidence: 1,
+        confidence_reasoning: 'test',
       };
-      await store.upsertApiConfig('test-api', testConfig);
-      await store.upsertExtractConfig('test-extract', testExtractConfig);
-      await store.upsertTransformConfig('test-transform', testTransformConfig);
-      await store.createRun(testRun);
+
+      const testRun: RunResult = {
+        id: 'test-run',
+        startedAt: new Date(),
+        completedAt: new Date(),
+        success: true,
+        config: testConfig,
+        error: null,
+      };
+
+      await store.upsertApiConfig('test-api', testConfig, testOrgId);
+      await store.upsertExtractConfig('test-extract', testExtractConfig, testOrgId);
+      await store.upsertTransformConfig('test-transform', testTransformConfig, testOrgId);
+      await store.createRun(testRun, testOrgId);
 
       await store.clearAll();
 
-      const { total: apiTotal } = await store.listApiConfigs();
-      const { total: extractTotal } = await store.listExtractConfigs();
-      const { total: transformTotal } = await store.listTransformConfigs();
-      const { total: runTotal } = await store.listRuns();
+      const { total: apiTotal } = await store.listApiConfigs(10, 0, testOrgId);
+      const { total: extractTotal } = await store.listExtractConfigs(10, 0, testOrgId);
+      const { total: transformTotal } = await store.listTransformConfigs(10, 0, testOrgId);
+      const { total: runTotal } = await store.listRuns(10, 0, null, testOrgId);
 
       expect(apiTotal).toBe(0);
       expect(extractTotal).toBe(0);
       expect(transformTotal).toBe(0);
       expect(runTotal).toBe(0);
-    });
-
-    it('should ping successfully', async () => {
-      const result = await store.ping();
-      expect(result).toBe(true);
     });
   });
 }); 

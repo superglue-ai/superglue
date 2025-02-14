@@ -2,6 +2,7 @@ scalar JSONSchema
 scalar JSON
 scalar JSONata
 scalar DateTime
+scalar Upload
 
 interface BaseConfig {
   id: ID!
@@ -209,6 +210,7 @@ input ApiInputRequest @oneOf {
 
 input ExtractInputRequest @oneOf {
   endpoint: ExtractInput
+  file: Upload
   id: ID
 }
 
@@ -218,7 +220,7 @@ input TransformInputRequest @oneOf {
 }
 
 type Query {
-  listRuns(limit: Int = 10, offset: Int = 0): RunList!
+  listRuns(limit: Int = 10, offset: Int = 0, configId: ID): RunList!
   listApis(limit: Int = 10, offset: Int = 0): ApiList!
   listTransforms(limit: Int = 10, offset: Int = 0): TransformList!
   listExtracts(limit: Int = 10, offset: Int = 0): ExtractList!
@@ -227,6 +229,8 @@ type Query {
   getApi(id: ID!): ApiConfig
   getTransform(id: ID!): TransformConfig
   getExtract(id: ID!): ExtractConfig
+
+  generateSchema(instruction: String!, responseData: String): JSONSchema!
 }
 
 type Mutation {

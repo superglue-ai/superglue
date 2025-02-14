@@ -1,5 +1,5 @@
 import React from 'react';
-import ConfigTable from './configs/page';
+import ConfigTable from '@/src/app/configs/page';
 
 const Main = () => {
   return (
