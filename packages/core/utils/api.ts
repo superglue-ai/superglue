@@ -8,7 +8,13 @@ import { API_PROMPT } from "./prompts.js";
 import { callAxios, composeUrl, replaceVariables } from "./tools.js";
 
 
-export async function prepareEndpoint(endpointInput: ApiInput, payload: any, credentials: any, lastError: string | null = null): Promise<ApiConfig> {
+export async function prepareEndpoint(
+  endpointInput: ApiInput, 
+  payload: any, 
+  credentials: any, 
+  lastError: string | null = null,
+  previousMessages: OpenAI.Chat.ChatCompletionMessageParam[] = []
+): Promise<{ config: ApiConfig; messages: OpenAI.Chat.ChatCompletionMessageParam[] }> {
     // Set the current timestamp
     const currentTime = new Date();
 
@@ -24,7 +30,7 @@ export async function prepareEndpoint(endpointInput: ApiInput, payload: any, cre
     const documentation = await getDocumentation(apiCallConfig.documentationUrl || composeUrl(apiCallConfig.urlHost, apiCallConfig.urlPath), apiCallConfig.headers, apiCallConfig.queryParams);
 
     const availableVars = [...Object.keys(payload || {}), ...Object.keys(credentials || {})];
-    const computedApiCallConfig = await generateApiConfig(apiCallConfig, documentation, availableVars, lastError);
+    const computedApiCallConfig = await generateApiConfig(apiCallConfig, documentation, availableVars, lastError, previousMessages);
     
     return computedApiCallConfig;
 }
@@ -144,7 +150,13 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
   };
 }
 
-async function generateApiConfig(apiConfig: Partial<ApiConfig>, documentation: string, vars: string[] = [], lastError: string | null = null): Promise<ApiConfig> {
+async function generateApiConfig(
+  apiConfig: Partial<ApiConfig>, 
+  documentation: string, 
+  vars: string[] = [], 
+  lastError: string | null = null,
+  previousMessages: OpenAI.Chat.ChatCompletionMessageParam[] = []
+): Promise<{ config: ApiConfig; messages: OpenAI.Chat.ChatCompletionMessageParam[] }> {
   console.log("Generating API config for " + apiConfig.urlHost);
   const schema = zodToJsonSchema(z.object({
     urlHost: z.string(),
@@ -163,9 +175,62 @@ async function generateApiConfig(apiConfig: Partial<ApiConfig>, documentation: s
   const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY
   });
+
+  const initialUserMessage: OpenAI.Chat.ChatCompletionUserMessageParam = {
+    role: "user", 
+    content: 
+`Generate API configuration for the following:
+
+Instructions: ${apiConfig.instruction}
+
+Base URL: ${composeUrl(apiConfig.urlHost, apiConfig.urlPath)}
+
+Also, the user provided the following information, which is probably correct:
+${apiConfig.headers ? `Headers: ${JSON.stringify(apiConfig.headers)}` : ''}
+${apiConfig.queryParams ? `Query Params: ${JSON.stringify(apiConfig.queryParams)}` : ''}
+${apiConfig.body ? `Body: ${JSON.stringify(apiConfig.body)}` : ''}
+${apiConfig.authentication ? `Authentication: ${apiConfig.authentication}` : ''}
+${apiConfig.dataPath ? `Data Path: ${apiConfig.dataPath}` : ''}
+${apiConfig.pagination ? `Pagination: ${JSON.stringify(apiConfig.pagination)}` : ''}
+${apiConfig.method ? `Method: ${apiConfig.method}` : ''}
+
+Documentation: ${String(documentation).slice(0, 20000)}
+
+Available variables: ${vars.join(", ")}
+`
+  }
+
+  const subsequentUserMessage: OpenAI.Chat.ChatCompletionUserMessageParam = {
+    role: "user",
+    content: 
+`You made an error, the configuration you generated was incorrect and failed with the following error: ${lastError}
+
+The previous configuration was: ${JSON.stringify(apiConfig)}.
+
+In case of a 401 error, please pay special attention to the authentication type and headers.
+
+You will get to try again, so feel free to experiment and iterate on the configuration.
+Make sure to try a fix before generating a new configuration. I will loose my job if I don't get this right.`
+  }
+
+  const systemMessage: OpenAI.Chat.ChatCompletionSystemMessageParam = {
+    role: "system",
+    content: API_PROMPT
+  };
+
+  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = previousMessages.length > 0 
+    ? [...previousMessages, subsequentUserMessage]
+    : [systemMessage, initialUserMessage];
+
+  const numInitialMessages = 2;
+  const retryCount = previousMessages.length > 0 ? (messages.length - numInitialMessages) / 2 : 0;
+  const temperature = Math.min(retryCount * 0.1, 0.7);
+
+  console.log(`Attempt ${retryCount + 1} with temperature ${temperature}`);
+
   const completion = await openai.chat.completions.create({
     model: process.env.OPENAI_MODEL,
-    temperature: 0,
+    temperature,
     response_format: {
       type: "json_schema",
       json_schema: {
@@ -173,30 +238,16 @@ async function generateApiConfig(apiConfig: Partial<ApiConfig>, documentation: s
         schema: schema,
       }
     },
-    messages: [
-      {
-        role: "system",
-        content: API_PROMPT
-      },
-      {
-        role: "user", 
-        content: 
-`Generate API configuration for the following:
-
-Instructions: ${apiConfig.instruction}
-
-Base URL: ${composeUrl(apiConfig.urlHost, apiConfig.urlPath)}
-
-Documentation: ${String(documentation).slice(0, 25000)}
-
-Available variables: ${vars.join(", ")}
-
-${lastError ? `We tried it before, but it failed with the following error: ${lastError.slice(0, 3000)}` : ''}
-`
-      }
-    ]
+    messages
   });
+
   const generatedConfig = JSON.parse(completion.choices[0].message.content);
+  
+  // Add the assistant's response to messages for future context
+  messages.push({
+    role: "assistant",
+    content: completion.choices[0].message.content
+  });
 
   // Check for any {var} in the generated config that isn't in available variables
   const invalidVars = validateVariables(generatedConfig, vars);
@@ -204,24 +255,30 @@ ${lastError ? `We tried it before, but it failed with the following error: ${las
   if (invalidVars.length > 0) {
     throw new Error(`Generated config contains variables that are not available. Please remove them: ${invalidVars.join(', ')}`);
   }
+
   return {
-    urlHost: apiConfig.urlHost || generatedConfig.urlHost,
-    urlPath: apiConfig.urlPath || generatedConfig.urlPath,
-    instruction: apiConfig.instruction || generatedConfig.instruction,
-    method: apiConfig.method || generatedConfig.method,
-    queryParams: apiConfig.queryParams || generatedConfig.queryParams,
-    headers: apiConfig.headers || generatedConfig.headers,
-    body: apiConfig.body || generatedConfig.body,
-    authentication: apiConfig.authentication || generatedConfig.authentication,
-    pagination: apiConfig.pagination || generatedConfig.pagination,
-    dataPath: apiConfig.dataPath || generatedConfig.dataPath,
-    documentationUrl: apiConfig.documentationUrl,
-    responseSchema: apiConfig.responseSchema,
-    responseMapping: apiConfig.responseMapping,
-    createdAt: apiConfig.createdAt || new Date(),
-    updatedAt: new Date(),
-    id: apiConfig.id,
-    } as ApiConfig;
+    config: {
+      // we want to iterate, therefore we only use the generated config
+      instruction: apiConfig.instruction,
+      urlHost: generatedConfig.urlHost,
+      urlPath: generatedConfig.urlPath,
+      method: generatedConfig.method,
+      queryParams: generatedConfig.queryParams,
+      headers: generatedConfig.headers,
+      body: generatedConfig.body,
+      authentication: generatedConfig.authentication,
+      // TODO: pagination, dataPath are not currently modified?
+      pagination: apiConfig.pagination || generatedConfig.pagination,
+      dataPath: apiConfig.dataPath || generatedConfig.dataPath,
+      documentationUrl: apiConfig.documentationUrl,
+      responseSchema: apiConfig.responseSchema,
+      responseMapping: apiConfig.responseMapping,
+      createdAt: apiConfig.createdAt || new Date(),
+      updatedAt: new Date(),
+      id: apiConfig.id,
+    } as ApiConfig,
+    messages
+  };
 }
 
 function validateVariables(generatedConfig: any, vars: string[]) {
