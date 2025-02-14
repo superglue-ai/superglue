@@ -86,7 +86,7 @@ export const extractResolver = async (
       id: callId,
       success: true,
       data: response,
-      configuration: preparedExtract,
+      config: preparedExtract,
       startedAt,
       completedAt,
     };
@@ -103,7 +103,7 @@ export const extractResolver = async (
       id: callId,
       success: false,
       error: maskedError,
-      configuration: preparedExtract || input.endpoint,
+      config: preparedExtract || input.endpoint,
       startedAt,
       completedAt,
     };
