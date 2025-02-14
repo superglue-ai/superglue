@@ -14,12 +14,14 @@ export async function getDocumentation(documentationUrl: string, headers: Record
     try {
       const response = await axios.get(documentationUrl);
       const docData = response.data;
-      if (String(docData).toLowerCase().slice(0, 100).includes("<html>")) {
+
+      if (String(docData).toLowerCase().slice(0, 200).includes("<html")) {
         documentation = NodeHtmlMarkdown.translate(docData);
       }
-      else if(docData) {
+      if(!documentation && docData) {
         documentation = typeof docData === 'object' ? JSON.stringify(docData) : String(docData);
       }
+
       // If the documentation contains GraphQL, fetch the schema and add it to the documentation
         if(documentationUrl.includes("graphql") || documentation.toLowerCase().includes("graphql")) {
           const graphqlDocumentation = await getGraphQLSchema(documentationUrl, headers, queryParams);
