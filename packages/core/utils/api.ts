@@ -194,7 +194,7 @@ ${apiConfig.dataPath ? `Data Path: ${apiConfig.dataPath}` : ''}
 ${apiConfig.pagination ? `Pagination: ${JSON.stringify(apiConfig.pagination)}` : ''}
 ${apiConfig.method ? `Method: ${apiConfig.method}` : ''}
 
-Documentation: ${String(documentation).slice(0, 10000)}
+Documentation: ${String(documentation).slice(0, 20000)}
 
 Available variables: ${vars.join(", ")}
 `
