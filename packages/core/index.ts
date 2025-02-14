@@ -1,20 +1,24 @@
 import { ApolloServer } from '@apollo/server';
 import { expressMiddleware } from '@apollo/server/express4';
 import { ApolloServerPluginLandingPageLocalDefault } from '@apollo/server/plugin/landingPage/default';
+import cors from 'cors';
 import express from 'express';
 import http from 'http';
-import cors from 'cors';
-import { resolvers, typeDefs } from './graphql/graphql.js';
-import { handleQueryError, sessionId, telemetryClient, telemetryMiddleware } from './utils/telemetry.js';
 import { createDataStore } from './datastore/datastore.js';
+import { resolvers, typeDefs } from './graphql/graphql.js';
+import { handleQueryError, telemetryClient, telemetryMiddleware } from './utils/telemetry.js';
+import { SupabaseKeyManager } from './auth/supabaseKeyManager.js';
+import { LocalKeyManager } from './auth/localKeyManager.js';
+import { graphqlUploadExpress } from 'graphql-upload-minimal';
 
 // Constants
 const PORT = process.env.GRAPHQL_PORT || 3000;
-const AUTH_TOKEN = process.env.AUTH_TOKEN;
+const authManager = process.env.AUTH_TOKEN ? new LocalKeyManager() : new SupabaseKeyManager();
+
 const DEBUG = process.env.DEBUG === 'true';
 export const DEFAULT_QUERY = `
 query Query {
-  listCalls(limit: 10) {
+  listRuns(limit: 10) {
     items {
       id
       status
@@ -30,6 +34,7 @@ const apolloConfig = {
   typeDefs,
   resolvers,
   introspection: true,
+  csrfPrevention: false,
   bodyParserOptions: { limit: "1024mb", type: "application/json" },
   plugins: [
     ApolloServerPluginLandingPageLocalDefault({ 
@@ -46,7 +51,8 @@ const apolloConfig = {
             console.error(errors);
           }
           if (errors && telemetryClient) {
-            handleQueryError(errors, requestContext.request.query);
+            const orgId = requestContext.contextValue.orgId;
+            handleQueryError(errors, requestContext.request.query, orgId);
           }
         }
       })
@@ -62,22 +68,36 @@ const contextConfig = {
       !req.body.query.includes("__schema") && DEBUG) {
       console.log(`${req.body.query}`);
     }
-    return { datastore: datastore };
+    return { 
+      datastore: datastore,
+      orgId: req.orgId || ''
+    };
   }
 };
 
+// Authentication Helper Function to cache API keys
+
 // Authentication Middleware
-const authMiddleware = (req, res, next) => {
+const authMiddleware = async (req, res, next) => {
   if(req.path === '/health') {
     return res.status(200).send('OK');
   }
+
   const token = req.headers?.authorization?.split(" ")?.[1]?.trim() || req.query.token;
-  
-  if (!token || token !== AUTH_TOKEN) {
+  if(!token) {
     console.log(`Authentication failed for token: ${token}`);
     return res.status(401).send(getAuthErrorHTML(token));
   }
-  next();
+
+  const authResult = await authManager.authenticate(token);
+
+  if (!authResult.success) {
+    console.log(`Authentication failed for token: ${token}`);
+    return res.status(401).send(getAuthErrorHTML(token));
+  }
+  req.orgId = authResult.orgId;
+  req.headers["orgId"] = authResult.orgId;
+  return next();
 };
 
 // Helper Functions
@@ -110,6 +130,7 @@ async function startServer() {
   app.use(cors());
   app.use(authMiddleware);
   app.use(telemetryMiddleware);
+  app.use(graphqlUploadExpress({ maxFileSize: 10000000, maxFiles: 1 }));
   app.use('/', expressMiddleware(server, contextConfig));
 
   // Start HTTP Server

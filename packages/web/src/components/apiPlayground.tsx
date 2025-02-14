@@ -8,7 +8,7 @@ import { Button } from "@/src/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/src/components/ui/card";
 import { Badge } from "@/src/components/ui/badge";
 import { Play, Clock, AlertCircle, Copy } from "lucide-react";
-import { SuperglueClient } from "@superglue/superglue";
+import { SuperglueClient } from "@superglue/client";
 import { useToast } from "@/src/hooks/use-toast";
 import { useConfig } from "@/src/app/config-context";
 

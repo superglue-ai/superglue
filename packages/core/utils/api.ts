@@ -1,11 +1,11 @@
-import axios, { AxiosRequestConfig } from "axios";
-import { ApiConfig, ApiInput, AuthType, RequestOptions, HttpMethod, PaginationType } from "@superglue/shared";
-import { callAxios, composeUrl, replaceVariables } from "./tools.js";
-import { z } from "zod";
+import { ApiConfig, ApiInput, AuthType, HttpMethod, PaginationType, RequestOptions } from "@superglue/shared";
+import { AxiosRequestConfig } from "axios";
 import OpenAI from "openai";
+import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { API_PROMPT } from "./prompts.js";
 import { getDocumentation } from "./documentation.js";
+import { API_PROMPT } from "./prompts.js";
+import { callAxios, composeUrl, replaceVariables } from "./tools.js";
 
 
 export async function prepareEndpoint(endpointInput: ApiInput, payload: any, credentials: any, lastError: string | null = null): Promise<ApiConfig> {
@@ -36,8 +36,9 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
   let page = 1;
   let offset = 0;
   let hasMore = true;
+  let loopCounter = 0;
 
-  while (hasMore) {
+  while (hasMore && loopCounter <= 500) {
     // Generate pagination variables if enabled
     let paginationVars = {};
     if (endpoint.pagination?.type === PaginationType.PAGE_BASED) {
@@ -120,10 +121,14 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
       if(responseData.length < endpoint.pagination?.pageSize) {
         hasMore = false;
       }
+      
       if(JSON.stringify(responseData) !== JSON.stringify(allResults)) {
         allResults = allResults.concat(responseData);
       }
-  } 
+      else {
+        hasMore = false;
+      }
+    } 
     else if(responseData && dataPathSuccess) {
       allResults.push(responseData);
       hasMore = false;
@@ -131,6 +136,7 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
     else {
       hasMore = false;
     }
+    loopCounter++;
   }
 
   return {
@@ -146,7 +152,7 @@ async function generateApiConfig(apiConfig: Partial<ApiConfig>, documentation: s
     queryParams: z.record(z.any()).optional(),
     method: z.enum(Object.values(HttpMethod) as [string, ...string[]]),
     headers: z.record(z.string()).optional(),
-    body: z.string().optional(),
+    body: z.string().optional().describe("Format as JSON if not instructed otherwise."),
     authentication: z.enum(Object.values(AuthType) as [string, ...string[]]),
     dataPath: z.string().optional().describe("The path to the data you want to extract from the response. E.g. products.variants.size"),
     pagination: z.object({
@@ -190,7 +196,6 @@ ${lastError ? `We tried it before, but it failed with the following error: ${las
       }
     ]
   });
-  console.log(completion.choices[0].message.content);
   const generatedConfig = JSON.parse(completion.choices[0].message.content);
 
   // Check for any {var} in the generated config that isn't in available variables
@@ -200,9 +205,23 @@ ${lastError ? `We tried it before, but it failed with the following error: ${las
     throw new Error(`Generated config contains variables that are not available. Please remove them: ${invalidVars.join(', ')}`);
   }
   return {
-    ...generatedConfig,
-    ...apiConfig,
-  } as ApiConfig;
+    urlHost: apiConfig.urlHost || generatedConfig.urlHost,
+    urlPath: apiConfig.urlPath || generatedConfig.urlPath,
+    instruction: apiConfig.instruction || generatedConfig.instruction,
+    method: apiConfig.method || generatedConfig.method,
+    queryParams: apiConfig.queryParams || generatedConfig.queryParams,
+    headers: apiConfig.headers || generatedConfig.headers,
+    body: apiConfig.body || generatedConfig.body,
+    authentication: apiConfig.authentication || generatedConfig.authentication,
+    pagination: apiConfig.pagination || generatedConfig.pagination,
+    dataPath: apiConfig.dataPath || generatedConfig.dataPath,
+    documentationUrl: apiConfig.documentationUrl,
+    responseSchema: apiConfig.responseSchema,
+    responseMapping: apiConfig.responseMapping,
+    createdAt: apiConfig.createdAt || new Date(),
+    updatedAt: new Date(),
+    id: apiConfig.id,
+    } as ApiConfig;
 }
 
 function validateVariables(generatedConfig: any, vars: string[]) {

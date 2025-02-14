@@ -295,6 +295,33 @@ Retrieves a specific extract configuration by ID. Returns [ExtractConfig](types.
   </Tab>
 </Tabs>
 
+### generateSchema
+Generates a JSON schema based on instructions and optional response data. Used to automatically create sensible response JSON schemas to return API data in.
+
+<Tabs>
+  <Tab title="GraphQL">
+    ```graphql
+    query GenerateSchema($instruction: String!, $responseData: String) {
+      generateSchema(instruction: $instruction, responseData: $responseData)
+    }
+    ```
+  </Tab>
+  <Tab title="Client">
+    ```typescript
+    const client = new SuperglueClient({
+      apiKey: 'YOUR_API_KEY'
+    });
+
+    const schema = await client.generateSchema(
+      "Get me all characters with only their name",
+      '[{"name": "Rick", "species": "Human"}, {"name": "Morty", "species": "Human"}]'
+    );
+    console.log(`Generated schema: ${schema}`);
+    ```
+  </Tab>
+</Tabs>
+
+
 See also:
 - [Types Reference](types.md) for detailed type definitions
 - [Overview](overview.md) for common parameters 

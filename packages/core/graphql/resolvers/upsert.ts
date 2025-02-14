@@ -1,5 +1,5 @@
+import { ApiConfig, Context, ExtractConfig, HttpMethod, TransformConfig } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
-import { ApiConfig, Context, TransformConfig, ExtractConfig, HttpMethod } from "@superglue/shared";
 
 export const upsertApiResolver = async (
     _: any,
@@ -11,7 +11,7 @@ export const upsertApiResolver = async (
       throw new Error("id is required");
     }
     // override id with the id from the input
-    const oldConfig = await context.datastore.getApiConfig(id);
+    const oldConfig = await context.datastore.getApiConfig(id, context.orgId);
 
     // reset the response mapping if there are major updates
     let newResponseMapping = input.responseMapping;
@@ -27,13 +27,13 @@ export const upsertApiResolver = async (
     }
 
     const config = { 
-      method: input.method || oldConfig?.method || HttpMethod.GET,
       urlHost: input.urlHost || oldConfig?.urlHost || '',
       urlPath: input.urlPath || oldConfig?.urlPath || '',
       instruction: input.instruction || oldConfig?.instruction || '',
       createdAt: input.createdAt || oldConfig?.createdAt || new Date(),
       updatedAt: new Date(),
       id: id,
+      method: input.method || oldConfig?.method,
       queryParams: input.queryParams || oldConfig?.queryParams,
       headers: input.headers || oldConfig?.headers,
       body: input.body || oldConfig?.body,
@@ -45,7 +45,7 @@ export const upsertApiResolver = async (
       dataPath: input.dataPath || oldConfig?.dataPath,
       version: input.version || oldConfig?.version
     };
-    await context.datastore.upsertApiConfig(id, config);
+    await context.datastore.upsertApiConfig(id, config, context.orgId);
     return config;
 };
 
@@ -58,7 +58,7 @@ export const upsertTransformResolver = async (
     if(!id) {
       throw new Error("id is required");
     }
-    const oldConfig = await context.datastore.getTransformConfig(id);
+    const oldConfig = await context.datastore.getTransformConfig(id, context.orgId);
     const config = { 
       id: id,
       updatedAt: new Date(),
@@ -66,7 +66,7 @@ export const upsertTransformResolver = async (
       responseSchema: input.responseSchema || oldConfig?.responseSchema || {},
       responseMapping: input.responseMapping || oldConfig?.responseMapping || "",
     };
-    await context.datastore.upsertTransformConfig(id, config);
+    await context.datastore.upsertTransformConfig(id, config, context.orgId);
     return config;
 };
 
@@ -79,15 +79,15 @@ export const upsertExtractResolver = async (
     if(!id) {
       throw new Error("id is required");
     }
-    const oldConfig = await context.datastore.getExtractConfig(id);
+    const oldConfig = await context.datastore.getExtractConfig(id, context.orgId);
     const config = { 
       id: id,
-      method: input.method || oldConfig?.method || HttpMethod.GET,
       urlHost: input.urlHost || oldConfig?.urlHost || '',
       urlPath: input.urlPath || oldConfig?.urlPath || '',
       instruction: input.instruction || oldConfig?.instruction || '',
       createdAt: oldConfig?.createdAt || new Date(),
       updatedAt: new Date(),
+      method: input.method || oldConfig?.method,
       queryParams: input.queryParams || oldConfig?.queryParams,
       headers: input.headers || oldConfig?.headers,
       body: input.body || oldConfig?.body,
@@ -97,6 +97,6 @@ export const upsertExtractResolver = async (
       fileType: input.fileType || oldConfig?.fileType,
       dataPath: input.dataPath || oldConfig?.dataPath
     };
-    await context.datastore.upsertExtractConfig(id, config);
+    await context.datastore.upsertExtractConfig(id, config, context.orgId);
     return config;
   };

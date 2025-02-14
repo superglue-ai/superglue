@@ -15,31 +15,56 @@ export const telemetryClient = !isTelemetryDisabled && !isDebug ?
     { host: config.posthog.host }
   ) : null;
 
+if(telemetryClient) {
+  console.log("superglue uses telemetry to understand how many users are using the platform. See self-hosting guide for more info.");
+}
+
+// Precompile the regex for better performance
+const OPERATION_REGEX = /(?:query|mutation)\s+\w+\s*[({][\s\S]*?{([\s\S]*?){/;
+
+export const extractOperationName = (query: string): string => {
+  // Early return for invalid input
+  if (!query) return 'unknown_query';
+
+  const match = OPERATION_REGEX.exec(query);
+  if (!match?.[1]) return 'unknown_query';
+
+  // Split only the relevant captured group and take first word
+  const firstWord = match[1].trim().split(/[\s({]/)[0];
+  return firstWord || 'unknown_query';
+};
+
 export const telemetryMiddleware = (req, res, next) => {
+  if(!telemetryClient) {
+    return next();
+  }
+
   if(req?.body?.query && !(req.body.query.includes("IntrospectionQuery") || req.body.query.includes("__schema"))) {
-    // we track the query, but NOT the variables or the response
-    // the query just contains the superglue endpoint that you call, e.g. "listCalls", 
-    // but not which actual endpoint you call or what payload / auth you use
-    telemetryClient?.capture({
-        distinctId: sessionId,
-        event: 'query',
+    const operation = extractOperationName(req.body.query);
+
+    telemetryClient.capture({
+        distinctId: req.orgId || sessionId,
+        event: operation,
         properties: {
-          query: req.body.query
+          query: req.body.query,
+          orgId: req.orgId,
         }
       });
-      }
+    }
   next();
 };
 
-export const handleQueryError = (errors: any[], query: string) => {
+export const handleQueryError = (errors: any[], query: string, orgId: string) => {
   // in case of an error, we track the query and the error
   // we do not track the variables or the response
-
+  // all errors are masked
+  const operation = extractOperationName(query);
   telemetryClient?.capture({
-    distinctId: sessionId,
-    event: 'query_error',
+    distinctId: orgId || sessionId,
+    event: operation + '_error',
     properties: {
       query,
+      orgId: orgId,
       errors: errors.map(e => ({
         message: e.message,
         path: e.path

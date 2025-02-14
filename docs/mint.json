@@ -17,13 +17,13 @@
   },
   "topbarLinks": [
     {
-      "name": "Dashboard [Beta]",
-      "url": "https://dashboard.superglue.cloud"
+      "name": "superglue Cloud [Beta]",
+      "url": "https://app.superglue.cloud"
     }
   ],
   "topbarCtaButton": {
     "name": "Talk to us",
-    "url": "https://calendar.app.google/Ae4i88qcuR6hyaER6"
+    "url": "https://cal.com/teamindex/superglue-demo"
   },
   "anchors": [
     {
@@ -34,7 +34,7 @@
     {
       "name": "Discord",
       "icon": "discord",
-      "url": "https://discord.gg/SKRYYQEp"
+      "url": "https://discord.gg/vUKnuhHtfW"
     }
   ],
   "navigation": [
