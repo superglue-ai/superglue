@@ -189,6 +189,10 @@ Also, the user provided the following information, which is probably correct:
 ${apiConfig.headers ? `Headers: ${JSON.stringify(apiConfig.headers)}` : ''}
 ${apiConfig.queryParams ? `Query Params: ${JSON.stringify(apiConfig.queryParams)}` : ''}
 ${apiConfig.body ? `Body: ${JSON.stringify(apiConfig.body)}` : ''}
+${apiConfig.authentication ? `Authentication: ${apiConfig.authentication}` : ''}
+${apiConfig.dataPath ? `Data Path: ${apiConfig.dataPath}` : ''}
+${apiConfig.pagination ? `Pagination: ${JSON.stringify(apiConfig.pagination)}` : ''}
+${apiConfig.method ? `Method: ${apiConfig.method}` : ''}
 
 Documentation: ${String(documentation).slice(0, 10000)}
 
