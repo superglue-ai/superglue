@@ -59,12 +59,19 @@ export const upsertTransformResolver = async (
       throw new Error("id is required");
     }
     const oldConfig = await context.datastore.getTransformConfig(id, context.orgId);
+    
+    // reset the response mapping if there are major updates
+    let newResponseMapping = input.responseMapping;
+    if (input.responseMapping === null && !input.responseSchema) {
+      newResponseMapping = oldConfig?.responseMapping;
+    }
+
     const config = { 
       id: id,
       updatedAt: new Date(),
       createdAt: oldConfig?.createdAt || new Date(),
       responseSchema: input.responseSchema || oldConfig?.responseSchema || {},
-      responseMapping: input.responseMapping || oldConfig?.responseMapping || "",
+      responseMapping: newResponseMapping,
     };
     await context.datastore.upsertTransformConfig(id, config, context.orgId);
     return config;
