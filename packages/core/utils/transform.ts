@@ -7,7 +7,7 @@ import crypto from 'crypto';
 export async function prepareTransform(
     datastore: DataStore,
     fromCache: boolean,
-    input: ApiInput | TransformInput,
+    input: TransformInput,
     data: any,
     orgId?: string
   ): Promise<TransformConfig | null> {

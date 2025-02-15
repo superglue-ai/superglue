@@ -27,8 +27,8 @@ export const transformResolver = async (
       await context.datastore.getTransformConfig(input.id, context.orgId) || 
       await context.datastore.getTransformConfigFromRequest(input.endpoint, data, context.orgId) 
     : null;
-    preparedTransform = preparedTransform || 
-      await prepareTransform(context.datastore, readCache, input.endpoint, data, context.orgId);
+    preparedTransform = preparedTransform?.responseMapping ? preparedTransform : 
+      await prepareTransform(context.datastore, readCache, preparedTransform || input.endpoint, data, context.orgId);
     if(!preparedTransform || !preparedTransform.responseMapping) {
       throw new Error("Did not find a valid transformation configuration. Usually this is due to missing information in the request. If you are sending an ID, you need to enable cache read access.");
     }
