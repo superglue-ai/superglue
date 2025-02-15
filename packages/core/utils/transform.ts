@@ -13,7 +13,7 @@ export async function prepareTransform(
   ): Promise<TransformConfig | null> {
 
     // Check if the response schema is empty
-    if(!input.responseSchema || 
+    if(!input?.responseSchema || 
       Object.keys(input.responseSchema).length === 0) {
       return null;
     }
