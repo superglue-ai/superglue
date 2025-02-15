@@ -30,7 +30,7 @@ export const transformResolver = async (
     preparedTransform = preparedTransform || 
       await prepareTransform(context.datastore, readCache, input.endpoint, data, context.orgId);
     if(!preparedTransform || !preparedTransform.responseMapping) {
-      throw new Error("Mapping could not be resolved");
+      throw new Error("Did not find a valid transformation configuration. Usually this is due to missing information in the request. If you are sending an ID, you need to enable cache read access.");
     }
     const transformation = await applyJsonataWithValidation(data, preparedTransform.responseMapping, preparedTransform.responseSchema);
 
