@@ -108,6 +108,7 @@ if (!testConfig.host || !testConfig.port || !testConfig.username || !testConfig.
         id: 'test-transform-id',
         createdAt: new Date(),
         updatedAt: new Date(),
+        instruction: 'Test transformation',
         responseSchema: {},
         responseMapping: '',
         confidence: 1,
