@@ -78,7 +78,7 @@ Source data:
 ${JSON.stringify(sample(payload), null, 2).slice(0,2000)}
 
 Structure:
-${JSON.stringify(toJsonSchema(schema), null, 2)}
+${JSON.stringify(toJsonSchema(payload, {required: true,arrays: {mode: 'first'}}), null, 2)}
 
 ------
 

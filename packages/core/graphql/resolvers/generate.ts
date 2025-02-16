@@ -13,7 +13,7 @@ export const generateSchemaResolver = async (
     }
     if(responseData) {
       try {
-        responseData = JSON.stringify(toJsonSchema(JSON.parse(responseData)));
+        responseData = JSON.stringify(toJsonSchema(JSON.parse(responseData), {required: true,arrays: {mode: 'first'}}));
       } catch (error) {
         responseData = String(responseData).slice(0, 1000);
       }
