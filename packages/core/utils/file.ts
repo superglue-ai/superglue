@@ -54,7 +54,7 @@ export async function decompressZip(buffer: Buffer): Promise<Buffer> {
     }
 }
 
-export async function parseFile(buffer: Buffer, fileType: FileType): Promise<any[]> {
+export async function parseFile(buffer: Buffer, fileType: FileType): Promise<any> {
     fileType = fileType == FileType.AUTO ? await detectFileType(buffer) : fileType;
 
     switch (fileType) {
@@ -62,17 +62,16 @@ export async function parseFile(buffer: Buffer, fileType: FileType): Promise<any
         return parseJSON(buffer);
         case FileType.XML:
         return parseXML(buffer);
-        case FileType.CSV: {
+        case FileType.CSV:
         return parseCSV(buffer);
-        }
         case FileType.EXCEL:
-            return parseExcel(buffer);
+        return parseExcel(buffer);
         default:
         throw new Error('Unsupported file type');
     }
 }
 
-async function parseCSV(buffer: Buffer): Promise<any[]> {
+async function parseCSV(buffer: Buffer): Promise<any> {
     const results: any[] = [];
     const delimiter = detectDelimiter(buffer);
     let current = 0;
@@ -118,7 +117,8 @@ async function parseCSV(buffer: Buffer): Promise<any[]> {
             },
             complete: async () => {
                 console.log('Finished parsing CSV');
-                resolve(results);
+                if(results?.length == 1) resolve(results[0]);
+                else resolve(results);
             },
             error: async (error) => {
                 console.error('Failed parsing CSV');
@@ -128,7 +128,7 @@ async function parseCSV(buffer: Buffer): Promise<any[]> {
     });
 }
     
-async function parseJSON(buffer: Buffer): Promise<any[]> {
+async function parseJSON(buffer: Buffer): Promise<any> {
     try {
         let data = JSON.parse(buffer.toString('utf8'));
         return data;
@@ -206,10 +206,11 @@ async function parseXML(buffer: Buffer): Promise<any[]> {
 
     parser.on('end', async () => {
         try {
-        console.log('Finished parsing XML');
-        resolve(results);
+            console.log('Finished parsing XML');
+            if(results?.length == 1) resolve(results[0]);
+            else resolve(results);
         } catch (error) {
-        reject(error);
+            reject(error);
         }
     });
 
@@ -218,44 +219,55 @@ async function parseXML(buffer: Buffer): Promise<any[]> {
     });
 }
 
-async function parseExcel(buffer: Buffer): Promise<any[]> {
+async function parseExcel(buffer: Buffer): Promise<{ [sheetName: string]: any[] }> {
     try {
-        const workbook = XLSX.read(buffer, { type: 'buffer' });
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        
-        // First, get all rows with original headers
-        const rawRows = XLSX.utils.sheet_to_json<any>(worksheet, { 
-            raw: false,
-            header: 1  // Use 1-based array indices for headers
+        const workbook = XLSX.read(buffer, { 
+            type: 'buffer',
+            cellDates: true
         });
-        if(!rawRows?.length) {
-            throw new Error('No rows found in Excel file');
-        }
-        // Find the row with max length from first 10 rows
-        const headerRowIndex = rawRows
-            .slice(0, 20)
-            .reduce((maxIndex, row, currentIndex, rows) => 
-                (row.length > rows[maxIndex]?.length || 0) ? currentIndex : maxIndex
-            , 0);
+        const result: { [sheetName: string]: any[] } = {};
 
-        // Get headers from the detected row
-        const headers = rawRows[headerRowIndex].map((header: any) => 
-            header ? String(header).trim() : ''
-        );
-
-        // Process all rows after the header row
-        const processedRows = rawRows.slice(headerRowIndex + 1).map((row: any) => {
-            const obj: { [key: string]: any } = {};
-            headers.forEach((header: string, index: number) => {
-                if (header && row[index] !== undefined) {
-                    obj[header] = row[index];
-                }
+        for (const sheetName of workbook.SheetNames) {
+            const worksheet = workbook.Sheets[sheetName];
+            
+            // Get all rows with original headers
+            const rawRows = XLSX.utils.sheet_to_json<any>(worksheet, { 
+                raw: false,
+                header: 1
             });
-            return obj;
-        });
 
-        return processedRows;
+            if (!rawRows?.length) {
+                result[sheetName] = [];
+                continue;
+            }
+
+            // Find the row with max length from first 20 rows
+            const headerRowIndex = rawRows
+                .slice(0, 20)
+                .reduce((maxIndex, row, currentIndex, rows) => 
+                    (row.length > rows[maxIndex]?.length || 0) ? currentIndex : maxIndex
+                , 0);
+
+            // Get headers from the detected row
+            const headers = rawRows[headerRowIndex].map((header: any) => 
+                header ? String(header).trim() : ''
+            );
+
+            // Process all rows after the header row
+            const processedRows = rawRows.slice(headerRowIndex + 1).map((row: any) => {
+                const obj: { [key: string]: any } = {};
+                headers.forEach((header: string, index: number) => {
+                    if (header && row[index] !== undefined) {
+                        obj[header] = row[index];
+                    }
+                });
+                return obj;
+            });
+
+            result[sheetName] = processedRows;
+        }
+
+        return result;
     } catch (error) {
         console.error('Failed parsing Excel file:', error);
         throw error;
