@@ -3,6 +3,7 @@ import { PROMPT_MAPPING } from "./prompts.js";
 import {  applyJsonataWithValidation, sample } from "./tools.js";
 import { ApiInput, DataStore, TransformConfig, TransformInput } from "@superglue/shared";
 import crypto from 'crypto';
+import toJsonSchema from "to-json-schema";
 
 export async function prepareTransform(
     datastore: DataStore,
@@ -71,9 +72,13 @@ export async function generateMapping(schema: any, payload: any, instruction?: s
     const userPrompt = 
 `
 
-Given the following source data, create a jsonata expression in JSON FORMAT:
+Given the following source data and structure, create a jsonata expression in JSON FORMAT:
 
-${JSON.stringify(sample(payload), null, 2).slice(0,10000)}
+Source data:
+${JSON.stringify(sample(payload), null, 2).slice(0,2000)}
+
+Structure:
+${JSON.stringify(toJsonSchema(schema), null, 2)}
 
 ------
 
