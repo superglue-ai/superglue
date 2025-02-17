@@ -35,6 +35,11 @@
       "name": "Discord",
       "icon": "discord",
       "url": "https://discord.gg/vUKnuhHtfW"
+    },
+    {
+      "name": "Changelog",
+      "icon": "list-timeline",
+      "url": "/changelog"
     }
   ],
   "navigation": [
@@ -60,6 +65,12 @@
         "api-reference/types",
         "api-reference/queries",
         "api-reference/mutations"
+      ]
+    },
+    {
+      "group": "Changelog",
+      "pages": [
+        "changelog"
       ]
     }
   ],
