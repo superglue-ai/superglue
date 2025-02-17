@@ -3,11 +3,12 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Layout, History } from "lucide-react";
+import { Layout, History, Book } from "lucide-react";
 
 const navItems = [
   { icon: Layout, label: 'Configurations', href: '/' },
   { icon: History, label: 'Runs', href: '/runs' },
+  { icon: Book, label: 'Documentation', href: 'https://docs.superglue.cloud', target: '_blank' },
 /*  { icon: AlertCircle, label: 'Error Monitoring', href: '/analytics' },
   { icon: Shield, label: 'Access Control', href: '/access-control' },
   { icon: Code, label: 'SDK Generation', href: '/sdk' },
@@ -35,6 +36,7 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              target={item.target || '_self'}
               className={`flex items-center px-6 py-3 text-sm ${
                 isActive 
                   ? 'bg-gray-100 dark:bg-secondary text-gray-900 dark:text-white border-r-2 border-gray-900 dark:border-white' 
