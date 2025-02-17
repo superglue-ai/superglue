@@ -46,7 +46,7 @@
     "object-hash": "^3.0.0",
     "openai": "^4.78.1",
     "papaparse": "^5.5.1",
-    "posthog-node": "^4.4.1",
+    "posthog-node": "^4.6.0",
     "redis": "^4.7.0",
     "sax": "^1.4.1",
     "to-json-schema": "^0.2.5",
