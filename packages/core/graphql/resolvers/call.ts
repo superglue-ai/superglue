@@ -1,11 +1,13 @@
-import { ApiConfig, ApiInput, ApiInputRequest, CacheMode, Context, RequestOptions, TransformConfig } from "@superglue/shared";
+import { ApiConfig, ApiInputRequest, CacheMode, Context, RequestOptions, TransformConfig } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import OpenAI from "openai";
 import { v4 as uuidv4 } from 'uuid';
 import { callEndpoint, prepareEndpoint } from "../../utils/api.js";
+import { telemetryClient } from "../../utils/telemetry.js";
 import { applyJsonataWithValidation, maskCredentials } from "../../utils/tools.js";
 import { prepareTransform } from "../../utils/transform.js";
 import { notifyWebhook } from "../../utils/webhook.js";
+
 export const callResolver = async (
   _: any,
   { input, payload, credentials, options }: { 
@@ -55,12 +57,20 @@ export const callResolver = async (
         }
       } catch (error) {
         console.log(`API call failed.`, error);
+        telemetryClient.captureException(error, context.orgId, {
+          preparedEndpoint: preparedEndpoint,
+          retryCount: retryCount,
+        });
         lastError = error?.message || JSON.stringify(error || {});
       }
       retryCount++;
     } while (!response && retryCount < 8);
     
     if(!response) {
+      telemetryClient.captureException(new Error(`API call failed after ${retryCount} retries. Last error: ${lastError}`), context.orgId, {
+        preparedEndpoint: preparedEndpoint,
+        retryCount: retryCount,
+      });
       throw new Error(`API call failed after ${retryCount} retries. Last error: ${lastError}`);
     }
 
