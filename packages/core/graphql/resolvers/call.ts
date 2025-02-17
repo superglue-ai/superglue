@@ -1,4 +1,4 @@
-import { ApiConfig, ApiInputRequest, CacheMode, Context, RequestOptions } from "@superglue/shared";
+import { ApiConfig, ApiInput, ApiInputRequest, CacheMode, Context, RequestOptions, TransformConfig } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import OpenAI from "openai";
 import { v4 as uuidv4 } from 'uuid';
@@ -66,7 +66,7 @@ export const callResolver = async (
 
     // Transform response
     const responseMapping = preparedEndpoint.responseMapping || 
-      (await prepareTransform(context.datastore, readCache, preparedEndpoint, response.data))?.responseMapping;
+      (await prepareTransform(context.datastore, readCache, preparedEndpoint as TransformConfig, response.data))?.responseMapping;
     const transformedResponse = responseMapping ? 
       await applyJsonataWithValidation(response.data, responseMapping, preparedEndpoint.responseSchema) : 
       { success: true, data: response.data };

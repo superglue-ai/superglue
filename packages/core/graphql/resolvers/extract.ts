@@ -68,8 +68,8 @@ export const extractResolver = async (
 
     // Save configuration if requested
     if(writeCache) {
-      if(input.id) {
-        context.datastore.upsertExtractConfig(input.id, preparedExtract, context.orgId);
+      if(input.id || preparedExtract.id) {
+        context.datastore.upsertExtractConfig(input.id || preparedExtract.id, preparedExtract, context.orgId);
       } else {
         context.datastore.saveExtractConfig(input.endpoint, payload, preparedExtract, context.orgId);
       }

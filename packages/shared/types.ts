@@ -100,8 +100,9 @@ export interface ExtractConfig extends BaseConfig {
 }
 
 export interface TransformConfig extends BaseConfig {
+  instruction: string;
   responseSchema: JSONSchema;
-  responseMapping: string;
+  responseMapping?: string;
   confidence?: number;
   confidence_reasoning?: string;
 }
@@ -145,7 +146,7 @@ export type ExtractInputRequest = {
 
 export type TransformInputRequest = {
   id?: string;
-  endpoint: TransformInput;
+  endpoint?: TransformInput;
 };
 
 export type ExtractInput = {

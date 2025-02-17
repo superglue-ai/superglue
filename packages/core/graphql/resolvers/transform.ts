@@ -1,14 +1,15 @@
-import { CacheMode, Context, RequestOptions, TransformConfig, TransformInput } from "@superglue/shared";
+import { CacheMode, Context, RequestOptions, TransformConfig, TransformInput, TransformInputRequest } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { v4 as uuidv4 } from 'uuid';
 import { applyJsonataWithValidation } from "../../utils/tools.js";
 import { prepareTransform } from "../../utils/transform.js";
 import { notifyWebhook } from "../../utils/webhook.js";
+import { prepareExtract } from "../../utils/extract.js";
 
 export const transformResolver = async (
   _: any,
   { input, data, options }: { 
-    input: TransformInput; 
+    input: TransformInputRequest; 
     data: any; 
     options: RequestOptions; 
   },
@@ -22,9 +23,14 @@ export const transformResolver = async (
   let preparedTransform: TransformConfig | null = null;
   try {
     // Transform response
-    preparedTransform = await prepareTransform(context.datastore, readCache, input, data, context.orgId);
+    preparedTransform = readCache ? 
+      await context.datastore.getTransformConfig(input.id, context.orgId) || 
+      await context.datastore.getTransformConfigFromRequest(input.endpoint, data, context.orgId) 
+    : null;
+    preparedTransform = preparedTransform?.responseMapping ? preparedTransform : 
+      await prepareTransform(context.datastore, readCache, preparedTransform || input.endpoint, data, context.orgId);
     if(!preparedTransform || !preparedTransform.responseMapping) {
-      throw new Error("Mapping could not be resolved");
+      throw new Error("Did not find a valid transformation configuration. Usually this is due to missing information in the request. If you are sending an ID, you need to enable cache read access.");
     }
     const transformation = await applyJsonataWithValidation(data, preparedTransform.responseMapping, preparedTransform.responseSchema);
 
@@ -34,7 +40,11 @@ export const transformResolver = async (
 
     // Save configuration if requested
     if(writeCache) {
-      context.datastore.saveTransformConfig(input, data, preparedTransform, context.orgId);
+      if(input.id || preparedTransform.id) {
+        context.datastore.upsertTransformConfig(input.id || preparedTransform.id, preparedTransform, context.orgId);
+      } else {
+        context.datastore.saveTransformConfig(input.endpoint, data, preparedTransform, context.orgId);
+      }
     }
     const completedAt = new Date();
 
