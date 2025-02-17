@@ -3,17 +3,18 @@ import { PROMPT_MAPPING } from "./prompts.js";
 import {  applyJsonataWithValidation, sample } from "./tools.js";
 import { ApiInput, DataStore, TransformConfig, TransformInput } from "@superglue/shared";
 import crypto from 'crypto';
+import toJsonSchema from "to-json-schema";
 
 export async function prepareTransform(
     datastore: DataStore,
     fromCache: boolean,
-    input: ApiInput | TransformInput,
+    input: TransformInput,
     data: any,
     orgId?: string
   ): Promise<TransformConfig | null> {
 
     // Check if the response schema is empty
-    if(!input.responseSchema || 
+    if(!input?.responseSchema || 
       Object.keys(input.responseSchema).length === 0) {
       return null;
     }
@@ -71,9 +72,13 @@ export async function generateMapping(schema: any, payload: any, instruction?: s
     const userPrompt = 
 `
 
-Given the following source data, create a jsonata expression in JSON FORMAT:
+Given the following source data and structure, create a jsonata expression in JSON FORMAT:
 
-${JSON.stringify(sample(payload), null, 2).slice(0,10000)}
+Source data:
+${JSON.stringify(sample(payload), null, 2).slice(0,2000)}
+
+Structure:
+${JSON.stringify(toJsonSchema(payload, {required: true,arrays: {mode: 'first'}}), null, 2)}
 
 ------
 

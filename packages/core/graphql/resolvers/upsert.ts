@@ -59,12 +59,21 @@ export const upsertTransformResolver = async (
       throw new Error("id is required");
     }
     const oldConfig = await context.datastore.getTransformConfig(id, context.orgId);
+
+    // reset the response mapping if there are major updates
+    let newResponseMapping = input.responseMapping;
+    if (input.responseMapping === null && !input.responseSchema && !input.instruction) {
+      newResponseMapping = oldConfig?.responseMapping;
+    }
+
     const config = { 
       id: id,
       updatedAt: new Date(),
       createdAt: oldConfig?.createdAt || new Date(),
+      instruction: input.instruction || oldConfig?.instruction || '',
       responseSchema: input.responseSchema || oldConfig?.responseSchema || {},
-      responseMapping: input.responseMapping || oldConfig?.responseMapping || "",
+      responseMapping: newResponseMapping,
+      version: input.version || oldConfig?.version
     };
     await context.datastore.upsertTransformConfig(id, config, context.orgId);
     return config;
@@ -95,7 +104,8 @@ export const upsertExtractResolver = async (
       decompressionMethod: input.decompressionMethod || oldConfig?.decompressionMethod,
       authentication: input.authentication || oldConfig?.authentication,
       fileType: input.fileType || oldConfig?.fileType,
-      dataPath: input.dataPath || oldConfig?.dataPath
+      dataPath: input.dataPath || oldConfig?.dataPath,
+      version: input.version || oldConfig?.version
     };
     await context.datastore.upsertExtractConfig(id, config, context.orgId);
     return config;
