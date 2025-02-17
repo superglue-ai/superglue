@@ -4,6 +4,8 @@ import { createContext, useContext } from 'react'
 interface Config {
   superglueEndpoint: string
   superglueApiKey: string
+  postHogKey: string
+  postHogHost: string
 }
 
 const ConfigContext = createContext<Config | null>(null)

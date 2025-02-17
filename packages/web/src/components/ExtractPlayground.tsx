@@ -2,21 +2,22 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { ApiConfig, CacheMode } from "@superglue/client";
+import { ExtractConfig, CacheMode } from "@superglue/client";
 import { composeUrl } from "@/src/lib/utils";
 import { Button } from "@/src/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/src/components/ui/card";
 import { Badge } from "@/src/components/ui/badge";
-import { Play, Clock, AlertCircle, Copy } from "lucide-react";
+import { Play, Clock, AlertCircle, Copy, Upload } from "lucide-react";
 import { SuperglueClient } from "@superglue/client";
 import { useToast } from "@/src/hooks/use-toast";
 import { useConfig } from "@/src/app/config-context";
+import { cn } from "@/src/lib/utils";
 
-export function ApiPlayground({ configId }: { configId?: string }) {
+export function ExtractPlayground({ extractId }: { extractId?: string }) {
   const params = useParams();
-  const id = configId || params.id as string;
+  const id = extractId || params.id as string;
   const { toast } = useToast();
-  const [config, setConfig] = useState<ApiConfig | null>(null);
+  const [extract, setExtract] = useState<ExtractConfig | null>(null);
   const [response, setResponse] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,6 +26,8 @@ export function ApiPlayground({ configId }: { configId?: string }) {
   const [credentialsInput, setCredentialsInput] = useState("{}");
   const [selectedCacheMode, setSelectedCacheMode] = useState<CacheMode>(CacheMode.READONLY);
   const superglueConfig = useConfig();
+  const [file, setFile] = useState<File | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
     const loadConfig = async () => {
@@ -33,8 +36,8 @@ export function ApiPlayground({ configId }: { configId?: string }) {
           endpoint: superglueConfig.superglueEndpoint,
           apiKey: superglueConfig.superglueApiKey
         })
-        const data = await superglueClient.getApi(id);
-        setConfig(data);
+        const data = await superglueClient.getExtract(id);
+        setExtract(data);
       } catch (err) {
         setError('Failed to load API configuration');
         console.error(err);
@@ -43,9 +46,33 @@ export function ApiPlayground({ configId }: { configId?: string }) {
     loadConfig();
   }, [id]);
 
-  const handleRunApi = async (e: React.MouseEvent) => {
-    e.preventDefault();  // Prevent any form submission
-    if (!config) return;
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    setFile(file);
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFile(file);
+  };
+
+  const handleRunExtract = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!extract) return;
     
     setLoading(true);
     setError(null);
@@ -55,35 +82,50 @@ export function ApiPlayground({ configId }: { configId?: string }) {
     const startTime = Date.now();
 
     try {
-        let parsedPayload = {};
-        let parsedCredentials = {};
-        
-        try {
-          parsedPayload = JSON.parse(payloadInput);
-          parsedCredentials = JSON.parse(credentialsInput);
-        } catch (e) {
-          toast({
-            title: "Invalid JSON",
-            description: "Please check your payload and credentials JSON format",
-            variant: "destructive",
-          }); 
-          throw new Error("Invalid JSON in payload or credentials");
-        }
-        const superglue = new SuperglueClient({
-            apiKey: superglueConfig.superglueApiKey,
-            endpoint: superglueConfig.superglueEndpoint
-        })
-        const response = await superglue.call({
-          id: config.id,
+      let parsedPayload = {};
+      let parsedCredentials = {};
+      
+      try {
+        parsedPayload = JSON.parse(payloadInput);
+        parsedCredentials = JSON.parse(credentialsInput);
+      } catch (e) {
+        toast({
+          title: "Invalid JSON",
+          description: "Please check your payload and credentials JSON format",
+          variant: "destructive",
+        }); 
+        throw new Error("Invalid JSON in payload or credentials");
+      }
+
+      const superglue = new SuperglueClient({
+        apiKey: superglueConfig.superglueApiKey,
+        endpoint: superglueConfig.superglueEndpoint
+      });
+
+      let result = await superglue.extract({
+          file,
+          id,
           payload: parsedPayload,
           credentials: parsedCredentials,
           options: {
-              cacheMode: selectedCacheMode
+            cacheMode: selectedCacheMode
           }
-        })
-
-        setResponse(response.data);
-        setResponseTime(Date.now() - startTime);
+        });
+      if (result.success) {
+        try {
+          result = await superglue.transform({
+            id,
+            data: result.data,
+            options: {
+              cacheMode: selectedCacheMode
+            }  
+          });
+        } catch (err) {
+          console.error(err);
+        }
+      }
+      setResponse(result.data);
+      setResponseTime(Date.now() - startTime);
     } catch (err: any) {
       const errorMessage = err.message || 'Failed to execute API call';
       setError(errorMessage);
@@ -101,7 +143,7 @@ export function ApiPlayground({ configId }: { configId?: string }) {
     }
   };
 
-  if (!config) {
+  if (!extract) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
@@ -119,32 +161,83 @@ export function ApiPlayground({ configId }: { configId?: string }) {
               <span>Request Configuration</span>
               <div className="flex gap-2 items-center">
               <Button 
-                onClick={handleRunApi}
+                onClick={handleRunExtract}
                 disabled={loading}
                 size="lg"
                 className="gap-2"
               >
                 <Play className="h-4 w-4" />
-                {loading ? 'Running...' : 'Run API'}
+                {loading ? 'Running...' : 'Run Extraction'}
               </Button>
             </div>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <label className="text-sm font-medium">URL</label>
-              <div className="mt-1 p-2 bg-secondary rounded-md flex items-center gap-2">
-              <Badge variant={loading ? "secondary" : "default"} className="h-6 justify-center">
-                {config.method}
-                </Badge>
-                {composeUrl(config.urlHost, config.urlPath)}
+              <label className="text-sm font-medium">Source</label>
+              <div 
+                className={cn(
+                  "mt-1 relative rounded-lg border-2 border-dashed p-6",
+                  isDragging ? "border-primary bg-primary/5" : "border-muted-foreground/25",
+                  file ? "border-blue-500/30 bg-blue-500/5 ring-1 ring-blue-500/20" : "",
+                  "transition-all duration-200 ease-in-out"
+                )}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
+                <div className="flex flex-col items-center gap-3 text-center">
+                  {file ? (
+                    <>
+                      <div className="flex items-center gap-3 bg-blue-500/10 px-4 py-2 rounded-full">
+                        <Upload className="h-5 w-5 text-blue-500" />
+                        <span className="text-blue-700 font-medium">{file.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-muted-foreground hover:text-destructive transition-colors"
+                          onClick={() => setFile(null)}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-8 w-8 text-muted-foreground/60" />
+                      <div>
+                        <Button
+                          variant="ghost"
+                          className="text-primary font-medium hover:text-primary/80"
+                          onClick={() => document.getElementById('playground-file-upload')?.click()}
+                        >
+                          Upload File
+                        </Button>
+                        <input
+                          type="file"
+                          id="playground-file-upload"
+                          className="hidden"
+                          onChange={handleFileUpload}
+                        />
+                        <p className="text-sm text-muted-foreground mt-1">or drag and drop your file here</p>
+                      </div>
+                    </>
+                  )}
+                </div>
+                {isDragging && (
+                  <div className="absolute inset-0 bg-primary/5 backdrop-blur-[1px] flex items-center justify-center rounded-lg border-2 border-primary transition-all duration-200">
+                    <p className="text-sm font-medium text-primary">Drop file here</p>
+                  </div>
+                )}
               </div>
             </div>
             
             <div>
               <label className="text-sm font-medium">Instruction</label>
               <div className="mt-1 p-2 bg-secondary rounded-md">
-                {config.instruction}
+                {extract.instruction}
               </div>
             </div>
 
@@ -245,7 +338,7 @@ export function ApiPlayground({ configId }: { configId?: string }) {
             <CardContent className="pt-6">
               <div className="flex flex-col items-center justify-center text-muted-foreground p-8">
                 <Play className="h-12 w-12 mb-4 opacity-50" />
-                <p>Run the API to see the response here</p>
+                <p>Run the extraction to see the response here</p>
               </div>
             </CardContent>
           </Card>

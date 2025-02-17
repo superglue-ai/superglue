@@ -1,35 +1,48 @@
 "use client"
+import { TutorialModal } from '@/src/components/TutorialModal'
+import { AnimatePresence, motion } from 'framer-motion'
 import { usePathname } from 'next/navigation'
-import { ConfigProvider } from '@/src/app/config-context'
-import { Sidebar } from '@/src/components/Sidebar'
-import { CSPostHogProvider } from '@/src/app/providers'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Toaster } from '@/src/components/ui/toaster'
-import { ServerMonitor } from '@/src/components/ServerMonitor'
-import { geistSans, geistMono } from '@/src/app/fonts'
+import { ServerMonitor } from '../components/ServerMonitor'
+import { Sidebar } from '../components/Sidebar'
+import { Toaster } from '../components/ui/toaster'
+import { ConfigProvider } from './config-context'
+import { geistMono, geistSans } from './fonts'
+import { CSPostHogProvider } from './providers'
 
-export function ClientWrapper({ children, config }: { children: React.ReactNode, config: any }) {
-  const pathname = usePathname() 
+interface Props {
+  children: React.ReactNode
+  config: any  // keep existing type
+}
+
+export function ClientWrapper({ children, config }: Props) {
+  const pathname = usePathname()
+  const isAuthPage = pathname?.startsWith('/auth')
+
   return (
     <ConfigProvider config={config}>
       <CSPostHogProvider>
         <div className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-          <div className="flex h-screen overflow-hidden">
-            <Sidebar />
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={pathname}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.3 }}
-                className="w-full h-full overflow-auto"
-              >
-                {children}
-              </motion.div>
-            </AnimatePresence>
-          </div>
+          {isAuthPage ? (
+            children
+          ) : (
+            <div className="flex h-screen overflow-hidden">
+              {config.superglueApiKey && <Sidebar />}
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={pathname}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="w-full h-full overflow-auto"
+                >
+                  {children}
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          )}
           <Toaster />
-          <ServerMonitor />
+          {config.superglueApiKey && <ServerMonitor />}
+          {config.superglueApiKey && <TutorialModal />}
         </div>
       </CSPostHogProvider>
     </ConfigProvider>

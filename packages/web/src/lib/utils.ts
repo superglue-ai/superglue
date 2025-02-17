@@ -1,8 +1,24 @@
-import { clsx, type ClassValue } from "clsx"
-import { twMerge } from "tailwind-merge"
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
+}
+
+export function cleanApiDomain(url: string): string {
+  try {
+    if (!url) return '';
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://' + url;
+    }
+    
+    const urlObj = new URL(url);
+    // Return only origin (protocol + hostname + port if exists & non-standard)
+    return urlObj.origin;
+  } catch (e) {
+    // If URL parsing fails, just use the user input verbatim
+    return url;
+  }
 }
 
 export function composeUrl(host: string, path: string | undefined) {
@@ -17,13 +33,3 @@ export function composeUrl(host: string, path: string | undefined) {
   return `${cleanHost}/${cleanPath}`;
 }
 
-export const isJsonEmpty = (inputJson: string) : boolean => {
-  try {
-    if (!inputJson) return true
-    const parsedJson = JSON.parse(inputJson)
-    return Object.keys(parsedJson).length === 0
-  } catch (error) {
-    // If invalid JSON, we consider it empty
-    return true
-  }
-}

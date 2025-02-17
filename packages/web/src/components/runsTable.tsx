@@ -9,7 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/src/components/ui/table";
-import { RunResult } from '@superglue/shared';
+import { RunResult } from '@superglue/client';
 import { useConfig } from '../app/config-context';
 import { SuperglueClient } from '@superglue/client';
 

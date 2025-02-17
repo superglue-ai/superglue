@@ -1,8 +1,7 @@
 'use client'
 
+import ApiConfigForm from "@/src/components/ApiConfigForm";
 import { useParams } from "next/navigation";
-import React from "react";
-import ApiConfigForm from "@/src/app/configs/new/page"
 
 export default function EditConfigPage() {
   const params = useParams();
