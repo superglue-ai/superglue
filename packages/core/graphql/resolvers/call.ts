@@ -112,6 +112,7 @@ export const callResolver = async (
     return {...result, data: transformedResponse.data};
   } catch (error) {
     const maskedError = maskCredentials(error.message, credentials);
+
     if (options?.webhookUrl) {
       await notifyWebhook(options.webhookUrl, callId, false, undefined, error.message);
     }
@@ -123,6 +124,11 @@ export const callResolver = async (
       startedAt,
       completedAt: new Date(),
     };
+    telemetryClient.captureException(maskedError, context.orgId, {
+      preparedEndpoint: preparedEndpoint,
+      messages: messages,
+      result: result
+    });
     context.datastore.createRun(result, context.orgId);
     return result;
   }
