@@ -15,7 +15,7 @@
     "clean": "turbo run clean"
   },
   "dependencies": {
-    "@superglue/client": "^2.3.4",
+    "@superglue/client": "^2.3.11",
     "dotenv": "^16.4.7",
     "dotenv-cli": "^8.0.0"
   },

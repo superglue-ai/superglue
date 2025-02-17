@@ -11,7 +11,7 @@ import {
   AccordionTrigger,
 } from "@/src/components/ui/accordion";
 import { composeUrl } from '@/src/lib/utils';
-import { ApiConfig } from '@superglue/shared';
+import { ApiConfig } from '@superglue/client';
 import { useConfig } from '@/src/app/config-context';
 import { SuperglueClient } from '@superglue/client';
 
@@ -33,8 +33,7 @@ const ApiConfigDetail = ({ id, onClose }: { id?: string; onClose?: () => void })
             endpoint: superglueConfig.superglueEndpoint,
             apiKey: superglueConfig.superglueApiKey
           })      
-          const apiConfigs = await superglueClient.listApis();
-          const foundConfig = apiConfigs.items.find((c: ApiConfig) => c.id === id);
+          const foundConfig = await superglueClient.getApi(id);
           if (!foundConfig) {
             throw new Error('Configuration not found');
           }
@@ -78,8 +77,8 @@ const ApiConfigDetail = ({ id, onClose }: { id?: string; onClose?: () => void })
   }
 
   return (
-    <div className="h-full">
-      <div className="p-6 space-y-6">
+    <div className="max-h-full overflow-y-auto my-4">
+      <div className="space-y-6">
         <div className="flex justify-between items-start">
           <div>
             <h2 className="text-xl font-semibold mb-2">API Configuration Details</h2>
