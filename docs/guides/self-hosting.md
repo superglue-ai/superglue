@@ -1,6 +1,6 @@
 ---
 title: "Self-Hosting Guide"
-description: "Deploy and manage your own Superglue instance"
+description: "Deploy and manage your own superglue instance"
 ---
 
 This guide walks you through deploying and managing your own instance of Superglue for complete control over your data processing pipeline.
