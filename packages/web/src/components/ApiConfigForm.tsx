@@ -1,7 +1,7 @@
 'use client'
 
 import { useConfig } from '@/src/app/config-context';
-import { ApiPlayground } from '@/src/components/ApiPlayground';
+import { ApiPlayground } from '@/src/components/apiPlayground';
 import JsonSchemaEditor from "@/src/components/JsonSchemaEditor";
 import {
   AlertDialog,
