@@ -1,6 +1,6 @@
 ---
-title: 'Project Management Data from JIRA'
-description: 'Guide for JIRA Project and Task Extraction'
+title: 'JIRA'
+description: 'How to extract projects and tasks'
 ---
 
 When building applications that integrate with JIRA, you often need to:

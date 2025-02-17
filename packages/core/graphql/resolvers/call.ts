@@ -1,11 +1,11 @@
 import { ApiConfig, ApiInput, ApiInputRequest, CacheMode, Context, RequestOptions, TransformConfig } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
+import OpenAI from "openai";
 import { v4 as uuidv4 } from 'uuid';
 import { callEndpoint, prepareEndpoint } from "../../utils/api.js";
 import { applyJsonataWithValidation, maskCredentials } from "../../utils/tools.js";
 import { prepareTransform } from "../../utils/transform.js";
 import { notifyWebhook } from "../../utils/webhook.js";
-
 export const callResolver = async (
   _: any,
   { input, payload, credentials, options }: { 
@@ -21,6 +21,7 @@ export const callResolver = async (
   const callId = uuidv4() as string;
 
   let preparedEndpoint: ApiConfig;
+  let messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
 
   const readCache = options ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.READONLY : true;
   const writeCache = options ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.WRITEONLY : true;
@@ -37,7 +38,9 @@ export const callResolver = async (
             await context.datastore.getApiConfigFromRequest(input.endpoint, payload, context.orgId) 
         }
         else if(preparedEndpoint || input.endpoint) {
-          preparedEndpoint = await prepareEndpoint(preparedEndpoint || input.endpoint, payload, credentials, lastError);
+          const result = await prepareEndpoint(preparedEndpoint || input.endpoint, payload, credentials, lastError, messages);
+          preparedEndpoint = result.config;
+          messages = result.messages;
         }
 
         if(!preparedEndpoint) {
