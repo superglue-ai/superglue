@@ -1,6 +1,6 @@
 'use client'
 
-import { ConfigCreateStepper } from '@/src/components/config-stepper/ConfigCreateStepper'
+import { ExtractCreateStepper } from '@/src/components/config-stepper/ExtractCreateStepper'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
@@ -9,7 +9,7 @@ export default function CreateConfigPage() {
   const router = useRouter()
 
   return (
-    <ConfigCreateStepper 
+    <ExtractCreateStepper 
       open={showCreateStepper} 
       onOpenChange={setShowCreateStepper}
       mode="create"

@@ -1,13 +1,12 @@
 'use client'
 
 import { useParams, useRouter } from "next/navigation";
-import { ApiPlayground } from "@/src/components/ApiPlayground";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/src/components/ui/button";
-
-export default function ApiPlaygroundPage({ configId }: { configId?: string }) {
+import { ExtractPlayground } from "@/src/components/ExtractPlayground";
+export default function ExtractPlaygroundPage({ extractId }: { extractId?: string }) {
   const params = useParams();
-  const id = configId || params.id as string;
+  const id = extractId || params.id as string;
   const router = useRouter();
 
   return (
@@ -21,18 +20,10 @@ export default function ApiPlaygroundPage({ configId }: { configId?: string }) {
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back
           </Button>
-          <Button 
-            onClick={() => window.location.href = `/configs/${id}/edit`}
-            size="lg"
-            variant="outline"
-            className="gap-2 mr-6"
-          >
-            Edit Config
-          </Button>
         </div>
 
         <div className="max-w-full lg:-mx-6">
-          <ApiPlayground configId={id} />
+          <ExtractPlayground extractId={id} />
         </div>
       </div>
     </div>

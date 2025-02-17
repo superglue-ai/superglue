@@ -1,0 +1,216 @@
+'use client'
+
+import { useConfig } from '@/src/app/config-context'
+import { useToast } from '@/src/hooks/use-toast'
+import { ApiConfig, CacheMode, SuperglueClient } from '@superglue/client'
+import { useEffect, useState } from 'react'
+import JsonSchemaEditor from './JsonSchemaEditor'
+import { Button } from './ui/button'
+import { Card, CardContent } from './ui/card'
+import { Input } from './ui/input'
+import { Label } from './ui/label'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
+
+interface InteractiveApiPlaygroundProps {
+  configId: string
+  instruction: string
+  onInstructionChange?: (instruction: string) => void
+  responseSchema: string
+  onResponseSchemaChange: (schema: string) => void
+  initialRawResponse?: any
+  onMappedResponse?: (response: any) => void
+  onRun?: () => Promise<void>
+  isRunning?: boolean
+  mappedResponseData?: any
+  hideRunButton?: boolean
+}
+
+interface CustomRequestOptions {
+  cacheMode?: CacheMode;
+  timeout?: number;
+  retries?: number;
+  retryDelay?: number;
+  webhookUrl?: string;
+  responseSchema?: object;
+}
+
+export function InteractiveApiPlayground({ 
+  configId, 
+  instruction, 
+  onInstructionChange,
+  responseSchema,
+  onResponseSchemaChange,
+  initialRawResponse,
+  onMappedResponse,
+  onRun,
+  isRunning,
+  mappedResponseData,
+  hideRunButton
+}: InteractiveApiPlaygroundProps) {
+  const [isLoading, setIsLoading] = useState(false)
+  const [rawResponse, setRawResponse] = useState<any>(initialRawResponse || null)
+  const [mappedResponse, setMappedResponse] = useState<any>(null)
+  const [activeTab, setActiveTab] = useState('raw')
+  const { toast } = useToast()
+  const superglueConfig = useConfig()
+  const [config, setConfig] = useState<ApiConfig | null>(null)
+
+  const fetchConfig = async () => {
+    try {
+      const superglueClient = new SuperglueClient({
+        endpoint: superglueConfig.superglueEndpoint,
+        apiKey: superglueConfig.superglueApiKey
+      })
+      const data = await superglueClient.getApi(configId)
+      setConfig(data)
+    } catch (error) {
+      console.error('Error fetching config:', error)
+    }
+  }
+
+  // Fetch config on mount
+  useEffect(() => {
+    if (configId) {
+      fetchConfig()
+    }
+  }, [configId])
+
+  const handleRun = async () => {
+    // TODO: deduplicate this with ConfigCreateStepper.tsx
+    if (onRun) {
+      return onRun()
+    }
+    setIsLoading(true)
+    try {
+      const superglueClient = new SuperglueClient({
+        endpoint: superglueConfig.superglueEndpoint,
+        apiKey: superglueConfig.superglueApiKey
+      })
+
+      // 1. First upsert the API config with the new schema and instruction
+      await superglueClient.upsertApi(configId, {
+        id: configId,
+        instruction,
+        responseSchema: JSON.parse(responseSchema)
+      })
+
+      // 2. Call the API using the config ID and get mapped response
+      const mappedResult = await superglueClient.call({
+        id: configId,
+        options: {
+          cacheMode: CacheMode.WRITEONLY
+        }
+      })
+
+      if (mappedResult.error) {
+        throw new Error(mappedResult.error)
+      }
+
+      // 3. Set the mapped response
+      setMappedResponse(mappedResult.data)
+      onMappedResponse?.(mappedResult.data)
+      setActiveTab('mapped')
+    } catch (error: any) {
+      console.error('Error running API:', error)
+      toast({
+        title: 'Error Running API',
+        description: error?.message || 'An error occurred while running the API',
+        variant: 'destructive'
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Update mapped response when it comes from props
+  useEffect(() => {
+    if (mappedResponseData) {
+      setMappedResponse(mappedResponseData)
+      setActiveTab('mapped')
+    }
+  }, [mappedResponseData])
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full">
+      {/* Left Column */}
+      <div className="flex flex-col space-y-4 overflow-hidden">
+        <div>
+          <Label>Instruction</Label>
+          <Input
+            value={instruction}
+            onChange={(e) => onInstructionChange?.(e.target.value)}
+            placeholder="E.g. 'Get all products with price and name'"
+            disabled={!onInstructionChange}
+          />
+        </div>
+
+        <div>
+          <Label>Discovered Endpoint URL</Label>
+          <Card>
+            <CardContent className="p-3">
+              <code className="text-sm text-muted-foreground break-all">
+                {config ? (
+                  <><span className="text-primary font-bold">{config.method || 'POST'}</span> {config.urlHost}{config.urlPath || ''}</>
+                ) : (
+                  'Loading...'
+                )}
+              </code>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-hidden flex flex-col max-h-[calc(100vh-20rem)]">
+          <div className="flex-1 min-h-0 bg-background">
+            <JsonSchemaEditor
+              value={responseSchema}
+              onChange={onResponseSchemaChange}
+            />
+          </div>
+        </div>
+
+        {!hideRunButton && (
+          <div className="flex justify-end">
+            <Button
+              onClick={handleRun}
+              disabled={isRunning || isLoading}
+            >
+              {isRunning || isLoading ? 'Running...' : 'Run'}
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Right Column */}
+      <div className="flex flex-col h-full overflow-hidden rounded-lg">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
+          <Card className="h-full flex flex-col">
+            <CardContent className="p-0 h-full flex flex-col bg-secondary">
+              <TabsList className="w-full rounded-t-lg rounded-b-none">
+                <TabsTrigger value="raw" className="flex-1">Raw API Response</TabsTrigger>
+                <TabsTrigger value="mapped" className="flex-1">Output</TabsTrigger>
+              </TabsList>
+
+              <div className="flex-1 min-h-0">
+                <TabsContent value="raw" className="m-0 h-full data-[state=active]:flex flex-col">
+                  <div className="flex-1 min-h-0 p-4 overflow-y-auto">
+                    <pre className="text-xs whitespace-pre-wrap">
+                      {rawResponse ? JSON.stringify(rawResponse, null, 2) : 'Response will appear here...'}
+                    </pre>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="mapped" className="m-0 h-full data-[state=active]:flex flex-col">
+                  <div className="flex-1 min-h-0 p-4 overflow-y-auto">
+                    <pre className="text-xs whitespace-pre-wrap">
+                      {mappedResponse ? JSON.stringify(mappedResponse, null, 2) : 'Output will appear here...'}
+                    </pre>
+                  </div>
+                </TabsContent>
+              </div>
+            </CardContent>
+          </Card>
+        </Tabs>
+      </div>
+    </div>
+  )
+} 

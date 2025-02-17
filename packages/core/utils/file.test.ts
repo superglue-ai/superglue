@@ -18,10 +18,35 @@ describe('File Utilities', () => {
       const buffer = Buffer.from(csvData);
       
       const result = await parseFile(buffer, FileType.CSV);
-      expect(result).toEqual([{ name: 'test', value: '123' }]);
+      expect(result).toEqual({ name: 'test', value: '123' });
     });
 
+    it('should parse CSV data as array if multiple rows are given', async () => {
+      const csvData = 'name,value\ntest,123\ntest2,456';
+      const buffer = Buffer.from(csvData);
+      
+      const result = await parseFile(buffer, FileType.CSV);
+      expect(result).toEqual([
+        { name: 'test', value: '123' },
+        { name: 'test2', value: '456' }
+      ]);
+    });
     it('should parse XML data', async () => {
+      const xmlData = `
+        <?xml version="1.0" encoding="UTF-8"?>
+        <root>
+          <item>
+            <name>test</name>
+            <value>123</value>
+          </item>
+        </root>
+      `;
+      const buffer = Buffer.from(xmlData);
+      
+      const result = await parseFile(buffer, FileType.XML);
+      expect(result).toEqual({ name: 'test', value: '123' });
+    }); 
+    it('should parse XML data as array if multiple rows are given', async () => {
       const xmlData = `
         <?xml version="1.0" encoding="UTF-8"?>
         <root>
@@ -39,10 +64,10 @@ describe('File Utilities', () => {
       
       const result = await parseFile(buffer, FileType.XML);
       expect(result).toHaveLength(2);
-      expect(result[0]).toHaveProperty('name', 'test');
-      expect(result[0]).toHaveProperty('value', '123');
-      expect(result[1]).toHaveProperty('name', 'test2');
-      expect(result[1]).toHaveProperty('value', '456');
+      expect(result).toEqual([
+        { name: 'test', value: '123' },
+        { name: 'test2', value: '456' }
+      ]);
     });
 
     it('should throw error for unsupported file type', async () => {
