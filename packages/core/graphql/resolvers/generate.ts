@@ -17,7 +17,7 @@ export const generateSchemaResolver = async (
       try {
         responseData = JSON.stringify(toJsonSchema(JSON.parse(responseData), {required: true,arrays: {mode: 'first'}}));
       } catch (error) {
-        telemetryClient.captureException(error, context.orgId, {
+        telemetryClient?.captureException(error, context.orgId, {
           instruction: instruction,
           responseData: String(responseData)
         });

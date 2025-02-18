@@ -57,7 +57,7 @@ export const callResolver = async (
         }
       } catch (error) {
         console.log(`API call failed.`, error);
-        telemetryClient.captureException(error, context.orgId, {
+        telemetryClient?.captureException(maskCredentials(error.message, credentials), context.orgId, {
           preparedEndpoint: preparedEndpoint,
           retryCount: retryCount,
         });
@@ -67,7 +67,7 @@ export const callResolver = async (
     } while (!response && retryCount < 8);
     
     if(!response) {
-      telemetryClient.captureException(new Error(`API call failed after ${retryCount} retries. Last error: ${lastError}`), context.orgId, {
+      telemetryClient?.captureException(new Error(`API call failed after ${retryCount} retries. Last error: ${maskCredentials(lastError, credentials)}`), context.orgId, {
         preparedEndpoint: preparedEndpoint,
         retryCount: retryCount,
       });
@@ -124,7 +124,7 @@ export const callResolver = async (
       startedAt,
       completedAt: new Date(),
     };
-    telemetryClient.captureException(maskedError, context.orgId, {
+    telemetryClient?.captureException(maskedError, context.orgId, {
       preparedEndpoint: preparedEndpoint,
       messages: messages,
       result: result

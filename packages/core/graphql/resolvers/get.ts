@@ -14,7 +14,7 @@ export const getApiResolver = async (
 
     const config = await context.datastore.getApiConfig(id, context.orgId);
     if(!config) {
-      telemetryClient.captureException(new Error(`api config with id ${id} not found`), context.orgId, {
+      telemetryClient?.captureException(new Error(`api config with id ${id} not found`), context.orgId, {
         id: id,
       });
       throw new Error(`api config with id ${id} not found`);
@@ -34,7 +34,7 @@ export const getTransformResolver = async (
 
     const config = await context.datastore.getTransformConfig(id, context.orgId);
     if(!config) {
-      telemetryClient.captureException(new Error(`transform config with id ${id} not found`), context.orgId, {
+      telemetryClient?.captureException(new Error(`transform config with id ${id} not found`), context.orgId, {
         id: id,
       });
       throw new Error(`transform config with id ${id} not found`);
@@ -54,7 +54,7 @@ export const getExtractResolver = async (
 
     const config = await context.datastore.getExtractConfig(id, context.orgId);
     if(!config) {
-      telemetryClient.captureException(new Error(`extract config with id ${id} not found`), context.orgId, {
+      telemetryClient?.captureException(new Error(`extract config with id ${id} not found`), context.orgId, {
         id: id,
       });
       throw new Error(`extract config with id ${id} not found`);
@@ -74,7 +74,7 @@ export const getRunResolver = async (
 
   const run = await context.datastore.getRun(id, context.orgId);
   if(!run) {
-    telemetryClient.captureException(new Error(`run with id ${id} not found`), context.orgId, {
+    telemetryClient?.captureException(new Error(`run with id ${id} not found`), context.orgId, {
       id: id,
     });
     throw new Error(`run with id ${id} not found`);
