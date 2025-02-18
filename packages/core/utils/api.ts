@@ -176,6 +176,16 @@ async function generateApiConfig(
     apiKey: process.env.OPENAI_API_KEY
   });
 
+  const userProvidedAdditionalInfo = Boolean(
+    apiConfig.headers ||
+    apiConfig.queryParams ||
+    apiConfig.body ||
+    apiConfig.authentication ||
+    apiConfig.dataPath ||
+    apiConfig.pagination ||
+    apiConfig.method
+  );
+
   const initialUserMessage: OpenAI.Chat.ChatCompletionUserMessageParam = {
     role: "user", 
     content: 
@@ -185,7 +195,8 @@ Instructions: ${apiConfig.instruction}
 
 Base URL: ${composeUrl(apiConfig.urlHost, apiConfig.urlPath)}
 
-Also, the user provided the following information, which is probably correct:
+${userProvidedAdditionalInfo ? `Also, the user provided the following information, which is probably correct: ` : ''}
+${userProvidedAdditionalInfo ? `Ensure to use the provided information. You must try them at least where they make sense.` : ''}
 ${apiConfig.headers ? `Headers: ${JSON.stringify(apiConfig.headers)}` : ''}
 ${apiConfig.queryParams ? `Query Params: ${JSON.stringify(apiConfig.queryParams)}` : ''}
 ${apiConfig.body ? `Body: ${JSON.stringify(apiConfig.body)}` : ''}
@@ -194,11 +205,12 @@ ${apiConfig.dataPath ? `Data Path: ${apiConfig.dataPath}` : ''}
 ${apiConfig.pagination ? `Pagination: ${JSON.stringify(apiConfig.pagination)}` : ''}
 ${apiConfig.method ? `Method: ${apiConfig.method}` : ''}
 
-Documentation: ${String(documentation).slice(0, 80000)}
-
 Available variables: ${vars.join(", ")}
+
+Documentation: ${String(documentation).slice(0, 80000)}
 `
   }
+
 
   const subsequentUserMessage: OpenAI.Chat.ChatCompletionUserMessageParam = {
     role: "user",
