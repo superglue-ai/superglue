@@ -30,7 +30,7 @@ export const transformResolver = async (
     preparedTransform = preparedTransform?.responseMapping ? preparedTransform : 
       await prepareTransform(context.datastore, readCache, preparedTransform || input.endpoint, data, context.orgId);
     if(!preparedTransform || !preparedTransform.responseMapping) {
-      telemetryClient.captureException(new Error("Didn't find a valid transformation configuration."), context.orgId, {
+      telemetryClient?.captureException(new Error("Didn't find a valid transformation configuration."), context.orgId, {
         input: input,
         data: data,
       });
@@ -39,7 +39,7 @@ export const transformResolver = async (
     const transformation = await applyJsonataWithValidation(data, preparedTransform.responseMapping, preparedTransform.responseSchema);
 
     if (!transformation.success) {
-      telemetryClient.captureException(new Error(transformation.error), context.orgId, {
+      telemetryClient?.captureException(new Error(transformation.error), context.orgId, {
         input: input,
         data: data,
         preparedTransform: preparedTransform,
