@@ -1,7 +1,8 @@
-import { CacheMode, Context, DecompressionMethod, ExtractConfig, ExtractInput, ExtractInputRequest, FileType, RequestOptions } from "@superglue/shared";
+import { CacheMode, Context, DecompressionMethod, ExtractConfig, ExtractInputRequest, FileType, RequestOptions } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { v4 as uuidv4 } from 'uuid';
 import { callExtract, prepareExtract, processFile } from "../../utils/extract.js";
+import { telemetryClient } from "../../utils/telemetry.js";
 import { maskCredentials } from "../../utils/tools.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 
@@ -55,15 +56,23 @@ export const extractResolver = async (
           const buffer = await callExtract(preparedExtract, payload, credentials, options);
           response = await processFile(buffer, preparedExtract);
         } catch (error) {
-        console.log(`Extract call failed. Retrying...`);
+          console.log(`Extract call failed. Retrying...`);
           lastError = error?.message || JSON.stringify(error || {});
+          telemetryClient?.captureException(maskCredentials(lastError, credentials), context.orgId, {
+            preparedEndpoint: preparedExtract || input.endpoint,
+            retryCount: retryCount,
+          });
         }
       }
       retryCount++;
     } while (!response && retryCount < 5);
     
     if(!response) {
-      throw new Error(`API call failed after ${retryCount} retries. Last error: ${lastError}`);
+      telemetryClient?.captureException(new Error(`Extract call failed after ${retryCount} retries. Last error: ${maskCredentials(lastError, credentials)}`), context.orgId, {
+        preparedEndpoint: preparedExtract || input.endpoint,
+        retryCount: retryCount,
+      });
+      throw new Error(`Extract call failed after ${retryCount} retries. Last error: ${lastError}`);
     }
 
     // Save configuration if requested
@@ -93,6 +102,10 @@ export const extractResolver = async (
 
   } catch (error) {
     const maskedError = maskCredentials(error.message, credentials);
+    telemetryClient?.captureException(maskedError, context.orgId, {
+      preparedEndpoint: preparedExtract || input.endpoint,
+    });
+
     const completedAt = new Date();
     
     if (options?.webhookUrl) {
