@@ -1,5 +1,6 @@
 import { Context } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
+import { telemetryClient } from "../../utils/telemetry.js";
 
 export const getApiResolver = async (
     _: any,
@@ -12,7 +13,12 @@ export const getApiResolver = async (
     }
 
     const config = await context.datastore.getApiConfig(id, context.orgId);
-    if(!config) throw new Error(`api config with id ${id} not found`);
+    if(!config) {
+      telemetryClient?.captureException(new Error(`api config with id ${id} not found`), context.orgId, {
+        id: id,
+      });
+      throw new Error(`api config with id ${id} not found`);
+    }
     return config;
 };
 
@@ -27,7 +33,12 @@ export const getTransformResolver = async (
     }
 
     const config = await context.datastore.getTransformConfig(id, context.orgId);
-    if(!config) throw new Error(`transform config with id ${id} not found`);
+    if(!config) {
+      telemetryClient?.captureException(new Error(`transform config with id ${id} not found`), context.orgId, {
+        id: id,
+      });
+      throw new Error(`transform config with id ${id} not found`);
+    }
     return config;
 };
 
@@ -42,7 +53,12 @@ export const getExtractResolver = async (
     }
 
     const config = await context.datastore.getExtractConfig(id, context.orgId);
-    if(!config) throw new Error(`extract config with id ${id} not found`);
+    if(!config) {
+      telemetryClient?.captureException(new Error(`extract config with id ${id} not found`), context.orgId, {
+        id: id,
+      });
+      throw new Error(`extract config with id ${id} not found`);
+    }
     return config;
 };
 
@@ -57,6 +73,11 @@ export const getRunResolver = async (
   }
 
   const run = await context.datastore.getRun(id, context.orgId);
-  if(!run) throw new Error(`run with id ${id} not found`);
+  if(!run) {
+    telemetryClient?.captureException(new Error(`run with id ${id} not found`), context.orgId, {
+      id: id,
+    });
+    throw new Error(`run with id ${id} not found`);
+  }
   return run;
 };

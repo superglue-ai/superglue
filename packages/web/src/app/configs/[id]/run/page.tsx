@@ -1,9 +1,9 @@
 'use client'
 
-import { useParams, useRouter } from "next/navigation";
-import { ApiPlayground } from "@/src/components/ApiPlayground";
-import { ArrowLeft } from "lucide-react";
+import { ApiPlayground } from "@/src/components/apiPlayground";
 import { Button } from "@/src/components/ui/button";
+import { ArrowLeft } from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
 
 export default function ApiPlaygroundPage({ configId }: { configId?: string }) {
   const params = useParams();

@@ -1,10 +1,9 @@
 "use client"
 
-import { RunsTable } from "@/src/components/RunsTable";
-import { useParams } from "next/navigation";
+import { RunsTable } from "@/src/components/runsTable";
 import { Button } from "@/src/components/ui/button";
 import { ArrowLeft } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 
 export default function RunsPage() {
     const { id } = useParams();     
