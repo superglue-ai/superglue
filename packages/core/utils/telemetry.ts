@@ -12,7 +12,10 @@ export const isTelemetryDisabled = process.env.DISABLE_TELEMETRY === "true";
 export const telemetryClient = !isTelemetryDisabled && !isDebug ? 
   new PostHog(
     config.posthog.apiKey,
-    { host: config.posthog.host }
+    {
+      host: config.posthog.host,
+      enableExceptionAutocapture: true 
+     }
   ) : null;
 
 if(telemetryClient) {

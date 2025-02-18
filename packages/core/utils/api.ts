@@ -27,7 +27,7 @@ export async function prepareEndpoint(
     };
 
     // If a documentation URL is provided, fetch and parse additional details
-    const documentation = await getDocumentation(apiCallConfig.documentationUrl || composeUrl(apiCallConfig.urlHost, apiCallConfig.urlPath), apiCallConfig.headers, apiCallConfig.queryParams);
+    const documentation = await getDocumentation(apiCallConfig.documentationUrl || composeUrl(apiCallConfig.urlHost, apiCallConfig.urlPath), apiCallConfig.headers, apiCallConfig.queryParams, apiCallConfig?.urlPath);
 
     const availableVars = [...Object.keys(payload || {}), ...Object.keys(credentials || {})];
     const computedApiCallConfig = await generateApiConfig(apiCallConfig, documentation, availableVars, lastError, previousMessages);
@@ -194,7 +194,7 @@ ${apiConfig.dataPath ? `Data Path: ${apiConfig.dataPath}` : ''}
 ${apiConfig.pagination ? `Pagination: ${JSON.stringify(apiConfig.pagination)}` : ''}
 ${apiConfig.method ? `Method: ${apiConfig.method}` : ''}
 
-Documentation: ${String(documentation).slice(0, 20000)}
+Documentation: ${String(documentation).slice(0, 80000)}
 
 Available variables: ${vars.join(", ")}
 `
