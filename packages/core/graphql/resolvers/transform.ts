@@ -1,10 +1,10 @@
-import { CacheMode, Context, RequestOptions, TransformConfig, TransformInput, TransformInputRequest } from "@superglue/shared";
+import { CacheMode, Context, RequestOptions, TransformConfig, TransformInputRequest } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { v4 as uuidv4 } from 'uuid';
+import { telemetryClient } from "../../utils/telemetry.js";
 import { applyJsonataWithValidation } from "../../utils/tools.js";
 import { prepareTransform } from "../../utils/transform.js";
 import { notifyWebhook } from "../../utils/webhook.js";
-import { prepareExtract } from "../../utils/extract.js";
 
 export const transformResolver = async (
   _: any,
@@ -30,11 +30,20 @@ export const transformResolver = async (
     preparedTransform = preparedTransform?.responseMapping ? preparedTransform : 
       await prepareTransform(context.datastore, readCache, preparedTransform || input.endpoint, data, context.orgId);
     if(!preparedTransform || !preparedTransform.responseMapping) {
+      telemetryClient.captureException(new Error("Didn't find a valid transformation configuration."), context.orgId, {
+        input: input,
+        data: data,
+      });
       throw new Error("Did not find a valid transformation configuration. Usually this is due to missing information in the request. If you are sending an ID, you need to enable cache read access.");
     }
     const transformation = await applyJsonataWithValidation(data, preparedTransform.responseMapping, preparedTransform.responseSchema);
 
     if (!transformation.success) {
+      telemetryClient.captureException(new Error(transformation.error), context.orgId, {
+        input: input,
+        data: data,
+        preparedTransform: preparedTransform,
+      });
       throw new Error(transformation.error);
     }
 
