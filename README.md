@@ -5,7 +5,7 @@
 
 <h1 align="center">data that speaks your language 🍯</h1>
 
-superglue translates data from external systems into exactly the format you need. It’s an open source proxy that automatically extracts, maps and transforms data so developers don’t have to write and maintain complex integration code.
+superglue translates data from external systems into exactly the format you need. It's an open source proxy that automatically extracts, maps and transforms data so developers don't have to write and maintain complex integration code.
 
 - 🔮 One-off LLM-powered translations: Generate deterministic, high-performance translation code.
 - 🩹 Self-healing: Detect format changes and update translations automatically.
@@ -135,13 +135,15 @@ GRAPHQL_ENDPOINT=http://localhost:3000
 # Authentication token for API access
 AUTH_TOKEN=your-auth-token
 
-# Datastore Configuration. Memory is faster but not persistent. Redis is slower but persistent.
-DATASTORE_TYPE=redis or memory
+# Datastore Configuration. Memory is faster but not persistent. Redis is slower but persistent. File is a simple persistent option.
+DATASTORE_TYPE=redis or memory or file
 # if redis
 REDIS_HOST=localhost
 REDIS_PORT=6379
 REDIS_USERNAME=default
 REDIS_PASSWORD=secret
+# if file
+STORAGE_DIR=/data
 
 # OpenAI Configuration
 OPENAI_API_KEY=sk-...
