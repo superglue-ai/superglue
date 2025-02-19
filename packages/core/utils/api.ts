@@ -3,7 +3,6 @@ import { AxiosRequestConfig } from "axios";
 import OpenAI from "openai";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { getDocumentation } from "./documentation.js";
 import { API_PROMPT } from "./prompts.js";
 import { callAxios, composeUrl, replaceVariables } from "./tools.js";
 
@@ -13,7 +12,8 @@ export async function prepareEndpoint(
   payload: any, 
   credentials: any, 
   lastError: string | null = null,
-  previousMessages: OpenAI.Chat.ChatCompletionMessageParam[] = []
+  previousMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [],
+  documentation: string | null = null
 ): Promise<{ config: ApiConfig; messages: OpenAI.Chat.ChatCompletionMessageParam[] }> {
     // Set the current timestamp
     const currentTime = new Date();
@@ -25,9 +25,6 @@ export async function prepareEndpoint(
       updatedAt: currentTime,
       id: crypto.randomUUID()
     };
-
-    // If a documentation URL is provided, fetch and parse additional details
-    const documentation = await getDocumentation(apiCallConfig.documentationUrl || composeUrl(apiCallConfig.urlHost, apiCallConfig.urlPath), apiCallConfig.headers, apiCallConfig.queryParams, apiCallConfig?.urlPath);
 
     const availableVars = [...Object.keys(payload || {}), ...Object.keys(credentials || {})];
     const computedApiCallConfig = await generateApiConfig(apiCallConfig, documentation, availableVars, lastError, previousMessages);

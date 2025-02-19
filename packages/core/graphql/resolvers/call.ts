@@ -3,8 +3,9 @@ import { GraphQLResolveInfo } from "graphql";
 import OpenAI from "openai";
 import { v4 as uuidv4 } from 'uuid';
 import { callEndpoint, prepareEndpoint } from "../../utils/api.js";
+import { getDocumentation } from "../../utils/documentation.js";
 import { telemetryClient } from "../../utils/telemetry.js";
-import { applyJsonataWithValidation, maskCredentials } from "../../utils/tools.js";
+import { applyJsonataWithValidation, composeUrl, maskCredentials } from "../../utils/tools.js";
 import { prepareTransform } from "../../utils/transform.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 
@@ -33,6 +34,13 @@ export const callResolver = async (
     let response: any;
     let retryCount = 0;
     let lastError: string | null = null;
+    let documentation: string = "";
+    if(input.endpoint || readCache) {
+      preparedEndpoint = await context.datastore.getApiConfig(input.id, context.orgId) || 
+        await context.datastore.getApiConfigFromRequest(input.endpoint, payload, context.orgId);
+      const docUrl = preparedEndpoint?.documentationUrl || input.endpoint?.documentationUrl || composeUrl(input.endpoint?.urlHost, input.endpoint?.urlPath);
+      documentation = await getDocumentation(docUrl, input.endpoint?.headers, input.endpoint?.queryParams, input.endpoint?.urlPath);
+    }
     do {
       try {
         if(readCache && !lastError) {
@@ -40,7 +48,7 @@ export const callResolver = async (
             await context.datastore.getApiConfigFromRequest(input.endpoint, payload, context.orgId) 
         }
         else if(preparedEndpoint || input.endpoint) {
-          const result = await prepareEndpoint(preparedEndpoint || input.endpoint, payload, credentials, lastError, messages);
+          const result = await prepareEndpoint(preparedEndpoint || input.endpoint, payload, credentials, lastError, messages, documentation);
           preparedEndpoint = result.config;
           messages = result.messages;
         }
