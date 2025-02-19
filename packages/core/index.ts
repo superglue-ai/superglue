@@ -27,7 +27,7 @@ query Query {
     total
   }
 }`;
-const datastore = createDataStore({ type: process.env.DATASTORE_TYPE === "redis" ?  'redis' : 'memory' });
+const datastore = createDataStore({ type: process.env.DATASTORE_TYPE as any });
 
 // Apollo Server Configuration
 const apolloConfig = {
