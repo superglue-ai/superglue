@@ -44,7 +44,13 @@ export class FileStore implements DataStore {
       console.log(`File Datastore: Created/verified directory: ${path.dirname(this.filePath)}`);
       
       const data = fs.readFileSync(this.filePath, 'utf-8');
-      const parsed = JSON.parse(data);
+      const parsed = JSON.parse(data, (key, value) => {
+        // Convert ISO date strings back to Date objects
+        if (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
+          return new Date(value);
+        }
+        return value;
+      });
       console.log('File Datastore: Successfully loaded existing data');
       
       // Convert plain objects back to Maps

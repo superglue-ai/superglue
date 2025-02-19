@@ -126,7 +126,7 @@ describe('API Utilities', () => {
 
       const result = await callEndpoint(testConfig, {}, {}, {});
 
-      expect(result).toEqual({ data: [{ result: 'success' }] });
+      expect(result).toEqual({ data: { result: 'success' } });
     });
 
     it('should handle pagination', async () => {
