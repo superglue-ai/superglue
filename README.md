@@ -135,15 +135,17 @@ GRAPHQL_ENDPOINT=http://localhost:3000
 # Authentication token for API access
 AUTH_TOKEN=your-auth-token
 
-# Datastore Configuration. Memory is faster but not persistent. Redis is slower but persistent. File is a simple persistent option.
-DATASTORE_TYPE=redis or memory or file
+# Datastore Configuration. File is a simple persistent option. Memory is fast but not persistent. Redis is distributed and can be configured to be persistent.
+DATASTORE_TYPE=file or memory or redis
+
+# if file
+STORAGE_DIR=/data
+
 # if redis
 REDIS_HOST=localhost
 REDIS_PORT=6379
 REDIS_USERNAME=default
 REDIS_PASSWORD=secret
-# if file
-STORAGE_DIR=/data
 
 # OpenAI Configuration
 OPENAI_API_KEY=sk-...
