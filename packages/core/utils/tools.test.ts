@@ -270,14 +270,14 @@ describe('tools utility functions', () => {
     it('should convert strings to ISO dates', async () => {
       const data = {
         isoDate: '2024-03-15T10:30:00Z',
-        usDate: '03/15/2024 10:30:00'
+        usDate: '03/15/2024 03:30:00'
       };
       
       const isoResult = await applyJsonata(data, '$toDate(isoDate)');
       const usResult = await applyJsonata(data, '$toDate(usDate)');
       
       expect(isoResult).toBe('2024-03-15T10:30:00.000Z');
-      expect(usResult).toBe('2024-03-15T17:30:00.000Z');
+      expect(usResult).toBe('2024-03-15T10:30:00.000Z');
     });
 
     it('should throw error for invalid date strings', async () => {
