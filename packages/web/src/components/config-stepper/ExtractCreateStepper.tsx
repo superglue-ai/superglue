@@ -640,7 +640,7 @@ if (transformResult?.success) {
                               )}
                               onClick={() => document.getElementById('file-upload')?.click()}
                             >
-                              Upload API Spec or Documentation
+                              Upload File
                             </Button>
                             <input
                               type="file"
