@@ -109,7 +109,7 @@ export async function getDocumentation(documentationUrl: string, headers: Record
           }
       }
     } catch (error) {
-      console.error(`Failed to fetch documentation from ${documentationUrl}:`, error);
+      console.error(`Failed to fetch documentation from ${documentationUrl}:`, error?.message);
     }
 
     if(documentation.length > docMaxLength) {

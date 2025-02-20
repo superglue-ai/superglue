@@ -1,8 +1,6 @@
-import React from 'react';
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
-import { Textarea } from "@/src/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -11,13 +9,15 @@ import {
   SelectValue,
 } from "@/src/components/ui/select";
 import { Switch } from "@/src/components/ui/switch";
-import { Plus, Trash2, ChevronRight, ListPlus } from "lucide-react";
+import { Textarea } from "@/src/components/ui/textarea";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/src/components/ui/tooltip";
+import { ListPlus, Plus, Trash2 } from "lucide-react";
+import React from 'react';
 
 interface JsonSchemaEditorProps {
   value: string;
@@ -27,10 +27,19 @@ interface JsonSchemaEditorProps {
 const SCHEMA_TYPES = ['object', 'array', 'string', 'number', 'boolean', 'null'];
 
 const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) => {
-  const [isCodeMode, setIsCodeMode] = React.useState(true);
+  const [isCodeMode, setIsCodeMode] = React.useState(() => {
+    // Initialize from localStorage, default to false if not set
+    return localStorage.getItem('jsonSchemaEditorCodeMode') === 'true'
+  });
+  
+  // Update localStorage when isCodeMode changes
+  React.useEffect(() => {
+    localStorage.setItem('jsonSchemaEditorCodeMode', isCodeMode.toString());
+  }, [isCodeMode]);
+  
   const [visualSchema, setVisualSchema] = React.useState<any>({});
   const [editingField, setEditingField] = React.useState<string | null>(null);
-
+  
   React.useEffect(() => {
     try {
       setVisualSchema(JSON.parse(value));
@@ -148,10 +157,12 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
               </div>
             ))}
             <Select
-              value={schema.type}
+              value={typeof schema.type === 'string' ? schema.type : 'string'}
               onValueChange={(value) => updateVisualSchema([...path, 'type'], value)}
             >
-              <SelectTrigger className="w-32 h-8"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-32 h-8">
+                <SelectValue placeholder="Type" />
+              </SelectTrigger>
               <SelectContent>
                 {SCHEMA_TYPES.map(type => (
                   <SelectItem key={type} value={type}>{type}</SelectItem>
@@ -217,8 +228,27 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
                 onClick={() => {
                   const newSchema = { ...visualSchema };
                   let current = newSchema;
+                  
+                  // Navigate to the parent to handle required fields
+                  const parentPath = path.slice(0, -2);
+                  let parent = newSchema;
+                  for (const segment of parentPath) {
+                    parent = parent[segment];
+                  }
+                  
+                  // If this field was required, remove it from the required array
+                  if (parent.required?.includes(fieldName)) {
+                    parent.required = parent.required.filter((f: string) => f !== fieldName);
+                    // Remove the required array if it's empty
+                    if (parent.required.length === 0) {
+                      delete parent.required;
+                    }
+                  }
+                  
+                  // Delete the field itself
                   for (let i = 0; i < path.length - 1; i++) current = current[path[i]];
                   delete current[path[path.length - 1] === 'properties' ? fieldName : path[path.length - 1]];
+                  
                   setVisualSchema(newSchema);
                   onChange(JSON.stringify(newSchema, null, 2));
                 }}
@@ -287,8 +317,8 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
   };
 
   return (
-    <div className="space-y-1 h-full flex-1 flex flex-col mb-4 h-full">
-      <div className="flex justify-between items-center">
+    <div className="space-y-1 flex flex-col h-full">
+      <div className="flex justify-between items-center shrink-0">
         <Label htmlFor="responseSchema">Set your desired response schema</Label>
         <div className="flex items-center gap-2">
           <Label htmlFor="editorMode" className="text-sm">Code Mode</Label>
@@ -296,7 +326,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
         </div>
       </div>
 
-      <div className="flex-1 border rounded-md relative">
+      <div className="flex-1 min-h-0 border rounded-md overflow-hidden">
         {isCodeMode ? (
           <Textarea
             id="responseSchema"
@@ -306,7 +336,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
             className="font-mono border-0 h-full"
           />
         ) : (
-          <div className="p-4 h-full">
+          <div className="h-full flex flex-col min-h-0">
             {Object.keys(visualSchema).length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                 <p className="mb-4">No schema defined yet</p>
@@ -322,8 +352,10 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
                 </Button>
               </div>
             ) : (
-              <div className="h-full pr-2">
-                {renderSchemaField('root', visualSchema, [])}
+              <div className="flex-1 overflow-y-auto min-h-0">
+                <div className="p-4">
+                  {renderSchemaField('root', visualSchema, [])}
+                </div>
               </div>
             )}
           </div>
