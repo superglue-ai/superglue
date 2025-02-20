@@ -30,6 +30,7 @@ export function superglueJsonata(expr: string) {
   const expression = jsonata(expr);
   expression.registerFunction("max", (arr: any[]) => Math.max(...arr));
   expression.registerFunction("min", (arr: any[]) => Math.min(...arr));
+  expression.registerFunction("number", (value: string) => parseFloat(value));
   expression.registerFunction("toDate", (date: string) => new Date(date).toISOString());
   expression.registerFunction("dateMax", (dates: string[]) => 
     dates.reduce((max, curr) => new Date(max) > new Date(curr) ? max : curr));
