@@ -109,7 +109,7 @@ ${instruction ? `For context, the instruction from the user is: ${instruction}` 
     const assistantResponse = String(reasoning.choices[0].message.content);
     messages.push({role: "assistant", content: assistantResponse});
     const content = JSON.parse(assistantResponse);
-
+    console.log("generated mapping", content?.jsonata);
     const transformation = await applyJsonataWithValidation(payload, content.jsonata, schema);
 
     if(!transformation.success) {
@@ -117,7 +117,7 @@ ${instruction ? `For context, the instruction from the user is: ${instruction}` 
       throw new Error(`Validation failed: ${transformation.error}`);
     }
 
-    console.log("validation succeeded", content?.jsonata);
+    console.log("validation succeeded");
     // Unwrap the data property
     return content;
 
