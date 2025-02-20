@@ -24,5 +24,13 @@ export const findArraysOfObjects = (obj: any): Record<string, any[]> => {
     }
   };
   traverse(obj);
+  
+  if (Object.keys(arrays).length === 0) {
+    if(Object.keys(obj).length === 1) {
+      const [key, value] = Object.entries(obj)[0];
+      return {[key]: [value]};
+    }
+    return {response: [obj]};
+  }
   return arrays;
 };

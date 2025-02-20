@@ -63,10 +63,16 @@ Guidelines for creating JSONata mappings:
       $trim(str) - Removes whitespace from both ends
       $pad(str, width[, char]) - Pads string to specified width
       $contains(str, substring) - Tests if string contains substring
+      $toMillis(timestamp [, picture]) - Converts ISO 8601 timestamp to milliseconds. E.g. $toMillis("2017-11-07T15:07:54.972Z") => 1510067274972
+      $toDate(str [, picture]) - Converts any timestamp string to valid ISO 8601 date string. E.g. $toDate("Oct 15, 2024 12:00:00 AM UTC") => "2024-10-15T00:00:00.000Z"
+      $dateMax(arr) - Returns the maximum date of an array of dates. E.g. $dateMax(["2017-11-07T15:07:54.972Z", "Oct 15, 2012 12:00:00 AM UTC"]) returns "2017-11-07T15:07:54.972Z".
+      $dateMin(arr) - Returns the minimum date of an array of dates. E.g. $dateMin($.variants.created_at) returns the minimum created_at date of all variants.
+      $dateDiff(date1, date2, unit: "seconds" | "minutes" | "hours" | "days") - Returns the difference between two dates in the specified unit. E.g. $dateDiff($.order.created_at, $.order.updated_at, "days") returns the number of days between the order created_at and updated_at.
+      $now([picture [, timezone]]) - Returns current date and time in ISO 8601 format. E.g. $now() => "2017-05-15T15:12:59.152Z"
       $split(str[, separator][, limit]) - Splits string into array
       $join(array[, separator]) - Joins array elements into string
       $match(str, pattern[, limit]) - Returns array of regex matches
-      $replace(str, pattern, replacement) - Replaces all occurrences of pattern
+      $replace(str, pattern, replacement) - Replaces all occurrences of pattern. E.g. $replace("abracadabra", /a.*?a/, "*") returns "ab*ad*bra". $replace("John Smith", "John", "Marc") returns Marc Smith.
       $number(arg) - Converts an argument to a number.
       $min(arr) - Returns minimum number of a number array. E.g. $min($map($.variants.price, $number)) returns the minimum price of all variants.
       $max(arr) - Returns maximum number of a number array. E.g. $max($map($.variants.price, $number)) returns the maximum price of all variants.

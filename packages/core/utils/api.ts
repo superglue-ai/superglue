@@ -76,7 +76,7 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
       JSON.parse(replaceVariables(endpoint.body, requestVars)) : 
       {};
 
-    const url = composeUrl(endpoint.urlHost, endpoint.urlPath);
+    const url = replaceVariables(composeUrl(endpoint.urlHost, endpoint.urlPath), requestVars);
     const axiosConfig: AxiosRequestConfig = {
       method: endpoint.method,
       url: url,
@@ -91,7 +91,7 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
 
     if(![200, 201, 204].includes(response?.status) || response.data?.error) {
       const error = JSON.stringify(response?.data?.error || response?.data);
-      const message = `${endpoint.method} ${url} failed with status ${response.status}. Response: ${error}
+      const message = `${endpoint.method} ${url} failed with status ${response.status}. Response: ${String(error).slice(0, 200)}
       Headers: ${JSON.stringify(headers)}
       Body: ${JSON.stringify(body)}
       Params: ${JSON.stringify(queryParams)}
@@ -135,7 +135,7 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
         hasMore = false;
       }
     } 
-    else if(responseData && dataPathSuccess) {
+    else if(responseData && allResults.length == 0) {
       allResults.push(responseData);
       hasMore = false;
     }
@@ -146,7 +146,7 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
   }
 
   return {
-    data: allResults
+    data: allResults?.length == 1 ? allResults[0] : allResults
   };
 }
 
@@ -207,10 +207,8 @@ ${apiConfig.method ? `Method: ${apiConfig.method}` : ''}
 
 Available variables: ${vars.join(", ")}
 
-Documentation: ${String(documentation).slice(0, 80000)}
-`
+Documentation: ${String(documentation).slice(0, 80000)}`
   }
-
 
   const subsequentUserMessage: OpenAI.Chat.ChatCompletionUserMessageParam = {
     role: "user",

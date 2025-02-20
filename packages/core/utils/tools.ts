@@ -1,6 +1,6 @@
-import { GraphQLResolveInfo } from "graphql";
 import { RequestOptions } from "@superglue/shared";
 import axios, { AxiosRequestConfig } from "axios";
+import { GraphQLResolveInfo } from "graphql";
 import jsonata from "jsonata";
 import { Validator } from "jsonschema";
 
@@ -18,12 +18,54 @@ interface TransformResult {
 
 export async function applyJsonata(data: any, expr: string): Promise<any> {
   try {
-    const result = await jsonata(expr).evaluate(data);
+    const expression = superglueJsonata(expr);
+    const result = await expression.evaluate(data);
     return result;
   } catch (error) {
     throw new Error(`Mapping transformation failed: ${error.message}`);
   }
 }
+
+export function superglueJsonata(expr: string) {
+  const expression = jsonata(expr);
+  expression.registerFunction("max", (arr: any[]) => Math.max(...arr));
+  expression.registerFunction("min", (arr: any[]) => Math.min(...arr));
+  expression.registerFunction("number", (value: string) => parseFloat(value));
+  expression.registerFunction("toDate", (date: string) => {
+    try {
+      return new Date(date).toISOString();
+    } catch (e) {
+      // Try US date format MM/DD/YYYY
+      const match = date.match(/^(\d{4})\/(\d{2})\/(\d{2})(?:\s+(\d{2}):(\d{2}):(\d{2}))?$/);
+      if (match) {
+        const [_, year, month, day, hours="00", minutes="00", seconds="00"] = match;
+        const isoDate = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.000Z`;
+        return new Date(isoDate).toISOString();
+      }
+      throw new Error(`Invalid date: ${e.message}`);
+    }
+  });
+  expression.registerFunction("dateMax", (dates: string[]) => 
+    dates.reduce((max, curr) => new Date(max) > new Date(curr) ? max : curr));
+  
+  expression.registerFunction("dateMin", (dates: string[]) => 
+    dates.reduce((min, curr) => new Date(min) < new Date(curr) ? min : curr));
+  
+  expression.registerFunction("dateDiff", (date1: string, date2: string, unit: string = 'days') => {
+    const d1 = new Date(date1);
+    const d2 = new Date(date2);
+    const diff = Math.abs(d1.getTime() - d2.getTime());
+    switch(unit.toLowerCase()) {
+      case 'seconds': return Math.floor(diff / 1000);
+      case 'minutes': return Math.floor(diff / (1000 * 60));
+      case 'hours': return Math.floor(diff / (1000 * 60 * 60));
+      case 'days': return Math.floor(diff / (1000 * 60 * 60 * 24));
+      default: return diff; // milliseconds
+    }
+  });
+  return expression;
+}
+
 export async function applyJsonataWithValidation(data: any, expr: string, schema: any): Promise<TransformResult> {
   try {
     const result = await applyJsonata(data, expr);
@@ -150,24 +192,24 @@ export function replaceVariables(template: string, variables: Record<string, any
   });
 }
 
-export function sample<T>(arr: any, sampleSize = 10): T[] {
-  if(!Array.isArray(arr)) {
-    return [arr];
-  }
-  const arrLength = arr.length;
-
-  if (arrLength <= sampleSize) {
-    return arr; // Return full array if less than or equal to sample size
-  }
-
-  const step = Math.floor(arrLength / sampleSize);
-  const result = [];
-
-  for (let i = 0; i < sampleSize; i++) {
-    result.push(arr[i * step]);
+export function sample(value: any, sampleSize = 10): any {
+  if (Array.isArray(value)) {
+    const arrLength = value.length;
+    if (arrLength <= sampleSize) {
+      return value.map(item => sample(item, sampleSize));
+    }
+    const step = Math.floor(arrLength / sampleSize);
+    return Array.from({ length: sampleSize }, (_, i) => sample(value[i * step], sampleSize));
   }
 
-  return result;
+  if (value && typeof value === 'object') {
+    return Object.entries(value).reduce((acc, [key, val]) => ({
+      ...acc,
+      [key]: sample(val, sampleSize)
+    }), {});
+  }
+
+  return value;
 }
 
 export function maskCredentials(message: string, credentials?: Record<string, string>): string {
