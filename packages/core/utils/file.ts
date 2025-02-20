@@ -76,38 +76,42 @@ export async function parseFile(buffer: Buffer, fileType: FileType): Promise<any
     }
 }
 
-async function parseCSV(buffer: Buffer): Promise<any> {
-    const results: any[] = [];
-    const metadata: any[] = [];
-    let headerValues: string[] = [];
-    let headerRowIndex: number = 0;
+async function detectCSVHeaders(sample: Buffer): Promise<{ headerValues: string[], headerRowIndex: number, delimiter: string }> {
+    const delimiter = detectDelimiter(sample);
     
-    // First pass: parse first chunk to detect headers
-    const sampleSize = Math.min(buffer.length, 32768);
-    const sample = buffer.slice(0, sampleSize);
-    
-    // Get headers from first chunk
-    await new Promise<void>((resolve, reject) => {
+    return new Promise<{ headerValues: string[], headerRowIndex: number, delimiter: string }>((resolve, reject) => {
         Papa.parse(Readable.from(sample), {
             preview: 100,
             header: false,
             skipEmptyLines: false,
+            delimiter: delimiter,
             complete: (result) => {
                 // Find row with most columns
-                headerRowIndex = result.data
+                const headerRowIndex = result.data
                     .reduce<number>((maxIndex: number, row: any[], currentIndex: number, rows: any[][]) => 
                         (row.length > (rows[maxIndex] as any[]).length) 
                             ? currentIndex 
                             : maxIndex
                     , 0);
                 
-                headerValues = (result.data[headerRowIndex] as string[])
-                    .map(value => value?.trim() || '');
-                resolve();
+                const headerValues = (result.data[headerRowIndex] as string[])
+                    .map((value: string, index: number) => value?.trim() || `Column ${index + 1}`);
+                
+                resolve({ headerValues, headerRowIndex, delimiter });
             },
             error: (error) => reject(error)
         });
     });
+}
+
+async function parseCSV(buffer: Buffer): Promise<any> {
+    const results: any[] = [];
+    const metadata: any[] = [];
+    
+    // First pass: parse first chunk to detect headers
+    const sampleSize = Math.min(buffer.length, 32768);
+    const sample = buffer.slice(0, sampleSize);
+    const { headerValues, headerRowIndex, delimiter } = await detectCSVHeaders(sample);
 
     // Second pass: parse entire file with detected headers
     let currentLine = -1;
@@ -115,16 +119,17 @@ async function parseCSV(buffer: Buffer): Promise<any> {
         Papa.parse(Readable.from(buffer), {
             header: false,
             skipEmptyLines: false,
+            delimiter: delimiter,
             step: (result: {data: any[]}, parser) => {
                 try {
                     currentLine++;
                     // Store metadata rows
                     if(currentLine <= headerRowIndex) {
-                        if(result.data == null || result.data?.length == 0 || currentLine == headerRowIndex) return;
+                        if(result.data == null || result.data?.filter(Boolean).length == 0 || currentLine == headerRowIndex) return;
                         metadata.push(result?.data);
                         return;
                     }
-                    if(result.data == null || result.data?.length == 0) return;
+                    if(result.data == null || result.data.map((value: any) => value?.trim()).filter(Boolean).length == 0) return;
                     const dataObject: { [key: string]: any } = {};
                     for(let i = 0; i < headerValues.length; i++) {
                         dataObject[headerValues[i]] = result.data[i];
@@ -260,7 +265,9 @@ async function parseExcel(buffer: Buffer): Promise<{ [sheetName: string]: any[] 
             // Get all rows with original headers
             const rawRows = XLSX.utils.sheet_to_json<any>(worksheet, { 
                 raw: false,
-                header: 1
+                header: 1,
+                defval: null,  // Use null for empty cells
+                blankrows: true // Include blank rows
             });
 
             if (!rawRows?.length) {
@@ -276,8 +283,8 @@ async function parseExcel(buffer: Buffer): Promise<{ [sheetName: string]: any[] 
                 , 0);
 
             // Get headers from the detected row
-            const headers = rawRows[headerRowIndex].map((header: any) => 
-                header ? String(header).trim() : ''
+            const headers = rawRows[headerRowIndex].map((header: any, index: number) => 
+                header ? String(header).trim() : `Column ${index + 1}`
             );
 
             // Process all rows after the header row
