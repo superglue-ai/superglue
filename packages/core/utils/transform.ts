@@ -4,6 +4,7 @@ import {  applyJsonataWithValidation, sample } from "./tools.js";
 import { ApiInput, DataStore, TransformConfig, TransformInput } from "@superglue/shared";
 import crypto from 'crypto';
 import toJsonSchema from "to-json-schema";
+import { ChatCompletionMessageParam } from "openai/resources/chat/index.mjs";
 
 export async function prepareTransform(
     datastore: DataStore,
@@ -63,45 +64,38 @@ export async function prepareTransform(
     return null;
   } 
 
-export async function generateMapping(schema: any, payload: any, instruction?: string, retry = 0, error?: string): Promise<{jsonata: string, confidence: number, confidence_reasoning: string} | null> {
-  console.log("generating mapping from schema");
+export async function generateMapping(schema: any, payload: any, instruction?: string, retry = 0, messages?: ChatCompletionMessageParam[]): Promise<{jsonata: string, confidence: number, confidence_reasoning: string} | null> {
+  console.log("generating mapping" + (retry ? `, attempt ${retry} with temperature ${retry * 0.1}` : ""));
   try {
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
     });
     const userPrompt = 
-`
+`Given a source data and structure, create a jsonata expression in JSON FORMAT.
 
-Given the following source data and structure, create a jsonata expression in JSON FORMAT:
+Important: The output should be a jsonata expression creating an object that matches the following schema:
+${JSON.stringify(schema, null, 2)}
 
-Source data:
-${JSON.stringify(sample(payload), null, 2).slice(0,2000)}
-
-Structure:
-${JSON.stringify(toJsonSchema(payload, {required: true,arrays: {mode: 'first'}}), null, 2)}
+${instruction ? `The instruction from the user is: ${instruction}` : ''}
 
 ------
 
-The output should be a jsonata expression with the following schema:
-${JSON.stringify(schema, null, 2)}
+Source Data Structure:
+${JSON.stringify(toJsonSchema(payload, {required: true,arrays: {mode: 'first'}}), null, 2)}
 
-${error ? `We tried to generate the jsonata expression, but it failed with the following error: ${error}` : ''}
+Source data Sample:
+${JSON.stringify(sample(payload, 5), null, 2).slice(0,10000)}`
 
-${instruction ? `The instruction to get the source data was: ${instruction}` : ''}
-`
+    if(!messages) {
+      messages = [
+        {role: "system", content: PROMPT_MAPPING},
+        {role: "user", content: userPrompt}
+      ]
+    }
     const reasoning = await openai.chat.completions.create({
       model: process.env.OPENAI_MODEL,
-      temperature: 0.2,
-      messages: [
-        {
-          role: "system",
-          content: PROMPT_MAPPING
-        },
-        {
-          role: "user", 
-          content: userPrompt
-        }
-      ],
+      temperature: retry * 0.1,
+      messages,
       response_format: {
         type: "json_schema",
         json_schema: {
@@ -111,34 +105,26 @@ ${instruction ? `The instruction to get the source data was: ${instruction}` : '
       },
     });
 
-    const contentJson = String(reasoning.choices[0].message.content);  
-    const content = JSON.parse(contentJson);
-
+    const assistantResponse = String(reasoning.choices[0].message.content);
+    messages.push({role: "assistant", content: assistantResponse});
+    const content = JSON.parse(assistantResponse);
+    console.log("generated mapping", content?.jsonata);
     const transformation = await applyJsonataWithValidation(payload, content.jsonata, schema);
 
     if(!transformation.success) {
       console.log("validation failed", String(transformation?.error).substring(0, 100));
-      throw new Error(
-        `Validation failed:
-        ${transformation.error}
-        
-        The mapping we used before: 
-        ${content.jsonata}
-
-        The reasoning:
-        ${content.confidence_reasoning}
-        `);
+      throw new Error(`Validation failed: ${transformation.error}`);
     }
 
-    console.log("validation succeeded", content?.jsonata);
+    console.log("validation succeeded");
     // Unwrap the data property
     return content;
 
   } catch (error) {
-      console.error('Error generating mapping:', error);
+      console.error('Error generating mapping:', error.message);
       if(retry < 10) {
-          console.log("retrying mapping generation, retry count: " + retry);
-          return generateMapping(schema, payload, instruction, retry + 1, error);
+        messages.push({role: "user", content: error.message});
+        return generateMapping(schema, payload, instruction, retry + 1, messages);
       }
   }
   return null;

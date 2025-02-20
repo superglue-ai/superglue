@@ -56,7 +56,7 @@ export const callResolver = async (
           throw new Error("No data returned from API. This could be due to a configuration error.");
         }
       } catch (error) {
-        console.log(`API call failed.`, error);
+        console.log(`API call failed. ${error?.message}`);
         telemetryClient?.captureException(maskCredentials(error.message, credentials), context.orgId, {
           preparedEndpoint: preparedEndpoint,
           retryCount: retryCount,
@@ -112,7 +112,7 @@ export const callResolver = async (
     return {...result, data: transformedResponse.data};
   } catch (error) {
     const maskedError = maskCredentials(error.message, credentials);
-
+    
     if (options?.webhookUrl) {
       await notifyWebhook(options.webhookUrl, callId, false, undefined, error.message);
     }

@@ -74,13 +74,6 @@ const ConfigTable = () => {
     getConfigs();
   }, [page, pageSize]);
 
-  const handleRowClick = (config: ApiConfig | ExtractConfig) => {
-    if ((config as any).type === 'api') {
-      setSelectedConfig(config);
-      setIsDetailOpen(true);
-    }
-  };
-
   const handleCreateNew = () => {
     router.push('/configs/new');
   };
@@ -122,11 +115,11 @@ const ConfigTable = () => {
         <div className="flex gap-4">
           <Button onClick={handleCreateNewExtract}>
             <Plus className="mr-2 h-4 w-4" />
-            Register Document
+            New File
           </Button>
           <Button onClick={handleCreateNew}>
             <Plus className="mr-2 h-4 w-4" />
-            Register API
+            New API
           </Button>
         </div>
       </div>
@@ -148,28 +141,18 @@ const ConfigTable = () => {
             {configs.map((config) => (
               <TableRow
                 key={config.id}
-                onClick={() => handleRowClick(config)}
-                className="cursor-pointer hover:bg-secondary"
+                className="hover:bg-secondary"
               >
                 <TableCell className="w-[100px]">
-                  <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="default"
+                <Button
+                        variant="secondary"
                         size="sm"
                         onClick={(e) => (config as any).type === 'extract' ? handlePlayExtract(e, config.id) : handlePlay(e, config.id)}
                         className="gap-2"
                       >
                         <Play className="h-4 w-4" />
                         Run
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Run API</p>
-                    </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                </Button>
                 </TableCell>
                 <TableCell className="font-medium max-w-[100px] truncate">
                   {config.id}

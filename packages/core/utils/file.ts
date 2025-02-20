@@ -36,7 +36,12 @@ export async function decompressZip(buffer: Buffer): Promise<Buffer> {
     try {
         const zipStream = await unzipper.Open.buffer(buffer);
         const isExcel = zipStream.files.some(f => 
-            f.path === '[Content_Types].xml' || f.path.startsWith('xl/')
+            f.path === '[Content_Types].xml' || 
+            f.path.startsWith('xl/') ||
+            // Add XLSB specific patterns
+            f.path.endsWith('.xlsb') ||
+            f.path.includes('xl/worksheets/sheet') ||
+            f.path.includes('xl/binData/')
         );
         if (isExcel) {
             return buffer;
@@ -71,56 +76,83 @@ export async function parseFile(buffer: Buffer, fileType: FileType): Promise<any
     }
 }
 
+async function detectCSVHeaders(sample: Buffer): Promise<{ headerValues: string[], headerRowIndex: number, delimiter: string }> {
+    const delimiter = detectDelimiter(sample);
+    
+    return new Promise<{ headerValues: string[], headerRowIndex: number, delimiter: string }>((resolve, reject) => {
+        Papa.parse(Readable.from(sample), {
+            preview: 100,
+            header: false,
+            skipEmptyLines: false,
+            delimiter: delimiter,
+            complete: (result) => {
+                // Find row with most columns
+                const headerRowIndex = result.data
+                    .reduce<number>((maxIndex: number, row: any[], currentIndex: number, rows: any[][]) => 
+                        (row.length > (rows[maxIndex] as any[]).length) 
+                            ? currentIndex 
+                            : maxIndex
+                    , 0);
+                
+                const headerValues = (result.data[headerRowIndex] as string[])
+                    .map((value: string, index: number) => value?.trim() || `Column ${index + 1}`);
+                
+                resolve({ headerValues, headerRowIndex, delimiter });
+            },
+            error: (error) => reject(error)
+        });
+    });
+}
+
 async function parseCSV(buffer: Buffer): Promise<any> {
     const results: any[] = [];
-    const delimiter = detectDelimiter(buffer);
-    let current = 0;
-
-    // Convert the first part of the buffer to find the header row
-    const sampleSize = Math.min(buffer.length, 4096); // Use first 4KB for header detection
-    const sample = buffer.slice(0, sampleSize).toString('utf8');
-    const sampleRows = sample.split('\n').slice(0, 10);
+    const metadata: any[] = [];
     
-    // Find the row with the most columns
-    const headerRowIndex = sampleRows
-        .reduce((maxIndex, row, currentIndex, rows) => 
-            (row.split(delimiter).length > rows[maxIndex].split(delimiter).length) 
-                ? currentIndex 
-                : maxIndex
-        , 0);
-    const headerValues = sampleRows[headerRowIndex].split(delimiter).map((value: string) => value.trim());
+    // First pass: parse first chunk to detect headers
+    const sampleSize = Math.min(buffer.length, 32768);
+    const sample = buffer.slice(0, sampleSize);
+    const { headerValues, headerRowIndex, delimiter } = await detectCSVHeaders(sample);
+
+    // Second pass: parse entire file with detected headers
+    let currentLine = -1;
     return new Promise((resolve, reject) => {
         Papa.parse(Readable.from(buffer), {
-            delimiter,
             header: false,
-            skipEmptyLines: true,
-            worker: true,
-            transformHeader: (header, index) => {
-                // Use the detected header row's values
-                return headerValues[index]|| `Column${index + 1}`;
-            },
-            step: (result, parser) => {
-                try { 
-                    // Skip the detected header row since Papa.parse will use it as headers
-                    const dataObject: { [key: string]: any } = {};
-                    if (current > headerRowIndex) {
-                        for(let i = 0; i < headerValues.length; i++) {
-                            dataObject[headerValues[i]] = result.data[i];
-                        }
-                        results.push(dataObject);
+            skipEmptyLines: false,
+            delimiter: delimiter,
+            step: (result: {data: any[]}, parser) => {
+                try {
+                    currentLine++;
+                    // Store metadata rows
+                    if(currentLine <= headerRowIndex) {
+                        if(result.data == null || result.data?.filter(Boolean).length == 0 || currentLine == headerRowIndex) return;
+                        metadata.push(result?.data);
+                        return;
                     }
-                    current++;
-                } catch(error) {  
+                    if(result.data == null || result.data.map((value: any) => value?.trim()).filter(Boolean).length == 0) return;
+                    const dataObject: { [key: string]: any } = {};
+                    for(let i = 0; i < headerValues.length; i++) {
+                        dataObject[headerValues[i]] = result.data[i];
+                    }
+                    results.push(dataObject);
+                } catch(error) {
                     console.error("Error parsing CSV", error);
                     parser.abort();
                 }
             },
-            complete: async () => {
+            complete: () => {
                 console.log('Finished parsing CSV');
-                if(results?.length == 1) resolve(results[0]);
-                else resolve(results);
+                if(metadata.length > 0) {
+                    resolve({
+                        data: results,
+                        metadata
+                    });
+                }
+                else {
+                    resolve(results);
+                }
             },
-            error: async (error) => {
+            error: (error) => {
                 console.error('Failed parsing CSV');
                 reject(error);
             },
@@ -233,7 +265,9 @@ async function parseExcel(buffer: Buffer): Promise<{ [sheetName: string]: any[] 
             // Get all rows with original headers
             const rawRows = XLSX.utils.sheet_to_json<any>(worksheet, { 
                 raw: false,
-                header: 1
+                header: 1,
+                defval: null,  // Use null for empty cells
+                blankrows: true // Include blank rows
             });
 
             if (!rawRows?.length) {
@@ -249,8 +283,8 @@ async function parseExcel(buffer: Buffer): Promise<{ [sheetName: string]: any[] 
                 , 0);
 
             // Get headers from the detected row
-            const headers = rawRows[headerRowIndex].map((header: any) => 
-                header ? String(header).trim() : ''
+            const headers = rawRows[headerRowIndex].map((header: any, index: number) => 
+                header ? String(header).trim() : `Column ${index + 1}`
             );
 
             // Process all rows after the header row
@@ -309,23 +343,74 @@ async function detectFileType(buffer: Buffer): Promise<FileType> {
 }
 
 function detectDelimiter(buffer: Buffer): string {
-    // Convert the first part of the buffer to string to detect the delimiter
-    const sampleSize = Math.min(buffer.length, 1024); // Use the first 1KB or less if buffer is smaller
+    const sampleSize = Math.min(buffer.length, 32768);
     const sample = buffer.slice(0, sampleSize).toString('utf8');
 
-    // Potential delimiters to check
     const delimiters = [',', '|', '\t', ';', ':'];
-
-    // Count occurrences of each delimiter in the sample
     const counts = delimiters.map(delimiter => ({
         delimiter,
-        count: sample.split(delimiter).length - 1
+        count: countUnescapedDelimiter(sample, delimiter)
     }));
 
-    // Find the delimiter with the highest count
     const detectedDelimiter = counts.reduce((prev, curr) => {
         return curr.count > prev.count ? curr : prev;
     });
 
     return detectedDelimiter.delimiter;
+}
+
+function countUnescapedDelimiter(text: string, delimiter: string): number {
+    let count = 0;
+    let inQuotes = false;
+    let prevChar = '';
+
+    for (let i = 0; i < text.length; i++) {
+        const currentChar = text[i];
+        
+        // Toggle quote state, but only if the quote isn't escaped
+        if (currentChar === '"' && prevChar !== '\\') {
+            inQuotes = !inQuotes;
+        }
+        // Count delimiter only if we're not inside quotes
+        else if (currentChar === delimiter && !inQuotes) {
+            count++;
+        }
+        
+        prevChar = currentChar;
+    }
+
+    return count;
+}
+
+function splitRespectingQuotes(text: string): string[] {
+    const rows: string[] = [];
+    let currentRow = '';
+    let inQuotes = false;
+    let prevChar = '';
+
+    for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        
+        // Handle quotes
+        if (char === '"' && prevChar !== '\\') {
+            inQuotes = !inQuotes;
+        }
+        
+        // Handle newlines
+        if (char === '\n' && !inQuotes) {
+            rows.push(currentRow);
+            currentRow = '';
+        } else {
+            currentRow += char;
+        }
+        
+        prevChar = char;
+    }
+    
+    // Don't forget the last row
+    if (currentRow) {
+        rows.push(currentRow);
+    }
+
+    return rows;
 }

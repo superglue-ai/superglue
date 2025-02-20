@@ -354,7 +354,10 @@ const result = await superglue.call({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-full lg:max-w-[calc(100vw-6rem)] w-[1400px] h-full lg:h-[calc(100vh-6rem)] mx-auto lg:py-12 flex flex-col">
+      <DialogContent 
+        className="h-[100vh] w-[100vw] max-w-[100vw] p-12 gap-0 rounded-none border-none"
+        onPointerDownOutside={e => e.preventDefault()}
+      >
         <DialogHeader>
           <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
             <DialogTitle>

@@ -20,6 +20,7 @@ interface InteractiveExtractPlaygroundProps {
   responseSchema: string
   onResponseSchemaChange: (schema: string) => void
   initialRawResponse?: any
+  responseMapping?: any
   onMappedResponse?: (response: any) => void
   onRun?: () => Promise<void>
   isRunning?: boolean
@@ -29,14 +30,20 @@ interface InteractiveExtractPlaygroundProps {
 }
 
 function VirtualizedTable({ data, columns }: { data: any[], columns: string[] }) {
-  const COLUMN_WIDTH = Math.max(200, 600 / columns.length);
+  // Handle case where data is array of primitives
+  const processedData = data.map(item => 
+    typeof item === 'object' ? item : { value: item }
+  );
+  const processedColumns = columns.length ? columns : ['value'];
+  
+  const COLUMN_WIDTH = Math.max(200, 600 / processedColumns.length);
   const ROW_HEIGHT = 32;
   
   const cellRenderer = ({ columnIndex, key, rowIndex, style }: any) => {
     const isHeader = rowIndex === 0;
     const rawContent = isHeader 
-      ? columns[columnIndex]
-      : data[rowIndex - 1][columns[columnIndex]];
+      ? processedColumns[columnIndex]
+      : processedData[rowIndex - 1][processedColumns[columnIndex]];
     
     const content = typeof rawContent === 'object'
       ? JSON.stringify(rawContent)
@@ -52,7 +59,7 @@ function VirtualizedTable({ data, columns }: { data: any[], columns: string[] })
         className={`
           border-r border-b border-slate-300 p-2 flex items-center
           ${isHeader ? 'bg-secondary font-medium' : rowIndex % 2 ? 'bg-muted/50' : ''}
-          ${columnIndex === columns.length - 1 ? 'border-r-0' : ''}
+          ${columnIndex === processedColumns.length - 1 ? 'border-r-0' : ''}
           text-xs
         `}
         title={content}
@@ -71,11 +78,11 @@ function VirtualizedTable({ data, columns }: { data: any[], columns: string[] })
           <MultiGrid
             cellRenderer={cellRenderer}
             columnWidth={COLUMN_WIDTH}
-            columnCount={columns.length}
+            columnCount={processedColumns.length}
             fixedRowCount={1}
             height={height}
             rowHeight={ROW_HEIGHT}
-            rowCount={data.length + 1}
+            rowCount={processedData.length + 1}
             width={width}
             overscanRowCount={5}
             overscanColumnCount={2}
@@ -102,10 +109,10 @@ export function InteractiveExtractPlayground({
   responseSchema,
   onResponseSchemaChange,
   initialRawResponse,
+  responseMapping,
   onMappedResponse,
   onRun,
   isRunning,
-
   mappedResponseData,
   hideRunButton,
   file
@@ -205,6 +212,7 @@ export function InteractiveExtractPlayground({
               <TabsList className="w-full rounded-t-lg rounded-b-none">
                 <TabsTrigger value="raw" className="flex-1">Raw Document</TabsTrigger>
                 <TabsTrigger value="mapped" className="flex-1">Output</TabsTrigger>
+                <TabsTrigger value="jsonata" className="flex-1">JSONata</TabsTrigger>
               </TabsList>
 
               <div className="flex-1 min-h-0">
@@ -259,10 +267,10 @@ export function InteractiveExtractPlayground({
                           </TabsList>
                           {Object.entries(mappedResponse).map(([key, array]) => (
                             <TabsContent key={key} value={key} className="h-[calc(100%-40px)]">
-                              {array?.length > 0 ? (
+                              {Array.isArray(array) && array.length > 0 ? (
                                 <VirtualizedTable 
                                   data={array} 
-                                  columns={Object.keys(array[0])}
+                                  columns={typeof array[0] === 'object' ? Object.keys(array[0]) : []}
                                 />
                               ) : (
                                 <div className="text-xs">Output will appear here...</div>
@@ -274,7 +282,9 @@ export function InteractiveExtractPlayground({
                         Object.values(mappedResponse)[0]?.length > 0 ? (
                           <VirtualizedTable 
                             data={Object.values(mappedResponse)[0]} 
-                            columns={Object.keys(Object.values(mappedResponse)[0][0])}
+                            columns={typeof Object.values(mappedResponse)[0][0] === 'object' 
+                              ? Object.keys(Object.values(mappedResponse)[0][0]) 
+                              : []}
                           />
                         ) : (
                           <div className="text-xs">Output will appear here...</div>
@@ -283,6 +293,14 @@ export function InteractiveExtractPlayground({
                     ) : (
                       <div className="text-xs">Output will appear here...</div>
                     )}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="jsonata" className="m-0 h-full data-[state=active]:flex flex-col">
+                  <div className="flex-1 min-h-0 p-4 overflow-y-auto">
+                    <pre className="text-xs whitespace-pre-wrap">
+                      {responseMapping || 'No JSONata mapping available'}
+                    </pre>
                   </div>
                 </TabsContent>
               </div>
