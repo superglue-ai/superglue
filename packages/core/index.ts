@@ -46,7 +46,10 @@ const apolloConfig = {
     {
       requestDidStart: async () => ({
         willSendResponse: async (requestContext) => {
-          const errors = requestContext.errors;
+          const errors = requestContext.errors || 
+            requestContext?.response?.body?.singleResult?.errors ||
+            Object.values(requestContext?.response?.body?.singleResult?.data || {}).map((d: any) => d.error).filter(Boolean);
+            
           if(errors && errors.length > 0) {
             console.error(errors);
           }

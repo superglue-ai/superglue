@@ -37,6 +37,7 @@ export function ExtractCreateStepper({ open, onOpenChange, extractId: initialExt
   const [initialRawResponse, setInitialRawResponse] = useState<any>(null)
   const [hasMappedResponse, setHasMappedResponse] = useState(false)
   const [mappedResponseData, setMappedResponseData] = useState<any>(null)
+  const [responseMapping, setResponseMapping] = useState<any>(null)
   const [isRunning, setIsRunning] = useState(false)
 
   const [formData, setFormData] = useState({
@@ -422,7 +423,7 @@ if (transformResult?.success) {
       })
 
       let mappedData = initialRawResponse;
-
+      let responseMapping = null;
       if(formData.responseSchema && Object.keys(JSON.parse(formData.responseSchema)).length > 0) {
         await superglueClient.upsertTransformation(extractId, {
           responseSchema: JSON.parse(formData.responseSchema),
@@ -438,10 +439,13 @@ if (transformResult?.success) {
           throw new Error(mappedResult.error);
         }
         mappedData = mappedResult.data;
+        console.log('mappedResult.config', mappedResult.config)
+        responseMapping = (mappedResult.config as TransformConfig).responseMapping;
       }
       
       setInitialRawResponse(initialRawResponse);
       setMappedResponseData(mappedData);
+      setResponseMapping(responseMapping);
       setHasMappedResponse(true);
 
     } catch (error: any) {
@@ -528,7 +532,10 @@ if (transformResult?.success) {
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-full lg:max-w-[calc(100vw-6rem)] w-[1400px] h-full lg:h-[calc(100vh-6rem)] mx-auto lg:py-12 flex flex-col">
+      <DialogContent 
+        className="h-[100vh] w-[100vw] max-w-[100vw] p-12 gap-0 rounded-none border-none"
+        onPointerDownOutside={e => e.preventDefault()}
+      >
         <DialogHeader>
         <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
           <DialogTitle>
@@ -827,6 +834,7 @@ if (transformResult?.success) {
                 responseSchema={formData.responseSchema}
                 onResponseSchemaChange={handleChange('responseSchema')}
                 initialRawResponse={initialRawResponse}
+                responseMapping={responseMapping}
                 onMappedResponse={handleMappedResponse}
                 onRun={handleRun}
                 isRunning={isRunning}

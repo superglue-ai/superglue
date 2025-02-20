@@ -91,7 +91,7 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
 
     if(![200, 201, 204].includes(response?.status) || response.data?.error) {
       const error = JSON.stringify(response?.data?.error || response?.data);
-      const message = `${endpoint.method} ${url} failed with status ${response.status}. Response: ${error}
+      const message = `${endpoint.method} ${url} failed with status ${response.status}. Response: ${String(error).slice(0, 200)}
       Headers: ${JSON.stringify(headers)}
       Body: ${JSON.stringify(body)}
       Params: ${JSON.stringify(queryParams)}

@@ -67,7 +67,7 @@ export const transformResolver = async (
       id: callId,
       success: true,
       data: transformation.data,
-      configuration: preparedTransform,
+      config: preparedTransform,
       startedAt,
       completedAt,
     };
@@ -83,7 +83,7 @@ export const transformResolver = async (
       id: callId,
       success: false,
       error: error.message,
-      configuration: preparedTransform || input,
+      config: preparedTransform || input,
       startedAt,
       completedAt,
     };

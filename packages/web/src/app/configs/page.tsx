@@ -122,11 +122,11 @@ const ConfigTable = () => {
         <div className="flex gap-4">
           <Button onClick={handleCreateNewExtract}>
             <Plus className="mr-2 h-4 w-4" />
-            Register Document
+            New File
           </Button>
           <Button onClick={handleCreateNew}>
             <Plus className="mr-2 h-4 w-4" />
-            Register API
+            New API
           </Button>
         </div>
       </div>
