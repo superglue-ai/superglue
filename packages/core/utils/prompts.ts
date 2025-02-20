@@ -72,7 +72,7 @@ Guidelines for creating JSONata mappings:
       $split(str[, separator][, limit]) - Splits string into array
       $join(array[, separator]) - Joins array elements into string
       $match(str, pattern[, limit]) - Returns array of regex matches
-      $replace(str, pattern, replacement) - Replaces all occurrences of pattern
+      $replace(str, pattern, replacement) - Replaces all occurrences of pattern. E.g. $replace("abracadabra", /a.*?a/, "*") returns "ab*ad*bra". $replace("John Smith", "John", "Marc") returns Marc Smith.
       $number(arg) - Converts an argument to a number.
       $min(arr) - Returns minimum number of a number array. E.g. $min($map($.variants.price, $number)) returns the minimum price of all variants.
       $max(arr) - Returns maximum number of a number array. E.g. $max($map($.variants.price, $number)) returns the maximum price of all variants.
