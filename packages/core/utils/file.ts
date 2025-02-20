@@ -120,7 +120,7 @@ async function parseCSV(buffer: Buffer): Promise<any> {
                     currentLine++;
                     // Store metadata rows
                     if(currentLine <= headerRowIndex) {
-                        if(result.data == null || result.data?.length == 0) return;
+                        if(result.data == null || result.data?.length == 0 || currentLine == headerRowIndex) return;
                         metadata.push(result?.data);
                         return;
                     }
@@ -137,10 +137,15 @@ async function parseCSV(buffer: Buffer): Promise<any> {
             },
             complete: () => {
                 console.log('Finished parsing CSV');
-                resolve({
-                    data: results,
-                    metadata
-                });
+                if(metadata.length > 0) {
+                    resolve({
+                        data: results,
+                        metadata
+                    });
+                }
+                else {
+                    resolve(results);
+                }
             },
             error: (error) => {
                 console.error('Failed parsing CSV');

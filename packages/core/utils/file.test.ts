@@ -18,7 +18,7 @@ describe('File Utilities', () => {
       const buffer = Buffer.from(csvData);
       
       const result = await parseFile(buffer, FileType.CSV);
-      expect(result).toEqual({ name: 'test', value: '123' });
+      expect(result).toEqual([{ name: 'test', value: '123' }]);
     });
 
     it('should parse CSV data as array if multiple rows are given', async () => {
