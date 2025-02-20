@@ -76,17 +76,16 @@ export async function generateMapping(schema: any, payload: any, instruction?: s
 Important: The output should be a jsonata expression creating an object that matches the following schema:
 ${JSON.stringify(schema, null, 2)}
 
+${instruction ? `The instruction from the user is: ${instruction}` : ''}
+
 ------
+
 Source Data Structure:
 ${JSON.stringify(toJsonSchema(payload, {required: true,arrays: {mode: 'first'}}), null, 2)}
 
 Source data Sample:
-${JSON.stringify(sample(payload, 5), null, 2).slice(0,10000)}
+${JSON.stringify(sample(payload, 5), null, 2).slice(0,10000)}`
 
-------
-
-${instruction ? `For context, the instruction from the user is: ${instruction}` : ''}
-`
     if(!messages) {
       messages = [
         {role: "system", content: PROMPT_MAPPING},
