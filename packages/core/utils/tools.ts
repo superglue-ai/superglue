@@ -136,20 +136,6 @@ export function applyAuthFormat(format: string, credentials: Record<string, stri
 }
 
 
-export function getAllKeys(obj: any): string[] {
-  let keys: string[] = [];
-  for (const key in obj) {
-    keys.push(`${typeof obj[key]}:${key}`);
-    if (obj[key] && typeof obj[key] === 'object') {
-      if (Array.isArray(obj[key])) {
-        keys = keys.concat(...obj[key].map(item => getAllKeys(item)));
-      } else {
-        keys = keys.concat(getAllKeys(obj[key]));
-      }
-    }
-  }
-  return keys.sort();
-}
 
 export function composeUrl(host: string, path: string) {
   // Handle empty/undefined inputs

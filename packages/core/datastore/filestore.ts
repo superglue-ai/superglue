@@ -1,8 +1,8 @@
 import { ApiConfig, ApiInput, DataStore, ExtractConfig, ExtractInput, RunResult, TransformConfig, TransformInput } from "@superglue/shared";
-import objectHash from 'object-hash';
-import { getAllKeys } from '../utils/tools.js';
 import fs from 'fs';
 import path from 'path';
+import toJsonSchema from "to-json-schema";
+import { createHash } from 'crypto';
 
 export class FileStore implements DataStore {
 
@@ -96,6 +96,11 @@ export class FileStore implements DataStore {
       .map(([key, value]) => ({ ...value, id: key.split(':').pop() })) as T[];
   }
 
+  // Helper function to generate md5 hash
+  private generateHash(data: any): string {
+    return createHash('md5').update(JSON.stringify(data)).digest('hex');
+  }
+
   // API Config Methods
   async getApiConfig(id: string, orgId: string): Promise<ApiConfig | null> {
     if(!id) return null;
@@ -114,7 +119,7 @@ export class FileStore implements DataStore {
 
   async saveApiConfig(request: ApiInput, payload: any, config: ApiConfig, orgId?: string): Promise<ApiConfig> {
     if(!request) return null;
-    const hash = objectHash({request, payloadKeys: getAllKeys(payload)});
+    const hash = this.generateHash({request, payloadKeys: toJsonSchema(payload)});
     const key = this.getKey('api', hash, orgId);
     this.storage.apis.set(key, config);
     await this.persist();
@@ -123,7 +128,7 @@ export class FileStore implements DataStore {
 
   async getApiConfigFromRequest(request: ApiInput, payload: any, orgId?: string): Promise<ApiConfig | null> {
     if(!request) return null;
-    const hash = objectHash({request, payloadKeys: getAllKeys(payload)});
+    const hash = this.generateHash({request, payloadKeys: toJsonSchema(payload)});
     const key = this.getKey('api', hash, orgId);
     const config = this.storage.apis.get(key);
     return config ? { ...config, id: hash } : null;
@@ -161,7 +166,7 @@ export class FileStore implements DataStore {
 
   async saveExtractConfig(request: ExtractInput, payload: any, config: ExtractConfig, orgId: string): Promise<ExtractConfig> {
     if(!request) return null;
-    const hash = objectHash({request, payloadKeys: getAllKeys(payload)});
+    const hash = this.generateHash({request, payloadKeys: toJsonSchema(payload)});
     const key = this.getKey('extract', hash, orgId);
     this.storage.extracts.set(key, config);
     await this.persist();
@@ -170,7 +175,7 @@ export class FileStore implements DataStore {
 
   async getExtractConfigFromRequest(request: ExtractInput, payload: any, orgId?: string): Promise<ExtractConfig | null> {
     if(!request) return null;
-    const hash = objectHash({request, payloadKeys: getAllKeys(payload)});
+    const hash = this.generateHash({request, payloadKeys: toJsonSchema(payload)});
     const key = this.getKey('extract', hash, orgId);
     const config = this.storage.extracts.get(key);
     return config ? { ...config, id: hash } : null;
@@ -208,7 +213,7 @@ export class FileStore implements DataStore {
 
   async saveTransformConfig(request: TransformInput, payload: any, config: TransformConfig, orgId?: string): Promise<TransformConfig> {
     if(!request) return null;
-    const hash = objectHash({request, payloadKeys: getAllKeys(payload)});
+    const hash = this.generateHash({request, payloadKeys: toJsonSchema(payload)});
     const key = this.getKey('transform', hash, orgId);
     this.storage.transforms.set(key, config);
     await this.persist();
@@ -217,7 +222,7 @@ export class FileStore implements DataStore {
 
   async getTransformConfigFromRequest(request: TransformInput, payload: any, orgId?: string): Promise<TransformConfig | null> {
     if(!request) return null;
-    const hash = objectHash({request, payloadKeys: getAllKeys(payload)});
+    const hash = this.generateHash({request, payloadKeys: toJsonSchema(payload)});
     const key = this.getKey('transform', hash, orgId);
     const config = this.storage.transforms.get(key);
     return config ? { ...config, id: hash } : null;
