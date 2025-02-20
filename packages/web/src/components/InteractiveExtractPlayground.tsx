@@ -148,9 +148,7 @@ export function InteractiveExtractPlayground({
   // Update mapped response when it comes from props
   useEffect(() => {
     if (mappedResponseData) {
-      console.log('mappedResponseData', mappedResponseData)
       const mappedResponse = findArraysOfObjects(mappedResponseData)
-      console.log('mappedResponse', mappedResponse)
       setMappedResponse(mappedResponse)
       setActiveTab('mapped')
     }
