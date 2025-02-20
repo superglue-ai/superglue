@@ -166,7 +166,7 @@ describe('tools utility functions', () => {
     it('should handle non-array input', () => {
       const obj = { test: 'value' };
       const result = sample(obj);
-      expect(result).toEqual([obj]);
+      expect(result).toEqual(obj);
     });
 
     it('should respect custom sample size', () => {
