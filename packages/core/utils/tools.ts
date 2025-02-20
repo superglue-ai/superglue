@@ -1,6 +1,6 @@
-import { GraphQLResolveInfo } from "graphql";
 import { RequestOptions } from "@superglue/shared";
 import axios, { AxiosRequestConfig } from "axios";
+import { GraphQLResolveInfo } from "graphql";
 import jsonata from "jsonata";
 import { Validator } from "jsonschema";
 
@@ -31,7 +31,20 @@ export function superglueJsonata(expr: string) {
   expression.registerFunction("max", (arr: any[]) => Math.max(...arr));
   expression.registerFunction("min", (arr: any[]) => Math.min(...arr));
   expression.registerFunction("number", (value: string) => parseFloat(value));
-  expression.registerFunction("toDate", (date: string) => new Date(date).toISOString());
+  expression.registerFunction("toDate", (date: string) => {
+    try {
+      return new Date(date).toISOString();
+    } catch (e) {
+      // Try US date format MM/DD/YYYY
+      const match = date.match(/^(\d{4})\/(\d{2})\/(\d{2})(?:\s+(\d{2}):(\d{2}):(\d{2}))?$/);
+      if (match) {
+        const [_, year, month, day, hours="00", minutes="00", seconds="00"] = match;
+        const isoDate = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.000Z`;
+        return new Date(isoDate).toISOString();
+      }
+      throw new Error(`Invalid date: ${e.message}`);
+    }
+  });
   expression.registerFunction("dateMax", (dates: string[]) => 
     dates.reduce((max, curr) => new Date(max) > new Date(curr) ? max : curr));
   
