@@ -28,8 +28,18 @@ export async function applyJsonata(data: any, expr: string): Promise<any> {
 
 export function superglueJsonata(expr: string) {
   const expression = jsonata(expr);
-  expression.registerFunction("max", (arr: any[]) => Math.max(...arr));
-  expression.registerFunction("min", (arr: any[]) => Math.min(...arr));
+  expression.registerFunction("max", (arr: any[]) => {
+    if(Array.isArray(arr)) {
+      return Math.max(...arr);
+    }
+    return arr;
+  });
+  expression.registerFunction("min", (arr: any[]) => {
+    if(Array.isArray(arr)) {
+      return Math.min(...arr);
+    }
+    return arr;
+  });
   expression.registerFunction("number", (value: string) => parseFloat(value));
   expression.registerFunction("substring", (str: string, start: number, end?: number) => String(str).substring(start, end));
   expression.registerFunction("replace", (obj: any, pattern: string, replacement: string) => {
@@ -85,6 +95,9 @@ export function superglueJsonata(expr: string) {
 export async function applyJsonataWithValidation(data: any, expr: string, schema: any): Promise<TransformResult> {
   try {
     const result = await applyJsonata(data, expr);
+    if(result === null || result === undefined || result?.length === 0 || Object.keys(result).length === 0) {
+      return { success: false, error: "Result is empty" };
+    }
     const validator = new Validator();
     const optionalSchema = addNullableToOptional(schema);
     const validation = validator.validate(result, optionalSchema);
