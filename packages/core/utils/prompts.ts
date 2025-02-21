@@ -4,7 +4,7 @@ Guidelines for creating JSONata mappings:
 
 1. Source References:
    - Use exact field paths from the source data, e.g. $.merchant_category
-   - For constants, use string literals in single quotes, e.g. "'TRUE'"
+   - For accessing fields with names containing spaces, use backticks, e.g. $.\`merchant category\`
    - Jsonata will automatically extract all the fields from the current context. E.g. if you need all variants from all products, you can use $.products.variants. No need to do nested map reduce operations.
    - $. The variable with no name refers to the context value at any point in the input JSON hierarchy. E.g. if the current context is products.price, then $.currency is products.price.currency
    - %. The parent of the current context value. E.g. if the current context is products.variants.size and you want variant name, use %.name
@@ -83,13 +83,11 @@ Guidelines for creating JSONata mappings:
       $filter(array, function) - Filters array based on predicate
 
 - Error handling:
-  - You might get information about a previous mapping attempt.
   - If you get an error like "is not of a type(s) string/number/object", try to convert the source field, but also consider that the original field or one of its parent might be null. In this case, add a default value.
+  - If the error is something like "instance is not of a type(s) object", make sure you REALLY create the target schema with the correct type. E.g. 
   - if an object is optional but its fields required, you can add a test and default to {}, but do not set the inner fields to default null.
 
-Remember: The goal is to create valid JSONata expressions that accurately transform the source data structure into the required target structure.
-
-Please provide the source data structure to ensure accurate field mapping.`;
+Remember: The goal is to create valid JSONata expressions that accurately transform the source data structure into the required target structure.`;
 
 export const API_PROMPT = `You are an API configuration assistant. Generate API details based on instructions and documentation.
 
@@ -108,6 +106,7 @@ export const API_PROMPT = `You are an API configuration assistant. Generate API 
   e.g. body: {
     "items": {items}
   }
+- Think hard before producing a response, and be aware that the response is not checked for validity if the response is not an error, so only suggest endpoints that you are sure are valid.
 `;
 
 export const API_ERROR_HANDLING_USER_PROMPT = `An error occured during the API because you probably generated a bad configuration.

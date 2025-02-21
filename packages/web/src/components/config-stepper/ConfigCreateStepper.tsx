@@ -35,6 +35,7 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
   const [initialRawResponse, setInitialRawResponse] = useState<any>(null)
   const [hasMappedResponse, setHasMappedResponse] = useState(false)
   const [mappedResponseData, setMappedResponseData] = useState<any>(null)
+  const [responseMapping, setResponseMapping] = useState<any>(null)
   const [isRunning, setIsRunning] = useState(false)
 
   const [formData, setFormData] = useState({
@@ -66,6 +67,7 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
     if (field === 'responseSchema' || field === 'instruction') {
       setHasMappedResponse(false)
       setMappedResponseData(null)
+      setResponseMapping(null)
     }
   }
 
@@ -340,6 +342,7 @@ const result = await superglue.call({
       const mappedData = mappedResult.data
       setMappedResponseData(mappedData)
       setHasMappedResponse(true)
+      setResponseMapping((mappedResult.config as ApiConfig).responseMapping)
     } catch (error: any) {
       console.error('Error running API:', error)
       toast({
@@ -355,29 +358,30 @@ const result = await superglue.call({
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent 
-        className="h-[100vh] w-[100vw] max-w-[100vw] p-12 gap-0 rounded-none border-none"
-        onPointerDownOutside={e => e.preventDefault()}
+        className="h-[100vh] w-[100vw] max-w-[100vw] p-12 gap-0 rounded-none border-none flex flex-col"
       >
-        <DialogHeader>
-          <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
-            <DialogTitle>
-              {step === 'success' ? 'Configuration Complete!' : 'Create New API Configuration'}
-            </DialogTitle>
-            {!step.includes('success') && (
-              <Button
-                variant="outline"
-                className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-200/50 hover:border-blue-300/50 text-blue-600 hover:text-blue-700 text-sm px-4 py-1 h-8 rounded-full animate-pulse shrink-0"
-                onClick={() => window.open('https://cal.com/teamindex/onboarding', '_blank')}
-              >
-                ✨ Get help from our team
-              </Button>
-            )}
-          </div>
-        </DialogHeader>
+        <div className="flex-none mb-12">
+          <DialogHeader>
+            <div className="flex flex-col lg:flex-row items-center justify-between gap-4 mb-4">
+              <DialogTitle>
+                {step === 'success' ? 'Configuration Complete!' : 'Create New API Configuration'}
+              </DialogTitle>
+              {!step.includes('success') && (
+                <Button
+                  variant="outline"
+                  className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-200/50 hover:border-blue-300/50 text-blue-600 hover:text-blue-700 text-sm px-4 py-1 h-8 rounded-full animate-pulse shrink-0"
+                  onClick={() => window.open('https://cal.com/teamindex/onboarding', '_blank')}
+                >
+                  ✨ Get help from our team
+                </Button>
+              )}
+            </div>
+          </DialogHeader>
 
-        <StepIndicator currentStep={step} />
+          <StepIndicator currentStep={step} />
+        </div>
 
-        <div className="mt-4 flex-1 overflow-y-auto px-1">
+        <div className="flex-1 overflow-y-auto px-1 min-h-0">
           {step === 'basic' && (
             <div className="space-y-3">
               <div>
@@ -397,7 +401,7 @@ const result = await superglue.call({
                   placeholder="E.g. 'Get all products with price and name'"
                   autoFocus
                   className={cn(
-                    "h-24",
+                    "h-48",
                     validationErrors.instruction && inputErrorStyles,
                     validationErrors.instruction && "focus:!border-destructive"
                   )}
@@ -577,6 +581,7 @@ const result = await superglue.call({
                 onRun={handleRun}
                 isRunning={isRunning}
                 mappedResponseData={mappedResponseData}
+                responseMapping={responseMapping}
                 hideRunButton={true}
               />
             </div>
@@ -639,7 +644,7 @@ const result = await superglue.call({
           )}
         </div>
 
-        <div className="mt-4 flex flex-col lg:flex-row gap-2 justify-between">
+        <div className="flex-none mt-4 flex flex-col lg:flex-row gap-2 justify-between">
           {step === 'success' ? (
             <>
               <Button
@@ -688,7 +693,16 @@ const result = await superglue.call({
                   </>
                 ) : (
                   step === 'try_and_output' ? 
-                    (isRunning ? 'Running...' : (!mappedResponseData ? 'Run' : 'Complete')) : 
+                    (isRunning ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Running...
+                      </>
+                    ) : (!mappedResponseData ? (
+                      <>
+                        ✨ Run
+                      </>
+                    ) : 'Complete')) : 
                     'Next'
                 )}
               </Button>

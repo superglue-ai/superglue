@@ -12,6 +12,7 @@ import { Label } from './ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
 import { AutoSizer, MultiGrid } from 'react-virtualized'
 import 'react-virtualized/styles.css'
+import { Loader2 } from "lucide-react"
 
 interface InteractiveExtractPlaygroundProps {
   configId: string
@@ -198,7 +199,16 @@ export function InteractiveExtractPlayground({
               onClick={handleRun}
               disabled={isRunning || isLoading}
             >
-              {isRunning || isLoading ? 'Running...' : 'Run'}
+              {isRunning || isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Running...
+                </>
+              ) : (
+                <>
+                  ✨ Run
+                </>
+              )}
             </Button>
           </div>
         )}

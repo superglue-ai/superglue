@@ -533,29 +533,31 @@ if (transformResult?.success) {
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent 
-        className="h-[100vh] w-[100vw] max-w-[100vw] p-12 gap-0 rounded-none border-none"
+        className="h-[100vh] w-[100vw] max-w-[100vw] p-12 gap-0 rounded-none border-none flex flex-col"
         onPointerDownOutside={e => e.preventDefault()}
       >
-        <DialogHeader>
-        <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
-          <DialogTitle>
-              {step === 'success' ? 'Configuration Complete!' : 'Create New Document Configuration'}
-            </DialogTitle>
-            {!step.includes('success') && (
-              <Button
-                variant="outline"
-                className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-200/50 hover:border-blue-300/50 text-blue-600 hover:text-blue-700 text-sm px-4 py-1 h-8 rounded-full animate-pulse shrink-0"
-                onClick={() => window.open('https://cal.com/teamindex/onboarding', '_blank')}
-              >
-                ✨ Get help from our team
-              </Button>
-            )}
-          </div>
-        </DialogHeader>
+        <div className="flex-none mb-12">
+          <DialogHeader>
+            <div className="flex flex-col lg:flex-row items-center justify-between gap-4 mb-4">
+              <DialogTitle>
+                {step === 'success' ? 'Configuration Complete!' : 'Create New Document Configuration'}
+              </DialogTitle>
+              {!step.includes('success') && (
+                <Button
+                  variant="outline"
+                  className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-200/50 hover:border-blue-300/50 text-blue-600 hover:text-blue-700 text-sm px-4 py-1 h-8 rounded-full animate-pulse shrink-0"
+                  onClick={() => window.open('https://cal.com/teamindex/onboarding', '_blank')}
+                >
+                  ✨ Get help from our team
+                </Button>
+              )}
+            </div>
+          </DialogHeader>
 
-        <StepIndicator currentStep={step} />
+          <StepIndicator currentStep={step} />
+        </div>
 
-        <div className="mt-4 flex-1 overflow-y-auto px-1">
+        <div className="flex-1 overflow-y-auto px-1 min-h-0">
           {step === 'basic' && (
             <div className="space-y-3">
               <div>
@@ -946,7 +948,7 @@ if (transformResult?.success) {
           )}
         </div>
 
-        <div className="mt-4 flex flex-col lg:flex-row gap-2 justify-between">
+        <div className="flex-none mt-4 flex flex-col lg:flex-row gap-2 justify-between">
           {step === 'success' ? (
             <>
               <Button
@@ -997,7 +999,16 @@ if (transformResult?.success) {
                   </>
                 ) : (
                   step === 'try_and_output' ? 
-                    (isRunning ? 'Running...' : (!mappedResponseData ? 'Run ✨' : 'Complete')) : 
+                    (isRunning ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Running...
+                      </>
+                    ) : (!mappedResponseData ? (
+                      <>
+                        ✨ Run
+                      </>
+                    ) : 'Complete')) : 
                     'Next'
                 )}
               </Button>
