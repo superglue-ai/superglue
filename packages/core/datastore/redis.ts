@@ -113,9 +113,10 @@ export class RedisService implements DataStore {
     return config;
   }
 
-  async deleteApiConfig(id: string, orgId: string): Promise<void> {
-    if(!id) return;
-    await this.redis.del(this.getKey(this.API_PREFIX, id, orgId));
+  async deleteApiConfig(id: string, orgId: string): Promise<boolean> {
+    if(!id) return false;
+    const deleted = await this.redis.del(this.getKey(this.API_PREFIX, id, orgId));
+    return deleted > 0;
   }
 
   // Extract Methods
@@ -155,9 +156,10 @@ export class RedisService implements DataStore {
     return config;
   }
 
-  async deleteExtractConfig(id: string, orgId?: string): Promise<void> {
-    if(!id) return;
-    await this.redis.del(this.getKey(this.EXTRACT_PREFIX, id, orgId));
+  async deleteExtractConfig(id: string, orgId?: string): Promise<boolean> {
+    if(!id) return false;
+    const deleted = await this.redis.del(this.getKey(this.EXTRACT_PREFIX, id, orgId));
+    return deleted > 0;
   }
 
   // Transform Methods
@@ -197,9 +199,10 @@ export class RedisService implements DataStore {
     return config;
   }
 
-  async deleteTransformConfig(id: string, orgId?: string): Promise<void> {
-    if(!id) return;
-    await this.redis.del(this.getKey(this.TRANSFORM_PREFIX, id, orgId));
+  async deleteTransformConfig(id: string, orgId?: string): Promise<boolean> {
+    if(!id) return false;
+    const deleted = await this.redis.del(this.getKey(this.TRANSFORM_PREFIX, id, orgId));
+    return deleted > 0;
   }
 
   async getRun(id: string, orgId?: string): Promise<RunResult | null> {
@@ -243,13 +246,14 @@ export class RedisService implements DataStore {
     };
   }
 
-  async deleteAllRuns(orgId: string): Promise<void> {
+  async deleteAllRuns(orgId: string): Promise<boolean> {
     const pattern = this.getPattern(this.RUN_PREFIX, orgId);
     const keys = await this.redis.keys(pattern);
     
     if (keys.length > 0) {
-      await this.redis.del(keys);
+      const deleted = await this.redis.del(keys);
     }
+    return true;
   }
 
   async createRun(run: RunResult, orgId?: string): Promise<RunResult> {
