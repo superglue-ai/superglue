@@ -11,7 +11,7 @@ import {
   TableRow,
 } from "@/src/components/ui/table";
 import { Button } from "@/src/components/ui/button";
-import { Plus, Settings, Play, History } from "lucide-react";
+import { Plus, Settings, Play, History, Trash2, RotateCw } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -24,6 +24,16 @@ import { ApiConfig, ExtractConfig } from '@superglue/client';
 import { useConfig } from '@/src/app/config-context';
 import { SuperglueClient } from '@superglue/client';
 import { Badge } from "@/src/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/src/components/ui/alert-dialog"
 
 const ConfigTable = () => {
   const router = useRouter();
@@ -35,44 +45,47 @@ const ConfigTable = () => {
   const [page, setPage] = React.useState(0);
   const [pageSize] = React.useState(20);
   const config = useConfig();
+  const [configToDelete, setConfigToDelete] = React.useState<ApiConfig | ExtractConfig | null>(null);
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
+
+  const refreshConfigs = React.useCallback(async () => {
+    setIsRefreshing(true);
+    setLoading(true);
+    try {
+      const superglueClient = new SuperglueClient({
+        endpoint: config.superglueEndpoint,
+        apiKey: config.superglueApiKey
+      });
+      
+      const [apiConfigs, extractConfigs] = await Promise.all([
+        superglueClient.listApis(1000, 0),
+        superglueClient.listExtracts(1000, 0)
+      ]);
+
+      const combinedConfigs = [
+        ...apiConfigs.items.map(item => ({ ...item, type: 'api' })), 
+        ...extractConfigs.items.map(item => ({ ...item, type: 'extract' }))
+      ].sort((a, b) => {
+        const dateA = new Date(a.updatedAt || a.createdAt).getTime();
+        const dateB = new Date(b.updatedAt || b.createdAt).getTime();
+        return dateB - dateA;
+      });
+
+      const start = page * pageSize;
+      const end = start + pageSize;
+      setConfigs(combinedConfigs.slice(start, end));
+      setTotal(combinedConfigs.length);
+    } catch (error) {
+      console.error('Error fetching configs:', error);
+    } finally {
+      setLoading(false);
+      setIsRefreshing(false);
+    }
+  }, [config, page, pageSize]);
 
   React.useEffect(() => {
-    const getConfigs = async () => {
-      try {
-        const superglueClient = new SuperglueClient({
-          endpoint: config.superglueEndpoint,
-          apiKey: config.superglueApiKey
-        });
-        
-        const [apiConfigs, extractConfigs] = await Promise.all([
-          superglueClient.listApis(1000, 0),  // Get up to 1000 configs
-          superglueClient.listExtracts(1000, 0)  // Get up to 1000 configs
-        ]);
-
-        const combinedConfigs = [
-          ...apiConfigs.items.map(item => ({ ...item, type: 'api' })), 
-          ...extractConfigs.items.map(item => ({ ...item, type: 'extract' }))
-        ]
-          .sort((a, b) => {
-            const dateA = new Date(a.updatedAt || a.createdAt).getTime();
-            const dateB = new Date(b.updatedAt || b.createdAt).getTime();
-            return dateB - dateA; // Sort in descending order (newest first)
-          });
-
-        // Handle pagination client-side
-        const start = page * pageSize;
-        const end = start + pageSize;
-        setConfigs(combinedConfigs.slice(start, end));
-        setTotal(combinedConfigs.length);
-      } catch (error) {
-        console.error('Error fetching configs:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    getConfigs();
-  }, [page, pageSize]);
+    refreshConfigs();
+  }, [refreshConfigs]);
 
   const handleCreateNew = () => {
     router.push('/configs/new');
@@ -102,10 +115,84 @@ const ConfigTable = () => {
     router.push(`/runs/${id}`);
   };
 
+  const handleDelete = async () => {
+    if (!configToDelete) return;
+    
+    try {
+      const superglueClient = new SuperglueClient({
+        endpoint: config.superglueEndpoint,
+        apiKey: config.superglueApiKey
+      });
+
+      if ((configToDelete as any)?.type === 'api') {
+        await superglueClient.deleteApi(configToDelete.id);
+      } else if ((configToDelete as any)?.type === 'extract') {
+        await superglueClient.deleteExtraction(configToDelete.id);
+      }
+
+      setConfigToDelete(null);
+      refreshConfigs();
+    } catch (error) {
+      console.error('Error deleting config:', error);
+    }
+  };
+
   const totalPages = Math.ceil(total / pageSize);
 
   if (loading) {
-    return "";
+    return (
+      <div className="p-8 max-w-none w-full min-h-full">
+        <div className="flex flex-col lg:flex-row justify-between lg:items-center mb-6 gap-2">
+          <h1 className="text-2xl font-bold">Configurations</h1>
+          <div className="flex gap-4">
+            <Button onClick={handleCreateNewExtract}>
+              <Plus className="mr-2 h-4 w-4" />
+              New File
+            </Button>
+            <Button onClick={handleCreateNew}>
+              <Plus className="mr-2 h-4 w-4" />
+              New API
+            </Button>
+          </div>
+        </div>
+
+        <div className="border rounded-lg">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead></TableHead>
+                <TableHead>ID</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Instruction</TableHead>
+                <TableHead>URL</TableHead>
+                <TableHead>Updated At</TableHead>
+                <TableHead className="text-right">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={refreshConfigs}
+                          className="transition-transform"
+                        >
+                          <RotateCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Refresh Configurations</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -134,7 +221,25 @@ const ConfigTable = () => {
               <TableHead>Instruction</TableHead>
               <TableHead>URL</TableHead>
               <TableHead>Updated At</TableHead>
-              <TableHead></TableHead>
+              <TableHead className="text-right">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={refreshConfigs}
+                        className="transition-transform"
+                      >
+                        <RotateCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Refresh Configurations</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -172,44 +277,61 @@ const ConfigTable = () => {
                   {config.updatedAt ? new Date(config.updatedAt).toLocaleDateString() : ''}
                 </TableCell>
                 <TableCell className="w-[100px]">
-                {(config as any).type === 'api' && (
-                  <div className="flex gap-2"></div>
-                )}
-                  {(config as any).type === 'api' && (
-                    <div className="flex gap-2">
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={(e) => handleViewLogs(e, config.id)}
-                            >
-                              <History className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>View Run History</p>
-                          </TooltipContent>
-                        </Tooltip>
+                  <div className="flex justify-end gap-2">
+                    <TooltipProvider>
+                      {(config as any).type === 'api' && (
+                        <>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={(e) => handleViewLogs(e, config.id)}
+                              >
+                                <History className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>View Run History</p>
+                            </TooltipContent>
+                          </Tooltip>
 
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={(e) => handleEdit(e, config.id)}
-                            >
-                              <Settings className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Edit Configuration</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-                  )}
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={(e) => handleEdit(e, config.id)}
+                              >
+                                <Settings className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Edit Configuration</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </>
+                      )}
+
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setConfigToDelete(config);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Delete Configuration</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
@@ -244,6 +366,21 @@ const ConfigTable = () => {
           )}
         </SheetContent>
       </Sheet>
+
+      <AlertDialog open={!!configToDelete} onOpenChange={(open) => !open && setConfigToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this configuration. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
