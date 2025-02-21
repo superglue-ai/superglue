@@ -253,7 +253,7 @@ export class RedisService implements DataStore {
     if (keys.length > 0) {
       const deleted = await this.redis.del(keys);
     }
-    return true;
+    return deleted > 0;
   }
 
   async createRun(run: RunResult, orgId?: string): Promise<RunResult> {
