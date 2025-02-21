@@ -121,11 +121,11 @@ ${JSON.stringify(sample(payload, 5), null, 2).slice(0,10000)}`
     return content;
 
   } catch (error) {
-      console.error('Error generating mapping:', error.message);
       if(retry < 10) {
         messages.push({role: "user", content: error.message});
         return generateMapping(schema, payload, instruction, retry + 1, messages);
       }
+      console.error('Error generating mapping:', String(error));
   }
   return null;
 }
