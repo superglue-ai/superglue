@@ -4,7 +4,7 @@ import OpenAI from "openai";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { getDocumentation } from "./documentation.js";
-import { API_PROMPT } from "./prompts.js";
+import { API_ERROR_HANDLING_USER_PROMPT, API_PROMPT } from "./prompts.js";
 import { callAxios, composeUrl, replaceVariables } from "./tools.js";
 
 
@@ -210,17 +210,13 @@ Available variables: ${vars.join(", ")}
 Documentation: ${String(documentation).slice(0, 80000)}`
   }
 
+  const errorHandlingMessage = API_ERROR_HANDLING_USER_PROMPT
+    .replace("{error}", lastError)
+    .replace("{previous_config}", JSON.stringify(apiConfig));
+
   const subsequentUserMessage: OpenAI.Chat.ChatCompletionUserMessageParam = {
     role: "user",
-    content: 
-`You made an error, the configuration you generated was incorrect and failed with the following error: ${lastError}
-
-The previous configuration was: ${JSON.stringify(apiConfig)}.
-
-In case of a 401 error, please pay special attention to the authentication type and headers.
-
-You will get to try again, so feel free to experiment and iterate on the configuration.
-Make sure to try a fix before generating a new configuration. I will loose my job if I don't get this right.`
+    content: errorHandlingMessage
   }
 
   const systemMessage: OpenAI.Chat.ChatCompletionSystemMessageParam = {
