@@ -74,10 +74,11 @@ export class MemoryStore implements DataStore {
     return { ...config, id };
   }
 
-  async deleteApiConfig(id: string, orgId: string): Promise<void> {
-    if(!id) return;
+  async deleteApiConfig(id: string, orgId: string): Promise<boolean> {
+    if(!id) return false;
     const key = this.getKey('api', id, orgId);
-    this.storage.apis.delete(key);
+    const deleted = this.storage.apis.delete(key);
+    return deleted;
   }
 
   // Extract Config Methods
@@ -118,10 +119,11 @@ export class MemoryStore implements DataStore {
     return { ...config, id };
   }
 
-  async deleteExtractConfig(id: string, orgId: string): Promise<void> {
-    if(!id) return;
+  async deleteExtractConfig(id: string, orgId: string): Promise<boolean> {
+    if(!id) return false;
     const key = this.getKey('extract', id, orgId);
-    this.storage.extracts.delete(key);
+    const deleted = this.storage.extracts.delete(key);
+    return deleted;
   }
 
   // Transform Config Methods
@@ -162,10 +164,11 @@ export class MemoryStore implements DataStore {
     return { ...config, id };
   }
 
-  async deleteTransformConfig(id: string, orgId: string): Promise<void> {
-    if(!id) return;
+  async deleteTransformConfig(id: string, orgId: string): Promise<boolean> {
+    if(!id) return false;
     const key = this.getKey('transform', id, orgId);
-    this.storage.transforms.delete(key);
+    const deleted = this.storage.transforms.delete(key);
+    return deleted;
   }
 
   // Run Result Methods
@@ -227,7 +230,7 @@ export class MemoryStore implements DataStore {
     return deleted;
   }
 
-  async deleteAllRuns(orgId: string): Promise<void> {
+  async deleteAllRuns(orgId: string): Promise<boolean> {
     const keys = Array.from(this.storage.runs.keys())
       .filter(key => key.startsWith(`${orgId ? `${orgId}:` : ''}run:`));
     
@@ -236,6 +239,7 @@ export class MemoryStore implements DataStore {
     }
     
     this.storage.runsIndex.delete(orgId);
+    return true;
   }
 
   async clearAll(): Promise<void> {
