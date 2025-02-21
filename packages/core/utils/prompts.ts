@@ -106,6 +106,7 @@ export const API_PROMPT = `You are an API configuration assistant. Generate API 
   e.g. body: {
     "items": {items}
   }
+- Think hard before producing a response, and be aware that the response is not checked for validity if the response is not an error, so only suggest endpoints that you are sure are valid.
 `;
 
 export const GENERATE_SCHEMA_PROMPT = `You are a json schema generator assistant. Generate a JSON schema based on instructions and response data.
