@@ -3,11 +3,12 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Layout, History, Book } from "lucide-react";
+import { Layout, History, Book, PlayCircle } from "lucide-react";
 
 const navItems = [
   { icon: Layout, label: 'Configurations', href: '/' },
   { icon: History, label: 'Runs', href: '/runs' },
+  { icon: PlayCircle, label: 'Playground', href: '/playground' },
   { icon: Book, label: 'Documentation', href: 'https://docs.superglue.cloud', target: '_blank' },
 /*  { icon: AlertCircle, label: 'Error Monitoring', href: '/analytics' },
   { icon: Shield, label: 'Access Control', href: '/access-control' },
@@ -24,7 +25,7 @@ export function Sidebar() {
         <div className="relative mx-auto">
           <img src="/logo.svg" alt="superglue Logo" className="max-w-full h-[50px] w-[200px] ml-auto mr-auto" />
           <div className="text-center text-sm text-gray-300 dark:text-gray-300 mt-2">
-            Data Proxy
+            Data Transformer
           </div>
         </div>
       </div>

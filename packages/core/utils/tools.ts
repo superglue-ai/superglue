@@ -31,14 +31,30 @@ export function superglueJsonata(expr: string) {
   expression.registerFunction("max", (arr: any[]) => Math.max(...arr));
   expression.registerFunction("min", (arr: any[]) => Math.min(...arr));
   expression.registerFunction("number", (value: string) => parseFloat(value));
+  expression.registerFunction("substring", (str: string, start: number, end?: number) => String(str).substring(start, end));
+  expression.registerFunction("replace", (obj: any, pattern: string, replacement: string) => {
+    if(Array.isArray(obj)) {
+      return obj.map(item => String(item).replace(pattern, replacement));
+    }
+    if(typeof obj === "object") {
+      return Object.fromEntries(Object.entries(obj).map(([key, value]) => [key, String(value).replace(pattern, replacement)]));
+    }
+    return String(obj).replace(pattern, replacement);
+  });
   expression.registerFunction("toDate", (date: string) => {
     try {
+      const match = date.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}):(\d{2}))?$/);
+      if (match) {
+        const [_, month, day, year, hours="00", minutes="00", seconds="00"] = match;
+        const isoDate = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.000Z`;
+        return new Date(isoDate).toISOString();
+      }
       return new Date(date).toISOString();
     } catch (e) {
       // Try US date format MM/DD/YYYY
-      const match = date.match(/^(\d{4})\/(\d{2})\/(\d{2})(?:\s+(\d{2}):(\d{2}):(\d{2}))?$/);
+      const match = date.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}):(\d{2}))?$/);
       if (match) {
-        const [_, year, month, day, hours="00", minutes="00", seconds="00"] = match;
+        const [_, month, day, year, hours="00", minutes="00", seconds="00"] = match;
         const isoDate = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.000Z`;
         return new Date(isoDate).toISOString();
       }
@@ -75,7 +91,7 @@ export async function applyJsonataWithValidation(data: any, expr: string, schema
     if (!validation.valid) {
       return { 
         success: false, 
-        error: validation.errors.map(e => `${e.message} for ${e.property}. Source: ${e.instance ? JSON.stringify(e.instance) : "undefined"}`).join('\n').slice(0, 5000) 
+        error: validation.errors.map(e => `${e.stack}. Source: ${e.instance ? JSON.stringify(e.instance) : "undefined"}`).join('\n').slice(0, 5000) 
       };
     }
     return { success: true, data: result };
@@ -136,20 +152,6 @@ export function applyAuthFormat(format: string, credentials: Record<string, stri
 }
 
 
-export function getAllKeys(obj: any): string[] {
-  let keys: string[] = [];
-  for (const key in obj) {
-    keys.push(`${typeof obj[key]}:${key}`);
-    if (obj[key] && typeof obj[key] === 'object') {
-      if (Array.isArray(obj[key])) {
-        keys = keys.concat(...obj[key].map(item => getAllKeys(item)));
-      } else {
-        keys = keys.concat(getAllKeys(obj[key]));
-      }
-    }
-  }
-  return keys.sort();
-}
 
 export function composeUrl(host: string, path: string) {
   // Handle empty/undefined inputs

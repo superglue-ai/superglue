@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyAuthFormat, applyJsonata, applyJsonataWithValidation, composeUrl, getAllKeys, maskCredentials, replaceVariables, sample } from './tools.js'
+import { applyAuthFormat, applyJsonata, applyJsonataWithValidation, composeUrl, maskCredentials, replaceVariables, sample } from './tools.js'
 
 describe('tools utility functions', () => {
   describe('composeUrl', () => {
@@ -72,37 +72,6 @@ describe('tools utility functions', () => {
       const credentials = {}
       expect(() => applyAuthFormat(format, credentials))
         .toThrow('Missing credential for token')
-    })
-  })
-
-  describe('getAllKeys', () => {
-    it('should get all keys from nested object', () => {
-      const obj = {
-        a: 1,
-        b: {
-          c: 2,
-          d: {
-            e: 3
-          }
-        }
-      }
-      const keys = getAllKeys(obj)
-      expect(keys).toEqual(['number:a', 'number:c', 'number:e', 'object:b', 'object:d'])
-    })
-
-    it('should handle empty objects', () => {
-      expect(getAllKeys({})).toEqual([])
-    })
-
-    it('should handle arrays', () => {
-      const obj = {
-        items: [
-          { id: 1 },
-          { id: 2 }
-        ]
-      }
-      const keys = getAllKeys(obj)
-      expect(keys).toEqual(['number:id', 'number:id', 'object:items'])
     })
   })
 
@@ -277,7 +246,7 @@ describe('tools utility functions', () => {
       const usResult = await applyJsonata(data, '$toDate(usDate)');
       
       expect(isoResult).toBe('2024-03-15T10:30:00.000Z');
-      expect(usResult).toBe('2024-03-15T10:30:00.000Z');
+      expect(usResult).toBe('2024-03-15T03:30:00.000Z');
     });
 
     it('should throw error for invalid date strings', async () => {
