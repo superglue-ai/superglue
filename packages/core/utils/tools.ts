@@ -31,6 +31,16 @@ export function superglueJsonata(expr: string) {
   expression.registerFunction("max", (arr: any[]) => Math.max(...arr));
   expression.registerFunction("min", (arr: any[]) => Math.min(...arr));
   expression.registerFunction("number", (value: string) => parseFloat(value));
+  expression.registerFunction("substring", (str: string, start: number, end?: number) => String(str).substring(start, end));
+  expression.registerFunction("replace", (obj: any, pattern: string, replacement: string) => {
+    if(Array.isArray(obj)) {
+      return obj.map(item => String(item).replace(pattern, replacement));
+    }
+    if(typeof obj === "object") {
+      return Object.fromEntries(Object.entries(obj).map(([key, value]) => [key, String(value).replace(pattern, replacement)]));
+    }
+    return String(obj).replace(pattern, replacement);
+  });
   expression.registerFunction("toDate", (date: string) => {
     try {
       return new Date(date).toISOString();
@@ -75,7 +85,7 @@ export async function applyJsonataWithValidation(data: any, expr: string, schema
     if (!validation.valid) {
       return { 
         success: false, 
-        error: validation.errors.map(e => `${e.message} for ${e.property}. Source: ${e.instance ? JSON.stringify(e.instance) : "undefined"}`).join('\n').slice(0, 5000) 
+        error: validation.errors.map(e => `${e.stack}. Source: ${e.instance ? JSON.stringify(e.instance) : "undefined"}`).join('\n').slice(0, 5000) 
       };
     }
     return { success: true, data: result };
