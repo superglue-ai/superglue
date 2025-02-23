@@ -14,7 +14,7 @@ export const telemetryClient = !isTelemetryDisabled && !isDebug ?
     config.posthog.apiKey,
     {
       host: config.posthog.host,
-      enableExceptionAutocapture: true 
+      enableExceptionAutocapture: true
      }
   ) : null;
 
