@@ -1,0 +1,14 @@
+---
+description: write app router code for nextjs
+globs: *.tsx, *.ts, *.js, *.jsx
+alwaysApply: false
+---
+# Rules
+always use functional react code. always write include typescript type annotations.
+in nextjs, always use the App Router pattern not the Pages Router pattern.
+
+always use shadcn ui components, if possible those already in our library or ask to install new ones.
+use tailwind classes instead of CSS to style HTML elements if possible.
+name handlers with the handle prefix, use descriptive variable names.
+
+use early returns to make code more readable.
