@@ -44,6 +44,11 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
   let hasMore = true;
   let loopCounter = 0;
 
+  const mergedOptions = {
+    ...options,
+    maxRateLimitWaitSec: endpoint.maxRateLimitWaitSec || options.maxRateLimitWaitSec || 30
+  };
+
   while (hasMore && loopCounter <= 500) {
     // Generate pagination variables if enabled
     let paginationVars = {};
@@ -83,19 +88,32 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
       headers,
       data: body,
       params: queryParams,
-      timeout: options?.timeout || 60000,
+      timeout: mergedOptions?.timeout || 60000,
     };
 
     console.log(`${endpoint.method} ${url}`);
-    const response = await callAxios(axiosConfig, options);
+    const response = await callAxios(axiosConfig, mergedOptions);
 
     if(![200, 201, 204].includes(response?.status) || response.data?.error) {
       const error = JSON.stringify(response?.data?.error || response?.data);
-      const message = `${endpoint.method} ${url} failed with status ${response.status}. Response: ${String(error).slice(0, 200)}
+      let message = `${endpoint.method} ${url} failed with status ${response.status}. Response: ${String(error).slice(0, 200)}
       Headers: ${JSON.stringify(headers)}
       Body: ${JSON.stringify(body)}
       Params: ${JSON.stringify(queryParams)}
       `;
+      
+      // Add specific context for rate limit errors
+      if (response.status === 429) {
+        const retryAfter = response.headers['retry-after'] 
+          ? `Retry-After: ${response.headers['retry-after']}` 
+          : 'No Retry-After header provided';
+        
+        message = `Rate limit exceeded. ${retryAfter}. Maximum wait time of ${options.maxRateLimitWaitSec || 30}s exceeded. 
+        Consider increasing maxRateLimitWaitSec in your API configuration or reducing request frequency.
+        
+        ${message}`;
+      }
+      
       throw new Error(`API call failed with status ${response.status}. Response: ${message}`);
     }
     if (typeof response.data === 'string' && 
