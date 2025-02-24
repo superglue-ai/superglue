@@ -1,4 +1,4 @@
-import { ApiConfig, Context, ExtractConfig, HttpMethod, TransformConfig } from "@superglue/shared";
+import { ApiConfig, Context, ExtractConfig, TransformConfig } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 
 export const upsertApiResolver = async (
@@ -43,7 +43,8 @@ export const upsertApiResolver = async (
       authentication: input.authentication || oldConfig?.authentication,
       pagination: input.pagination || oldConfig?.pagination,
       dataPath: input.dataPath || oldConfig?.dataPath,
-      version: input.version || oldConfig?.version
+      version: input.version || oldConfig?.version,
+      maxRateLimitWaitSec: input.maxRateLimitWaitSec || oldConfig?.maxRateLimitWaitSec
     };
     await context.datastore.upsertApiConfig(id, config, context.orgId);
     return config;

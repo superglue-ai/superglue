@@ -94,7 +94,8 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
     dataPath: '',
     authentication: 'auto',
     paginationType: 'auto',
-    pageSize: ''
+    pageSize: '',
+    maxRateLimitWaitSec: 30
   });
 
   const [isAutofilling, setIsAutofilling] = React.useState(false);
@@ -205,7 +206,8 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
         dataPath: data.dataPath || '',
         authentication: data.authentication || 'auto',
         paginationType: data.pagination?.type || 'auto',
-        pageSize: String(data.pagination?.pageSize || "")
+        pageSize: String(data.pagination?.pageSize || ""),
+        maxRateLimitWaitSec: (data as any).maxRateLimitWaitSec || 30
       });
       
       setSearchParamsChecked(true);
@@ -235,6 +237,7 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
         type: formData.paginationType as PaginationType,
         pageSize: parseInt(formData.pageSize) ?? null
       } : undefined,
+      maxRateLimitWaitSec: formData.maxRateLimitWaitSec ? parseInt(formData.maxRateLimitWaitSec) : undefined,
     };
     // Add only defined optional fields to config
     Object.entries(optionalFields).forEach(([key, value]) => {
@@ -307,7 +310,8 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
           dataPath: config.dataPath || '',
           authentication: config.authentication || 'auto',
           paginationType: config.pagination?.type || 'auto',
-          pageSize: String(config.pagination?.pageSize || '')
+          pageSize: String(config.pagination?.pageSize || ''),
+          maxRateLimitWaitSec: (config as any).maxRateLimitWaitSec || 30
         });
       }
       
@@ -648,6 +652,26 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
                             onChange={handleChange('pageSize')}
                             min="1"
                             disabled={formData.paginationType === 'DISABLED'}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 pt-4">
+                      <h3 className="font-medium">Rate Limiting</h3>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="maxRateLimitWaitSec" className="flex items-center gap-1 my-1">
+                            Max Wait Time (seconds)
+                            <InfoTooltip text="Maximum time in seconds to wait when a rate limit (HTTP 429) is encountered. The system will retry after waiting for the time specified in the Retry-After header, up to this maximum." />
+                          </Label>
+                          <Input
+                            id="maxRateLimitWaitSec"
+                            type="number"
+                            value={formData.maxRateLimitWaitSec || 30}
+                            onChange={handleChange('maxRateLimitWaitSec')}
+                            min="1"
+                            placeholder="30"
                           />
                         </div>
                       </div>
