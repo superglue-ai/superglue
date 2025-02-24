@@ -172,6 +172,7 @@ input ApiInput {
   pagination: PaginationInput
   dataPath: String
   version: String
+  maxRateLimitWaitSec: Int
 }
 
 input ExtractInput {
