@@ -1,6 +1,6 @@
+import { FileUpload } from "graphql-upload-minimal";
 import { JSONSchema } from "openai/src/lib/jsonschema.js";
 import { DataStore } from "./datastore.js";
-import { FileUpload } from "graphql-upload-minimal";
 export type Context = {
   datastore: DataStore;
   orgId: string;
@@ -82,6 +82,7 @@ export interface ApiConfig extends BaseConfig {
   authentication?: AuthType;
   pagination?: Pagination;
   dataPath?: string;
+  maxRateLimitWaitSec?: number;
 }
 
 export interface ExtractConfig extends BaseConfig {
@@ -131,6 +132,7 @@ export type ApiInput = {
   pagination?: Pagination;
   dataPath?: string;
   version?: string;
+  maxRateLimitWaitSec?: number;
 };
 
 export type ApiInputRequest = {
@@ -176,6 +178,7 @@ export type RequestOptions = {
   retries?: number;
   retryDelay?: number;
   webhookUrl?: string;
+  maxRateLimitWaitSec?: number;
 };
 
 export type ResultList = {
