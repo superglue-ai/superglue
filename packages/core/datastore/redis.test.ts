@@ -101,6 +101,27 @@ if (!testConfig.host || !testConfig.port || !testConfig.username || !testConfig.
         const retrieved = await store.getExtractConfig(testExtractConfig.id, testOrgId);
         expect(retrieved).toBeNull();
       });
+
+      it('should handle null payloads when getting extract by request', async () => {
+        const saved = await store.saveExtractConfig(testExtractConfig, null, testExtractConfig, testOrgId);
+        
+        // Test with null payload
+        const nullPayloadResult = await store.getExtractConfigFromRequest(
+          testExtractConfig,
+          null,
+          testOrgId
+        );
+        expect(nullPayloadResult).toEqual(saved);
+  
+        // Test with undefined payload
+        const undefinedPayloadResult = await store.getExtractConfigFromRequest(
+          testExtractConfig,
+          undefined,
+          testOrgId
+        );
+        expect(undefinedPayloadResult).toEqual(saved);
+      });
+  
     });
 
     describe('Transform Config', () => {
