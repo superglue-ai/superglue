@@ -46,7 +46,7 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
 
   const mergedOptions = {
     ...options,
-    maxRateLimitWaitSec: endpoint.maxRateLimitWaitSec || options.maxRateLimitWaitSec || 30
+    maxRateLimitWaitSec: endpoint.maxRateLimitWaitSec || options?.maxRateLimitWaitSec || 30
   };
 
   while (hasMore && loopCounter <= 500) {
