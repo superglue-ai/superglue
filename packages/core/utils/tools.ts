@@ -41,7 +41,24 @@ export function superglueJsonata(expr: string) {
     }
     return arr;
   });
-  expression.registerFunction("number", (value: string) => parseFloat(value));
+  expression.registerFunction("number", (value: any) => {
+    function parseNumber(str: string): number {
+      const matches = str.replace(/,/g, '').match(/-?\d+(\.\d+)?/);
+      return matches ? parseFloat(matches[0]) : NaN;
+    }
+    
+    // Handle arrays by mapping each element
+    if (Array.isArray(value)) {
+      return value.map(item => {
+        if (typeof item === 'number') return item;
+        return parseNumber(String(item));
+      });
+    }
+    
+    // Handle single values
+    if (typeof value === 'number') return value;
+    return parseNumber(String(value));
+  });
   expression.registerFunction("substring", (str: string, start: number, end?: number) => String(str).substring(start, end));
   expression.registerFunction("replace", (obj: any, pattern: string, replacement: string) => {
     if(Array.isArray(obj)) {
@@ -330,4 +347,9 @@ function makeNullable(schema: any): any {
 export function getSchemaFromData(data: any): any {
   if(!data) return null;
   return toJsonSchema(data);
+}
+
+function parseNumber(str: string): number {
+  const matches = str.replace(/,/g, '').match(/-?\d+(\.\d+)?/);
+  return matches ? parseFloat(matches[0]) : NaN;
 }
