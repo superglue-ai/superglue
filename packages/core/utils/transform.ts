@@ -3,8 +3,8 @@ import { PROMPT_MAPPING } from "./prompts.js";
 import {  applyJsonataWithValidation, sample } from "./tools.js";
 import { ApiInput, DataStore, TransformConfig, TransformInput } from "@superglue/shared";
 import crypto from 'crypto';
-import toJsonSchema from "to-json-schema";
 import { ChatCompletionMessageParam } from "openai/resources/chat/index.mjs";
+import toJsonSchema from "to-json-schema";
 
 export async function prepareTransform(
     datastore: DataStore,
