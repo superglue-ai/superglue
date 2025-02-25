@@ -94,7 +94,7 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
     dataPath: '',
     authentication: 'auto',
     paginationType: 'auto',
-    pageSize: '',
+    pageSize: ''
   });
 
   const [isAutofilling, setIsAutofilling] = React.useState(false);
