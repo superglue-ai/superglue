@@ -136,23 +136,60 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
   let retryCount = 0;
   const maxRetries = options?.retries || 0;
   const delay = options?.retryDelay || 1000;
+  const maxRateLimitWaitMs = 60 * 1000; // 60s is the max wait time for rate limit retries, hardcoded
+  let rateLimitRetryCount = 0;
+  let totalRateLimitWaitTime = 0;
 
   // Don't send body for GET, HEAD, DELETE, OPTIONS
   if(["GET", "HEAD", "DELETE", "OPTIONS"].includes(config.method!)) {
     config.data = undefined;
   }
+  
   do {
     try {
-      return await axios({
+      const response = await axios({
         ...config,
         validateStatus: null, // Don't throw on any status
       });
+      
+      if (response.status === 429) {
+
+        let waitTime = 0;
+        if (response.headers['retry-after']) {
+          // Retry-After can be a date or seconds
+          const retryAfter = response.headers['retry-after'];
+          if (/^\d+$/.test(retryAfter)) {
+            waitTime = parseInt(retryAfter, 10) * 1000;
+          } else {
+            const retryDate = new Date(retryAfter);
+            waitTime = retryDate.getTime() - Date.now();
+          }
+        } else {
+          // Exponential backoff with jitter
+          waitTime = Math.min(Math.pow(2, rateLimitRetryCount) * 1000 + Math.random() * 1000, 10000);
+        }
+        
+        // Check if we've exceeded the maximum wait time
+        if (totalRateLimitWaitTime + waitTime > maxRateLimitWaitMs) {
+          console.log(`Rate limit retry would exceed maximum wait time of ${maxRateLimitWaitMs}ms (60s)`);
+          return response; // Return the 429 response, caller will handle the error
+        }
+        
+        console.log(`Rate limited (429). Waiting ${waitTime}ms before retry.`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        
+        totalRateLimitWaitTime += waitTime;
+        rateLimitRetryCount++;
+        continue; // Skip the regular retry logic and try again immediately
+      }
+      
+      return response;
     } catch (error) {
       if (retryCount >= maxRetries) throw error;
       retryCount++;
       await new Promise(resolve => setTimeout(resolve, delay * retryCount));
     }
-  } while (retryCount < maxRetries);
+  } while (retryCount < maxRetries || rateLimitRetryCount > 0);  // separate max retries and rate limit retries
 }
 
 export function applyAuthFormat(format: string, credentials: Record<string, string>): string {
@@ -163,8 +200,6 @@ export function applyAuthFormat(format: string, credentials: Record<string, stri
     return credentials[key];
   });
 }
-
-
 
 export function composeUrl(host: string, path: string) {
   // Handle empty/undefined inputs

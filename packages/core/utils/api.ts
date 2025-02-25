@@ -91,11 +91,23 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
 
     if(![200, 201, 204].includes(response?.status) || response.data?.error) {
       const error = JSON.stringify(response?.data?.error || response?.data);
-      const message = `${endpoint.method} ${url} failed with status ${response.status}. Response: ${String(error).slice(0, 200)}
+      let message = `${endpoint.method} ${url} failed with status ${response.status}. Response: ${String(error).slice(0, 200)}
       Headers: ${JSON.stringify(headers)}
       Body: ${JSON.stringify(body)}
       Params: ${JSON.stringify(queryParams)}
       `;
+      
+      // Add specific context for rate limit errors
+      if (response.status === 429) {
+        const retryAfter = response.headers['retry-after'] 
+          ? `Retry-After: ${response.headers['retry-after']}` 
+          : 'No Retry-After header provided';
+        
+        message = `Rate limit exceeded. ${retryAfter}. Maximum wait time of 60s exceeded. 
+        
+        ${message}`;
+      }
+      
       throw new Error(`API call failed with status ${response.status}. Response: ${message}`);
     }
     if (typeof response.data === 'string' && 
