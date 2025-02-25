@@ -98,11 +98,11 @@ describe('FileStore', () => {
     });
 
     it('should handle null payloads when getting extract by request', async () => {
-      const saved = await store.saveExtractConfig(testExtractConfig, null, testExtractConfig, testOrgId);
+      const saved = await store.saveExtractConfig({ urlHost: testExtractConfig.urlHost, instruction: testExtractConfig.instruction }, null, testExtractConfig, testOrgId);
       
       // Test with null payload
       const nullPayloadResult = await store.getExtractConfigFromRequest(
-        testExtractConfig,
+        { urlHost: testExtractConfig.urlHost, instruction: testExtractConfig.instruction },
         null,
         testOrgId
       );
@@ -110,7 +110,7 @@ describe('FileStore', () => {
 
       // Test with undefined payload
       const undefinedPayloadResult = await store.getExtractConfigFromRequest(
-        testExtractConfig,
+        { urlHost: testExtractConfig.urlHost, instruction: testExtractConfig.instruction },
         undefined,
         testOrgId
       );
