@@ -8,8 +8,8 @@ export async function generateSchema(instruction: string, responseData: string, 
   console.log("Generating schema");
   
   const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY
-
+    apiKey: process.env.OPENAI_API_KEY,
+    baseURL: process.env.OPENAI_API_BASE_URL
   });
 
   const completion = await openai.chat.completions.create({

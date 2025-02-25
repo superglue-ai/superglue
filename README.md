@@ -151,6 +151,8 @@ REDIS_PASSWORD=secret
 OPENAI_API_KEY=sk-...
 # OpenAI model to use. We recommend gpt-4o-2024-11-20
 OPENAI_MODEL=gpt-4o-2024-11-20
+# Optional: Set a custom OpenAI API URL (for self-hosted models or proxies)
+# OPENAI_API_BASE_URL=https://your-custom-endpoint/v1
 ```
 
 3. Start the server:
