@@ -44,11 +44,6 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
   let hasMore = true;
   let loopCounter = 0;
 
-  const mergedOptions = {
-    ...options,
-    maxRateLimitWaitSec: endpoint.maxRateLimitWaitSec || options?.maxRateLimitWaitSec || 30
-  };
-
   while (hasMore && loopCounter <= 500) {
     // Generate pagination variables if enabled
     let paginationVars = {};
@@ -88,11 +83,11 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
       headers,
       data: body,
       params: queryParams,
-      timeout: mergedOptions?.timeout || 60000,
+      timeout: options?.timeout || 60000,
     };
 
     console.log(`${endpoint.method} ${url}`);
-    const response = await callAxios(axiosConfig, mergedOptions);
+    const response = await callAxios(axiosConfig, options);
 
     if(![200, 201, 204].includes(response?.status) || response.data?.error) {
       const error = JSON.stringify(response?.data?.error || response?.data);
@@ -108,8 +103,7 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
           ? `Retry-After: ${response.headers['retry-after']}` 
           : 'No Retry-After header provided';
         
-        message = `Rate limit exceeded. ${retryAfter}. Maximum wait time of ${options.maxRateLimitWaitSec || 30}s exceeded. 
-        Consider increasing maxRateLimitWaitSec in your API configuration or reducing request frequency.
+        message = `Rate limit exceeded. ${retryAfter}. Maximum wait time of 60s exceeded. 
         
         ${message}`;
       }
