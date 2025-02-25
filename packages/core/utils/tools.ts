@@ -136,7 +136,7 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
   let retryCount = 0;
   const maxRetries = options?.retries || 0;
   const delay = options?.retryDelay || 1000;
-  const maxRateLimitWaitMs = (options?.maxRateLimitWaitSec || 30) * 1000; // Convert seconds to milliseconds, default to 30 seconds
+  const maxRateLimitWaitMs = 60 * 1000; // 60s is the max wait time for rate limit retries, hardcoded
   let rateLimitRetryCount = 0;
   let totalRateLimitWaitTime = 0;
 
@@ -171,7 +171,7 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
         
         // Check if we've exceeded the maximum wait time
         if (totalRateLimitWaitTime + waitTime > maxRateLimitWaitMs) {
-          console.log(`Rate limit retry would exceed maximum wait time of ${maxRateLimitWaitMs}ms (${options?.maxRateLimitWaitSec || 30}s)`);
+          console.log(`Rate limit retry would exceed maximum wait time of ${maxRateLimitWaitMs}ms (60s)`);
           return response; // Return the 429 response, caller will handle the error
         }
         

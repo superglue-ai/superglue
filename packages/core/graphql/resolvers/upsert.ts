@@ -43,8 +43,7 @@ export const upsertApiResolver = async (
       authentication: input.authentication || oldConfig?.authentication,
       pagination: input.pagination || oldConfig?.pagination,
       dataPath: input.dataPath || oldConfig?.dataPath,
-      version: input.version || oldConfig?.version,
-      maxRateLimitWaitSec: input.maxRateLimitWaitSec || oldConfig?.maxRateLimitWaitSec
+      version: input.version || oldConfig?.version
     };
     await context.datastore.upsertApiConfig(id, config, context.orgId);
     return config;

@@ -34,7 +34,6 @@ type ApiConfig implements BaseConfig {
   authentication: AuthType
   pagination: Pagination
   dataPath: String
-  maxRateLimitWaitSec: Int
 }
 
 type ExtractConfig implements BaseConfig {  
@@ -172,7 +171,6 @@ input ApiInput {
   pagination: PaginationInput
   dataPath: String
   version: String
-  maxRateLimitWaitSec: Int
 }
 
 input ExtractInput {

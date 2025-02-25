@@ -24,7 +24,7 @@ describe('Rate Limit Integration Test with real server', () => {
     });
     // Endpoint that always returns 429 with a long retry time
     app.get('/api/always-rate-limited', (req, res) => {
-      res.setHeader('Retry-After', '30');
+      res.setHeader('Retry-After', '61');  // 61 seconds is greater than the hardcoded 60s limit
       res.status(429).json({ error: 'Rate limit exceeded' });
     });
     
@@ -54,7 +54,7 @@ describe('Rate Limit Integration Test with real server', () => {
       urlPath: 'api/test-rate-limit',
       method: HttpMethod.GET,
       instruction: 'Test rate limit integration',
-      maxRateLimitWaitSec: 5,
+      // maxRateLimitWaitSec: 5,
       createdAt: new Date(),
       updatedAt: new Date()
     };
@@ -65,13 +65,13 @@ describe('Rate Limit Integration Test with real server', () => {
   });
   
   it('should fail when rate limit wait time exceeds maximum', async () => {
+    // Modify the server to return a retry time that exceeds the hardcoded 60s limit
     const config: ApiConfig = {
       id: 'test-always-rate-limited',
       urlHost: baseUrl,
       urlPath: 'api/always-rate-limited',
       method: HttpMethod.GET,
       instruction: 'Test always rate limited',
-      maxRateLimitWaitSec: 1,
       createdAt: new Date(),
       updatedAt: new Date()
     };
