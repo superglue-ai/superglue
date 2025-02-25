@@ -13,7 +13,8 @@ let postHog: PostHog | undefined = undefined;
 // Only in components
 if (typeof window !== 'undefined' && !postHog) {
   postHog = posthog.init("phc_89mcVkZ9osPaFQwTp3oFA2595ne95OSNk47qnhqCCbE", {
-      api_host: "https://us.i.posthog.com",
+      ui_host: "https://us.posthog.com",
+      api_host: 'https://d22ze2hfwgrlye.cloudfront.net',
       person_profiles: 'always',
     })
 }
