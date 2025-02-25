@@ -1,7 +1,7 @@
 import { cn } from '@/src/lib/utils'
 import { Check } from 'lucide-react'
 
-export type StepperStep = 'basic' | 'try_and_output' | 'success'
+export type StepperStep = 'basic' | 'try_and_output' | 'success' | 'auth'
 
 interface StepConfig {
   id: StepperStep
@@ -12,6 +12,10 @@ export const STEPS: StepConfig[] = [
   {
     id: 'basic',
     title: 'Basic Info'
+  },
+  {
+    id: 'auth',
+    title: 'Authentication'
   },
   {
     id: 'try_and_output',
@@ -25,10 +29,16 @@ export const STEPS: StepConfig[] = [
 
 interface StepIndicatorProps {
   currentStep: StepperStep
+  steps?: StepConfig[]
 }
 
-export function StepIndicator({ currentStep }: StepIndicatorProps) {
-  const currentIndex = STEPS.findIndex(s => s.id === currentStep)
+export function StepIndicator({ currentStep, steps = STEPS }: StepIndicatorProps) {
+  // Filter out the auth step if not needed for compatibility with existing components
+  const filteredSteps = steps.filter(step => 
+    currentStep === 'auth' ? true : step.id !== 'auth'
+  )
+  
+  const currentIndex = filteredSteps.findIndex(s => s.id === currentStep)
 
   return (
     <div className="py-3">
@@ -39,12 +49,12 @@ export function StepIndicator({ currentStep }: StepIndicatorProps) {
         {/* Active progress bar */}
         <div 
           className="absolute top-4 left-0 h-0.5 bg-primary transition-all duration-500 ease-in-out"
-          style={{ width: `${(currentIndex / (STEPS.length - 1)) * 100}%` }}
+          style={{ width: `${(currentIndex / (filteredSteps.length - 1)) * 100}%` }}
         />
 
         {/* Steps */}
         <div className="relative grid grid-cols-3 w-full">
-          {STEPS.map((step, index) => {
+          {filteredSteps.map((step, index) => {
             const isActive = index === currentIndex
             const isCompleted = index < currentIndex
 

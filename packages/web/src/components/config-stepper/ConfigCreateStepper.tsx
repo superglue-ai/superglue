@@ -362,7 +362,7 @@ const result = await superglue.call({
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent 
-        className="h-[100vh] w-[100vw] max-w-[100vw] p-12 gap-0 rounded-none border-none flex flex-col"
+        className="h-[100vh] w-[100vw] max-w-[100vw] p-3 sm:p-6 lg:p-12 gap-0 rounded-none border-none flex flex-col"
       >
         <div className="flex-none mb-4">
           <DialogHeader>
@@ -546,7 +546,7 @@ const result = await superglue.call({
           )}
         </div>
 
-        <div className="flex-none mt-4 flex flex-col lg:flex-row gap-2 justify-between">
+        <div className="flex-none mt-2 sm:mt-4 flex flex-col lg:flex-row gap-2 justify-between">
           {step === 'success' ? (
             <>
               <Button
