@@ -1,4 +1,4 @@
-import { ApiConfig, Context, ExtractConfig, HttpMethod, TransformConfig } from "@superglue/shared";
+import { ApiConfig, Context, ExtractConfig, TransformConfig } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 
 export const upsertApiResolver = async (

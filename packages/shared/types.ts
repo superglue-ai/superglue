@@ -1,6 +1,6 @@
+import { FileUpload } from "graphql-upload-minimal";
 import { JSONSchema } from "openai/src/lib/jsonschema.js";
 import { DataStore } from "./datastore.js";
-import { FileUpload } from "graphql-upload-minimal";
 export type Context = {
   datastore: DataStore;
   orgId: string;
