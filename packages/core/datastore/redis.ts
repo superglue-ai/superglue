@@ -1,7 +1,8 @@
 import { ApiConfig, ApiInput, DataStore, ExtractConfig, ExtractInput, RunResult, TransformConfig, TransformInput } from "@superglue/shared";
 import { createHash } from 'crypto';
 import { createClient, RedisClientType } from 'redis';
-import toJsonSchema from "to-json-schema";
+import { getSchemaFromData } from "../utils/tools.js";
+
 export class RedisService implements DataStore {
   private redis: RedisClientType;
   private readonly RUN_PREFIX = 'run:';
@@ -76,7 +77,7 @@ export class RedisService implements DataStore {
 
   async saveApiConfig(request: ApiInput, payload: any, config: ApiConfig, orgId?: string): Promise<ApiConfig> {
     if(!request) return null;
-    const hash = this.generateHash({request, payloadKeys: toJsonSchema(payload)});
+    const hash = this.generateHash({request, payloadKeys: getSchemaFromData(payload)});
     const key = this.getKey(this.API_PREFIX, hash, orgId);
     await this.redis.set(key, JSON.stringify(config));
     return config;
@@ -84,7 +85,7 @@ export class RedisService implements DataStore {
 
   async getApiConfigFromRequest(request: ApiInput, payload: any, orgId?: string): Promise<ApiConfig | null> {
     if(!request) return null;
-    const hash = this.generateHash({request, payloadKeys: toJsonSchema(payload)});
+    const hash = this.generateHash({request, payloadKeys: getSchemaFromData(payload)});
     const key = this.getKey(this.API_PREFIX, hash, orgId);
     const data = await this.redis.get(key);
     return parseWithId(data, hash);
@@ -92,7 +93,7 @@ export class RedisService implements DataStore {
 
   async getExtractConfigFromRequest(request: ExtractInput, payload: any, orgId?: string): Promise<ExtractConfig | null> {
     if(!request) return null;
-    const hash = this.generateHash({request, payloadKeys: toJsonSchema(payload)});
+    const hash = this.generateHash({request, payloadKeys: getSchemaFromData(payload)});
     const key = this.getKey(this.EXTRACT_PREFIX, hash, orgId);
     const data = await this.redis.get(key);
     return parseWithId(data, hash);
@@ -100,7 +101,7 @@ export class RedisService implements DataStore {
 
   async getTransformConfigFromRequest(request: TransformInput, payload: any, orgId?: string): Promise<TransformConfig | null> {
     if(!request) return null;
-    const hash = this.generateHash({request, payloadKeys: toJsonSchema(payload)});
+    const hash = this.generateHash({request, payloadKeys: getSchemaFromData(payload)});
     const key = this.getKey(this.TRANSFORM_PREFIX, hash, orgId);
     const data = await this.redis.get(key);
     return parseWithId(data, hash);
@@ -143,7 +144,7 @@ export class RedisService implements DataStore {
 
   async saveExtractConfig(request: ExtractInput, payload: any, config: ExtractConfig, orgId?: string): Promise<ExtractConfig> {
     if(!request) return null;
-    const hash = this.generateHash({request, payloadKeys: toJsonSchema(payload)});
+    const hash = this.generateHash({request, payloadKeys: getSchemaFromData(payload)});
     const key = this.getKey(this.EXTRACT_PREFIX, hash, orgId);
     await this.redis.set(key, JSON.stringify(config));
     return config;
@@ -186,7 +187,7 @@ export class RedisService implements DataStore {
 
   async saveTransformConfig(request: TransformInput, payload: any, config: TransformConfig, orgId?: string): Promise<TransformConfig> {
     if(!request) return null;
-    const hash = this.generateHash({request, payloadKeys: toJsonSchema(payload)});
+    const hash = this.generateHash({request, payloadKeys: getSchemaFromData(payload)});
     const key = this.getKey(this.TRANSFORM_PREFIX, hash, orgId);
     await this.redis.set(key, JSON.stringify(config));
     return config;
