@@ -24,7 +24,14 @@ interface JsonSchemaEditorProps {
   onChange: (value: string) => void;
 }
 
-const SCHEMA_TYPES = ['object', 'array', 'string', 'number', 'boolean', 'null'];
+const SCHEMA_TYPES = ['object', 'array', 'string', 'number', 'boolean'];
+const SCHEMA_TYPE_DISPLAY = {
+  'object': 'object',
+  'array': 'array',
+  'string': 'string',
+  'number': 'number',
+  'boolean': 'bool'
+};
 
 const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) => {
   const [isCodeMode, setIsCodeMode] = React.useState(() => {
@@ -39,6 +46,19 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
   
   const [visualSchema, setVisualSchema] = React.useState<any>({});
   const [editingField, setEditingField] = React.useState<string | null>(null);
+  // Track the path of the currently hovered description field
+  const [hoveredDescField, setHoveredDescField] = React.useState<string | null>(null);
+  // Ref to store timeout IDs for hover delay
+  const hoverTimeoutRef = React.useRef<{ [key: string]: NodeJS.Timeout }>({});
+  
+  // Clear all hover timeouts when component unmounts
+  React.useEffect(() => {
+    return () => {
+      Object.values(hoverTimeoutRef.current).forEach(timeoutId => {
+        clearTimeout(timeoutId);
+      });
+    };
+  }, []);
   
   React.useEffect(() => {
     try {
@@ -74,6 +94,33 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
     setVisualSchema(newSchema);
     onChange(JSON.stringify(newSchema, null, 2));
   };
+  
+  // Handle mouse enter with delay
+  const handleMouseEnter = (fieldId: string) => {
+    // Clear any existing timeout for this field
+    if (hoverTimeoutRef.current[fieldId]) {
+      clearTimeout(hoverTimeoutRef.current[fieldId]);
+    }
+    
+    // Set a new timeout to show tooltip after 2 seconds
+    hoverTimeoutRef.current[fieldId] = setTimeout(() => {
+      setHoveredDescField(fieldId);
+    }, 1000);
+  };
+  
+  // Handle mouse leave
+  const handleMouseLeave = (fieldId: string) => {
+    // Clear the timeout if mouse leaves before delay completes
+    if (hoverTimeoutRef.current[fieldId]) {
+      clearTimeout(hoverTimeoutRef.current[fieldId]);
+      delete hoverTimeoutRef.current[fieldId];
+    }
+    
+    // Hide the tooltip if it's currently shown for this field
+    if (hoveredDescField === fieldId) {
+      setHoveredDescField(null);
+    }
+  };
 
   const generateUniqueFieldName = (properties: any) => {
     let index = 1;
@@ -90,6 +137,8 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
 
     const isRoot = path.length === 0;
     const isEditing = editingField === path.join('.');
+    // Create a unique ID for this field's description
+    const descFieldId = [...path, 'description'].join('.');
     
     // Add this helper function to check if field is required
     const isFieldRequired = () => {
@@ -139,7 +188,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
                   onChange(JSON.stringify(newSchema, null, 2));
                   setEditingField(newPath);
                 }}
-                className="w-48 min-h-[32px]"
+                className="w-36 min-h-[32px]"
                 placeholder="Field name"
                 autoFocus
                 onBlur={() => setEditingField(null)}
@@ -147,7 +196,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
               />
             ) : (!isArrayChild &&(
               <div 
-                className={`w-48 px-2 py-0.5 min-h-[32px] rounded hover:bg-secondary cursor-pointer text-[14px] flex items-center gap-0.5`}
+                className={`w-36 px-2 py-0.5 min-h-[32px] rounded hover:bg-secondary cursor-pointer text-[14px] flex items-center gap-0.5`}
                 onClick={() => setEditingField(path.join('.'))}
               >
                 {fieldName}
@@ -160,22 +209,51 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
               value={typeof schema.type === 'string' ? schema.type : 'string'}
               onValueChange={(value) => updateVisualSchema([...path, 'type'], value)}
             >
-              <SelectTrigger className="w-32 h-8">
+              <SelectTrigger className="w-24 h-8">
                 <SelectValue placeholder="Type" />
               </SelectTrigger>
               <SelectContent>
                 {SCHEMA_TYPES.map(type => (
-                  <SelectItem key={type} value={type}>{type}</SelectItem>
+                  <SelectItem key={type} value={type}>{SCHEMA_TYPE_DISPLAY[type]}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
 
-            <Input
-              value={schema.description || ''}
-              onChange={(e) => updateVisualSchema([...path, 'description'], e.target.value)}
-              className="flex-1"
-              placeholder="Description"
-            />
+            <TooltipProvider>
+              <Tooltip open={hoveredDescField === descFieldId}>
+                <TooltipTrigger asChild>
+                  <Input
+                    value={schema.description || ''}
+                    onChange={(e) => {
+                      updateVisualSchema([...path, 'description'], e.target.value);
+                      // Clear any pending timeout
+                      if (hoverTimeoutRef.current[descFieldId]) {
+                        clearTimeout(hoverTimeoutRef.current[descFieldId]);
+                        delete hoverTimeoutRef.current[descFieldId];
+                      }
+                      // Hide tooltip when typing
+                      setHoveredDescField(null);
+                    }}
+                    className="w-full min-w-[200px] max-w-[400px] flex-1 border-muted hover:border-primary/50 focus:border-primary"
+                    placeholder="Describe for AI mapping"
+                    onFocus={() => {
+                      // Clear timeout and hide tooltip on focus
+                      if (hoverTimeoutRef.current[descFieldId]) {
+                        clearTimeout(hoverTimeoutRef.current[descFieldId]);
+                        delete hoverTimeoutRef.current[descFieldId];
+                      }
+                      setHoveredDescField(null);
+                    }}
+                    onMouseEnter={() => handleMouseEnter(descFieldId)}
+                    onMouseLeave={() => handleMouseLeave(descFieldId)}
+                  />
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  Add instructions to help AI understand how to map data to this field
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
             {!isRoot && !isArrayChild && (
               <TooltipProvider>
                 <Tooltip>
