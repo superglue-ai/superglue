@@ -121,6 +121,7 @@ export class FileStore implements DataStore {
     if(!request) return null;
     const hash = this.generateHash({request, payloadKeys: getSchemaFromData(payload)});
     const key = this.getKey('api', hash, orgId);
+    config.id = hash;
     this.storage.apis.set(key, config);
     await this.persist();
     return { ...config, id: hash };
@@ -169,6 +170,7 @@ export class FileStore implements DataStore {
     if(!request) return null;
     const hash = this.generateHash({request, payloadKeys: getSchemaFromData(payload)});
     const key = this.getKey('extract', hash, orgId);
+    config.id = hash;
     this.storage.extracts.set(key, config);
     await this.persist();
     return { ...config, id: hash };
@@ -217,6 +219,7 @@ export class FileStore implements DataStore {
     if(!request) return null;
     const hash = this.generateHash({request, payloadKeys: getSchemaFromData(payload)});
     const key = this.getKey('transform', hash, orgId);
+    config.id = hash;
     this.storage.transforms.set(key, config);
     await this.persist();
     return { ...config, id: hash };

@@ -79,6 +79,7 @@ export class RedisService implements DataStore {
     if(!request) return null;
     const hash = this.generateHash({request, payloadKeys: getSchemaFromData(payload)});
     const key = this.getKey(this.API_PREFIX, hash, orgId);
+    config.id = hash;
     await this.redis.set(key, JSON.stringify(config));
     return config;
   }
@@ -146,6 +147,7 @@ export class RedisService implements DataStore {
     if(!request) return null;
     const hash = this.generateHash({request, payloadKeys: getSchemaFromData(payload)});
     const key = this.getKey(this.EXTRACT_PREFIX, hash, orgId);
+    config.id = hash;
     await this.redis.set(key, JSON.stringify(config));
     return config;
   }
@@ -189,6 +191,7 @@ export class RedisService implements DataStore {
     if(!request) return null;
     const hash = this.generateHash({request, payloadKeys: getSchemaFromData(payload)});
     const key = this.getKey(this.TRANSFORM_PREFIX, hash, orgId);
+    config.id = hash;
     await this.redis.set(key, JSON.stringify(config));
     return config;
   }
