@@ -53,8 +53,9 @@ import {
 import { useToast } from "@/src/hooks/use-toast";
 import { isJsonEmpty } from '@/src/lib/client-utils';
 import { ApiConfig, ApiInput, AuthType, CacheMode, HttpMethod, PaginationType, SuperglueClient } from '@superglue/client';
-import { ArrowLeft, Info } from 'lucide-react';
+import { ArrowLeft, Info, Terminal, Copy } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { parseCredentialsHelper } from './config-stepper/Helpers'
 import React from 'react';
 
 const HTTP_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'];
@@ -106,6 +107,45 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
   const [hasUnsavedChanges, setHasUnsavedChanges] = React.useState(false);
   const [showUnsavedChangesDialog, setShowUnsavedChangesDialog] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState("basic");
+
+  const getCurlCommand = () => {
+      let payload = {}
+      try {
+        payload = JSON.parse(formData.inputPayload)
+      } catch (e) {
+        console.warn('Invalid input payload JSON')
+      }
+  
+      const credentials = parseCredentialsHelper(formData.auth.value, JSON.parse(formData.auth.advancedConfig))
+  
+      const graphqlQuery = {
+        query: `mutation { call(input: { id: "${configId}" }, payload: ${JSON.stringify(payload)}, credentials: ${JSON.stringify(credentials)}) { data } }`
+      }
+      const command = `curl -X POST "${superglueConfig.superglueEndpoint}/graphql" \\
+    -H "Content-Type: application/json" \\
+    -H "Authorization: Bearer ${superglueConfig.superglueApiKey}" \\
+    -d '${JSON.stringify(graphqlQuery)}'`
+      
+      return command
+    }
+
+  const getSdkCode = () => {
+      const credentials = parseCredentialsHelper(formData.auth.value, JSON.parse(formData.auth.advancedConfig))
+      return `npm install @superglue/client
+  
+  // in your app:
+  import { SuperglueClient } from "@superglue/client";
+  const superglue = new SuperglueClient({
+    apiKey: "${superglueConfig.superglueApiKey}"
+  });
+  
+  // Transform any API response with a single call
+  const result = await superglue.call({ 
+    id: "${configId}",
+    payload: ${formData.inputPayload},
+    credentials: ${JSON.stringify(credentials)}
+  })`
+    }
 
   React.useEffect(() => {
     if (editingId && !searchParamsChecked) {
@@ -391,6 +431,7 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
                 <TabsTrigger value="request">Request</TabsTrigger>
                 <TabsTrigger value="responseMapping">Response Mapping</TabsTrigger>
                 <TabsTrigger value="advanced">Advanced</TabsTrigger>
+                <TabsTrigger value="sdk">SDK Integration</TabsTrigger>
                 {editingId && (
                   <TabsTrigger value="test">
                     Run
@@ -653,6 +694,57 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
                       </div>
                     </div>
                   </div>
+                </TabsContent>
+
+                <TabsContent value="sdk">
+                <p className="text-sm font-medium">When you call your superglue API, the call is directly proxied to the targeted endpoint without any AI inbewteen. Thus, API calls remain predicable and fast with ms latency. We provide a TypeScript client SDK for easy integration in your application.</p>
+              <div className="rounded-md bg-muted p-4">
+                <div className="flex items-start space-x-2">
+                  <Terminal className="mt-0.5 h-5 w-5 text-muted-foreground" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Try the endpoint locally with curl: </p>
+                    <div className="relative flex items-start gap-2">
+                      <pre className="flex-1 rounded-lg bg-secondary p-4 text-sm">
+                        <code>{getCurlCommand()}</code>
+                      </pre>
+                      <Button
+                        variant="ghost" 
+                        size="icon"
+                        className="h-8 w-8 flex-none mt-2"
+                        onClick={() => {
+                          navigator.clipboard.writeText(getCurlCommand());
+                        }}
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="rounded-md bg-muted p-4">
+                <div className="flex items-start space-x-2">
+                  <Terminal className="mt-0.5 h-5 w-5 text-muted-foreground" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Or use the TypeScript SDK in your application: </p>
+                    <div className="relative flex items-start gap-2">
+                      <pre className="flex-1 rounded-lg bg-secondary p-4 text-sm">
+                        <code>{getSdkCode()}</code>
+                      </pre>
+                      <Button
+                        variant="ghost" 
+                        size="icon"
+                        className="h-8 w-8 flex-none"
+                        onClick={() => {
+                          navigator.clipboard.writeText(getSdkCode());
+                        }}
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
                 </TabsContent>
 
                 {editingId && (
