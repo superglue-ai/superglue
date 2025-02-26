@@ -86,7 +86,7 @@ Guidelines for creating JSONata mappings:
 - Error handling:
   - If you get an error like "is not of a type(s) string/number/object", try to convert the source field, but also consider that the original field or one of its parent might be null. In this case, add a default value.
   - If the error is something like "instance is not of a type(s) object", make sure you REALLY create the target schema with the correct type.
-  - If the error is something like "instance is not of a type(s) array", this can happen if the source data just has one object. In this case, wrap the source reference in an array to ensure it always returns an array. E.g. [$.items]
+  - If the error is something like "instance is not of a type(s) array or array/null". In this case, wrap the source selector in an array to ensure it always returns an array. E.g. "result": [$.items]
   - if an object is optional but its fields required, you can add a test and default to {}, but do not set the inner fields to default null.
 
 Remember: The goal is to create valid JSONata expressions that accurately transform the source data structure into the required target structure.`;
