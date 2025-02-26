@@ -491,27 +491,29 @@ const result = await superglue.call({
 
           {step === 'success' && (
             <div className="space-y-4 h-full">
-              <p className="text-m font-medium">Done! superglue has configured the API endpoint. You can now use it from your application</p>
-              <p className="text-sm font-medium">When you call your superglue API, the call is directly proxied to the targeted endpoint without any AI inbewteen. Thus, API calls remain predicable and fast with ms latency. We provide a TypeScript client SDK for easy integration in your application.</p>
+              <p className="text-m font-medium">Done!</p>
+              <p className="text-sm font-medium">You can now call the endpoint from your app. The call is proxied to the targeted endpoint without AI inbewteen. Predictable and millisecond latency.</p>
               <div className="rounded-md bg-muted p-4">
                 <div className="flex items-start space-x-2">
                   <Terminal className="mt-0.5 h-5 w-5 text-muted-foreground" />
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">Try the endpoint locally with curl: </p>
-                    <div className="relative flex items-start gap-2">
-                      <pre className="flex-1 rounded-lg bg-secondary p-4 text-sm">
-                        <code>{getCurlCommand()}</code>
-                      </pre>
+                  <div className="space-y-1 w-full">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">Try the endpoint locally with curl: </p>
                       <Button
                         variant="ghost" 
                         size="icon"
-                        className="h-8 w-8 flex-none mt-2"
+                        className="h-8 w-8 flex-none"
                         onClick={() => {
                           navigator.clipboard.writeText(getCurlCommand());
                         }}
                       >
                         <Copy className="h-4 w-4" />
                       </Button>
+                    </div>
+                    <div className="relative">
+                      <pre className="rounded-lg bg-secondary p-4 text-sm overflow-x-auto">
+                        <code>{getCurlCommand()}</code>
+                      </pre>
                     </div>
                   </div>
                 </div>
@@ -520,12 +522,9 @@ const result = await superglue.call({
               <div className="rounded-md bg-muted p-4">
                 <div className="flex items-start space-x-2">
                   <Terminal className="mt-0.5 h-5 w-5 text-muted-foreground" />
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">Or use the TypeScript SDK in your application: </p>
-                    <div className="relative flex items-start gap-2">
-                      <pre className="flex-1 rounded-lg bg-secondary p-4 text-sm">
-                        <code>{getSdkCode()}</code>
-                      </pre>
+                  <div className="space-y-1 w-full">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">Or use the TypeScript SDK in your application: </p>
                       <Button
                         variant="ghost" 
                         size="icon"
@@ -536,6 +535,11 @@ const result = await superglue.call({
                       >
                         <Copy className="h-4 w-4" />
                       </Button>
+                    </div>
+                    <div className="relative">
+                      <pre className="rounded-lg bg-secondary p-4 text-sm overflow-x-auto">
+                        <code>{getSdkCode()}</code>
+                      </pre>
                     </div>
                   </div>
                 </div>
