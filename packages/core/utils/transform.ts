@@ -93,8 +93,11 @@ ${JSON.stringify(sample(payload, 5), null, 2).slice(0,10000)}`
         {role: "user", content: userPrompt}
       ]
     }
+    const temperature = String(process.env.OPENAI_MODEL).startsWith("o") ? undefined : Math.min(retry * 0.1, 1);
+  
     const reasoning = await openai.chat.completions.create({
-      model: "o3-mini",
+      model: process.env.OPENAI_MODEL,
+      temperature,
       messages,
       response_format: {
         type: "json_schema",
@@ -121,7 +124,7 @@ ${JSON.stringify(sample(payload, 5), null, 2).slice(0,10000)}`
     return content;
 
   } catch (error) {
-      if(retry < 10) {
+      if(retry < 5) {
         messages.push({role: "user", content: error.message});
         return generateMapping(schema, payload, instruction, retry + 1, messages);
       }

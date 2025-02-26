@@ -107,7 +107,7 @@ export async function applyJsonataWithValidation(data: any, expr: string, schema
     const optionalSchema = addNullableToOptional(schema);
     const validation = validator.validate(result, optionalSchema);
     if (!validation.valid) {
-      return { 
+      return {
         success: false, 
         error: validation.errors.map(e => `${e.stack}. Source: ${e.instance ? JSON.stringify(e.instance) : "undefined"}`).join('\n').slice(0, 5000) 
       };
