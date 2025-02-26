@@ -8,6 +8,7 @@ export function postProcessLargeDoc(documentation: string, endpointPath: string)
   const MAX_INITIAL_CHUNK = 40000;
   const CONTEXT_SIZE = 10000;
   const CONTEXT_SEPARATOR = "\n\n";
+  const MIN_SEARCH_TERM_LENGTH = 3;
 
   if (documentation.length <= MAX_DOC_LENGTH) {
     return documentation;
@@ -18,20 +19,20 @@ export function postProcessLargeDoc(documentation: string, endpointPath: string)
   searchTerm = searchTerm ? String(searchTerm).trim() : '';
   const docLower = documentation.toLowerCase();
 
-  // Find all occurrences of the search term
-  const positions: number[] = [];
-  let pos = 0;
-  while (searchTerm?.length > 3) {
-    pos = docLower.indexOf(searchTerm, pos);
-    if (pos == -1) {
-      break;
-    }
-    positions.push(pos);
-    pos++;
+  if (!endpointPath || searchTerm.length < MIN_SEARCH_TERM_LENGTH) {
+    return documentation.slice(0, MAX_DOC_LENGTH);
   }
 
-  // If no occurrences found or no endpoint provided, return max doc length
-  if (positions.length === 0 || !endpointPath) {
+  // Find all occurrences of the search term
+  const positions: number[] = [];
+  let pos = docLower.indexOf(searchTerm);	
+  while (pos !== -1) {
+    positions.push(pos);
+    pos = docLower.indexOf(searchTerm, pos + 1);
+  }
+
+  // If no occurrences found return max doc length
+  if (positions.length === 0) {
     return documentation.slice(0, MAX_DOC_LENGTH);
   }
 
