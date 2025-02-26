@@ -29,7 +29,7 @@ import {
 } from "@/src/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/src/components/ui/tooltip";
 import { ApiConfig, ExtractConfig, SuperglueClient } from '@superglue/client';
-import { History, Play, Plus, RotateCw, Settings, Trash2 } from "lucide-react";
+import { History, Play, Plus, RotateCw, Settings, ShoppingBag, Trash2 } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import React from 'react';
 
@@ -279,12 +279,18 @@ const ConfigTable = () => {
             
             <Button 
               onClick={handleCreateExampleShopify}
-              className="h-32 md:col-span-2 shadow-md hover:shadow-lg transition-all duration-300 rounded-2xl bg-card border border-primary/20 hover:border-primary/30"
+              className="h-40 md:col-span-2 shadow-md hover:shadow-lg transition-all duration-300 rounded-2xl bg-card border border-primary/20 hover:border-primary/30"
               variant="outline"
               size="lg"
             >
-              <div className="flex flex-col items-center justify-center">
-                <span className="text-xl font-semibold">Create Example Shopify API</span>
+              <div className="flex items-center justify-center gap-10">
+                <div className="p-6 rounded-full bg-primary/10 hover:bg-primary/15 transition-colors duration-300">
+                  <ShoppingBag className="h-16 w-16 text-primary" strokeWidth={1.5} />
+                </div>
+                <div className="flex flex-col items-start">
+                  <span className="text-2xl font-semibold mb-2">Create Example Shopify API</span>
+                  <span className="text-muted-foreground text-sm max-w-[16rem]">Get product data with one click in your format</span>
+                </div>
               </div>
             </Button>
           </div>
