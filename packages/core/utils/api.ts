@@ -60,7 +60,12 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
 
     // Combine all variables
     const requestVars = { ...paginationVars, ...allVariables };
-
+    // Check for any {var} in the generated config that isn't in available variables
+    const invalidVars = validateVariables(endpoint, Object.keys(requestVars));
+    
+    if (invalidVars.length > 0) {
+      throw new Error(`The following variables are not defined: ${invalidVars.join(', ')}`);  
+    }
     // Generate request parameters with variables replaced
     const headers = Object.fromEntries(
       Object.entries(endpoint.headers || {})
@@ -266,16 +271,6 @@ Documentation: ${String(documentation).slice(0, 80000)}`
     role: "assistant",
     content: completion.choices[0].message.content
   });
-
-  // Check for any {var} in the generated config that isn't in available variables
-  const invalidVars = validateVariables(generatedConfig, vars);
-  
-  if (invalidVars.length > 0) {
-    messages.push({
-      role: "user",
-      content: `The following variables are not defined: ${invalidVars.join(', ')}`
-    });  
-  }
 
   return {
     config: {
