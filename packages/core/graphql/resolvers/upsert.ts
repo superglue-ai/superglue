@@ -22,7 +22,7 @@ export const upsertApiResolver = async (
       (!input?.queryParams || oldConfig?.queryParams === input?.queryParams) &&
       (!input?.headers || oldConfig?.headers === input?.headers) &&
       (!input?.instruction || oldConfig?.instruction === input?.instruction);
-    if (newResponseMapping === null && hasNoUpdates) {
+    if (!newResponseMapping && hasNoUpdates) {
       newResponseMapping = oldConfig?.responseMapping;
     }
 
@@ -62,7 +62,7 @@ export const upsertTransformResolver = async (
 
     // reset the response mapping if there are major updates
     let newResponseMapping = input.responseMapping;
-    if (input.responseMapping === null && !input.responseSchema && !input.instruction) {
+    if (!newResponseMapping && !input.responseSchema && !input.instruction) {
       newResponseMapping = oldConfig?.responseMapping;
     }
 
