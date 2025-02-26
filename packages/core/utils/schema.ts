@@ -63,7 +63,7 @@ async function attemptSchemaGeneration(
   
   const completion = await openai.chat.completions.create(completionRequest);
   let generatedSchema = JSON.parse(completion.choices[0].message.content);
-  if(generatedSchema.jsonSchema) {
+  if(generatedSchema?.jsonSchema) {
     generatedSchema = generatedSchema.jsonSchema;
   }
   if(!generatedSchema || Object.keys(generatedSchema).length === 0) {
