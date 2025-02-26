@@ -285,7 +285,7 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
     }
 
     const credentials = parseCredentialsHelper(formData.auth.value, JSON.parse(formData.auth.advancedConfig))
-    
+
     const graphqlQuery = {
       query: `mutation CallApi($payload: JSON!, $credentials: JSON!) { 
   call(input: { id: "${configId}" }, payload: $payload, credentials: $credentials) { 
