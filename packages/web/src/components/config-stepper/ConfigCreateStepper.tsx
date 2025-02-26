@@ -138,7 +138,6 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
       
       // Parse the URL when moving to the next step
       const url = splitUrl(formData.fullUrl)
-      console.log('URL parsed for next step:', url)
     
       setIsAutofilling(true)
       try {
@@ -182,7 +181,6 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
         // Apply the returned config
         const config = response.config as ApiConfig
         if (config) {
-          console.log('config', url)
           const id = url.urlHost.replace(/^https?:\/\//, '').replace(/\//g, '') + '-' + Math.floor(1000 + Math.random() * 9000)
           setConfigId(id)
 
