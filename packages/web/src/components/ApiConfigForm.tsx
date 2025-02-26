@@ -1,7 +1,7 @@
 'use client'
 
 import { useConfig } from '@/src/app/config-context';
-import { ApiPlayground } from '@/src/components/ApiPlayground';
+import { ApiPlayground } from '@/src/components/apiPlayground';
 import JsonSchemaEditor from "@/src/components/JsonSchemaEditor";
 import {
   AlertDialog,
@@ -258,9 +258,6 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
     const config: ApiInput = {
       urlHost: formData.urlHost,
       instruction: formData.instruction,
-    };
-    // Optional fields
-    const optionalFields = {
       urlPath: formData.urlPath,
       headers: isJsonEmpty(formData.headers) ? undefined : JSON.parse(formData.headers),
       queryParams: isJsonEmpty(formData.queryParams) ? undefined : JSON.parse(formData.queryParams),
@@ -273,16 +270,9 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
       documentationUrl: formData.documentationUrl,
       pagination: formData.paginationType !== "auto" ? {
         type: formData.paginationType as PaginationType,
-        pageSize: parseInt(formData.pageSize) ?? null
-      } : undefined,
+        pageSize: parseInt(formData.pageSize) || null
+      } : undefined
     };
-    // Add only defined optional fields to config
-    Object.entries(optionalFields).forEach(([key, value]) => {
-      if (value && value !== undefined) {
-        config[key as keyof ApiInput] = value;
-      }
-    });
-
     return config;
   };
 

@@ -1,13 +1,36 @@
 import { ApiConfig, ExtractConfig, HttpMethod, RunResult, TransformConfig } from '@superglue/shared';
-import { beforeEach, describe, expect, it } from 'vitest';
-import { MemoryStore } from './memory.js';
+import { beforeEach, describe, expect, it, afterEach } from 'vitest';
+import { FileStore } from './filestore.js';
+import fs from 'fs';
+import path from 'path';
 
-describe('MemoryStore', () => {
-  let store: MemoryStore;
+describe('FileStore', () => {
+  let store: FileStore;
   const testOrgId = 'test-org';
+  const testDir = './.test-data';
+  const testPath = path.join(testDir, 'superglue_data.json');
 
   beforeEach(() => {
-    store = new MemoryStore();
+    // Clean up any existing test data
+    if (fs.existsSync(testPath)) {
+      fs.unlinkSync(testPath);
+    }
+    if (fs.existsSync(testDir)) {
+      fs.rmdirSync(testDir);
+    }
+    store = new FileStore(testDir);
+  });
+
+  afterEach(async () => {
+    await store.clearAll();
+    await store.disconnect();
+    // Clean up test files
+    if (fs.existsSync(testPath)) {
+      fs.unlinkSync(testPath);
+    }
+    if (fs.existsSync(testDir)) {
+      fs.rmdirSync(testDir);
+    }
   });
 
   describe('API Config', () => {
@@ -73,6 +96,7 @@ describe('MemoryStore', () => {
       const retrieved = await store.getExtractConfig(testExtractConfig.id, testOrgId);
       expect(retrieved).toBeNull();
     });
+
     it('should handle null payloads when getting extract by request', async () => {
       const saved = await store.saveExtractConfig({ urlHost: testExtractConfig.urlHost, instruction: testExtractConfig.instruction }, null, testExtractConfig, testOrgId);
       
@@ -92,7 +116,6 @@ describe('MemoryStore', () => {
       );
       expect(undefinedPayloadResult).toEqual(saved);
     });
-
   });
 
   describe('Transform Config', () => {
@@ -200,27 +223,14 @@ describe('MemoryStore', () => {
       expect(items.map(run => run.id).sort()).toEqual(['run1', 'run3']);
     });
 
-    it('should handle listing runs when configs have missing IDs', async () => {
-      const runWithoutConfigId = { 
-        ...testRun, 
-        id: 'run1', 
-        config: { ...testRun.config, id: undefined } 
-      };
-      const runWithConfigId = { 
-        ...testRun, 
-        id: 'run2', 
-        config: { ...testRun.config, id: 'config1' } 
-      };
-      
-      await store.createRun(runWithoutConfigId, testOrgId);
-      await store.createRun(runWithConfigId, testOrgId);
-      
-      const { items: filteredItems } = await store.listRuns(10, 0, 'config1', testOrgId);
-      expect(filteredItems.length).toBe(1);
-      expect(filteredItems[0].id).toBe('run2');
+    it('should persist data between store instances', async () => {
+      await store.createRun(testRun, testOrgId);
+      await store.disconnect();
 
-      const { items: allItems } = await store.listRuns(10, 0, null, testOrgId);
-      expect(allItems.length).toBe(2);
+      // Create a new store instance pointing to the same directory
+      const newStore = new FileStore(testDir);
+      const retrieved = await newStore.getRun(testRun.id, testOrgId);
+      expect(retrieved).toEqual(testRun);
     });
   });
 
@@ -283,4 +293,4 @@ describe('MemoryStore', () => {
       expect(runTotal).toBe(0);
     });
   });
-}); 
+});

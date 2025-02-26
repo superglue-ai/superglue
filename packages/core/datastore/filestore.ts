@@ -1,8 +1,11 @@
 import { ApiConfig, ApiInput, DataStore, ExtractConfig, ExtractInput, RunResult, TransformConfig, TransformInput } from "@superglue/shared";
+import fs from 'fs';
+import path from 'path';
 import { createHash } from 'crypto';
 import { getSchemaFromData } from "../utils/tools.js";
 
-export class MemoryStore implements DataStore {
+export class FileStore implements DataStore {
+
   private storage: {
     apis: Map<string, ApiConfig>;
     extracts: Map<string, ExtractConfig>;
@@ -11,7 +14,9 @@ export class MemoryStore implements DataStore {
     runsIndex: Map<string, { id: string; timestamp: number; configId: string }[]>;
   };
 
-  constructor() {
+  private filePath: string;
+
+  constructor(storageDir: string = '/data') {
     this.storage = {
       apis: new Map(),
       extracts: new Map(),
@@ -19,6 +24,66 @@ export class MemoryStore implements DataStore {
       runs: new Map(),
       runsIndex: new Map()
     };
+
+    // Check if /data exists synchronously
+    if (storageDir === '/data' && !fs.existsSync('/data')) {
+      console.log('File Datastore: "/data" directory not found, using local ".superglue" directory instead');
+      storageDir = './.superglue';
+    }
+
+    this.filePath = path.join(storageDir, 'superglue_data.json');
+    console.log(`File Datastore: Using storage path: ${this.filePath}`);
+    
+    this.initializeStorage();
+  }
+
+  private async initializeStorage() {
+    try {
+      // Ensure the directory exists with proper permissions
+      fs.mkdirSync(path.dirname(this.filePath), { recursive: true, mode: 0o755 });
+      console.log(`File Datastore: Created/verified directory: ${path.dirname(this.filePath)}`);
+      
+      const data = fs.readFileSync(this.filePath, 'utf-8');
+      const parsed = JSON.parse(data, (key, value) => {
+        // Convert ISO date strings back to Date objects
+        if (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
+          return new Date(value);
+        }
+        return value;
+      });
+      console.log('File Datastore: Successfully loaded existing data');
+      
+      // Convert plain objects back to Maps
+      this.storage = {
+        apis: new Map(Object.entries(parsed.apis || {})),
+        extracts: new Map(Object.entries(parsed.extracts || {})),
+        transforms: new Map(Object.entries(parsed.transforms || {})),
+        runs: new Map(Object.entries(parsed.runs || {})),
+        runsIndex: new Map(Object.entries(parsed.runsIndex || {}))
+      };
+    } catch (error) {
+      console.log('File Datastore: No existing data found, starting with empty storage');
+      await this.persist();
+    }
+  }
+
+  private async persist() {
+    try {
+      const serialized = {
+        apis: Object.fromEntries(this.storage.apis),
+        extracts: Object.fromEntries(this.storage.extracts),
+        transforms: Object.fromEntries(this.storage.transforms),
+        runs: Object.fromEntries(this.storage.runs),
+        runsIndex: Object.fromEntries(this.storage.runsIndex)
+      };
+      // Use temporary file to ensure atomic writes
+      const tempPath = `${this.filePath}.tmp`;
+      fs.writeFileSync(tempPath, JSON.stringify(serialized, null, 2), { mode: 0o644 });
+      fs.renameSync(tempPath, this.filePath);
+    } catch (error) {
+      console.error('Failed to persist data:', error);
+      throw error;
+    }
   }
 
   private getKey(prefix: string, id: string, orgId?: string): string {
@@ -31,6 +96,7 @@ export class MemoryStore implements DataStore {
       .map(([key, value]) => ({ ...value, id: key.split(':').pop() })) as T[];
   }
 
+  // Helper function to generate md5 hash
   private generateHash(data: any): string {
     return createHash('md5').update(JSON.stringify(data)).digest('hex');
   }
@@ -57,6 +123,7 @@ export class MemoryStore implements DataStore {
     const key = this.getKey('api', hash, orgId);
     config.id = hash;
     this.storage.apis.set(key, config);
+    await this.persist();
     return { ...config, id: hash };
   }
 
@@ -72,6 +139,7 @@ export class MemoryStore implements DataStore {
     if(!id || !config) return null;
     const key = this.getKey('api', id, orgId);
     this.storage.apis.set(key, config);
+    await this.persist();
     return { ...config, id };
   }
 
@@ -79,6 +147,7 @@ export class MemoryStore implements DataStore {
     if(!id) return false;
     const key = this.getKey('api', id, orgId);
     const deleted = this.storage.apis.delete(key);
+    await this.persist();
     return deleted;
   }
 
@@ -103,6 +172,7 @@ export class MemoryStore implements DataStore {
     const key = this.getKey('extract', hash, orgId);
     config.id = hash;
     this.storage.extracts.set(key, config);
+    await this.persist();
     return { ...config, id: hash };
   }
 
@@ -118,6 +188,7 @@ export class MemoryStore implements DataStore {
     if(!id || !config) return null;
     const key = this.getKey('extract', id, orgId);
     this.storage.extracts.set(key, config);
+    await this.persist();
     return { ...config, id };
   }
 
@@ -125,6 +196,7 @@ export class MemoryStore implements DataStore {
     if(!id) return false;
     const key = this.getKey('extract', id, orgId);
     const deleted = this.storage.extracts.delete(key);
+    await this.persist();
     return deleted;
   }
 
@@ -149,6 +221,7 @@ export class MemoryStore implements DataStore {
     const key = this.getKey('transform', hash, orgId);
     config.id = hash;
     this.storage.transforms.set(key, config);
+    await this.persist();
     return { ...config, id: hash };
   }
 
@@ -164,6 +237,7 @@ export class MemoryStore implements DataStore {
     if(!id || !config) return null;
     const key = this.getKey('transform', id, orgId);
     this.storage.transforms.set(key, config);
+    await this.persist();
     return { ...config, id };
   }
 
@@ -171,6 +245,7 @@ export class MemoryStore implements DataStore {
     if(!id) return false;
     const key = this.getKey('transform', id, orgId);
     const deleted = this.storage.transforms.delete(key);
+    await this.persist();
     return deleted;
   }
 
@@ -199,6 +274,7 @@ export class MemoryStore implements DataStore {
     });
     index.sort((a, b) => b.timestamp - a.timestamp);
     
+    await this.persist();
     return run;
   }
 
@@ -215,6 +291,7 @@ export class MemoryStore implements DataStore {
       return run ? { ...run, id } : null;
     }).filter((run): run is RunResult => run !== null);
     
+    await this.persist();
     return { items, total: index.length };
   }
 
@@ -230,6 +307,7 @@ export class MemoryStore implements DataStore {
         index.splice(entryIndex, 1);
       }
     }
+    await this.persist();
     return deleted;
   }
 
@@ -242,6 +320,7 @@ export class MemoryStore implements DataStore {
     }
     
     this.storage.runsIndex.delete(orgId);
+    await this.persist();
     return true;
   }
 
@@ -251,10 +330,11 @@ export class MemoryStore implements DataStore {
     this.storage.transforms.clear();
     this.storage.runs.clear();
     this.storage.runsIndex.clear();
+    await this.persist();
   }
 
   async disconnect(): Promise<void> {
-    // No-op for memory store
+    await this.persist();
   }
 
   async ping(): Promise<boolean> {

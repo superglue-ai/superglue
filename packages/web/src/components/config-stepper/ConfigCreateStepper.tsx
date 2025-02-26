@@ -6,7 +6,7 @@ import { cleanApiDomain, cn } from '@/src/lib/utils'
 import { ApiConfig, AuthType, CacheMode, SuperglueClient } from '@superglue/client'
 import { Copy, Loader2, Terminal } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { InteractiveApiPlayground } from '../InteractiveApiPlayground'
 import { Button } from '../ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
@@ -21,10 +21,15 @@ interface ConfigCreateStepperProps {
   onOpenChange: (open: boolean) => void
   configId?: string // not used, but if we later want to edit through this flow
   mode?: 'create' | 'edit'
+  prefillData?: {
+    fullUrl: string
+    instruction: string
+    documentationUrl?: string
+  }
+  onComplete?: () => void
 }
 
-
-export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfigId, mode = 'create' }: ConfigCreateStepperProps) {
+export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfigId, mode = 'create', prefillData, onComplete }: ConfigCreateStepperProps) {
   const [step, setStep] = useState<StepperStep>('basic')
   const [isAutofilling, setIsAutofilling] = useState(false)
   const { toast } = useToast()
@@ -35,13 +40,13 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
   const [initialRawResponse, setInitialRawResponse] = useState<any>(null)
   const [hasMappedResponse, setHasMappedResponse] = useState(false)
   const [mappedResponseData, setMappedResponseData] = useState<any>(null)
+  const [responseMapping, setResponseMapping] = useState<any>(null)
   const [isRunning, setIsRunning] = useState(false)
 
   const [formData, setFormData] = useState({
-    urlHost: '',
-    urlPath: '',
-    instruction: '',
-    documentationUrl: '',
+    fullUrl: prefillData?.fullUrl || '',
+    instruction: prefillData?.instruction || '',
+    documentationUrl: prefillData?.documentationUrl || '',
     inputPayload: '{}',
     auth: {
       type: AuthType.HEADER,
@@ -52,7 +57,7 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
   })
 
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({})
-
+  
   const handleChange = (field: string) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | string
   ) => {
@@ -66,28 +71,34 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
     if (field === 'responseSchema' || field === 'instruction') {
       setHasMappedResponse(false)
       setMappedResponseData(null)
+      setResponseMapping(null)
     }
   }
 
-  const handleUrlBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-    const url = e.target.value
+  const splitUrl = (url: string) => {
+    if (!url) {
+      return {
+        urlHost: '',
+        urlPath: ''
+      }
+    }
+    
     try {
-      const urlObj = new URL(url)
+      const urlObj = new URL(url.startsWith('http') ? url : `https://${url}`)
       const cleanedHost = cleanApiDomain(`${urlObj.protocol}//${urlObj.host}`)
       const path = urlObj.pathname === '/' ? '' : urlObj.pathname
-      
-      setFormData(prev => ({
-        ...prev,
+      return {
         urlHost: cleanedHost,
-        ...(path ? { urlPath: path } : {})
-      }))
-    } catch {
+        urlPath: path
+      }
+    } catch (error) {
       // If URL parsing fails, just use existing cleanApiDomain
+      console.warn('URL parsing failed:', error)
       const cleanedUrl = cleanApiDomain(url)
-      setFormData(prev => ({
-        ...prev,
-        urlHost: cleanedUrl
-      }))
+      return {
+        urlHost: cleanedUrl,
+        urlPath: ''
+      }
     }
   }
 
@@ -105,8 +116,8 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
     if (step === 'basic') {
       const errors: Record<string, boolean> = {}
       
-      if (!formData.urlHost) {
-        errors.urlHost = true
+      if (!formData.fullUrl) {
+        errors.fullUrl = true
       }
       if (!formData.instruction) {
         errors.instruction = true
@@ -124,9 +135,10 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
         return
       }
       setValidationErrors({})
-    }
-
-    if (step === 'auth') {
+      
+      // Parse the URL when moving to the next step
+      const url = splitUrl(formData.fullUrl)
+    
       setIsAutofilling(true)
       try {
         const superglueClient = new SuperglueClient({
@@ -137,8 +149,8 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
         // Call autofill endpoint
         const response = await superglueClient.call({
           endpoint: {
-            urlHost: formData.urlHost,
-            ...(formData.urlPath ? { urlPath: formData.urlPath } : {}),
+            urlHost: url.urlHost,
+            ...(url.urlPath ? { urlPath: url.urlPath } : {}),
             ...(formData.documentationUrl ? { documentationUrl: formData.documentationUrl } : {}),
             instruction: formData.instruction,
             authentication: formData.auth.value ? AuthType.HEADER : AuthType.NONE
@@ -169,7 +181,7 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
         // Apply the returned config
         const config = response.config as ApiConfig
         if (config) {
-          const id = formData.urlHost.replace(/^https?:\/\//, '').replace(/\//g, '') + '-' + Math.floor(1000 + Math.random() * 9000)
+          const id = url.urlHost.replace(/^https?:\/\//, '').replace(/\//g, '') + '-' + Math.floor(1000 + Math.random() * 9000)
           setConfigId(id)
 
           // Save the configuration with the generated schema
@@ -205,10 +217,10 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
           endpoint: superglueConfig.superglueEndpoint,
           apiKey: superglueConfig.superglueApiKey
         })
-
+        const url = splitUrl(formData.fullUrl)
         const savedConfig = await superglueClient.upsertApi(configId, {
           id: configId,
-          urlHost: formData.urlHost,
+          urlHost: url.urlHost,
           instruction: formData.instruction,
           documentationUrl: formData.documentationUrl || undefined,
           // authentication: formData.auth.value ? AuthType.HEADER : AuthType.NONE,
@@ -240,7 +252,7 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
       }
     }
 
-    const steps: StepperStep[] = ['basic', 'auth', 'try_and_output', 'success']
+    const steps: StepperStep[] = ['basic', 'try_and_output', 'success']
     const currentIndex = steps.indexOf(step)
     if (currentIndex < steps.length - 1) {
       setStep(steps[currentIndex + 1])
@@ -248,7 +260,7 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
   }
 
   const handleBack = () => {
-    const steps: StepperStep[] = ['basic', 'auth', 'try_and_output', 'success']
+    const steps: StepperStep[] = ['basic', 'try_and_output', 'success']
     const currentIndex = steps.indexOf(step)
     if (currentIndex > 0) {
       setStep(steps[currentIndex - 1])
@@ -275,8 +287,17 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
     const credentials = parseCredentialsHelper(formData.auth.value, JSON.parse(formData.auth.advancedConfig))
 
     const graphqlQuery = {
-      query: `mutation { call(input: { id: "${configId}" }, payload: ${JSON.stringify(payload)}, credentials: ${JSON.stringify(credentials)}) { data } }`
+      query: `mutation CallApi($payload: JSON!, $credentials: JSON!) { 
+  call(input: { id: "${configId}" }, payload: $payload, credentials: $credentials) { 
+    data 
+  } 
+}`,
+      variables: {
+        payload,
+        credentials
+      }
     }
+    
     const command = `curl -X POST "${superglueConfig.superglueEndpoint}/graphql" \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer ${superglueConfig.superglueApiKey}" \\
@@ -340,6 +361,7 @@ const result = await superglue.call({
       const mappedData = mappedResult.data
       setMappedResponseData(mappedData)
       setHasMappedResponse(true)
+      setResponseMapping((mappedResult.config as ApiConfig).responseMapping)
     } catch (error: any) {
       console.error('Error running API:', error)
       toast({
@@ -352,32 +374,101 @@ const result = await superglue.call({
     }
   }
 
+  // Update form data when prefillData changes or when modal is opened
+  useEffect(() => {
+    if (prefillData && open) {
+      setFormData(prevData => ({
+        ...prevData,
+        fullUrl: prefillData.fullUrl || prevData.fullUrl,
+        instruction: prefillData.instruction || prevData.instruction,
+        documentationUrl: prefillData.documentationUrl || prevData.documentationUrl
+      }));
+    }
+  }, [prefillData, open]);
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-full lg:max-w-[calc(100vw-6rem)] w-[1400px] h-full lg:h-[calc(100vh-6rem)] mx-auto lg:py-12 flex flex-col">
-        <DialogHeader>
-          <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
-            <DialogTitle>
-              {step === 'success' ? 'Configuration Complete!' : 'Create New API Configuration'}
-            </DialogTitle>
-            {!step.includes('success') && (
-              <Button
-                variant="outline"
-                className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-200/50 hover:border-blue-300/50 text-blue-600 hover:text-blue-700 text-sm px-4 py-1 h-8 rounded-full animate-pulse shrink-0"
-                onClick={() => window.open('https://cal.com/teamindex/onboarding', '_blank')}
-              >
-                ✨ Get help from our team
-              </Button>
-            )}
-          </div>
-        </DialogHeader>
+      <DialogContent 
+        className="h-[100vh] w-[100vw] max-w-[100vw] p-3 sm:p-6 lg:p-12 gap-0 rounded-none border-none flex flex-col"
+      >
+        <div className="flex-none mb-4">
+          <DialogHeader>
+            <div className="flex flex-col lg:flex-row items-center justify-between gap-4 mb-4">
+              <DialogTitle>
+                {step === 'success' ? 'Configuration Complete!' : 'Create New API Configuration'}
+              </DialogTitle>
+              {!step.includes('success') && (
+                <Button
+                  variant="outline"
+                  className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-200/50 hover:border-blue-300/50 text-blue-600 hover:text-blue-700 text-sm px-4 py-1 h-8 rounded-full animate-pulse shrink-0"
+                  onClick={() => window.open('https://cal.com/teamindex/onboarding', '_blank')}
+                >
+                  ✨ Get help from our team
+                </Button>
+              )}
+            </div>
+          </DialogHeader>
 
-        <StepIndicator currentStep={step} />
+          <StepIndicator currentStep={step} />
+        </div>
 
-        <div className="mt-4 flex-1 overflow-y-auto px-1">
+        <div className="flex-1 overflow-y-auto px-1 min-h-0">
           {step === 'basic' && (
             <div className="space-y-3">
               <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <Label htmlFor="fullUrl">API Endpoint URL</Label>
+                  <HelpTooltip text="The API URL (e.g., https://api.example.com/v1). Don't include the endpoint, e.g. /books/list, we figure it out." />
+                </div>
+                <Input
+                  id="fullUrl"
+                  value={formData.fullUrl}
+                  onChange={(e) => {
+                    handleChange('fullUrl')(e)
+                    if (e.target.value) {
+                      setValidationErrors(prev => ({ ...prev, fullUrl: false }))
+                    }
+                  }}
+                  placeholder="https://api.example.com/v1"
+                  required
+                  autoFocus
+                  className={cn(
+                    validationErrors.fullUrl && inputErrorStyles,
+                    validationErrors.fullUrl && "focus:!border-destructive"
+                  )}
+                />
+                {validationErrors.fullUrl && (
+                  <p className="text-sm text-destructive mt-1">API endpoint URL is required</p>
+                )}
+              </div>
+              
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <Label htmlFor="documentationUrl">API Documentation (Optional)</Label>
+                  <HelpTooltip text="Link to the API's documentation if available" />
+                </div>
+                <Input
+                  id="documentationUrl"
+                  value={formData.documentationUrl}
+                  onChange={handleChange('documentationUrl')}
+                  placeholder="https://docs.example.com"
+                />
+              </div>
+              
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <Label htmlFor="auth">API Key or Token (Optional)</Label>
+                  <HelpTooltip text="Enter API secret here (we don't store it!). Omit prefixes like Bearer. We figure out where to put the secret." />
+                </div>
+                <Input
+                  id="auth"
+                  value={formData.auth.value}
+                  onChange={(e) => handleAuthChange(e.target.value)}
+                  placeholder="Enter your API key or token"
+                />
+              </div>
+              
+              <div className="mt-6">
                 <div className="flex items-center gap-2 mb-1">
                   <Label htmlFor="instruction">What do you want to get from this API?</Label>
                   <HelpTooltip text="Describe what data you want to extract from this API in plain English" />
@@ -392,9 +483,8 @@ const result = await superglue.call({
                     }
                   }}
                   placeholder="E.g. 'Get all products with price and name'"
-                  autoFocus
                   className={cn(
-                    "h-24",
+                    "h-48",
                     validationErrors.instruction && inputErrorStyles,
                     validationErrors.instruction && "focus:!border-destructive"
                   )}
@@ -403,160 +493,6 @@ const result = await superglue.call({
                 {validationErrors.instruction && (
                   <p className="text-sm text-destructive mt-1">Instruction is required</p>
                 )}
-              </div>
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <Label htmlFor="urlHost">API Endpoint Domain</Label>
-                  <HelpTooltip text="The base URL of the API (e.g., https://api.example.com)." />
-                </div>
-                <Input
-                  id="urlHost"
-                  value={formData.urlHost}
-                  onChange={(e) => {
-                    handleChange('urlHost')(e)
-                    if (e.target.value) {
-                      setValidationErrors(prev => ({ ...prev, urlHost: false }))
-                    }
-                  }}
-                  onBlur={handleUrlBlur}
-                  placeholder="https://api.example.com"
-                  required
-                  className={cn(
-                    validationErrors.urlHost && inputErrorStyles,
-                    validationErrors.urlHost && "focus:!border-destructive"
-                  )}
-                />
-                {validationErrors.urlHost && (
-                  <p className="text-sm text-destructive mt-1">API endpoint is required</p>
-                )}
-              </div>
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <Label htmlFor="urlPath">API Endpoint Path (Optional)</Label>
-                  <HelpTooltip text="Additional path after the domain (e.g., /v1/apis). If you leave this blank, superglue will figure out the path automatically." />
-                </div>
-                <Input
-                  id="urlPath"
-                  value={formData.urlPath}
-                  onChange={handleChange('urlPath')}
-                  placeholder="/v1/apis"
-                />
-              </div>
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <Label htmlFor="documentationUrl">API Documentation (Optional)</Label>
-                  <HelpTooltip text="Link to the API's documentation if available" />
-                </div>
-                <Input
-                  id="documentationUrl"
-                  value={formData.documentationUrl}
-                  onChange={handleChange('documentationUrl')}
-                  placeholder="https://docs.example.com"
-                />
-              </div>
-              <div>
-                <Button
-                  variant="outline"
-                  onClick={() => setFormData(prev => ({
-                    ...prev,
-                    inputPayload: prev.inputPayload === '{}' ? 
-                      JSON.stringify({
-                        query: "",
-                        filters: {}
-                      }, null, 2) : 
-                      '{}'
-                  }))}
-                  className="w-full"
-                >
-                  {formData.inputPayload === '{}' ? 'Add Request Variables (Optional)' : 'Remove Request Variables'}
-                </Button>
-
-                {formData.inputPayload !== '{}' && (
-                  <div className="mt-3">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Label>Request Variables</Label>
-                      <HelpTooltip text="Add variables to be used in the API call. E.g. IDs that can change for each request." />
-                    </div>
-                    <Textarea
-                      value={formData.inputPayload}
-                      onChange={handleChange('inputPayload')}
-                      placeholder="Enter JSON payload structure"
-                      className="font-mono h-32"
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {step === 'auth' && (
-            <div className="space-y-6">
-              {formData.auth.advancedConfig === '{}' ? (
-                <div className="space-y-4 h-full">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <Label htmlFor="auth">API Key or Token for Target API (Optional)</Label>
-                      <HelpTooltip text="Enter API key/token here, superglue figures out where to put it. Do not include prefixes like Bearer or Basic in the field." />
-                    </div>
-                    <Input
-                      id="auth"
-                      value={formData.auth.value}
-                      onChange={(e) => handleAuthChange(e.target.value)}
-                      placeholder="Enter your API key or token"
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Label>Advanced Authentication Configuration</Label>
-                    <HelpTooltip text="Configure more complex auth which needs multiple fields like user/password." />
-                  </div>
-                  <Textarea
-                    value={formData.auth.advancedConfig}
-                    onChange={(e) => setFormData(prev => ({
-                      ...prev,
-                      auth: {
-                        ...prev.auth,
-                        advancedConfig: e.target.value
-                      }
-                    }))}
-                    placeholder="Enter JSON configuration"
-                    className="font-mono h-48"
-                  />
-                </div>
-              )}
-              
-              <div className="space-y-4 h-full">
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t" />
-                  </div>
-                </div>
-
-                <Button
-                  variant="outline"
-                  onClick={() => setFormData(prev => ({
-                    ...prev,
-                    auth: {
-                      ...prev.auth,
-                      value: '', // Clear the simple auth value when switching
-                      advancedConfig: prev.auth.advancedConfig === '{}' ? 
-                        JSON.stringify({
-                          username: '',
-                          password: '',
-                          // Uncomment fields below if needed:
-                          // bearer_token: "",
-                          // api_key: "",
-                          // custom_headers: {}
-                        }, null, 2) : 
-                        '{}'
-                    }
-                  }))}
-                  className="w-full"
-                >
-                  {formData.auth.advancedConfig === '{}' ? 'Switch to Advanced Authentication' : 'Switch back to Simple Authentication'}
-                </Button>
               </div>
             </div>
           )}
@@ -574,6 +510,7 @@ const result = await superglue.call({
                 onRun={handleRun}
                 isRunning={isRunning}
                 mappedResponseData={mappedResponseData}
+                responseMapping={responseMapping}
                 hideRunButton={true}
               />
             </div>
@@ -581,27 +518,29 @@ const result = await superglue.call({
 
           {step === 'success' && (
             <div className="space-y-4 h-full">
-              <p className="text-m font-medium">Done! superglue has configured the API endpoint. You can now use it from your application</p>
-              <p className="text-sm font-medium">When you call your superglue API, the call is directly proxied to the targeted endpoint without any AI inbewteen. Thus, API calls remain predicable and fast with ms latency. We provide a TypeScript client SDK for easy integration in your application.</p>
+              <p className="text-m font-medium">Done!</p>
+              <p className="text-sm font-medium">You can now call the endpoint from your app. The call is proxied to the targeted endpoint without AI inbewteen. Predictable and millisecond latency.</p>
               <div className="rounded-md bg-muted p-4">
                 <div className="flex items-start space-x-2">
                   <Terminal className="mt-0.5 h-5 w-5 text-muted-foreground" />
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">Try the endpoint locally with curl: </p>
-                    <div className="relative flex items-start gap-2">
-                      <pre className="flex-1 rounded-lg bg-secondary p-4 text-sm">
-                        <code>{getCurlCommand()}</code>
-                      </pre>
+                  <div className="space-y-1 w-full">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">Try the endpoint locally with curl: </p>
                       <Button
                         variant="ghost" 
                         size="icon"
-                        className="h-8 w-8 flex-none mt-2"
+                        className="h-8 w-8 flex-none"
                         onClick={() => {
                           navigator.clipboard.writeText(getCurlCommand());
                         }}
                       >
                         <Copy className="h-4 w-4" />
                       </Button>
+                    </div>
+                    <div className="relative">
+                      <pre className="rounded-lg bg-secondary p-4 text-sm overflow-x-auto">
+                        <code>{getCurlCommand()}</code>
+                      </pre>
                     </div>
                   </div>
                 </div>
@@ -610,12 +549,9 @@ const result = await superglue.call({
               <div className="rounded-md bg-muted p-4">
                 <div className="flex items-start space-x-2">
                   <Terminal className="mt-0.5 h-5 w-5 text-muted-foreground" />
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">Or use the TypeScript SDK in your application: </p>
-                    <div className="relative flex items-start gap-2">
-                      <pre className="flex-1 rounded-lg bg-secondary p-4 text-sm">
-                        <code>{getSdkCode()}</code>
-                      </pre>
+                  <div className="space-y-1 w-full">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">Or use the TypeScript SDK in your application: </p>
                       <Button
                         variant="ghost" 
                         size="icon"
@@ -627,6 +563,11 @@ const result = await superglue.call({
                         <Copy className="h-4 w-4" />
                       </Button>
                     </div>
+                    <div className="relative">
+                      <pre className="rounded-lg bg-secondary p-4 text-sm overflow-x-auto">
+                        <code>{getSdkCode()}</code>
+                      </pre>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -636,7 +577,7 @@ const result = await superglue.call({
           )}
         </div>
 
-        <div className="mt-4 flex flex-col lg:flex-row gap-2 justify-between">
+        <div className="flex-none mt-2 sm:mt-4 flex flex-col lg:flex-row gap-2 justify-between">
           {step === 'success' ? (
             <>
               <Button
@@ -658,6 +599,10 @@ const result = await superglue.call({
                 <Button
                   onClick={() => {
                     router.push('/configs')
+                    // Call onComplete before closing if provided
+                    if (onComplete) {
+                      onComplete()
+                    }
                     onOpenChange(false)
                   }}
                 >
@@ -681,11 +626,20 @@ const result = await superglue.call({
                 {isAutofilling ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {step as StepperStep === 'auth' ? 'superglue automagically configures API...' : 'Configuring...'}
+                    {step === 'basic' ? 'superglue automagically configures API...' : 'Configuring...'}
                   </>
                 ) : (
                   step === 'try_and_output' ? 
-                    (isRunning ? 'Running...' : (!mappedResponseData ? 'Run' : 'Complete')) : 
+                    (isRunning ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Running...
+                      </>
+                    ) : (!mappedResponseData ? (
+                      <>
+                        ✨ Run
+                      </>
+                    ) : 'Complete')) : 
                     'Next'
                 )}
               </Button>

@@ -3,12 +3,12 @@
 import { useConfig } from '@/src/app/config-context'
 import { useToast } from '@/src/hooks/use-toast'
 import { ApiConfig, CacheMode, SuperglueClient } from '@superglue/client'
-import { useEffect, useState } from 'react'
+import { Loader2 } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { AutoSizer, List } from 'react-virtualized'
 import JsonSchemaEditor from './JsonSchemaEditor'
 import { Button } from './ui/button'
 import { Card, CardContent } from './ui/card'
-import { Input } from './ui/input'
-import { Label } from './ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
 
 interface InteractiveApiPlaygroundProps {
@@ -18,6 +18,7 @@ interface InteractiveApiPlaygroundProps {
   responseSchema: string
   onResponseSchemaChange: (schema: string) => void
   initialRawResponse?: any
+  responseMapping?: any
   onMappedResponse?: (response: any) => void
   onRun?: () => Promise<void>
   isRunning?: boolean
@@ -41,6 +42,7 @@ export function InteractiveApiPlayground({
   responseSchema,
   onResponseSchemaChange,
   initialRawResponse,
+  responseMapping,
   onMappedResponse,
   onRun,
   isRunning,
@@ -130,37 +132,43 @@ export function InteractiveApiPlayground({
     }
   }, [mappedResponseData])
 
+  // Memoize the line splitting for each content type
+  const rawResponseLines = useMemo(() => {
+    return rawResponse ? JSON.stringify(rawResponse, null, 2).split('\n') : ['Response will appear here...']
+  }, [rawResponse])
+
+  const mappedResponseLines = useMemo(() => {
+    return mappedResponse ? JSON.stringify(mappedResponse, null, 2).split('\n') : ['Output will appear here...']
+  }, [mappedResponse])
+
+  const renderRow = (lines: string[]) => ({ index, key, style }: any) => {
+    const line = lines[index]
+    const indentMatch = line?.match(/^(\s*)/)
+    const indentLevel = indentMatch ? indentMatch[0].length : 0
+    
+    return (
+      <div 
+        key={key} 
+        style={{
+          ...style,
+          whiteSpace: 'pre',
+          paddingLeft: `${indentLevel * 8}px`,
+        }} 
+        className="font-mono text-xs overflow-hidden text-ellipsis"
+      >
+        {line?.trimLeft()}
+      </div>
+    )
+  }
+
+  const getLineCount = (lines: string[]) => lines.length
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full">
       {/* Left Column */}
-      <div className="flex flex-col space-y-4 overflow-hidden">
-        <div>
-          <Label>Instruction</Label>
-          <Input
-            value={instruction}
-            onChange={(e) => onInstructionChange?.(e.target.value)}
-            placeholder="E.g. 'Get all products with price and name'"
-            disabled={!onInstructionChange}
-          />
-        </div>
-
-        <div>
-          <Label>Discovered Endpoint URL</Label>
-          <Card>
-            <CardContent className="p-3">
-              <code className="text-sm text-muted-foreground break-all">
-                {config ? (
-                  <><span className="text-primary font-bold">{config.method || 'POST'}</span> {config.urlHost}{config.urlPath || ''}</>
-                ) : (
-                  'Loading...'
-                )}
-              </code>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="flex-1 min-h-0 overflow-hidden flex flex-col max-h-[calc(100vh-20rem)]">
-          <div className="flex-1 min-h-0 bg-background">
+      <div className="flex flex-col space-y-4 overflow-hidden h-full">
+        <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+          <div className="flex-1 min-h-0 bg-background h-full">
             <JsonSchemaEditor
               value={responseSchema}
               onChange={onResponseSchemaChange}
@@ -174,7 +182,16 @@ export function InteractiveApiPlayground({
               onClick={handleRun}
               disabled={isRunning || isLoading}
             >
-              {isRunning || isLoading ? 'Running...' : 'Run'}
+              {isRunning || isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Running...
+                </>
+              ) : (
+                <>
+                  ✨ Run
+                </>
+              )}
             </Button>
           </div>
         )}
@@ -187,22 +204,51 @@ export function InteractiveApiPlayground({
             <CardContent className="p-0 h-full flex flex-col bg-secondary">
               <TabsList className="w-full rounded-t-lg rounded-b-none">
                 <TabsTrigger value="raw" className="flex-1">Raw API Response</TabsTrigger>
-                <TabsTrigger value="mapped" className="flex-1">Output</TabsTrigger>
+                <TabsTrigger value="mapped" className="flex-1">🍯 Output</TabsTrigger>
+                <TabsTrigger value="jsonata" className="flex-1">Response Mapping</TabsTrigger>
               </TabsList>
 
               <div className="flex-1 min-h-0">
                 <TabsContent value="raw" className="m-0 h-full data-[state=active]:flex flex-col">
-                  <div className="flex-1 min-h-0 p-4 overflow-y-auto">
-                    <pre className="text-xs whitespace-pre-wrap">
-                      {rawResponse ? JSON.stringify(rawResponse, null, 2) : 'Response will appear here...'}
-                    </pre>
+                  <div className="flex-1 min-h-0 p-4 overflow-hidden">
+                    <AutoSizer>
+                      {({ height, width }) => (
+                        <List
+                          width={width}
+                          height={height}
+                          rowCount={getLineCount(rawResponseLines)}
+                          rowHeight={18}
+                          rowRenderer={renderRow(rawResponseLines)}
+                          overscanRowCount={100}
+                          className="overflow-auto"
+                        />
+                      )}
+                    </AutoSizer>
                   </div>
                 </TabsContent>
 
                 <TabsContent value="mapped" className="m-0 h-full data-[state=active]:flex flex-col">
+                  <div className="flex-1 min-h-0 p-4 overflow-hidden">
+                    <AutoSizer>
+                      {({ height, width }) => (
+                        <List
+                          width={width}
+                          height={height}
+                          rowCount={getLineCount(mappedResponseLines)}
+                          rowHeight={18}
+                          rowRenderer={renderRow(mappedResponseLines)}
+                          overscanRowCount={100}
+                          className="overflow-auto"
+                        />
+                      )}
+                    </AutoSizer>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="jsonata" className="m-0 h-full data-[state=active]:flex flex-col">
                   <div className="flex-1 min-h-0 p-4 overflow-y-auto">
-                    <pre className="text-xs whitespace-pre-wrap">
-                      {mappedResponse ? JSON.stringify(mappedResponse, null, 2) : 'Output will appear here...'}
+                    <pre className="text-xs whitespace-pre-wrap leading-[18px]">
+                      {responseMapping || 'No JSONata mapping available'}
                     </pre>
                   </div>
                 </TabsContent>

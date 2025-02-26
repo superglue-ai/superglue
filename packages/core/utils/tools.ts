@@ -1,8 +1,9 @@
-import { GraphQLResolveInfo } from "graphql";
 import { RequestOptions } from "@superglue/shared";
 import axios, { AxiosRequestConfig } from "axios";
+import { GraphQLResolveInfo } from "graphql";
 import jsonata from "jsonata";
 import { Validator } from "jsonschema";
+import toJsonSchema from "to-json-schema";
 
 export function isRequested(field: string, info: GraphQLResolveInfo) {
     return info.fieldNodes.some(
@@ -18,22 +19,93 @@ interface TransformResult {
 
 export async function applyJsonata(data: any, expr: string): Promise<any> {
   try {
-    const result = await jsonata(expr).evaluate(data);
+    const expression = superglueJsonata(expr);
+    const result = await expression.evaluate(data);
     return result;
   } catch (error) {
     throw new Error(`Mapping transformation failed: ${error.message}`);
   }
 }
+
+export function superglueJsonata(expr: string) {
+  const expression = jsonata(expr);
+  expression.registerFunction("max", (arr: any[]) => {
+    if(Array.isArray(arr)) {
+      return Math.max(...arr);
+    }
+    return arr;
+  });
+  expression.registerFunction("min", (arr: any[]) => {
+    if(Array.isArray(arr)) {
+      return Math.min(...arr);
+    }
+    return arr;
+  });
+  expression.registerFunction("number", (value: string) => parseFloat(value));
+  expression.registerFunction("substring", (str: string, start: number, end?: number) => String(str).substring(start, end));
+  expression.registerFunction("replace", (obj: any, pattern: string, replacement: string) => {
+    if(Array.isArray(obj)) {
+      return obj.map(item => String(item).replace(pattern, replacement));
+    }
+    if(typeof obj === "object") {
+      return Object.fromEntries(Object.entries(obj).map(([key, value]) => [key, String(value).replace(pattern, replacement)]));
+    }
+    return String(obj).replace(pattern, replacement);
+  });
+  expression.registerFunction("toDate", (date: string) => {
+    try {
+      const match = date.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}):(\d{2}))?$/);
+      if (match) {
+        const [_, month, day, year, hours="00", minutes="00", seconds="00"] = match;
+        const isoDate = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.000Z`;
+        return new Date(isoDate).toISOString();
+      }
+      return new Date(date).toISOString();
+    } catch (e) {
+      // Try US date format MM/DD/YYYY
+      const match = date.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}):(\d{2}))?$/);
+      if (match) {
+        const [_, month, day, year, hours="00", minutes="00", seconds="00"] = match;
+        const isoDate = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.000Z`;
+        return new Date(isoDate).toISOString();
+      }
+      throw new Error(`Invalid date: ${e.message}`);
+    }
+  });
+  expression.registerFunction("dateMax", (dates: string[]) => 
+    dates.reduce((max, curr) => new Date(max) > new Date(curr) ? max : curr));
+  
+  expression.registerFunction("dateMin", (dates: string[]) => 
+    dates.reduce((min, curr) => new Date(min) < new Date(curr) ? min : curr));
+  
+  expression.registerFunction("dateDiff", (date1: string, date2: string, unit: string = 'days') => {
+    const d1 = new Date(date1);
+    const d2 = new Date(date2);
+    const diff = Math.abs(d1.getTime() - d2.getTime());
+    switch(unit.toLowerCase()) {
+      case 'seconds': return Math.floor(diff / 1000);
+      case 'minutes': return Math.floor(diff / (1000 * 60));
+      case 'hours': return Math.floor(diff / (1000 * 60 * 60));
+      case 'days': return Math.floor(diff / (1000 * 60 * 60 * 24));
+      default: return diff; // milliseconds
+    }
+  });
+  return expression;
+}
+
 export async function applyJsonataWithValidation(data: any, expr: string, schema: any): Promise<TransformResult> {
   try {
     const result = await applyJsonata(data, expr);
+    if(result === null || result === undefined || result?.length === 0 || Object.keys(result).length === 0) {
+      return { success: false, error: "Result is empty" };
+    }
     const validator = new Validator();
     const optionalSchema = addNullableToOptional(schema);
     const validation = validator.validate(result, optionalSchema);
     if (!validation.valid) {
       return { 
         success: false, 
-        error: validation.errors.map(e => `${e.message} for ${e.property}. Source: ${e.instance ? JSON.stringify(e.instance) : "undefined"}`).join('\n').slice(0, 5000) 
+        error: validation.errors.map(e => `${e.stack}. Source: ${e.instance ? JSON.stringify(e.instance) : "undefined"}`).join('\n').slice(0, 5000) 
       };
     }
     return { success: true, data: result };
@@ -65,23 +137,60 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
   let retryCount = 0;
   const maxRetries = options?.retries || 0;
   const delay = options?.retryDelay || 1000;
+  const maxRateLimitWaitMs = 60 * 1000; // 60s is the max wait time for rate limit retries, hardcoded
+  let rateLimitRetryCount = 0;
+  let totalRateLimitWaitTime = 0;
 
   // Don't send body for GET, HEAD, DELETE, OPTIONS
   if(["GET", "HEAD", "DELETE", "OPTIONS"].includes(config.method!)) {
     config.data = undefined;
   }
+  
   do {
     try {
-      return await axios({
+      const response = await axios({
         ...config,
         validateStatus: null, // Don't throw on any status
       });
+      
+      if (response.status === 429) {
+
+        let waitTime = 0;
+        if (response.headers['retry-after']) {
+          // Retry-After can be a date or seconds
+          const retryAfter = response.headers['retry-after'];
+          if (/^\d+$/.test(retryAfter)) {
+            waitTime = parseInt(retryAfter, 10) * 1000;
+          } else {
+            const retryDate = new Date(retryAfter);
+            waitTime = retryDate.getTime() - Date.now();
+          }
+        } else {
+          // Exponential backoff with jitter
+          waitTime = Math.min(Math.pow(2, rateLimitRetryCount) * 1000 + Math.random() * 1000, 10000);
+        }
+        
+        // Check if we've exceeded the maximum wait time
+        if (totalRateLimitWaitTime + waitTime > maxRateLimitWaitMs) {
+          console.log(`Rate limit retry would exceed maximum wait time of ${maxRateLimitWaitMs}ms (60s)`);
+          return response; // Return the 429 response, caller will handle the error
+        }
+        
+        console.log(`Rate limited (429). Waiting ${waitTime}ms before retry.`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        
+        totalRateLimitWaitTime += waitTime;
+        rateLimitRetryCount++;
+        continue; // Skip the regular retry logic and try again immediately
+      }
+      
+      return response;
     } catch (error) {
       if (retryCount >= maxRetries) throw error;
       retryCount++;
       await new Promise(resolve => setTimeout(resolve, delay * retryCount));
     }
-  } while (retryCount < maxRetries);
+  } while (retryCount < maxRetries || rateLimitRetryCount > 0);  // separate max retries and rate limit retries
 }
 
 export function applyAuthFormat(format: string, credentials: Record<string, string>): string {
@@ -91,22 +200,6 @@ export function applyAuthFormat(format: string, credentials: Record<string, stri
     }
     return credentials[key];
   });
-}
-
-
-export function getAllKeys(obj: any): string[] {
-  let keys: string[] = [];
-  for (const key in obj) {
-    keys.push(`${typeof obj[key]}:${key}`);
-    if (obj[key] && typeof obj[key] === 'object') {
-      if (Array.isArray(obj[key])) {
-        keys = keys.concat(...obj[key].map(item => getAllKeys(item)));
-      } else {
-        keys = keys.concat(getAllKeys(obj[key]));
-      }
-    }
-  }
-  return keys.sort();
 }
 
 export function composeUrl(host: string, path: string) {
@@ -150,24 +243,24 @@ export function replaceVariables(template: string, variables: Record<string, any
   });
 }
 
-export function sample<T>(arr: any, sampleSize = 10): T[] {
-  if(!Array.isArray(arr)) {
-    return [arr];
-  }
-  const arrLength = arr.length;
-
-  if (arrLength <= sampleSize) {
-    return arr; // Return full array if less than or equal to sample size
-  }
-
-  const step = Math.floor(arrLength / sampleSize);
-  const result = [];
-
-  for (let i = 0; i < sampleSize; i++) {
-    result.push(arr[i * step]);
+export function sample(value: any, sampleSize = 10): any {
+  if (Array.isArray(value)) {
+    const arrLength = value.length;
+    if (arrLength <= sampleSize) {
+      return value.map(item => sample(item, sampleSize));
+    }
+    const step = Math.floor(arrLength / sampleSize);
+    return Array.from({ length: sampleSize }, (_, i) => sample(value[i * step], sampleSize));
   }
 
-  return result;
+  if (value && typeof value === 'object') {
+    return Object.entries(value).reduce((acc, [key, val]) => ({
+      ...acc,
+      [key]: sample(val, sampleSize)
+    }), {});
+  }
+
+  return value;
 }
 
 export function maskCredentials(message: string, credentials?: Record<string, string>): string {
@@ -232,4 +325,9 @@ function makeNullable(schema: any): any {
   }
   
   return newSchema;
+}
+
+export function getSchemaFromData(data: any): any {
+  if(!data) return null;
+  return toJsonSchema(data);
 }

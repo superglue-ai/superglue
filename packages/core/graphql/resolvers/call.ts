@@ -1,11 +1,13 @@
-import { ApiConfig, ApiInput, ApiInputRequest, CacheMode, Context, RequestOptions, TransformConfig } from "@superglue/shared";
+import { ApiConfig, ApiInputRequest, CacheMode, Context, RequestOptions, TransformConfig } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import OpenAI from "openai";
 import { v4 as uuidv4 } from 'uuid';
 import { callEndpoint, prepareEndpoint } from "../../utils/api.js";
+import { telemetryClient } from "../../utils/telemetry.js";
 import { applyJsonataWithValidation, maskCredentials } from "../../utils/tools.js";
 import { prepareTransform } from "../../utils/transform.js";
 import { notifyWebhook } from "../../utils/webhook.js";
+
 export const callResolver = async (
   _: any,
   { input, payload, credentials, options }: { 
@@ -49,18 +51,26 @@ export const callResolver = async (
 
         response = await callEndpoint(preparedEndpoint, payload, credentials, options);
 
-        if(!response.data || (Array.isArray(response.data) && response.data.length === 0) || (typeof response.data === 'object' && Object.keys(response.data).length === 0)) {
+        if(!response.data || (typeof response.data === 'object' && Object.keys(response.data).length === 0)) {
           response = null;
           throw new Error("No data returned from API. This could be due to a configuration error.");
         }
       } catch (error) {
-        console.log(`API call failed.`, error);
+        console.log(`API call failed. ${error?.message}`);
+        telemetryClient?.captureException(maskCredentials(error.message, credentials), context.orgId, {
+          preparedEndpoint: preparedEndpoint,
+          retryCount: retryCount,
+        });
         lastError = error?.message || JSON.stringify(error || {});
       }
       retryCount++;
     } while (!response && retryCount < 8);
     
     if(!response) {
+      telemetryClient?.captureException(new Error(`API call failed after ${retryCount} retries. Last error: ${maskCredentials(lastError, credentials)}`), context.orgId, {
+        preparedEndpoint: preparedEndpoint,
+        retryCount: retryCount,
+      });
       throw new Error(`API call failed after ${retryCount} retries. Last error: ${lastError}`);
     }
 
@@ -102,6 +112,7 @@ export const callResolver = async (
     return {...result, data: transformedResponse.data};
   } catch (error) {
     const maskedError = maskCredentials(error.message, credentials);
+    
     if (options?.webhookUrl) {
       await notifyWebhook(options.webhookUrl, callId, false, undefined, error.message);
     }
@@ -113,6 +124,11 @@ export const callResolver = async (
       startedAt,
       completedAt: new Date(),
     };
+    telemetryClient?.captureException(maskedError, context.orgId, {
+      preparedEndpoint: preparedEndpoint,
+      messages: messages,
+      result: result
+    });
     context.datastore.createRun(result, context.orgId);
     return result;
   }

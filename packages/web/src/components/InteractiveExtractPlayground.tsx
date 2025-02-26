@@ -1,17 +1,18 @@
 'use client'
 
 import { useConfig } from '@/src/app/config-context'
-import { ExtractConfig, SuperglueClient } from '@superglue/client'
-import { useEffect, useState } from 'react'
 import { findArraysOfObjects } from '@/src/lib/client-utils'
+import { ExtractConfig, SuperglueClient } from '@superglue/client'
+import { Loader2 } from "lucide-react"
+import { useEffect, useState } from 'react'
+import { AutoSizer, MultiGrid } from 'react-virtualized'
+import 'react-virtualized/styles.css'
 import JsonSchemaEditor from './JsonSchemaEditor'
 import { Button } from './ui/button'
 import { Card, CardContent } from './ui/card'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
-import { AutoSizer, MultiGrid } from 'react-virtualized'
-import 'react-virtualized/styles.css'
 
 interface InteractiveExtractPlaygroundProps {
   configId: string
@@ -20,23 +21,31 @@ interface InteractiveExtractPlaygroundProps {
   responseSchema: string
   onResponseSchemaChange: (schema: string) => void
   initialRawResponse?: any
+  responseMapping?: any
   onMappedResponse?: (response: any) => void
   onRun?: () => Promise<void>
   isRunning?: boolean
   mappedResponseData?: any
   hideRunButton?: boolean
+  hideInstruction?: boolean
   file?: File
 }
 
 function VirtualizedTable({ data, columns }: { data: any[], columns: string[] }) {
-  const COLUMN_WIDTH = Math.max(200, 600 / columns.length);
+  // Handle case where data is array of primitives
+  const processedData = data.map(item => 
+    typeof item === 'object' ? item : { value: item }
+  );
+  const processedColumns = columns.length ? columns : ['value'];
+  
+  const COLUMN_WIDTH = Math.max(200, 600 / processedColumns.length);
   const ROW_HEIGHT = 32;
   
   const cellRenderer = ({ columnIndex, key, rowIndex, style }: any) => {
     const isHeader = rowIndex === 0;
     const rawContent = isHeader 
-      ? columns[columnIndex]
-      : data[rowIndex - 1][columns[columnIndex]];
+      ? processedColumns[columnIndex]
+      : processedData[rowIndex - 1][processedColumns[columnIndex]];
     
     const content = typeof rawContent === 'object'
       ? JSON.stringify(rawContent)
@@ -52,7 +61,7 @@ function VirtualizedTable({ data, columns }: { data: any[], columns: string[] })
         className={`
           border-r border-b border-slate-300 p-2 flex items-center
           ${isHeader ? 'bg-secondary font-medium' : rowIndex % 2 ? 'bg-muted/50' : ''}
-          ${columnIndex === columns.length - 1 ? 'border-r-0' : ''}
+          ${columnIndex === processedColumns.length - 1 ? 'border-r-0' : ''}
           text-xs
         `}
         title={content}
@@ -71,11 +80,11 @@ function VirtualizedTable({ data, columns }: { data: any[], columns: string[] })
           <MultiGrid
             cellRenderer={cellRenderer}
             columnWidth={COLUMN_WIDTH}
-            columnCount={columns.length}
+            columnCount={processedColumns.length}
             fixedRowCount={1}
             height={height}
             rowHeight={ROW_HEIGHT}
-            rowCount={data.length + 1}
+            rowCount={processedData.length + 1}
             width={width}
             overscanRowCount={5}
             overscanColumnCount={2}
@@ -102,12 +111,13 @@ export function InteractiveExtractPlayground({
   responseSchema,
   onResponseSchemaChange,
   initialRawResponse,
+  responseMapping,
   onMappedResponse,
   onRun,
   isRunning,
-
   mappedResponseData,
   hideRunButton,
+  hideInstruction,
   file
 }: InteractiveExtractPlaygroundProps) {
   const [isLoading, setIsLoading] = useState(false)
@@ -151,33 +161,20 @@ export function InteractiveExtractPlayground({
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full">
       {/* Left Column */}
       <div className="flex flex-col space-y-4 overflow-hidden">
-        <div>
-          <Label>Instruction</Label>
-          <Input
-            value={instruction}
-            onChange={(e) => onInstructionChange?.(e.target.value)}
-            placeholder="E.g. 'Get all products with price and name'"
-            disabled={!onInstructionChange}
-          />
-        </div>
+        {!hideInstruction && (
+          <div>
+            <Label>Instruction</Label>
+            <Input
+              value={instruction}
+              onChange={(e) => onInstructionChange?.(e.target.value)}
+              placeholder="E.g. 'Get all products with price and name'"
+              disabled={!onInstructionChange}
+            />
+          </div>
+        )}
 
-        <div>
-          <Label>Extraction Source</Label>
-          <Card>
-            <CardContent className="p-3">
-              <code className="text-sm text-muted-foreground break-all">
-                {config ? (
-                  <><span className="text-primary font-bold">{config.method || 'POST'}</span> {config.urlHost}{config.urlPath || ''}</>
-                ) : (
-                  <><span className="text-primary font-bold">FILE</span> {file?.name}</>
-                )}
-              </code>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="flex-1 min-h-0 overflow-hidden flex flex-col max-h-[calc(100vh-20rem)]">
-          <div className="flex-1 min-h-0 bg-background">
+        <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+          <div className="flex-1 min-h-0 bg-background h-full">
             <JsonSchemaEditor
               value={responseSchema}
               onChange={onResponseSchemaChange}
@@ -191,7 +188,16 @@ export function InteractiveExtractPlayground({
               onClick={handleRun}
               disabled={isRunning || isLoading}
             >
-              {isRunning || isLoading ? 'Running...' : 'Run'}
+              {isRunning || isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Running...
+                </>
+              ) : (
+                <>
+                  ✨ Run
+                </>
+              )}
             </Button>
           </div>
         )}
@@ -204,7 +210,8 @@ export function InteractiveExtractPlayground({
             <CardContent className="p-0 h-full flex flex-col bg-secondary">
               <TabsList className="w-full rounded-t-lg rounded-b-none">
                 <TabsTrigger value="raw" className="flex-1">Raw Document</TabsTrigger>
-                <TabsTrigger value="mapped" className="flex-1">Output</TabsTrigger>
+                <TabsTrigger value="mapped" className="flex-1">🍯 Output</TabsTrigger>
+                <TabsTrigger value="jsonata" className="flex-1">Response Mapping</TabsTrigger>
               </TabsList>
 
               <div className="flex-1 min-h-0">
@@ -259,10 +266,10 @@ export function InteractiveExtractPlayground({
                           </TabsList>
                           {Object.entries(mappedResponse).map(([key, array]) => (
                             <TabsContent key={key} value={key} className="h-[calc(100%-40px)]">
-                              {array?.length > 0 ? (
+                              {Array.isArray(array) && array.length > 0 ? (
                                 <VirtualizedTable 
                                   data={array} 
-                                  columns={Object.keys(array[0])}
+                                  columns={typeof array[0] === 'object' ? Object.keys(array[0]) : []}
                                 />
                               ) : (
                                 <div className="text-xs">Output will appear here...</div>
@@ -274,7 +281,9 @@ export function InteractiveExtractPlayground({
                         Object.values(mappedResponse)[0]?.length > 0 ? (
                           <VirtualizedTable 
                             data={Object.values(mappedResponse)[0]} 
-                            columns={Object.keys(Object.values(mappedResponse)[0][0])}
+                            columns={typeof Object.values(mappedResponse)[0][0] === 'object' 
+                              ? Object.keys(Object.values(mappedResponse)[0][0]) 
+                              : []}
                           />
                         ) : (
                           <div className="text-xs">Output will appear here...</div>
@@ -283,6 +292,14 @@ export function InteractiveExtractPlayground({
                     ) : (
                       <div className="text-xs">Output will appear here...</div>
                     )}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="jsonata" className="m-0 h-full data-[state=active]:flex flex-col">
+                  <div className="flex-1 min-h-0 p-4 overflow-y-auto">
+                    <pre className="text-xs whitespace-pre-wrap">
+                      {responseMapping || 'No JSONata mapping available'}
+                    </pre>
                   </div>
                 </TabsContent>
               </div>

@@ -4,7 +4,7 @@ import OpenAI from "openai";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { getDocumentation } from "./documentation.js";
-import { API_PROMPT } from "./prompts.js";
+import { API_ERROR_HANDLING_USER_PROMPT, API_PROMPT } from "./prompts.js";
 import { callAxios, composeUrl, replaceVariables } from "./tools.js";
 
 
@@ -27,7 +27,7 @@ export async function prepareEndpoint(
     };
 
     // If a documentation URL is provided, fetch and parse additional details
-    const documentation = await getDocumentation(apiCallConfig.documentationUrl || composeUrl(apiCallConfig.urlHost, apiCallConfig.urlPath), apiCallConfig.headers, apiCallConfig.queryParams);
+    const documentation = await getDocumentation(apiCallConfig.documentationUrl || composeUrl(apiCallConfig.urlHost, apiCallConfig.urlPath), apiCallConfig.headers, apiCallConfig.queryParams, apiCallConfig?.urlPath);
 
     const availableVars = [...Object.keys(payload || {}), ...Object.keys(credentials || {})];
     const computedApiCallConfig = await generateApiConfig(apiCallConfig, documentation, availableVars, lastError, previousMessages);
@@ -76,7 +76,7 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
       JSON.parse(replaceVariables(endpoint.body, requestVars)) : 
       {};
 
-    const url = composeUrl(endpoint.urlHost, endpoint.urlPath);
+    const url = replaceVariables(composeUrl(endpoint.urlHost, endpoint.urlPath), requestVars);
     const axiosConfig: AxiosRequestConfig = {
       method: endpoint.method,
       url: url,
@@ -91,11 +91,23 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
 
     if(![200, 201, 204].includes(response?.status) || response.data?.error) {
       const error = JSON.stringify(response?.data?.error || response?.data);
-      const message = `${endpoint.method} ${url} failed with status ${response.status}. Response: ${error}
+      let message = `${endpoint.method} ${url} failed with status ${response.status}. Response: ${String(error).slice(0, 200)}
       Headers: ${JSON.stringify(headers)}
       Body: ${JSON.stringify(body)}
       Params: ${JSON.stringify(queryParams)}
       `;
+      
+      // Add specific context for rate limit errors
+      if (response.status === 429) {
+        const retryAfter = response.headers['retry-after'] 
+          ? `Retry-After: ${response.headers['retry-after']}` 
+          : 'No Retry-After header provided';
+        
+        message = `Rate limit exceeded. ${retryAfter}. Maximum wait time of 60s exceeded. 
+        
+        ${message}`;
+      }
+      
       throw new Error(`API call failed with status ${response.status}. Response: ${message}`);
     }
     if (typeof response.data === 'string' && 
@@ -135,7 +147,7 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
         hasMore = false;
       }
     } 
-    else if(responseData && dataPathSuccess) {
+    else if(responseData && allResults.length == 0) {
       allResults.push(responseData);
       hasMore = false;
     }
@@ -146,7 +158,7 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
   }
 
   return {
-    data: allResults
+    data: allResults?.length == 1 ? allResults[0] : allResults
   };
 }
 
@@ -173,8 +185,19 @@ async function generateApiConfig(
     }).optional()
   }));
   const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY
+    apiKey: process.env.OPENAI_API_KEY,
+    baseURL: process.env.OPENAI_API_BASE_URL
   });
+
+  const userProvidedAdditionalInfo = Boolean(
+    apiConfig.headers ||
+    apiConfig.queryParams ||
+    apiConfig.body ||
+    apiConfig.authentication ||
+    apiConfig.dataPath ||
+    apiConfig.pagination ||
+    apiConfig.method
+  );
 
   const initialUserMessage: OpenAI.Chat.ChatCompletionUserMessageParam = {
     role: "user", 
@@ -185,7 +208,8 @@ Instructions: ${apiConfig.instruction}
 
 Base URL: ${composeUrl(apiConfig.urlHost, apiConfig.urlPath)}
 
-Also, the user provided the following information, which is probably correct:
+${userProvidedAdditionalInfo ? `Also, the user provided the following information, which is probably correct: ` : ''}
+${userProvidedAdditionalInfo ? `Ensure to use the provided information. You must try them at least where they make sense.` : ''}
 ${apiConfig.headers ? `Headers: ${JSON.stringify(apiConfig.headers)}` : ''}
 ${apiConfig.queryParams ? `Query Params: ${JSON.stringify(apiConfig.queryParams)}` : ''}
 ${apiConfig.body ? `Body: ${JSON.stringify(apiConfig.body)}` : ''}
@@ -194,23 +218,18 @@ ${apiConfig.dataPath ? `Data Path: ${apiConfig.dataPath}` : ''}
 ${apiConfig.pagination ? `Pagination: ${JSON.stringify(apiConfig.pagination)}` : ''}
 ${apiConfig.method ? `Method: ${apiConfig.method}` : ''}
 
-Documentation: ${String(documentation).slice(0, 20000)}
-
 Available variables: ${vars.join(", ")}
-`
+
+Documentation: ${String(documentation).slice(0, 80000)}`
   }
+
+  const errorHandlingMessage = API_ERROR_HANDLING_USER_PROMPT
+    .replace("{error}", lastError)
+    .replace("{previous_config}", JSON.stringify(apiConfig));
 
   const subsequentUserMessage: OpenAI.Chat.ChatCompletionUserMessageParam = {
     role: "user",
-    content: 
-`You made an error, the configuration you generated was incorrect and failed with the following error: ${lastError}
-
-The previous configuration was: ${JSON.stringify(apiConfig)}.
-
-In case of a 401 error, please pay special attention to the authentication type and headers.
-
-You will get to try again, so feel free to experiment and iterate on the configuration.
-Make sure to try a fix before generating a new configuration. I will loose my job if I don't get this right.`
+    content: errorHandlingMessage
   }
 
   const systemMessage: OpenAI.Chat.ChatCompletionSystemMessageParam = {
@@ -253,7 +272,7 @@ Make sure to try a fix before generating a new configuration. I will loose my jo
   const invalidVars = validateVariables(generatedConfig, vars);
   
   if (invalidVars.length > 0) {
-    throw new Error(`Generated config contains variables that are not available. Please remove them: ${invalidVars.join(', ')}`);
+    throw new Error(`The following variables are not defined: ${invalidVars.join(', ')}`);
   }
 
   return {

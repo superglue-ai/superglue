@@ -2,10 +2,10 @@
 
 import { useConfig } from '@/src/app/config-context'
 import { useToast } from '@/src/hooks/use-toast'
-import { cleanApiDomain, cn } from '@/src/lib/utils'
 import { findArraysOfObjects } from '@/src/lib/client-utils'
+import { cleanApiDomain, cn } from '@/src/lib/utils'
 import { ApiConfig, AuthType, CacheMode, ExtractConfig, SuperglueClient, TransformConfig } from '@superglue/client'
-import { Copy, Download, Upload, Loader2, Terminal } from 'lucide-react'
+import { Copy, Download, Loader2, Terminal, Upload } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { InteractiveExtractPlayground } from '../InteractiveExtractPlayground'
@@ -37,6 +37,7 @@ export function ExtractCreateStepper({ open, onOpenChange, extractId: initialExt
   const [initialRawResponse, setInitialRawResponse] = useState<any>(null)
   const [hasMappedResponse, setHasMappedResponse] = useState(false)
   const [mappedResponseData, setMappedResponseData] = useState<any>(null)
+  const [responseMapping, setResponseMapping] = useState<any>(null)
   const [isRunning, setIsRunning] = useState(false)
 
   const [formData, setFormData] = useState({
@@ -73,28 +74,6 @@ export function ExtractCreateStepper({ open, onOpenChange, extractId: initialExt
     if (field === 'responseSchema' || field === 'instruction') {
       setHasMappedResponse(false)
       setMappedResponseData(null)
-    }
-  }
-
-  const handleUrlBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-    const url = e.target.value
-    try {
-      const urlObj = new URL(url)
-      const cleanedHost = cleanApiDomain(`${urlObj.protocol}//${urlObj.host}`)
-      const path = urlObj.pathname === '/' ? '' : urlObj.pathname
-      
-      setFormData(prev => ({
-        ...prev,
-        urlHost: cleanedHost,
-        ...(path ? { urlPath: path } : {})
-      }))
-    } catch {
-      // If URL parsing fails, just use existing cleanApiDomain
-      const cleanedUrl = cleanApiDomain(url)
-      setFormData(prev => ({
-        ...prev,
-        urlHost: cleanedUrl
-      }))
     }
   }
 
@@ -151,22 +130,23 @@ export function ExtractCreateStepper({ open, onOpenChange, extractId: initialExt
           return
         }
       }
-    }
-
-    if (step === 'auth') {
-      setIsAutofilling(true)
-      try {
-        await fetchFromConfig()
-      } catch (error: any) {
-        console.error('Error during autofill:', error)
-        toast({
-          title: 'Autofill Failed',
-          description: error?.message || 'An error occurred while configuring the API',
-          variant: 'destructive'
-        })
-        return
-      } finally {
-        setIsAutofilling(false)
+      
+      // If URL is selected, fetch from config
+      if(activeSourceTab === 'url') {
+        setIsAutofilling(true)
+        try {
+          await fetchFromConfig()
+        } catch (error: any) {
+          console.error('Error during autofill:', error)
+          toast({
+            title: 'Autofill Failed',
+            description: error?.message || 'An error occurred while configuring the API',
+            variant: 'destructive'
+          })
+          return
+        } finally {
+          setIsAutofilling(false)
+        }
       }
     }
 
@@ -204,7 +184,7 @@ export function ExtractCreateStepper({ open, onOpenChange, extractId: initialExt
       }
     }
 
-    const steps: StepperStep[] = ['basic', 'auth', 'try_and_output', 'success']
+    const steps: StepperStep[] = ['basic', 'try_and_output', 'success']
     const currentIndex = steps.indexOf(step)
     if (currentIndex < steps.length - 1) {
       setStep(steps[currentIndex + 1])
@@ -212,12 +192,8 @@ export function ExtractCreateStepper({ open, onOpenChange, extractId: initialExt
   }
 
   const handleBack = () => {
-    const steps: StepperStep[] = ['basic', 'auth', 'try_and_output', 'success']
+    const steps: StepperStep[] = ['basic', 'try_and_output', 'success']
     const currentIndex = steps.indexOf(step)
-    if(step === 'try_and_output' && file) {
-      setStep('basic')
-      return
-    }
     if (currentIndex > 0) {
       setStep(steps[currentIndex - 1])
     }
@@ -264,7 +240,6 @@ curl -s -X POST "${superglueConfig.superglueEndpoint}" \\
       console.warn('Invalid input payload JSON')
     }
     const credentials = parseCredentialsHelper(formData.auth.value, JSON.parse(formData.auth.advancedConfig))
-
     const extractCommand = `# First command: Extract data and store in JSON
 curl -s -X POST "${superglueConfig.superglueEndpoint}" \\
   -H "Authorization: Bearer ${superglueConfig.superglueApiKey}" \\
@@ -422,7 +397,7 @@ if (transformResult?.success) {
       })
 
       let mappedData = initialRawResponse;
-
+      let responseMapping = null;
       if(formData.responseSchema && Object.keys(JSON.parse(formData.responseSchema)).length > 0) {
         await superglueClient.upsertTransformation(extractId, {
           responseSchema: JSON.parse(formData.responseSchema),
@@ -438,10 +413,13 @@ if (transformResult?.success) {
           throw new Error(mappedResult.error);
         }
         mappedData = mappedResult.data;
+        console.log('mappedResult.config', mappedResult.config)
+        responseMapping = (mappedResult.config as TransformConfig).responseMapping;
       }
       
       setInitialRawResponse(initialRawResponse);
       setMappedResponseData(mappedData);
+      setResponseMapping(responseMapping);
       setHasMappedResponse(true);
 
     } catch (error: any) {
@@ -528,27 +506,32 @@ if (transformResult?.success) {
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-full lg:max-w-[calc(100vw-6rem)] w-[1400px] h-full lg:h-[calc(100vh-6rem)] mx-auto lg:py-12 flex flex-col">
-        <DialogHeader>
-        <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
-          <DialogTitle>
-              {step === 'success' ? 'Configuration Complete!' : 'Create New Document Configuration'}
-            </DialogTitle>
-            {!step.includes('success') && (
-              <Button
-                variant="outline"
-                className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-200/50 hover:border-blue-300/50 text-blue-600 hover:text-blue-700 text-sm px-4 py-1 h-8 rounded-full animate-pulse shrink-0"
-                onClick={() => window.open('https://cal.com/teamindex/onboarding', '_blank')}
-              >
-                ✨ Get help from our team
-              </Button>
-            )}
-          </div>
-        </DialogHeader>
+      <DialogContent 
+        className="h-[100vh] w-[100vw] max-w-[100vw] p-3 sm:p-6 lg:p-12 gap-0 rounded-none border-none flex flex-col"
+        onPointerDownOutside={e => e.preventDefault()}
+      >
+        <div className="flex-none mb-4">
+          <DialogHeader>
+            <div className="flex flex-col lg:flex-row items-center justify-between gap-4 mb-4">
+              <DialogTitle>
+                {step === 'success' ? 'Configuration Complete!' : 'Create New Document Configuration'}
+              </DialogTitle>
+              {!step.includes('success') && (
+                <Button
+                  variant="outline"
+                  className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-200/50 hover:border-blue-300/50 text-blue-600 hover:text-blue-700 text-sm px-4 py-1 h-8 rounded-full animate-pulse shrink-0"
+                  onClick={() => window.open('https://cal.com/teamindex/onboarding', '_blank')}
+                >
+                  ✨ Get help from our team
+                </Button>
+              )}
+            </div>
+          </DialogHeader>
 
-        <StepIndicator currentStep={step} />
+          <StepIndicator currentStep={step} />
+        </div>
 
-        <div className="mt-4 flex-1 overflow-y-auto px-1">
+        <div className="flex-1 overflow-y-auto px-1 min-h-0">
           {step === 'basic' && (
             <div className="space-y-3">
               <div>
@@ -633,7 +616,7 @@ if (transformResult?.success) {
                               )}
                               onClick={() => document.getElementById('file-upload')?.click()}
                             >
-                              Upload API Spec or Documentation
+                              Upload File
                             </Button>
                             <input
                               type="file"
@@ -669,7 +652,6 @@ if (transformResult?.success) {
                           setValidationErrors(prev => ({ ...prev, urlHost: false }))
                         }
                       }}
-                      onBlur={handleUrlBlur}
                       placeholder="https://api.example.com"
                       required
                       className={cn(
@@ -827,11 +809,13 @@ if (transformResult?.success) {
                 responseSchema={formData.responseSchema}
                 onResponseSchemaChange={handleChange('responseSchema')}
                 initialRawResponse={initialRawResponse}
+                responseMapping={responseMapping}
                 onMappedResponse={handleMappedResponse}
                 onRun={handleRun}
                 isRunning={isRunning}
                 mappedResponseData={mappedResponseData}
                 hideRunButton={true}
+                hideInstruction={true}
                 file={file}
               />
             </div>
@@ -839,8 +823,8 @@ if (transformResult?.success) {
 
           {step === 'success' && (
             <div className="space-y-4 h-full">
-              <p className="text-m font-medium">Done! superglue has configured the API endpoint. You can now use it from your application</p>
-              <p className="text-sm font-medium">When you call your superglue API, the call is directly proxied to the targeted endpoint without any AI inbewteen. Thus, API calls remain predicable and fast with ms latency. We provide a TypeScript client SDK for easy integration in your application.</p>
+              <p className="text-m font-medium">Done!</p>
+              <p className="text-sm font-medium">Your extraction is complete. You can now download the results or use the code examples below.</p>
               
               <Tabs defaultValue="download" className="w-full">
                 <TabsList className="grid w-full grid-cols-3">
@@ -887,21 +871,23 @@ if (transformResult?.success) {
                     <div className="flex items-start space-x-2">
                       <Terminal className="mt-0.5 h-5 w-5 text-muted-foreground shrink-0" />
                       <div className="space-y-1 w-full">
-                        <p className="text-sm font-medium">Try the endpoint locally with curl: </p>
-                        <div className="relative flex items-start gap-2">
-                          <pre className="flex-1 rounded-lg bg-secondary p-4 text-sm overflow-x-auto whitespace-pre-wrap break-all">
-                            <code>{getCurlCommand()}</code>
-                          </pre>
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium">Try the endpoint locally with curl: </p>
                           <Button
                             variant="ghost" 
                             size="icon"
-                            className="h-8 w-8 shrink-0 mt-2"
+                            className="h-8 w-8 shrink-0"
                             onClick={() => {
                               navigator.clipboard.writeText(getCurlCommand());
                             }}
                           >
                             <Copy className="h-4 w-4" />
                           </Button>
+                        </div>
+                        <div className="relative">
+                          <pre className="rounded-lg bg-secondary p-4 text-sm overflow-x-auto whitespace-pre-wrap break-all">
+                            <code>{getCurlCommand()}</code>
+                          </pre>
                         </div>
                       </div>
                     </div>
@@ -913,11 +899,8 @@ if (transformResult?.success) {
                     <div className="flex items-start space-x-2">
                       <Terminal className="mt-0.5 h-5 w-5 text-muted-foreground shrink-0" />
                       <div className="space-y-1 w-full">
-                        <p className="text-sm font-medium">Or use the TypeScript SDK in your application: </p>
-                        <div className="relative flex items-start gap-2">
-                          <pre className="flex-1 rounded-lg bg-secondary p-4 text-sm overflow-x-auto whitespace-pre-wrap break-all">
-                            <code>{getSdkCode()}</code>
-                          </pre>
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium">Or use the TypeScript SDK in your application: </p>
                           <Button
                             variant="ghost" 
                             size="icon"
@@ -929,6 +912,11 @@ if (transformResult?.success) {
                             <Copy className="h-4 w-4" />
                           </Button>
                         </div>
+                        <div className="relative">
+                          <pre className="rounded-lg bg-secondary p-4 text-sm overflow-x-auto whitespace-pre-wrap break-all">
+                            <code>{getSdkCode()}</code>
+                          </pre>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -938,7 +926,7 @@ if (transformResult?.success) {
           )}
         </div>
 
-        <div className="mt-4 flex flex-col lg:flex-row gap-2 justify-between">
+        <div className="flex-none mt-2 sm:mt-4 flex flex-col lg:flex-row gap-2 justify-between">
           {step === 'success' ? (
             <>
               <Button
@@ -985,11 +973,20 @@ if (transformResult?.success) {
                 {isAutofilling ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {step as StepperStep === 'auth' ? 'superglue automagically configures API...' : 'Configuring...'}
+                    {step as StepperStep === 'basic' ? 'superglue extracts file...' : 'Configuring...'}
                   </>
                 ) : (
                   step === 'try_and_output' ? 
-                    (isRunning ? 'Running...' : (!mappedResponseData ? 'Run ✨' : 'Complete')) : 
+                    (isRunning ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Running...
+                      </>
+                    ) : (!mappedResponseData ? (
+                      <>
+                        ✨ Run
+                      </>
+                    ) : 'Complete')) : 
                     'Next'
                 )}
               </Button>

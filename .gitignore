@@ -8,3 +8,4 @@ node_modules
 build.sh
 diff.txt
 diff.sh
+**/superglue_data.json
