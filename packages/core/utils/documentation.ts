@@ -14,15 +14,20 @@ export function postProcessLargeDoc(documentation: string, endpointPath: string)
   }
 
   // Extract search term from endpoint
-  const searchTerm = endpointPath ? endpointPath.startsWith('/') ? endpointPath.slice(1).toLowerCase() : endpointPath.toLowerCase() : endpointPath;
+  let searchTerm = endpointPath ? endpointPath.startsWith('/') ? endpointPath.slice(1).toLowerCase() : endpointPath.toLowerCase() : endpointPath;
+  searchTerm = searchTerm ? String(searchTerm).trim() : '';
   const docLower = documentation.toLowerCase();
 
   // Find all occurrences of the search term
   const positions: number[] = [];
-  let pos = docLower.indexOf(searchTerm);
-  while (pos !== -1) {
+  let pos = 0;
+  while (searchTerm?.length > 3) {
+    pos = docLower.indexOf(searchTerm, pos);
+    if (pos == -1) {
+      break;
+    }
     positions.push(pos);
-    pos = docLower.indexOf(searchTerm, pos + 1);
+    pos++;
   }
 
   // If no occurrences found or no endpoint provided, return max doc length
@@ -109,7 +114,7 @@ export async function getDocumentation(documentationUrl: string, headers: Record
           }
       }
     } catch (error) {
-      console.error(`Failed to fetch documentation from ${documentationUrl}:`, error?.message);
+      console.warn(`Failed to fetch documentation from ${documentationUrl}:`, error?.message);
     }
 
     if(documentation.length > docMaxLength) {
