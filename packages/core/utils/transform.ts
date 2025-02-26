@@ -94,8 +94,7 @@ ${JSON.stringify(sample(payload, 5), null, 2).slice(0,10000)}`
       ]
     }
     const reasoning = await openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL,
-      temperature: retry * 0.1,
+      model: "o3-mini",
       messages,
       response_format: {
         type: "json_schema",

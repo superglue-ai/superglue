@@ -13,6 +13,12 @@ export const upsertApiResolver = async (
     // override id with the id from the input
     const oldConfig = await context.datastore.getApiConfig(id, context.orgId);
 
+    if(!input.urlHost && !oldConfig?.urlHost) {
+      throw new Error("urlHost is required.");
+    }
+    if(!input.instruction && !oldConfig?.instruction) {
+      throw new Error("instruction is required");
+    }
     // reset the response mapping if there are major updates
     let newResponseMapping = input.responseMapping;
     const hasNoUpdates = (!input?.urlHost || oldConfig?.urlHost === input?.urlHost) && 
@@ -21,6 +27,7 @@ export const upsertApiResolver = async (
       (!input?.body || oldConfig?.body === input?.body) &&
       (!input?.queryParams || oldConfig?.queryParams === input?.queryParams) &&
       (!input?.headers || oldConfig?.headers === input?.headers) &&
+      (!input?.responseSchema || oldConfig?.responseSchema === input?.responseSchema) &&
       (!input?.instruction || oldConfig?.instruction === input?.instruction);
     if (!newResponseMapping && hasNoUpdates) {
       newResponseMapping = oldConfig?.responseMapping;
