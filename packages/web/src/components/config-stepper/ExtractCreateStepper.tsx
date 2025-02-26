@@ -2,10 +2,10 @@
 
 import { useConfig } from '@/src/app/config-context'
 import { useToast } from '@/src/hooks/use-toast'
-import { cleanApiDomain, cn } from '@/src/lib/utils'
 import { findArraysOfObjects } from '@/src/lib/client-utils'
+import { cleanApiDomain, cn } from '@/src/lib/utils'
 import { ApiConfig, AuthType, CacheMode, ExtractConfig, SuperglueClient, TransformConfig } from '@superglue/client'
-import { Copy, Download, Upload, Loader2, Terminal } from 'lucide-react'
+import { Copy, Download, Loader2, Terminal, Upload } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { InteractiveExtractPlayground } from '../InteractiveExtractPlayground'
@@ -533,10 +533,10 @@ if (transformResult?.success) {
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent 
-        className="h-[100vh] w-[100vw] max-w-[100vw] p-12 gap-0 rounded-none border-none flex flex-col"
+        className="h-[100vh] w-[100vw] max-w-[100vw] p-3 sm:p-6 lg:p-12 gap-0 rounded-none border-none flex flex-col"
         onPointerDownOutside={e => e.preventDefault()}
       >
-        <div className="flex-none mb-12">
+        <div className="flex-none mb-4">
           <DialogHeader>
             <div className="flex flex-col lg:flex-row items-center justify-between gap-4 mb-4">
               <DialogTitle>
@@ -849,8 +849,8 @@ if (transformResult?.success) {
 
           {step === 'success' && (
             <div className="space-y-4 h-full">
-              <p className="text-m font-medium">Done! superglue has configured the API endpoint. You can now use it from your application</p>
-              <p className="text-sm font-medium">When you call your superglue API, the call is directly proxied to the targeted endpoint without any AI inbewteen. Thus, API calls remain predicable and fast with ms latency. We provide a TypeScript client SDK for easy integration in your application.</p>
+              <p className="text-m font-medium">Done!</p>
+              <p className="text-sm font-medium">You can now call the endpoint from your app. The call is proxied to the targeted endpoint without AI inbewteen. Predictable and millisecond latency.</p>
               
               <Tabs defaultValue="download" className="w-full">
                 <TabsList className="grid w-full grid-cols-3">
@@ -897,21 +897,23 @@ if (transformResult?.success) {
                     <div className="flex items-start space-x-2">
                       <Terminal className="mt-0.5 h-5 w-5 text-muted-foreground shrink-0" />
                       <div className="space-y-1 w-full">
-                        <p className="text-sm font-medium">Try the endpoint locally with curl: </p>
-                        <div className="relative flex items-start gap-2">
-                          <pre className="flex-1 rounded-lg bg-secondary p-4 text-sm overflow-x-auto whitespace-pre-wrap break-all">
-                            <code>{getCurlCommand()}</code>
-                          </pre>
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium">Try the endpoint locally with curl: </p>
                           <Button
                             variant="ghost" 
                             size="icon"
-                            className="h-8 w-8 shrink-0 mt-2"
+                            className="h-8 w-8 shrink-0"
                             onClick={() => {
                               navigator.clipboard.writeText(getCurlCommand());
                             }}
                           >
                             <Copy className="h-4 w-4" />
                           </Button>
+                        </div>
+                        <div className="relative">
+                          <pre className="rounded-lg bg-secondary p-4 text-sm overflow-x-auto whitespace-pre-wrap break-all">
+                            <code>{getCurlCommand()}</code>
+                          </pre>
                         </div>
                       </div>
                     </div>
@@ -923,11 +925,8 @@ if (transformResult?.success) {
                     <div className="flex items-start space-x-2">
                       <Terminal className="mt-0.5 h-5 w-5 text-muted-foreground shrink-0" />
                       <div className="space-y-1 w-full">
-                        <p className="text-sm font-medium">Or use the TypeScript SDK in your application: </p>
-                        <div className="relative flex items-start gap-2">
-                          <pre className="flex-1 rounded-lg bg-secondary p-4 text-sm overflow-x-auto whitespace-pre-wrap break-all">
-                            <code>{getSdkCode()}</code>
-                          </pre>
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium">Or use the TypeScript SDK in your application: </p>
                           <Button
                             variant="ghost" 
                             size="icon"
@@ -939,6 +938,11 @@ if (transformResult?.success) {
                             <Copy className="h-4 w-4" />
                           </Button>
                         </div>
+                        <div className="relative">
+                          <pre className="rounded-lg bg-secondary p-4 text-sm overflow-x-auto whitespace-pre-wrap break-all">
+                            <code>{getSdkCode()}</code>
+                          </pre>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -948,7 +952,7 @@ if (transformResult?.success) {
           )}
         </div>
 
-        <div className="flex-none mt-4 flex flex-col lg:flex-row gap-2 justify-between">
+        <div className="flex-none mt-2 sm:mt-4 flex flex-col lg:flex-row gap-2 justify-between">
           {step === 'success' ? (
             <>
               <Button
