@@ -210,7 +210,7 @@ export function InteractiveExtractPlayground({
             <CardContent className="p-0 h-full flex flex-col bg-secondary">
               <TabsList className="w-full rounded-t-lg rounded-b-none">
                 <TabsTrigger value="raw" className="flex-1">Raw Document</TabsTrigger>
-                <TabsTrigger value="mapped" className="flex-1">Output</TabsTrigger>
+                <TabsTrigger value="mapped" className="flex-1">🍯 Output</TabsTrigger>
                 <TabsTrigger value="jsonata" className="flex-1">JSONata</TabsTrigger>
               </TabsList>
 
