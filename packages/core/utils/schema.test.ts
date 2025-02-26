@@ -48,6 +48,8 @@ describe('generateSchema', () => {
     // Reset environment before each test
     process.env = { ...originalEnv }
     process.env.OPENAI_API_KEY = 'test-key'
+    // Set default model for tests
+    process.env.OPENAI_MODEL = 'gpt-4o'
     
     // Reset the mocks before each test
     vi.resetAllMocks()
@@ -113,9 +115,12 @@ describe('generateSchema', () => {
 
     const o3MiniCallArgs = mockCreate.mock.calls[0][0]
     expect(o3MiniCallArgs.temperature).toBeUndefined()
+    expect(o3MiniCallArgs.model).toBe('o3-mini')
     
+    // Reset for gpt-4o test
     vi.resetAllMocks()
-    process.env.SCHEMA_GENERATION_MODEL = 'gpt-4o'
+    delete process.env.SCHEMA_GENERATION_MODEL // Remove specific model setting
+    process.env.OPENAI_MODEL = 'gpt-4o' // Set via fallback
     
     mockCreate.mockResolvedValueOnce({
       choices: [
@@ -130,7 +135,9 @@ describe('generateSchema', () => {
     await generateSchema(instruction, responseData)
     
     const gpt4oCallArgs = mockCreate.mock.calls[0][0]
+    // Verify temperature parameter is included for gpt-4o
     expect(gpt4oCallArgs.temperature).toBeDefined()
+    expect(gpt4oCallArgs.model).toBe('gpt-4o')
   })
 
   // Skip live API tests when API key isn't available
