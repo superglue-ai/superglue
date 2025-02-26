@@ -12,3 +12,5 @@ use tailwind classes instead of CSS to style HTML elements if possible.
 name handlers with the handle prefix, use descriptive variable names.
 
 use early returns to make code more readable.
+
+to run unit tests, always just run `npm run test` in the top level project folder.
