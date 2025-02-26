@@ -1,29 +1,7 @@
 "use client"
 
-import React from 'react';
-import { useRouter } from 'next/navigation';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/src/components/ui/table";
-import { Button } from "@/src/components/ui/button";
-import { Plus, Settings, Play, History, Trash2, RotateCw } from "lucide-react";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/src/components/ui/sheet"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/src/components/ui/tooltip"
-import ApiConfigDetail from '@/src/app/configs/[id]/page';
-import { ApiConfig, ExtractConfig } from '@superglue/client';
 import { useConfig } from '@/src/app/config-context';
-import { SuperglueClient } from '@superglue/client';
-import { Badge } from "@/src/components/ui/badge";
+import ApiConfigDetail from '@/src/app/configs/[id]/page';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,7 +11,26 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/src/components/ui/alert-dialog"
+} from "@/src/components/ui/alert-dialog";
+import { Badge } from "@/src/components/ui/badge";
+import { Button } from "@/src/components/ui/button";
+import {
+  Sheet,
+  SheetContent
+} from "@/src/components/ui/sheet";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/src/components/ui/table";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/src/components/ui/tooltip";
+import { ApiConfig, ExtractConfig, SuperglueClient } from '@superglue/client';
+import { History, Play, Plus, RotateCw, Settings, Trash2 } from "lucide-react";
+import { useRouter } from 'next/navigation';
+import React from 'react';
 
 const ConfigTable = () => {
   const router = useRouter();
@@ -190,6 +187,71 @@ const ConfigTable = () => {
             <TableBody>
             </TableBody>
           </Table>
+        </div>
+      </div>
+    );
+  }
+
+  if (configs.length === 0) {
+    return (
+      <div className="p-8 max-w-none w-full min-h-full">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold">Configurations</h1>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={refreshConfigs}
+                  className="transition-transform"
+                >
+                  <RotateCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Refresh Configurations</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+
+        <div className="flex flex-col items-center justify-center py-16">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 w-full max-w-4xl">
+            <Button 
+              onClick={handleCreateNew} 
+              className="h-64 shadow-md hover:shadow-lg transition-all duration-300 rounded-2xl bg-card border border-primary/20 hover:border-primary/30"
+              variant="outline"
+              size="lg"
+            >
+              <div className="flex flex-col items-center justify-center gap-7">
+                <div className="p-6 rounded-full bg-primary/10 hover:bg-primary/15 transition-colors duration-300">
+                  <Plus className="h-16 w-16 text-primary" strokeWidth={1.5} />
+                </div>
+                <div className="flex flex-col items-center">
+                  <span className="text-2xl font-semibold mb-2">Add new API</span>
+                  <span className="text-muted-foreground text-sm max-w-[12rem] text-center">One click connect to any API</span>
+                </div>
+              </div>
+            </Button>
+            
+            <Button 
+              onClick={handleCreateNewExtract} 
+              className="h-64 shadow-md hover:shadow-lg transition-all duration-300 rounded-2xl bg-card border border-primary/20 hover:border-primary/30"
+              variant="outline"
+              size="lg"
+            >
+              <div className="flex flex-col items-center justify-center gap-7">
+                <div className="p-6 rounded-full bg-primary/10 hover:bg-primary/15 transition-colors duration-300">
+                  <Plus className="h-16 w-16 text-primary" strokeWidth={1.5} />
+                </div>
+                <div className="flex flex-col items-center">
+                  <span className="text-2xl font-semibold mb-2">Add new File</span>
+                  <span className="text-muted-foreground text-sm max-w-[12rem] text-center">Map any file to your structure</span>
+                </div>
+              </div>
+            </Button>
+          </div>
         </div>
       </div>
     );
