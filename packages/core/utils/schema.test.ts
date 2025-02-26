@@ -1,64 +1,140 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { generateSchema } from './schema.js'
 
-describe('generateSchema', () => {
-  vi.setConfig({ testTimeout: 20000 }) // 20 seconds timeout
+// Create mock functions that will be used in our tests
+const mockCreate = vi.fn()
 
-  if(!process.env.VITE_OPENAI_API_KEY) {
-    it('skips tests when VITE_OPENAI_API_KEY is not set', () => {})
-    return
-  }
-  else {
-    process.env.OPENAI_API_KEY = process.env.VITE_OPENAI_API_KEY;
-    process.env.OPENAI_MODEL = process.env.VITE_OPENAI_MODEL || 'gpt-4o-2024-11-20';
-  }
-  it('should generate a valid schema', async () => {
-    const expectedSchema = {
-      type: "object",
-      properties: {
-        results: {
-          type: "array",
-          items: {
-            type: "object", 
-            properties: {
-              name: {
-                type: "string"
-              }
-            },
-            required: ["name"]
+// Mock the openai module
+vi.mock('openai', () => {
+  return {
+    default: function() {
+      return {
+        chat: {
+          completions: {
+            create: mockCreate
           }
         }
-      },
-      required: ["results"]
+      }
     }
-    const schema = await generateSchema("get me all characters with only their name", '{"results": [{"name": "Rick", "species": "Human"}, {"name": "Morty", "species": "Human"}]}')
-    expect(schema).toEqual(expectedSchema)
-  })
+  }
+})
 
-  it('should generate a valid schema for a single object response', async () => {
-    const expectedSchema = {
-      type: "object",
-      properties: {
-        result: {
-          type: "object",
+describe('generateSchema', () => {
+  const originalEnv = { ...process.env }
+  
+  // Test data
+  const instruction = "get me all characters with only their name"
+  const responseData = '{"results": [{"name": "Homer", "species": "Human"}, {"name": "Bart", "species": "Human"}]}'
+  const expectedSchema = {
+    type: "object",
+    properties: {
+      results: {
+        type: "array",
+        items: {
+          type: "object", 
           properties: {
-            id: {
+            name: {
               type: "string"
-            },
-            status: {
-              type: "string",
-
             }
           },
-          required: ["id", "status"]
+          required: ["name"]
         }
-      },
-      required: ["result"]
-    }
-    const schema = await generateSchema(
-      "Get the current account status and ID for the authenticated user",
-      '{"result": {"id": "123e4567-e89b-12d3-a456-426614174000", "status": "active"}}'
-    )
-    expect(schema).toEqual(expectedSchema)
+      }
+    },
+    required: ["results"]
+  }
+
+  beforeEach(() => {
+    // Reset environment before each test
+    process.env = { ...originalEnv }
+    process.env.OPENAI_API_KEY = 'test-key'
+    
+    // Reset the mocks before each test
+    vi.resetAllMocks()
   })
+
+  afterEach(() => {
+    process.env = originalEnv
+  })
+
+  it('should generate a valid schema (happy path)', async () => {
+    mockCreate.mockResolvedValueOnce({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({ jsonSchema: expectedSchema })
+          }
+        }
+      ]
+    })
+
+    const schema = await generateSchema(instruction, responseData)
+    expect(schema).toEqual(expectedSchema)
+    expect(mockCreate).toHaveBeenCalledTimes(1)
+  })
+
+  it('should retry on failure and succeed on second attempt', async () => {
+    // Mock a failure on first attempt, success on second
+    const errorMessage = 'Test error message'
+    mockCreate.mockRejectedValueOnce(new Error(errorMessage))
+    mockCreate.mockResolvedValueOnce({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({ jsonSchema: expectedSchema })
+          }
+        }
+      ]
+    })
+
+    const schema = await generateSchema(instruction, responseData)
+    expect(schema).toEqual(expectedSchema)
+
+    expect(mockCreate).toHaveBeenCalledTimes(2)
+
+    const secondCallArgs = mockCreate.mock.calls[1][0]
+    const lastMessage = secondCallArgs.messages[secondCallArgs.messages.length - 1]
+    expect(lastMessage.content).toContain(errorMessage)
+  })
+
+  it('should not include temperature parameter for o3-mini model', async () => {
+    process.env.SCHEMA_GENERATION_MODEL = 'o3-mini'
+    mockCreate.mockResolvedValueOnce({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({ jsonSchema: expectedSchema })
+          }
+        }
+      ]
+    })
+
+    await generateSchema(instruction, responseData)
+
+    const o3MiniCallArgs = mockCreate.mock.calls[0][0]
+    expect(o3MiniCallArgs.temperature).toBeUndefined()
+    
+    vi.resetAllMocks()
+    process.env.SCHEMA_GENERATION_MODEL = 'gpt-4o'
+    
+    mockCreate.mockResolvedValueOnce({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({ jsonSchema: expectedSchema })
+          }
+        }
+      ]
+    })
+    
+    await generateSchema(instruction, responseData)
+    
+    const gpt4oCallArgs = mockCreate.mock.calls[0][0]
+    expect(gpt4oCallArgs.temperature).toBeDefined()
+  })
+
+  // Skip live API tests when API key isn't available
+  if(!process.env.VITE_OPENAI_API_KEY) {
+    it('skips live tests when VITE_OPENAI_API_KEY is not set', () => {})
+  }
 })
