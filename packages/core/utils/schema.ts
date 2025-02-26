@@ -47,7 +47,7 @@ async function attemptSchemaGeneration(
     baseURL: process.env.OPENAI_API_BASE_URL
   });
   
-  const modelName = process.env.SCHEMA_GENERATION_MODEL || 'gpt-4o';
+  const modelName = process.env.SCHEMA_GENERATION_MODEL || process.env.OPENAI_MODEL;
   
   let temperature = 0;
   if (modelName === 'gpt-4o' && retry > 0) {
