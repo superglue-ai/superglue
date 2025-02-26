@@ -3,13 +3,17 @@
   <img src="https://github.com/user-attachments/assets/be0e65d4-dcd8-4133-9841-b08799e087e7" width="350" alt="superglue_logo_white">
 </p>
 
-<h1 align="center">data that speaks your language 🍯</h1>
+<h2 align="center">API connector that writes its own code 🍯</h2>
 
-superglue translates data from external systems into exactly the format you need. It's an open source proxy that automatically extracts, maps and transforms data so developers don't have to write and maintain complex integration code.
+superglue allows you to connect to any API/data source and get the data you want in the format you need. It’s an open source proxy server which sits between you and your target APIs. Thus, you can easily deploy it into your own infra.
 
-- 🔮 One-off LLM-powered translations: Generate deterministic, high-performance translation code.
-- 🩹 Self-healing: Detect format changes and update translations automatically.
-- 🚀 Fast deployment: Supports most APIs and data formats out of the box.
+Here's how it works: You define your desired data schema and provide basic instructions about an API endpoint (like "get all issues from jira"). Superglue then does the following:
+
+- Automatically generates the API configuration by analyzing API docs.
+- Handles pagination, authentication, and error retries.
+- Transforms response data into the exact schema you want using JSONata expressions.
+- Validates that all data coming through follows that schema, and fixes transformations when they break.
+
 
 
 <div align="center">
@@ -24,6 +28,7 @@ superglue translates data from external systems into exactly the format you need
 
 </div>
 
+If you’re spending a lot of time writing code connecting to weird APIs, fumbling with custom fields in foreign language ERPs, mapping JSONs, extracting data from compressed CSVs sitting on FTP servers, and making sure your integrations don’t break when something unexpected comes through, superglue might be for you.
 
 ```mermaid
 flowchart LR
