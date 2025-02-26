@@ -40,9 +40,10 @@ Guidelines for creating JSONata mappings:
    - Prefer variant-specific fields over general fields (e.g., sizeVariants.description over sizes)
    - Choose the most specific/detailed field available (e.g., type="shelf" over category="furniture")
 
-5. Variant and Option Mapping:
-   - For variant/option mappings, consider source attributes that could represent variants
-   - Use appropriate JSONata array transformation functions for variant data
+5. Filters:
+   - Pay special attention to filter statements in the instruction and the schema description. Add them to the generated jsonata expression.
+     Example: Get me all products with SKU 0406654608 or products: {"type": "array", description: "only products with SKU 0406654608"}
+     Generated jsonata expression: Account.Order.Product[SKU = "0406654608"].{"Description": Description}
 
 6. Data Integrity:
    - ONLY use fields that exist in the source data structure
@@ -64,7 +65,7 @@ Guidelines for creating JSONata mappings:
       $pad(str, width[, char]) - Pads string to specified width
       $contains(str, substring) - Tests if string contains substring
       $toMillis(timestamp [, picture]) - Converts ISO 8601 timestamp to milliseconds. E.g. $toMillis("2017-11-07T15:07:54.972Z") => 1510067274972
-      $toDate(str [, picture]) - Converts any timestamp string to valid ISO 8601 date string. E.g. $toDate("Oct 15, 2024 12:00:00 AM UTC") => "2024-10-15T00:00:00.000Z"
+      $toDate(str | number) - Converts any timestamp string to valid ISO 8601 date string. E.g. $toDate("Oct 15, 2024 12:00:00 AM UTC") => "2024-10-15T00:00:00.000Z", $toDate(1728873600000) => "2024-10-15T00:00:00.000Z"
       $dateMax(arr) - Returns the maximum date of an array of dates. E.g. $dateMax(["2017-11-07T15:07:54.972Z", "Oct 15, 2012 12:00:00 AM UTC"]) returns "2017-11-07T15:07:54.972Z".
       $dateMin(arr) - Returns the minimum date of an array of dates. E.g. $dateMin($.variants.created_at) returns the minimum created_at date of all variants.
       $dateDiff(date1, date2, unit: "seconds" | "minutes" | "hours" | "days") - Returns the difference between two dates in the specified unit. E.g. $dateDiff($.order.created_at, $.order.updated_at, "days") returns the number of days between the order created_at and updated_at.
@@ -85,7 +86,7 @@ Guidelines for creating JSONata mappings:
 - Error handling:
   - If you get an error like "is not of a type(s) string/number/object", try to convert the source field, but also consider that the original field or one of its parent might be null. In this case, add a default value.
   - If the error is something like "instance is not of a type(s) object", make sure you REALLY create the target schema with the correct type.
-  - If the error is something like "instance is not of a type(s) array", this can happen if the source data just has one object. In this case, wrap the source reference in an array to ensure it always returns an array. E.g. [$.items]
+  - If the error is something like "instance is not of a type(s) array or array/null". In this case, wrap the source selector in an array to ensure it always returns an array. E.g. "result": [$.items]
   - if an object is optional but its fields required, you can add a test and default to {}, but do not set the inner fields to default null.
 
 Remember: The goal is to create valid JSONata expressions that accurately transform the source data structure into the required target structure.`;

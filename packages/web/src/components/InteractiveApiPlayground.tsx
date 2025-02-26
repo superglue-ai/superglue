@@ -138,8 +138,9 @@ export function InteractiveApiPlayground({
   }, [rawResponse])
 
   const mappedResponseLines = useMemo(() => {
+    if (isRunning || isLoading) return ['Loading...']
     return mappedResponse ? JSON.stringify(mappedResponse, null, 2).split('\n') : ['Output will appear here...']
-  }, [mappedResponse])
+  }, [mappedResponse, isRunning, isLoading])
 
   const renderRow = (lines: string[]) => ({ index, key, style }: any) => {
     const line = lines[index]
@@ -248,7 +249,7 @@ export function InteractiveApiPlayground({
                 <TabsContent value="jsonata" className="m-0 h-full data-[state=active]:flex flex-col">
                   <div className="flex-1 min-h-0 p-4 overflow-y-auto">
                     <pre className="text-xs whitespace-pre-wrap leading-[18px]">
-                      {responseMapping || 'No JSONata mapping available'}
+                      {isRunning || isLoading ? 'Loading...' : (responseMapping || 'No JSONata mapping available')}
                     </pre>
                   </div>
                 </TabsContent>

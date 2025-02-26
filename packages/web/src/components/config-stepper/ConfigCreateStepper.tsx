@@ -147,6 +147,7 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
         })
 
         // Call autofill endpoint
+        
         const response = await superglueClient.call({
           endpoint: {
             urlHost: url.urlHost,
@@ -170,6 +171,7 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
         setInitialRawResponse(response.data)
 
         // Generate schema based on the raw response
+        
         const generatedSchema = await superglueClient.generateSchema(formData.instruction, JSON.stringify(response.data))
         if (generatedSchema) {
           setFormData(prev => ({
@@ -200,9 +202,10 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
       } catch (error: any) {
         console.error('Error during autofill:', error)
         toast({
-          title: 'Autofill Failed',
+          title: 'API Configuration Failed',
           description: error?.message || 'An error occurred while configuring the API',
-          variant: 'destructive'
+          variant: 'destructive',
+          duration: 10000
         })
         return
       } finally {
@@ -390,6 +393,7 @@ const result = await superglue.call({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent 
         className="h-[100vh] w-[100vw] max-w-[100vw] p-3 sm:p-6 lg:p-12 gap-0 rounded-none border-none flex flex-col"
+        onPointerDownOutside={e => e.preventDefault()}
       >
         <div className="flex-none mb-4">
           <DialogHeader>
@@ -626,7 +630,7 @@ const result = await superglue.call({
                 {isAutofilling ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {step === 'basic' ? 'superglue automagically configures API...' : 'Configuring...'}
+                    {initialRawResponse ? 'Generating schema...' : 'Creating configuration...'}
                   </>
                 ) : (
                   step === 'try_and_output' ? 
