@@ -25,13 +25,14 @@ interface JsonSchemaEditorProps {
   onChange: (value: string) => void;
 }
 
-const SCHEMA_TYPES = ['object', 'array', 'string', 'number', 'boolean'];
+const SCHEMA_TYPES = ['object', 'array', 'string', 'number', 'boolean', 'integer'];
 const SCHEMA_TYPE_DISPLAY = {
   'object': 'object',
   'array': 'array',
   'string': 'string',
   'number': 'number',
-  'boolean': 'bool'
+  'boolean': 'bool',
+  'integer': 'integer',
 };
 
 const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) => {
@@ -239,7 +240,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
                       setHoveredDescField(null);
                     }}
                     className="w-full min-w-[200px] max-w-[400px] flex-1 border-muted hover:border-primary/50 focus:border-primary text-xs sm:text-sm"
-                    placeholder="Describe for AI mapping"
+                    placeholder="Add AI instructions or filters"
                     onFocus={() => {
                       // Clear timeout and hide tooltip on focus
                       if (hoverTimeoutRef.current[descFieldId]) {
