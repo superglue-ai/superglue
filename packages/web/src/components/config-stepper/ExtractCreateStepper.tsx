@@ -77,28 +77,6 @@ export function ExtractCreateStepper({ open, onOpenChange, extractId: initialExt
     }
   }
 
-  const handleUrlBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-    const url = e.target.value
-    try {
-      const urlObj = new URL(url)
-      const cleanedHost = cleanApiDomain(`${urlObj.protocol}//${urlObj.host}`)
-      const path = urlObj.pathname === '/' ? '' : urlObj.pathname
-      
-      setFormData(prev => ({
-        ...prev,
-        urlHost: cleanedHost,
-        ...(path ? { urlPath: path } : {})
-      }))
-    } catch {
-      // If URL parsing fails, just use existing cleanApiDomain
-      const cleanedUrl = cleanApiDomain(url)
-      setFormData(prev => ({
-        ...prev,
-        urlHost: cleanedUrl
-      }))
-    }
-  }
-
   const handleAuthChange = (value: string) => {
     setFormData(prev => ({
       ...prev,
@@ -265,7 +243,6 @@ curl -s -X POST "${superglueConfig.superglueEndpoint}" \\
       console.warn('Invalid input payload JSON')
     }
     const credentials = parseCredentialsHelper(formData.auth.value, JSON.parse(formData.auth.advancedConfig))
-
     const extractCommand = `# First command: Extract data and store in JSON
 curl -s -X POST "${superglueConfig.superglueEndpoint}" \\
   -H "Authorization: Bearer ${superglueConfig.superglueApiKey}" \\
@@ -678,7 +655,6 @@ if (transformResult?.success) {
                           setValidationErrors(prev => ({ ...prev, urlHost: false }))
                         }
                       }}
-                      onBlur={handleUrlBlur}
                       placeholder="https://api.example.com"
                       required
                       className={cn(
