@@ -64,7 +64,7 @@ export const callResolver = async (
         lastError = error?.message || JSON.stringify(error || {});
       }
       retryCount++;
-    } while (!response && retryCount < 8);
+    } while (!response && retryCount < 5);
     
     if(!response) {
       telemetryClient?.captureException(new Error(`API call failed after ${retryCount} retries. Last error: ${maskCredentials(lastError, credentials)}`), context.orgId, {

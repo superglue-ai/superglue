@@ -124,41 +124,7 @@ Run your own instance of superglue using Docker:
 docker pull superglueai/superglue
 ```
 
-2. Create a `.env` file with the following configuration:
-```env
-# Server Configuration
-
-# Port to run the superglue server
-GRAPHQL_PORT=3000
-
-# Port to run the web dashboard 
-WEB_PORT=3001
-
-# Endpoint the web interface will connect to
-GRAPHQL_ENDPOINT=http://localhost:3000
-
-# Authentication token for API access
-AUTH_TOKEN=your-auth-token
-
-# Datastore Configuration. File is a simple persistent option. Memory is fast but not persistent. Redis is distributed and can be configured to be persistent.
-DATASTORE_TYPE=file or memory or redis
-
-# if file
-STORAGE_DIR=/data
-
-# if redis
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_USERNAME=default
-REDIS_PASSWORD=secret
-
-# OpenAI Configuration
-OPENAI_API_KEY=sk-...
-# OpenAI model to use. We recommend gpt-4o-2024-11-20
-OPENAI_MODEL=gpt-4o-2024-11-20
-# Optional: Set a custom OpenAI API URL (for self-hosted models or proxies)
-# OPENAI_API_BASE_URL=https://your-custom-endpoint/v1
-```
+2. Create a `.env` by copying the `.env.example` file at the root
 
 3. Start the server:
 ```bash
