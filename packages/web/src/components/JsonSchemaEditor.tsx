@@ -16,6 +16,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/src/components/ui/tooltip";
+import { cn } from "@/src/lib/utils";
 import { ListPlus, Plus, Trash2 } from "lucide-react";
 import React from 'react';
 
@@ -24,7 +25,15 @@ interface JsonSchemaEditorProps {
   onChange: (value: string) => void;
 }
 
-const SCHEMA_TYPES = ['object', 'array', 'string', 'number', 'boolean', 'null'];
+const SCHEMA_TYPES = ['object', 'array', 'string', 'number', 'boolean', 'integer'];
+const SCHEMA_TYPE_DISPLAY = {
+  'object': 'object',
+  'array': 'array',
+  'string': 'string',
+  'number': 'number',
+  'boolean': 'bool',
+  'integer': 'integer',
+};
 
 const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) => {
   const [isCodeMode, setIsCodeMode] = React.useState(() => {
@@ -39,6 +48,19 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
   
   const [visualSchema, setVisualSchema] = React.useState<any>({});
   const [editingField, setEditingField] = React.useState<string | null>(null);
+  // Track the path of the currently hovered description field
+  const [hoveredDescField, setHoveredDescField] = React.useState<string | null>(null);
+  // Ref to store timeout IDs for hover delay
+  const hoverTimeoutRef = React.useRef<{ [key: string]: NodeJS.Timeout }>({});
+  
+  // Clear all hover timeouts when component unmounts
+  React.useEffect(() => {
+    return () => {
+      Object.values(hoverTimeoutRef.current).forEach(timeoutId => {
+        clearTimeout(timeoutId);
+      });
+    };
+  }, []);
   
   React.useEffect(() => {
     try {
@@ -74,6 +96,33 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
     setVisualSchema(newSchema);
     onChange(JSON.stringify(newSchema, null, 2));
   };
+  
+  // Handle mouse enter with delay
+  const handleMouseEnter = (fieldId: string) => {
+    // Clear any existing timeout for this field
+    if (hoverTimeoutRef.current[fieldId]) {
+      clearTimeout(hoverTimeoutRef.current[fieldId]);
+    }
+    
+    // Set a new timeout to show tooltip after 2 seconds
+    hoverTimeoutRef.current[fieldId] = setTimeout(() => {
+      setHoveredDescField(fieldId);
+    }, 1000);
+  };
+  
+  // Handle mouse leave
+  const handleMouseLeave = (fieldId: string) => {
+    // Clear the timeout if mouse leaves before delay completes
+    if (hoverTimeoutRef.current[fieldId]) {
+      clearTimeout(hoverTimeoutRef.current[fieldId]);
+      delete hoverTimeoutRef.current[fieldId];
+    }
+    
+    // Hide the tooltip if it's currently shown for this field
+    if (hoveredDescField === fieldId) {
+      setHoveredDescField(null);
+    }
+  };
 
   const generateUniqueFieldName = (properties: any) => {
     let index = 1;
@@ -90,6 +139,8 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
 
     const isRoot = path.length === 0;
     const isEditing = editingField === path.join('.');
+    // Create a unique ID for this field's description
+    const descFieldId = [...path, 'description'].join('.');
     
     // Add this helper function to check if field is required
     const isFieldRequired = () => {
@@ -139,7 +190,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
                   onChange(JSON.stringify(newSchema, null, 2));
                   setEditingField(newPath);
                 }}
-                className="w-48 min-h-[32px]"
+                className="w-36 min-h-[32px] text-xs sm:text-sm"
                 placeholder="Field name"
                 autoFocus
                 onBlur={() => setEditingField(null)}
@@ -147,12 +198,15 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
               />
             ) : (!isArrayChild &&(
               <div 
-                className={`w-48 px-2 py-0.5 min-h-[32px] rounded hover:bg-secondary cursor-pointer text-[14px] flex items-center gap-0.5`}
+                className={cn(
+                  "w-36 px-2 py-0.5 min-h-[32px] rounded hover:bg-secondary cursor-pointer flex items-center gap-0.5",
+                  "text-[11px] xs:text-[12px] sm:text-[14px]"
+                )}
                 onClick={() => setEditingField(path.join('.'))}
               >
                 {fieldName}
                 {isFieldRequired() && (
-                  <span className="text-red-500 text-[18px] font-bold" title="Required field">*</span>
+                  <span className="text-red-500 text-[14px] sm:text-[18px] font-bold" title="Required field">*</span>
                 )}
               </div>
             ))}
@@ -160,22 +214,51 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
               value={typeof schema.type === 'string' ? schema.type : 'string'}
               onValueChange={(value) => updateVisualSchema([...path, 'type'], value)}
             >
-              <SelectTrigger className="w-32 h-8">
+              <SelectTrigger className="w-24 h-8 text-xs sm:text-sm">
                 <SelectValue placeholder="Type" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="text-xs sm:text-sm">
                 {SCHEMA_TYPES.map(type => (
-                  <SelectItem key={type} value={type}>{type}</SelectItem>
+                  <SelectItem key={type} value={type}>{SCHEMA_TYPE_DISPLAY[type]}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
 
-            <Input
-              value={schema.description || ''}
-              onChange={(e) => updateVisualSchema([...path, 'description'], e.target.value)}
-              className="flex-1"
-              placeholder="Description"
-            />
+            <TooltipProvider>
+              <Tooltip open={hoveredDescField === descFieldId}>
+                <TooltipTrigger asChild>
+                  <Input
+                    value={schema.description || ''}
+                    onChange={(e) => {
+                      updateVisualSchema([...path, 'description'], e.target.value);
+                      // Clear any pending timeout
+                      if (hoverTimeoutRef.current[descFieldId]) {
+                        clearTimeout(hoverTimeoutRef.current[descFieldId]);
+                        delete hoverTimeoutRef.current[descFieldId];
+                      }
+                      // Hide tooltip when typing
+                      setHoveredDescField(null);
+                    }}
+                    className="w-full min-w-[200px] max-w-[400px] flex-1 border-muted hover:border-primary/50 focus:border-primary text-xs sm:text-sm"
+                    placeholder="Add AI instructions or filters"
+                    onFocus={() => {
+                      // Clear timeout and hide tooltip on focus
+                      if (hoverTimeoutRef.current[descFieldId]) {
+                        clearTimeout(hoverTimeoutRef.current[descFieldId]);
+                        delete hoverTimeoutRef.current[descFieldId];
+                      }
+                      setHoveredDescField(null);
+                    }}
+                    onMouseEnter={() => handleMouseEnter(descFieldId)}
+                    onMouseLeave={() => handleMouseLeave(descFieldId)}
+                  />
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <span className="text-xs sm:text-sm">Add instructions to help AI understand how to map data to this field</span>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
             {!isRoot && !isArrayChild && (
               <TooltipProvider>
                 <Tooltip>
@@ -208,14 +291,14 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
                       />
                       <span className="pointer-events-none absolute flex h-4 w-4 items-center justify-center rounded-full bg-background shadow-lg ring-0 transition-transform peer-data-[state=checked]:translate-x-4 peer-data-[state=unchecked]:translate-x-0 left-[2px] top-[2px]">
                         {isFieldRequired() ? (
-                          <span className="text-red-500 text-[16px] font-bold leading-none mt-2">*</span>
+                          <span className="text-red-500 text-[12px] sm:text-[16px] font-bold leading-none mt-2">*</span>
                         ) : (
-                          <span className="text-muted-foreground text-[12px] font-semibold leading-none">?</span>
+                          <span className="text-muted-foreground text-[10px] sm:text-[12px] font-semibold leading-none">?</span>
                         )}
                       </span>
                     </div>
                   </TooltipTrigger>
-                  <TooltipContent side="top" className="z-50">
+                  <TooltipContent side="top" className="z-50 text-xs sm:text-sm">
                     {isFieldRequired() ? 'Make field optional' : 'Make field required'}
                   </TooltipContent>
                 </Tooltip>
@@ -268,7 +351,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
               type="button"
               variant="outline"
               size="sm"
-              className="gap-2"
+              className="gap-2 text-xs sm:text-sm"
               onClick={() => updateVisualSchema(
                 [...path, 'properties'],
                 { 
@@ -277,8 +360,8 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
                 }
               )}
             >
-              <Plus className="h-4 w-4" />
-              Add Property
+              <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="text-xs sm:text-sm">Add Property</span>
             </Button>
           </div>
         )}
@@ -291,7 +374,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
         type="button"
         variant="outline"
         size="sm"
-        className="gap-2"
+        className="gap-2 text-xs sm:text-sm"
         onClick={() => updateVisualSchema(
         [...path, 'items'],
         { 
@@ -300,8 +383,8 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
         }
         )}
     >
-            <ListPlus className="h-4 w-4" />
-                Set Item
+            <ListPlus className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="text-xs sm:text-sm">Set Item</span>
             </Button>        
             )}
           </div>
@@ -317,11 +400,11 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
   };
 
   return (
-    <div className="space-y-1 flex flex-col h-full">
+    <div className="space-y-1 flex flex-col h-full mb-4">
       <div className="flex justify-between items-center shrink-0">
-        <Label htmlFor="responseSchema">Set your desired response schema</Label>
+        <Label htmlFor="responseSchema" className="text-xs sm:text-sm">Set your desired response schema</Label>
         <div className="flex items-center gap-2">
-          <Label htmlFor="editorMode" className="text-sm">Code Mode</Label>
+          <Label htmlFor="editorMode" className="text-xs sm:text-sm">Code Mode</Label>
           <Switch id="editorMode" checked={isCodeMode} onCheckedChange={setIsCodeMode} />
         </div>
       </div>
@@ -333,22 +416,23 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
             value={value}
             onChange={(e) => onChange(e.target.value)}
             placeholder="{}"
-            className="font-mono border-0 h-full"
+            className="font-mono border-0 h-full text-xs sm:text-sm"
           />
         ) : (
           <div className="h-full flex flex-col min-h-0">
             {Object.keys(visualSchema).length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                <p className="mb-4">No schema defined yet</p>
+                <p className="mb-4 text-xs sm:text-sm">No schema defined yet</p>
                 <Button
                   variant="outline"
+                  className="text-xs sm:text-sm"
                   onClick={() => {
                     const initialSchema = ensureObjectStructure({ type: 'object', properties: {} });
                     setVisualSchema(initialSchema);
                     onChange(JSON.stringify(initialSchema, null, 2));
                   }}
                 >
-                  Add Root Property
+                  <span className="text-xs sm:text-sm">Add Root Property</span>
                 </Button>
               </div>
             ) : (

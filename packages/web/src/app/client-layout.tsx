@@ -1,5 +1,4 @@
 "use client"
-import { TutorialModal } from '@/src/components/TutorialModal'
 import { AnimatePresence, motion } from 'framer-motion'
 import { usePathname } from 'next/navigation'
 import { ServerMonitor } from '../components/ServerMonitor'
@@ -42,7 +41,6 @@ export function ClientWrapper({ children, config }: Props) {
           )}
           <Toaster />
           {config.superglueApiKey && <ServerMonitor />}
-          {config.superglueApiKey && <TutorialModal />}
         </div>
       </CSPostHogProvider>
     </ConfigProvider>

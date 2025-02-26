@@ -1,18 +1,18 @@
 'use client'
 
 import { useConfig } from '@/src/app/config-context'
-import { ExtractConfig, SuperglueClient } from '@superglue/client'
-import { useEffect, useState } from 'react'
 import { findArraysOfObjects } from '@/src/lib/client-utils'
+import { ExtractConfig, SuperglueClient } from '@superglue/client'
+import { Loader2 } from "lucide-react"
+import { useEffect, useState } from 'react'
+import { AutoSizer, MultiGrid } from 'react-virtualized'
+import 'react-virtualized/styles.css'
 import JsonSchemaEditor from './JsonSchemaEditor'
 import { Button } from './ui/button'
 import { Card, CardContent } from './ui/card'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
-import { AutoSizer, MultiGrid } from 'react-virtualized'
-import 'react-virtualized/styles.css'
-import { Loader2 } from "lucide-react"
 
 interface InteractiveExtractPlaygroundProps {
   configId: string
@@ -27,6 +27,7 @@ interface InteractiveExtractPlaygroundProps {
   isRunning?: boolean
   mappedResponseData?: any
   hideRunButton?: boolean
+  hideInstruction?: boolean
   file?: File
 }
 
@@ -116,6 +117,7 @@ export function InteractiveExtractPlayground({
   isRunning,
   mappedResponseData,
   hideRunButton,
+  hideInstruction,
   file
 }: InteractiveExtractPlaygroundProps) {
   const [isLoading, setIsLoading] = useState(false)
@@ -159,33 +161,20 @@ export function InteractiveExtractPlayground({
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full">
       {/* Left Column */}
       <div className="flex flex-col space-y-4 overflow-hidden">
-        <div>
-          <Label>Instruction</Label>
-          <Input
-            value={instruction}
-            onChange={(e) => onInstructionChange?.(e.target.value)}
-            placeholder="E.g. 'Get all products with price and name'"
-            disabled={!onInstructionChange}
-          />
-        </div>
+        {!hideInstruction && (
+          <div>
+            <Label>Instruction</Label>
+            <Input
+              value={instruction}
+              onChange={(e) => onInstructionChange?.(e.target.value)}
+              placeholder="E.g. 'Get all products with price and name'"
+              disabled={!onInstructionChange}
+            />
+          </div>
+        )}
 
-        <div>
-          <Label>Extraction Source</Label>
-          <Card>
-            <CardContent className="p-3">
-              <code className="text-sm text-muted-foreground break-all">
-                {config ? (
-                  <><span className="text-primary font-bold">{config.method || 'POST'}</span> {config.urlHost}{config.urlPath || ''}</>
-                ) : (
-                  <><span className="text-primary font-bold">FILE</span> {file?.name}</>
-                )}
-              </code>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="flex-1 min-h-0 overflow-hidden flex flex-col max-h-[calc(100vh-20rem)]">
-          <div className="flex-1 min-h-0 bg-background">
+        <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+          <div className="flex-1 min-h-0 bg-background h-full">
             <JsonSchemaEditor
               value={responseSchema}
               onChange={onResponseSchemaChange}
@@ -221,8 +210,8 @@ export function InteractiveExtractPlayground({
             <CardContent className="p-0 h-full flex flex-col bg-secondary">
               <TabsList className="w-full rounded-t-lg rounded-b-none">
                 <TabsTrigger value="raw" className="flex-1">Raw Document</TabsTrigger>
-                <TabsTrigger value="mapped" className="flex-1">Output</TabsTrigger>
-                <TabsTrigger value="jsonata" className="flex-1">JSONata</TabsTrigger>
+                <TabsTrigger value="mapped" className="flex-1">🍯 Output</TabsTrigger>
+                <TabsTrigger value="jsonata" className="flex-1">Response Mapping</TabsTrigger>
               </TabsList>
 
               <div className="flex-1 min-h-0">

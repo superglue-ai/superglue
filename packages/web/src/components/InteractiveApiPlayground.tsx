@@ -3,15 +3,13 @@
 import { useConfig } from '@/src/app/config-context'
 import { useToast } from '@/src/hooks/use-toast'
 import { ApiConfig, CacheMode, SuperglueClient } from '@superglue/client'
-import { useEffect, useState, useMemo } from 'react'
+import { Loader2 } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { AutoSizer, List } from 'react-virtualized'
 import JsonSchemaEditor from './JsonSchemaEditor'
 import { Button } from './ui/button'
 import { Card, CardContent } from './ui/card'
-import { Input } from './ui/input'
-import { Label } from './ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
-import { Loader2 } from 'lucide-react'
-import { List, AutoSizer } from 'react-virtualized'
 
 interface InteractiveApiPlaygroundProps {
   configId: string
@@ -168,34 +166,9 @@ export function InteractiveApiPlayground({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full">
       {/* Left Column */}
-      <div className="flex flex-col space-y-4 overflow-hidden">
-        <div>
-          <Label>Instruction</Label>
-          <Input
-            value={instruction}
-            onChange={(e) => onInstructionChange?.(e.target.value)}
-            placeholder="E.g. 'Get all products with price and name'"
-            disabled={!onInstructionChange}
-          />
-        </div>
-
-        <div>
-          <Label>Discovered Endpoint URL</Label>
-          <Card>
-            <CardContent className="p-3">
-              <code className="text-sm text-muted-foreground break-all">
-                {config ? (
-                  <><span className="text-primary font-bold">{config.method || 'POST'}</span> {config.urlHost}{config.urlPath || ''}</>
-                ) : (
-                  'Loading...'
-                )}
-              </code>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="flex-1 min-h-0 overflow-hidden flex flex-col max-h-[calc(100vh-20rem)]">
-          <div className="flex-1 min-h-0 bg-background">
+      <div className="flex flex-col space-y-4 overflow-hidden h-full">
+        <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+          <div className="flex-1 min-h-0 bg-background h-full">
             <JsonSchemaEditor
               value={responseSchema}
               onChange={onResponseSchemaChange}
@@ -231,8 +204,8 @@ export function InteractiveApiPlayground({
             <CardContent className="p-0 h-full flex flex-col bg-secondary">
               <TabsList className="w-full rounded-t-lg rounded-b-none">
                 <TabsTrigger value="raw" className="flex-1">Raw API Response</TabsTrigger>
-                <TabsTrigger value="mapped" className="flex-1">Output</TabsTrigger>
-                <TabsTrigger value="jsonata" className="flex-1">JSONata</TabsTrigger>
+                <TabsTrigger value="mapped" className="flex-1">🍯 Output</TabsTrigger>
+                <TabsTrigger value="jsonata" className="flex-1">Response Mapping</TabsTrigger>
               </TabsList>
 
               <div className="flex-1 min-h-0">
