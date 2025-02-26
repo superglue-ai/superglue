@@ -25,6 +25,52 @@ export function ApiPlayground({ configId }: { configId?: string }) {
   const [credentialsInput, setCredentialsInput] = useState("{}");
   const [selectedCacheMode, setSelectedCacheMode] = useState<CacheMode>(CacheMode.READONLY);
   const superglueConfig = useConfig();
+  const [templateVars, setTemplateVars] = useState<string[]>([]);
+
+  // Find template variables in a string
+  const findTemplateVars = (str: string): string[] => {
+    if (!str) return [];
+    // Only match {varName} patterns
+    const matches = str.match(/\{(\w+)\}/g) || [];
+    return matches.map(match => match.slice(1, -1));
+  };
+
+  // Save user inputs to sessionStorage instead of localStorage
+  const saveUserInputs = () => {
+    if (!id) return;
+    sessionStorage.setItem(`sg-playground-payload-${id}`, payloadInput);
+    sessionStorage.setItem(`sg-playground-credentials-${id}`, credentialsInput);
+    sessionStorage.setItem(`sg-playground-cachemode-${id}`, selectedCacheMode);
+  };
+
+  // Load user inputs from sessionStorage
+  const loadUserInputs = () => {
+    if (!id) return;
+    const savedPayload = sessionStorage.getItem(`sg-playground-payload-${id}`);
+    const savedCredentials = sessionStorage.getItem(`sg-playground-credentials-${id}`);
+    const savedCacheMode = sessionStorage.getItem(`sg-playground-cachemode-${id}`);
+    
+    if (savedPayload) setPayloadInput(savedPayload);
+    if (savedCredentials) setCredentialsInput(savedCredentials);
+    if (savedCacheMode) setSelectedCacheMode(savedCacheMode as CacheMode);
+  };
+
+  // Save inputs when user switches tabs
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        saveUserInputs();
+      }
+    };
+
+    window.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', saveUserInputs);
+    
+    return () => {
+      window.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', saveUserInputs);
+    };
+  }, [id, payloadInput, credentialsInput, selectedCacheMode]);
 
   useEffect(() => {
     const loadConfig = async () => {
@@ -35,6 +81,25 @@ export function ApiPlayground({ configId }: { configId?: string }) {
         })
         const data = await superglueClient.getApi(id);
         setConfig(data);
+        
+        const varMatches = [
+          data.urlPath,
+          ...Object.values(data.queryParams || {}),
+          ...Object.values(data.headers || {}),
+          data.body
+        ].flatMap(value => findTemplateVars(String(value)));
+        setTemplateVars(varMatches);
+        const allVars = [...new Set(varMatches)].filter(v => !['limit', 'offset', 'page'].includes(v));
+        // Pre-populate credentials with template variables
+        if (allVars.length > 0 && credentialsInput === "{}") {
+          const prefilledCredentials = Object.fromEntries(
+            allVars.map(varName => [varName, ""])
+          );
+          setCredentialsInput(JSON.stringify(prefilledCredentials, null, 2));
+        }
+        
+        // Load saved user inputs
+        loadUserInputs();
       } catch (err) {
         setError('Failed to load API configuration');
         console.error(err);
@@ -46,6 +111,9 @@ export function ApiPlayground({ configId }: { configId?: string }) {
   const handleRunApi = async (e: React.MouseEvent) => {
     e.preventDefault();  // Prevent any form submission
     if (!config) return;
+    
+    // Save inputs before running
+    saveUserInputs();
     
     setLoading(true);
     setError(null);
@@ -69,6 +137,21 @@ export function ApiPlayground({ configId }: { configId?: string }) {
           }); 
           throw new Error("Invalid JSON in payload or credentials");
         }
+
+        // Check if all credential variables have values
+        const emptyCredentials = Object.entries(parsedCredentials)
+          .filter(([key, value]) => value === "")
+          .map(([key]) => key);
+          
+        if (emptyCredentials.length > 0) {
+          toast({
+            title: "Missing Credentials",
+            description: `Please provide values for: ${emptyCredentials.join(', ')}`,
+            variant: "destructive",
+          });
+          throw new Error("Missing credential values");
+        }
+
         const superglue = new SuperglueClient({
             apiKey: superglueConfig.superglueApiKey,
             endpoint: superglueConfig.superglueEndpoint
@@ -160,6 +243,11 @@ export function ApiPlayground({ configId }: { configId?: string }) {
 
             <div>
               <label className="text-sm font-medium">Credentials (JSON)</label>
+              {templateVars.length > 0 && (
+                <div className="mt-1 mb-2 text-xs text-muted-foreground">
+                  Found template variables: {templateVars.join(', ')}
+                </div>
+              )}
               <textarea
                 className="mt-1 p-2 w-full h-32 font-mono text-sm bg-secondary rounded-md"
                 value={credentialsInput}
