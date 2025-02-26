@@ -52,23 +52,27 @@ export function superglueJsonata(expr: string) {
     }
     return String(obj).replace(pattern, replacement);
   });
-  expression.registerFunction("toDate", (date: string) => {
+  expression.registerFunction("toDate", (date: string | number) => {
     try {
-      const match = date.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}):(\d{2}))?$/);
+      // Handle numeric timestamps (milliseconds or seconds)
+      if (typeof date === 'number' || /^\d+$/.test(date)) {
+        const timestamp = typeof date === 'number' ? date : parseInt(date, 10);
+        // If timestamp is in seconds (typically 10 digits), convert to milliseconds
+        const millisTimestamp = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
+        return new Date(millisTimestamp).toISOString();
+      }
+      
+      // Handle date strings in MM/DD/YYYY format
+      const match = String(date).match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}):(\d{2}))?$/);
       if (match) {
         const [_, month, day, year, hours="00", minutes="00", seconds="00"] = match;
         const isoDate = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.000Z`;
         return new Date(isoDate).toISOString();
       }
+      
+      // Default case: try standard Date parsing
       return new Date(date).toISOString();
     } catch (e) {
-      // Try US date format MM/DD/YYYY
-      const match = date.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}):(\d{2}))?$/);
-      if (match) {
-        const [_, month, day, year, hours="00", minutes="00", seconds="00"] = match;
-        const isoDate = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.000Z`;
-        return new Date(isoDate).toISOString();
-      }
       throw new Error(`Invalid date: ${e.message}`);
     }
   });
