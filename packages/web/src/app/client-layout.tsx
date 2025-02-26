@@ -8,6 +8,9 @@ import { Toaster } from '../components/ui/toaster'
 import { ConfigProvider } from './config-context'
 import { geistMono, geistSans } from './fonts'
 import { CSPostHogProvider } from './providers'
+import { useChatRuntime } from '@assistant-ui/react-ai-sdk'
+import { AssistantRuntimeProvider, makeAssistantReadable } from '@assistant-ui/react'
+import { Thread } from '@/src/components/assistant-ui/thread'
 
 interface Props {
   children: React.ReactNode
@@ -17,33 +20,33 @@ interface Props {
 export function ClientWrapper({ children, config }: Props) {
   const pathname = usePathname()
   const isAuthPage = pathname?.startsWith('/auth')
+  const AssistantSidebar = makeAssistantReadable(Sidebar);
+  
+  const runtime = useChatRuntime({
+    api: "/api/chat",
+  });
 
   return (
     <ConfigProvider config={config}>
       <CSPostHogProvider>
+        <AssistantRuntimeProvider runtime={runtime}>
         <div className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
           {isAuthPage ? (
             children
           ) : (
             <div className="flex h-screen overflow-hidden">
-              {config.superglueApiKey && <Sidebar />}
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={pathname}
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.3 }}
-                  className="w-full h-full overflow-auto"
-                >
-                  {children}
-                </motion.div>
-              </AnimatePresence>
+                {config.superglueApiKey && <AssistantSidebar />}
+                {children}
+                <div className="px-4 py-4 border relative z-50">
+                  <Thread />
+                </div>
             </div>
           )}
           <Toaster />
           {config.superglueApiKey && <ServerMonitor />}
           {config.superglueApiKey && <TutorialModal />}
         </div>
+        </AssistantRuntimeProvider>
       </CSPostHogProvider>
     </ConfigProvider>
   )

@@ -3,14 +3,13 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/src/components/ui/table";
-import { Button } from "@/src/components/ui/button";
+import { Button } from "@/src/components/assistant-ui/assistant";
 import { Plus, Settings, Play, History, Trash2, RotateCw } from "lucide-react";
 import {
   Sheet,
@@ -34,7 +33,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/src/components/ui/alert-dialog"
-
+import { Table } from "@/src/components/assistant-ui/assistant"
 const ConfigTable = () => {
   const router = useRouter();
   const [configs, setConfigs] = React.useState<(ApiConfig | ExtractConfig)[]>([]);
@@ -194,7 +193,7 @@ const ConfigTable = () => {
       </div>
     );
   }
-
+  
   return (
     <div className="p-8 max-w-none w-full min-h-full">
       <div className="flex flex-col lg:flex-row justify-between lg:items-center mb-6 gap-2">

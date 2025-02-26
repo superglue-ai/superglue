@@ -1,6 +1,6 @@
-import { Button } from "@/src/components/ui/button";
-import { Input } from "@/src/components/ui/input";
-import { Label } from "@/src/components/ui/label";
+import { Button } from "@/src/components/assistant-ui/assistant";
+import { Input } from "@/src/components/assistant-ui/assistant";
+import { Label } from "@/src/components/assistant-ui/assistant";
 import {
   Select,
   SelectContent,
@@ -8,14 +8,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/src/components/ui/select";
-import { Switch } from "@/src/components/ui/switch";
-import { Textarea } from "@/src/components/ui/textarea";
+import { Switch } from "@/src/components/assistant-ui/assistant";
+import { Textarea } from "@/src/components/assistant-ui/assistant";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/src/components/ui/tooltip";
+} from "@/src/components/assistant-ui/assistant";
 import { ListPlus, Plus, Trash2 } from "lucide-react";
 import React from 'react';
 

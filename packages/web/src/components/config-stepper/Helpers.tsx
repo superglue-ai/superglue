@@ -1,7 +1,5 @@
 import { HelpCircle } from "lucide-react"
-import { Tooltip, TooltipContent } from "../ui/tooltip"
-import { TooltipProvider } from "../ui/tooltip"
-import { TooltipTrigger } from "../ui/tooltip"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../assistant-ui/assistant"
 
 export const inputErrorStyles = "!border-destructive !border-[1px] focus:!ring-0 focus:!ring-offset-0"
 
