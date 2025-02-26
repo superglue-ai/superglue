@@ -40,9 +40,10 @@ Guidelines for creating JSONata mappings:
    - Prefer variant-specific fields over general fields (e.g., sizeVariants.description over sizes)
    - Choose the most specific/detailed field available (e.g., type="shelf" over category="furniture")
 
-5. Variant and Option Mapping:
-   - For variant/option mappings, consider source attributes that could represent variants
-   - Use appropriate JSONata array transformation functions for variant data
+5. Filters:
+   - Pay special attention to filter statements in the instruction and the schema description. Add them to the generated jsonata expression.
+     Example: Get me all products with SKU 0406654608 or products: {"type": "array", description: "only products with SKU 0406654608"}
+     Generated jsonata expression: Account.Order.Product[SKU = "0406654608"].{"Description": Description}
 
 6. Data Integrity:
    - ONLY use fields that exist in the source data structure
@@ -64,7 +65,7 @@ Guidelines for creating JSONata mappings:
       $pad(str, width[, char]) - Pads string to specified width
       $contains(str, substring) - Tests if string contains substring
       $toMillis(timestamp [, picture]) - Converts ISO 8601 timestamp to milliseconds. E.g. $toMillis("2017-11-07T15:07:54.972Z") => 1510067274972
-      $toDate(str [, picture]) - Converts any timestamp string to valid ISO 8601 date string. E.g. $toDate("Oct 15, 2024 12:00:00 AM UTC") => "2024-10-15T00:00:00.000Z"
+      $toDate(str | number) - Converts any timestamp string to valid ISO 8601 date string. E.g. $toDate("Oct 15, 2024 12:00:00 AM UTC") => "2024-10-15T00:00:00.000Z", $toDate(1728873600000) => "2024-10-15T00:00:00.000Z"
       $dateMax(arr) - Returns the maximum date of an array of dates. E.g. $dateMax(["2017-11-07T15:07:54.972Z", "Oct 15, 2012 12:00:00 AM UTC"]) returns "2017-11-07T15:07:54.972Z".
       $dateMin(arr) - Returns the minimum date of an array of dates. E.g. $dateMin($.variants.created_at) returns the minimum created_at date of all variants.
       $dateDiff(date1, date2, unit: "seconds" | "minutes" | "hours" | "days") - Returns the difference between two dates in the specified unit. E.g. $dateDiff($.order.created_at, $.order.updated_at, "days") returns the number of days between the order created_at and updated_at.
