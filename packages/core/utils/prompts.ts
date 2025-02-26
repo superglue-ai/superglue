@@ -84,7 +84,8 @@ Guidelines for creating JSONata mappings:
 
 - Error handling:
   - If you get an error like "is not of a type(s) string/number/object", try to convert the source field, but also consider that the original field or one of its parent might be null. In this case, add a default value.
-  - If the error is something like "instance is not of a type(s) object", make sure you REALLY create the target schema with the correct type. E.g. 
+  - If the error is something like "instance is not of a type(s) object", make sure you REALLY create the target schema with the correct type.
+  - If the error is something like "instance is not of a type(s) array", this can happen if the source data just has one object. In this case, wrap the source reference in an array to ensure it always returns an array. E.g. [$.items]
   - if an object is optional but its fields required, you can add a test and default to {}, but do not set the inner fields to default null.
 
 Remember: The goal is to create valid JSONata expressions that accurately transform the source data structure into the required target structure.`;
@@ -107,6 +108,7 @@ export const API_PROMPT = `You are an API configuration assistant. Generate API 
     "items": {items}
   }
 - Think hard before producing a response, and be aware that the response is not checked for validity if the response is not an error, so only suggest endpoints that you are sure are valid.
+- If this is a store / e-commerce site, try products.json, collections.json, categories.json, etc.
 `;
 
 export const API_ERROR_HANDLING_USER_PROMPT = `An error occured during the API because you probably generated a bad configuration.
