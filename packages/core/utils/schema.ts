@@ -14,7 +14,6 @@ export async function generateSchema(instruction: string, responseData: string, 
 
   const completion = await openai.chat.completions.create({
     model: process.env.OPENAI_MODEL,
-    temperature: 0,
     response_format: {
       type: "json_schema",
       json_schema: {

@@ -181,7 +181,7 @@ async function generateApiConfig(
     dataPath: z.string().optional().describe("The path to the data you want to extract from the response. E.g. products.variants.size"),
     pagination: z.object({
       type: z.enum(Object.values(PaginationType) as [string, ...string[]]),
-      pageSize: z.number().describe("Number of items per page. Use as {limit} in the pagination variables"),
+      pageSize: z.number().describe("Number of items per page. Set this to a number. In headers or query params, you can access it as {limit}."),
     }).optional()
   }));
   const openai = new OpenAI({
@@ -243,13 +243,11 @@ Documentation: ${String(documentation).slice(0, 80000)}`
 
   const numInitialMessages = 2;
   const retryCount = previousMessages.length > 0 ? (messages.length - numInitialMessages) / 2 : 0;
-  const temperature = Math.min(retryCount * 0.1, 0.7);
-
-  console.log(`Attempt ${retryCount + 1} with temperature ${temperature}`);
+  const temperature = String(process.env.OPENAI_MODEL).startsWith("o") ? undefined : Math.min(retryCount * 0.1, 1);
+  console.log(`Attempt ${retryCount + 1}${temperature ?  ` with temperature ${temperature}`: ""}`);
 
   const completion = await openai.chat.completions.create({
     model: process.env.OPENAI_MODEL,
-    temperature,
     response_format: {
       type: "json_schema",
       json_schema: {
@@ -257,6 +255,7 @@ Documentation: ${String(documentation).slice(0, 80000)}`
         schema: schema,
       }
     },
+    temperature,
     messages
   });
 
@@ -272,7 +271,10 @@ Documentation: ${String(documentation).slice(0, 80000)}`
   const invalidVars = validateVariables(generatedConfig, vars);
   
   if (invalidVars.length > 0) {
-    throw new Error(`The following variables are not defined: ${invalidVars.join(', ')}`);
+    messages.push({
+      role: "user",
+      content: `The following variables are not defined: ${invalidVars.join(', ')}`
+    });  
   }
 
   return {
@@ -286,7 +288,6 @@ Documentation: ${String(documentation).slice(0, 80000)}`
       headers: generatedConfig.headers,
       body: generatedConfig.body,
       authentication: generatedConfig.authentication,
-      // TODO: pagination, dataPath are not currently modified?
       pagination: apiConfig.pagination || generatedConfig.pagination,
       dataPath: apiConfig.dataPath || generatedConfig.dataPath,
       documentationUrl: apiConfig.documentationUrl,
