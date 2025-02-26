@@ -6,7 +6,7 @@ import { cleanApiDomain, cn } from '@/src/lib/utils'
 import { ApiConfig, AuthType, CacheMode, SuperglueClient } from '@superglue/client'
 import { Copy, Loader2, Terminal } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { InteractiveApiPlayground } from '../InteractiveApiPlayground'
 import { Button } from '../ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
@@ -21,9 +21,15 @@ interface ConfigCreateStepperProps {
   onOpenChange: (open: boolean) => void
   configId?: string // not used, but if we later want to edit through this flow
   mode?: 'create' | 'edit'
+  prefillData?: {
+    fullUrl: string
+    instruction: string
+    documentationUrl?: string
+  }
+  onComplete?: () => void
 }
 
-export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfigId, mode = 'create' }: ConfigCreateStepperProps) {
+export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfigId, mode = 'create', prefillData, onComplete }: ConfigCreateStepperProps) {
   const [step, setStep] = useState<StepperStep>('basic')
   const [isAutofilling, setIsAutofilling] = useState(false)
   const { toast } = useToast()
@@ -38,9 +44,9 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
   const [isRunning, setIsRunning] = useState(false)
 
   const [formData, setFormData] = useState({
-    fullUrl: '',
-    instruction: '',
-    documentationUrl: '',
+    fullUrl: prefillData?.fullUrl || '',
+    instruction: prefillData?.instruction || '',
+    documentationUrl: prefillData?.documentationUrl || '',
     inputPayload: '{}',
     auth: {
       type: AuthType.HEADER,
@@ -50,14 +56,14 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
     responseSchema: '{}'
   })
 
-  const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({})
-  
   // Temporary state to keep track of the split URL when form is submitted
   const [splitUrl, setSplitUrl] = useState({
     urlHost: '',
     urlPath: ''
   })
 
+  const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({})
+  
   const handleChange = (field: string) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | string
   ) => {
@@ -359,6 +365,23 @@ const result = await superglue.call({
     }
   }
 
+  // Update form data when prefillData changes or when modal is opened
+  useEffect(() => {
+    if (prefillData && open) {
+      setFormData(prevData => ({
+        ...prevData,
+        fullUrl: prefillData.fullUrl || prevData.fullUrl,
+        instruction: prefillData.instruction || prevData.instruction,
+        documentationUrl: prefillData.documentationUrl || prevData.documentationUrl
+      }));
+      
+      // Parse the URL when prefillData changes
+      if (prefillData.fullUrl) {
+        handleUrlBlur({ target: { value: prefillData.fullUrl } } as React.FocusEvent<HTMLInputElement>);
+      }
+    }
+  }, [prefillData, open]);
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent 
@@ -572,6 +595,10 @@ const result = await superglue.call({
                 <Button
                   onClick={() => {
                     router.push('/configs')
+                    // Call onComplete before closing if provided
+                    if (onComplete) {
+                      onComplete()
+                    }
                     onOpenChange(false)
                   }}
                 >
