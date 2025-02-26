@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterEach, type Mocked } from 'vitest';
 import axios from 'axios';
-import { getDocumentation } from './documentation.js';
+import { afterEach, beforeEach, describe, expect, it, vi, type Mocked } from 'vitest';
+import { getDocumentation, postProcessLargeDoc } from './documentation.js';
 
 // Mock axios
 vi.mock('axios');
@@ -181,6 +181,57 @@ describe('Documentation Utilities', () => {
       expect(result).toContain('Item with **bold** and _italic_');
       expect(result).toContain('`inline code <tags>`');
       expect(result).toContain('| Cell 1 © | Cell 2 ® |');
+    });
+  });
+
+  describe('postProcessLargeDoc', () => {
+    it('should handle undefined endpoint without infinite loops', () => {
+      // Create a documentation string longer than MAX_DOC_LENGTH
+      const longDocumentation = 'A'.repeat(100000);
+      
+      // Call with undefined endpoint
+      const result = postProcessLargeDoc(longDocumentation, undefined);
+      
+      // Should return a truncated version of the documentation
+      expect(result.length).toBeLessThanOrEqual(80000);
+      expect(result).toBe(longDocumentation.slice(0, 80000));
+    });
+    
+    it('should handle null endpoint without infinite loops', () => {
+      // Create a documentation string longer than MAX_DOC_LENGTH
+      const longDocumentation = 'A'.repeat(100000);
+      
+      // Call with null endpoint
+      const result = postProcessLargeDoc(longDocumentation, null);
+      
+      // Should return a truncated version of the documentation
+      expect(result.length).toBeLessThanOrEqual(80000);
+      expect(result).toBe(longDocumentation.slice(0, 80000));
+    });
+    
+    it('should handle empty string endpoint without infinite loops', () => {
+      // Create a documentation string longer than MAX_DOC_LENGTH
+      const longDocumentation = 'A'.repeat(100000);
+      
+      // Call with empty string endpoint
+      const result = postProcessLargeDoc(longDocumentation, '');
+      
+      // Should return a truncated version of the documentation
+      expect(result.length).toBeLessThanOrEqual(80000);
+      expect(result).toBe(longDocumentation.slice(0, 80000));
+    });
+
+    it('should handle very short endpoint without infinite loops', () => {
+      // Create a documentation string longer than MAX_DOC_LENGTH
+      const longDocumentation = 'A'.repeat(100000) + 'api' + 'A'.repeat(10000);
+      
+      // Call with endpoint shorter than minimum search term length (4 chars)
+      const result = postProcessLargeDoc(longDocumentation, 'api');
+      
+      // Should return a truncated version of the documentation (first chunk)
+      expect(result.length).toBeLessThanOrEqual(80000);
+      // In this case, it should still find the search term
+      expect(result).toContain('api');
     });
   });
 });

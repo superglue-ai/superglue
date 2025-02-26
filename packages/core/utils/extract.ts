@@ -1,23 +1,27 @@
 import axios, { AxiosRequestConfig } from "axios";
 import {  AuthType, RequestOptions, DecompressionMethod, ExtractConfig, ExtractInput, FileType, HttpMethod } from "@superglue/shared";
-import { callAxios, composeUrl, replaceVariables } from "./tools.js";
+import { callAxios, composeUrl, getSchemaFromData, replaceVariables } from "./tools.js";
 import { z } from "zod";
 import OpenAI from "openai";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { API_PROMPT } from "./prompts.js";
 import { getDocumentation } from "./documentation.js";
 import { decompressData, parseFile } from "./file.js";
-
+import { createHash } from "crypto";
 
 export async function prepareExtract(extractInput: ExtractInput, payload: any, credentials: any, lastError: string | null = null): Promise<ExtractConfig> {
     // Set the current timestamp
     const currentTime = new Date();
 
     // Initialize the ApiCallConfig object with provided input
+    const hash = createHash('md5')
+      .update(JSON.stringify({request: extractInput, payloadKeys: getSchemaFromData(payload)}))
+      .digest('hex');
     let extractConfig: Partial<ExtractConfig> = { 
       ...extractInput,
       createdAt: currentTime,
-      updatedAt: currentTime
+      updatedAt: currentTime,
+      id: hash,
     };
 
     // If a documentation URL is provided, fetch and parse additional details
@@ -137,8 +141,8 @@ ${lastError}` : ''}`
   console.log(completion.choices[0].message.content);
   const generatedConfig = JSON.parse(completion.choices[0].message.content);
   return {
+    ...extractConfig,
     ...generatedConfig,
-    ...extractConfig
   } as ExtractConfig;
 }
 

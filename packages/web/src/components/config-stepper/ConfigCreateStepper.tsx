@@ -56,12 +56,6 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
     responseSchema: '{}'
   })
 
-  // Temporary state to keep track of the split URL when form is submitted
-  const [splitUrl, setSplitUrl] = useState({
-    urlHost: '',
-    urlPath: ''
-  })
-
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({})
   
   const handleChange = (field: string) => (
@@ -81,24 +75,30 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
     }
   }
 
-  const handleUrlBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-    const url = e.target.value
+  const splitUrl = (url: string) => {
+    if (!url) {
+      return {
+        urlHost: '',
+        urlPath: ''
+      }
+    }
+    
     try {
       const urlObj = new URL(url.startsWith('http') ? url : `https://${url}`)
       const cleanedHost = cleanApiDomain(`${urlObj.protocol}//${urlObj.host}`)
       const path = urlObj.pathname === '/' ? '' : urlObj.pathname
-      
-      setSplitUrl({
+      return {
         urlHost: cleanedHost,
         urlPath: path
-      })
-    } catch {
+      }
+    } catch (error) {
       // If URL parsing fails, just use existing cleanApiDomain
+      console.warn('URL parsing failed:', error)
       const cleanedUrl = cleanApiDomain(url)
-      setSplitUrl({
+      return {
         urlHost: cleanedUrl,
         urlPath: ''
-      })
+      }
     }
   }
 
@@ -137,8 +137,8 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
       setValidationErrors({})
       
       // Parse the URL when moving to the next step
-      handleUrlBlur({ target: { value: formData.fullUrl } } as React.FocusEvent<HTMLInputElement>)
-      
+      const url = splitUrl(formData.fullUrl)
+    
       setIsAutofilling(true)
       try {
         const superglueClient = new SuperglueClient({
@@ -149,8 +149,8 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
         // Call autofill endpoint
         const response = await superglueClient.call({
           endpoint: {
-            urlHost: splitUrl.urlHost,
-            ...(splitUrl.urlPath ? { urlPath: splitUrl.urlPath } : {}),
+            urlHost: url.urlHost,
+            ...(url.urlPath ? { urlPath: url.urlPath } : {}),
             ...(formData.documentationUrl ? { documentationUrl: formData.documentationUrl } : {}),
             instruction: formData.instruction,
             authentication: formData.auth.value ? AuthType.HEADER : AuthType.NONE
@@ -181,7 +181,7 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
         // Apply the returned config
         const config = response.config as ApiConfig
         if (config) {
-          const id = splitUrl.urlHost.replace(/^https?:\/\//, '').replace(/\//g, '') + '-' + Math.floor(1000 + Math.random() * 9000)
+          const id = url.urlHost.replace(/^https?:\/\//, '').replace(/\//g, '') + '-' + Math.floor(1000 + Math.random() * 9000)
           setConfigId(id)
 
           // Save the configuration with the generated schema
@@ -217,10 +217,10 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
           endpoint: superglueConfig.superglueEndpoint,
           apiKey: superglueConfig.superglueApiKey
         })
-
+        const url = splitUrl(formData.fullUrl)
         const savedConfig = await superglueClient.upsertApi(configId, {
           id: configId,
-          urlHost: splitUrl.urlHost,
+          urlHost: url.urlHost,
           instruction: formData.instruction,
           documentationUrl: formData.documentationUrl || undefined,
           // authentication: formData.auth.value ? AuthType.HEADER : AuthType.NONE,
@@ -287,8 +287,17 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
     const credentials = parseCredentialsHelper(formData.auth.value, JSON.parse(formData.auth.advancedConfig))
 
     const graphqlQuery = {
-      query: `mutation { call(input: { id: "${configId}" }, payload: ${JSON.stringify(payload)}, credentials: ${JSON.stringify(credentials)}) { data } }`
+      query: `mutation CallApi($payload: JSON!, $credentials: JSON!) { 
+  call(input: { id: "${configId}" }, payload: $payload, credentials: $credentials) { 
+    data 
+  } 
+}`,
+      variables: {
+        payload,
+        credentials
+      }
     }
+    
     const command = `curl -X POST "${superglueConfig.superglueEndpoint}/graphql" \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer ${superglueConfig.superglueApiKey}" \\
@@ -374,11 +383,6 @@ const result = await superglue.call({
         instruction: prefillData.instruction || prevData.instruction,
         documentationUrl: prefillData.documentationUrl || prevData.documentationUrl
       }));
-      
-      // Parse the URL when prefillData changes
-      if (prefillData.fullUrl) {
-        handleUrlBlur({ target: { value: prefillData.fullUrl } } as React.FocusEvent<HTMLInputElement>);
-      }
     }
   }, [prefillData, open]);
 

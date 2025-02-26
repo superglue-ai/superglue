@@ -8,25 +8,31 @@ export function postProcessLargeDoc(documentation: string, endpointPath: string)
   const MAX_INITIAL_CHUNK = 40000;
   const CONTEXT_SIZE = 10000;
   const CONTEXT_SEPARATOR = "\n\n";
+  const MIN_SEARCH_TERM_LENGTH = 3;
 
   if (documentation.length <= MAX_DOC_LENGTH) {
     return documentation;
   }
 
   // Extract search term from endpoint
-  const searchTerm = endpointPath ? endpointPath.startsWith('/') ? endpointPath.slice(1).toLowerCase() : endpointPath.toLowerCase() : endpointPath;
+  let searchTerm = endpointPath ? endpointPath.startsWith('/') ? endpointPath.slice(1).toLowerCase() : endpointPath.toLowerCase() : endpointPath;
+  searchTerm = searchTerm ? String(searchTerm).trim() : '';
   const docLower = documentation.toLowerCase();
+
+  if (!endpointPath || searchTerm.length < MIN_SEARCH_TERM_LENGTH) {
+    return documentation.slice(0, MAX_DOC_LENGTH);
+  }
 
   // Find all occurrences of the search term
   const positions: number[] = [];
-  let pos = docLower.indexOf(searchTerm);
+  let pos = docLower.indexOf(searchTerm);	
   while (pos !== -1) {
     positions.push(pos);
     pos = docLower.indexOf(searchTerm, pos + 1);
   }
 
-  // If no occurrences found or no endpoint provided, return max doc length
-  if (positions.length === 0 || !endpointPath) {
+  // If no occurrences found return max doc length
+  if (positions.length === 0) {
     return documentation.slice(0, MAX_DOC_LENGTH);
   }
 
@@ -109,7 +115,7 @@ export async function getDocumentation(documentationUrl: string, headers: Record
           }
       }
     } catch (error) {
-      console.error(`Failed to fetch documentation from ${documentationUrl}:`, error?.message);
+      console.warn(`Failed to fetch documentation from ${documentationUrl}:`, error?.message);
     }
 
     if(documentation.length > docMaxLength) {
