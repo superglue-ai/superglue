@@ -2,6 +2,7 @@
 
 import { useConfig } from '@/src/app/config-context';
 import ApiConfigDetail from '@/src/app/configs/[id]/page';
+import { ConfigCreateStepper } from '@/src/components/config-stepper/ConfigCreateStepper';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,7 +29,7 @@ import {
 } from "@/src/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/src/components/ui/tooltip";
 import { ApiConfig, ExtractConfig, SuperglueClient } from '@superglue/client';
-import { History, Play, Plus, RotateCw, Settings, Trash2 } from "lucide-react";
+import { History, Play, Plus, RotateCw, Settings, ShoppingBag, Trash2 } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import React from 'react';
 
@@ -44,6 +45,8 @@ const ConfigTable = () => {
   const config = useConfig();
   const [configToDelete, setConfigToDelete] = React.useState<ApiConfig | ExtractConfig | null>(null);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
+  const [showConfigStepper, setShowConfigStepper] = React.useState(false);
+  const [configStepperProps, setConfigStepperProps] = React.useState({});
 
   const refreshConfigs = React.useCallback(async () => {
     setIsRefreshing(true);
@@ -90,6 +93,28 @@ const ConfigTable = () => {
 
   const handleCreateNewExtract = () => {
     router.push('/extracts/new');
+  };
+
+  const handleCreateExampleShopify = () => {
+    // Create detailed prefill configuration with the Shopify example values
+    const shopifyPrefillData = {
+      fullUrl: 'https://timbuk2.com',
+      instruction: 'get me all products with name and price',
+      documentationUrl: ''
+    };
+    
+    // Set prefill data in configStepperProps
+    setConfigStepperProps({
+      prefillData: shopifyPrefillData
+    });
+    
+    // Reset any existing config states to ensure a clean start
+    setShowConfigStepper(false);
+    
+    // Short timeout to ensure state changes are processed before opening
+    setTimeout(() => {
+      setShowConfigStepper(true);
+    }, 50); // Increased timeout to ensure state updates are processed
   };
 
   const handleEdit = (e: React.MouseEvent, id: string) => {
@@ -251,8 +276,35 @@ const ConfigTable = () => {
                 </div>
               </div>
             </Button>
+            
+            <Button 
+              onClick={handleCreateExampleShopify}
+              className="h-40 md:col-span-2 shadow-md hover:shadow-lg transition-all duration-300 rounded-2xl bg-card border border-primary/20 hover:border-primary/30"
+              variant="outline"
+              size="lg"
+            >
+              <div className="flex items-center justify-center gap-10">
+                <div className="p-6 rounded-full bg-primary/10 hover:bg-primary/15 transition-colors duration-300">
+                  <ShoppingBag className="h-16 w-16 text-primary" strokeWidth={1.5} />
+                </div>
+                <div className="flex flex-col items-start">
+                  <span className="text-2xl font-semibold mb-2">Create Example Shopify API</span>
+                  <span className="text-muted-foreground text-sm max-w-[16rem]">Get product data with one click in your format</span>
+                </div>
+              </div>
+            </Button>
           </div>
         </div>
+        
+        {showConfigStepper && (
+          <ConfigCreateStepper
+            open={showConfigStepper}
+            onOpenChange={setShowConfigStepper}
+            mode="create"
+            onComplete={refreshConfigs}
+            {...configStepperProps}
+          />
+        )}
       </div>
     );
   }
@@ -443,6 +495,16 @@ const ConfigTable = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {showConfigStepper && (
+        <ConfigCreateStepper
+          open={showConfigStepper}
+          onOpenChange={setShowConfigStepper}
+          mode="create"
+          onComplete={refreshConfigs}
+          {...configStepperProps}
+        />
+      )}
     </div>
   );
 };
