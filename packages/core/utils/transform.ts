@@ -69,6 +69,7 @@ export async function generateMapping(schema: any, payload: any, instruction?: s
   try {
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
+      baseURL: process.env.OPENAI_API_BASE_URL,
     });
     const userPrompt = 
 `Given a source data and structure, create a jsonata expression in JSON FORMAT.

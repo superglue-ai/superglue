@@ -185,7 +185,8 @@ async function generateApiConfig(
     }).optional()
   }));
   const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY
+    apiKey: process.env.OPENAI_API_KEY,
+    baseURL: process.env.OPENAI_API_BASE_URL
   });
 
   const userProvidedAdditionalInfo = Boolean(
