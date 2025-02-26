@@ -2,6 +2,7 @@
 
 import { useConfig } from '@/src/app/config-context';
 import ApiConfigDetail from '@/src/app/configs/[id]/page';
+import { ConfigCreateStepper } from '@/src/components/config-stepper/ConfigCreateStepper';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,6 +45,8 @@ const ConfigTable = () => {
   const config = useConfig();
   const [configToDelete, setConfigToDelete] = React.useState<ApiConfig | ExtractConfig | null>(null);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
+  const [showConfigStepper, setShowConfigStepper] = React.useState(false);
+  const [configStepperProps, setConfigStepperProps] = React.useState({});
 
   const refreshConfigs = React.useCallback(async () => {
     setIsRefreshing(true);
@@ -90,6 +93,28 @@ const ConfigTable = () => {
 
   const handleCreateNewExtract = () => {
     router.push('/extracts/new');
+  };
+
+  const handleCreateExampleShopify = () => {
+    // Create detailed prefill configuration with the Shopify example values
+    const shopifyPrefillData = {
+      fullUrl: 'https://timbuk2.com',
+      instruction: 'get me all products with name and price',
+      documentationUrl: ''
+    };
+    
+    // Set prefill data in configStepperProps
+    setConfigStepperProps({
+      prefillData: shopifyPrefillData
+    });
+    
+    // Reset any existing config states to ensure a clean start
+    setShowConfigStepper(false);
+    
+    // Short timeout to ensure state changes are processed before opening
+    setTimeout(() => {
+      setShowConfigStepper(true);
+    }, 50); // Increased timeout to ensure state updates are processed
   };
 
   const handleEdit = (e: React.MouseEvent, id: string) => {
@@ -251,8 +276,29 @@ const ConfigTable = () => {
                 </div>
               </div>
             </Button>
+            
+            <Button 
+              onClick={handleCreateExampleShopify}
+              className="h-32 md:col-span-2 shadow-md hover:shadow-lg transition-all duration-300 rounded-2xl bg-card border border-primary/20 hover:border-primary/30"
+              variant="outline"
+              size="lg"
+            >
+              <div className="flex flex-col items-center justify-center">
+                <span className="text-xl font-semibold">Create Example Shopify API</span>
+              </div>
+            </Button>
           </div>
         </div>
+        
+        {showConfigStepper && (
+          <ConfigCreateStepper
+            open={showConfigStepper}
+            onOpenChange={setShowConfigStepper}
+            mode="create"
+            onComplete={refreshConfigs}
+            {...configStepperProps}
+          />
+        )}
       </div>
     );
   }
@@ -443,6 +489,16 @@ const ConfigTable = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {showConfigStepper && (
+        <ConfigCreateStepper
+          open={showConfigStepper}
+          onOpenChange={setShowConfigStepper}
+          mode="create"
+          onComplete={refreshConfigs}
+          {...configStepperProps}
+        />
+      )}
     </div>
   );
 };
