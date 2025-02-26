@@ -77,28 +77,6 @@ export function ExtractCreateStepper({ open, onOpenChange, extractId: initialExt
     }
   }
 
-  const handleUrlBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-    const url = e.target.value
-    try {
-      const urlObj = new URL(url)
-      const cleanedHost = cleanApiDomain(`${urlObj.protocol}//${urlObj.host}`)
-      const path = urlObj.pathname === '/' ? '' : urlObj.pathname
-      
-      setFormData(prev => ({
-        ...prev,
-        urlHost: cleanedHost,
-        ...(path ? { urlPath: path } : {})
-      }))
-    } catch {
-      // If URL parsing fails, just use existing cleanApiDomain
-      const cleanedUrl = cleanApiDomain(url)
-      setFormData(prev => ({
-        ...prev,
-        urlHost: cleanedUrl
-      }))
-    }
-  }
-
   const handleAuthChange = (value: string) => {
     setFormData(prev => ({
       ...prev,
@@ -152,22 +130,23 @@ export function ExtractCreateStepper({ open, onOpenChange, extractId: initialExt
           return
         }
       }
-    }
-
-    if (step === 'auth') {
-      setIsAutofilling(true)
-      try {
-        await fetchFromConfig()
-      } catch (error: any) {
-        console.error('Error during autofill:', error)
-        toast({
-          title: 'Autofill Failed',
-          description: error?.message || 'An error occurred while configuring the API',
-          variant: 'destructive'
-        })
-        return
-      } finally {
-        setIsAutofilling(false)
+      
+      // If URL is selected, fetch from config
+      if(activeSourceTab === 'url') {
+        setIsAutofilling(true)
+        try {
+          await fetchFromConfig()
+        } catch (error: any) {
+          console.error('Error during autofill:', error)
+          toast({
+            title: 'Autofill Failed',
+            description: error?.message || 'An error occurred while configuring the API',
+            variant: 'destructive'
+          })
+          return
+        } finally {
+          setIsAutofilling(false)
+        }
       }
     }
 
@@ -205,7 +184,7 @@ export function ExtractCreateStepper({ open, onOpenChange, extractId: initialExt
       }
     }
 
-    const steps: StepperStep[] = ['basic', 'auth', 'try_and_output', 'success']
+    const steps: StepperStep[] = ['basic', 'try_and_output', 'success']
     const currentIndex = steps.indexOf(step)
     if (currentIndex < steps.length - 1) {
       setStep(steps[currentIndex + 1])
@@ -213,12 +192,8 @@ export function ExtractCreateStepper({ open, onOpenChange, extractId: initialExt
   }
 
   const handleBack = () => {
-    const steps: StepperStep[] = ['basic', 'auth', 'try_and_output', 'success']
+    const steps: StepperStep[] = ['basic', 'try_and_output', 'success']
     const currentIndex = steps.indexOf(step)
-    if(step === 'try_and_output' && file) {
-      setStep('basic')
-      return
-    }
     if (currentIndex > 0) {
       setStep(steps[currentIndex - 1])
     }
@@ -265,7 +240,6 @@ curl -s -X POST "${superglueConfig.superglueEndpoint}" \\
       console.warn('Invalid input payload JSON')
     }
     const credentials = parseCredentialsHelper(formData.auth.value, JSON.parse(formData.auth.advancedConfig))
-
     const extractCommand = `# First command: Extract data and store in JSON
 curl -s -X POST "${superglueConfig.superglueEndpoint}" \\
   -H "Authorization: Bearer ${superglueConfig.superglueApiKey}" \\
@@ -678,7 +652,6 @@ if (transformResult?.success) {
                           setValidationErrors(prev => ({ ...prev, urlHost: false }))
                         }
                       }}
-                      onBlur={handleUrlBlur}
                       placeholder="https://api.example.com"
                       required
                       className={cn(
@@ -1000,7 +973,7 @@ if (transformResult?.success) {
                 {isAutofilling ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {step as StepperStep === 'auth' ? 'superglue automagically configures API...' : 'Configuring...'}
+                    {step as StepperStep === 'basic' ? 'superglue extracts file...' : 'Configuring...'}
                   </>
                 ) : (
                   step === 'try_and_output' ? 

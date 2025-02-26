@@ -272,7 +272,7 @@ Documentation: ${String(documentation).slice(0, 80000)}`
   const invalidVars = validateVariables(generatedConfig, vars);
   
   if (invalidVars.length > 0) {
-    throw new Error(`Generated config contains variables that are not available. Please remove them: ${invalidVars.join(', ')}`);
+    throw new Error(`The following variables are not defined: ${invalidVars.join(', ')}`);
   }
 
   return {

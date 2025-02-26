@@ -21,7 +21,6 @@ export function ServerMonitor() {
           title: "Connection could not be established",
           description: `Please check your connection.\nEndpoint: ${serverConfig.superglueEndpoint}`,
           variant: "destructive",
-          duration: Infinity,
         })
         setIsServerDown(true);
       }
