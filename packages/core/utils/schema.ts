@@ -57,18 +57,15 @@ async function attemptSchemaGeneration(
   const completionRequest: any = {
     model: modelName,
     temperature: modelName.startsWith('gpt-4') ? temperature : undefined,
-    response_format: {
-      type: "json_schema",
-      json_schema: {
-        name: "api_definition",
-        schema: { type: "object", properties: { jsonSchema: { type: "object" } } },
-      }
-    },
+    response_format: { "type": "json_object" },
     messages: messages
   };
   
   const completion = await openai.chat.completions.create(completionRequest);
-  const generatedSchema = JSON.parse(completion.choices[0].message.content).jsonSchema;
+  const generatedSchema = JSON.parse(completion.choices[0].message.content);
+  if(!generatedSchema || Object.keys(generatedSchema).length === 0) {
+    throw new Error("No schema generated");
+  }
   const validator = new Validator();
   const validation = validator.validate({}, generatedSchema);
   return generatedSchema;
