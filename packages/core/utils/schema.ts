@@ -6,14 +6,13 @@ import { z } from "zod";
 
 export async function generateSchema(instruction: string, responseData: string, retry = 0, lastError?: string) : Promise<string> {
   console.log("Generating schema");
-  
   const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
     baseURL: process.env.OPENAI_API_BASE_URL
   });
-
+  try {
   const completion = await openai.chat.completions.create({
-    model: process.env.OPENAI_MODEL,
+    model: "gpt-4o",
     response_format: {
       type: "json_schema",
       json_schema: {
@@ -37,6 +36,12 @@ export async function generateSchema(instruction: string, responseData: string, 
   // validate json schema
   const validator = new Validator();
   // unless a SchemaError is thrown, we are good
-  const validation = validator.validate({}, generatedSchema);
-  return generatedSchema;
+    const validation = validator.validate({}, generatedSchema);
+    return generatedSchema;
+  } catch (error) {
+    if (retry < 3) {
+      return generateSchema(instruction, responseData, retry + 1, error.message);
+    }
+    throw error;
+  }
 }
