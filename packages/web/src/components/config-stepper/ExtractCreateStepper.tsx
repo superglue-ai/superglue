@@ -842,6 +842,7 @@ if (transformResult?.success) {
                 isRunning={isRunning}
                 mappedResponseData={mappedResponseData}
                 hideRunButton={true}
+                hideInstruction={true}
                 file={file}
               />
             </div>
@@ -850,7 +851,7 @@ if (transformResult?.success) {
           {step === 'success' && (
             <div className="space-y-4 h-full">
               <p className="text-m font-medium">Done!</p>
-              <p className="text-sm font-medium">You can now call the endpoint from your app. The call is proxied to the targeted endpoint without AI inbewteen. Predictable and millisecond latency.</p>
+              <p className="text-sm font-medium">Your extraction is complete. You can now download the results or use the code examples below.</p>
               
               <Tabs defaultValue="download" className="w-full">
                 <TabsList className="grid w-full grid-cols-3">
