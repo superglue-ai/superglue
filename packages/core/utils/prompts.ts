@@ -131,7 +131,7 @@ Make sure to try a fix before generating a new configuration. I will loose my jo
 export const GENERATE_SCHEMA_PROMPT = `You are a json schema generator assistant. Generate a JSON schema based on instructions and response data.
 If the response data is an array, make the schema an array of objects and name the array object "results".
 
-Make the schema as simple as possible.
+Make the schema as simple as possible. No need to include every possible field, just the ones relevant to the query.
 
 - The schema should be a JSON schema object.
 - The schema should be valid.
