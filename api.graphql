@@ -258,6 +258,8 @@ type Mutation {
   upsertApi(id: ID!, input: JSON!): ApiConfig!
   deleteApi(id: ID!): Boolean!
 
+  updateApiConfigId(oldId: ID!, newId: ID!): ApiConfig!
+
   upsertExtraction(id: ID!, input: JSON!): ExtractConfig!
   deleteExtraction(id: ID!): Boolean!
   
