@@ -2,6 +2,71 @@ import axios from "axios";
 import { getIntrospectionQuery } from "graphql";
 import { NodeHtmlMarkdown } from "node-html-markdown";
 
+export function extractOpenApiUrl(html: string): string | null {
+  try {
+    // First try to match based on swagger settings
+    const settingsMatch = html.match(/<script[^>]*id=["']swagger-settings["'][^>]*>([\s\S]*?)<\/script>/i);
+    if (settingsMatch && settingsMatch[1]) {
+
+      const settingsContent = settingsMatch[1].trim();
+      const settings = JSON.parse(settingsContent);
+      
+      if (settings.url) {
+        return settings.url;
+      }
+    }
+    
+    // Fallback: look for JSON with a url property pointing to openapi.json
+    const jsonMatch = html.match(/({[^}]*"url"[^}]*"[^"]*openapi\.json[^}]*})/i);
+    if (jsonMatch && jsonMatch[1]) {
+      try {
+        const jsonObj = JSON.parse(jsonMatch[1]);
+        if (jsonObj.url) {
+          return jsonObj.url;
+        }
+      } catch (e) {
+        // Continue
+      }
+    }
+    
+    // find direct references to openapi.json URLs
+    const openApiUrlMatch = html.match(/["']((?:https?:\/\/)?[^"']*openapi\.json)["']/i);
+    if (openApiUrlMatch && openApiUrlMatch[1]) {
+      return openApiUrlMatch[1];
+    }
+    
+    return null;
+  } catch (error) {
+    console.warn('Failed to extract OpenAPI URL:', error?.message);
+    return null;
+  }
+}
+
+async function getOpenApiJsonFromUrl(openApiUrl: string, documentationUrl: string): Promise<string | null> {
+  try {
+    // Determine the full URL based on whether it's relative or absolute
+    const fullOpenApiUrl = openApiUrl.startsWith('http') 
+      ? openApiUrl 
+      : new URL(openApiUrl, documentationUrl).toString();
+
+    const openApiResponse = await axios.get(fullOpenApiUrl);
+    const openApiData = openApiResponse.data;
+    if (openApiData) {
+      const openApiJson = typeof openApiData === 'object' 
+        ? openApiData 
+        : JSON.parse(openApiData);
+
+      if (openApiJson && !openApiJson.openapi) {
+        console.warn('Fetched JSON does not appear to be a valid OpenAPI document (missing "openapi" key)');
+      }
+      return openApiJson;
+    }
+  } catch (error) {
+    console.warn(`Failed to fetch OpenAPI JSON from ${openApiUrl}:`, error?.message);
+  }
+  return null;
+}
+
 export function postProcessLargeDoc(documentation: string, endpointPath: string): string {
   const MAX_DOC_LENGTH = 80000;
   const MIN_INITIAL_CHUNK = 20000;
@@ -99,20 +164,31 @@ export async function getDocumentation(documentationUrl: string, headers: Record
     try {
       const response = await axios.get(documentationUrl);
       const docData = response.data;
+      const docString = typeof docData === 'string' ? docData : JSON.stringify(docData);
 
-      if (String(docData).toLowerCase().slice(0, 200).includes("<html")) {
-        documentation = NodeHtmlMarkdown.translate(docData);
+      if (docString.toLowerCase().slice(0, 200).includes("<html")) {
+        documentation = NodeHtmlMarkdown.translate(docString);
+        
+        // TODO: maybe do this irrespective of the html tag presence?
+        const openApiUrl = extractOpenApiUrl(docString);
+        if (openApiUrl) {
+          const openApiJson = await getOpenApiJsonFromUrl(openApiUrl, documentationUrl);
+          if (openApiJson) {
+            documentation = [JSON.stringify(openApiJson), documentation].join("\n\n");
+          }
+        }
+
       }
       if(!documentation && docData) {
-        documentation = typeof docData === 'object' ? JSON.stringify(docData) : String(docData);
+        documentation = typeof docData === 'object' ? JSON.stringify(docData) : docString;
       }
 
       // If the documentation contains GraphQL, fetch the schema and add it to the documentation
-        if(documentationUrl.includes("graphql") || documentation.toLowerCase().includes("graphql")) {
-          const graphqlDocumentation = await getGraphQLSchema(documentationUrl, headers, queryParams);
-          if(graphqlDocumentation) {
-            documentation = [JSON.stringify(graphqlDocumentation), documentation].join("\n\n"); 
-          }
+      if(documentationUrl.includes("graphql") || documentation.toLowerCase().includes("graphql")) {
+        const graphqlDocumentation = await getGraphQLSchema(documentationUrl, headers, queryParams);
+        if(graphqlDocumentation) {
+          documentation = [JSON.stringify(graphqlDocumentation), documentation].join("\n\n"); 
+        }
       }
     } catch (error) {
       console.warn(`Failed to fetch documentation from ${documentationUrl}:`, error?.message);
@@ -125,6 +201,7 @@ export async function getDocumentation(documentationUrl: string, headers: Record
     return documentation;
   }
   
+
   async function getGraphQLSchema(documentationUrl: string, headers?: Record<string, string>, queryParams?: Record<string, string>) {
     // The standard introspection query
     const introspectionQuery = getIntrospectionQuery();
