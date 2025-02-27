@@ -2,6 +2,7 @@
 
 import { useConfig } from '@/src/app/config-context';
 import ApiConfigDetail from '@/src/app/configs/[id]/page';
+import ApiConfigIdEditModal from '@/src/components/ApiConfigIdEditModal';
 import { ConfigCreateStepper } from '@/src/components/config-stepper/ConfigCreateStepper';
 import {
   AlertDialog,
@@ -29,7 +30,7 @@ import {
 } from "@/src/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/src/components/ui/tooltip";
 import { ApiConfig, ExtractConfig, SuperglueClient } from '@superglue/client';
-import { History, Play, Plus, RotateCw, Settings, ShoppingBag, Trash2 } from "lucide-react";
+import { History, Pencil, Play, Plus, RotateCw, Settings, ShoppingBag, Trash2 } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import React from 'react';
 
@@ -47,6 +48,7 @@ const ConfigTable = () => {
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [showConfigStepper, setShowConfigStepper] = React.useState(false);
   const [configStepperProps, setConfigStepperProps] = React.useState({});
+  const [configIdToEdit, setConfigIdToEdit] = React.useState<string | null>(null);
 
   const refreshConfigs = React.useCallback(async () => {
     setIsRefreshing(true);
@@ -373,10 +375,25 @@ const ConfigTable = () => {
                         Run
                 </Button>
                 </TableCell>
-                <TableCell className="font-medium max-w-[100px] truncate">
-                  {config.id}
+                <TableCell className="font-medium max-w-[200px] truncate relative group">
+                  <div className="flex items-center">
+                    <span className="truncate">{config.id}</span>
+                    {(config as any).type === 'api' && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="ml-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setConfigIdToEdit(config.id);
+                        }}
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
                 </TableCell>
-                <TableCell>
+                <TableCell className="w-[80px]">
                   <Badge variant={(config as any).type === 'extract' ? 'default' : 'secondary'}>
                     {(config as any).type === 'extract' ? 'Extract' : 'API'}
                   </Badge>
@@ -384,7 +401,7 @@ const ConfigTable = () => {
                 <TableCell className="max-w-[300px] truncate">
                   {config.instruction}
                 </TableCell>
-                <TableCell className="font-medium max-w-[200px] truncate">
+                <TableCell className="font-medium max-w-[100px] truncate">
                   {config.urlHost}
                 </TableCell>
                 <TableCell className="w-[150px]">
@@ -503,6 +520,15 @@ const ConfigTable = () => {
           mode="create"
           onComplete={refreshConfigs}
           {...configStepperProps}
+        />
+      )}
+
+      {configIdToEdit && (
+        <ApiConfigIdEditModal
+          isOpen={!!configIdToEdit}
+          onClose={() => setConfigIdToEdit(null)}
+          configId={configIdToEdit}
+          onConfigUpdated={refreshConfigs}
         />
       )}
     </div>
