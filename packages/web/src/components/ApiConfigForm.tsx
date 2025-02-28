@@ -416,7 +416,7 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
                             <Button
                               type="button"
                               variant="outline"
-                              className="h-10 rounded-l-none px-3"
+                              className="h-9 rounded-l-none"
                               onClick={() => setIsEditingIdModalOpen(true)}
                             >
                               <svg
