@@ -1,6 +1,7 @@
 'use client'
 
 import { useConfig } from '@/src/app/config-context';
+import ApiConfigIdEditModal from '@/src/components/ApiConfigIdEditModal';
 import { ApiPlayground } from '@/src/components/apiPlayground';
 import JsonSchemaEditor from "@/src/components/JsonSchemaEditor";
 import {
@@ -102,6 +103,7 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
   const [isAutofillDialogOpen, setIsAutofillDialogOpen] = React.useState(false);
   const [autofillPayload, setAutofillPayload] = React.useState("{}");
   const [autofillCredentials, setAutofillCredentials] = React.useState("{}");
+  const [isEditingIdModalOpen, setIsEditingIdModalOpen] = React.useState(false);
   const superglueConfig = useConfig();
   const [hasUnsavedChanges, setHasUnsavedChanges] = React.useState(false);
   const [showUnsavedChangesDialog, setShowUnsavedChangesDialog] = React.useState(false);
@@ -355,6 +357,10 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
     }
   };
 
+  const handleConfigIdUpdated = (newId: string) => {
+    router.push(`/configs/${newId}/edit`);
+  };
+
   return (
     <div className="p-8 max-w-none w-full min-h-full">
       <Button
@@ -397,14 +403,40 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
                           ID
                           <InfoTooltip text="A unique identifier for this API configuration. Use this ID to call the endpoint through the SDK." />
                         </Label>
-                        <Input
-                          id="id"
-                          value={formData.id}
-                          onChange={handleChange('id')}
-                          placeholder="unique-identifier"
-                          disabled={!!editingId}
-                          className={editingId ? "disabled:opacity-100" : ""}
-                        />
+                        <div className="flex items-center">
+                          <Input
+                            id="id"
+                            value={formData.id}
+                            onChange={handleChange('id')}
+                            placeholder="unique-identifier"
+                            disabled={!!editingId}
+                            className={`${editingId ? "disabled:opacity-100" : ""} ${editingId ? "rounded-r-none" : ""}`}
+                          />
+                          {editingId && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="h-10 rounded-l-none px-3"
+                              onClick={() => setIsEditingIdModalOpen(true)}
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="lucide lucide-pen"
+                              >
+                                <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                              </svg>
+                              <span className="sr-only">Edit ID</span>
+                            </Button>
+                          )}
+                        </div>
                       </div>
 
                       <div>
@@ -801,6 +833,15 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {editingId && (
+        <ApiConfigIdEditModal
+          isOpen={isEditingIdModalOpen}
+          onClose={() => setIsEditingIdModalOpen(false)}
+          configId={editingId}
+          onConfigUpdated={handleConfigIdUpdated}
+        />
+      )}
     </div>
   );
 };
