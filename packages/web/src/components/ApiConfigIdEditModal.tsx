@@ -17,7 +17,7 @@ type ApiConfigIdEditModalProps = {
   isOpen: boolean;
   onClose: () => void;
   configId: string;
-  onConfigUpdated: () => void;
+  onConfigUpdated: (newId: string) => void;
 };
 
 const ApiConfigIdEditModal = ({
@@ -98,7 +98,7 @@ const ApiConfigIdEditModal = ({
         description: `Config ID successfully updated from "${configId}" to "${newConfigId}"`,
       });
 
-      onConfigUpdated();
+      onConfigUpdated(newConfigId);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred while updating the config ID");
