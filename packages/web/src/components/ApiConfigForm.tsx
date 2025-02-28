@@ -108,6 +108,7 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
   const [showUnsavedChangesDialog, setShowUnsavedChangesDialog] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState("basic");
 
+  
   const getCurlCommand = () => {
       let payload = {}
       try {
@@ -119,7 +120,7 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
       const credentials = parseCredentialsHelper(formData.auth.value, JSON.parse(formData.auth.advancedConfig))
   
       const graphqlQuery = {
-        query: `mutation { call(input: { id: "${configId}" }, payload: ${JSON.stringify(payload)}, credentials: ${JSON.stringify(credentials)}) { data } }`
+        query: `mutation { call(input: { id: "${formData.id}" }, payload: ${JSON.stringify(payload)}, credentials: ${JSON.stringify(credentials)}) { data } }`
       }
       const command = `curl -X POST "${superglueConfig.superglueEndpoint}/graphql" \\
     -H "Content-Type: application/json" \\
@@ -141,12 +142,12 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
   
   // Transform any API response with a single call
   const result = await superglue.call({ 
-    id: "${configId}",
+    id: "${formData.id}",
     payload: ${formData.inputPayload},
     credentials: ${JSON.stringify(credentials)}
   })`
     }
-
+  
   React.useEffect(() => {
     if (editingId && !searchParamsChecked) {
       fetchConfig();
@@ -695,14 +696,14 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
                     <p className="text-sm font-medium">Try the endpoint locally with curl: </p>
                     <div className="relative flex items-start gap-2">
                       <pre className="flex-1 rounded-lg bg-secondary p-4 text-sm">
-                        <code>{getCurlCommand()}</code>
+                        <code>{}</code>
                       </pre>
                       <Button
                         variant="ghost" 
                         size="icon"
                         className="h-8 w-8 flex-none mt-2"
                         onClick={() => {
-                          navigator.clipboard.writeText(getCurlCommand());
+                          //navigator.clipboard.writeText(getCurlCommand());
                         }}
                       >
                         <Copy className="h-4 w-4" />
@@ -719,14 +720,14 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
                     <p className="text-sm font-medium">Or use the TypeScript SDK in your application: </p>
                     <div className="relative flex items-start gap-2">
                       <pre className="flex-1 rounded-lg bg-secondary p-4 text-sm">
-                        <code>{getSdkCode()}</code>
+                        <code>{}</code>
                       </pre>
                       <Button
                         variant="ghost" 
                         size="icon"
                         className="h-8 w-8 flex-none"
                         onClick={() => {
-                          navigator.clipboard.writeText(getSdkCode());
+                          //navigator.clipboard.writeText(getSdkCode());
                         }}
                       >
                         <Copy className="h-4 w-4" />
