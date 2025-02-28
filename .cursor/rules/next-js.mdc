@@ -14,3 +14,19 @@ name handlers with the handle prefix, use descriptive variable names.
 use early returns to make code more readable.
 
 to run unit tests, always just run `npm run test` in the top level project folder.
+
+don't include superfluous comments in the code, for example this is bad:
+```typescript
+// setting max retries to 3
+const MAX_RETRIES = 3
+```
+
+always try to use all-cap const variables instead of magic numbers in the code.
+```typescript
+// bad:
+if (retries > 3) {...}
+
+// good:
+const MAX_RETRIES = 3
+if (retries > MAX_RETRIES) {...}
+```

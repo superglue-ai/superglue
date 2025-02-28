@@ -53,7 +53,7 @@ const apolloConfig = {
           if(errors && errors.length > 0) {
             console.error(errors);
           }
-          if (errors && telemetryClient) {
+          if (errors && errors.length > 0 && telemetryClient) {
             const orgId = requestContext.contextValue.orgId;
             handleQueryError(errors, requestContext.request.query, orgId);
           }

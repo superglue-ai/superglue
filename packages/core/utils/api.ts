@@ -174,7 +174,6 @@ async function generateApiConfig(
   lastError: string | null = null,
   previousMessages: OpenAI.Chat.ChatCompletionMessageParam[] = []
 ): Promise<{ config: ApiConfig; messages: OpenAI.Chat.ChatCompletionMessageParam[] }> {
-  console.log("Generating API config for " + apiConfig.urlHost);
   const schema = zodToJsonSchema(z.object({
     urlHost: z.string(),
     urlPath: z.string(),
@@ -186,7 +185,7 @@ async function generateApiConfig(
     dataPath: z.string().optional().describe("The path to the data you want to extract from the response. E.g. products.variants.size"),
     pagination: z.object({
       type: z.enum(Object.values(PaginationType) as [string, ...string[]]),
-      pageSize: z.number().describe("Number of items per page. Set this to a number. In headers or query params, you can access it as {limit}."),
+      pageSize: z.number().int().describe("Number of items per page. Set this to a number. In headers or query params, you can access it as {limit}."),
     }).optional()
   }));
   const openai = new OpenAI({
@@ -249,7 +248,7 @@ Documentation: ${String(documentation).slice(0, 80000)}`
   const numInitialMessages = 2;
   const retryCount = previousMessages.length > 0 ? (messages.length - numInitialMessages) / 2 : 0;
   const temperature = String(process.env.OPENAI_MODEL).startsWith("o") ? undefined : Math.min(retryCount * 0.1, 1);
-  console.log(`Attempt ${retryCount + 1}${temperature ?  ` with temperature ${temperature}`: ""}`);
+  console.log("Generating API config for " + apiConfig.urlHost + (retryCount > 0 ? ` (retry ${retryCount})` : ""));
 
   const completion = await openai.chat.completions.create({
     model: process.env.OPENAI_MODEL,

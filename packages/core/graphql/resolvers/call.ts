@@ -51,7 +51,7 @@ export const callResolver = async (
 
         response = await callEndpoint(preparedEndpoint, payload, credentials, options);
 
-        if(!response.data || (typeof response.data === 'object' && Object.keys(response.data).length === 0)) {
+        if(!response.data) {
           response = null;
           throw new Error("No data returned from API. This could be due to a configuration error.");
         }

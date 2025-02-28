@@ -1,8 +1,9 @@
 import OpenAI from "openai";
 import { PROMPT_MAPPING } from "./prompts.js";
-import {  applyJsonataWithValidation, sample } from "./tools.js";
+import {  applyJsonataWithValidation, getSchemaFromData, sample } from "./tools.js";
 import { ApiInput, DataStore, TransformConfig, TransformInput } from "@superglue/shared";
 import crypto from 'crypto';
+import { createHash } from "crypto";
 import { ChatCompletionMessageParam } from "openai/resources/chat/index.mjs";
 import toJsonSchema from "to-json-schema";
 
@@ -33,10 +34,13 @@ export async function prepareTransform(
       if (cached) return { ...cached, ...input };
     }
 
-    // Check if the response mapping is already generated
+    const hash = createHash('md5')
+      .update(JSON.stringify({request: input, payloadKeys: getSchemaFromData(data)}))
+      .digest('hex');
+
     if(input.responseMapping) {
       return { 
-        id: crypto.randomUUID(),
+        id: hash,
         createdAt: new Date(),
         updatedAt: new Date(),
         responseMapping: input.responseMapping,
@@ -51,7 +55,7 @@ export async function prepareTransform(
     // Check if the mapping is generated successfully
     if(mapping) {
       return { 
-        id: crypto.randomUUID(),
+        id: hash,
         createdAt: new Date(),
         updatedAt: new Date(),
         ...input, 
