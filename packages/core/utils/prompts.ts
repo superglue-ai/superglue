@@ -44,6 +44,7 @@ Guidelines for creating JSONata mappings:
    - Pay special attention to filter statements in the instruction and the schema description. Add them to the generated jsonata expression.
      Example: Get me all products with SKU 0406654608 or products: {"type": "array", description: "only products with SKU 0406654608"}
      Generated jsonata expression: Account.Order.Product[SKU = "0406654608"].{"Description": Description}
+   - For filtering with arrays, you can use the "in" operator. E.g. library.books["Steven King" in authors]
 
 6. Data Integrity:
    - ONLY use fields that exist in the source data structure

@@ -51,7 +51,6 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
     auth: {
       type: AuthType.HEADER,
       value: '',
-      advancedConfig: '{}'
     },
     responseSchema: '{}'
   })
@@ -157,7 +156,7 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
             authentication: formData.auth.value ? AuthType.HEADER : AuthType.NONE
           },
           payload: JSON.parse(formData.inputPayload),
-          credentials: parseCredentialsHelper(formData.auth.value, JSON.parse(formData.auth.advancedConfig)),
+          credentials: parseCredentialsHelper(formData.auth.value),
           options: {
             cacheMode: CacheMode.DISABLED
           }
@@ -287,7 +286,7 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
       console.warn('Invalid input payload JSON')
     }
 
-    const credentials = parseCredentialsHelper(formData.auth.value, JSON.parse(formData.auth.advancedConfig))
+    const credentials = parseCredentialsHelper(formData.auth.value)
 
     const graphqlQuery = {
       query: `mutation CallApi($payload: JSON!, $credentials: JSON!) { 
@@ -310,7 +309,7 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
   }
 
   const getSdkCode = () => {
-    const credentials = parseCredentialsHelper(formData.auth.value, JSON.parse(formData.auth.advancedConfig))
+    const credentials = parseCredentialsHelper(formData.auth.value)
     return `npm install @superglue/client
 
 // in your app:
@@ -353,7 +352,7 @@ const result = await superglue.call({
       const mappedResult = await superglueClient.call({
         id: configId,
         payload: JSON.parse(formData.inputPayload),
-        credentials: parseCredentialsHelper(formData.auth.value, JSON.parse(formData.auth.advancedConfig))
+        credentials: parseCredentialsHelper(formData.auth.value)
       })
 
       if (mappedResult.error) {
@@ -462,7 +461,7 @@ const result = await superglue.call({
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <Label htmlFor="auth">API Key or Token (Optional)</Label>
-                  <HelpTooltip text="Enter API secret here (we don't store it!). Omit prefixes like Bearer. We figure out where to put the secret." />
+                  <HelpTooltip text="Enter API secret here (not stored, just for initial setup). Omit prefixes like Bearer. Alternatively, you can put a JSON object here with multiple keys and values." />
                 </div>
                 <Input
                   id="auth"
