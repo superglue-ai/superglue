@@ -182,6 +182,133 @@ describe('Documentation Utilities', () => {
       expect(result).toContain('`inline code <tags>`');
       expect(result).toContain('| Cell 1 © | Cell 2 ® |');
     });
+
+    it('should extract and fetch OpenAPI JSON URL from Swagger UI HTML', async () => {
+      const swaggerHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <link type="text/css" rel="stylesheet" href="/static/ninja/swagger-ui.c9a0b360b746.css">
+            <link rel="shortcut icon" href="/static/ninja/favicon.8d5ab72e19e7.png">
+            <title>Ento API</title>
+        </head>
+        <body
+            data-csrf-token=""
+            data-api-csrf="">
+        
+            <script type="application/json" id="swagger-settings">
+                {
+         "layout": "BaseLayout",
+         "deepLinking": true,
+         "url": "/api/v1/openapi.json"
+        }
+            </script>
+            
+            <div id="swagger-ui"></div>
+        
+            <script src="/static/ninja/swagger-ui-bundle.ca90216c3f6d.js"></script>
+            <script src="/static/ninja/swagger-ui-init.ec666b6c27d3.js"></script>
+        
+        </body>
+        </html>
+      `;
+      
+      const openApiJson = {
+        openapi: "3.0.0",
+        info: {
+          title: "Test API",
+          version: "1.0.0"
+        },
+        paths: {}
+      };
+      
+      // Mock first response to return the Swagger HTML
+      mockedAxios.get.mockImplementationOnce(url => {
+        if (url === 'https://api.example.com/docs') {
+          return Promise.resolve({ data: swaggerHtml });
+        }
+        return Promise.reject(new Error('URL not mocked'));
+      });
+      
+      // Mock second response to return the OpenAPI JSON
+      mockedAxios.get.mockImplementationOnce(url => {
+        if (url === 'https://api.example.com/api/v1/openapi.json') {
+          return Promise.resolve({ data: openApiJson });
+        }
+        return Promise.reject(new Error('URL not mocked'));
+      });
+      
+      const result = await getDocumentation('https://api.example.com/docs', {}, {});
+      
+      // Verify both calls were made
+      expect(mockedAxios.get).toHaveBeenCalledTimes(2);
+      expect(mockedAxios.get).toHaveBeenNthCalledWith(1, 'https://api.example.com/docs');
+      expect(mockedAxios.get).toHaveBeenNthCalledWith(2, 'https://api.example.com/api/v1/openapi.json');
+      
+      // Verify the result contains the OpenAPI JSON
+      expect(result).toContain(JSON.stringify(openApiJson));
+    });
+    
+    it('should handle OpenAPI URL that is absolute', async () => {
+      // More complete HTML example for better matching
+      const swaggerHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>API Documentation</title>
+        </head>
+        <body>
+          <div id="swagger-ui"></div>
+          <script type="application/json" id="swagger-settings">
+            {
+              "url": "https://external-api.com/openapi.json"
+            }
+          </script>
+        </body>
+        </html>
+      `;
+      
+      const openApiJson = { openapi: "3.0.0" };
+      
+      mockedAxios.get.mockResolvedValueOnce({ data: swaggerHtml });
+      mockedAxios.get.mockResolvedValueOnce({ data: openApiJson });
+      
+      const result = await getDocumentation('https://api.example.com/docs', {}, {});
+      
+      expect(mockedAxios.get).toHaveBeenCalledTimes(2);
+      expect(mockedAxios.get).toHaveBeenNthCalledWith(2, 'https://external-api.com/openapi.json');
+      expect(result).toContain(JSON.stringify(openApiJson));
+    });
+    
+    it('should handle OpenAPI extraction errors gracefully', async () => {
+      // More complete HTML example for better matching
+      const swaggerHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>API Documentation</title>
+        </head>
+        <body>
+          <div id="swagger-ui"></div>
+          <script type="application/json" id="swagger-settings">
+            {
+              "url": "/api/v1/openapi.json"
+            }
+          </script>
+        </body>
+        </html>
+      `;
+      
+      mockedAxios.get.mockResolvedValueOnce({ data: swaggerHtml });
+      mockedAxios.get.mockRejectedValueOnce(new Error('Failed to fetch OpenAPI'));
+      
+      const result = await getDocumentation('https://api.example.com/docs', {}, {});
+      
+      expect(mockedAxios.get).toHaveBeenCalledTimes(2);
+      // Result should still contain parts of the original HTML converted to markdown
+      expect(result).toContain('DOCTYPE');
+      expect(result).toContain('html');
+    });
   });
 
   describe('postProcessLargeDoc', () => {

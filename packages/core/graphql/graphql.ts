@@ -1,4 +1,5 @@
 import fs from 'fs';
+import { GraphQLUpload } from 'graphql-upload-minimal';
 import { callResolver } from './resolvers/call.js';
 import { deleteApiResolver, deleteExtractResolver, deleteTransformResolver } from './resolvers/delete.js';
 import { extractResolver } from './resolvers/extract.js';
@@ -7,8 +8,8 @@ import { getApiResolver, getExtractResolver, getRunResolver, getTransformResolve
 import { listApisResolver, listExtractsResolver, listRunsResolver, listTransformsResolver } from './resolvers/list.js';
 import { JSONResolver, JSONSchemaResolver, JSONataResolver } from './resolvers/scalars.js';
 import { transformResolver } from './resolvers/transform.js';
+import { updateApiConfigIdResolver } from './resolvers/updateId.js';
 import { upsertApiResolver, upsertExtractResolver, upsertTransformResolver } from './resolvers/upsert.js';
-import { GraphQLUpload } from 'graphql-upload-minimal';
 
 export const resolvers = {
     Query: {
@@ -28,6 +29,7 @@ export const resolvers = {
         transform: transformResolver,
         upsertApi: upsertApiResolver,
         deleteApi: deleteApiResolver,
+        updateApiConfigId: updateApiConfigIdResolver,
         upsertExtraction: upsertExtractResolver,
         deleteExtraction: deleteExtractResolver,
         upsertTransformation: upsertTransformResolver,

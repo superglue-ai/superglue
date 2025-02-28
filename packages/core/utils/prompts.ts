@@ -44,6 +44,7 @@ Guidelines for creating JSONata mappings:
    - Pay special attention to filter statements in the instruction and the schema description. Add them to the generated jsonata expression.
      Example: Get me all products with SKU 0406654608 or products: {"type": "array", description: "only products with SKU 0406654608"}
      Generated jsonata expression: Account.Order.Product[SKU = "0406654608"].{"Description": Description}
+   - For filtering with arrays, you can use the "in" operator. E.g. library.books["Steven King" in authors]
 
 6. Data Integrity:
    - ONLY use fields that exist in the source data structure
@@ -131,7 +132,7 @@ Make sure to try a fix before generating a new configuration. I will loose my jo
 export const GENERATE_SCHEMA_PROMPT = `You are a json schema generator assistant. Generate a JSON schema based on instructions and response data.
 If the response data is an array, make the schema an array of objects and name the array object "results".
 
-Make the schema as simple as possible.
+Make the schema as simple as possible. No need to include every possible field, just the ones relevant to the query.
 
 - The schema should be a JSON schema object.
 - The schema should be valid.
