@@ -41,7 +41,7 @@ async function attemptSchemaGeneration(
   messages: ChatCompletionMessageParam[],
   retry: number
 ): Promise<string> {
-  console.log(`Generating schema (retry: ${retry})`);
+  console.log(`Generating schema: ${retry ? `(retry ${retry})` : ""}`);
   const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
     baseURL: process.env.OPENAI_API_BASE_URL
