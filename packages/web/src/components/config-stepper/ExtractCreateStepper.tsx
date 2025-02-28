@@ -239,7 +239,7 @@ curl -s -X POST "${superglueConfig.superglueEndpoint}" \\
     } catch (e) {
       console.warn('Invalid input payload JSON')
     }
-    const credentials = parseCredentialsHelper(formData.auth.value, JSON.parse(formData.auth.advancedConfig))
+    const credentials = parseCredentialsHelper(formData.auth.value)
     const extractCommand = `# First command: Extract data and store in JSON
 curl -s -X POST "${superglueConfig.superglueEndpoint}" \\
   -H "Authorization: Bearer ${superglueConfig.superglueApiKey}" \\
@@ -267,7 +267,7 @@ curl -s -X POST "${superglueConfig.superglueEndpoint}" \\
   }
 
   const getSdkCode = () => {
-    const credentials = parseCredentialsHelper(formData.auth.value, JSON.parse(formData.auth.advancedConfig))
+    const credentials = parseCredentialsHelper(formData.auth.value)
     return `npm install @superglue/client
 
 // in your app:
@@ -308,7 +308,7 @@ if (transformResult?.success) {
         authentication: formData.auth.value ? AuthType.HEADER : AuthType.NONE
       },
       payload: JSON.parse(formData.inputPayload),
-      credentials: parseCredentialsHelper(formData.auth.value, JSON.parse(formData.auth.advancedConfig)),
+      credentials: parseCredentialsHelper(formData.auth.value),
       options: {
         cacheMode: CacheMode.DISABLED
       }
@@ -730,72 +730,26 @@ if (transformResult?.success) {
 
           {step === 'auth' && (
             <div className="space-y-6">
-              {formData.auth.advancedConfig === '{}' ? (
-                <div className="space-y-4 h-full">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <Label htmlFor="auth">API Key or Token for Target API (Optional)</Label>
-                      <HelpTooltip text="Enter API key/token here, superglue figures out where to put it. Do not include prefixes like Bearer or Basic in the field." />
-                    </div>
-                    <Input
-                      id="auth"
-                      value={formData.auth.value}
-                      onChange={(e) => handleAuthChange(e.target.value)}
-                      placeholder="Enter your API key or token"
-                    />
+              <div className="space-y-4 h-full">
+                <div>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <Label htmlFor="auth">API Key or Token for Target API (Optional)</Label>
+                    <HelpTooltip text="Enter API key/token here, superglue figures out where to put it. Do not include prefixes like Bearer or Basic in the field." />
                   </div>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Label>Advanced Authentication Configuration</Label>
-                    <HelpTooltip text="Configure more complex auth which needs multiple fields like user/password." />
-                  </div>
-                  <Textarea
-                    value={formData.auth.advancedConfig}
-                    onChange={(e) => setFormData(prev => ({
-                      ...prev,
-                      auth: {
-                        ...prev.auth,
-                        advancedConfig: e.target.value
-                      }
-                    }))}
-                    placeholder="Enter JSON configuration"
-                    className="font-mono h-48"
+                  <Input
+                    id="auth"
+                    value={formData.auth.value}
+                    onChange={(e) => handleAuthChange(e.target.value)}
+                    placeholder="Enter your API key or token"
                   />
                 </div>
-              )}
-              
+              </div>              
               <div className="space-y-4 h-full">
                 <div className="relative">
                   <div className="absolute inset-0 flex items-center">
                     <span className="w-full border-t" />
                   </div>
                 </div>
-
-                <Button
-                  variant="outline"
-                  onClick={() => setFormData(prev => ({
-                    ...prev,
-                    auth: {
-                      ...prev.auth,
-                      value: '', // Clear the simple auth value when switching
-                      advancedConfig: prev.auth.advancedConfig === '{}' ? 
-                        JSON.stringify({
-                          username: '',
-                          password: '',
-                          // Uncomment fields below if needed:
-                          // bearer_token: "",
-                          // api_key: "",
-                          // custom_headers: {}
-                        }, null, 2) : 
-                        '{}'
-                    }
-                  }))}
-                  className="w-full"
-                >
-                  {formData.auth.advancedConfig === '{}' ? 'Switch to Advanced Authentication' : 'Switch back to Simple Authentication'}
-                </Button>
               </div>
             </div>
           )}
