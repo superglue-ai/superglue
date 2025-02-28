@@ -5,23 +5,25 @@ import { TooltipTrigger } from "../ui/tooltip"
 
 export const inputErrorStyles = "!border-destructive !border-[1px] focus:!ring-0 focus:!ring-offset-0"
 
-export const parseCredentialsHelper = (simpleCreds: string, advancedCreds: JSON) : Record<string, any> => {
-  if (simpleCreds?.trim()) {
-    if(simpleCreds.includes('Bearer ')) {
-      return { apiKey: simpleCreds.replace('Bearer ', '') }
-    }
-    if(simpleCreds.includes('Basic ')) {
-      return { apiKey: simpleCreds.replace('Basic ', '') }
-    }
-    return { apiKey: simpleCreds }
-  } else if (advancedCreds) {
-    const advancedCredsStr = JSON.stringify(advancedCreds)
-    if (advancedCredsStr === '{}' || advancedCredsStr === '""' || advancedCredsStr === JSON.stringify({username: '', password: ''})) {
-      return {}
-    }
-    return JSON.parse(advancedCredsStr)
+export const parseCredentialsHelper = (simpleCreds: string) : Record<string, any> => {
+  const creds = simpleCreds?.trim() || ""
+  if(!creds) {
+    return {}
   }
-  return {}
+
+  if (creds.startsWith('{')) {
+    return JSON.parse(creds)
+  }
+
+  if(creds.startsWith('Bearer ')) {
+    return { apiKey: creds.replace('Bearer ', '') }
+  }
+
+  if(creds.startsWith('Basic ')) {
+    return { apiKey: creds.replace('Basic ', '') }
+  }
+
+  return { apiKey: creds }
 }
 
 export function HelpTooltip({ text }: { text: string }) {
