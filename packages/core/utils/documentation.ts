@@ -90,6 +90,12 @@ export function postProcessLargeDoc(documentation: string, endpointPath: string)
 
   // Find all occurrences of the search term
   const positions: number[] = [];
+
+  let authPos = docLower.indexOf("securityschemes") || docLower.indexOf("authorization");
+  if(authPos !== -1) {
+    positions.push(authPos);
+  }
+
   let pos = docLower.indexOf(searchTerm);	
   while (pos !== -1) {
     positions.push(pos);
