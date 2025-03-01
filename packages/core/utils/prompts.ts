@@ -99,6 +99,10 @@ export const API_PROMPT = `You are an API configuration assistant. Generate API 
    e.g. headers: {
         "Authorization": "Bearer {access_token}"
    }
+   e.g. headers: {
+        "Authorization": "Basic {username}:{password}"
+  }
+  Note: For Basic Authentication, format as "Basic {username}:{password}" and the system will automatically convert it to Base64.
 - Variables provided starting with 'x-' are probably headers.
 - For pagination, please add {page} or {offset} as well as {limit} to the url / query params / body / headers.
       e.g. https://api.example.com/v1/items?page={page}&limit={limit}
