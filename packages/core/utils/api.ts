@@ -36,7 +36,7 @@ export async function prepareEndpoint(
 }
 
 export function convertBasicAuthToBase64(headerValue){
-  if (typeof headerValue === 'string' && headerValue.startsWith('Basic')) {
+    if(!headerValue) return headerValue;
     // Get the part of the 'Basic '
     const credentials = headerValue.substring('Basic '.length).trim();
     // checking if it is already Base64 decoded
@@ -47,7 +47,6 @@ export function convertBasicAuthToBase64(headerValue){
       const base64Credentials = Buffer.from(credentials).toString('base64');
       return `Basic ${base64Credentials}`; 
     }
-  }
       return headerValue; 
 }
 
@@ -91,7 +90,7 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
     // Process headers for Basic Auth
     const processedHeaders = {};
     for (const [key, value] of Object.entries(headers)) {
-      if (key.toLowerCase() === 'authorization') {
+      if (key.toLowerCase() === 'authorization' && typeof value === 'string' && value.startsWith('Basic ')) {
         processedHeaders[key] = convertBasicAuthToBase64(value);
       } else {
         processedHeaders[key] = value;
