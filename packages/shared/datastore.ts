@@ -34,5 +34,9 @@ export interface DataStore {
     createRun(result: RunResult, orgId?: string): Promise<RunResult>;
     deleteRun(id: string, orgId?: string): Promise<boolean>;
     deleteAllRuns(orgId?: string): Promise<boolean>;
+
+    // Tenant Information Methods
+    getTenantInfo(): Promise<{ email: string | null, hasAskedForEmail: boolean }>;
+    setTenantInfo(email: string): Promise<void>;
   }
   

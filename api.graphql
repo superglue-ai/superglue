@@ -232,9 +232,18 @@ type Query {
   getExtract(id: ID!): ExtractConfig
 
   generateSchema(instruction: String!, responseData: String): JSONSchema!
+  
+  getTenantInfo: TenantInfo
+}
+
+type TenantInfo {
+  email: String
+  hasAskedForEmail: Boolean!
 }
 
 type Mutation {
+  setTenantInfo(email: String!): TenantInfo!
+  
   call(
     input: ApiInputRequest!
     payload: JSON

@@ -11,6 +11,11 @@ export class MemoryStore implements DataStore {
     runsIndex: Map<string, { id: string; timestamp: number; configId: string }[]>;
   };
 
+  private tenant: { email: string | null; hasAskedForEmail: boolean } = {
+    email: null,
+    hasAskedForEmail: false
+  };
+
   constructor() {
     this.storage = {
       apis: new Map(),
@@ -259,5 +264,16 @@ export class MemoryStore implements DataStore {
 
   async ping(): Promise<boolean> {
     return true;
+  }
+
+  async getTenantInfo(): Promise<{ email: string | null; hasAskedForEmail: boolean }> {
+    return this.tenant;
+  }
+
+  async setTenantInfo(email: string): Promise<void> {
+    this.tenant = {
+      email,
+      hasAskedForEmail: true
+    };
   }
 } 
