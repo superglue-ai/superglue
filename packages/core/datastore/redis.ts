@@ -303,6 +303,41 @@ export class RedisService implements DataStore {
       return false;
     }
   }
+
+  private tenantKey(): string {
+    return `tenant`;
+  }
+
+  async getTenantInfo(): Promise<{ email: string | null; hasAskedForEmail: boolean }> {
+    try {
+      const data = await this.redis.get(this.tenantKey());
+      if (data) {
+        return JSON.parse(data);
+      }
+      return {
+        email: null,
+        hasAskedForEmail: false
+      };
+    } catch (error) {
+      console.error('Error getting tenant info:', error);
+      return {
+        email: null,
+        hasAskedForEmail: false
+      };
+    }
+  }
+
+  async setTenantInfo(email: string): Promise<void> {
+    try {
+      const tenantInfo = {
+        email,
+        hasAskedForEmail: true
+      };
+      await this.redis.set(this.tenantKey(), JSON.stringify(tenantInfo));
+    } catch (error) {
+      console.error('Error setting tenant info:', error);
+    }
+  }
 }
 
 function parseWithId(data: string, id: string): any {

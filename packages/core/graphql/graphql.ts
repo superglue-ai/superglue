@@ -7,6 +7,7 @@ import { generateSchemaResolver } from './resolvers/generate.js';
 import { getApiResolver, getExtractResolver, getRunResolver, getTransformResolver } from './resolvers/get.js';
 import { listApisResolver, listExtractsResolver, listRunsResolver, listTransformsResolver } from './resolvers/list.js';
 import { JSONResolver, JSONSchemaResolver, JSONataResolver } from './resolvers/scalars.js';
+import { getTenantInfoResolver, setTenantInfoResolver } from './resolvers/tenant.js';
 import { transformResolver } from './resolvers/transform.js';
 import { updateApiConfigIdResolver } from './resolvers/updateId.js';
 import { upsertApiResolver, upsertExtractResolver, upsertTransformResolver } from './resolvers/upsert.js';
@@ -21,9 +22,11 @@ export const resolvers = {
         getTransform: getTransformResolver,
         listExtracts: listExtractsResolver,
         getExtract: getExtractResolver,
-        generateSchema: generateSchemaResolver
+        generateSchema: generateSchemaResolver,
+        getTenantInfo: getTenantInfoResolver
     },
     Mutation: {
+        setTenantInfo: setTenantInfoResolver,
         call: callResolver,
         extract: extractResolver,
         transform: transformResolver,
