@@ -185,7 +185,7 @@ async function generateApiConfig(
     dataPath: z.string().optional().describe("The path to the data you want to extract from the response. E.g. products.variants.size"),
     pagination: z.object({
       type: z.enum(Object.values(PaginationType) as [string, ...string[]]),
-      pageSize: z.number().int().describe("Number of items per page. Set this to a number. In headers or query params, you can access it as {limit}."),
+      pageSize: z.string().describe("Number of items per page. Set this to a number. In headers or query params, you can access it as {limit}."),
     }).optional()
   }));
   const openai = new OpenAI({
