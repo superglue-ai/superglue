@@ -1,5 +1,9 @@
 'use client'
 
+import { Button } from '@/src/components/ui/button'
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/src/components/ui/card'
+import { Input } from '@/src/components/ui/input'
+import { Label } from '@/src/components/ui/label'
 import { useRouter } from 'next/navigation'
 import { usePostHog } from 'posthog-js/react'
 import { useEffect, useState } from 'react'
@@ -60,7 +64,7 @@ export default function WelcomePage() {
     }
     
     checkTenantInfo()
-  }, [router, config.superglueEndpoint])
+  }, [router, config.superglueEndpoint, config.superglueApiKey])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -137,61 +141,103 @@ export default function WelcomePage() {
     }
   }
 
+  const handleSkip = async () => {
+    try {
+      // TODO: remove once client SDK is updated
+      const response = await fetch(`${config.superglueEndpoint}/graphql`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${config.superglueApiKey}`,
+        },
+        body: JSON.stringify({
+          query: `
+            mutation SetTenantInfo($skip: Boolean!) {
+              setTenantInfo(skip: $skip) {
+                hasAskedForEmail
+              }
+            }
+          `,
+          variables: {
+            skip: true,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('GraphQL request failed');
+      }
+
+      // Store in cookies
+      document.cookie = `sg_tenant_hasAskedForEmail=true; path=/; max-age=31536000; SameSite=Strict`;
+      
+      router.push('/');
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gray-50">
-        <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-lg shadow-lg">
-          <div className="text-center">
-            <h2 className="mt-6 text-3xl font-bold text-gray-900">Loading...</h2>
-          </div>
-        </div>
+      <div className="min-h-screen flex flex-col items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="space-y-1 text-center">
+            <CardTitle className="text-2xl">Loading...</CardTitle>
+          </CardHeader>
+        </Card>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gray-50">
-      <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-lg shadow-lg">
-        <div className="text-center">
-          <h2 className="mt-6 text-3xl font-bold text-gray-900">Welcome to Superglue</h2>
-          <p className="mt-2 text-sm text-gray-600">
-            Please enter your email to continue
-          </p>
-        </div>
+    <div className="min-h-screen flex flex-col items-center justify-center p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="space-y-1 text-center">
+          <CardTitle className="text-2xl">Welcome to superglue</CardTitle>
+          <CardDescription>
+            Enter your email to receive security-relevant updates
+          </CardDescription>
+        </CardHeader>
         
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div>
-            <label htmlFor="email" className="sr-only">
-              Email address
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              required
-              className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-              placeholder="Email address"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email address</Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
 
-          {error && (
-            <div className="text-red-500 text-sm">{error}</div>
-          )}
+            {error && (
+              <div className="text-red-500 text-sm">{error}</div>
+            )}
 
-          <div>
-            <button
+            <Button
               type="submit"
+              className="w-full"
               disabled={isSubmitting}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
             >
               {isSubmitting ? 'Submitting...' : 'Continue'}
-            </button>
-          </div>
-        </form>
-      </div>
+            </Button>
+          </form>
+        </CardContent>
+        
+        <CardFooter className="flex justify-end pt-0">
+          <span 
+            className="text-xs text-gray-600 hover:text-gray-700 cursor-pointer transition-colors"
+            onClick={handleSkip}
+          >
+            skip
+          </span>
+        </CardFooter>
+      </Card>
     </div>
   )
 } 
