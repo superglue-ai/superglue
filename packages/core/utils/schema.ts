@@ -43,11 +43,10 @@ async function attemptSchemaGeneration(
 ): Promise<string> {
   console.log(`Generating schema: ${retry ? `(retry ${retry})` : ""}`);
   const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-    baseURL: process.env.OPENAI_API_BASE_URL
+    baseURL: process.env.LITELLM_BASE_URL
   });
   
-  const modelName = process.env.SCHEMA_GENERATION_MODEL || process.env.OPENAI_MODEL;
+  const modelName = process.env.SCHEMA_GENERATION_MODEL || process.env.LLM_MODEL;
   
   let temperature = 0;
   if (modelName === 'gpt-4o' && retry > 0) {

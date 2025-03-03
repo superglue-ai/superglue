@@ -38,6 +38,7 @@ services:
       - .env
     depends_on:
       - redis
+      - litellm
     restart: unless-stopped
 
   redis:
@@ -48,6 +49,21 @@ services:
     volumes:
       - redis_data:/data
     restart: unless-stopped
+  
+  litellm:
+    build:
+      context: .
+      args:
+        target: runtime
+    image: ghcr.io/berriai/litellm:main-stable
+    volumes:
+     - ./litellm-config.yaml:/app/config.yaml
+    command:
+     - "--config=/app/config.yaml"
+    ports:
+      - "4000:4000"
+    env_file:
+      - .env
 
 volumes:
   redis_data:
@@ -84,12 +100,30 @@ REDIS_PORT=6379
 REDIS_USERNAME=default
 REDIS_PASSWORD=secret
 
-# OpenAI Configuration
-OPENAI_API_KEY=sk-...
-# OpenAI model to use. We recommend gpt-4o-2024-11-20
-OPENAI_MODEL=gpt-4o-2024-11-20
-```
+# Litellm is used to provide access to 100+ AI models.
+LITELLM_BASE_URL=http://litellm:4000
 
+# Your LLM model API key. For other models, check: https://docs.litellm.ai/docs/providers
+OPENAI_API_KEY=sk-proj-1234567890
+# GEMINI_API_KEY=sk-proj-1234567890
+# ANTHROPIC_API_KEY=sk-proj-1234567890
+
+# Your LLM model name. For other models, check: https://docs.litellm.ai/docs/providers
+LLM_MODEL=gpt-4o-2024-11-20
+# LLM_MODEL=gemini/gemini-2.0-flash
+# LLM_MODEL=claude-3-opus-20240229
+```
+Create a `litellm-config.yaml` file
+```
+model_list:
+  # Works for ALL Providers and needs the default provider credentials in .env
+  - model_name: "*" 
+    litellm_params:
+      model: "*"
+
+litellm_settings: # module level litellm settings
+  drop_params: True
+```
 3. **Start the Services**
 
 ```bash
