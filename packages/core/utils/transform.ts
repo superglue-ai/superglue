@@ -72,8 +72,7 @@ export async function generateMapping(schema: any, payload: any, instruction?: s
   console.log("generating mapping" + (retry ? `, attempt ${retry} with temperature ${retry * 0.1}` : ""));
   try {
     const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-      baseURL: process.env.OPENAI_API_BASE_URL,
+      baseURL: process.env.LITELLM_BASE_URL,
     });
     const userPrompt = 
 `Given a source data and structure, create a jsonata expression in JSON FORMAT.
@@ -97,10 +96,10 @@ ${JSON.stringify(sample(payload, 5), null, 2).slice(0,10000)}`
         {role: "user", content: userPrompt}
       ]
     }
-    const temperature = String(process.env.OPENAI_MODEL).startsWith("o") ? undefined : Math.min(retry * 0.1, 1);
+    const temperature = String(process.env.LLM_MODEL).startsWith("o") ? undefined : Math.min(retry * 0.1, 1);
   
     const reasoning = await openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL,
+      model: process.env.LLM_MODEL,
       temperature,
       messages,
       response_format: {

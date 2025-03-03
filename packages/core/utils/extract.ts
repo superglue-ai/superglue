@@ -102,11 +102,10 @@ async function generateExtractConfig(extractConfig: Partial<ExtractConfig>, docu
   }));
 
   const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-    baseURL: process.env.OPENAI_API_BASE_URL
+    baseURL: process.env.LITELLM_BASE_URL
   });
   const completion = await openai.chat.completions.create({
-    model: process.env.OPENAI_MODEL,
+    model: process.env.LLM_MODEL,
     response_format: {
       type: "json_schema",
       json_schema: {

@@ -11,3 +11,20 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    depends_on:
+      - litellm
+
+  litellm:
+    build:
+      context: .
+      args:
+        target: runtime
+    image: ghcr.io/berriai/litellm:main-stable
+    volumes:
+     - ./litellm-config.yaml:/app/config.yaml
+    command:
+     - "--config=/app/config.yaml"
+    ports:
+      - "4000:4000"
+    env_file:
+      - .env

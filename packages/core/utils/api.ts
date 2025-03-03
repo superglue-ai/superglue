@@ -189,8 +189,7 @@ async function generateApiConfig(
     }).optional()
   }));
   const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-    baseURL: process.env.OPENAI_API_BASE_URL
+    baseURL: process.env.LITELLM_BASE_URL
   });
 
   const userProvidedAdditionalInfo = Boolean(
@@ -247,11 +246,11 @@ Documentation: ${String(documentation).slice(0, 80000)}`
 
   const numInitialMessages = 2;
   const retryCount = previousMessages.length > 0 ? (messages.length - numInitialMessages) / 2 : 0;
-  const temperature = String(process.env.OPENAI_MODEL).startsWith("o") ? undefined : Math.min(retryCount * 0.1, 1);
+  const temperature = String(process.env.LLM_MODEL).startsWith("o") ? undefined : Math.min(retryCount * 0.1, 1);
   console.log("Generating API config for " + apiConfig.urlHost + (retryCount > 0 ? ` (retry ${retryCount})` : ""));
 
   const completion = await openai.chat.completions.create({
-    model: process.env.OPENAI_MODEL,
+    model: process.env.LLM_MODEL,
     response_format: {
       type: "json_schema",
       json_schema: {

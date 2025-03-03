@@ -19,7 +19,7 @@ describe('API Utilities', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.OPENAI_API_KEY = 'test-key';
-    process.env.OPENAI_MODEL = 'test-model';
+    process.env.LLM_MODEL = 'test-model';
   });
 
   afterEach(() => {

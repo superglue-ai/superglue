@@ -1,0 +1,8 @@
+model_list:
+  # Works for ALL Providers and needs the default provider credentials in .env
+  - model_name: "*" 
+    litellm_params:
+      model: "*"
+
+litellm_settings: # module level litellm settings
+  drop_params: True
