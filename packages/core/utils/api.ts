@@ -3,6 +3,7 @@ import { AxiosRequestConfig } from "axios";
 import OpenAI from "openai";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
+import { DOCUMENTATION_MAX_LENGTH } from "../config.js";
 import { getDocumentation } from "./documentation.js";
 import { API_ERROR_HANDLING_USER_PROMPT, API_PROMPT } from "./prompts.js";
 import { callAxios, composeUrl, replaceVariables } from "./tools.js";
@@ -28,6 +29,12 @@ export async function prepareEndpoint(
 
     // If a documentation URL is provided, fetch and parse additional details
     const documentation = await getDocumentation(apiCallConfig.documentationUrl || composeUrl(apiCallConfig.urlHost, apiCallConfig.urlPath), apiCallConfig.headers, apiCallConfig.queryParams, apiCallConfig?.urlPath);
+    if(documentation.length >= DOCUMENTATION_MAX_LENGTH) {
+      console.warn("Documentation length at limit: " + documentation.length);
+    }
+    if(documentation.length <= 10000) {
+      console.warn("Documentation length is short: " + documentation.length);
+    }
 
     const availableVars = [...Object.keys(payload || {}), ...Object.keys(credentials || {})];
     const computedApiCallConfig = await generateApiConfig(apiCallConfig, documentation, availableVars, lastError, previousMessages);
