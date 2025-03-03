@@ -96,7 +96,7 @@ ${JSON.stringify(sample(payload, 5), null, 2).slice(0,10000)}`
         {role: "user", content: userPrompt}
       ]
     }
-    const temperature = String(process.env.LLM_MODEL).startsWith("o") ? undefined : Math.min(retry * 0.1, 1);
+    const temperature = Math.min(retry * 0.1, 1);
   
     const reasoning = await openai.chat.completions.create({
       model: process.env.LLM_MODEL,
