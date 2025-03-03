@@ -89,7 +89,7 @@ Source Data Structure:
 ${JSON.stringify(toJsonSchema(payload, {required: true,arrays: {mode: 'first'}}), null, 2)}
 
 Source data Sample:
-${JSON.stringify(sample(payload, 5), null, 2).slice(0,10000)}`
+${JSON.stringify(sample(payload, 2), null, 2).slice(0,30000)}`
 
     if(!messages) {
       messages = [
