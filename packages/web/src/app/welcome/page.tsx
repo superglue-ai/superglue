@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { usePostHog } from 'posthog-js/react'
 import { useEffect, useState } from 'react'
+import { useConfig } from '../config-context'
 
 export default function WelcomePage() {
   const [email, setEmail] = useState('')
@@ -11,8 +12,7 @@ export default function WelcomePage() {
   const [loading, setLoading] = useState(true)
   const router = useRouter()
   const posthog = usePostHog()
-
-  const endpoint = process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT || 'http://localhost:3000'
+  const config = useConfig()
 
   useEffect(() => {
     if (process.env.NEXT_PUBLIC_DISABLE_WELCOME_SCREEN === 'true') {
@@ -22,10 +22,12 @@ export default function WelcomePage() {
     
     const checkTenantInfo = async () => {
       try {
-        const response = await fetch(`${endpoint}/graphql`, {
+        // TODO: remove once client SDK is updated
+        const response = await fetch(`${config.superglueEndpoint}/graphql`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${config.superglueApiKey}`,
           },
           body: JSON.stringify({
             query: `
@@ -58,7 +60,7 @@ export default function WelcomePage() {
     }
     
     checkTenantInfo()
-  }, [router, endpoint])
+  }, [router, config.superglueEndpoint])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -87,10 +89,12 @@ export default function WelcomePage() {
         }
       })
 
-      const response = await fetch(`${endpoint}/graphql`, {
+      // TODO: remove once client SDK is updated
+      const response = await fetch(`${config.superglueEndpoint}/graphql`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${config.superglueApiKey}`,
         },
         body: JSON.stringify({
           query: `
@@ -115,6 +119,10 @@ export default function WelcomePage() {
       if (result.errors) {
         throw new Error(result.errors[0]?.message || 'Failed to store email')
       }
+
+      // Store in cookies for better performance
+      document.cookie = `sg_tenant_email=${encodeURIComponent(email)}; path=/; max-age=31536000; SameSite=Strict`
+      document.cookie = `sg_tenant_hasAskedForEmail=true; path=/; max-age=31536000; SameSite=Strict`
 
       posthog.identify(email, {
         email: email
