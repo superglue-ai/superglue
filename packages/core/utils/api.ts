@@ -246,7 +246,7 @@ Documentation: ${String(documentation).slice(0, 80000)}`
 
   const numInitialMessages = 2;
   const retryCount = previousMessages.length > 0 ? (messages.length - numInitialMessages) / 2 : 0;
-  const temperature = String(process.env.LLM_MODEL).startsWith("o") ? undefined : Math.min(retryCount * 0.1, 1);
+  const temperature = Math.min(retryCount * 0.1, 1);
   console.log("Generating API config for " + apiConfig.urlHost + (retryCount > 0 ? ` (retry ${retryCount})` : ""));
 
   const completion = await openai.chat.completions.create({
