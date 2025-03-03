@@ -50,13 +50,13 @@ async function attemptSchemaGeneration(
   const modelName = process.env.SCHEMA_GENERATION_MODEL || process.env.OPENAI_MODEL;
   
   let temperature = 0;
-  if (modelName === 'gpt-4o' && retry > 0) {
+  if (modelName.startsWith('gpt-4') && retry > 0) {
     temperature = Math.min(0.3 * retry, 1.0);
     console.log(`Using increased temperature: ${temperature} for retry ${retry}`);
   }
   const completionRequest: any = {
     model: modelName,
-    temperature: modelName.startsWith('gpt-4') ? temperature : undefined,
+    temperature: temperature ? temperature : undefined,
     response_format: { "type": "json_object" },
     messages: messages
   };
