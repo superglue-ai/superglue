@@ -1,6 +1,7 @@
 import axios from "axios";
 import { getIntrospectionQuery } from "graphql";
 import { NodeHtmlMarkdown } from "node-html-markdown";
+import { DOCUMENTATION_MAX_LENGTH } from "../config.js";
 
 export function extractOpenApiUrl(html: string): string | null {
   try {
@@ -104,7 +105,7 @@ export function postProcessLargeDoc(documentation: string, endpointPath: string)
 
   // If no occurrences found return max doc length
   if (positions.length === 0) {
-    return documentation.slice(0, MAX_DOC_LENGTH);
+    return documentation.slice(0, DOCUMENTATION_MAX_LENGTH);
   }
 
   // Calculate non-overlapping context regions
@@ -130,7 +131,7 @@ export function postProcessLargeDoc(documentation: string, endpointPath: string)
   const separatorSpace = regions.length * CONTEXT_SEPARATOR.length;
 
   // If contexts overlap significantly, we might have more space for initial chunk
-  const availableForInitial = MAX_DOC_LENGTH - (totalContextSpace + separatorSpace);
+  const availableForInitial = DOCUMENTATION_MAX_LENGTH - (totalContextSpace + separatorSpace);
   
   // Use up to MAX_INITIAL_CHUNK if we have space due to overlapping contexts
   const initialChunkSize = Math.max(
@@ -139,7 +140,7 @@ export function postProcessLargeDoc(documentation: string, endpointPath: string)
   );
 
   let finalDoc = documentation.slice(0, initialChunkSize);
-  let remainingLength = MAX_DOC_LENGTH - finalDoc.length;
+  let remainingLength = DOCUMENTATION_MAX_LENGTH - finalDoc.length;
 
   // Add context for each non-overlapping region
   for (const region of regions) {
@@ -158,7 +159,6 @@ export function postProcessLargeDoc(documentation: string, endpointPath: string)
 }
 
 export async function getDocumentation(documentationUrl: string, headers: Record<string, string>, queryParams: Record<string, string>, apiEndpoint?: string): Promise<string> {
-    const docMaxLength = 80000;
     if(!documentationUrl) {
       return "";
     }
@@ -200,7 +200,7 @@ export async function getDocumentation(documentationUrl: string, headers: Record
       console.warn(`Failed to fetch documentation from ${documentationUrl}:`, error?.message);
     }
 
-    if(documentation.length > docMaxLength) {
+    if(documentation.length > DOCUMENTATION_MAX_LENGTH) {
       documentation = postProcessLargeDoc(documentation, apiEndpoint || '');
     }
 
