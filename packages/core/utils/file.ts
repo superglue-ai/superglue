@@ -171,7 +171,7 @@ async function parseJSON(buffer: Buffer): Promise<any> {
 }
   
 async function parseXML(buffer: Buffer): Promise<any[]> {
-    const results: any[] = [];
+    const results: any = {};
     let currentElement: any = null;
     const elementStack: any[] = [];
     
@@ -210,25 +210,23 @@ async function parseXML(buffer: Buffer): Promise<any[]> {
     });
 
     parser.on('closetag', (tagName) => {
-        const parentElement = elementStack.pop();
-        if (elementStack.length > 0) {
-            if (currentElement) {
-                if(!parentElement[tagName]) {
-                    parentElement[tagName] = currentElement;
-                }
-                else if(Array.isArray(parentElement[tagName])) {
-                    parentElement[tagName].push(currentElement);
-                }
-                else {
-                    // Convert single value to array when second value is encountered
-                    parentElement[tagName] = [parentElement[tagName], currentElement];
-                }
-            }  
-            currentElement = parentElement;
-        } else if (currentElement && Object.keys(currentElement).length > 0) {
-            results.push(currentElement);
-            currentElement = {};
+        let parentElement = elementStack.pop();
+        if(parentElement == null) {
+            parentElement = results;
         }
+        if (currentElement) {
+            if(!parentElement[tagName]) {
+                parentElement[tagName] = currentElement;
+            }
+            else if(Array.isArray(parentElement[tagName])) {
+                parentElement[tagName].push(currentElement);
+            }
+            else {
+                // Convert single value to array when second value is encountered
+                parentElement[tagName] = [parentElement[tagName], currentElement];
+            }
+        }  
+        currentElement = parentElement;
     });
 
     parser.on('error', (error) => {
@@ -239,8 +237,7 @@ async function parseXML(buffer: Buffer): Promise<any[]> {
     parser.on('end', async () => {
         try {
             console.log('Finished parsing XML');
-            if(results?.length == 1) resolve(results[0]);
-            else resolve(results);
+            resolve(results);
         } catch (error) {
             reject(error);
         }
