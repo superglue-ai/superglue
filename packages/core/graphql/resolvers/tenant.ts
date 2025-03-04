@@ -8,7 +8,7 @@ export const getTenantInfoResolver = async (
   if (process.env.NEXT_PUBLIC_DISABLE_WELCOME_SCREEN === 'true') {
     return {
       email: null,
-      hasAskedForEmail: true
+      emailEntrySkipped: true
     };
   }
   try {
@@ -17,27 +17,27 @@ export const getTenantInfoResolver = async (
     console.error('Error getting tenant info:', error);
     return {
       email: null,
-      hasAskedForEmail: false
+      emailEntrySkipped: false
     };
   }
 };
 
 export const setTenantInfoResolver = async (
   _: any,
-  { email, hasAskedForEmail }: { email?: string, hasAskedForEmail?: boolean },
+  { email, emailEntrySkipped }: { email?: string, emailEntrySkipped?: boolean },
   { datastore }: { datastore: DataStore }
 ) => {
   if (process.env.NEXT_PUBLIC_DISABLE_WELCOME_SCREEN === 'true') {
     return {
       email: null,
-      hasAskedForEmail
+      emailEntrySkipped
     };
   }
   try {
-    await datastore.setTenantInfo(email, hasAskedForEmail);
+    await datastore.setTenantInfo(email, emailEntrySkipped);
     return {
       email,
-      hasAskedForEmail
+      emailEntrySkipped
     };
   } catch (error) {
     console.error('Error setting tenant info:', error);

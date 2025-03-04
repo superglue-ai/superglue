@@ -6,10 +6,10 @@ export async function middleware(request: NextRequest) {
   if (process.env.NEXT_PUBLIC_DISABLE_WELCOME_SCREEN === 'true') {
     return NextResponse.next()
   }
-  const hasAskedForEmail = request.cookies.get('sg_tenant_hasAskedForEmail')?.value === 'true'
+  const emailEntrySkipped = request.cookies.get('sg_tenant_emailEntrySkipped')?.value === 'true'
   const tenantEmail = request.cookies.get('sg_tenant_email')?.value
   
-  if (hasAskedForEmail || tenantEmail) {
+  if (emailEntrySkipped || tenantEmail) {
     return NextResponse.next()
   } else {
     try {
@@ -26,7 +26,7 @@ export async function middleware(request: NextRequest) {
             query GetTenantInfo {
               getTenantInfo {
                 email
-                hasAskedForEmail
+                emailEntrySkipped
               }
             }
           `,
@@ -35,9 +35,9 @@ export async function middleware(request: NextRequest) {
 
       if (response.ok) {
         const { data } = await response.json()
-        if (data?.getTenantInfo?.hasAskedForEmail) {
+        if (data?.getTenantInfo?.emailEntrySkipped) {
           document.cookie = `sg_tenant_email=${data.getTenantInfo?.email}; path=/; max-age=31536000; SameSite=Strict`
-          document.cookie = `sg_tenant_hasAskedForEmail=true; path=/; max-age=31536000; SameSite=Strict`
+          document.cookie = `sg_tenant_emailEntrySkipped=true; path=/; max-age=31536000; SameSite=Strict`
           return NextResponse.next()
         }
       }

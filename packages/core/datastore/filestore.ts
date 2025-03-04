@@ -14,7 +14,7 @@ export class FileStore implements DataStore {
     runsIndex: Map<string, { id: string; timestamp: number; configId: string }[]>;
     tenant: {
       email: string | null;
-      hasAskedForEmail: boolean;
+      emailEntrySkipped: boolean;
     };
   };
 
@@ -29,7 +29,7 @@ export class FileStore implements DataStore {
       runsIndex: new Map(),
       tenant: {
         email: null,
-        hasAskedForEmail: false
+        emailEntrySkipped: false
       }
     };
 
@@ -70,7 +70,7 @@ export class FileStore implements DataStore {
         runsIndex: new Map(Object.entries(parsed.runsIndex || {})),
         tenant: {
           email: parsed.tenant?.email || null,
-          hasAskedForEmail: parsed.tenant?.hasAskedForEmail || false
+          emailEntrySkipped: parsed.tenant?.emailEntrySkipped || false
         }
       };
     } catch (error) {
@@ -354,14 +354,14 @@ export class FileStore implements DataStore {
     return true;
   }
 
-  async getTenantInfo(): Promise<{ email: string | null; hasAskedForEmail: boolean }> {
+  async getTenantInfo(): Promise<{ email: string | null; emailEntrySkipped: boolean }> {
     return this.storage.tenant;
   }
 
-  async setTenantInfo(email?: string, hasAskedForEmail?: boolean): Promise<void> {
+  async setTenantInfo(email?: string, emailEntrySkipped?: boolean): Promise<void> {
     this.storage.tenant = {
       email: email || null,
-      hasAskedForEmail: hasAskedForEmail || false
+      emailEntrySkipped: emailEntrySkipped || false
     };
     await this.persist();
   }
