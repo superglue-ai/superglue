@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import playwright from '@playwright/test';
+import axios from 'axios';
 import { DOCUMENTATION_MAX_LENGTH } from '../config.js';
 import { getDocumentation, postProcessLargeDoc, closeBrowser } from './documentation.js';
 
-// Mock playwright
+// Mock playwright and axios
 vi.mock('@playwright/test', () => ({
   default: {
     chromium: {
@@ -11,6 +12,8 @@ vi.mock('@playwright/test', () => ({
     },
   },
 }));
+
+vi.mock('axios');
 
 describe('Documentation Utilities', () => {
   let mockPage: any;
@@ -43,6 +46,9 @@ describe('Documentation Utilities', () => {
 
     // Setup the browser launch mock
     vi.mocked(playwright.chromium.launch).mockResolvedValue(mockBrowser);
+
+    // Add axios mock reset
+    vi.mocked(axios.get).mockReset();
   });
 
   afterEach(async () => {
@@ -117,6 +123,144 @@ describe('Documentation Utilities', () => {
       await getDocumentation('https://api.example.com/docs', {}, {});
       
       expect(mockPage.evaluate).toHaveBeenCalled();
+    });
+
+    it('should handle complex HTML with special characters and nested elements', async () => {
+      const complexHtmlDoc = `
+        <!DOCTYPE html>
+        <html class="documentation">
+          <body>
+            <div class="wrapper">
+              <h1>Complex &amp; Special Doc</h1>
+              <div class="nested">
+                <ul>
+                  <li>Item with <strong>bold</strong> and <em>italic</em></li>
+                  <li>Item with <code>inline code &lt;tags&gt;</code></li>
+                </ul>
+                <script>
+                  function test() {
+                    // Some code block
+                    return true;
+                  }
+                </script>
+                <table>
+                  <tr>
+                    <td>Cell 1 &copy;</td>
+                    <td>Cell 2 &reg;</td>
+                  </tr>
+                </table>
+              </div>
+            </div>
+          </body>
+        </html>
+      `;
+      
+      mockPage.content.mockResolvedValueOnce(complexHtmlDoc);
+      
+      const result = await getDocumentation('https://api.example.com/docs', {}, {});
+      
+      expect(result).toContain('Complex & Special Doc');
+      expect(result).toContain('Item with **bold** and _italic_');
+      expect(result).toContain('`inline code <tags>`');
+      expect(result).toContain('Cell 1 ©');
+      expect(result).toContain('Cell 2 ®');
+    });
+
+    it('should extract and fetch OpenAPI JSON URL from Swagger UI HTML', async () => {
+      const swaggerHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>API Documentation</title>
+        </head>
+        <body>
+            <script type="application/json" id="swagger-settings">
+                {
+                  "url": "/api/v1/openapi.json"
+                }
+            </script>
+            <div id="swagger-ui"></div>
+        </body>
+        </html>
+      `;
+      
+      const openApiJson = {
+        openapi: "3.0.0",
+        info: {
+          title: "Test API",
+          version: "1.0.0"
+        },
+        paths: {}
+      };
+      
+      mockPage.content.mockResolvedValueOnce(swaggerHtml);
+      vi.mocked(axios.get).mockResolvedValueOnce({ data: openApiJson });
+      
+      const result = await getDocumentation('https://api.example.com/docs', {}, {});
+      
+      expect(mockPage.goto).toHaveBeenCalledTimes(1);
+      expect(axios.get).toHaveBeenCalledWith('https://api.example.com/api/v1/openapi.json');
+      expect(result).toContain(JSON.stringify(openApiJson));
+    });
+    
+    it('should handle OpenAPI URL that is absolute', async () => {
+      const swaggerHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>API Documentation</title>
+        </head>
+        <body>
+          <script type="application/json" id="swagger-settings">
+            {
+              "url": "https://external-api.com/openapi.json"
+            }
+          </script>
+          <div id="swagger-ui"></div>
+        </body>
+        </html>
+      `;
+      
+      const openApiJson = { openapi: "3.0.0" };
+      
+      mockPage.content.mockResolvedValueOnce(swaggerHtml);
+      vi.mocked(axios.get).mockResolvedValueOnce({ data: openApiJson });
+      
+      const result = await getDocumentation('https://api.example.com/docs', {}, {});
+      
+      expect(mockPage.goto).toHaveBeenCalledTimes(1);
+      expect(axios.get).toHaveBeenCalledWith('https://external-api.com/openapi.json');
+      expect(result).toContain(JSON.stringify(openApiJson));
+    });
+    
+    it('should handle OpenAPI extraction errors gracefully', async () => {
+      const swaggerHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>API Documentation</title>
+        </head>
+        <body>
+          <script type="application/json" id="swagger-settings">
+            {
+              "url": "/api/v1/openapi.json"
+            }
+          </script>
+          <div id="swagger-ui"></div>
+        </body>
+        </html>
+      `;
+      
+      mockPage.content.mockResolvedValueOnce(swaggerHtml);
+      vi.mocked(axios.get).mockRejectedValueOnce(new Error('Failed to fetch OpenAPI'));
+      
+      const result = await getDocumentation('https://api.example.com/docs', {}, {});
+      
+      expect(mockPage.goto).toHaveBeenCalledTimes(1);
+      expect(axios.get).toHaveBeenCalled();
+      // Result should still contain parts of the original HTML
+      expect(result).toContain('DOCTYPE');
+      expect(result).toContain('html');
     });
   });
 
