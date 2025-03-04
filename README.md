@@ -15,6 +15,8 @@ Here's how it works: You define your desired data schema and provide basic instr
 - Validates that all data coming through follows that schema, and fixes transformations when they break.
 
 
+[![Star History Chart](https://api.star-history.com/svg?repos=superglue-ai/superglue&type=Date)](https://star-history.com/#bytebase/star-history&Date)
+
 
 <div align="center">
 
