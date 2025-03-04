@@ -35,6 +35,21 @@ export async function prepareEndpoint(
     return computedApiCallConfig;
 }
 
+export function convertBasicAuthToBase64(headerValue){
+    if(!headerValue) return headerValue;
+    // Get the part of the 'Basic '
+    const credentials = headerValue.substring('Basic '.length).trim();
+    // checking if it is already Base64 decoded
+    const seemsEncoded = /^[A-Za-z0-9+/=]+$/.test(credentials);
+
+    if (!seemsEncoded) {
+      // if not encoded, convert to username:password to Base64
+      const base64Credentials = Buffer.from(credentials).toString('base64');
+      return `Basic ${base64Credentials}`; 
+    }
+      return headerValue; 
+}
+
 export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions): Promise<any> {  
   const allVariables = { ...payload, ...credentials };
   
@@ -72,6 +87,16 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
         .map(([key, value]) => [key, replaceVariables(value, requestVars)])
     );
 
+    // Process headers for Basic Auth
+    const processedHeaders = {};
+    for (const [key, value] of Object.entries(headers)) {
+      if (key.toLowerCase() === 'authorization' && typeof value === 'string' && value.startsWith('Basic ')) {
+        processedHeaders[key] = convertBasicAuthToBase64(value);
+      } else {
+        processedHeaders[key] = value;
+      }
+    }
+
     const queryParams = Object.fromEntries(
       Object.entries(endpoint.queryParams || {})
         .map(([key, value]) => [key, replaceVariables(value, requestVars)])
@@ -85,7 +110,7 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
     const axiosConfig: AxiosRequestConfig = {
       method: endpoint.method,
       url: url,
-      headers,
+      headers: processedHeaders, // added processedHeaders instead of headers
       data: body,
       params: queryParams,
       timeout: options?.timeout || 60000,
