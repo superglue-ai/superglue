@@ -102,8 +102,8 @@ export default function WelcomePage() {
         },
         body: JSON.stringify({
           query: `
-            mutation SetTenantInfo($email: String!) {
-              setTenantInfo(email: $email) {
+            mutation SetTenantInfo($email: String!, $hasAskedForEmail: Boolean!) {
+              setTenantInfo(email: $email, hasAskedForEmail: $hasAskedForEmail) {
                 email
                 hasAskedForEmail
               }
@@ -111,6 +111,7 @@ export default function WelcomePage() {
           `,
           variables: {
             email,
+            hasAskedForEmail: true,
           },
         }),
       })
@@ -152,14 +153,14 @@ export default function WelcomePage() {
         },
         body: JSON.stringify({
           query: `
-            mutation SetTenantInfo($skip: Boolean!) {
-              setTenantInfo(skip: $skip) {
+            mutation SetTenantInfo($hasAskedForEmail: Boolean!) {
+              setTenantInfo(hasAskedForEmail: $hasAskedForEmail) {
                 hasAskedForEmail
               }
             }
           `,
           variables: {
-            skip: true,
+            hasAskedForEmail: true,
           },
         }),
       });

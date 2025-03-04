@@ -358,10 +358,10 @@ export class FileStore implements DataStore {
     return this.storage.tenant;
   }
 
-  async setTenantInfo(email: string): Promise<void> {
+  async setTenantInfo(email?: string, hasAskedForEmail?: boolean): Promise<void> {
     this.storage.tenant = {
-      email,
-      hasAskedForEmail: true
+      email: email || null,
+      hasAskedForEmail: hasAskedForEmail || false
     };
     await this.persist();
   }
