@@ -119,8 +119,22 @@ function getAuthErrorHTML(token: string | undefined) {
   `;
 }
 
+function validateEnvironment() {
+  const requiredEnvVars = [
+    'OPENAI_MODEL',
+    'GRAPHQL_PORT',
+    'OPENAI_API_KEY'
+  ];
+  requiredEnvVars.forEach((envVar) => {
+    if (!process.env[envVar]) {
+      throw new Error(`Environment variable ${envVar} is not set.`);
+    }
+  });
+}
+
 // Server Setup
 async function startServer() {
+  validateEnvironment();
   // Initialize Apollo Server
   const server = new ApolloServer(apolloConfig);
   await server.start();
