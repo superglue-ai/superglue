@@ -11,9 +11,9 @@ export class MemoryStore implements DataStore {
     runsIndex: Map<string, { id: string; timestamp: number; configId: string }[]>;
   };
 
-  private tenant: { email: string | null; hasAskedForEmail: boolean } = {
+  private tenant: { email: string | null; emailEntrySkipped: boolean } = {
     email: null,
-    hasAskedForEmail: false
+    emailEntrySkipped: false
   };
 
   constructor() {
@@ -266,14 +266,14 @@ export class MemoryStore implements DataStore {
     return true;
   }
 
-  async getTenantInfo(): Promise<{ email: string | null; hasAskedForEmail: boolean }> {
+  async getTenantInfo(): Promise<{ email: string | null; emailEntrySkipped: boolean }> {
     return this.tenant;
   }
 
-  async setTenantInfo(email?: string, hasAskedForEmail?: boolean): Promise<void> {
+  async setTenantInfo(email?: string, emailEntrySkipped?: boolean): Promise<void> {
     this.tenant = {
       email: email || null,
-      hasAskedForEmail: hasAskedForEmail || false
+      emailEntrySkipped: emailEntrySkipped || false
     };
   }
 } 

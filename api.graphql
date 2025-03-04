@@ -238,11 +238,11 @@ type Query {
 
 type TenantInfo {
   email: String
-  hasAskedForEmail: Boolean!
+  emailEntrySkipped: Boolean!
 }
 
 type Mutation {
-  setTenantInfo(email: String!, hasAskedForEmail: Boolean!): TenantInfo!
+  setTenantInfo(email: String, emailEntrySkipped: Boolean): TenantInfo!
   
   call(
     input: ApiInputRequest!

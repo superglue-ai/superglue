@@ -308,7 +308,7 @@ export class RedisService implements DataStore {
     return `tenant`;
   }
 
-  async getTenantInfo(): Promise<{ email: string | null; hasAskedForEmail: boolean }> {
+  async getTenantInfo(): Promise<{ email: string | null; emailEntrySkipped: boolean }> {
     try {
       const data = await this.redis.get(this.tenantKey());
       if (data) {
@@ -316,22 +316,22 @@ export class RedisService implements DataStore {
       }
       return {
         email: null,
-        hasAskedForEmail: false
+        emailEntrySkipped: false
       };
     } catch (error) {
       console.error('Error getting tenant info:', error);
       return {
         email: null,
-        hasAskedForEmail: false
+        emailEntrySkipped: false
       };
     }
   }
 
-  async setTenantInfo(email?: string, hasAskedForEmail?: boolean): Promise<void> {
+  async setTenantInfo(email?: string, emailEntrySkipped?: boolean): Promise<void> {
     try {
       const tenantInfo = {
         email: email || null,
-        hasAskedForEmail: hasAskedForEmail || false
+        emailEntrySkipped: emailEntrySkipped || false
       };
       await this.redis.set(this.tenantKey(), JSON.stringify(tenantInfo));
     } catch (error) {

@@ -38,7 +38,7 @@ export default function WelcomePage() {
               query GetTenantInfo {
                 getTenantInfo {
                   email
-                  hasAskedForEmail
+                  emailEntrySkipped
                 }
               }
             `,
@@ -53,7 +53,7 @@ export default function WelcomePage() {
         
         const { data } = await response.json()
         
-        if (data?.getTenantInfo?.hasAskedForEmail) {
+        if (data?.getTenantInfo?.emailEntrySkipped) {
           router.push('/')
         }
       } catch (err) {
@@ -102,16 +102,16 @@ export default function WelcomePage() {
         },
         body: JSON.stringify({
           query: `
-            mutation SetTenantInfo($email: String!, $hasAskedForEmail: Boolean!) {
-              setTenantInfo(email: $email, hasAskedForEmail: $hasAskedForEmail) {
+            mutation SetTenantInfo($email: String!, $emailEntrySkipped: Boolean!) {
+              setTenantInfo(email: $email, emailEntrySkipped: $emailEntrySkipped) {
                 email
-                hasAskedForEmail
+                emailEntrySkipped
               }
             }
           `,
           variables: {
             email,
-            hasAskedForEmail: true,
+            emailEntrySkipped: false,
           },
         }),
       })
@@ -127,7 +127,7 @@ export default function WelcomePage() {
 
       // Store in cookies for better performance
       document.cookie = `sg_tenant_email=${encodeURIComponent(email)}; path=/; max-age=31536000; SameSite=Strict`
-      document.cookie = `sg_tenant_hasAskedForEmail=true; path=/; max-age=31536000; SameSite=Strict`
+      document.cookie = `sg_tenant_emailEntrySkipped=false; path=/; max-age=31536000; SameSite=Strict`
 
       posthog.identify(email, {
         email: email
@@ -153,14 +153,14 @@ export default function WelcomePage() {
         },
         body: JSON.stringify({
           query: `
-            mutation SetTenantInfo($hasAskedForEmail: Boolean!) {
-              setTenantInfo(hasAskedForEmail: $hasAskedForEmail) {
-                hasAskedForEmail
+            mutation SetTenantInfo($emailEntrySkipped: Boolean!) {
+              setTenantInfo(emailEntrySkipped: $emailEntrySkipped) {
+                emailEntrySkipped
               }
             }
           `,
           variables: {
-            hasAskedForEmail: true,
+            emailEntrySkipped: true,
           },
         }),
       });
@@ -170,7 +170,7 @@ export default function WelcomePage() {
       }
 
       // Store in cookies
-      document.cookie = `sg_tenant_hasAskedForEmail=true; path=/; max-age=31536000; SameSite=Strict`;
+      document.cookie = `sg_tenant_emailEntrySkipped=true; path=/; max-age=31536000; SameSite=Strict`;
       
       router.push('/');
     } catch (err) {
