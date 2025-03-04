@@ -3,6 +3,16 @@ import { getIntrospectionQuery } from "graphql";
 import { NodeHtmlMarkdown } from "node-html-markdown";
 import playwright from '@playwright/test';
 import { DOCUMENTATION_MAX_LENGTH } from "../config.js";
+
+let browserInstance: playwright.Browser | null = null;
+
+async function getBrowser() {
+  if (!browserInstance) {
+    browserInstance = await playwright.chromium.launch();
+  }
+  return browserInstance;
+}
+
 export function extractOpenApiUrl(html: string): string | null {
   try {
     // First try to match based on swagger settings
@@ -163,27 +173,25 @@ export function postProcessLargeDoc(documentation: string, endpointPath: string)
 
   return finalDoc;
 }
-const browser = await playwright.chromium.launch();
 
 export async function getDocumentation(documentationUrl: string, headers: Record<string, string>, queryParams: Record<string, string>, apiEndpoint?: string): Promise<string> {
     if(!documentationUrl) {
       return "";
     }
     let documentation = "";
-    // If the documentation is not a URL, return it as is
     if(!documentationUrl.startsWith("http")) {
       return documentationUrl;
     }
     
     try {
+      const browser = await getBrowser();
       const context = await browser.newContext();
       const page = await context.newPage();
 
-      // Add headers if provided
       if (headers) {
         await context.setExtraHTTPHeaders(headers);
       }
-      // Construct URL with query parameters
+
       const url = new URL(documentationUrl);
       if (queryParams) {
         Object.entries(queryParams).forEach(([key, value]) => {
@@ -286,5 +294,14 @@ async function getGraphQLSchema(documentationUrl: string, headers?: Record<strin
   } catch (error) {
     console.error('Failed to fetch GraphQL schema:', error);
     return null;
+  }
+}
+
+// For testing purposes and cleanup
+export async function closeBrowser() {
+  if (browserInstance) {
+    const closedInstance = browserInstance;
+    browserInstance = null;
+    await closedInstance.close();
   }
 }
