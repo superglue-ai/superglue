@@ -5,6 +5,12 @@ export const getTenantInfoResolver = async (
   __: any,
   { datastore }: { datastore: DataStore }
 ) => {
+  if (process.env.NEXT_PUBLIC_DISABLE_WELCOME_SCREEN === 'true') {
+    return {
+      email: null,
+      hasAskedForEmail: true
+    };
+  }
   try {
     return await datastore.getTenantInfo();
   } catch (error) {
@@ -18,14 +24,20 @@ export const getTenantInfoResolver = async (
 
 export const setTenantInfoResolver = async (
   _: any,
-  { email }: { email: string },
+  { email, hasAskedForEmail }: { email?: string, hasAskedForEmail?: boolean },
   { datastore }: { datastore: DataStore }
 ) => {
+  if (process.env.NEXT_PUBLIC_DISABLE_WELCOME_SCREEN === 'true') {
+    return {
+      email: null,
+      hasAskedForEmail
+    };
+  }
   try {
-    await datastore.setTenantInfo(email);
+    await datastore.setTenantInfo(email, hasAskedForEmail);
     return {
       email,
-      hasAskedForEmail: true
+      hasAskedForEmail
     };
   } catch (error) {
     console.error('Error setting tenant info:', error);

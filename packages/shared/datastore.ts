@@ -37,6 +37,6 @@ export interface DataStore {
 
     // Tenant Information Methods
     getTenantInfo(): Promise<{ email: string | null, hasAskedForEmail: boolean }>;
-    setTenantInfo(email: string): Promise<void>;
+    setTenantInfo(email?: string, hasAskedForEmail?: boolean): Promise<void>;
   }
   

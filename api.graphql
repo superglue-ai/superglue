@@ -242,7 +242,7 @@ type TenantInfo {
 }
 
 type Mutation {
-  setTenantInfo(email: String!): TenantInfo!
+  setTenantInfo(email: String!, hasAskedForEmail: Boolean!): TenantInfo!
   
   call(
     input: ApiInputRequest!

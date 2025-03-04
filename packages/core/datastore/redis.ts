@@ -327,11 +327,11 @@ export class RedisService implements DataStore {
     }
   }
 
-  async setTenantInfo(email: string): Promise<void> {
+  async setTenantInfo(email?: string, hasAskedForEmail?: boolean): Promise<void> {
     try {
       const tenantInfo = {
-        email,
-        hasAskedForEmail: true
+        email: email || null,
+        hasAskedForEmail: hasAskedForEmail || false
       };
       await this.redis.set(this.tenantKey(), JSON.stringify(tenantInfo));
     } catch (error) {
