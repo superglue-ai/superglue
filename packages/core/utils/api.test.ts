@@ -247,5 +247,34 @@ describe('API Utilities', () => {
 
       expect(result.data).toEqual([{ id: 1 }, { id: 2 }]);
     });
+
+    it('should handle GraphQL error responses', async () => {
+      const config = {
+        ...testConfig,
+        method: HttpMethod.POST,
+        body: 'query { test }',
+      } as ApiConfig;
+
+      const graphqlErrorResponse = {
+        status: 200,  // GraphQL often returns 200 even with errors
+        data: {
+          errors: [
+            {
+              message: 'Field "test" not found',
+              locations: [{ line: 1, column: 9 }],
+              path: ['test']
+            }
+          ],
+          data: null
+        },
+        statusText: 'OK',
+        headers: {},
+        config: {} as any
+      };
+      mockedTools.callAxios.mockResolvedValueOnce(graphqlErrorResponse);
+
+      await expect(callEndpoint(config, {}, {}, {}))
+        .rejects.toThrow(/API call failed*/);
+    });
   });
 }); 
