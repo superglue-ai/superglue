@@ -192,7 +192,7 @@ export async function getDocumentation(documentationUrl: string, headers: Record
       }
 
       await page.goto(url.toString());
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
       
       // Remove common non-documentation elements
       await page.evaluate(() => {
