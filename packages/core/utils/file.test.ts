@@ -44,7 +44,7 @@ describe('File Utilities', () => {
       const buffer = Buffer.from(xmlData);
       
       const result = await parseFile(buffer, FileType.XML);
-      expect(result).toEqual({ name: 'test', value: '123' });
+      expect(result?.root?.item).toEqual({ name: 'test', value: '123' });
     }); 
     it('should parse XML data as array if multiple rows are given', async () => {
       const xmlData = `
@@ -63,8 +63,8 @@ describe('File Utilities', () => {
       const buffer = Buffer.from(xmlData);
       
       const result = await parseFile(buffer, FileType.XML);
-      expect(result).toHaveLength(2);
-      expect(result).toEqual([
+      expect(result?.root?.item).toHaveLength(2);
+      expect(result?.root?.item).toEqual([
         { name: 'test', value: '123' },
         { name: 'test2', value: '456' }
       ]);
