@@ -20,6 +20,7 @@
     "dotenv-cli": "^8.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.50.1",
     "@types/node": "^20.17.19",
     "turbo": "^2.4.4",
     "typescript": "^5.7.3"
