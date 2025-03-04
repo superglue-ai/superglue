@@ -1,7 +1,7 @@
 import { ApiConfig, ApiInput, DataStore, ExtractConfig, ExtractInput, RunResult, TransformConfig, TransformInput } from "@superglue/shared";
+import { createHash } from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import { createHash } from 'crypto';
 import { getSchemaFromData } from "../utils/tools.js";
 
 export class FileStore implements DataStore {
@@ -12,6 +12,10 @@ export class FileStore implements DataStore {
     transforms: Map<string, TransformConfig>;
     runs: Map<string, RunResult>;
     runsIndex: Map<string, { id: string; timestamp: number; configId: string }[]>;
+    tenant: {
+      email: string | null;
+      emailEntrySkipped: boolean;
+    };
   };
 
   private filePath: string;
@@ -22,7 +26,11 @@ export class FileStore implements DataStore {
       extracts: new Map(),
       transforms: new Map(),
       runs: new Map(),
-      runsIndex: new Map()
+      runsIndex: new Map(),
+      tenant: {
+        email: null,
+        emailEntrySkipped: false
+      }
     };
 
     // Check if /data exists synchronously
@@ -59,7 +67,11 @@ export class FileStore implements DataStore {
         extracts: new Map(Object.entries(parsed.extracts || {})),
         transforms: new Map(Object.entries(parsed.transforms || {})),
         runs: new Map(Object.entries(parsed.runs || {})),
-        runsIndex: new Map(Object.entries(parsed.runsIndex || {}))
+        runsIndex: new Map(Object.entries(parsed.runsIndex || {})),
+        tenant: {
+          email: parsed.tenant?.email || null,
+          emailEntrySkipped: parsed.tenant?.emailEntrySkipped || false
+        }
       };
     } catch (error) {
       console.log('File Datastore: No existing data found, starting with empty storage');
@@ -74,7 +86,8 @@ export class FileStore implements DataStore {
         extracts: Object.fromEntries(this.storage.extracts),
         transforms: Object.fromEntries(this.storage.transforms),
         runs: Object.fromEntries(this.storage.runs),
-        runsIndex: Object.fromEntries(this.storage.runsIndex)
+        runsIndex: Object.fromEntries(this.storage.runsIndex),
+        tenant: this.storage.tenant
       };
       // Use temporary file to ensure atomic writes
       const tempPath = `${this.filePath}.tmp`;
@@ -339,5 +352,17 @@ export class FileStore implements DataStore {
 
   async ping(): Promise<boolean> {
     return true;
+  }
+
+  async getTenantInfo(): Promise<{ email: string | null; emailEntrySkipped: boolean }> {
+    return this.storage.tenant;
+  }
+
+  async setTenantInfo(email?: string, emailEntrySkipped?: boolean): Promise<void> {
+    this.storage.tenant = {
+      email: email || null,
+      emailEntrySkipped: emailEntrySkipped || false
+    };
+    await this.persist();
   }
 } 
