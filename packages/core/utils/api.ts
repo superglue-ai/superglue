@@ -126,8 +126,11 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
     console.log(`${endpoint.method} ${url}`);
     const response = await callAxios(axiosConfig, options);
 
-    if(![200, 201, 204].includes(response?.status) || response.data?.error) {
-      const error = JSON.stringify(response?.data?.error || response?.data);
+    if(![200, 201, 204].includes(response?.status) || 
+        response.data?.error || 
+        (Array.isArray(response?.data?.errors) && response?.data?.errors.length > 0)
+      ) {
+      const error = JSON.stringify(response?.data?.error || response.data?.errors || response?.data);
       let message = `${endpoint.method} ${url} failed with status ${response.status}. Response: ${String(error).slice(0, 200)}
       Headers: ${JSON.stringify(headers)}
       Body: ${JSON.stringify(body)}
@@ -256,7 +259,7 @@ ${apiConfig.method ? `Method: ${apiConfig.method}` : ''}
 
 Available variables: ${vars.join(", ")}
 
-Documentation: ${String(documentation).slice(0, 80000)}`
+Documentation: ${String(documentation)}`
   }
 
   const errorHandlingMessage = API_ERROR_HANDLING_USER_PROMPT
