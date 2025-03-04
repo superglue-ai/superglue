@@ -1,61 +1,97 @@
-import type { NextRequest } from 'next/server'
-import { NextResponse } from 'next/server'
-import { useConfig } from './app/config-context'
+'use server'
+
+import type { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 
 export async function middleware(request: NextRequest) {
-  if (process.env.NEXT_PUBLIC_DISABLE_WELCOME_SCREEN === 'true') {
-    return NextResponse.next()
-  }
-  const emailEntrySkipped = request.cookies.get('sg_tenant_emailEntrySkipped')?.value === 'true'
-  const tenantEmail = request.cookies.get('sg_tenant_email')?.value
-  
-  if (emailEntrySkipped || tenantEmail) {
-    return NextResponse.next()
-  } else {
-    try {
-      // TODO: remove once client SDK is updated
-      const config = useConfig()
-      const response = await fetch(`${config.superglueEndpoint}/graphql`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${config.superglueApiKey}`,
-        },
-        body: JSON.stringify({
-          query: `
-            query GetTenantInfo {
-              getTenantInfo {
-                email
-                emailEntrySkipped
-              }
-            }
-          `,
-        }),
-      })
-
-      if (response.ok) {
-        const { data } = await response.json()
-        if (data?.getTenantInfo?.emailEntrySkipped) {
-          document.cookie = `sg_tenant_email=${data.getTenantInfo?.email}; path=/; max-age=31536000; SameSite=Strict`
-          document.cookie = `sg_tenant_emailEntrySkipped=true; path=/; max-age=31536000; SameSite=Strict`
-          return NextResponse.next()
-        }
-      }
-    } catch (err) {
-      // do nothing..
-    }
-  }
-
+  // Always skip middleware for these paths
   if (
     request.nextUrl.pathname.startsWith('/api') ||
     request.nextUrl.pathname.startsWith('/_next') ||
     request.nextUrl.pathname.startsWith('/welcome') ||
     request.nextUrl.pathname.includes('.') // Skip static files
   ) {
-    return NextResponse.next()
+    return NextResponse.next();
   }
 
-  return NextResponse.redirect(new URL('/welcome', request.url))
+  // Check for email or emailEntrySkipped cookies
+  const tenantEmail = request.cookies.get('sg_tenant_email')?.value;
+  const emailEntrySkipped = request.cookies.get('sg_tenant_emailEntrySkipped')?.value;
+  
+  // If we have cookies, decide based on them
+  if (tenantEmail || emailEntrySkipped === 'true') {
+    return NextResponse.next();
+  } else if (emailEntrySkipped === 'false') {
+    return NextResponse.redirect(new URL('/welcome', request.url));
+  }
+  
+  const GQL_ENDPOINT = process.env.GRAPHQL_ENDPOINT
+  const GQL_API_KEY = process.env.AUTH_TOKEN
+  try {
+    console.log('fetching gql');
+    // TODO: remove once client SDK is updated
+    const response = await fetch(`${GQL_ENDPOINT}/graphql`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${GQL_API_KEY}`,
+      },
+      body: JSON.stringify({
+        query: `
+          query GetTenantInfo {
+            getTenantInfo {
+              email
+              emailEntrySkipped
+            }
+          }
+        `,
+      }),
+    });
+
+    if (response.ok) {
+      const { data } = await response.json();
+      const redirectResponse = NextResponse.redirect(new URL('/welcome', request.url));
+      const nextResponse = NextResponse.next();
+      if (data?.getTenantInfo?.email !== undefined) {
+        const cookieValue = data.getTenantInfo.email || '';
+        redirectResponse.cookies.set('sg_tenant_email', cookieValue, {
+          path: '/',
+          maxAge: 31536000,
+          sameSite: 'strict'
+        });
+        nextResponse.cookies.set('sg_tenant_email', cookieValue, {
+          path: '/',
+          maxAge: 31536000,
+          sameSite: 'strict'
+        });
+      }
+      
+      if (data?.getTenantInfo?.emailEntrySkipped !== undefined) {
+        const skipValue = String(data.getTenantInfo.emailEntrySkipped);
+        redirectResponse.cookies.set('sg_tenant_emailEntrySkipped', skipValue, {
+          path: '/',
+          maxAge: 31536000,
+          sameSite: 'strict'
+        });
+        nextResponse.cookies.set('sg_tenant_emailEntrySkipped', skipValue, {
+          path: '/',
+          maxAge: 31536000,
+          sameSite: 'strict'
+        });
+      }
+      
+      if (data?.getTenantInfo?.email || data?.getTenantInfo?.emailEntrySkipped === true) {
+        return nextResponse;
+      } else {
+        // Either emailEntrySkipped is false or both values are null
+        return redirectResponse;
+      }
+    }
+  } catch (err) {
+    // do nothing, will fall through to default redirect
+  }
+  
+  return NextResponse.redirect(new URL('/welcome', request.url));
 }
 
 // Applies to all routes except these listed:
