@@ -69,14 +69,13 @@ async function getOpenApiJsonFromUrl(openApiUrl: string, documentationUrl: strin
 }
 
 export function postProcessLargeDoc(documentation: string, endpointPath: string): string {
-  const MAX_DOC_LENGTH = 80000;
   const MIN_INITIAL_CHUNK = 20000;
   const MAX_INITIAL_CHUNK = 40000;
   const CONTEXT_SIZE = 10000;
   const CONTEXT_SEPARATOR = "\n\n";
   const MIN_SEARCH_TERM_LENGTH = 3;
 
-  if (documentation.length <= MAX_DOC_LENGTH) {
+  if (documentation.length <= DOCUMENTATION_MAX_LENGTH) {
     return documentation;
   }
 
@@ -86,15 +85,20 @@ export function postProcessLargeDoc(documentation: string, endpointPath: string)
   const docLower = documentation.toLowerCase();
 
   if (!endpointPath || searchTerm.length < MIN_SEARCH_TERM_LENGTH) {
-    return documentation.slice(0, MAX_DOC_LENGTH);
+    return documentation.slice(0, DOCUMENTATION_MAX_LENGTH);
   }
 
   // Find all occurrences of the search term
   const positions: number[] = [];
 
-  let authPos = docLower.indexOf("securityschemes") || docLower.indexOf("authorization");
-  if(authPos !== -1) {
-    positions.push(authPos);
+  // Fix the authorization search to properly find all relevant authorization terms
+  let authPosSecuritySchemes = docLower.indexOf("securityschemes");
+  if (authPosSecuritySchemes !== -1) {
+    positions.push(authPosSecuritySchemes);
+  }
+  let authPosAuthorization = docLower.indexOf("authorization");
+  if (authPosAuthorization !== -1) {
+    positions.push(authPosAuthorization);
   }
 
   let pos = docLower.indexOf(searchTerm);	
@@ -111,6 +115,8 @@ export function postProcessLargeDoc(documentation: string, endpointPath: string)
   // Calculate non-overlapping context regions
   type Region = { start: number; end: number };
   const regions: Region[] = [];
+  // Sort positions to ensure we process them in order from start to end of document
+  positions.sort((a, b) => a - b);
   
   for (const pos of positions) {
     const start = Math.max(0, pos - CONTEXT_SIZE);
