@@ -3,6 +3,7 @@ import { AxiosRequestConfig } from "axios";
 import OpenAI from "openai";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
+import { DOCUMENTATION_MAX_LENGTH } from "../config.js";
 import { getDocumentation } from "./documentation.js";
 import { API_ERROR_HANDLING_USER_PROMPT, API_PROMPT } from "./prompts.js";
 import { callAxios, composeUrl, replaceVariables } from "./tools.js";
@@ -28,11 +29,32 @@ export async function prepareEndpoint(
 
     // If a documentation URL is provided, fetch and parse additional details
     const documentation = await getDocumentation(apiCallConfig.documentationUrl || composeUrl(apiCallConfig.urlHost, apiCallConfig.urlPath), apiCallConfig.headers, apiCallConfig.queryParams, apiCallConfig?.urlPath);
+    if(documentation.length >= DOCUMENTATION_MAX_LENGTH) {
+      console.warn("Documentation length at limit: " + documentation.length);
+    }
+    if(documentation.length <= 10000) {
+      console.warn("Documentation length is short: " + documentation.length);
+    }
 
     const availableVars = [...Object.keys(payload || {}), ...Object.keys(credentials || {})];
     const computedApiCallConfig = await generateApiConfig(apiCallConfig, documentation, availableVars, lastError, previousMessages);
     
     return computedApiCallConfig;
+}
+
+export function convertBasicAuthToBase64(headerValue){
+    if(!headerValue) return headerValue;
+    // Get the part of the 'Basic '
+    const credentials = headerValue.substring('Basic '.length).trim();
+    // checking if it is already Base64 decoded
+    const seemsEncoded = /^[A-Za-z0-9+/=]+$/.test(credentials);
+
+    if (!seemsEncoded) {
+      // if not encoded, convert to username:password to Base64
+      const base64Credentials = Buffer.from(credentials).toString('base64');
+      return `Basic ${base64Credentials}`; 
+    }
+      return headerValue; 
 }
 
 export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions): Promise<any> {  
@@ -72,6 +94,16 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
         .map(([key, value]) => [key, replaceVariables(value, requestVars)])
     );
 
+    // Process headers for Basic Auth
+    const processedHeaders = {};
+    for (const [key, value] of Object.entries(headers)) {
+      if (key.toLowerCase() === 'authorization' && typeof value === 'string' && value.startsWith('Basic ')) {
+        processedHeaders[key] = convertBasicAuthToBase64(value);
+      } else {
+        processedHeaders[key] = value;
+      }
+    }
+
     const queryParams = Object.fromEntries(
       Object.entries(endpoint.queryParams || {})
         .map(([key, value]) => [key, replaceVariables(value, requestVars)])
@@ -85,7 +117,7 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
     const axiosConfig: AxiosRequestConfig = {
       method: endpoint.method,
       url: url,
-      headers,
+      headers: processedHeaders, // added processedHeaders instead of headers
       data: body,
       params: queryParams,
       timeout: options?.timeout || 60000,

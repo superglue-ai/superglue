@@ -1,8 +1,6 @@
 import { PostHog } from 'posthog-node';
 import { config } from '../default.js';
 
-// PostHog Telemetry
-
 // we use a privacy-preserving session id to track queries
 export const sessionId = crypto.randomUUID();
 
