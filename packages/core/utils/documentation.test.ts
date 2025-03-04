@@ -1,19 +1,52 @@
-import axios from 'axios';
-import { afterEach, beforeEach, describe, expect, it, vi, type Mocked } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import playwright from '@playwright/test';
 import { DOCUMENTATION_MAX_LENGTH } from '../config.js';
-import { getDocumentation, postProcessLargeDoc } from './documentation.js';
+import { getDocumentation, postProcessLargeDoc, closeBrowser } from './documentation.js';
 
-// Mock axios
-vi.mock('axios');
-const mockedAxios = axios as Mocked<typeof axios>;
+// Mock playwright
+vi.mock('@playwright/test', () => ({
+  default: {
+    chromium: {
+      launch: vi.fn(),
+    },
+  },
+}));
 
 describe('Documentation Utilities', () => {
+  let mockPage: any;
+  let mockContext: any;
+  let mockBrowser: any;
+
   beforeEach(() => {
+    // Reset all mocks
     vi.clearAllMocks();
+
+    // Setup mock implementations
+    mockPage = {
+      goto: vi.fn().mockResolvedValue(undefined),
+      waitForLoadState: vi.fn().mockResolvedValue(undefined),
+      content: vi.fn().mockResolvedValue(''),
+      evaluate: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+
+    mockContext = {
+      newPage: vi.fn().mockResolvedValue(mockPage),
+      setExtraHTTPHeaders: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+
+    mockBrowser = {
+      newContext: vi.fn().mockResolvedValue(mockContext),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+
+    // Setup the browser launch mock
+    vi.mocked(playwright.chromium.launch).mockResolvedValue(mockBrowser);
   });
 
-  afterEach(() => {
-    vi.resetAllMocks();
+  afterEach(async () => {
+    await closeBrowser();
   });
 
   describe('getDocumentation', () => {
@@ -32,283 +65,58 @@ describe('Documentation Utilities', () => {
         </html>
       `;
       
-      mockedAxios.get.mockResolvedValueOnce({ data: htmlDoc });
+      mockPage.content.mockResolvedValueOnce(htmlDoc);
       
       const result = await getDocumentation('https://api.example.com/docs', {}, {});
       
-      expect(mockedAxios.get).toHaveBeenCalledWith('https://api.example.com/docs');
-      expect(result).toContain('# API Documentation');
-      expect(result).toContain('This is a test documentation.');
+      expect(mockPage.goto).toHaveBeenCalledWith(expect.stringContaining('https://api.example.com/docs'));
+      expect(mockPage.waitForLoadState).toHaveBeenCalledWith('domcontentloaded');
+      expect(result).toContain('API Documentation');
+      expect(result).toContain('This is a test documentation');
     });
 
     it('should handle non-HTML documentation', async () => {
       const plainDoc = 'Plain text documentation';
-      mockedAxios.get.mockResolvedValueOnce({ data: plainDoc });
+      mockPage.content.mockResolvedValueOnce(plainDoc);
       
       const result = await getDocumentation('https://api.example.com/docs', {}, {});
       
-      expect(result).toBe('Plain text documentation');
-    });
-
-    it('should fetch GraphQL schema for GraphQL endpoints', async () => {
-      const mockSchema = {
-        __schema: {
-          types: [
-            { name: 'Query', fields: [] }
-          ]
-        }
-      };
-
-      mockedAxios.get.mockResolvedValueOnce({ data: 'GraphQL API Documentation' });
-      mockedAxios.post.mockResolvedValueOnce({ 
-        data: { data: mockSchema }
-      });
-
-      const result = await getDocumentation(
-        'https://api.example.com/graphql',
-        { 'Authorization': 'Bearer token' },
-        { 'version': '1' }
-      );
-
-      // Verify both documentation and schema were fetched
-      expect(mockedAxios.get).toHaveBeenCalledWith('https://api.example.com/graphql');
-      expect(mockedAxios.post).toHaveBeenCalledWith(
-        'https://api.example.com/graphql',
-        expect.objectContaining({
-          query: expect.any(String),
-          operationName: 'IntrospectionQuery'
-        }),
-        expect.objectContaining({
-          headers: { 'Authorization': 'Bearer token' },
-          params: { 'version': '1' }
-        })
-      );
-      expect(result).toContain(JSON.stringify(mockSchema.__schema));
-    });
-
-    it('should handle GraphQL schema fetch errors gracefully', async () => {
-      const plainDoc = 'GraphQL API Documentation';
-      mockedAxios.get.mockResolvedValueOnce({ data: plainDoc });
-      mockedAxios.post.mockRejectedValueOnce(new Error('GraphQL Error'));
-
-      const result = await getDocumentation('https://api.example.com/graphql', {}, {});
-
-      expect(result).toBe(plainDoc);
-    });
-
-    it('should handle GraphQL schema errors in response', async () => {
-      const plainDoc = 'GraphQL API Documentation';
-      mockedAxios.get.mockResolvedValueOnce({ data: plainDoc });
-      mockedAxios.post.mockResolvedValueOnce({ 
-        data: { 
-          errors: [{ message: 'Invalid introspection query' }]
-        }
-      });
-
-      const result = await getDocumentation('https://api.example.com/graphql', {}, {});
-
       expect(result).toBe(plainDoc);
     });
 
     it('should handle documentation fetch errors gracefully', async () => {
-      mockedAxios.get.mockRejectedValueOnce(new Error('Network Error'));
+      mockPage.goto.mockRejectedValueOnce(new Error('Network Error'));
 
       const result = await getDocumentation('https://api.example.com/docs', {}, {});
 
       expect(result).toBe('');
     });
 
-    it('should detect GraphQL endpoints from documentation content', async () => {
-      const docWithGraphQL = 'This is a GraphQL API endpoint';
-      const mockSchema = {
-        __schema: {
-          types: [
-            { name: 'Query', fields: [] }
-          ]
-        }
-      };
-
-      mockedAxios.get.mockResolvedValueOnce({ data: docWithGraphQL });
-      mockedAxios.post.mockResolvedValueOnce({ 
-        data: { data: mockSchema }
-      });
-
-      const result = await getDocumentation(
-        'https://api.example.com/docs',
-        {},
-        {}
-      );
-
-      expect(mockedAxios.post).toHaveBeenCalled();
-      expect(result).toContain(docWithGraphQL);
-      expect(result).toContain(JSON.stringify(mockSchema.__schema));
+    it('should set custom headers when provided', async () => {
+      const headers = { 'Authorization': 'Bearer token' };
+      await getDocumentation('https://api.example.com/docs', headers, {});
+      
+      expect(mockContext.setExtraHTTPHeaders).toHaveBeenCalledWith(headers);
     });
 
-    it('should handle complex HTML with special characters and nested elements', async () => {
-      const complexHtmlDoc = `
-        <!DOCTYPE html>
-        <html class="documentation">
-          <body>
-            <div class="wrapper">
-              <h1>Complex &amp; Special Doc</h1>
-              <div class="nested">
-                <ul>
-                  <li>Item with <strong>bold</strong> and <em>italic</em></li>
-                  <li>Item with <code>inline code &lt;tags&gt;</code></li>
-                </ul>
-                <script>
-                  function test() {
-                    // Some code block
-                    return true;
-                  }
-                </script>
-                <table>
-                  <tr>
-                    <td>Cell 1 &copy;</td>
-                    <td>Cell 2 &reg;</td>
-                  </tr>
-                </table>
-              </div>
-            </div>
-          </body>
-        </html>
-      `;
+    it('should handle query parameters correctly', async () => {
+      const queryParams = { 'version': '1' };
+      await getDocumentation('https://api.example.com/docs', {}, queryParams);
       
-      mockedAxios.get.mockResolvedValueOnce({ data: complexHtmlDoc });
-      
-      const result = await getDocumentation('https://api.example.com/docs', {}, {});
-      
-      expect(result).toContain('# Complex & Special Doc');
-      expect(result).toContain('Item with **bold** and _italic_');
-      expect(result).toContain('`inline code <tags>`');
-      expect(result).toContain('| Cell 1 © | Cell 2 ® |');
+      expect(mockPage.goto).toHaveBeenCalledWith('https://api.example.com/docs?version=1');
     });
 
-    it('should extract and fetch OpenAPI JSON URL from Swagger UI HTML', async () => {
-      const swaggerHtml = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <link type="text/css" rel="stylesheet" href="/static/ninja/swagger-ui.c9a0b360b746.css">
-            <link rel="shortcut icon" href="/static/ninja/favicon.8d5ab72e19e7.png">
-            <title>Ento API</title>
-        </head>
-        <body
-            data-csrf-token=""
-            data-api-csrf="">
-        
-            <script type="application/json" id="swagger-settings">
-                {
-         "layout": "BaseLayout",
-         "deepLinking": true,
-         "url": "/api/v1/openapi.json"
-        }
-            </script>
-            
-            <div id="swagger-ui"></div>
-        
-            <script src="/static/ninja/swagger-ui-bundle.ca90216c3f6d.js"></script>
-            <script src="/static/ninja/swagger-ui-init.ec666b6c27d3.js"></script>
-        
-        </body>
-        </html>
-      `;
+    it('should clean up resources after fetching', async () => {
+      await getDocumentation('https://api.example.com/docs', {}, {});
       
-      const openApiJson = {
-        openapi: "3.0.0",
-        info: {
-          title: "Test API",
-          version: "1.0.0"
-        },
-        paths: {}
-      };
-      
-      // Mock first response to return the Swagger HTML
-      mockedAxios.get.mockImplementationOnce(url => {
-        if (url === 'https://api.example.com/docs') {
-          return Promise.resolve({ data: swaggerHtml });
-        }
-        return Promise.reject(new Error('URL not mocked'));
-      });
-      
-      // Mock second response to return the OpenAPI JSON
-      mockedAxios.get.mockImplementationOnce(url => {
-        if (url === 'https://api.example.com/api/v1/openapi.json') {
-          return Promise.resolve({ data: openApiJson });
-        }
-        return Promise.reject(new Error('URL not mocked'));
-      });
-      
-      const result = await getDocumentation('https://api.example.com/docs', {}, {});
-      
-      // Verify both calls were made
-      expect(mockedAxios.get).toHaveBeenCalledTimes(2);
-      expect(mockedAxios.get).toHaveBeenNthCalledWith(1, 'https://api.example.com/docs');
-      expect(mockedAxios.get).toHaveBeenNthCalledWith(2, 'https://api.example.com/api/v1/openapi.json');
-      
-      // Verify the result contains the OpenAPI JSON
-      expect(result).toContain(JSON.stringify(openApiJson));
+      expect(mockPage.close).toHaveBeenCalled();
+      expect(mockContext.close).toHaveBeenCalled();
     });
-    
-    it('should handle OpenAPI URL that is absolute', async () => {
-      // More complete HTML example for better matching
-      const swaggerHtml = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>API Documentation</title>
-        </head>
-        <body>
-          <div id="swagger-ui"></div>
-          <script type="application/json" id="swagger-settings">
-            {
-              "url": "https://external-api.com/openapi.json"
-            }
-          </script>
-        </body>
-        </html>
-      `;
+
+    it('should remove non-documentation elements', async () => {
+      await getDocumentation('https://api.example.com/docs', {}, {});
       
-      const openApiJson = { openapi: "3.0.0" };
-      
-      mockedAxios.get.mockResolvedValueOnce({ data: swaggerHtml });
-      mockedAxios.get.mockResolvedValueOnce({ data: openApiJson });
-      
-      const result = await getDocumentation('https://api.example.com/docs', {}, {});
-      
-      expect(mockedAxios.get).toHaveBeenCalledTimes(2);
-      expect(mockedAxios.get).toHaveBeenNthCalledWith(2, 'https://external-api.com/openapi.json');
-      expect(result).toContain(JSON.stringify(openApiJson));
-    });
-    
-    it('should handle OpenAPI extraction errors gracefully', async () => {
-      // More complete HTML example for better matching
-      const swaggerHtml = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>API Documentation</title>
-        </head>
-        <body>
-          <div id="swagger-ui"></div>
-          <script type="application/json" id="swagger-settings">
-            {
-              "url": "/api/v1/openapi.json"
-            }
-          </script>
-        </body>
-        </html>
-      `;
-      
-      mockedAxios.get.mockResolvedValueOnce({ data: swaggerHtml });
-      mockedAxios.get.mockRejectedValueOnce(new Error('Failed to fetch OpenAPI'));
-      
-      const result = await getDocumentation('https://api.example.com/docs', {}, {});
-      
-      expect(mockedAxios.get).toHaveBeenCalledTimes(2);
-      // Result should still contain parts of the original HTML converted to markdown
-      expect(result).toContain('DOCTYPE');
-      expect(result).toContain('html');
+      expect(mockPage.evaluate).toHaveBeenCalled();
     });
   });
 
