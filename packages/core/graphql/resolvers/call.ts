@@ -108,7 +108,21 @@ export const callResolver = async (
       completedAt: new Date(),
     };
     context.datastore.createRun(result, context.orgId);
-  
+    telemetryClient?.capture({
+      distinctId: context.orgId,
+      event: 'api_call_success',
+      properties: {
+        success: true,
+        endpointHost: preparedEndpoint.urlHost,
+        endpointPath: preparedEndpoint?.urlPath,
+        callMethod: preparedEndpoint.method,
+        documentationUrl: preparedEndpoint?.documentationUrl,
+        authType: preparedEndpoint?.authentication,
+        statusCode: response.status,
+        responseTime: new Date().getTime() - startedAt.getTime(),
+      }
+    }); 
+
     return {...result, data: transformedResponse.data};
   } catch (error) {
     const maskedError = maskCredentials(error.message, credentials);
@@ -125,7 +139,15 @@ export const callResolver = async (
       completedAt: new Date(),
     };
     telemetryClient?.captureException(maskedError, context.orgId, {
-      preparedEndpoint: preparedEndpoint,
+      event: 'api_call_failed',
+      success: false,
+      endpointHost: preparedEndpoint.urlHost,
+      endpointPath: preparedEndpoint?.urlPath,
+      callMethod: preparedEndpoint.method,
+      documentationUrl: preparedEndpoint?.documentationUrl,
+      authType: preparedEndpoint?.authentication,
+      responseTime: new Date().getTime() - startedAt.getTime(),
+      error: maskedError,
       messages: messages,
       result: result
     });
