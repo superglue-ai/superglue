@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mocked } from 'vitest';
+import { DOCUMENTATION_MAX_LENGTH } from '../config.js';
 import { getDocumentation, postProcessLargeDoc } from './documentation.js';
 
 // Mock axios
@@ -314,51 +315,126 @@ describe('Documentation Utilities', () => {
   describe('postProcessLargeDoc', () => {
     it('should handle undefined endpoint without infinite loops', () => {
       // Create a documentation string longer than MAX_DOC_LENGTH
-      const longDocumentation = 'A'.repeat(100000);
+      const repeatLenght = DOCUMENTATION_MAX_LENGTH * 2;
+      const longDocumentation = 'A'.repeat(repeatLenght);
       
       // Call with undefined endpoint
       const result = postProcessLargeDoc(longDocumentation, undefined);
       
       // Should return a truncated version of the documentation
-      expect(result.length).toBeLessThanOrEqual(80000);
-      expect(result).toBe(longDocumentation.slice(0, 80000));
+      expect(result.length).toBeLessThanOrEqual(DOCUMENTATION_MAX_LENGTH);
+      expect(result).toBe(longDocumentation.slice(0, DOCUMENTATION_MAX_LENGTH));
     });
     
     it('should handle null endpoint without infinite loops', () => {
       // Create a documentation string longer than MAX_DOC_LENGTH
-      const longDocumentation = 'A'.repeat(100000);
+      const repeatLenght = DOCUMENTATION_MAX_LENGTH * 2;
+      const longDocumentation = 'A'.repeat(repeatLenght);
       
       // Call with null endpoint
       const result = postProcessLargeDoc(longDocumentation, null);
       
       // Should return a truncated version of the documentation
-      expect(result.length).toBeLessThanOrEqual(80000);
-      expect(result).toBe(longDocumentation.slice(0, 80000));
+      expect(result.length).toBeLessThanOrEqual(DOCUMENTATION_MAX_LENGTH);
+      expect(result).toBe(longDocumentation.slice(0, DOCUMENTATION_MAX_LENGTH));
     });
     
     it('should handle empty string endpoint without infinite loops', () => {
       // Create a documentation string longer than MAX_DOC_LENGTH
-      const longDocumentation = 'A'.repeat(100000);
+      const repeatLenght = DOCUMENTATION_MAX_LENGTH * 2;
+      const longDocumentation = 'A'.repeat(repeatLenght);
       
       // Call with empty string endpoint
       const result = postProcessLargeDoc(longDocumentation, '');
       
       // Should return a truncated version of the documentation
-      expect(result.length).toBeLessThanOrEqual(80000);
-      expect(result).toBe(longDocumentation.slice(0, 80000));
+      expect(result.length).toBeLessThanOrEqual(DOCUMENTATION_MAX_LENGTH);
+      expect(result).toBe(longDocumentation.slice(0, DOCUMENTATION_MAX_LENGTH));
     });
 
     it('should handle very short endpoint without infinite loops', () => {
       // Create a documentation string longer than MAX_DOC_LENGTH
-      const longDocumentation = 'A'.repeat(100000) + 'api' + 'A'.repeat(10000);
+      const repeatLenght = DOCUMENTATION_MAX_LENGTH * 2;
+      const longDocumentation = 'A'.repeat(repeatLenght) + 'api' + 'A'.repeat(repeatLenght);
       
       // Call with endpoint shorter than minimum search term length (4 chars)
       const result = postProcessLargeDoc(longDocumentation, 'api');
       
       // Should return a truncated version of the documentation (first chunk)
-      expect(result.length).toBeLessThanOrEqual(80000);
+      expect(result.length).toBeLessThanOrEqual(DOCUMENTATION_MAX_LENGTH);
       // In this case, it should still find the search term
       expect(result).toContain('api');
+    });
+    it('should include regions around multiple occurrences of search term', () => {
+      // Create a documentation string with multiple occurrences of the search term
+      const repeatLenght = DOCUMENTATION_MAX_LENGTH * 1.8 / 3;
+      const prefix = 'ABC'.repeat(repeatLenght);
+      const middle = 'BKJ'.repeat(repeatLenght);
+      const suffix = 'CDE'.repeat(repeatLenght);
+      const suffixShort = 'FGH'.repeat(100);
+      
+      // Insert search term at different positions
+      const searchTerm = 'userProfile';
+      const docTerms = [
+        `Here is info about ${searchTerm}`,
+        `More details about ${searchTerm} endpoint`,
+        `Overlapping details about ${searchTerm} endpoint `
+      ];
+      const longDocumentation = 
+        prefix + 
+        docTerms[0] + 
+        middle + 
+        docTerms[1] + 
+        suffixShort +
+        docTerms[2] +
+        suffix;
+      
+      // Call with the search term as endpoint
+      const result = postProcessLargeDoc(longDocumentation, '/userProfile');
+      
+      // Should return a document within the max length
+      expect(result.length).toBeLessThanOrEqual(DOCUMENTATION_MAX_LENGTH);
+      
+      // Should contain context from both regions
+      expect(result).toContain(docTerms[0]);
+      expect(result).toContain(docTerms[1]);
+      expect(result).toContain(docTerms[2]);
+    });
+
+    it('it should include the authorization, even if its the last thing found', () => {
+      // Create a documentation string with multiple occurrences of the search term
+      const repeatLenght = DOCUMENTATION_MAX_LENGTH * 1.8 / 3;
+      const prefix = 'ABC'.repeat(repeatLenght);
+      const middle = 'BKJ'.repeat(repeatLenght);
+      const suffix = 'CDE'.repeat(repeatLenght);
+      const suffixShort = 'FGH'.repeat(100);
+      
+      // Insert search term at different positions
+      const searchTerm = 'userProfile';
+      const docTerms = [
+        `Here is info about ${searchTerm}`,
+        `More details about ${searchTerm} endpoint`,
+        `details about authorization`
+      ];
+      const longDocumentation = 
+        prefix + 
+        docTerms[0] + 
+        middle + 
+        docTerms[1] + 
+        suffix +
+        docTerms[2] +
+        suffixShort;
+      
+      // Call with the search term as endpoint
+      const result = postProcessLargeDoc(longDocumentation, '/userProfile');
+      
+      // Should return a document within the max length
+      expect(result.length).toBeLessThanOrEqual(DOCUMENTATION_MAX_LENGTH);
+      
+      // Should contain context from both regions
+      expect(result).toContain(docTerms[0]);
+      expect(result).toContain(docTerms[1]);
+      expect(result).toContain(docTerms[2]);
     });
   });
 });
