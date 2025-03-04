@@ -14,6 +14,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  if (process.env.NEXT_PUBLIC_DISABLE_WELCOME_SCREEN === 'true') {
+    return NextResponse.next();
+  }
+
   // Check for email or emailEntrySkipped cookies
   const tenantEmail = request.cookies.get('sg_tenant_email')?.value;
   const emailEntrySkipped = request.cookies.get('sg_tenant_emailEntrySkipped')?.value;
