@@ -110,8 +110,8 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
     );
 
     const body = endpoint.body ? 
-      JSON.parse(replaceVariables(endpoint.body, requestVars)) : 
-      {};
+      replaceVariables(endpoint.body, requestVars) : 
+      "";
 
     const url = replaceVariables(composeUrl(endpoint.urlHost, endpoint.urlPath), requestVars);
     const axiosConfig: AxiosRequestConfig = {
