@@ -27,6 +27,9 @@ jobs:
       run: |
         rm -rf node_modules package-lock.json
         npm install
+        
+    - name: Install Playwright browsers
+      run: npx playwright install
       
     - name: Run tests
       run: npm run test

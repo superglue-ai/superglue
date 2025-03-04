@@ -26,9 +26,8 @@ RUN npm install && \
 # Copy source code
 COPY . .
 
-# After copying files but before building
+# Build the application
 RUN npm run build
-    
 
 # Production stage
 FROM node:22-slim
@@ -43,9 +42,10 @@ COPY packages/core/package*.json ./packages/core/
 COPY packages/web/package*.json ./packages/web/
 COPY packages/shared/package*.json ./packages/shared/
 
-# Install production dependencies only
+# Install production dependencies and Playwright
 RUN npm ci --omit=dev && \
-    npm install -g next turbo cross-env
+    npm install -g next turbo cross-env && \
+    npx playwright install --with-deps
 
 # Copy built files from builder stage
 COPY --from=builder /usr/src/app/packages/core/dist ./packages/core/dist

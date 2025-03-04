@@ -1,7 +1,17 @@
 import axios from "axios";
 import { getIntrospectionQuery } from "graphql";
 import { NodeHtmlMarkdown } from "node-html-markdown";
+import playwright from '@playwright/test';
 import { DOCUMENTATION_MAX_LENGTH } from "../config.js";
+
+let browserInstance: playwright.Browser | null = null;
+
+async function getBrowser() {
+  if (!browserInstance) {
+    browserInstance = await playwright.chromium.launch();
+  }
+  return browserInstance;
+}
 
 export function extractOpenApiUrl(html: string): string | null {
   try {
@@ -169,30 +179,78 @@ export async function getDocumentation(documentationUrl: string, headers: Record
       return "";
     }
     let documentation = "";
-    // If the documentation is not a URL, return it as is
     if(!documentationUrl.startsWith("http")) {
       return documentationUrl;
     }
+    
     try {
-      const response = await axios.get(documentationUrl);
-      const docData = response.data;
-      const docString = typeof docData === 'string' ? docData : JSON.stringify(docData);
+      const browser = await getBrowser();
+      const context = await browser.newContext();
+      const page = await context.newPage();
 
-      if (docString.toLowerCase().slice(0, 200).includes("<html")) {
-        documentation = NodeHtmlMarkdown.translate(docString);
+      if (headers) {
+        await context.setExtraHTTPHeaders(headers);
+      }
+
+      const url = new URL(documentationUrl);
+      if (queryParams) {
+        Object.entries(queryParams).forEach(([key, value]) => {
+          url.searchParams.append(key, value);
+        });
+      }
+
+      await page.goto(url.toString());
+      await page.waitForLoadState('domcontentloaded');
+      
+      // Remove common non-documentation elements
+      await page.evaluate(() => {
+        const selectorsToRemove = [
+          'nav',
+          'header',
+          'footer',
+          '.nav',
+          '.navbar',
+          '.header',
+          '.footer',
+          '.cookie-banner',
+          '.cookie-consent',
+          '.cookies',
+          '#cookie-banner',
+          '.cookie-notice',
+          '.sidebar',
+          '.menu',
+          '[role="navigation"]',
+          '[role="banner"]',
+          '[role="contentinfo"]',
+        ];
+
+        selectorsToRemove.forEach(selector => {
+          document.querySelectorAll(selector).forEach(element => {
+            element.remove();
+          });
+        });
+      });
+
+      // Get the cleaned HTML content
+      const docData = await page.content();
+
+      await page.close();
+      await context.close();
+      
+      if (docData.toLowerCase().slice(0, 200).includes("<html")) {
+        documentation = NodeHtmlMarkdown.translate(docData);
         
-        // TODO: maybe do this irrespective of the html tag presence?
-        const openApiUrl = extractOpenApiUrl(docString);
+        const openApiUrl = extractOpenApiUrl(docData);
         if (openApiUrl) {
           const openApiJson = await getOpenApiJsonFromUrl(openApiUrl, documentationUrl);
           if (openApiJson) {
             documentation = [JSON.stringify(openApiJson), documentation].join("\n\n");
           }
         }
-
       }
+      
       if(!documentation && docData) {
-        documentation = typeof docData === 'object' ? JSON.stringify(docData) : docString;
+        documentation = docData;
       }
 
       // If the documentation contains GraphQL, fetch the schema and add it to the documentation
@@ -211,30 +269,39 @@ export async function getDocumentation(documentationUrl: string, headers: Record
     }
 
     return documentation;
-  }
+}
   
 
-  async function getGraphQLSchema(documentationUrl: string, headers?: Record<string, string>, queryParams?: Record<string, string>) {
+async function getGraphQLSchema(documentationUrl: string, headers?: Record<string, string>, queryParams?: Record<string, string>) {
     // The standard introspection query
-    const introspectionQuery = getIntrospectionQuery();
-  
-    try {
+  const introspectionQuery = getIntrospectionQuery();
+
+  try {
       const response = await axios.post(
         documentationUrl,
         {
-          query: introspectionQuery,
-          operationName: 'IntrospectionQuery'
+        query: introspectionQuery,
+        operationName: 'IntrospectionQuery'
         },
         { headers, params: queryParams }
       );
-  
+
       if (response.data.errors) {
         throw new Error(`GraphQL Introspection failed: ${response.data.errors[0].message}`);
-      }
-  
-      return response.data.data.__schema;
-    } catch (error) {
-      console.error('Failed to fetch GraphQL schema:', error);
-      return null;
     }
+
+      return response.data.data.__schema;
+  } catch (error) {
+    console.error('Failed to fetch GraphQL schema:', error);
+    return null;
   }
+}
+
+// For testing purposes and cleanup
+export async function closeBrowser() {
+  if (browserInstance) {
+    const closedInstance = browserInstance;
+    browserInstance = null;
+    await closedInstance.close();
+  }
+}
