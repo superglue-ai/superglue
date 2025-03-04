@@ -3,13 +3,13 @@ import { expressMiddleware } from '@apollo/server/express4';
 import { ApolloServerPluginLandingPageLocalDefault } from '@apollo/server/plugin/landingPage/default';
 import cors from 'cors';
 import express from 'express';
+import { graphqlUploadExpress } from 'graphql-upload-minimal';
 import http from 'http';
+import { LocalKeyManager } from './auth/localKeyManager.js';
+import { SupabaseKeyManager } from './auth/supabaseKeyManager.js';
 import { createDataStore } from './datastore/datastore.js';
 import { resolvers, typeDefs } from './graphql/graphql.js';
 import { handleQueryError, telemetryClient, telemetryMiddleware } from './utils/telemetry.js';
-import { SupabaseKeyManager } from './auth/supabaseKeyManager.js';
-import { LocalKeyManager } from './auth/localKeyManager.js';
-import { graphqlUploadExpress } from 'graphql-upload-minimal';
 
 // Constants
 const PORT = process.env.GRAPHQL_PORT || 3000;
@@ -77,8 +77,6 @@ const contextConfig = {
     };
   }
 };
-
-// Authentication Helper Function to cache API keys
 
 // Authentication Middleware
 const authMiddleware = async (req, res, next) => {
