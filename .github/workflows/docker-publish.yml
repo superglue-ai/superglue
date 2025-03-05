@@ -35,12 +35,15 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
       
-      - name: Build and push
+      - name: Build and push multi-architecture image
         uses: docker/build-push-action@v4
         with:
           context: .
+          file: ./docker/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
             ${{ env.IMAGE_NAME }}:latest
             ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=gha,scope=multiarch
+          cache-to: type=gha,mode=max,scope=multiarch
