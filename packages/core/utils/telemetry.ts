@@ -74,3 +74,23 @@ export const handleQueryError = (errors: any[], query: string, orgId: string) =>
   });
 };
 
+export const createTelemetryPlugin = () => {
+  return {
+    requestDidStart: async () => ({
+      willSendResponse: async (requestContext: any) => {
+        const errors = requestContext.errors || 
+          requestContext?.response?.body?.singleResult?.errors ||
+          Object.values(requestContext?.response?.body?.singleResult?.data || {}).map((d: any) => d.error).filter(Boolean);
+          
+        if(errors && errors.length > 0) {
+          console.error(errors);
+        }
+        if (errors && errors.length > 0 && telemetryClient) {
+          const orgId = requestContext.contextValue.orgId;
+          handleQueryError(errors, requestContext.request.query, orgId);
+        }
+      }
+    })
+  };
+};
+
