@@ -83,7 +83,7 @@ type RunResult {
 
 type Pagination {
   type: PaginationType!
-  pageSize: Int
+  pageSize: String
 }
 
 type RunList {
@@ -232,9 +232,18 @@ type Query {
   getExtract(id: ID!): ExtractConfig
 
   generateSchema(instruction: String!, responseData: String): JSONSchema!
+  
+  getTenantInfo: TenantInfo
+}
+
+type TenantInfo {
+  email: String
+  emailEntrySkipped: Boolean!
 }
 
 type Mutation {
+  setTenantInfo(email: String, emailEntrySkipped: Boolean): TenantInfo!
+  
   call(
     input: ApiInputRequest!
     payload: JSON

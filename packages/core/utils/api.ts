@@ -3,6 +3,7 @@ import { AxiosRequestConfig } from "axios";
 import OpenAI from "openai";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
+import { DOCUMENTATION_MAX_LENGTH } from "../config.js";
 import { getDocumentation } from "./documentation.js";
 import { API_ERROR_HANDLING_USER_PROMPT, API_PROMPT } from "./prompts.js";
 import { callAxios, composeUrl, replaceVariables } from "./tools.js";
@@ -28,11 +29,32 @@ export async function prepareEndpoint(
 
     // If a documentation URL is provided, fetch and parse additional details
     const documentation = await getDocumentation(apiCallConfig.documentationUrl || composeUrl(apiCallConfig.urlHost, apiCallConfig.urlPath), apiCallConfig.headers, apiCallConfig.queryParams, apiCallConfig?.urlPath);
+    if(documentation.length >= DOCUMENTATION_MAX_LENGTH) {
+      console.warn("Documentation length at limit: " + documentation.length);
+    }
+    if(documentation.length <= 10000) {
+      console.warn("Documentation length is short: " + documentation.length);
+    }
 
     const availableVars = [...Object.keys(payload || {}), ...Object.keys(credentials || {})];
     const computedApiCallConfig = await generateApiConfig(apiCallConfig, documentation, availableVars, lastError, previousMessages);
     
     return computedApiCallConfig;
+}
+
+export function convertBasicAuthToBase64(headerValue){
+    if(!headerValue) return headerValue;
+    // Get the part of the 'Basic '
+    const credentials = headerValue.substring('Basic '.length).trim();
+    // checking if it is already Base64 decoded
+    const seemsEncoded = /^[A-Za-z0-9+/=]+$/.test(credentials);
+
+    if (!seemsEncoded) {
+      // if not encoded, convert to username:password to Base64
+      const base64Credentials = Buffer.from(credentials).toString('base64');
+      return `Basic ${base64Credentials}`; 
+    }
+      return headerValue; 
 }
 
 export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions): Promise<any> {  
@@ -72,20 +94,30 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
         .map(([key, value]) => [key, replaceVariables(value, requestVars)])
     );
 
+    // Process headers for Basic Auth
+    const processedHeaders = {};
+    for (const [key, value] of Object.entries(headers)) {
+      if (key.toLowerCase() === 'authorization' && typeof value === 'string' && value.startsWith('Basic ')) {
+        processedHeaders[key] = convertBasicAuthToBase64(value);
+      } else {
+        processedHeaders[key] = value;
+      }
+    }
+
     const queryParams = Object.fromEntries(
       Object.entries(endpoint.queryParams || {})
         .map(([key, value]) => [key, replaceVariables(value, requestVars)])
     );
 
     const body = endpoint.body ? 
-      JSON.parse(replaceVariables(endpoint.body, requestVars)) : 
-      {};
+      replaceVariables(endpoint.body, requestVars) : 
+      "";
 
     const url = replaceVariables(composeUrl(endpoint.urlHost, endpoint.urlPath), requestVars);
     const axiosConfig: AxiosRequestConfig = {
       method: endpoint.method,
       url: url,
-      headers,
+      headers: processedHeaders, // added processedHeaders instead of headers
       data: body,
       params: queryParams,
       timeout: options?.timeout || 60000,
@@ -94,8 +126,11 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
     console.log(`${endpoint.method} ${url}`);
     const response = await callAxios(axiosConfig, options);
 
-    if(![200, 201, 204].includes(response?.status) || response.data?.error) {
-      const error = JSON.stringify(response?.data?.error || response?.data);
+    if(![200, 201, 204].includes(response?.status) || 
+        response.data?.error || 
+        (Array.isArray(response?.data?.errors) && response?.data?.errors.length > 0)
+      ) {
+      const error = JSON.stringify(response?.data?.error || response.data?.errors || response?.data);
       let message = `${endpoint.method} ${url} failed with status ${response.status}. Response: ${String(error).slice(0, 200)}
       Headers: ${JSON.stringify(headers)}
       Body: ${JSON.stringify(body)}
@@ -185,7 +220,7 @@ async function generateApiConfig(
     dataPath: z.string().optional().describe("The path to the data you want to extract from the response. E.g. products.variants.size"),
     pagination: z.object({
       type: z.enum(Object.values(PaginationType) as [string, ...string[]]),
-      pageSize: z.number().int().describe("Number of items per page. Set this to a number. In headers or query params, you can access it as {limit}."),
+      pageSize: z.string().describe("Number of items per page. Set this to a number. In headers or query params, you can access it as {limit}."),
     }).optional()
   }));
   const openai = new OpenAI({
@@ -224,7 +259,7 @@ ${apiConfig.method ? `Method: ${apiConfig.method}` : ''}
 
 Available variables: ${vars.join(", ")}
 
-Documentation: ${String(documentation).slice(0, 80000)}`
+Documentation: ${String(documentation)}`
   }
 
   const errorHandlingMessage = API_ERROR_HANDLING_USER_PROMPT

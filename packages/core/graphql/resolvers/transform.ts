@@ -21,6 +21,11 @@ export const transformResolver = async (
   const readCache = options ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.READONLY : true;
   const writeCache = options ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.WRITEONLY : true;
   let preparedTransform: TransformConfig | null = null;
+
+  if((input.endpoint?.responseSchema as any)?._def?.typeName === "ZodObject") {
+    throw new Error("zod is not supported for response schema. Please use json schema instead. you can use the zod-to-json-schema package to convert zod to json schema.");
+  }
+
   try {
     // Transform response
     preparedTransform = readCache ? 
