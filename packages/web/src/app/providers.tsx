@@ -1,12 +1,15 @@
 'use client'
-import React from 'react'
 import posthog, { PostHog } from 'posthog-js'
 import { PostHogProvider } from 'posthog-js/react'
+import SuspendedPostHogPageView from '../components/PHPageView'
 
 export function CSPostHogProvider({ children }: { children: any }) {
   return (
-    <PostHogProvider client={posthog}>{children}</PostHogProvider>
-)
+    <PostHogProvider client={posthog}>
+      <SuspendedPostHogPageView />
+      {children}
+    </PostHogProvider>
+  )
 }
 let postHog: PostHog | undefined = undefined;
 

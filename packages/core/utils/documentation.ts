@@ -1,6 +1,17 @@
 import axios from "axios";
 import { getIntrospectionQuery } from "graphql";
 import { NodeHtmlMarkdown } from "node-html-markdown";
+import playwright from '@playwright/test';
+import { DOCUMENTATION_MAX_LENGTH } from "../config.js";
+
+let browserInstance: playwright.Browser | null = null;
+
+async function getBrowser() {
+  if (!browserInstance) {
+    browserInstance = await playwright.chromium.launch();
+  }
+  return browserInstance;
+}
 
 export function extractOpenApiUrl(html: string): string | null {
   try {
@@ -68,14 +79,13 @@ async function getOpenApiJsonFromUrl(openApiUrl: string, documentationUrl: strin
 }
 
 export function postProcessLargeDoc(documentation: string, endpointPath: string): string {
-  const MAX_DOC_LENGTH = 80000;
   const MIN_INITIAL_CHUNK = 20000;
   const MAX_INITIAL_CHUNK = 40000;
   const CONTEXT_SIZE = 10000;
   const CONTEXT_SEPARATOR = "\n\n";
   const MIN_SEARCH_TERM_LENGTH = 3;
 
-  if (documentation.length <= MAX_DOC_LENGTH) {
+  if (documentation.length <= DOCUMENTATION_MAX_LENGTH) {
     return documentation;
   }
 
@@ -85,11 +95,22 @@ export function postProcessLargeDoc(documentation: string, endpointPath: string)
   const docLower = documentation.toLowerCase();
 
   if (!endpointPath || searchTerm.length < MIN_SEARCH_TERM_LENGTH) {
-    return documentation.slice(0, MAX_DOC_LENGTH);
+    return documentation.slice(0, DOCUMENTATION_MAX_LENGTH);
   }
 
   // Find all occurrences of the search term
   const positions: number[] = [];
+
+  // Fix the authorization search to properly find all relevant authorization terms
+  let authPosSecuritySchemes = docLower.indexOf("securityschemes");
+  if (authPosSecuritySchemes !== -1) {
+    positions.push(authPosSecuritySchemes);
+  }
+  let authPosAuthorization = docLower.indexOf("authorization");
+  if (authPosAuthorization !== -1) {
+    positions.push(authPosAuthorization);
+  }
+
   let pos = docLower.indexOf(searchTerm);	
   while (pos !== -1) {
     positions.push(pos);
@@ -98,12 +119,14 @@ export function postProcessLargeDoc(documentation: string, endpointPath: string)
 
   // If no occurrences found return max doc length
   if (positions.length === 0) {
-    return documentation.slice(0, MAX_DOC_LENGTH);
+    return documentation.slice(0, DOCUMENTATION_MAX_LENGTH);
   }
 
   // Calculate non-overlapping context regions
   type Region = { start: number; end: number };
   const regions: Region[] = [];
+  // Sort positions to ensure we process them in order from start to end of document
+  positions.sort((a, b) => a - b);
   
   for (const pos of positions) {
     const start = Math.max(0, pos - CONTEXT_SIZE);
@@ -124,7 +147,7 @@ export function postProcessLargeDoc(documentation: string, endpointPath: string)
   const separatorSpace = regions.length * CONTEXT_SEPARATOR.length;
 
   // If contexts overlap significantly, we might have more space for initial chunk
-  const availableForInitial = MAX_DOC_LENGTH - (totalContextSpace + separatorSpace);
+  const availableForInitial = DOCUMENTATION_MAX_LENGTH - (totalContextSpace + separatorSpace);
   
   // Use up to MAX_INITIAL_CHUNK if we have space due to overlapping contexts
   const initialChunkSize = Math.max(
@@ -133,7 +156,7 @@ export function postProcessLargeDoc(documentation: string, endpointPath: string)
   );
 
   let finalDoc = documentation.slice(0, initialChunkSize);
-  let remainingLength = MAX_DOC_LENGTH - finalDoc.length;
+  let remainingLength = DOCUMENTATION_MAX_LENGTH - finalDoc.length;
 
   // Add context for each non-overlapping region
   for (const region of regions) {
@@ -152,35 +175,82 @@ export function postProcessLargeDoc(documentation: string, endpointPath: string)
 }
 
 export async function getDocumentation(documentationUrl: string, headers: Record<string, string>, queryParams: Record<string, string>, apiEndpoint?: string): Promise<string> {
-    const docMaxLength = 80000;
     if(!documentationUrl) {
       return "";
     }
     let documentation = "";
-    // If the documentation is not a URL, return it as is
     if(!documentationUrl.startsWith("http")) {
       return documentationUrl;
     }
+    
     try {
-      const response = await axios.get(documentationUrl);
-      const docData = response.data;
-      const docString = typeof docData === 'string' ? docData : JSON.stringify(docData);
+      const browser = await getBrowser();
+      const context = await browser.newContext();
+      const page = await context.newPage();
 
-      if (docString.toLowerCase().slice(0, 200).includes("<html")) {
-        documentation = NodeHtmlMarkdown.translate(docString);
+      if (headers) {
+        await context.setExtraHTTPHeaders(headers);
+      }
+
+      const url = new URL(documentationUrl);
+      if (queryParams) {
+        Object.entries(queryParams).forEach(([key, value]) => {
+          url.searchParams.append(key, value);
+        });
+      }
+
+      await page.goto(url.toString());
+      await page.waitForLoadState('domcontentloaded');
+      
+      // Remove common non-documentation elements
+      await page.evaluate(() => {
+        const selectorsToRemove = [
+          'nav',
+          'header',
+          'footer',
+          '.nav',
+          '.navbar',
+          '.header',
+          '.footer',
+          '.cookie-banner',
+          '.cookie-consent',
+          '.cookies',
+          '#cookie-banner',
+          '.cookie-notice',
+          '.sidebar',
+          '.menu',
+          '[role="navigation"]',
+          '[role="banner"]',
+          '[role="contentinfo"]',
+        ];
+
+        selectorsToRemove.forEach(selector => {
+          document.querySelectorAll(selector).forEach(element => {
+            element.remove();
+          });
+        });
+      });
+
+      // Get the cleaned HTML content
+      const docData = await page.content();
+
+      await page.close();
+      await context.close();
+      
+      if (docData.toLowerCase().slice(0, 200).includes("<html")) {
+        documentation = NodeHtmlMarkdown.translate(docData);
         
-        // TODO: maybe do this irrespective of the html tag presence?
-        const openApiUrl = extractOpenApiUrl(docString);
+        const openApiUrl = extractOpenApiUrl(docData);
         if (openApiUrl) {
           const openApiJson = await getOpenApiJsonFromUrl(openApiUrl, documentationUrl);
           if (openApiJson) {
             documentation = [JSON.stringify(openApiJson), documentation].join("\n\n");
           }
         }
-
       }
+      
       if(!documentation && docData) {
-        documentation = typeof docData === 'object' ? JSON.stringify(docData) : docString;
+        documentation = docData;
       }
 
       // If the documentation contains GraphQL, fetch the schema and add it to the documentation
@@ -194,35 +264,44 @@ export async function getDocumentation(documentationUrl: string, headers: Record
       console.warn(`Failed to fetch documentation from ${documentationUrl}:`, error?.message);
     }
 
-    if(documentation.length > docMaxLength) {
+    if(documentation.length > DOCUMENTATION_MAX_LENGTH) {
       documentation = postProcessLargeDoc(documentation, apiEndpoint || '');
     }
 
     return documentation;
-  }
+}
   
 
-  async function getGraphQLSchema(documentationUrl: string, headers?: Record<string, string>, queryParams?: Record<string, string>) {
+async function getGraphQLSchema(documentationUrl: string, headers?: Record<string, string>, queryParams?: Record<string, string>) {
     // The standard introspection query
-    const introspectionQuery = getIntrospectionQuery();
-  
-    try {
+  const introspectionQuery = getIntrospectionQuery();
+
+  try {
       const response = await axios.post(
         documentationUrl,
         {
-          query: introspectionQuery,
-          operationName: 'IntrospectionQuery'
+        query: introspectionQuery,
+        operationName: 'IntrospectionQuery'
         },
         { headers, params: queryParams }
       );
-  
+
       if (response.data.errors) {
         throw new Error(`GraphQL Introspection failed: ${response.data.errors[0].message}`);
-      }
-  
-      return response.data.data.__schema;
-    } catch (error) {
-      console.error('Failed to fetch GraphQL schema:', error);
-      return null;
     }
+
+      return response.data.data.__schema;
+  } catch (error) {
+    console.error('Failed to fetch GraphQL schema:', error);
+    return null;
   }
+}
+
+// For testing purposes and cleanup
+export async function closeBrowser() {
+  if (browserInstance) {
+    const closedInstance = browserInstance;
+    browserInstance = null;
+    await closedInstance.close();
+  }
+}

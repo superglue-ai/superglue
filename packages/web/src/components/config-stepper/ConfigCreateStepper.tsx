@@ -85,7 +85,8 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
     try {
       const urlObj = new URL(url.startsWith('http') ? url : `https://${url}`)
       const cleanedHost = cleanApiDomain(`${urlObj.protocol}//${urlObj.host}`)
-      const path = urlObj.pathname === '/' ? '' : urlObj.pathname
+      // Include query params in the path, good context for LLM
+      const path = urlObj.pathname === '/' ? '' : `${urlObj.pathname}${urlObj.search}` 
       return {
         urlHost: cleanedHost,
         urlPath: path
@@ -146,7 +147,6 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
         })
 
         // Call autofill endpoint
-        
         const response = await superglueClient.call({
           endpoint: {
             urlHost: url.urlHost,
