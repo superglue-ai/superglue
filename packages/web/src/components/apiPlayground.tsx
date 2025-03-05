@@ -148,7 +148,22 @@ export function ApiPlayground({ configId }: { configId?: string }) {
     const startTime = Date.now();
 
     try {
-      const credentialsObj = Object.fromEntries(credentials.map(c => [c.key, c.value]));
+      // Parse JSON values if they are valid JSON strings
+      const credentialsObj = Object.fromEntries(
+        credentials.map(c => {
+          let value = c.value;
+          try {
+            // Check if the value looks like JSON (starts with { or [)
+            if (/^[\[\{]/.test(value.trim())) {
+              value = JSON.parse(value);
+            }
+          } catch (e) {
+            // If parsing fails, use the original string value
+            console.debug(`Failed to parse JSON for ${c.key}, using raw string`);
+          }
+          return [c.key, value];
+        })
+      );
       
       const superglue = new SuperglueClient({
         apiKey: superglueConfig.superglueApiKey,
