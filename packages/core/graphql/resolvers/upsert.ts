@@ -26,6 +26,7 @@ export const upsertApiResolver = async (
       (!input?.dataPath || oldConfig?.dataPath === input?.dataPath) &&
       (!input?.body || oldConfig?.body === input?.body) &&
       (!input?.queryParams || oldConfig?.queryParams === input?.queryParams) &&
+      (!input?.inputPayload || oldConfig?.inputPayload === input?.inputPayload) &&
       (!input?.headers || oldConfig?.headers === input?.headers) &&
       (!input?.responseSchema || oldConfig?.responseSchema === input?.responseSchema) &&
       (!input?.instruction || oldConfig?.instruction === input?.instruction);
@@ -48,6 +49,7 @@ export const upsertApiResolver = async (
       responseSchema: input.responseSchema || oldConfig?.responseSchema,
       responseMapping: newResponseMapping,
       authentication: input.authentication || oldConfig?.authentication,
+      inputPayload: input.inputPayload || oldConfig?.inputPayload,
       pagination: input.pagination || oldConfig?.pagination,
       dataPath: input.dataPath || oldConfig?.dataPath,
       version: input.version || oldConfig?.version
@@ -110,6 +112,7 @@ export const upsertExtractResolver = async (
       documentationUrl: input.documentationUrl || oldConfig?.documentationUrl,
       decompressionMethod: input.decompressionMethod || oldConfig?.decompressionMethod,
       authentication: input.authentication || oldConfig?.authentication,
+      inputPayload: input.inputPayload || oldConfig?.inputPayload,
       fileType: input.fileType || oldConfig?.fileType,
       dataPath: input.dataPath || oldConfig?.dataPath,
       version: input.version || oldConfig?.version

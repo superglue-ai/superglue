@@ -80,6 +80,7 @@ export interface ApiConfig extends BaseConfig {
   responseSchema?: JSONSchema;
   responseMapping?: string;
   authentication?: AuthType;
+  inputPayload?: string;
   pagination?: Pagination;
   dataPath?: string;
 }
@@ -95,6 +96,7 @@ export interface ExtractConfig extends BaseConfig {
   documentationUrl?: string;
   decompressionMethod?: DecompressionMethod;
   authentication?: AuthType;
+  inputPayload?: string;
   fileType?: FileType;
   dataPath?: string;
 }
@@ -128,6 +130,7 @@ export type ApiInput = {
   responseSchema?: JSONSchema;
   responseMapping?: any;
   authentication?: AuthType;
+  inputPayload?: string;
   pagination?: Pagination;
   dataPath?: string;
   version?: string;
@@ -160,6 +163,7 @@ export type ExtractInput = {
   documentationUrl?: string;
   decompressionMethod?: DecompressionMethod;
   authentication?: AuthType;
+  inputPayload?: string;
   version?: string;
 };
 

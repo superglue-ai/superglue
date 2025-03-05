@@ -225,10 +225,11 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
           urlHost: url.urlHost,
           instruction: formData.instruction,
           documentationUrl: formData.documentationUrl || undefined,
-          // authentication: formData.auth.value ? AuthType.HEADER : AuthType.NONE,
+          authentication: formData.auth.value ? AuthType.HEADER : AuthType.NONE,
+          inputPayload: formData.inputPayload,
           // headers: {},
           // TODO: enable headers
-          // headers: formData.auth.value ? { 'Authorization': formData.auth.value } : undefined,
+          headers: formData.auth.value ? { Bearer: formData.auth.value } : undefined,
           responseSchema: JSON.parse(formData.responseSchema),
           createdAt: new Date(),
           updatedAt: new Date()
@@ -237,6 +238,9 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
         if (!savedConfig) {
           throw new Error('Failed to save configuration')
         }
+
+        console.log(formData.auth.value)
+        console.log(formData.inputPayload)
 
         // TODO: show some notification to the user that something has been saved
         // toast({
@@ -286,7 +290,9 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
       console.warn('Invalid input payload JSON')
     }
 
+    console.log(formData.auth.value)
     const credentials = parseCredentialsHelper(formData.auth.value)
+    console.log(credentials)
 
     const graphqlQuery = {
       query: `mutation CallApi($payload: JSON!, $credentials: JSON!) { 

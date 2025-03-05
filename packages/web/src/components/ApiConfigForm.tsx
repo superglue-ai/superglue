@@ -95,6 +95,7 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
     responseMapping: '',
     dataPath: '',
     authentication: 'auto',
+    inputPayload: '', 
     paginationType: 'auto',
     pageSize: ''
   });
@@ -112,43 +113,55 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
 
   
   const getCurlCommand = () => {
-      let payload = {}
-      try {
-        payload = JSON.parse(formData.inputPayload)
-      } catch (e) {
-        console.warn('Invalid input payload JSON')
-      }
-  
-      const credentials = parseCredentialsHelper(formData.auth.value, JSON.parse(formData.auth.advancedConfig))
-  
-      const graphqlQuery = {
-        query: `mutation { call(input: { id: "${formData.id}" }, payload: ${JSON.stringify(payload)}, credentials: ${JSON.stringify(credentials)}) { data } }`
-      }
-      const command = `curl -X POST "${superglueConfig.superglueEndpoint}/graphql" \\
-    -H "Content-Type: application/json" \\
-    -H "Authorization: Bearer ${superglueConfig.superglueApiKey}" \\
-    -d '${JSON.stringify(graphqlQuery)}'`
-      
-      return command
+    let payload = {}
+    try {
+      payload = JSON.parse(formData.inputPayload)
+    } catch (e) {
+      console.warn('Invalid input payload JSON')
     }
 
-  const getSdkCode = () => {
-      const credentials = parseCredentialsHelper(formData.auth.value, JSON.parse(formData.auth.advancedConfig))
-      return `npm install @superglue/client
-  
-  // in your app:
-  import { SuperglueClient } from "@superglue/client";
-  const superglue = new SuperglueClient({
-    apiKey: "${superglueConfig.superglueApiKey}"
-  });
-  
-  // Transform any API response with a single call
-  const result = await superglue.call({ 
-    id: "${formData.id}",
-    payload: ${formData.inputPayload},
-    credentials: ${JSON.stringify(credentials)}
-  })`
+    console.log(formData.headers)
+    const credentials = parseCredentialsHelper(formData.headers)
+    console.log(credentials)
+
+    const graphqlQuery = {
+      query: `mutation CallApi($payload: JSON!, $credentials: JSON!) { 
+  call(input: { id: "${formData.id}" }, payload: $payload, credentials: $credentials) { 
+    data 
+  } 
+}`,
+      variables: {
+        payload,
+        credentials
+      }
     }
+    
+    const command = `curl -X POST "${superglueConfig.superglueEndpoint}/graphql" \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer ${superglueConfig.superglueApiKey}" \\
+  -d '${JSON.stringify(graphqlQuery)}'`
+    
+    return command
+  }
+
+  const getSdkCode = () => {
+    const credentials = parseCredentialsHelper(formData.headers)
+
+    return `npm install @superglue/client
+
+// in your app:
+import { SuperglueClient } from "@superglue/client";
+const superglue = new SuperglueClient({
+  apiKey: "${superglueConfig.superglueApiKey}"
+});
+
+// Transform any API response with a single call
+const result = await superglue.call({ 
+  id: "${formData.id}",
+  payload: ${formData.inputPayload},
+  credentials: ${JSON.stringify(credentials)}
+})`
+  }
   
   React.useEffect(() => {
     if (editingId && !searchParamsChecked) {
@@ -233,6 +246,7 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
         apiKey: superglueConfig.superglueApiKey
       })
       const data = await superglueClient.getApi(editingId);
+      console.log(data)
       setFormData({
         id: data.id,
         urlHost: data.urlHost,
@@ -240,13 +254,14 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
         urlPath: data.urlPath || '',
         method: data.method || 'auto',
         queryParams: JSON.stringify(data.queryParams || {}, null, 2),
-        headers: Array.isArray(data.headers) ? data.headers.join('\n') : '',
+        headers: (typeof data.headers == "object") ? data.headers.Bearer : '',
         body: data.body || '',
         documentationUrl: data.documentationUrl || '',
         responseSchema: JSON.stringify(data.responseSchema || {}, null, 2),
         responseMapping: data.responseMapping || '',
         dataPath: data.dataPath || '',
         authentication: data.authentication || 'auto',
+        inputPayload: data.inputPayload || '{}',
         paginationType: data.pagination?.type || 'auto',
         pageSize: String(data.pagination?.pageSize || "")
       });
@@ -268,6 +283,7 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
       dataPath: formData.dataPath,
       method: formData.method !== "auto" ? formData.method as HttpMethod : undefined,
       authentication: formData.authentication !== "auto" ? formData.authentication as AuthType : undefined,
+      inputPayload: formData.inputPayload,
       responseSchema: isJsonEmpty(formData.responseSchema) ? undefined : JSON.parse(formData.responseSchema),
       responseMapping: formData.responseMapping ? String(formData.responseMapping) : undefined,
       documentationUrl: formData.documentationUrl,
@@ -339,9 +355,11 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
           responseMapping: config.responseMapping || '',
           dataPath: config.dataPath || '',
           authentication: config.authentication || 'auto',
+          inputPayload: config.inputPayload || '',
           paginationType: config.pagination?.type || 'auto',
           pageSize: String(config.pagination?.pageSize || '')
         });
+        console.log(formData.headers)
       }
       
       setIsAutofillDialogOpen(false);
@@ -720,26 +738,28 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
                 </TabsContent>
 
                 <TabsContent value="sdk">
-                <p className="text-sm font-medium">When you call your superglue API, the call is directly proxied to the targeted endpoint without any AI inbewteen. Thus, API calls remain predicable and fast with ms latency. We provide a TypeScript client SDK for easy integration in your application.</p>
+                <p className="text-sm font-medium">You can now call the endpoint from your app. The call is proxied to the targeted endpoint without AI inbewteen. Predictable and millisecond latency.</p>
               <div className="rounded-md bg-muted p-4">
                 <div className="flex items-start space-x-2">
                   <Terminal className="mt-0.5 h-5 w-5 text-muted-foreground" />
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">Try the endpoint locally with curl: </p>
-                    <div className="relative flex items-start gap-2">
-                      <pre className="flex-1 rounded-lg bg-secondary p-4 text-sm">
-                        <code>{}</code>
-                      </pre>
+                  <div className="space-y-1 w-full">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">Try the endpoint locally with curl: </p>
                       <Button
                         variant="ghost" 
                         size="icon"
-                        className="h-8 w-8 flex-none mt-2"
+                        className="h-8 w-8 flex-none"
                         onClick={() => {
-                          //navigator.clipboard.writeText(getCurlCommand());
+                          navigator.clipboard.writeText(getCurlCommand());
                         }}
                       >
                         <Copy className="h-4 w-4" />
                       </Button>
+                    </div>
+                    <div className="relative">
+                      <pre className="rounded-lg bg-secondary p-4 text-sm overflow-x-auto">
+                        <code>{getCurlCommand()}</code>
+                      </pre>
                     </div>
                   </div>
                 </div>
@@ -748,22 +768,24 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
               <div className="rounded-md bg-muted p-4">
                 <div className="flex items-start space-x-2">
                   <Terminal className="mt-0.5 h-5 w-5 text-muted-foreground" />
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">Or use the TypeScript SDK in your application: </p>
-                    <div className="relative flex items-start gap-2">
-                      <pre className="flex-1 rounded-lg bg-secondary p-4 text-sm">
-                        <code>{}</code>
-                      </pre>
+                  <div className="space-y-1 w-full">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">Or use the TypeScript SDK in your application: </p>
                       <Button
                         variant="ghost" 
                         size="icon"
                         className="h-8 w-8 flex-none"
                         onClick={() => {
-                          //navigator.clipboard.writeText(getSdkCode());
+                          navigator.clipboard.writeText(getSdkCode());
                         }}
                       >
                         <Copy className="h-4 w-4" />
                       </Button>
+                    </div>
+                    <div className="relative">
+                      <pre className="rounded-lg bg-secondary p-4 text-sm overflow-x-auto">
+                        <code>{getSdkCode()}</code>
+                      </pre>
                     </div>
                   </div>
                 </div>

@@ -282,6 +282,7 @@ Documentation: ${String(documentation).slice(0, 80000)}`
       headers: generatedConfig.headers,
       body: generatedConfig.body,
       authentication: generatedConfig.authentication,
+      inputPayload: generatedConfig.inputPayload,
       pagination: apiConfig.pagination || generatedConfig.pagination,
       dataPath: apiConfig.dataPath || generatedConfig.dataPath,
       documentationUrl: apiConfig.documentationUrl,
