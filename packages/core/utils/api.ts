@@ -317,6 +317,7 @@ Documentation: ${String(documentation)}`
       headers: generatedConfig.headers,
       body: generatedConfig.body,
       authentication: generatedConfig.authentication,
+      inputPayload: generatedConfig.inputPayload,
       pagination: apiConfig.pagination || generatedConfig.pagination,
       dataPath: apiConfig.dataPath || generatedConfig.dataPath,
       documentationUrl: apiConfig.documentationUrl,

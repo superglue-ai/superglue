@@ -54,8 +54,9 @@ import {
 import { useToast } from "@/src/hooks/use-toast";
 import { isJsonEmpty } from '@/src/lib/client-utils';
 import { ApiConfig, ApiInput, AuthType, CacheMode, HttpMethod, PaginationType, SuperglueClient } from '@superglue/client';
-import { ArrowLeft, Info } from 'lucide-react';
+import { ArrowLeft, Info, Terminal, Copy } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { parseCredentialsHelper } from './config-stepper/Helpers'
 import React from 'react';
 
 const HTTP_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'];
@@ -94,6 +95,7 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
     responseMapping: '',
     dataPath: '',
     authentication: 'auto',
+    inputPayload: '', 
     paginationType: 'auto',
     pageSize: ''
   });
@@ -109,6 +111,56 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
   const [showUnsavedChangesDialog, setShowUnsavedChangesDialog] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState("basic");
 
+  
+  const getCurlCommand = () => {
+    let payload = {}
+    try {
+      payload = JSON.parse(formData.inputPayload)
+    } catch (e) {
+      console.warn('Invalid input payload JSON')
+    }
+
+    const credentials = parseCredentialsHelper(formData.headers)
+
+    const graphqlQuery = {
+      query: `mutation CallApi($payload: JSON!, $credentials: JSON!) { 
+  call(input: { id: "${formData.id}" }, payload: $payload, credentials: $credentials) { 
+    data 
+  } 
+}`,
+      variables: {
+        payload,
+        credentials
+      }
+    }
+    
+    const command = `curl -X POST "${superglueConfig.superglueEndpoint}/graphql" \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer ${superglueConfig.superglueApiKey}" \\
+  -d '${JSON.stringify(graphqlQuery)}'`
+    
+    return command
+  }
+
+  const getSdkCode = () => {
+    const credentials = parseCredentialsHelper(formData.headers)
+
+    return `npm install @superglue/client
+
+// in your app:
+import { SuperglueClient } from "@superglue/client";
+const superglue = new SuperglueClient({
+  apiKey: "${superglueConfig.superglueApiKey}"
+});
+
+// Transform any API response with a single call
+const result = await superglue.call({ 
+  id: "${formData.id}",
+  payload: ${formData.inputPayload},
+  credentials: ${JSON.stringify(credentials)}
+})`
+  }
+  
   React.useEffect(() => {
     if (editingId && !searchParamsChecked) {
       fetchConfig();
@@ -199,13 +251,14 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
         urlPath: data.urlPath || '',
         method: data.method || 'auto',
         queryParams: JSON.stringify(data.queryParams || {}, null, 2),
-        headers: Array.isArray(data.headers) ? data.headers.join('\n') : '',
+        headers: (typeof data.headers == "object") ? data.headers.Bearer : '',
         body: data.body || '',
         documentationUrl: data.documentationUrl || '',
         responseSchema: JSON.stringify(data.responseSchema || {}, null, 2),
         responseMapping: data.responseMapping || '',
         dataPath: data.dataPath || '',
         authentication: data.authentication || 'auto',
+        inputPayload: data.inputPayload || '{}',
         paginationType: data.pagination?.type || 'auto',
         pageSize: String(data.pagination?.pageSize || "")
       });
@@ -227,6 +280,7 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
       dataPath: formData.dataPath,
       method: formData.method !== "auto" ? formData.method as HttpMethod : undefined,
       authentication: formData.authentication !== "auto" ? formData.authentication as AuthType : undefined,
+      inputPayload: formData.inputPayload,
       responseSchema: isJsonEmpty(formData.responseSchema) ? undefined : JSON.parse(formData.responseSchema),
       responseMapping: formData.responseMapping ? String(formData.responseMapping) : undefined,
       documentationUrl: formData.documentationUrl,
@@ -298,6 +352,7 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
           responseMapping: config.responseMapping || '',
           dataPath: config.dataPath || '',
           authentication: config.authentication || 'auto',
+          inputPayload: config.inputPayload || '',
           paginationType: config.pagination?.type || 'auto',
           pageSize: String(config.pagination?.pageSize || '')
         });
@@ -387,6 +442,7 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
                 <TabsTrigger value="request">Request</TabsTrigger>
                 <TabsTrigger value="responseMapping">Response Mapping</TabsTrigger>
                 <TabsTrigger value="advanced">Advanced</TabsTrigger>
+                <TabsTrigger value="sdk">SDK Integration</TabsTrigger>
                 {editingId && (
                   <TabsTrigger value="test">
                     Run
@@ -675,6 +731,61 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
                       </div>
                     </div>
                   </div>
+                </TabsContent>
+
+                <TabsContent value="sdk">
+                <p className="text-sm font-medium">You can now call the endpoint from your app. The call is proxied to the targeted endpoint without AI inbewteen. Predictable and millisecond latency.</p>
+              <div className="rounded-md bg-muted p-4">
+                <div className="flex items-start space-x-2">
+                  <Terminal className="mt-0.5 h-5 w-5 text-muted-foreground" />
+                  <div className="space-y-1 w-full">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">Try the endpoint locally with curl: </p>
+                      <Button
+                        variant="ghost" 
+                        size="icon"
+                        className="h-8 w-8 flex-none"
+                        onClick={() => {
+                          navigator.clipboard.writeText(getCurlCommand());
+                        }}
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="relative">
+                      <pre className="rounded-lg bg-secondary p-4 text-sm overflow-x-auto">
+                        <code>{getCurlCommand()}</code>
+                      </pre>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="rounded-md bg-muted p-4">
+                <div className="flex items-start space-x-2">
+                  <Terminal className="mt-0.5 h-5 w-5 text-muted-foreground" />
+                  <div className="space-y-1 w-full">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">Or use the TypeScript SDK in your application: </p>
+                      <Button
+                        variant="ghost" 
+                        size="icon"
+                        className="h-8 w-8 flex-none"
+                        onClick={() => {
+                          navigator.clipboard.writeText(getSdkCode());
+                        }}
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="relative">
+                      <pre className="rounded-lg bg-secondary p-4 text-sm overflow-x-auto">
+                        <code>{getSdkCode()}</code>
+                      </pre>
+                    </div>
+                  </div>
+                </div>
+              </div>
                 </TabsContent>
 
                 {editingId && (
