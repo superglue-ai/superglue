@@ -120,9 +120,7 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
       console.warn('Invalid input payload JSON')
     }
 
-    console.log(formData.headers)
     const credentials = parseCredentialsHelper(formData.headers)
-    console.log(credentials)
 
     const graphqlQuery = {
       query: `mutation CallApi($payload: JSON!, $credentials: JSON!) { 
@@ -246,7 +244,6 @@ const result = await superglue.call({
         apiKey: superglueConfig.superglueApiKey
       })
       const data = await superglueClient.getApi(editingId);
-      console.log(data)
       setFormData({
         id: data.id,
         urlHost: data.urlHost,
@@ -359,7 +356,6 @@ const result = await superglue.call({
           paginationType: config.pagination?.type || 'auto',
           pageSize: String(config.pagination?.pageSize || '')
         });
-        console.log(formData.headers)
       }
       
       setIsAutofillDialogOpen(false);

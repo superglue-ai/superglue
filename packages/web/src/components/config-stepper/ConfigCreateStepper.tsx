@@ -239,8 +239,6 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
           throw new Error('Failed to save configuration')
         }
 
-        console.log(formData.auth.value)
-        console.log(formData.inputPayload)
 
         // TODO: show some notification to the user that something has been saved
         // toast({
@@ -290,9 +288,7 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
       console.warn('Invalid input payload JSON')
     }
 
-    console.log(formData.auth.value)
     const credentials = parseCredentialsHelper(formData.auth.value)
-    console.log(credentials)
 
     const graphqlQuery = {
       query: `mutation CallApi($payload: JSON!, $credentials: JSON!) { 
