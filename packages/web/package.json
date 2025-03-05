@@ -10,6 +10,7 @@
     },
     "dependencies": {
         "@apollo/client": "^3.13.1",
+        "@monaco-editor/react": "^4.7.0",
         "@radix-ui/react-accordion": "^1.2.3",
         "@radix-ui/react-alert-dialog": "^1.1.6",
         "@radix-ui/react-dialog": "^1.1.5",
@@ -32,6 +33,7 @@
         "posthog-js": "^1.224.0",
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
+        "react-json-editor-ajrm": "^2.5.14",
         "react-virtualized": "^9.22.6",
         "shadcn-ui": "^0.9.5",
         "tailwind-merge": "^2.6.0",
