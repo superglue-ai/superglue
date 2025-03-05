@@ -28,6 +28,11 @@ export const callResolver = async (
   const readCache = options ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.READONLY : true;
   const writeCache = options ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.WRITEONLY : true;
 
+  // Check if response schema is zod and throw an error if it is
+  if((input.endpoint?.responseSchema as any)?._def?.typeName === "ZodObject") {
+    throw new Error("zod is not supported for response schema. Please use json schema instead. you can use the zod-to-json-schema package to convert zod to json schema.");
+  }
+
   try {
     // Resolve endpoint configuration from cache or prepare new one
     let response: any;
