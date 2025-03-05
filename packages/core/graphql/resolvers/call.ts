@@ -108,8 +108,9 @@ export const callResolver = async (
       completedAt: new Date(),
     };
     context.datastore.createRun(result, context.orgId);
+    const distinctId = context.orgId ? context.orgId : "self-hosted-instance-dummy-id";
     telemetryClient?.capture({
-      distinctId: context.orgId,
+      distinctId: distinctId,
       event: 'api_call_success',
       properties: {
         success: true,
@@ -138,7 +139,8 @@ export const callResolver = async (
       startedAt,
       completedAt: new Date(),
     };
-    telemetryClient?.captureException(maskedError, context.orgId, {
+    const distinctId = context.orgId ? context.orgId : "self-hosted-instance-dummy-id";
+    telemetryClient?.captureException(maskedError, distinctId, {
       event: 'api_call_failed',
       success: false,
       endpointHost: preparedEndpoint.urlHost,
