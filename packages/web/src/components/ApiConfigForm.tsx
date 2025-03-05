@@ -101,7 +101,6 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
   const [isAutofilling, setIsAutofilling] = React.useState(false);
   const [editingId, setEditingId] = React.useState(id);
   const [isAutofillDialogOpen, setIsAutofillDialogOpen] = React.useState(false);
-  const [autofillPayload, setAutofillPayload] = React.useState("{}");
   const [autofillCredentials, setAutofillCredentials] = React.useState("{}");
   const [isEditingIdModalOpen, setIsEditingIdModalOpen] = React.useState(false);
   const superglueConfig = useConfig();
@@ -250,11 +249,9 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
     setIsAutofilling(true);
     
     try {
-      let parsedPayload = {};
       let parsedCredentials = {};
       
       try {
-        parsedPayload = JSON.parse(autofillPayload);
         parsedCredentials = JSON.parse(autofillCredentials);
       } catch (e) {
         toast({
@@ -271,7 +268,6 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
 
       const response = await superglueClient.call({
         endpoint: buildEndpointConfig(formData),
-        payload: parsedPayload,
         credentials: parsedCredentials,
         options: {
           cacheMode: CacheMode.DISABLED
@@ -760,18 +756,6 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
                 placeholder="https://docs.example.com"
               />
             </div>
-            <div>
-              <Label htmlFor="autofillPayload">Payload (JSON)</Label>
-              <Textarea
-                id="autofillPayload"
-                className="font-mono"
-                value={autofillPayload}
-                onChange={(e) => setAutofillPayload(e.target.value)}
-                placeholder="{}"
-                rows={6}
-              />
-            </div>
-
             <div>
               <Label htmlFor="autofillCredentials">Credentials (JSON)</Label>
               <Textarea
