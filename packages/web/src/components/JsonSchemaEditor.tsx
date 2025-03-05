@@ -19,6 +19,8 @@ import {
 import { cn } from "@/src/lib/utils";
 import { ListPlus, Plus, Trash2 } from "lucide-react";
 import React from 'react';
+import JSONInput from 'react-json-editor-ajrm';
+import locale from 'react-json-editor-ajrm/locale/en';
 
 interface JsonSchemaEditorProps {
   value: string;
@@ -411,12 +413,32 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
 
       <div className="flex-1 min-h-0 border rounded-md overflow-hidden">
         {isCodeMode ? (
-          <Textarea
-            id="responseSchema"
+          <JSONInput
+            placeholder={visualSchema}
             value={value}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder="{}"
-            className="font-mono border-0 h-full text-xs sm:text-sm"
+            locale={locale}
+            theme="light_mitsuketa_tribute"
+            height="100%"
+            width="100%"
+            onBlur={(data: any) => {
+              if (data.jsObject) {
+                onChange(JSON.stringify(data.jsObject, null, 2));
+              }
+            }}
+            style={{
+              body: {
+                fontSize: '12px',
+                backgroundColor: 'hsl(var(--card))',
+                color: 'hsl(var(--card-foreground))'
+              },
+              outerBox: {
+                border: 'none',
+                borderRadius: 'var(--radius)'
+              },
+              container: {
+                backgroundColor: 'hsl(var(--card))'
+              }
+            }}
           />
         ) : (
           <div className="h-full flex flex-col min-h-0">
