@@ -224,7 +224,7 @@ export function replaceVariables(template: string, variables: Record<string, any
   const variableNames = Object.keys(variables);
   const pattern = new RegExp(`\\{(${variableNames.join('|')})(?:\\.(\\w+))*\\}`, 'g');
   
-  return template.replace(pattern, (match, path) => {
+  return String(template).replace(pattern, (match, path) => {
     const parts = path.split('.');
     let value = variables;
     
