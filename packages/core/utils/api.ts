@@ -213,7 +213,7 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
         const cursorParts = (endpoint.pagination?.cursorPath || 'next_cursor').split('.');
         let nextCursor = response.data;
         for (const part of cursorParts) {
-          nextCursor = nextCursor?.[part] ?? nextCursor;
+          nextCursor = nextCursor?.[part];
         }
         cursor = nextCursor;
         if(!cursor) {
@@ -223,7 +223,7 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
     loopCounter++;
   }
 
-  if(cursor) {
+  if(endpoint.pagination?.type === PaginationType.CURSOR_BASED) {
     return {
       data: {
         results: allResults,
