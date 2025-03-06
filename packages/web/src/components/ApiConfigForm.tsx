@@ -57,6 +57,9 @@ import { ApiConfig, ApiInput, AuthType, CacheMode, HttpMethod, PaginationType, S
 import { ArrowLeft, Info } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import React from 'react';
+import Editor from 'react-simple-code-editor';
+import Prism from 'prismjs';
+import 'prismjs/components/prism-json';
 
 const HTTP_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'];
 const AUTH_TYPES = ['NONE', 'HEADER', 'QUERY_PARAM', 'OAUTH2'];
@@ -74,6 +77,15 @@ const InfoTooltip = ({ text }: { text: string }) => (
     </Tooltip>
   </TooltipProvider>
 );
+
+const highlightJson = (code: string) => {
+  try {
+    const formatted = JSON.stringify(JSON.parse(code), null, 2);
+    return Prism.highlight(formatted, Prism.languages.json, 'json');
+  } catch {
+    return code;
+  }
+};
 
 const ApiConfigForm = ({ id }: { id?: string }) => {
   const router = useRouter();
@@ -124,6 +136,36 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
       });
       return;
     }
+
+    // Add JSON validation for headers and query parameters
+    try {
+      if (formData.headers && formData.headers.trim()) {
+        JSON.parse(formData.headers);
+      }
+    } catch (error) {
+      toast({
+        title: "Invalid Headers JSON",
+        description: "Please check your headers format",
+        variant: "destructive",
+      });
+      setActiveTab("request");
+      return;
+    }
+
+    try {
+      if (formData.queryParams && formData.queryParams.trim()) {
+        JSON.parse(formData.queryParams);
+      }
+    } catch (error) {
+      toast({
+        title: "Invalid Query Parameters JSON",
+        description: "Please check your query parameters format",
+        variant: "destructive",
+      });
+      setActiveTab("request");
+      return;
+    }
+
     if(!formData.id) {
       formData.id = formData.urlHost
         .replace(/^https?:\/\//, '')  // Remove http:// or https://
@@ -151,6 +193,9 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
       }
       setHasUnsavedChanges(false);
       router.push(`/configs/${response.id}/edit`);
+    
+      // Add refetch after successful save
+      await fetchConfig();
     
       toast({
         title: "Configuration Saved",
@@ -198,7 +243,7 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
         urlPath: data.urlPath || '',
         method: data.method || 'auto',
         queryParams: JSON.stringify(data.queryParams || {}, null, 2),
-        headers: Array.isArray(data.headers) ? data.headers.join('\n') : '',
+        headers: JSON.stringify(data.headers || {}, null, 2),
         body: data.body || '',
         documentationUrl: data.documentationUrl || '',
         responseSchema: JSON.stringify(data.responseSchema || {}, null, 2),
@@ -220,19 +265,19 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
       urlHost: formData.urlHost,
       instruction: formData.instruction,
       urlPath: formData.urlPath,
-      headers: isJsonEmpty(formData.headers) ? undefined : JSON.parse(formData.headers),
-      queryParams: isJsonEmpty(formData.queryParams) ? undefined : JSON.parse(formData.queryParams),
+      headers: isJsonEmpty(formData.headers) ? null : JSON.parse(formData.headers),
+      queryParams: isJsonEmpty(formData.queryParams) ? null : JSON.parse(formData.queryParams),
       body: formData.body,
       dataPath: formData.dataPath,
-      method: formData.method !== "auto" ? formData.method as HttpMethod : undefined,
-      authentication: formData.authentication !== "auto" ? formData.authentication as AuthType : undefined,
-      responseSchema: isJsonEmpty(formData.responseSchema) ? undefined : JSON.parse(formData.responseSchema),
-      responseMapping: formData.responseMapping ? String(formData.responseMapping) : undefined,
+      method: formData.method !== "auto" ? formData.method as HttpMethod : null,
+      authentication: formData.authentication !== "auto" ? formData.authentication as AuthType : null,
+      responseSchema: isJsonEmpty(formData.responseSchema) ? null : JSON.parse(formData.responseSchema),
+      responseMapping: formData.responseMapping ? String(formData.responseMapping) : null,
       documentationUrl: formData.documentationUrl,
       pagination: formData.paginationType !== "auto" ? {
         type: formData.paginationType as PaginationType,
         pageSize: parseInt(formData.pageSize) || null
-      } : undefined
+      } : null
     };
     return config;
   };
@@ -516,13 +561,20 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
                         Headers (JSON)
                         <InfoTooltip text="Request headers in JSON format. Each key-value pair represents a header name and its value." />
                       </Label>
-                      <Textarea
-                        id="headers"
-                        value={formData.headers}
-                        onChange={handleChange('headers')}
-                        placeholder='{\n"Content-Type": "application/json"\n}'
-                        className="h-32 font-mono"
-                      />
+                      <div className="relative font-mono border rounded-md">
+                        <Editor
+                          value={formData.headers}
+                          onValueChange={handleChange('headers')}
+                          highlight={highlightJson}
+                          padding={10}
+                          tabSize={2}
+                          insertSpaces={true}
+                          className="min-h-[8rem] text-sm [&_textarea]:outline-none [&_textarea]:w-full [&_textarea]:resize-none [&_textarea]:p-0 [&_textarea]:border-0 [&_textarea]:bg-transparent dark:[&_textarea]:text-white"
+                          style={{
+                            fontFamily: 'var(--font-mono)',
+                          }}
+                        />
+                      </div>
                     </div>
 
                     <div>
@@ -530,13 +582,20 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
                         Query Parameters (JSON)
                         <InfoTooltip text="URL query parameters in JSON format. These will be appended to the URL as ?key=value pairs." />
                       </Label>
-                      <Textarea
-                        id="queryParams"
-                        value={formData.queryParams}
-                        onChange={handleChange('queryParams')}
-                        placeholder="{}"
-                        className="h-32 font-mono"
-                      />
+                      <div className="relative font-mono border rounded-md">
+                        <Editor
+                          value={formData.queryParams}
+                          onValueChange={handleChange('queryParams')}
+                          highlight={highlightJson}
+                          padding={10}
+                          tabSize={2}
+                          insertSpaces={true}
+                          className="min-h-[8rem] text-sm [&_textarea]:outline-none [&_textarea]:w-full [&_textarea]:resize-none [&_textarea]:p-0 [&_textarea]:border-0 [&_textarea]:bg-transparent dark:[&_textarea]:text-white"
+                          style={{
+                            fontFamily: 'var(--font-mono)',
+                          }}
+                        />
+                      </div>
                     </div>
 
                     <div>
