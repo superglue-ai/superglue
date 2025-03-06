@@ -223,6 +223,15 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
     loopCounter++;
   }
 
+  if(cursor) {
+    return {
+      data: {
+        results: allResults,
+        next_cursor: cursor
+      }
+    };
+  }
+
   return {
     data: allResults?.length == 1 ? allResults[0] : allResults
   };
