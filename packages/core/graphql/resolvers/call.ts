@@ -113,7 +113,6 @@ export const callResolver = async (
       completedAt: new Date(),
     };
     context.datastore.createRun(result, context.orgId);
-  
     return {...result, data: transformedResponse.data};
   } catch (error) {
     const maskedError = maskCredentials(error.message, credentials);
@@ -129,11 +128,6 @@ export const callResolver = async (
       startedAt,
       completedAt: new Date(),
     };
-    telemetryClient?.captureException(maskedError, context.orgId, {
-      preparedEndpoint: preparedEndpoint,
-      messages: messages,
-      result: result
-    });
     context.datastore.createRun(result, context.orgId);
     return result;
   }
