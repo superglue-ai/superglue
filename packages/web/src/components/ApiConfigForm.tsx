@@ -63,7 +63,7 @@ import 'prismjs/components/prism-json';
 
 const HTTP_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'];
 const AUTH_TYPES = ['NONE', 'HEADER', 'QUERY_PARAM', 'OAUTH2'];
-const PAGINATION_TYPES = ['OFFSET_BASED', 'PAGE_BASED', 'DISABLED'];
+const PAGINATION_TYPES = ['OFFSET_BASED', 'PAGE_BASED', 'CURSOR_BASED', 'DISABLED'];
 
 const InfoTooltip = ({ text }: { text: string }) => (
   <TooltipProvider delayDuration={100}>
