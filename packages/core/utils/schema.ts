@@ -19,7 +19,9 @@ export async function generateSchema(instruction: string, responseData: string) 
 
   while (retryCount <= MAX_RETRIES) {
     try {
-      return await attemptSchemaGeneration(messages, retryCount);
+      const schema = await attemptSchemaGeneration(messages, retryCount);
+      console.log(`Schema generated`);
+      return schema;
     } catch (error) {
       retryCount++;
       if (retryCount > MAX_RETRIES) {
@@ -41,7 +43,7 @@ async function attemptSchemaGeneration(
   messages: ChatCompletionMessageParam[],
   retry: number
 ): Promise<string> {
-  console.log(`Generating schema: ${retry ? `(retry ${retry})` : ""}`);
+  console.log(`Generating schema${retry ? `: (retry ${retry})` : ""}`);
   const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
     baseURL: process.env.OPENAI_API_BASE_URL
@@ -72,6 +74,7 @@ async function attemptSchemaGeneration(
     throw new Error("No schema generated");
   }
   const validator = new Validator();
-  const validation = validator.validate({}, generatedSchema);
+  validator.validate({}, generatedSchema);
+
   return generatedSchema;
 }
