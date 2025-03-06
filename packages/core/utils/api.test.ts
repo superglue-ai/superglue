@@ -1,11 +1,11 @@
 import { ApiConfig, ApiInput, AuthType, HttpMethod, PaginationType } from '@superglue/shared';
-import OpenAI from 'openai';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mocked } from 'vitest';
 import { callEndpoint, prepareEndpoint } from './api.js';
 import * as tools from './tools.js';
+import LLMClient from './llm.js';
 
 vi.mock('axios');
-vi.mock('openai');
+vi.mock('./llm.js');
 vi.mock('./tools.js', async () => {
     const actual = await vi.importActual('./tools.js');
     return {
@@ -13,13 +13,22 @@ vi.mock('./tools.js', async () => {
         callAxios: vi.fn()
     };
 });
+
+// Create mock implementation
+const mockGetText = vi.fn();
+const mockGetObject = vi.fn();
+
+// Set up the mock implementation
+vi.mocked(LLMClient).getInstance = vi.fn(() => ({
+  getText: mockGetText,
+  getObject: mockGetObject
+}));
+
 const mockedTools = tools as Mocked<typeof tools>;
 
 describe('API Utilities', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.OPENAI_API_KEY = 'test-key';
-    process.env.OPENAI_MODEL = 'test-model';
   });
 
   afterEach(() => {
@@ -35,27 +44,14 @@ describe('API Utilities', () => {
     };
 
     beforeEach(() => {
-      // Mock OpenAI response with all required fields
-      const mockOpenAIResponse = {
-        choices: [{
-          message: {
-            content: JSON.stringify({
-              urlHost: 'https://api.example.com',
-              urlPath: 'v1/test',
-              method: HttpMethod.GET,
-              authentication: AuthType.NONE,
-              headers: { 'Content-Type': 'application/json' }
-            })
-          }
-        }]
-      };
-
-      // Setup OpenAI mock properly
-      (OpenAI as any).prototype.chat = {
-        completions: {
-          create: vi.fn().mockResolvedValue(mockOpenAIResponse)
-        }
-      };
+      // Mock LLMClient response
+      mockGetObject.mockResolvedValueOnce({
+        urlHost: 'https://api.example.com',
+        urlPath: 'v1/test',
+        method: HttpMethod.GET,
+        authentication: AuthType.NONE,
+        headers: { 'Content-Type': 'application/json' }
+      });
 
       // Mock the documentation fetch
       vi.spyOn(global.crypto, 'randomUUID').mockReturnValue('test-uuid-1232-2532-3233');
@@ -78,12 +74,9 @@ describe('API Utilities', () => {
       expect(result.messages).toBeInstanceOf(Array);
       expect(result.messages).toHaveLength(3); // system, user, and assistant messages
 
-      // Verify OpenAI was called correctly
-      expect((OpenAI as any).prototype.chat.completions.create).toHaveBeenCalledWith(
+      // Verify LLMClient was called correctly
+      expect(mockGetObject).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'test-model',
-          temperature: 0,
-          response_format: expect.any(Object),
           messages: expect.arrayContaining([
             expect.objectContaining({ role: 'system' }),
             expect.objectContaining({ role: 'user' })

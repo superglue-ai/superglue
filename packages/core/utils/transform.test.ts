@@ -4,21 +4,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyJsonataWithValidation } from './tools.js';
 import { generateMapping, prepareTransform } from './transform.js';
 
-// Define mockOpenAI at the top level
-const mockOpenAI = {
-  chat: {
-    completions: {
-      create: vi.fn()
-    }
-  }
+const mockLLMClient = {
+  getObject: vi.fn()
 };
-vi.mock('openai', () => ({
-    default: class {
-      constructor() {
-        return mockOpenAI;
-      }
-    }
-  }));          
+
+vi.mock('./llm.js', () => ({
+  default: {
+    getInstance: vi.fn(() => mockLLMClient)
+  }
+}));
 
 describe('transform utils', () => {  
   beforeEach(() => {
@@ -26,7 +20,7 @@ describe('transform utils', () => {
     vi.clearAllMocks();
     dotenv.config();
     // Reset the mock implementation
-    mockOpenAI.chat.completions.create.mockReset();
+    mockLLMClient.getObject.mockReset();
   });
 
   describe('prepareTransform', () => {
@@ -97,22 +91,18 @@ describe('transform utils', () => {
       expect(result?.updatedAt).toBeInstanceOf(Date);
     });
 
-    
     it('should generate new mapping if no responseMapping is provided', async () => {
-        let mockDataStore = {
-            getTransformConfigFromRequest: vi.fn(),
-          } as any;      
-          mockOpenAI.chat.completions.create.mockResolvedValueOnce({
-            choices: [{
-              message: {
-                content: JSON.stringify({
-                  jsonata: '{"name": user.firstName & " " & user.lastName}',
-                  confidence: 95,
-                  confidence_reasoning: 'Direct field mapping available'
-                })
-              }
-            }]
-          });    
+      let mockDataStore = {
+        getTransformConfigFromRequest: vi.fn(),
+      } as any;
+
+      // Mock the response of getObject
+      mockLLMClient.getObject.mockResolvedValueOnce({
+        jsonata: '{"name": user.firstName & " " & user.lastName}',
+        confidence: 95,
+        confidence_reasoning: 'Direct field mapping available'
+      });
+
       const transform = await prepareTransform(mockDataStore, false, sampleInput, samplePayload, testOrgId);
       const result = await applyJsonataWithValidation(samplePayload, transform.responseMapping, sampleInput.responseSchema);
       expect(result).toMatchObject({
@@ -131,7 +121,7 @@ describe('transform utils', () => {
       // Reset modules to ensure clean mocks
       vi.resetModules();
 
-      mockOpenAI.chat.completions.create.mockReset();
+      mockLLMClient.getObject.mockReset();
     });
 
     const sampleSchema = {
@@ -149,16 +139,11 @@ describe('transform utils', () => {
     };
 
     it('should generate mapping successfully', async () => {
-      mockOpenAI.chat.completions.create.mockResolvedValueOnce({
-        choices: [{
-          message: {
-            content: JSON.stringify({
-              jsonata: '{"name": user.firstName & " " & user.lastName}',
-              confidence: 95,
-              confidence_reasoning: 'Direct field mapping available'
-            })
-          }
-        }]
+      // Mock the response of getObject
+      mockLLMClient.getObject.mockResolvedValueOnce({
+        jsonata: '{"name": user.firstName & " " & user.lastName}',
+        confidence: 95,
+        confidence_reasoning: 'Direct field mapping available'
       });
 
       const mapping = await generateMapping(sampleSchema, samplePayload);
@@ -175,17 +160,11 @@ describe('transform utils', () => {
 
     it('should retry on failure', async () => {
       let attempts = 0;
-      mockOpenAI.chat.completions.create.mockRejectedValueOnce(attempts++ === 0 ? new Error('API Error') : null);
-      mockOpenAI.chat.completions.create.mockResolvedValueOnce({
-        choices: [{
-          message: {
-            content: JSON.stringify({
-              jsonata: '{"name": user.firstName & " " & user.lastName}',
-              confidence: 95,
-              confidence_reasoning: 'Direct field mapping available'
-            })
-          }
-        }]
+      mockLLMClient.getObject.mockRejectedValueOnce(attempts++ === 0 ? new Error('API Error') : null);
+      mockLLMClient.getObject.mockResolvedValueOnce({
+        jsonata: '{"name": user.firstName & " " & user.lastName}',
+        confidence: 95,
+        confidence_reasoning: 'Direct field mapping available'
       });
       const result = await generateMapping(sampleSchema, samplePayload);
       expect(result).toBeDefined();
@@ -193,7 +172,7 @@ describe('transform utils', () => {
     });
 
     it('should return null after max retries', async () => {
-      mockOpenAI.chat.completions.create.mockRejectedValue(new Error('API Error'));
+      mockLLMClient.getObject.mockRejectedValue(new Error('API Error'));
 
       const result = await generateMapping(sampleSchema, samplePayload);
       expect(result).toBeNull();
