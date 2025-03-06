@@ -1,11 +1,12 @@
-import OpenAI from "openai";
 import { PROMPT_MAPPING } from "./prompts.js";
 import {  applyJsonataWithValidation, getSchemaFromData, sample } from "./tools.js";
-import { ApiInput, DataStore, TransformConfig, TransformInput } from "@superglue/shared";
-import crypto from 'crypto';
+import { DataStore, TransformConfig, TransformInput } from "@superglue/shared";
 import { createHash } from "crypto";
-import { ChatCompletionMessageParam } from "openai/resources/chat/index.mjs";
 import toJsonSchema from "to-json-schema";
+import { z } from "zod";
+import { CoreMessage } from 'ai';
+import LLMClient from "./llm.js";
+
 
 export async function prepareTransform(
     datastore: DataStore,
@@ -68,28 +69,25 @@ export async function prepareTransform(
     return null;
   } 
 
-export async function generateMapping(schema: any, payload: any, instruction?: string, retry = 0, messages?: ChatCompletionMessageParam[]): Promise<{jsonata: string, confidence: number, confidence_reasoning: string} | null> {
+export async function generateMapping(schema: any, payload: any, instruction?: string, retry = 0, messages?: Array<CoreMessage>): Promise<{jsonata: string, confidence: number, confidence_reasoning: string} | null> {
   console.log("generating mapping" + (retry ? `, attempt ${retry} with temperature ${retry * 0.1}` : ""));
   try {
-    const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-      baseURL: process.env.OPENAI_API_BASE_URL,
-    });
+
     const userPrompt = 
-`Given a source data and structure, create a jsonata expression in JSON FORMAT.
+      `Given a source data and structure, create a jsonata expression in JSON FORMAT.
 
-Important: The output should be a jsonata expression creating an object that matches the following schema:
-${JSON.stringify(schema, null, 2)}
+      Important: The output should be a jsonata expression creating an object that matches the following schema:
+      ${JSON.stringify(schema, null, 2)}
 
-${instruction ? `The instruction from the user is: ${instruction}` : ''}
+      ${instruction ? `The instruction from the user is: ${instruction}` : ''}
 
-------
+      ------
 
-Source Data Structure:
-${JSON.stringify(toJsonSchema(payload, {required: true,arrays: {mode: 'first'}}), null, 2)}
+      Source Data Structure:
+      ${JSON.stringify(toJsonSchema(payload, {required: true,arrays: {mode: 'first'}}), null, 2)}
 
-Source data Sample:
-${JSON.stringify(sample(payload, 2), null, 2).slice(0,30000)}`
+      Source data Sample:
+      ${JSON.stringify(sample(payload, 2), null, 2).slice(0,30000)}`
 
     if(!messages) {
       messages = [
@@ -97,26 +95,19 @@ ${JSON.stringify(sample(payload, 2), null, 2).slice(0,30000)}`
         {role: "user", content: userPrompt}
       ]
     }
-    const temperature = String(process.env.OPENAI_MODEL).startsWith("o") ? undefined : Math.min(retry * 0.1, 1);
+    const temperature = Math.min(retry * 0.1, 1);
   
-    const reasoning = await openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL,
-      temperature,
-      messages,
-      response_format: {
-        type: "json_schema",
-        json_schema: {
-          name: "required_format",
-          schema: jsonataSchema,
-        }
-      },
+    const reasoning = await LLMClient.getInstance().getObject({
+      schema: zodSchema,
+      schemaName: "mapping_definition",
+      temperature:temperature,
+      messages:messages
     });
+        
+    messages.push({role: "assistant", content:  JSON.stringify(reasoning)});
 
-    const assistantResponse = String(reasoning.choices[0].message.content);
-    messages.push({role: "assistant", content: assistantResponse});
-    const content = JSON.parse(assistantResponse);
-    console.log("generated mapping", content?.jsonata);
-    const transformation = await applyJsonataWithValidation(payload, content.jsonata, schema);
+    console.log("generated mapping", reasoning?.jsonata);
+    const transformation = await applyJsonataWithValidation(payload, reasoning?.jsonata, schema);
 
     if(!transformation.success) {
       console.log("validation failed", String(transformation?.error).substring(0, 100));
@@ -125,7 +116,7 @@ ${JSON.stringify(sample(payload, 2), null, 2).slice(0,30000)}`
 
     console.log("validation succeeded");
     // Unwrap the data property
-    return content;
+    return reasoning;
 
   } catch (error) {
       if(retry < 5) {
@@ -138,28 +129,8 @@ ${JSON.stringify(sample(payload, 2), null, 2).slice(0,30000)}`
 }
 
 
-const jsonataSchema = {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "JSONata Expression Schema",
-  "description": "Schema for validating JSONata expressions",
-  "type": "object",
-  "properties": {
-    "jsonata": {
-      "type": "string",
-      "description": "JSONata expression"
-    },
-    "confidence": {
-      "type": "number",
-      "description": `Confidence score for the JSONata expression between 0 and 100. 
-      Give a low confidence score if there are missing fields in the source data. 
-      Give a low confidence score if there are multiple options for a field and it is unclear which one to choose.
-      `,
-    },
-    "confidence_reasoning": {
-      "type": "string",
-      "description": "Reasoning for the confidence score"
-    }
-  },
-  "required": ["jsonata", "confidence", "confidence_reasoning"],
-  "additionalProperties": false
-}
+const zodSchema = z.object({
+  jsonata: z.string().describe("JSONata expression"),
+  confidence: z.number().describe("Confidence score for the JSONata expression between 0 and 100. Give a low confidence score if there are missing fields in the source data. Give a low confidence score if there are multiple options for a field and it is unclear which one to choose."),
+  confidence_reasoning: z.string().describe("Reasoning for the confidence score"),
+}).strict();

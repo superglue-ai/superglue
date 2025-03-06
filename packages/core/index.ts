@@ -121,9 +121,9 @@ function getAuthErrorHTML(token: string | undefined) {
 
 function validateEnvironment() {
   const requiredEnvVars = [
-    'OPENAI_MODEL',
+    'LLM_PROVIDER',
+    'LLM_MODEL',
     'GRAPHQL_PORT',
-    'OPENAI_API_KEY'
   ];
   requiredEnvVars.forEach((envVar) => {
     if (!process.env[envVar]) {
