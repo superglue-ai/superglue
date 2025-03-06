@@ -11,7 +11,13 @@ Before you begin, ensure you have:
 
 - Docker (version 20.10.0 or higher)
 - Redis (version 6.0 or higher) for persistent storage
-- OpenAI API key with access to the recommended model
+- API key from one of the supported LLM providers:
+  - OpenAI
+  - Anthropic
+  - Google Gemini
+  - Mistral
+  - xAI
+  - DeepSeek
 - At least 2GB of RAM and 1 CPU core
 - Git (optional, for building from source)
 
@@ -84,10 +90,30 @@ REDIS_PORT=6379
 REDIS_USERNAME=default
 REDIS_PASSWORD=secret
 
-# OpenAI Configuration
-OPENAI_API_KEY=sk-...
-# OpenAI model to use. We recommend gpt-4o-2024-11-20
-OPENAI_MODEL=gpt-4o-2024-11-20
+# LLM Configuration
+# Choose your default provider and model
+LLM_PROVIDER=openai  # options: openai, google, anthropic, mistral, deepseek, xai
+LLM_MODEL=gpt-4-turbo  # see model options below
+
+# Schema Generation Configuration (optional, defaults to LLM_PROVIDER if not set)
+SCHEMA_GENERATION_PROVIDER=openai  # options: openai, google, anthropic, mistral, deepseek, xai
+SCHEMA_GENERATION_MODEL=gpt-4-turbo  # see model options below
+
+# Provider API Keys
+GOOGLE_GENERATIVE_AI_API_KEY=  # for Google Gemini
+OPENAI_API_KEY=                # for OpenAI
+ANTHROPIC_API_KEY=             # for Anthropic
+MISTRAL_API_KEY=               # for Mistral
+DEEPSEEK_API_KEY=              # for DeepSeek
+XAI_API_KEY=                   # for xAI
+
+# Available models per provider:
+# OpenAI: gpt-4-turbo, gpt-4-0125-preview, gpt-3.5-turbo, etc.
+# Google: gemini-pro, gemini-1.5-pro, etc.
+# Anthropic: claude-3-opus-20240229, claude-3-sonnet-20240229, etc.
+# Mistral: mistral-large-latest, mistral-small-latest, etc.
+# xAI: grok-1, grok-vision-beta, etc.
+# DeepSeek: deepseek-chat, deepseek-reasoner
 ```
 
 3. **Start the Services**

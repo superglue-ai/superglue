@@ -69,7 +69,14 @@ flowchart TB
 
 - **LLM Transform Engine**:
   - Converts data between different schemas and formats
-  - Uses OpenAI API to generate JSONata transformations
+  - Supports multiple LLM providers:
+    - OpenAI
+    - Anthropic
+    - Google Gemini
+    - Mistral
+    - xAI
+    - DeepSeek
+  - Uses LLMs to generate JSONata transformations
   - Caches successful transformations in Redis with 30-day TTL
   - Validates output against JSON Schema before returning
   - Handles nested object/array transformations up to 10 levels deep
