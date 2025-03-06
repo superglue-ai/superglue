@@ -75,11 +75,11 @@ export const upsertTransformResolver = async (
     const oldConfig = await context.datastore.getTransformConfig(id, context.orgId);
 
     // reset the response mapping if there are major updates
-    let newResponseMapping = resolveField(input.responseMapping, oldConfig?.responseMapping);
-    if (!newResponseMapping && !input.responseSchema && !input.instruction) {
+    let newResponseMapping = input.responseMapping;
+    if (newResponseMapping === undefined && !input.responseSchema && !input.instruction) {
       newResponseMapping = oldConfig?.responseMapping;
     }
-
+    
     const config = { 
       id: id,
       updatedAt: new Date(),
@@ -89,6 +89,7 @@ export const upsertTransformResolver = async (
       responseMapping: newResponseMapping,
       version: resolveField(input.version, oldConfig?.version)
     };
+
     await context.datastore.upsertTransformConfig(id, config, context.orgId);
     return config;
 };
