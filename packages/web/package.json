@@ -33,7 +33,6 @@
         "posthog-js": "^1.224.0",
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
-        "react-json-editor-ajrm": "^2.5.14",
         "react-virtualized": "^9.22.6",
         "shadcn-ui": "^0.9.5",
         "tailwind-merge": "^2.6.0",
