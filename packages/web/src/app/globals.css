@@ -115,4 +115,17 @@ body {
   button:hover {
     @apply bg-secondary transition-colors;
   }
+
+  /* Custom scrollbar styles */
+  ::-webkit-scrollbar {
+    @apply w-2 h-2;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-secondary/50 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/50 rounded-full hover:bg-muted-foreground/70 transition-colors;
+  }
 }
