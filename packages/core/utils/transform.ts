@@ -115,7 +115,7 @@ export async function generateMapping(schema: any, payload: any, instruction?: s
     }
 
     console.log("validation succeeded");
-    // Unwrap the data property
+    
     return reasoning;
 
   } catch (error) {
