@@ -84,6 +84,7 @@ type RunResult {
 type Pagination {
   type: PaginationType!
   pageSize: String
+  cursorPath: String
 }
 
 type RunList {
@@ -141,6 +142,7 @@ enum CacheMode {
 enum PaginationType {
   OFFSET_BASED
   PAGE_BASED
+  CURSOR_BASED
   DISABLED
 }
 
@@ -154,6 +156,7 @@ enum FileType {
 input PaginationInput {
   type: PaginationType!
   pageSize: Int
+  cursorPath: String
 }
 
 input ApiInput {
