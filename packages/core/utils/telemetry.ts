@@ -5,6 +5,7 @@ import { config } from '../default.js';
 export const sessionId = crypto.randomUUID();
 
 export const isDebug = process.env.DEBUG === "true";
+export const isSelfHosted = process.env.RUNS_ON_SUPERGLUE_CLOUD !== "true";
 export const isTelemetryDisabled = process.env.DISABLE_TELEMETRY === "true";
 
 export const telemetryClient = !isTelemetryDisabled && !isDebug ? 
@@ -55,22 +56,97 @@ export const telemetryMiddleware = (req, res, next) => {
   next();
 };
 
-export const handleQueryError = (errors: any[], query: string, orgId: string) => {
+
+const createCallProperties = (query: string, responseBody: any, isSelfHosted: boolean, operation: string) => {
+  const properties: Record<string, any> = {};
+  properties.isSelfHosted = isSelfHosted;
+  properties.operation = operation;
+  properties.query = query;
+
+  switch(operation) {
+    case 'call':
+      const call = responseBody?.singleResult?.data?.call;
+      if(!call) break;
+      properties.endpointHost = call?.config?.urlHost;
+      properties.endpointPath = call?.config?.urlPath;
+      properties.apiConfigId = call?.config?.id;
+      properties.callMethod = call?.config?.method;
+      properties.documentationUrl = call?.config?.documentationUrl;
+      properties.authType = call?.config?.authentication;
+      properties.responseTimeMs = call?.completedAt?.getTime() - call?.startedAt?.getTime()
+      break;
+    default:
+      break;
+  }
+
+  return properties;
+}
+
+export const handleQueryError = (errors: any[], query: string, orgId: string, requestContext: any) => {
   // in case of an error, we track the query and the error
   // we do not track the variables or the response
   // all errors are masked
   const operation = extractOperationName(query);
+  const properties = createCallProperties(query, requestContext.response?.body, isSelfHosted, operation);
+  properties.success = false;
   telemetryClient?.capture({
     distinctId: orgId || sessionId,
     event: operation + '_error',
     properties: {
-      query,
+      ...properties,
       orgId: orgId,
       errors: errors.map(e => ({
         message: e.message,
         path: e.path
-      }))
+      })),
+      success: false
+    },
+    groups: {
+      orgId: orgId
     }
   });
 };
 
+const handleQuerySuccess = (query: string, orgId: string, requestContext: any) => {
+  const distinctId = isSelfHosted ? `sh-inst-${requestContext.contextValue.datastore.storage?.tenant?.email}` : orgId;
+  const operation = extractOperationName(query);
+  const properties = createCallProperties(query, requestContext.response?.body, isSelfHosted, operation);
+  properties.success = true;
+
+  telemetryClient?.capture({
+    distinctId: distinctId,
+    event: operation,
+    properties: properties,
+    groups: {
+      orgId: orgId
+    }
+  }); 
+};
+
+export const createTelemetryPlugin = () => {
+  return {
+    requestDidStart: async () => ({
+      willSendResponse: async (requestContext: any) => {
+        const errors = requestContext.errors || 
+          requestContext?.response?.body?.singleResult?.errors ||
+          Object.values(requestContext?.response?.body?.singleResult?.data || {}).map((d: any) => d.error).filter(Boolean);
+
+        if (telemetryClient) {
+          if(errors && errors.length > 0) {
+            console.error(errors);
+            const orgId = requestContext.contextValue.orgId;
+            handleQueryError(errors, requestContext.request.query, orgId, requestContext);
+          } else {
+            const orgId = requestContext.contextValue.orgId;
+            handleQuerySuccess(requestContext.request.query, orgId, requestContext);
+          }
+        } else {
+          // disabled telemetry
+          if(errors && errors.length > 0) {
+            console.error(errors);
+          }
+        }
+      }
+    })
+  };
+};
