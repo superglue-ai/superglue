@@ -19,8 +19,9 @@ import {
 import { cn } from "@/src/lib/utils";
 import { ListPlus, Plus, Trash2 } from "lucide-react";
 import React from 'react';
-import JSONInput from 'react-json-editor-ajrm';
-import locale from 'react-json-editor-ajrm/locale/en';
+import Editor from 'react-simple-code-editor';
+import Prism from 'prismjs';
+import 'prismjs/components/prism-json';
 
 interface JsonSchemaEditorProps {
   value: string;
@@ -42,6 +43,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
     // Initialize from localStorage, default to false if not set
     return localStorage.getItem('jsonSchemaEditorCodeMode') === 'true'
   });
+  const [jsonError, setJsonError] = React.useState<string | null>(null);
   
   // Update localStorage when isCodeMode changes
   React.useEffect(() => {
@@ -66,9 +68,15 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
   
   React.useEffect(() => {
     try {
-      setVisualSchema(JSON.parse(value));
+      // Only update visual schema if the JSON is valid
+      const parsed = JSON.parse(value);
+      setVisualSchema(parsed);
+      setJsonError(null);
     } catch (e) {
-      value !== '' && console.error('Invalid JSON Schema:', e);
+      // Just set the error but don't update visual schema if JSON is invalid
+      if (value !== '') {
+        setJsonError((e as Error).message);
+      }
     }
   }, [value]);
 
@@ -401,6 +409,18 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
     return schema;
   };
 
+  // Add this highlight function
+  const highlightJson = (code: string) => {
+    try {
+      // Format the JSON before highlighting
+      const formatted = JSON.stringify(JSON.parse(code), null, 2);
+      return Prism.highlight(formatted, Prism.languages.json, 'json');
+    } catch {
+      // If JSON is invalid, just return the raw code
+      return code;
+    }
+  };
+
   return (
     <div className="space-y-1 flex flex-col h-full mb-4">
       <div className="flex justify-between items-center shrink-0">
@@ -413,33 +433,38 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
 
       <div className="flex-1 min-h-0 border rounded-md overflow-hidden">
         {isCodeMode ? (
-          <JSONInput
-            placeholder={visualSchema}
-            value={value}
-            locale={locale}
-            theme="light_mitsuketa_tribute"
-            height="100%"
-            width="100%"
-            onBlur={(data: any) => {
-              if (data.jsObject) {
-                onChange(JSON.stringify(data.jsObject, null, 2));
-              }
-            }}
-            style={{
-              body: {
-                fontSize: '12px',
-                backgroundColor: 'hsl(var(--card))',
-                color: 'hsl(var(--card-foreground))'
-              },
-              outerBox: {
-                border: 'none',
-                borderRadius: 'var(--radius)'
-              },
-              container: {
-                backgroundColor: 'hsl(var(--card))'
-              }
-            }}
-          />
+          <div className="h-full font-mono relative bg-transparent">
+            <Editor
+              value={value}
+              onValueChange={(code) => {
+                // Always update the value, regardless of JSON validity
+                onChange(code);
+                try {
+                  JSON.parse(code);
+                  setJsonError(null);
+                } catch (e) {
+                  setJsonError((e as Error).message);
+                }
+              }}
+              highlight={highlightJson}
+              padding={10}
+              tabSize={2}
+              insertSpaces={true}
+              className={cn(
+                "h-full text-xs [&_textarea]:outline-none [&_textarea]:w-full [&_textarea]:h-full [&_textarea]:resize-none [&_textarea]:p-0 [&_textarea]:border-0 [&_textarea]:bg-transparent dark:[&_textarea]:text-white",
+                jsonError && "border-red-500"
+              )}
+              style={{
+                fontFamily: 'var(--font-mono)',
+                minHeight: '100%',
+              }}
+            />
+            {jsonError && (
+              <div className="absolute bottom-0 left-0 right-0 bg-red-500/10 text-red-500 p-2 text-xs">
+                {jsonError}
+              </div>
+            )}
+          </div>
         ) : (
           <div className="h-full flex flex-col min-h-0">
             {Object.keys(visualSchema).length === 0 ? (
