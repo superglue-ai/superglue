@@ -33,6 +33,7 @@
     "@ai-sdk/xai": "^1.1.12",
     "@apollo/server": "^4.11.3",
     "@superglue/shared": "file:../shared",
+    "ai": "^4.1.54",
     "axios": "^1.8.1",
     "console-stamp": "^3.1.2",
     "cors": "^2.8.5",
