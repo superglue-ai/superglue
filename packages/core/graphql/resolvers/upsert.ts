@@ -27,7 +27,7 @@ export const upsertApiResolver = async (
     }
 
     // Handle response mapping with existing logic
-    let newResponseMapping = resolveField(input.responseMapping, oldConfig?.responseMapping);
+    let newResponseMapping = input.responseMapping;
     const hasNoUpdates = (input.urlHost === undefined || oldConfig?.urlHost === input.urlHost) && 
       (input.urlPath === undefined || oldConfig?.urlPath === input.urlPath) &&
       (input.dataPath === undefined || oldConfig?.dataPath === input.dataPath) &&

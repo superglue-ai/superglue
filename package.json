@@ -17,11 +17,8 @@
   "dependencies": {
     "@playwright/test": "^1.50.1",
     "@superglue/client": "^2.3.11",
-    "@types/prismjs": "^1.26.5",
     "dotenv": "^16.4.7",
-    "dotenv-cli": "^8.0.0",
-    "prismjs": "^1.29.0",
-    "react-simple-code-editor": "^0.14.1"
+    "dotenv-cli": "^8.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.17.19",
