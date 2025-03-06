@@ -49,6 +49,7 @@ export enum DecompressionMethod {
 export enum PaginationType {
   OFFSET_BASED = "OFFSET_BASED",
   PAGE_BASED = "PAGE_BASED",
+  CURSOR_BASED = "CURSOR_BASED",
   DISABLED = "DISABLED"
 }
 
@@ -110,6 +111,7 @@ export interface TransformConfig extends BaseConfig {
 export type Pagination = {
   type: PaginationType;
   pageSize?: number;
+  cursorPath?: string;
 };
 
 export type RunResult = BaseResult & {

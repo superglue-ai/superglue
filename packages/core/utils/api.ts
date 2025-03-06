@@ -63,21 +63,26 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
   let allResults = [];
   let page = 1;
   let offset = 0;
+  let cursor = null;
   let hasMore = true;
   let loopCounter = 0;
 
-  while (hasMore && loopCounter <= 500) {
+  while (hasMore && loopCounter < 500) {
     // Generate pagination variables if enabled
     let paginationVars = {};
-    if (endpoint.pagination?.type === PaginationType.PAGE_BASED) {
-      paginationVars = { page, limit: endpoint.pagination?.pageSize || 50 };
-      page++;
-    } else if (endpoint.pagination?.type === PaginationType.OFFSET_BASED) {
-      paginationVars = { offset, limit: endpoint.pagination?.pageSize || 50 };
-      offset += endpoint.pagination?.pageSize || 50;
-    }
-    else {
-      hasMore = false;
+    switch (endpoint.pagination?.type) {
+      case PaginationType.PAGE_BASED:
+        paginationVars = { page, limit: endpoint.pagination?.pageSize || 50 };
+        break;
+      case PaginationType.OFFSET_BASED:
+        paginationVars = { offset, limit: endpoint.pagination?.pageSize || 50 };
+        break;
+      case PaginationType.CURSOR_BASED:
+        paginationVars = { cursor: cursor, limit: endpoint.pagination?.pageSize || 50 };
+        break;
+      default:
+        hasMore = false;
+        break;
     }
 
     // Combine all variables
@@ -157,10 +162,12 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
         This usually indicates an error page or invalid endpoint.\nResponse: ${response.data.slice(0, 2000)}`);
     }
 
-    let responseData = response.data;
     let dataPathSuccess = true;
-    if (endpoint.dataPath) {
 
+    // TODO: we need to remove the data path and just join the data with the next page of data, otherwise we will have to do a lot of gymnastics to get the data path right
+
+    let responseData = response.data;
+    if (endpoint.dataPath) {
       // Navigate to the specified data path
       const pathParts = endpoint.dataPath.split('.');
 
@@ -179,7 +186,7 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
       if(responseData.length < endpoint.pagination?.pageSize) {
         hasMore = false;
       }
-      
+
       if(JSON.stringify(responseData) !== JSON.stringify(allResults)) {
         allResults = allResults.concat(responseData);
       }
@@ -193,6 +200,25 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
     }
     else {
       hasMore = false;
+    }
+
+    // update pagination
+    if(endpoint.pagination?.type === PaginationType.PAGE_BASED) {
+      page++;
+    }
+    else if(endpoint.pagination?.type === PaginationType.OFFSET_BASED) {
+      offset += endpoint.pagination?.pageSize || 50;
+    }
+    else if (endpoint.pagination?.type === PaginationType.CURSOR_BASED) {
+        const cursorParts = (endpoint.pagination?.cursorPath || 'next_cursor').split('.');
+        let nextCursor = response.data;
+        for (const part of cursorParts) {
+          nextCursor = nextCursor?.[part] ?? nextCursor;
+        }
+        cursor = nextCursor;
+        if(!cursor) {
+          hasMore = false;
+        }
     }
     loopCounter++;
   }
@@ -221,6 +247,7 @@ async function generateApiConfig(
     pagination: z.object({
       type: z.enum(Object.values(PaginationType) as [string, ...string[]]),
       pageSize: z.string().describe("Number of items per page. Set this to a number. In headers or query params, you can access it as {limit}."),
+      cursorPath: z.string().optional().describe("If cursor_based: The path to the cursor in the response. E.g. cursor.current or next_cursor")
     }).optional()
   }));
   const openai = new OpenAI({
@@ -317,8 +344,8 @@ Documentation: ${String(documentation)}`
       headers: generatedConfig.headers,
       body: generatedConfig.body,
       authentication: generatedConfig.authentication,
-      pagination: apiConfig.pagination || generatedConfig.pagination,
-      dataPath: apiConfig.dataPath || generatedConfig.dataPath,
+      pagination: generatedConfig.pagination,
+      dataPath: generatedConfig.dataPath,
       documentationUrl: apiConfig.documentationUrl,
       responseSchema: apiConfig.responseSchema,
       responseMapping: apiConfig.responseMapping,
@@ -335,7 +362,8 @@ function validateVariables(generatedConfig: any, vars: string[]) {
     ...vars,
     "page",
     "limit",
-    "offset"
+    "offset",
+    "cursor"
   ]
   
   // Helper function to find only template variables in a string
