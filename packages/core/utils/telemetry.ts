@@ -5,6 +5,7 @@ import { config } from '../default.js';
 export const sessionId = crypto.randomUUID();
 
 export const isDebug = process.env.DEBUG === "true";
+export const isSelfHosted = process.env.RUNS_ON_SUPERGLUE_CLOUD !== "true";
 export const isTelemetryDisabled = process.env.DISABLE_TELEMETRY === "true";
 
 export const telemetryClient = !isTelemetryDisabled && !isDebug ? 
@@ -64,13 +65,15 @@ const createCallProperties = (query: string, responseBody: any, isSelfHosted: bo
 
   switch(operation) {
     case 'call':
-      properties.endpointHost = responseBody?.singleResult?.data?.call?.config?.urlHost;
-      properties.endpointPath = responseBody?.singleResult?.data?.call?.config?.urlPath;
-      properties.apiConfigId = responseBody?.singleResult?.data?.call?.config?.id;
-      properties.callMethod = responseBody?.singleResult?.data?.call?.config?.method;
-      properties.documentationUrl = responseBody?.singleResult?.data?.call?.config?.documentationUrl;
-      properties.authType = responseBody?.singleResult?.data?.call?.config?.authentication;
-      properties.responseTimeMs = responseBody?.singleResult?.data?.call?.completedAt.getTime() - responseBody?.singleResult?.data?.call?.startedAt.getTime()
+      const call = responseBody?.singleResult?.data?.call;
+      if(!call) break;
+      properties.endpointHost = call?.config?.urlHost;
+      properties.endpointPath = call?.config?.urlPath;
+      properties.apiConfigId = call?.config?.id;
+      properties.callMethod = call?.config?.method;
+      properties.documentationUrl = call?.config?.documentationUrl;
+      properties.authType = call?.config?.authentication;
+      properties.responseTimeMs = call?.completedAt?.getTime() - call?.startedAt?.getTime()
       break;
     default:
       break;
@@ -83,7 +86,6 @@ export const handleQueryError = (errors: any[], query: string, orgId: string, re
   // in case of an error, we track the query and the error
   // we do not track the variables or the response
   // all errors are masked
-  const isSelfHosted = checkIfSelfHosted(requestContext);
   const operation = extractOperationName(query);
   const properties = createCallProperties(query, requestContext.response?.body, isSelfHosted, operation);
   properties.success = false;
@@ -106,7 +108,6 @@ export const handleQueryError = (errors: any[], query: string, orgId: string, re
 };
 
 const handleQuerySuccess = (query: string, orgId: string, requestContext: any) => {
-  const isSelfHosted = checkIfSelfHosted(requestContext);
   const distinctId = isSelfHosted ? `sh-inst-${requestContext.contextValue.datastore.storage?.tenant?.email}` : orgId;
   const operation = extractOperationName(query);
   const properties = createCallProperties(query, requestContext.response?.body, isSelfHosted, operation);
@@ -148,19 +149,4 @@ export const createTelemetryPlugin = () => {
       }
     })
   };
-};
-
-
-const checkIfSelfHosted = (requestContext: any): boolean => {
-  const datastoreName = requestContext.contextValue.datastore.constructor.name;
-  if(datastoreName !== 'RedisDataStore') {
-    return true;
-  }
-  if (requestContext.contextValue.dataStore.storage?.tenant?.email) {
-    return true;
-  }
-  if (requestContext.contextValue.dataStore.storage?.tenant?.emailEntrySkipped === true) {
-    return true;
-  }
-  return false;
 };
