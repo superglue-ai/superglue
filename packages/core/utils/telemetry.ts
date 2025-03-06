@@ -59,7 +59,6 @@ export const telemetryMiddleware = (req, res, next) => {
 const createCallProperties = (query: string, responseBody: any, isSelfHosted: boolean, operation: string) => {
   const properties: Record<string, any> = {};
   properties.isSelfHosted = isSelfHosted;
-  properties.success = true;
   properties.operation = operation;
   properties.query = query;
 
@@ -87,6 +86,7 @@ export const handleQueryError = (errors: any[], query: string, orgId: string, re
   const isSelfHosted = checkIfSelfHosted(requestContext);
   const operation = extractOperationName(query);
   const properties = createCallProperties(query, requestContext.response?.body, isSelfHosted, operation);
+  properties.success = false;
   telemetryClient?.capture({
     distinctId: orgId || sessionId,
     event: operation + '_error',
@@ -110,6 +110,7 @@ const handleQuerySuccess = (query: string, orgId: string, requestContext: any) =
   const distinctId = isSelfHosted ? `sh-inst-${requestContext.contextValue.datastore.storage?.tenant?.email}` : orgId;
   const operation = extractOperationName(query);
   const properties = createCallProperties(query, requestContext.response?.body, isSelfHosted, operation);
+  properties.success = true;
 
   telemetryClient?.capture({
     distinctId: distinctId,
