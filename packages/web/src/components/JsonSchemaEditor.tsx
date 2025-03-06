@@ -39,15 +39,22 @@ const SCHEMA_TYPE_DISPLAY = {
 };
 
 const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) => {
-  const [isCodeMode, setIsCodeMode] = React.useState(() => {
-    // Initialize from localStorage, default to false if not set
-    return localStorage.getItem('jsonSchemaEditorCodeMode') === 'true'
-  });
+  const [isCodeMode, setIsCodeMode] = React.useState(false);
   const [jsonError, setJsonError] = React.useState<string | null>(null);
   
+  // Initialize from localStorage on mount
+  React.useEffect(() => {
+    const savedMode = localStorage?.getItem('jsonSchemaEditorCodeMode');
+    if (savedMode !== null) {
+      setIsCodeMode(savedMode === 'true');
+    }
+  }, []);
+
   // Update localStorage when isCodeMode changes
   React.useEffect(() => {
-    localStorage.setItem('jsonSchemaEditorCodeMode', isCodeMode.toString());
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('jsonSchemaEditorCodeMode', isCodeMode.toString());
+    }
   }, [isCodeMode]);
   
   const [visualSchema, setVisualSchema] = React.useState<any>({});
