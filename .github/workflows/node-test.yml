@@ -28,8 +28,8 @@ jobs:
         rm -rf node_modules package-lock.json
         npm install
         
-    - name: Install Playwright browsers
-      run: npx playwright install
+    - name: Install Playwright chromium browser
+      run: npx playwright install chromium
       
     - name: Run tests
       run: npm run test

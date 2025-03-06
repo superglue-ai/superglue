@@ -9,7 +9,7 @@ import { LocalKeyManager } from './auth/localKeyManager.js';
 import { SupabaseKeyManager } from './auth/supabaseKeyManager.js';
 import { createDataStore } from './datastore/datastore.js';
 import { resolvers, typeDefs } from './graphql/graphql.js';
-import { handleQueryError, telemetryClient, telemetryMiddleware } from './utils/telemetry.js';
+import { createTelemetryPlugin, telemetryMiddleware } from './utils/telemetry.js';
 
 // Constants
 const PORT = process.env.GRAPHQL_PORT || 3000;
@@ -42,24 +42,7 @@ const apolloConfig = {
       embed: true, 
       document: DEFAULT_QUERY
     }),
-    // Telemetry Plugin
-    {
-      requestDidStart: async () => ({
-        willSendResponse: async (requestContext) => {
-          const errors = requestContext.errors || 
-            requestContext?.response?.body?.singleResult?.errors ||
-            Object.values(requestContext?.response?.body?.singleResult?.data || {}).map((d: any) => d.error).filter(Boolean);
-            
-          if(errors && errors.length > 0) {
-            console.error(errors);
-          }
-          if (errors && errors.length > 0 && telemetryClient) {
-            const orgId = requestContext.contextValue.orgId;
-            handleQueryError(errors, requestContext.request.query, orgId);
-          }
-        }
-      })
-    }
+    createTelemetryPlugin()
   ],
 };
 
