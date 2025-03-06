@@ -39,7 +39,7 @@ COPY packages/shared/package*.json ./packages/shared/
 # Install production dependencies and Playwright
 RUN npm ci --omit=dev && \
     npm install -g next turbo cross-env && \
-    npx playwright install --with-deps
+    npx playwright install chromium --with-deps
 
 # This is a base image with all dependencies installed
 # It does not contain any application code 
