@@ -510,7 +510,7 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
                       </div>
                     </div>
 
-                    <div className="h-full">
+                    <div className="h-full overflow-y-hidden">
                       <JsonSchemaEditor
                         value={formData.responseSchema}
                         onChange={handleChange('responseSchema')}
