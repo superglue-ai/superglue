@@ -37,7 +37,6 @@ export function ApiPlayground({ configId }: { configId?: string }) {
   const [error, setError] = useState<string | null>(null);
   const [responseTime, setResponseTime] = useState<number | null>(null);
   const superglueConfig = useConfig();
-  const [templateVars, setTemplateVars] = useState<string[]>([]);
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [invalidFields, setInvalidFields] = useState<Set<string>>(new Set());
 
@@ -60,7 +59,6 @@ export function ApiPlayground({ configId }: { configId?: string }) {
   const loadUserInputs = () => {
     if (!id) return;
     const savedCredentials = sessionStorage.getItem(`sg-playground-credentials-${id}`);
-    
     if (savedCredentials) {
       try {
         const parsed = JSON.parse(savedCredentials);
@@ -104,13 +102,12 @@ export function ApiPlayground({ configId }: { configId?: string }) {
           ...Object.values(data.headers || {}),
           data.body
         ].flatMap(value => findTemplateVars(String(value)));
-        setTemplateVars(varMatches);
         const allVars = [...new Set(varMatches)].filter(v => !['limit', 'offset', 'page'].includes(v));
-        // Pre-populate credentials list with template variables
-        if (allVars.length > 0 && credentials.length === 0) {
-          setCredentials(allVars.map(key => ({ key, value: '' })));
-        }
         
+        // Set credentials without merging
+        setCredentials(allVars.map(key => ({ key, value: '' })));
+        
+        // Load saved values after setting initial credentials
         loadUserInputs();
       } catch (err) {
         setError('Failed to load API configuration');
