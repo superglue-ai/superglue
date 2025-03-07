@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { ApiConfig, CacheMode } from "@superglue/client";
 import { composeUrl } from "@/src/lib/utils";
@@ -49,43 +49,40 @@ export function ApiPlayground({ configId }: { configId?: string }) {
   };
 
   // Save user inputs to sessionStorage instead of localStorage
-  const saveUserInputs = () => {
+  const saveUserInputs = useCallback(() => {
     if (!id) return;
     const credentialsObj = Object.fromEntries(credentials.map(c => [c.key, c.value]));
     sessionStorage.setItem(`sg-playground-credentials-${id}`, JSON.stringify(credentialsObj));
-  };
+  }, [id, credentials]);
 
   // Load user inputs from sessionStorage
-  const loadUserInputs = () => {
+  const loadUserInputs = useCallback(() => {
     if (!id) return;
     const savedCredentials = sessionStorage.getItem(`sg-playground-credentials-${id}`);
     if (savedCredentials) {
       try {
         const parsed = JSON.parse(savedCredentials);
-        setCredentials(Object.entries(parsed).map(([key, value]) => ({ key, value: value as string })));
+        setCredentials(prev => {
+          // Merge saved values with existing credential keys
+          return prev.map(cred => ({
+            key: cred.key,
+            value: parsed[cred.key] || cred.value
+          }));
+        });
       } catch (e) {
-        console.error('Failed to parse saved credentials');
+        console.error('Failed to parse saved credentials:', e);
       }
     }
-  };
+  }, [id]);
 
-  // Save inputs when user switches tabs
+  // Call loadUserInputs when credentials are initialized
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        saveUserInputs();
-      }
-    };
+    if (credentials.length > 0) {
+      loadUserInputs();
+    }
+  }, [credentials.length, loadUserInputs]);
 
-    window.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('beforeunload', saveUserInputs);
-    
-    return () => {
-      window.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('beforeunload', saveUserInputs);
-    };
-  }, [id, credentials]);
-
+  // Save on visibility change and beforeunload
   useEffect(() => {
     const loadConfig = async () => {
       try {
@@ -265,6 +262,7 @@ export function ApiPlayground({ configId }: { configId?: string }) {
                               newInvalidFields.delete(cred.key);
                               setInvalidFields(newInvalidFields);
                             }
+                            saveUserInputs();
                           }}
                           required
                           placeholder="Enter value"
