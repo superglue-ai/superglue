@@ -9,7 +9,6 @@ import {
   SelectValue,
 } from "@/src/components/ui/select";
 import { Switch } from "@/src/components/ui/switch";
-import { Textarea } from "@/src/components/ui/textarea";
 import {
   Tooltip,
   TooltipContent,
@@ -440,11 +439,10 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
 
       <div className="flex-1 min-h-0 border rounded-md overflow-hidden">
         {isCodeMode ? (
-          <div className="h-full font-mono relative bg-transparent">
+          <div className="h-full font-mono relative bg-transparent overflow-auto">
             <Editor
               value={value}
               onValueChange={(code) => {
-                // Always update the value, regardless of JSON validity
                 onChange(code);
                 try {
                   JSON.parse(code);
@@ -458,7 +456,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
               tabSize={2}
               insertSpaces={true}
               className={cn(
-                "h-full text-xs [&_textarea]:outline-none [&_textarea]:w-full [&_textarea]:h-full [&_textarea]:resize-none [&_textarea]:p-0 [&_textarea]:border-0 [&_textarea]:bg-transparent dark:[&_textarea]:text-white",
+                "min-h-full text-xs [&_textarea]:outline-none [&_textarea]:w-full [&_textarea]:h-full [&_textarea]:resize-none [&_textarea]:p-0 [&_textarea]:border-0 [&_textarea]:bg-transparent dark:[&_textarea]:text-white",
                 jsonError && "border-red-500"
               )}
               style={{
