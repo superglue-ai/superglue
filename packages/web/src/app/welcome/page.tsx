@@ -19,7 +19,7 @@ export default function WelcomePage() {
   const config = useConfig()
 
   useEffect(() => {
-    if (process.env.NEXT_PUBLIC_DISABLE_WELCOME_SCREEN === 'true') {
+    if (process.env.NEXT_PUBLIC_DISABLE_WELCOME_SCREEN === 'true' || true) {
       router.push('/')
       return
     }
