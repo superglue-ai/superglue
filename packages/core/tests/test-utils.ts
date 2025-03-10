@@ -1,18 +1,18 @@
-import type { DataStore } from '@superglue/shared';
-import express from 'express';
-import fs from 'node:fs';
-import type { AddressInfo } from 'node:net';
-import path from 'node:path';
-import { afterAll, beforeAll } from 'vitest';
-import { FileStore } from '../datastore/filestore.js';
-import { MemoryStore } from '../datastore/memory.js';
+import type { DataStore } from "@superglue/shared";
+import express from "express";
+import fs from "node:fs";
+import type { AddressInfo } from "node:net";
+import path from "node:path";
+import { afterAll, beforeAll } from "vitest";
+import { FileStore } from "../datastore/filestore.js";
+import { MemoryStore } from "../datastore/memory.js";
 
 /**
  * Creates and manages a mock HTTP server for integration tests
  */
 export class MockServerFactory {
   private server: any;
-  private baseUrl = '';
+  private baseUrl = "";
   private app = express();
 
   constructor() {
@@ -64,7 +64,7 @@ export class MockServerFactory {
     beforeAll(async () => {
       await this.start();
     });
-    
+
     afterAll(() => {
       this.stop();
     });
@@ -79,9 +79,9 @@ export class DataStoreFactory {
   private testPath: string;
   private dataStores: { name: string; instance: DataStore }[] = [];
 
-  constructor(testDir = './.test-data') {
+  constructor(testDir = "./.test-data") {
     this.testDir = testDir;
-    this.testPath = path.join(testDir, 'superglue_data.json');
+    this.testPath = path.join(testDir, "superglue_data.json");
   }
 
   init() {
@@ -94,15 +94,15 @@ export class DataStoreFactory {
     }
 
     this.dataStores = [
-      { name: 'FileStore', instance: new FileStore(this.testDir) },
-      { name: 'MemoryStore', instance: new MemoryStore() }
+      { name: "FileStore", instance: new FileStore(this.testDir) },
+      { name: "MemoryStore", instance: new MemoryStore() },
     ];
 
     return this.dataStores;
   }
 
-  getInstance(name: 'FileStore' | 'MemoryStore'): DataStore {
-    const store = this.dataStores.find(ds => ds.name === name);
+  getInstance(name: "FileStore" | "MemoryStore"): DataStore {
+    const store = this.dataStores.find((ds) => ds.name === name);
     if (!store) {
       throw new Error(`Data store "${name}" not found`);
     }
@@ -116,7 +116,7 @@ export class DataStoreFactory {
   async cleanup() {
     for (const { name, instance } of this.dataStores) {
       // Cast to any since clearAll and disconnect are implementation-specific
-      if (name === 'FileStore') {
+      if (name === "FileStore") {
         // For FileStore we need to clear all and disconnect
         await (instance as any).clearAll();
         await (instance as any).disconnect();
@@ -139,7 +139,7 @@ export class DataStoreFactory {
     beforeAll(() => {
       this.init();
     });
-    
+
     afterAll(async () => {
       await this.cleanup();
     });
