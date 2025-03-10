@@ -1,8 +1,8 @@
-import { ApiConfig, HttpMethod } from '@superglue/shared';
+import { type ApiConfig, HttpMethod } from '@superglue/shared';
 import express from 'express';
-import { AddressInfo } from 'net';
+import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { callEndpoint } from './api.js';
+import { callEndpoint } from '../utils/api.js';
 
 describe('Rate Limit Integration Test with real server', () => {
   let server: any;
