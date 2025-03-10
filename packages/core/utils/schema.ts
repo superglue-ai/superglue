@@ -1,10 +1,10 @@
 import { Validator } from "jsonschema";
-import OpenAI from "openai";
-import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { GENERATE_SCHEMA_PROMPT } from "./prompts.js";
-
+import { CoreMessage } from "ai";
+import LLMClient from "./llm.js";
+import ModelProvider from "./model-provider.js";
 export async function generateSchema(instruction: string, responseData: string) : Promise<string> {
-  const messages: ChatCompletionMessageParam[] = [
+  const messages: Array<CoreMessage> = [
     {
       role: "system",
       content: GENERATE_SCHEMA_PROMPT
@@ -40,9 +40,14 @@ export async function generateSchema(instruction: string, responseData: string) 
 }
 
 async function attemptSchemaGeneration(
-  messages: ChatCompletionMessageParam[],
+  messages: Array<CoreMessage>,
   retry: number
 ): Promise<string> {
+//<<<<<<< vercel-ai-sdk-integration
+  console.log(`Generating schema: ${retry ? `(retry ${retry})` : ""}`);
+    
+  const temperature = Math.min(0.3 * retry, 1.0);
+//=======
   console.log(`Generating schema${retry ? `: (retry ${retry})` : ""}`);
   const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
@@ -50,23 +55,17 @@ async function attemptSchemaGeneration(
   });
   
   const modelName = process.env.SCHEMA_GENERATION_MODEL || process.env.OPENAI_MODEL;
+//>>>>>>> staging
   
-  let temperature = Math.min(0.3 * retry, 1.0);
-  let useTemperature = false;
+  let generatedSchema = await LLMClient.getInstance().getText({
+    model: ModelProvider.getSchemaModel(),
+    temperature,
+    messages
+  });
+
+  generatedSchema = cleanJsonResponse(generatedSchema);
+  generatedSchema = JSON.parse(generatedSchema);
   
-  if (modelName.startsWith('gpt-4')) {
-    temperature = Math.min(0.3 * retry, 1.0);
-    useTemperature = true;
-  }
-  const completionRequest: any = {
-    model: modelName,
-    ...(useTemperature ? { temperature: temperature } : {}),
-    response_format: { "type": "json_object" },
-    messages: messages
-  };
-  
-  const completion = await openai.chat.completions.create(completionRequest);
-  let generatedSchema = JSON.parse(completion.choices[0].message.content);
   if(generatedSchema?.jsonSchema) {
     generatedSchema = generatedSchema.jsonSchema;
   }
@@ -77,4 +76,12 @@ async function attemptSchemaGeneration(
   validator.validate({}, generatedSchema);
 
   return generatedSchema;
+}
+
+function cleanJsonResponse(response: string | null | undefined): string {
+  if (!response) {
+    return '';
+  }
+  const cleanedResponse = response.replace(/```json\s*([\s\S]*?)\s*```/, '$1').trim();
+  return cleanedResponse;
 }

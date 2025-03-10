@@ -1,12 +1,12 @@
 import { ApiConfig, ApiInputRequest, CacheMode, Context, RequestOptions, TransformConfig } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
-import OpenAI from "openai";
 import { v4 as uuidv4 } from 'uuid';
 import { callEndpoint, prepareEndpoint } from "../../utils/api.js";
 import { telemetryClient } from "../../utils/telemetry.js";
 import { applyJsonataWithValidation, maskCredentials } from "../../utils/tools.js";
 import { prepareTransform } from "../../utils/transform.js";
 import { notifyWebhook } from "../../utils/webhook.js";
+import { CoreMessage } from "ai";
 
 export const callResolver = async (
   _: any,
@@ -23,7 +23,7 @@ export const callResolver = async (
   const callId = uuidv4() as string;
 
   let preparedEndpoint: ApiConfig;
-  let messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
+  let messages: Array<CoreMessage> = [];
 
   const readCache = options ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.READONLY : true;
   const writeCache = options ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.WRITEONLY : true;

@@ -2,12 +2,12 @@ import axios, { AxiosRequestConfig } from "axios";
 import {  AuthType, RequestOptions, DecompressionMethod, ExtractConfig, ExtractInput, FileType, HttpMethod } from "@superglue/shared";
 import { callAxios, composeUrl, getSchemaFromData, replaceVariables } from "./tools.js";
 import { z } from "zod";
-import OpenAI from "openai";
-import { zodToJsonSchema } from "zod-to-json-schema";
 import { API_PROMPT } from "./prompts.js";
 import { getDocumentation } from "./documentation.js";
 import { decompressData, parseFile } from "./file.js";
 import { createHash } from "crypto";
+import { CoreMessage } from "ai";
+import LLMClient from "./llm.js";
 
 export async function prepareExtract(extractInput: ExtractInput, payload: any, credentials: any, lastError: string | null = null): Promise<ExtractConfig> {
     // Set the current timestamp
@@ -88,7 +88,7 @@ export async function processFile(data: Buffer, extractConfig: ExtractConfig) {
 }
 
 async function generateExtractConfig(extractConfig: Partial<ExtractConfig>, documentation: string, vars: string[] = [], lastError: string | null = null): Promise<ExtractConfig> {
-  const schema = zodToJsonSchema(z.object({
+  const schema = z.object({
     urlHost: z.string(),
     urlPath: z.string().optional(),
     queryParams: z.record(z.any()).optional(),
@@ -99,46 +99,39 @@ async function generateExtractConfig(extractConfig: Partial<ExtractConfig>, docu
     dataPath: z.string().optional().describe('The path to the data array in the response JSON. e.g. "products"'),
     decompressionMethod: z.enum(Object.values(DecompressionMethod) as [string, ...string[]]).optional(),
     fileType: z.enum(Object.values(FileType) as [string, ...string[]]).optional(),
-  }));
-
-  const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-    baseURL: process.env.OPENAI_API_BASE_URL
   });
-  const completion = await openai.chat.completions.create({
-    model: process.env.OPENAI_MODEL,
-    response_format: {
-      type: "json_schema",
-      json_schema: {
-        name: "api_definition",
-        schema: schema,
-      }
+
+  const messages: Array<CoreMessage> = [
+    {
+      role: "system",
+      content: API_PROMPT
     },
-    messages: [
-      {
-        role: "system",
-        content: API_PROMPT
-      },
-      {
-        role: "user", 
-        content: 
-`Generate API configuration for the following:
+    {
+      role: "user", 
+      content: 
+        `Generate API configuration for the following:
 
-Instructions: ${extractConfig.instruction}
+        Instructions: ${extractConfig.instruction}
 
-Base URL: ${composeUrl(extractConfig.urlHost, extractConfig.urlPath)}
+        Base URL: ${composeUrl(extractConfig.urlHost, extractConfig.urlPath)}
 
-Documentation: ${documentation}
+        Documentation: ${documentation}
 
-Available variables: ${vars.join(", ")}
+        Available variables: ${vars.join(", ")}
 
-${lastError ? `We tried to call the API but it failed with the following error:
-${lastError}` : ''}`
-      }
-    ]
+        ${lastError ? `We tried to call the API but it failed with the following error:
+        ${lastError}` : ''}`
+    }
+  ]
+
+  const generatedConfig = await LLMClient.getInstance().getObject({
+    schema:schema,
+    schemaName:"api_definition",
+    messages:messages,
   });
-  console.log(completion.choices[0].message.content);
-  const generatedConfig = JSON.parse(completion.choices[0].message.content);
+
+  console.log(generatedConfig);
+
   return {
     ...extractConfig,
     ...generatedConfig,

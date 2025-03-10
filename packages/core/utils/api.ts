@@ -1,12 +1,12 @@
 import { ApiConfig, ApiInput, AuthType, HttpMethod, PaginationType, RequestOptions } from "@superglue/shared";
 import { AxiosRequestConfig } from "axios";
-import OpenAI from "openai";
 import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
+import { CoreMessage } from "ai";
 import { DOCUMENTATION_MAX_LENGTH } from "../config.js";
 import { getDocumentation } from "./documentation.js";
 import { API_ERROR_HANDLING_USER_PROMPT, API_PROMPT } from "./prompts.js";
 import { callAxios, composeUrl, replaceVariables } from "./tools.js";
+import LLMClient from "./llm.js";
 
 
 export async function prepareEndpoint(
@@ -14,8 +14,8 @@ export async function prepareEndpoint(
   payload: any, 
   credentials: any, 
   lastError: string | null = null,
-  previousMessages: OpenAI.Chat.ChatCompletionMessageParam[] = []
-): Promise<{ config: ApiConfig; messages: OpenAI.Chat.ChatCompletionMessageParam[] }> {
+  previousMessages: Array<CoreMessage> = []
+): Promise<{ config: ApiConfig; messages: Array<CoreMessage> }> {
     // Set the current timestamp
     const currentTime = new Date();
 
@@ -242,9 +242,9 @@ async function generateApiConfig(
   documentation: string, 
   vars: string[] = [], 
   lastError: string | null = null,
-  previousMessages: OpenAI.Chat.ChatCompletionMessageParam[] = []
-): Promise<{ config: ApiConfig; messages: OpenAI.Chat.ChatCompletionMessageParam[] }> {
-  const schema = zodToJsonSchema(z.object({
+  previousMessages: Array<CoreMessage> = []
+): Promise<{ config: ApiConfig; messages: Array<CoreMessage> }> {
+  const schema = z.object({
     urlHost: z.string(),
     urlPath: z.string(),
     queryParams: z.record(z.any()).optional(),
@@ -258,10 +258,6 @@ async function generateApiConfig(
       pageSize: z.string().describe("Number of items per page. Set this to a number. In headers or query params, you can access it as {limit}."),
       cursorPath: z.string().optional().describe("If cursor_based: The path to the cursor in the response. E.g. cursor.current or next_cursor")
     }).optional()
-  }));
-  const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-    baseURL: process.env.OPENAI_API_BASE_URL
   });
 
   const userProvidedAdditionalInfo = Boolean(
@@ -274,7 +270,7 @@ async function generateApiConfig(
     apiConfig.method
   );
 
-  const initialUserMessage: OpenAI.Chat.ChatCompletionUserMessageParam = {
+  const initialUserMessage: CoreMessage = {
     role: "user", 
     content: 
 `Generate API configuration for the following:
@@ -302,44 +298,36 @@ Documentation: ${String(documentation)}`
     .replace("{error}", lastError)
     .replace("{previous_config}", JSON.stringify(apiConfig));
 
-  const subsequentUserMessage: OpenAI.Chat.ChatCompletionUserMessageParam = {
+  const subsequentUserMessage: CoreMessage = {
     role: "user",
     content: errorHandlingMessage
   }
 
-  const systemMessage: OpenAI.Chat.ChatCompletionSystemMessageParam = {
+  const systemMessage: CoreMessage = {
     role: "system",
     content: API_PROMPT
   };
 
-  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = previousMessages.length > 0 
+  const messages: Array<CoreMessage> = previousMessages.length > 0 
     ? [...previousMessages, subsequentUserMessage]
     : [systemMessage, initialUserMessage];
 
   const numInitialMessages = 2;
   const retryCount = previousMessages.length > 0 ? (messages.length - numInitialMessages) / 2 : 0;
-  const temperature = String(process.env.OPENAI_MODEL).startsWith("o") ? undefined : Math.min(retryCount * 0.1, 1);
+  const temperature = Math.min(retryCount * 0.1, 1);
   console.log("Generating API config for " + apiConfig.urlHost + (retryCount > 0 ? ` (retry ${retryCount})` : ""));
 
-  const completion = await openai.chat.completions.create({
-    model: process.env.OPENAI_MODEL,
-    response_format: {
-      type: "json_schema",
-      json_schema: {
-        name: "api_definition",
-        schema: schema,
-      }
-    },
-    temperature,
-    messages
+  const generatedConfig = await LLMClient.getInstance().getObject({
+    schema:schema,
+    schemaName:"api_definition",
+    temperature:temperature,
+    messages:messages
   });
-
-  const generatedConfig = JSON.parse(completion.choices[0].message.content);
   
   // Add the assistant's response to messages for future context
   messages.push({
     role: "assistant",
-    content: completion.choices[0].message.content
+    content: JSON.stringify(generatedConfig)
   });
 
   return {
