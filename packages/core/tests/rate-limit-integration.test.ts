@@ -1,56 +1,37 @@
 import { type ApiConfig, HttpMethod } from '@superglue/shared';
-import express from 'express';
-import type { AddressInfo } from 'node:net';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { callEndpoint } from '../utils/api.js';
+import { MockServerFactory } from './test-utils.js';
 
 describe('Rate Limit Integration Test with real server', () => {
-  let server: any;
-  let baseUrl: string;
+  const mockServer = new MockServerFactory();
   let requestCount = 0;
   
   // Mock server that returns 429 responses
-  beforeAll(async () => {
-    const app = express();
-    // Endpoint returns 429 on first call, then 200
-    app.get('/api/test-rate-limit', (req, res) => {
-      requestCount++;
-      if (requestCount === 1) {
-        res.setHeader('Retry-After', '1');
-        res.status(429).json({ error: 'Rate limit exceeded' });
-      } else {
-        res.status(200).json({ success: true, data: 'Rate limit test passed' });
-      }
-    });
-    // Endpoint that always returns 429 with a long retry time
-    app.get('/api/always-rate-limited', (req, res) => {
-      res.setHeader('Retry-After', '61');  // 61 seconds is greater than the hardcoded 60s limit
+  mockServer.addGetRoute('/api/test-rate-limit', (req, res) => {
+    requestCount++;
+    if (requestCount === 1) {
+      res.setHeader('Retry-After', '1');
       res.status(429).json({ error: 'Rate limit exceeded' });
-    });
-    
-    // Start the server
-    return new Promise<void>((resolve) => {
-      server = app.listen(0, () => {
-        const address = server.address() as AddressInfo;
-        baseUrl = `http://localhost:${address.port}`;
-        console.log(`Mock server running at ${baseUrl}`);
-        resolve();
-      });
-    });
-  });
-  
-  afterAll(() => {
-    if (server) {
-      server.close();
+    } else {
+      res.status(200).json({ success: true, data: 'Rate limit test passed' });
     }
   });
+  
+  mockServer.addGetRoute('/api/always-rate-limited', (req, res) => {
+    res.setHeader('Retry-After', '61');  // 61 seconds is greater than the hardcoded 60s limit
+    res.status(429).json({ error: 'Rate limit exceeded' });
+  });
+  
+  // Setup before/after hooks
+  mockServer.setupHooks();
   
   it('should successfully retry after a 429 response', async () => {
     requestCount = 0;
     
     const config: ApiConfig = {
       id: 'test-rate-limit-integration',
-      urlHost: baseUrl,
+      urlHost: mockServer.getBaseUrl(),
       urlPath: 'api/test-rate-limit',
       method: HttpMethod.GET,
       instruction: 'Test rate limit integration',
@@ -68,7 +49,7 @@ describe('Rate Limit Integration Test with real server', () => {
     // Modify the server to return a retry time that exceeds the hardcoded 60s limit
     const config: ApiConfig = {
       id: 'test-always-rate-limited',
-      urlHost: baseUrl,
+      urlHost: mockServer.getBaseUrl(),
       urlPath: 'api/always-rate-limited',
       method: HttpMethod.GET,
       instruction: 'Test always rate limited',
@@ -79,4 +60,4 @@ describe('Rate Limit Integration Test with real server', () => {
     await expect(callEndpoint(config, {}, {}, {}))
       .rejects.toThrow(/Rate limit exceeded/);
   });
-}); 
+});
