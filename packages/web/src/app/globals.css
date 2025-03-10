@@ -60,6 +60,47 @@ body {
     --chart-4: 330 75% 55%;
     --chart-5: 150 65% 45%;
   }
+
+  /* Code editor syntax highlighting */
+  .token {
+    background: none !important;
+  }
+
+  .token.property {
+    color: hsl(var(--chart-0));
+  }
+
+  .token.string {
+    color: hsl(var(--chart-5));
+  }
+
+  .token.number {
+    color: hsl(var(--chart-5));
+  }
+
+  .token.boolean {
+    color: hsl(var(--chart-2));
+  }
+
+  .token.punctuation {
+    color: hsl(var(--muted-foreground));
+  }
+
+  .token.operator {
+    color: hsl(var(--muted-foreground));
+  }
+
+  .token.keyword {
+    color: hsl(var(--chart-1));
+  }
+
+  .token.null {
+    color: hsl(var(--chart-2));
+  }
+
+  .token.comment {
+    color: hsl(var(--muted-foreground));
+  }
 }
 
 @layer base {
@@ -73,5 +114,18 @@ body {
   /* Add hover styles for buttons */
   button:hover {
     @apply bg-secondary transition-colors;
+  }
+
+  /* Custom scrollbar styles */
+  ::-webkit-scrollbar {
+    @apply w-2 h-2;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-secondary/50 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/50 rounded-full hover:bg-muted-foreground/70 transition-colors;
   }
 }

@@ -14,8 +14,6 @@ Here's how it works: You define your desired data schema and provide basic instr
 - Transforms response data into the exact schema you want using JSONata expressions.
 - Validates that all data coming through follows that schema, and fixes transformations when they break.
 
-
-
 <div align="center">
 
 [![GitHub](https://img.shields.io/github/license/superglue-ai/superglue?style=flat-square)](https://github.com/superglue-ai/superglue/blob/main/LICENSE)

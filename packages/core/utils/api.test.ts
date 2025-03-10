@@ -188,6 +188,127 @@ describe('API Utilities', () => {
       );
     });
 
+    it('should handle cursor-based pagination', async () => {
+      const config = {
+        ...testConfig,
+        dataPath: 'data',
+        pagination: {
+          type: PaginationType.CURSOR_BASED,
+          pageSize: 2,
+          cursorPath: 'meta.next_cursor'
+        }
+      } as ApiConfig;
+
+      const mockResponses = [
+        { 
+          status: 200, 
+          data: { 
+            data: [{ id: 1 }, { id: 2 }],
+            meta: { next_cursor: 'cursor123' }
+          },
+          statusText: 'OK',
+          headers: {},
+          config: {} as any 
+        },
+        { 
+          status: 200, 
+          data: { 
+            data: [{ id: 3 }],
+            meta: { next_cursor: null }
+          },
+          statusText: 'OK',
+          headers: {},
+          config: {} as any 
+        }
+      ];
+
+      mockedTools.callAxios
+        .mockResolvedValueOnce(mockResponses[0])
+        .mockResolvedValueOnce(mockResponses[1]);
+
+      const result = await callEndpoint(config, {}, {}, {});
+
+      expect(result.data.results).toHaveLength(3);
+      expect(result.data.next_cursor).toBeNull();
+    });
+
+    it('should stop pagination when receiving duplicate data', async () => {
+      const config = {
+        ...testConfig,
+        pagination: {
+          type: PaginationType.PAGE_BASED,
+          pageSize: 2
+        }
+      } as ApiConfig;
+
+      const sameResponse = { 
+        status: 200, 
+        data: [{ id: 1 }, { id: 2 }],
+        statusText: 'OK',
+        headers: {},
+        config: {} as any 
+      };
+
+      mockedTools.callAxios
+        .mockResolvedValueOnce(sameResponse)
+        .mockResolvedValueOnce(sameResponse); // Same data returned
+
+      const result = await callEndpoint(config, {}, {}, {});
+
+      expect(result.data).toHaveLength(2); // Should only include unique data
+      expect(mockedTools.callAxios).toHaveBeenCalledTimes(2);
+    });
+
+    it('should stop after 500 iterations', async () => {
+      const config = {
+        ...testConfig,
+        pagination: {
+          type: PaginationType.OFFSET_BASED,
+          pageSize: 1
+        }
+      } as ApiConfig;
+
+      // Mock 501 responses to test the loop limit
+      const mockResponse = { 
+        status: 200, 
+        statusText: 'OK',
+        headers: {},
+        config: {} as any 
+      };
+      for(let i = 0; i < 505; i++) {
+        mockedTools.callAxios.mockResolvedValueOnce({...mockResponse, data: [{ id: i }]});
+      }
+      const result = await callEndpoint(config, {}, {}, {});
+      // Should stop at 500 iterations (as defined in the code)
+      expect(mockedTools.callAxios).toHaveBeenCalledTimes(500);
+    });
+
+    it('if 2 responses are the same, stop pagination', async () => {
+      const config = {
+        ...testConfig,
+        pagination: {
+          type: PaginationType.OFFSET_BASED,
+          pageSize: 1
+        }
+      } as ApiConfig;
+
+      // Mock 501 responses to test the loop limit
+      const mockResponse = { 
+        status: 200, 
+        data: [{ id: 1 }],
+        statusText: 'OK',
+        headers: {},
+        config: {} as any 
+      };
+
+      mockedTools.callAxios.mockResolvedValue(mockResponse);
+
+      const result = await callEndpoint(config, {}, {}, {});
+
+      // Should stop at 500 iterations (as defined in the code)
+      expect(mockedTools.callAxios).toHaveBeenCalledTimes(2);
+    });
+
     it('should handle error responses', async () => {
       const errorResponse = { 
         status: 400, 

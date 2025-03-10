@@ -30,3 +30,5 @@ if (retries > 3) {...}
 const MAX_RETRIES = 3
 if (retries > MAX_RETRIES) {...}
 ```
+
+always be mindful of deleting tests and explicitly let the user know when you do so (ask for consent!).
