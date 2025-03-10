@@ -14,7 +14,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (process.env.NEXT_PUBLIC_DISABLE_WELCOME_SCREEN === 'true' || true) {
+  if (process.env.NEXT_PUBLIC_DISABLE_WELCOME_SCREEN === 'true') {
     return NextResponse.next();
   }
 
