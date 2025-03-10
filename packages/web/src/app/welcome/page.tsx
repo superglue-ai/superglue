@@ -53,7 +53,8 @@ export default function WelcomePage() {
         
         const { data } = await response.json()
         
-        if (data?.getTenantInfo?.emailEntrySkipped) {
+        // Redirect if either email is set or entry was skipped
+        if (data?.getTenantInfo?.email || data?.getTenantInfo?.emailEntrySkipped) {
           router.push('/')
         }
       } catch (err) {
@@ -167,6 +168,11 @@ export default function WelcomePage() {
 
       if (!response.ok) {
         throw new Error('GraphQL request failed');
+      }
+
+      const result = await response.json();
+      if (result.errors) {
+        throw new Error(result.errors[0]?.message || 'Failed to update skip status');
       }
 
       // Store in cookies

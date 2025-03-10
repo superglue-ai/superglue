@@ -1,6 +1,6 @@
-import { ApiConfig, ApiInput, DataStore, ExtractConfig, ExtractInput, RunResult, TransformConfig, TransformInput } from "@superglue/shared";
+import type { ApiConfig, ApiInput, DataStore, ExtractConfig, ExtractInput, RunResult, TransformConfig, TransformInput } from "@superglue/shared";
 import { createHash } from 'crypto';
-import { createClient, RedisClientType } from 'redis';
+import { type RedisClientType, createClient } from 'redis';
 import { getSchemaFromData } from "../utils/tools.js";
 
 export class RedisService implements DataStore {
@@ -60,7 +60,7 @@ export class RedisService implements DataStore {
     return parseWithId(data, id);
   }
 
-  async listApiConfigs(limit: number = 10, offset: number = 0, orgId?: string): Promise<{ items: ApiConfig[], total: number }> {
+  async listApiConfigs(limit = 10, offset = 0, orgId?: string): Promise<{ items: ApiConfig[], total: number }> {
     const pattern = this.getPattern(this.API_PREFIX, orgId);
     const keys = await this.redis.keys(pattern);
     const slicedKeys = keys.slice(offset, offset + limit);
@@ -128,7 +128,7 @@ export class RedisService implements DataStore {
     return parseWithId(data, id);
   }
 
-  async listExtractConfigs(limit: number = 10, offset: number = 0, orgId: string): Promise<{ items: ExtractConfig[], total: number }> {
+  async listExtractConfigs(limit = 10, offset = 0, orgId: string): Promise<{ items: ExtractConfig[], total: number }> {
     const pattern = this.getPattern(this.EXTRACT_PREFIX, orgId);
     const keys = await this.redis.keys(pattern);
     const slicedKeys = keys.slice(offset, offset + limit);
@@ -172,7 +172,7 @@ export class RedisService implements DataStore {
     return parseWithId(data, id);
   }
 
-  async listTransformConfigs(limit: number = 10, offset: number = 0, orgId?: string): Promise<{ items: TransformConfig[], total: number }> {
+  async listTransformConfigs(limit = 10, offset = 0, orgId?: string): Promise<{ items: TransformConfig[], total: number }> {
     const pattern = this.getPattern(this.TRANSFORM_PREFIX, orgId);
     const keys = await this.redis.keys(pattern);
     const slicedKeys = keys.slice(offset, offset + limit);
@@ -220,7 +220,7 @@ export class RedisService implements DataStore {
     return parseWithId(data, id);
   }
 
-  async listRuns(limit: number = 10, offset: number = 0, configId?: string, orgId?: string): Promise<{ items: RunResult[], total: number }> {
+  async listRuns(limit = 10, offset = 0, configId?: string, orgId?: string): Promise<{ items: RunResult[], total: number }> {
     const pattern = configId 
       ? this.getRunsByConfigPattern(this.RUN_PREFIX, configId, orgId)
       : this.getPattern(this.RUN_PREFIX, orgId);
@@ -329,9 +329,10 @@ export class RedisService implements DataStore {
 
   async setTenantInfo(email?: string, emailEntrySkipped?: boolean): Promise<void> {
     try {
+      const currentInfo = await this.getTenantInfo();
       const tenantInfo = {
-        email: email || null,
-        emailEntrySkipped: emailEntrySkipped || false
+        email: email !== undefined ? email : currentInfo.email,
+        emailEntrySkipped: emailEntrySkipped !== undefined ? emailEntrySkipped : currentInfo.emailEntrySkipped
       };
       await this.redis.set(this.tenantKey(), JSON.stringify(tenantInfo));
     } catch (error) {
