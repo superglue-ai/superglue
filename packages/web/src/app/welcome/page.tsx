@@ -19,7 +19,7 @@ export default function WelcomePage() {
   const config = useConfig()
 
   useEffect(() => {
-    if (process.env.NEXT_PUBLIC_DISABLE_WELCOME_SCREEN === 'true' || true) {
+    if (process.env.NEXT_PUBLIC_DISABLE_WELCOME_SCREEN === 'true') {
       router.push('/')
       return
     }
@@ -53,7 +53,8 @@ export default function WelcomePage() {
         
         const { data } = await response.json()
         
-        if (data?.getTenantInfo?.emailEntrySkipped) {
+        // Redirect if either email is set or entry was skipped
+        if (data?.getTenantInfo?.email || data?.getTenantInfo?.emailEntrySkipped) {
           router.push('/')
         }
       } catch (err) {
@@ -127,7 +128,7 @@ export default function WelcomePage() {
 
       // Store in cookies for better performance
       document.cookie = `sg_tenant_email=${encodeURIComponent(email)}; path=/; max-age=31536000; SameSite=Strict`
-      document.cookie = `sg_tenant_emailEntrySkipped=false; path=/; max-age=31536000; SameSite=Strict`
+      document.cookie = "sg_tenant_emailEntrySkipped=false; path=/; max-age=31536000; SameSite=Strict"
 
       posthog.identify(email, {
         email: email
@@ -169,8 +170,13 @@ export default function WelcomePage() {
         throw new Error('GraphQL request failed');
       }
 
+      const result = await response.json();
+      if (result.errors) {
+        throw new Error(result.errors[0]?.message || 'Failed to update skip status');
+      }
+
       // Store in cookies
-      document.cookie = `sg_tenant_emailEntrySkipped=true; path=/; max-age=31536000; SameSite=Strict`;
+      document.cookie = "sg_tenant_emailEntrySkipped=true; path=/; max-age=31536000; SameSite=Strict";
       
       router.push('/');
     } catch (err) {
