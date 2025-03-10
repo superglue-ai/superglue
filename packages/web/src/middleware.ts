@@ -14,7 +14,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (process.env.NEXT_PUBLIC_DISABLE_WELCOME_SCREEN === 'true' || true) {
+  if (process.env.NEXT_PUBLIC_DISABLE_WELCOME_SCREEN === 'true') {
     return NextResponse.next();
   }
 
@@ -22,11 +22,9 @@ export async function middleware(request: NextRequest) {
   const tenantEmail = request.cookies.get('sg_tenant_email')?.value;
   const emailEntrySkipped = request.cookies.get('sg_tenant_emailEntrySkipped')?.value;
   
-  // If we have cookies, decide based on them
+  // If either email is set or entry was skipped, allow the user to proceed
   if (tenantEmail || emailEntrySkipped === 'true') {
     return NextResponse.next();
-  } else if (emailEntrySkipped === 'false') {
-    return NextResponse.redirect(new URL('/welcome', request.url));
   }
   
   const GQL_ENDPOINT = process.env.GRAPHQL_ENDPOINT

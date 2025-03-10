@@ -1,4 +1,4 @@
-import { ApiConfig, ApiInput, DataStore, ExtractConfig, ExtractInput, RunResult, TransformConfig, TransformInput } from "@superglue/shared";
+import type { ApiConfig, ApiInput, DataStore, ExtractConfig, ExtractInput, RunResult, TransformConfig, TransformInput } from "@superglue/shared";
 import { createHash } from 'crypto';
 import fs from 'fs';
 import path from 'path';
@@ -20,7 +20,7 @@ export class FileStore implements DataStore {
 
   private filePath: string;
 
-  constructor(storageDir: string = '/data') {
+  constructor(storageDir = '/data') {
     this.storage = {
       apis: new Map(),
       extracts: new Map(),
@@ -122,7 +122,7 @@ export class FileStore implements DataStore {
     return config ? { ...config, id } : null;
   }
 
-  async listApiConfigs(limit: number = 10, offset: number = 0, orgId?: string): Promise<{ items: ApiConfig[], total: number }> {
+  async listApiConfigs(limit = 10, offset = 0, orgId?: string): Promise<{ items: ApiConfig[], total: number }> {
     const orgItems = this.getOrgItems(this.storage.apis, 'api', orgId);
     const items = orgItems
       .slice(offset, offset + limit);
@@ -172,7 +172,7 @@ export class FileStore implements DataStore {
     return config ? { ...config, id } : null;
   }
 
-  async listExtractConfigs(limit: number = 10, offset: number = 0, orgId?: string): Promise<{ items: ExtractConfig[], total: number }> {
+  async listExtractConfigs(limit = 10, offset = 0, orgId?: string): Promise<{ items: ExtractConfig[], total: number }> {
     const items = this.getOrgItems(this.storage.extracts, 'extract', orgId)
       .slice(offset, offset + limit);
     const total = this.getOrgItems(this.storage.extracts, 'extract', orgId).length;
@@ -221,7 +221,7 @@ export class FileStore implements DataStore {
     return config ? { ...config, id } : null;
   }
 
-  async listTransformConfigs(limit: number = 10, offset: number = 0, orgId?: string): Promise<{ items: TransformConfig[], total: number }> {
+  async listTransformConfigs(limit = 10, offset = 0, orgId?: string): Promise<{ items: TransformConfig[], total: number }> {
     const items = this.getOrgItems(this.storage.transforms, 'transform', orgId)
       .slice(offset, offset + limit);
     const total = this.getOrgItems(this.storage.transforms, 'transform', orgId).length;
@@ -291,7 +291,7 @@ export class FileStore implements DataStore {
     return run;
   }
 
-  async listRuns(limit: number = 10, offset: number = 0, configId?: string, orgId?: string): Promise<{ items: RunResult[], total: number }> {
+  async listRuns(limit = 10, offset = 0, configId?: string, orgId?: string): Promise<{ items: RunResult[], total: number }> {
     const index = this.storage.runsIndex.get(orgId) || [];
     const runIds = index
       .filter(entry => !configId || entry.configId === configId)
@@ -359,9 +359,10 @@ export class FileStore implements DataStore {
   }
 
   async setTenantInfo(email?: string, emailEntrySkipped?: boolean): Promise<void> {
+    const currentInfo = this.storage.tenant;
     this.storage.tenant = {
-      email: email || null,
-      emailEntrySkipped: emailEntrySkipped || false
+      email: email !== undefined ? email : currentInfo.email,
+      emailEntrySkipped: emailEntrySkipped !== undefined ? emailEntrySkipped : currentInfo.emailEntrySkipped
     };
     await this.persist();
   }
