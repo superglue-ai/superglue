@@ -22,5 +22,5 @@
       }
     }
   },
-  "javascript": { "formatter": { "quoteStyle": "double" } }
+  "javascript": { "formatter": { "quoteStyle": "double", "jsxQuoteStyle": "double" } }
 }

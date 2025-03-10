@@ -1,57 +1,17 @@
 import type { DataStore } from '@superglue/shared';
-import express from 'express';
-import fs from 'node:fs';
-import type { AddressInfo } from 'node:net';
-import path from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { FileStore } from '../datastore/filestore.js';
-import { MemoryStore } from '../datastore/memory.js';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { DataStoreFactory, EnvVarManager, MockServerFactory } from './test-utils.js';
 
 describe('Tenant Info Basic Tests', () => {
-  const dataStores: { name: string; instance: DataStore }[] = [];
-  const testDir = './.test-tenant-data';
-  const testPath = path.join(testDir, 'superglue_data.json');
-
-  // Set up test datastores
-  beforeAll(() => {
-    // Clean up any existing test data
-    if (fs.existsSync(testPath)) {
-      fs.unlinkSync(testPath);
-    }
-    if (fs.existsSync(testDir)) {
-      fs.rmdirSync(testDir);
-    }
-
-    dataStores.push(
-      { name: 'FileStore', instance: new FileStore(testDir) },
-      { name: 'MemoryStore', instance: new MemoryStore() }
-    );
-  });
-
-  afterAll(async () => {
-    for (const { name, instance } of dataStores) {
-      // Cast to any since clearAll and disconnect are implementation-specific
-      if (name === 'FileStore') {
-        // For FileStore we need to clear all and disconnect
-        await (instance as any).clearAll();
-        await (instance as any).disconnect();
-      }
-    }
-
-    // Clean up test files
-    if (fs.existsSync(testPath)) {
-      fs.unlinkSync(testPath);
-    }
-    if (fs.existsSync(testDir)) {
-      fs.rmdirSync(testDir);
-    }
-  });
-
+  // Create data store factory
+  const dataStoreFactory = new DataStoreFactory('./.test-tenant-data');
+  dataStoreFactory.setupHooks();
+  
   // Test all datastore implementations
-  for (const { name, instance } of dataStores) {
+  for (const { name, instance } of dataStoreFactory.init()) {
     describe(`${name} Tenant Info Tests`, () => {
-      beforeAll(async () => {
-        // Reset tenant info before each test
+      // Reset before each test to ensure clean state
+      beforeEach(async () => {
         await instance.setTenantInfo(null, false);
       });
 
@@ -138,10 +98,10 @@ describe('Tenant Info Basic Tests', () => {
   };
 
   describe('TenantInfo Mock GraphQL Resolvers', () => {
-    const datastore = new MemoryStore();
+    let datastore: DataStore;
     
-    beforeAll(async () => {
-      // Reset tenant info before each test
+    beforeEach(async () => {
+      datastore = DataStoreFactory.createMemoryStore();
       await datastore.setTenantInfo(null, false);
     });
 
@@ -162,9 +122,6 @@ describe('Tenant Info Basic Tests', () => {
     });
 
     it('mocked setTenantInfoResolver should update tenant info in datastore', async () => {
-      // First reset to ensure a clean state
-      await datastore.setTenantInfo(null, false);
-      
       // Create a mock resolver that mimics the actual setTenantInfoResolver
       const mockSetTenantInfoResolver = async (
         _: any, 
@@ -186,8 +143,6 @@ describe('Tenant Info Basic Tests', () => {
     });
 
     it('mocked setTenantInfoResolver should preserve unset values', async () => {
-      // Set initial values (explicitly reset first)
-      await datastore.setTenantInfo(null, false);
       const initialEmail = 'initial@example.com';
       await datastore.setTenantInfo(initialEmail, false);
       
@@ -212,78 +167,70 @@ describe('Tenant Info Basic Tests', () => {
     });
 
     it('should handle NEXT_PUBLIC_DISABLE_WELCOME_SCREEN env var', async () => {
-      // Save original env var
-      const originalEnv = process.env.NEXT_PUBLIC_DISABLE_WELCOME_SCREEN;
+      const envManager = new EnvVarManager();
+      envManager.setupHooks();
       
-      try {
-        // Set env var to true
-        process.env.NEXT_PUBLIC_DISABLE_WELCOME_SCREEN = 'true';
-        
-        // Create a mock resolver that mimics the actual getTenantInfoResolver with env var handling
-        const mockGetTenantInfoResolver = async (_: any, __: any, { datastore }: { datastore: DataStore }) => {
-          if (process.env.NEXT_PUBLIC_DISABLE_WELCOME_SCREEN === 'true') {
-            return {
-              email: null,
-              emailEntrySkipped: true
-            };
-          }
-          return await datastore.getTenantInfo();
-        };
-        
-        // Create a mock resolver that mimics the actual setTenantInfoResolver with env var handling
-        const mockSetTenantInfoResolver = async (
-          _: any, 
-          { email, emailEntrySkipped }: { email?: string, emailEntrySkipped?: boolean }, 
-          { datastore }: { datastore: DataStore }
-        ) => {
-          if (process.env.NEXT_PUBLIC_DISABLE_WELCOME_SCREEN === 'true') {
-            return {
-              email: null,
-              emailEntrySkipped: true
-            };
-          }
-          await datastore.setTenantInfo(email, emailEntrySkipped);
-          return await datastore.getTenantInfo();
-        };
-        
-        // Should always return emailEntrySkipped: true regardless of datastore
-        const getResult = await mockGetTenantInfoResolver(null, null, { datastore });
-        expect(getResult).toEqual({
-          email: null,
-          emailEntrySkipped: true
-        });
-        
-        // Should always set emailEntrySkipped to true regardless of input
-        const setResult = await mockSetTenantInfoResolver(
-          null, 
-          { email: 'ignored@example.com', emailEntrySkipped: false }, 
-          { datastore }
-        );
-        expect(setResult).toEqual({
-          email: null,
-          emailEntrySkipped: true
-        });
-      } finally {
-        // Restore original env var
-        process.env.NEXT_PUBLIC_DISABLE_WELCOME_SCREEN = originalEnv;
-      }
+      envManager.set('NEXT_PUBLIC_DISABLE_WELCOME_SCREEN', 'true');
+      
+      // Create a mock resolver that mimics the actual getTenantInfoResolver with env var handling
+      const mockGetTenantInfoResolver = async (_: any, __: any, { datastore }: { datastore: DataStore }) => {
+        if (process.env.NEXT_PUBLIC_DISABLE_WELCOME_SCREEN === 'true') {
+          return {
+            email: null,
+            emailEntrySkipped: true
+          };
+        }
+        return await datastore.getTenantInfo();
+      };
+      
+      // Create a mock resolver that mimics the actual setTenantInfoResolver with env var handling
+      const mockSetTenantInfoResolver = async (
+        _: any, 
+        { email, emailEntrySkipped }: { email?: string, emailEntrySkipped?: boolean }, 
+        { datastore }: { datastore: DataStore }
+      ) => {
+        if (process.env.NEXT_PUBLIC_DISABLE_WELCOME_SCREEN === 'true') {
+          return {
+            email: null,
+            emailEntrySkipped: true
+          };
+        }
+        await datastore.setTenantInfo(email, emailEntrySkipped);
+        return await datastore.getTenantInfo();
+      };
+      
+      // Should always return emailEntrySkipped: true regardless of datastore
+      const getResult = await mockGetTenantInfoResolver(null, null, { datastore });
+      expect(getResult).toEqual({
+        email: null,
+        emailEntrySkipped: true
+      });
+      
+      // Should always set emailEntrySkipped to true regardless of input
+      const setResult = await mockSetTenantInfoResolver(
+        null, 
+        { email: 'ignored@example.com', emailEntrySkipped: false }, 
+        { datastore }
+      );
+      expect(setResult).toEqual({
+        email: null,
+        emailEntrySkipped: true
+      });
     });
   });
 
   describe('Welcome Screen HTTP Mock Integration Test', () => {
-    let server: any;
-    let baseUrl: string;
+    const mockServer = new MockServerFactory();
     let datastore: DataStore;
     
-    // Mock server that simulates the GraphQL endpoint
-    beforeAll(async () => {
-      datastore = new MemoryStore();
+    beforeEach(async () => {
+      datastore = DataStoreFactory.createMemoryStore();
+      await datastore.setTenantInfo(null, false);
+      mockServer.getApp()._router.stack = mockServer.getApp()._router.stack.filter(
+        (layer: any) => layer.route === undefined
+      );
       
-      const app = express();
-      app.use(express.json());
-      
-      // GraphQL endpoint
-      app.post('/graphql', async (req, res) => {
+      mockServer.addPostRoute('/graphql', async (req, res) => {
         const { query, variables } = req.body;
         
         // Handle getTenantInfo query
@@ -313,23 +260,10 @@ describe('Tenant Info Basic Tests', () => {
         // Handle unknown query
         res.status(400).json({ errors: [{ message: 'Unknown query' }] });
       });
-      
-      // Start the server
-      return new Promise<void>((resolve) => {
-        server = app.listen(0, () => {
-          const address = server.address() as AddressInfo;
-          baseUrl = `http://localhost:${address.port}`;
-          console.log(`Mock GraphQL server running at ${baseUrl}`);
-          resolve();
-        });
-      });
     });
     
-    afterAll(() => {
-      if (server) {
-        server.close();
-      }
-    });
+    // Setup server hooks
+    mockServer.setupHooks();
     
     // We'll simulate HTTP requests to the GraphQL endpoint
     // This simulates what happens in welcome/page.tsx and middleware.ts
@@ -338,7 +272,7 @@ describe('Tenant Info Basic Tests', () => {
       const testEmail = 'welcome@example.com';
       
       // Simulate the handleSubmit function
-      const response = await fetch(`${baseUrl}/graphql`, {
+      const response = await fetch(`${mockServer.getBaseUrl()}/graphql`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -376,7 +310,7 @@ describe('Tenant Info Basic Tests', () => {
     
     it('should handle skip button click on welcome screen', async () => {
       // Simulate the handleSkip function
-      const response = await fetch(`${baseUrl}/graphql`, {
+      const response = await fetch(`${mockServer.getBaseUrl()}/graphql`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -409,7 +343,7 @@ describe('Tenant Info Basic Tests', () => {
       await datastore.setTenantInfo('middleware@example.com', true);
       
       // Simulate the middleware check
-      const response = await fetch(`${baseUrl}/graphql`, {
+      const response = await fetch(`${mockServer.getBaseUrl()}/graphql`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
