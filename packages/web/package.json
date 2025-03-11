@@ -25,7 +25,7 @@
         "@radix-ui/react-tooltip": "^1.1.8",
         "@superglue/shared": "file:../shared",
         "autoprefixer": "^10.4.20",
-        "axios": "^1.8.1",
+        "axios": "^1.8.2",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "framer-motion": "^12.4.7",
