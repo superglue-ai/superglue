@@ -20,7 +20,7 @@ export async function generateSchema(instruction: string, responseData: string) 
   while (retryCount <= MAX_RETRIES) {
     try {
       const schema = await attemptSchemaGeneration(messages, retryCount);
-      console.log(`Schema generated`);
+      console.log("Schema generated");
       return schema;
     } catch (error) {
       retryCount++;

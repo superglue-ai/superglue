@@ -2,6 +2,20 @@ import type { ApiConfig, ApiInput, RequestOptions } from "@superglue/shared";
 
 export type ExecutionPlanId = string;
 
+export type ExecutionMode = "DIRECT" | "LOOP" | "FILTER";
+
+export interface VariableMapping {
+  source: string;
+  path: string;
+  isArray: boolean;
+  selectedValues?: string[];
+}
+
+export interface StepAnalysis {
+  executionMode: ExecutionMode;
+  variableMapping: Record<string, VariableMapping>;
+}
+
 export interface ExecutionStep {
   id: string;
   description: string;
@@ -10,6 +24,7 @@ export interface ExecutionStep {
   apiConfig?: ApiConfig;
   dependencies?: string[];
   generateSchema?: boolean;
+  executionMode?: ExecutionMode;
 }
 
 export interface ExecutionPlan {
