@@ -1,6 +1,4 @@
 import type { ApiConfig, ApiInput, RequestOptions } from "@superglue/shared";
-import { callEndpoint, generateApiConfig } from "../../../utils/api.js";
-import { applyJsonataWithValidation } from "../../../utils/tools.js";
 import type {
   ExecutionPlan,
   ExecutionStep,
@@ -10,6 +8,13 @@ import type {
   WorkflowResult,
 } from "../domain/workflow.types.js";
 import { DataExtractor } from "./dataExtractor.js";
+import {
+  executeApiCall,
+  extractTemplateVariables,
+  prepareApiConfig,
+  processStepResult,
+  storeStepResult,
+} from "./workflowUtils.js";
 
 export abstract class WorkflowExecutionStrategy {
   constructor(
@@ -33,119 +38,29 @@ export abstract class WorkflowExecutionStrategy {
     credentials: Record<string, unknown>,
     options?: RequestOptions,
   ): Promise<unknown> {
-    try {
-      if (apiConfig.urlPath?.includes("${")) {
-        const templateVars = this.extractTemplateVariables(apiConfig.urlPath);
-
-        for (const varName of templateVars) {
-          if (!(varName in callPayload)) {
-            throw new Error(`The following variables are not defined: ${varName}`);
-          }
-        }
-
-        // Replace template variables in the URL path
-        let processedPath = apiConfig.urlPath;
-        for (const varName of templateVars) {
-          const value = callPayload[varName];
-          processedPath = processedPath.replace(`\${${varName}}`, String(value));
-        }
-
-        // Update the API config with the processed path
-        apiConfig = {
-          ...apiConfig,
-          urlPath: processedPath,
-        };
-
-        console.log(
-          `[API Call] ${this.step.id}: ${apiConfig.urlPath} (with ${templateVars[0]}=${callPayload[templateVars[0]]})`,
-        );
-      }
-
-      const result = await callEndpoint(apiConfig, callPayload, credentials, options || { timeout: 60000 });
-      return result.data;
-    } catch (error) {
-      console.error(`Error calling '${apiConfig.id}': ${String(error)}`);
-      throw new Error(`API call '${apiConfig.id}' failed: ${String(error)}`);
-    }
+    return executeApiCall(apiConfig, callPayload, credentials, this.step.id, options);
   }
 
   protected extractTemplateVariables(text: string): string[] {
-    const matches = text.match(/\$\{([^}]+)\}/g) || [];
-    return matches.map((match) => match.slice(2, -1));
+    return extractTemplateVariables(text);
   }
 
   protected async processStepResult(result: unknown): Promise<unknown> {
-    try {
-      // If there's no mapping or it's the identity mapping, return as-is
-      if (!this.stepMapping?.responseMapping || this.stepMapping.responseMapping === "$") {
-        return result;
-      }
-
-      // Apply the transformation
-      const transformResult = await applyJsonataWithValidation(result, this.stepMapping.responseMapping, undefined);
-
-      if (!transformResult.success) {
-        console.error(`❌ [Mapping Error] Step '${this.step.id}' - Failed to apply response mapping`);
-        throw new Error(`Response mapping failed: ${transformResult.error}`);
-      }
-
-      console.log(`📝 [Transform] Step '${this.step.id}' - Applied response mapping`);
-      return transformResult.data;
-    } catch (error) {
-      console.error(`❌ [Mapping Error] Step '${this.step.id}' - ${String(error)}`);
-      return result;
-    }
+    return processStepResult(this.step.id, result, this.stepMapping);
   }
 
   /**
    * Store a step result in the workflow result
    */
   protected storeStepResult(rawData: unknown, transformedData: unknown, success: boolean, error?: string): void {
-    const stepResult = {
-      stepId: this.step.id,
-      success,
-      rawData,
-      transformedData,
-      error,
-    };
-
-    this.result.stepResults[this.step.id] = stepResult;
-
-    if (success) {
-      // Update the aggregated data
-      this.result.data[this.step.id] = transformedData;
-      console.log(`✅ [Result] Step '${this.step.id}' - Complete`);
-    } else {
-      console.error(`❌ [Result] Step '${this.step.id}' - Failed: ${error}`);
-    }
+    storeStepResult(this.step.id, this.result, rawData, transformedData, success, error);
   }
 
   /**
    * Prepare the API config for a step
    */
   protected async prepareApiConfig(urlPath: string = this.step.endpoint): Promise<ApiConfig> {
-    // Use manually configured API if available
-    if (this.step.apiConfig) {
-      return this.step.apiConfig;
-    }
-
-    // Otherwise, generate it from the step information
-    const apiInput: ApiInput = {
-      ...(this.baseApiInput || {}),
-      urlHost: this.executionPlan.apiHost,
-      urlPath: urlPath,
-      method: this.step.method as any,
-      instruction: this.step.description,
-    };
-
-    // Make sure we have documentation
-    if (!this.apiDocumentation) {
-      throw new Error("No API documentation available. Please call retrieveApiDocumentation first.");
-    }
-
-    // Generate API config
-    const { config } = await generateApiConfig(apiInput, this.apiDocumentation);
-    return config;
+    return prepareApiConfig(this.step, this.executionPlan, this.apiDocumentation, this.baseApiInput, urlPath);
   }
 }
 
@@ -271,25 +186,12 @@ export class LoopExecutionStrategy extends WorkflowExecutionStrategy {
       const processedResult = await this.processStepResult(apiResponse);
 
       // Store the result
-      this.result.stepResults[this.step.id] = {
-        stepId: this.step.id,
-        success: true,
-        rawData: apiResponse,
-        transformedData: processedResult,
-      };
-
-      // Update the aggregated data
-      this.result.data[this.step.id] = processedResult;
-      console.log(`✅ [LOOP] Step '${this.step.id}' - Complete`);
+      this.storeStepResult(apiResponse, processedResult, true);
 
       return true;
     } catch (error) {
       console.error(`❌ [LOOP] Error in step ${this.step.id}: ${String(error)}`);
-      this.result.stepResults[this.step.id] = {
-        stepId: this.step.id,
-        success: false,
-        error: String(error),
-      };
+      this.storeStepResult(undefined, undefined, false, String(error));
       return false;
     }
   }

@@ -2,7 +2,7 @@ import type { ApiConfig, ApiInput, RequestOptions } from "@superglue/shared";
 import { HttpMethod } from "@superglue/shared";
 import OpenAI from "openai";
 import { v4 as uuidv4 } from "uuid";
-import { callEndpoint, generateApiConfig } from "../../utils/api.js";
+import { generateApiConfig } from "../../utils/api.js";
 import { getDocumentation } from "../../utils/documentation.js";
 import { applyJsonata } from "../../utils/tools.js";
 
@@ -22,6 +22,12 @@ import type {
 import type { WorkflowOrchestrator } from "./domain/workflowOrchestrator.js";
 
 import { DirectExecutionStrategy, ExecutionStrategyFactory } from "./execution/workflowExecutionStrategy.js";
+import {
+  executeApiCall,
+  extractTemplateVariables,
+  processStepResult,
+  storeStepResult
+} from "./execution/workflowUtils.js";
 
 export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
   private apiDocumentation: string;
@@ -259,24 +265,26 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
             processedResult = await this.processStepResult(step, apiResponse, stepMapping);
           }
 
-          result.stepResults[step.id] = {
-            stepId: step.id,
-            success: true,
-            rawData: apiResponse,
-            transformedData: processedResult,
-          };
-
-          // Update the aggregated data
-          result.data[step.id] = processedResult;
+          // Store the step result
+          storeStepResult(
+            step.id,
+            result,
+            apiResponse,
+            processedResult,
+            true
+          );
         } catch (stepError) {
           console.error(`Error executing step ${step.id}:`, stepError);
 
           // If a step fails, record the error but continue with other steps if possible
-          result.stepResults[step.id] = {
-            stepId: step.id,
-            success: false,
-            error: String(stepError),
-          };
+          storeStepResult(
+            step.id,
+            result,
+            undefined,
+            undefined,
+            false,
+            String(stepError)
+          );
           const dependentSteps = executionPlan.steps.filter((s) => s.dependencies?.includes(step.id));
 
           if (dependentSteps.length > 0) {
@@ -412,35 +420,8 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
       if (!apiConfig) {
         throw new Error("No API configuration provided");
       }
-
-      // Check for variables in URL path
-      if (apiConfig.urlPath?.includes("${")) {
-        const templateVars = this.extractTemplateVariables(apiConfig.urlPath);
-
-        // Validate if all required variables are present in the payload
-        for (const varName of templateVars) {
-          if (!(varName in payload)) {
-            throw new Error(`The following variables are not defined: ${varName}`);
-          }
-        }
-
-        // Replace template variables in the URL path
-        let processedPath = apiConfig.urlPath;
-        for (const varName of templateVars) {
-          const value = payload[varName];
-          processedPath = processedPath.replace(`\${${varName}}`, String(value));
-        }
-
-        // Update the API config with the processed path
-        apiConfig = {
-          ...apiConfig,
-          urlPath: processedPath,
-        };
-      }
-
-      const result = await callEndpoint(apiConfig, payload, credentials, options || { timeout: 60000 });
-
-      return result.data;
+      
+      return executeApiCall(apiConfig, payload, credentials, apiConfig.id, options);
     } catch (error) {
       throw new Error(`API call '${apiConfig.id}' failed: ${String(error)}`);
     }
@@ -633,8 +614,7 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
   }
 
   private extractTemplateVariables(text: string): string[] {
-    const matches = text.match(/\$\{([^}]+)\}/g) || [];
-    return matches.map((match) => match.slice(2, -1));
+    return extractTemplateVariables(text);
   }
 
   private async analyzeStep(
@@ -700,7 +680,7 @@ ${JSON.stringify(originalPayload, null, 2)}
 
       console.log("Analyzing step with LLM:", step.id);
       const completion = await openai.chat.completions.create({
-        model: process.env.OPENAI_MODEL || "gpt-4o",
+        model: "gpt-4o",
         response_format: { type: "json_object" },
         messages: messages as any,
       });
@@ -729,24 +709,6 @@ ${JSON.stringify(originalPayload, null, 2)}
   }
 
   private async processStepResult(step: ExecutionStep, result: unknown, mapping: StepMapping): Promise<unknown> {
-    try {
-      // If there's no mapping or it's just the identity mapping, return the result as-is
-      if (!mapping?.responseMapping || mapping.responseMapping === "$") {
-        return result;
-      }
-
-      // Apply the JSONata mapping to transform the result
-      const transformResult = await applyJsonataWithValidation(result, mapping.responseMapping, undefined);
-
-      if (!transformResult.success) {
-        throw new Error(`Response mapping failed: ${transformResult.error}`);
-      }
-
-      return transformResult.data;
-    } catch (error) {
-      // Fall back to returning the raw result if mapping fails
-      console.error(`Error applying response mapping for step ${step.id}:`, error);
-      return result;
-    }
+    return processStepResult(step.id, result, mapping);
   }
 }

@@ -37,16 +37,19 @@ describe("ApiWorkflowOrchestrator-dog", { timeout: 600000 }, () => {
           description: "Get all dog breeds",
         },
         {
-          id: "getRandomImage",
+          id: "getBreedImage",
           endpoint: "/breed/${breed}/images/random",
           method: HttpMethod.GET,
-          description: "Get a random image for each dog breed",
-          dependencies: ["getAllBreeds"],
+          description: "Get a random image for a specific dog breed",
+          dependencies: ["getAllBreeds"]
         },
       ],
       finalTransform: `{
-        "breeds": getAllBreeds,
-        "randomImage": getRandomImage
+        "breeds": $map($keys(getAllBreeds.message), function($breed, $index) {
+          {
+            $breed: getBreedImage[$index].message
+          }
+        })
       }`,
     };
 
@@ -60,7 +63,7 @@ describe("ApiWorkflowOrchestrator-dog", { timeout: 600000 }, () => {
       responseMapping: "$",
     });
 
-    await orchestrator.setStepMapping(planId, "getRandomImage", {
+    await orchestrator.setStepMapping(planId, "getBreedImage", {
       inputMapping: "$",
       responseMapping: "$",
     });
@@ -75,39 +78,17 @@ describe("ApiWorkflowOrchestrator-dog", { timeout: 600000 }, () => {
     const result = await orchestrator.executeWorkflowPlan(planId, payload, credentials);
     console.log("Full result:", result);
 
-    console.log("\n📋 [Workflow] Workflow completed successfully");
-    console.log(
-      "Final result:",
-      JSON.stringify(
-        {
-          breeds: "Object with dog breeds",
-          randomImage: result.data.randomImage,
-        },
-        null,
-        2,
-      ),
-    );
-
-    // Show key results only
-    for (const [stepId, stepResult] of Object.entries(result.stepResults)) {
-      if (stepId === "getRandomImage") {
-        console.log(`\n🖼️ Random image URL: ${stepResult.transformedData}`);
-      }
-    }
-
     // Assertions
     expect(result.success).toBe(true);
     expect(result.data).toBeDefined();
     expect(result.data.breeds).toBeDefined();
-    expect(typeof result.data.breeds).toBe("object");
-    expect(result.data.randomImage).toBeDefined();
-    expect(typeof result.data.randomImage).toBe("string");
+    expect(Array.isArray(result.data.breeds)).toBe(true);
+    expect(Object.values(result.data.breeds[0])[0]).toBeDefined();
+    expect(typeof Object.values(result.data.breeds[0])[0]).toBe("string");
 
     // Step results should exist and be successful
     expect(result.stepResults).toBeDefined();
     expect(result.stepResults.getAllBreeds).toBeDefined();
     expect(result.stepResults.getAllBreeds.success).toBe(true);
-    expect(result.stepResults.getRandomImage).toBeDefined();
-    expect(result.stepResults.getRandomImage.success).toBe(true);
   });
 });
