@@ -162,7 +162,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
     // Create a unique ID for this field's description
     const descFieldId = [...path, 'description'].join('.');
     
-    // Add this helper function to check if field is required
+    // Helper function to check if field is required
     const isFieldRequired = () => {
       if (isRoot || isArrayChild) return false;
       const parentPath = path.slice(0, -2);
@@ -171,6 +171,45 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
         parent = parent[segment];
       }
       return parent.required?.includes(fieldName) || false;
+    };
+    
+    const finishEditing = () => {
+      // Only update the schema if the field name is not a duplicate and not empty
+      if (!isDuplicateField && tempFieldName !== fieldName && tempFieldName.trim() !== '') {
+        const newSchema = { ...visualSchema };
+        let current = newSchema;
+        for (let i = 0; i < path.length - 2; i++) {
+          current = current[path[i]];
+        }
+        
+        const properties = current[path[path.length - 2]];
+        const newProperties: Record<string, any> = {};
+        
+        // Apply the name change
+        for (const key of Object.keys(properties)) {
+          if (key === fieldName) {
+            newProperties[tempFieldName] = properties[fieldName];
+          } else {
+            newProperties[key] = properties[key];
+          }
+        }
+        
+        // Update required fields if needed
+        if (current.required?.includes(fieldName)) {
+          current.required = current.required.map((f: string) => 
+            f === fieldName ? tempFieldName : f
+          );
+        }
+        
+        current[path[path.length - 2]] = newProperties;
+        setVisualSchema(newSchema);
+        onChange(JSON.stringify(newSchema, null, 2));
+      }
+      
+      // Always reset states when done editing
+      setTempFieldName('');
+      setEditingField(null);
+      setIsDuplicateField(false);
     };
 
     return (
@@ -192,7 +231,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
                   }
                   const properties = current[path[path.length - 2]];
                   
-                  // (it's a duplicate if a property with that name exists and it's not the current field)
+                  // it's a duplicate if a property with that name exists and it's not the current field
                   const isDuplicateKey = properties[e.target.value] && fieldName !== e.target.value;
                   setIsDuplicateField(isDuplicateKey);  // for UI highlighting
                   // DO NOT update the schema while typing - only when editing is complete
@@ -203,81 +242,10 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
                 )}
                 placeholder="Field name"
                 autoFocus
-                onBlur={() => {
-                  // Only update the schema if the field name is not a duplicate
-                  if (!isDuplicateField && tempFieldName !== fieldName) {
-                    const newSchema = { ...visualSchema };
-                    let current = newSchema;
-                    for (let i = 0; i < path.length - 2; i++) {
-                      current = current[path[i]];
-                    }
-                    
-                    const properties = current[path[path.length - 2]];
-                    const newProperties: Record<string, any> = {};
-                    
-                    // Apply the name change
-                    for (const key of Object.keys(properties)) {
-                      if (key === fieldName) {
-                        newProperties[tempFieldName] = properties[fieldName];
-                      } else {
-                        newProperties[key] = properties[key];
-                      }
-                    }
-                    
-                    // Update required fields
-                    if (current.required?.includes(fieldName)) {
-                      current.required = current.required.map((f: string) => 
-                        f === fieldName ? tempFieldName : f
-                      );
-                    }
-                    
-                    current[path[path.length - 2]] = newProperties;
-                    setVisualSchema(newSchema);
-                    onChange(JSON.stringify(newSchema, null, 2));
-                  }
-                  
-                  // Reset states after editing
-                  setTempFieldName('');
-                  setEditingField(null);
-                  setIsDuplicateField(false);
-                }}
+                onBlur={finishEditing}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
-                    // Only update the schema if the field name is not a duplicate
-                    if (!isDuplicateField && tempFieldName !== fieldName) {
-                      const newSchema = { ...visualSchema };
-                      let current = newSchema;
-                      for (let i = 0; i < path.length - 2; i++) {
-                        current = current[path[i]];
-                      }
-                      
-                      const properties = current[path[path.length - 2]];
-                      const newProperties: Record<string, any> = {};
-                      
-                      for (const key of Object.keys(properties)) {
-                        if (key === fieldName) {
-                          newProperties[tempFieldName] = properties[fieldName];
-                        } else {
-                          newProperties[key] = properties[key];
-                        }
-                      }
-                      
-                      // Update required fields if needed
-                      if (current.required?.includes(fieldName)) {
-                        current.required = current.required.map((f: string) => 
-                          f === fieldName ? tempFieldName : f
-                        );
-                      }
-                      
-                      current[path[path.length - 2]] = newProperties;
-                      setVisualSchema(newSchema);
-                      onChange(JSON.stringify(newSchema, null, 2));
-                    }
-                    
-                    // Reset states after editing
-                    setTempFieldName('');
-                    setEditingField(null);
-                    setIsDuplicateField(false);
+                    finishEditing();
                   }
                 }}
               />
