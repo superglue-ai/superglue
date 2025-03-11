@@ -4,6 +4,7 @@ import { anthropic } from '@ai-sdk/anthropic';
 import { mistral } from '@ai-sdk/mistral';
 import { xai } from '@ai-sdk/xai';
 import { deepseek } from '@ai-sdk/deepseek';
+import { LanguageModel } from 'ai';
 
 class ModelProvider {
   private static model: any = null;
@@ -17,62 +18,36 @@ class ModelProvider {
       throw new Error('LLM_PROVIDER is not specified in the environment variables');
     }
 
+    ModelProvider.model = ModelProvider.selectModel(llmProvider, llmModel);
+  }
+  private static selectModel(llmProvider: string, llmModel: string) : LanguageModel {
     switch (llmProvider.toLowerCase()) {
       case 'openai':
-        ModelProvider.model = openai(llmModel, { structuredOutputs: true });
-        break;
+        return openai(llmModel, { structuredOutputs: true });
       case 'google':
-        ModelProvider.model = google(llmModel, { structuredOutputs: true });
-        break;
+        return google(llmModel, { structuredOutputs: true });
       case 'anthropic':
-        ModelProvider.model = anthropic(llmModel);
-        break;
+        return anthropic(llmModel);
       case 'mistral':
-        ModelProvider.model = mistral(llmModel);
-        break;
+        return mistral(llmModel);
       case 'deepseek':
-        ModelProvider.model = deepseek(llmModel);
-        break;
+        return deepseek(llmModel);
       case 'xai':
-        ModelProvider.model = xai(llmModel);
-        break;
+        return xai(llmModel);
       default:
         throw new Error(`Unsupported LLM provider: ${llmProvider}`);
     }
   }
-
   private static initializeSchemaModel() {
-    const schemaGenerationProvider = process.env.SCHEMA_GENERATION_PROVIDER;
-    const schemaGenerationModel = process.env.SCHEMA_GENERATION_MODEL;
-    const llmModel = process.env.LLM_MODEL;
+    const schemaGenerationProvider = process.env.SCHEMA_GENERATION_PROVIDER || process.env.LLM_PROVIDER;
+    const schemaGenerationModel = process.env.SCHEMA_GENERATION_MODEL || process.env.LLM_MODEL;
 
     if (!schemaGenerationProvider || !schemaGenerationModel) {
       ModelProvider.schemaModel = ModelProvider.getModel();
       return;
     }
 
-    switch (schemaGenerationProvider.toLowerCase()) {
-      case 'openai':
-        ModelProvider.schemaModel = openai(llmModel, { structuredOutputs: true });
-        break;
-      case 'google':
-        ModelProvider.schemaModel = google(llmModel, { structuredOutputs: true });
-        break;
-      case 'anthropic':
-        ModelProvider.schemaModel = anthropic(llmModel);
-        break;
-      case 'mistral':
-        ModelProvider.schemaModel = mistral(llmModel);
-        break;
-      case 'deepseek':
-        ModelProvider.schemaModel = deepseek(llmModel);
-        break;
-      case 'xai':
-        ModelProvider.schemaModel = xai(llmModel);
-        break;
-      default:
-        ModelProvider.schemaModel = ModelProvider.getModel();
-    }
+    ModelProvider.schemaModel = ModelProvider.selectModel(schemaGenerationProvider, schemaGenerationModel);
   }
 
   public static getModel() {

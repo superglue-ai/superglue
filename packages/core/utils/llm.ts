@@ -32,7 +32,6 @@ class LLMClient {
     const result = await generateObject({
       model: model || ModelProvider.getModel(),
       schema,
-      schemaName,
       messages,
       temperature,
     });

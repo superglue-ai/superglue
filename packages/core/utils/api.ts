@@ -162,8 +162,6 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
         This usually indicates an error page or invalid endpoint.\nResponse: ${response.data.slice(0, 2000)}`);
     }
 
-    let dataPathSuccess = true;
-
     // TODO: we need to remove the data path and just join the data with the next page of data, otherwise we will have to do a lot of gymnastics to get the data path right
 
     let responseData = response.data;
@@ -175,7 +173,6 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
         // sometimes a jsonata expression is used to get the data, so ignore the $
         // TODO: fix this later
         if(!responseData[part] && part !== '$') {
-          dataPathSuccess = false;
           break;
         }
         responseData = responseData[part] || responseData;  
@@ -318,10 +315,10 @@ Documentation: ${String(documentation)}`
   console.log("Generating API config for " + apiConfig.urlHost + (retryCount > 0 ? ` (retry ${retryCount})` : ""));
 
   const generatedConfig = await LLMClient.getInstance().getObject({
-    schema:schema,
-    schemaName:"api_definition",
-    temperature:temperature,
-    messages:messages
+    schema,
+    schemaName: "api_definition",
+    temperature,
+    messages,
   });
   
   // Add the assistant's response to messages for future context

@@ -108,6 +108,10 @@ function validateEnvironment() {
     'LLM_MODEL',
     'GRAPHQL_PORT',
   ];
+  // backwards compatibility
+  process.env.LLM_PROVIDER = process.env.LLM_PROVIDER || 'openai';
+  process.env.LLM_MODEL = process.env.LLM_MODEL || process.env.OPENAI_MODEL;
+
   requiredEnvVars.forEach((envVar) => {
     if (!process.env[envVar]) {
       throw new Error(`Environment variable ${envVar} is not set.`);

@@ -43,19 +43,8 @@ async function attemptSchemaGeneration(
   messages: Array<CoreMessage>,
   retry: number
 ): Promise<string> {
-//<<<<<<< vercel-ai-sdk-integration
   console.log(`Generating schema: ${retry ? `(retry ${retry})` : ""}`);
-    
   const temperature = Math.min(0.3 * retry, 1.0);
-//=======
-  console.log(`Generating schema${retry ? `: (retry ${retry})` : ""}`);
-  const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-    baseURL: process.env.OPENAI_API_BASE_URL
-  });
-  
-  const modelName = process.env.SCHEMA_GENERATION_MODEL || process.env.OPENAI_MODEL;
-//>>>>>>> staging
   
   let generatedSchema = await LLMClient.getInstance().getText({
     model: ModelProvider.getSchemaModel(),
