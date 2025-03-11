@@ -1,5 +1,5 @@
-import { ApiConfig, ApiInput, AuthType, HttpMethod, PaginationType, RequestOptions } from "@superglue/shared";
-import { AxiosRequestConfig } from "axios";
+import { type ApiConfig, type ApiInput, AuthType, HttpMethod, PaginationType, type RequestOptions } from "@superglue/shared";
+import type { AxiosRequestConfig } from "axios";
 import OpenAI from "openai";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
@@ -20,7 +20,7 @@ export async function prepareEndpoint(
     const currentTime = new Date();
 
     // Initialize the ApiCallConfig object with provided input
-    let apiCallConfig: Partial<ApiConfig> = { 
+    const apiCallConfig: Partial<ApiConfig> = { 
       ...endpointInput,
       createdAt: currentTime,
       updatedAt: currentTime,
@@ -30,10 +30,10 @@ export async function prepareEndpoint(
     // If a documentation URL is provided, fetch and parse additional details
     const documentation = await getDocumentation(apiCallConfig.documentationUrl || composeUrl(apiCallConfig.urlHost, apiCallConfig.urlPath), apiCallConfig.headers, apiCallConfig.queryParams, apiCallConfig?.urlPath);
     if(documentation.length >= DOCUMENTATION_MAX_LENGTH) {
-      console.warn("Documentation length at limit: " + documentation.length);
+      console.warn(`Documentation length at limit: ${documentation.length}`);
     }
     if(documentation.length <= 10000) {
-      console.warn("Documentation length is short: " + documentation.length);
+      console.warn(`Documentation length is short: ${documentation.length}`);
     }
 
     const availableVars = [...Object.keys(payload || {}), ...Object.keys(credentials || {})];
@@ -194,7 +194,7 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
         hasMore = false;
       }
     } 
-    else if(responseData && allResults.length == 0) {
+    else if(responseData && allResults.length === 0) {
       allResults.push(responseData);
       hasMore = false;
     }
@@ -233,11 +233,11 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
   }
 
   return {
-    data: allResults?.length == 1 ? allResults[0] : allResults
+    data: allResults?.length === 1 ? allResults[0] : allResults
   };
 }
 
-async function generateApiConfig(
+export async function generateApiConfig(
   apiConfig: Partial<ApiConfig>, 
   documentation: string, 
   vars: string[] = [], 
@@ -283,8 +283,8 @@ Instructions: ${apiConfig.instruction}
 
 Base URL: ${composeUrl(apiConfig.urlHost, apiConfig.urlPath)}
 
-${userProvidedAdditionalInfo ? `Also, the user provided the following information, which is probably correct: ` : ''}
-${userProvidedAdditionalInfo ? `Ensure to use the provided information. You must try them at least where they make sense.` : ''}
+${userProvidedAdditionalInfo ? "Also, the user provided the following information, which is probably correct: " : ""}
+${userProvidedAdditionalInfo ? "Ensure to use the provided information. You must try them at least where they make sense." : ""}
 ${apiConfig.headers ? `Headers: ${JSON.stringify(apiConfig.headers)}` : ''}
 ${apiConfig.queryParams ? `Query Params: ${JSON.stringify(apiConfig.queryParams)}` : ''}
 ${apiConfig.body ? `Body: ${JSON.stringify(apiConfig.body)}` : ''}
@@ -319,7 +319,7 @@ Documentation: ${String(documentation)}`
   const numInitialMessages = 2;
   const retryCount = previousMessages.length > 0 ? (messages.length - numInitialMessages) / 2 : 0;
   const temperature = String(process.env.OPENAI_MODEL).startsWith("o") ? undefined : Math.min(retryCount * 0.1, 1);
-  console.log("Generating API config for " + apiConfig.urlHost + (retryCount > 0 ? ` (retry ${retryCount})` : ""));
+  console.log(`Generating API config for ${apiConfig.urlHost} ${retryCount > 0 ? `(retry ${retryCount})` : ""}`);
 
   const completion = await openai.chat.completions.create({
     model: process.env.OPENAI_MODEL,
