@@ -4,7 +4,7 @@ import { useConfig } from '@/src/app/config-context'
 import { useToast } from '@/src/hooks/use-toast'
 import { cleanApiDomain, cn } from '@/src/lib/utils'
 import { ApiConfig, AuthType, CacheMode, SuperglueClient } from '@superglue/client'
-import { Copy, Loader2, Terminal } from 'lucide-react'
+import { Copy, Loader2, Terminal, Upload } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { InteractiveApiPlayground } from '../InteractiveApiPlayground'
@@ -57,6 +57,9 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
 
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({})
   
+  const [docFile, setDocFile] = useState<File | null>(null)
+  const [isDraggingDoc, setIsDraggingDoc] = useState(false)
+
   const handleChange = (field: string) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | string
   ) => {
@@ -376,6 +379,88 @@ const result = await superglue.call({
     }
   }
 
+  // Add these handlers for documentation file upload
+  const handleDocDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDraggingDoc(true)
+  }
+
+  const handleDocDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDraggingDoc(false)
+  }
+
+  const extractTextFromFile = async (file: File): Promise<string> => {
+    if (file.type === 'application/pdf') {
+      // For PDFs, use pdf.js
+      const pdfjsLib = await import('pdfjs-dist');
+      // Update worker path to use .mjs extension
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
+      
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      
+      let fullText = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map((item: any) => item.str).join(' ');
+        fullText += pageText + '\n';
+      }
+      return fullText;
+    } else {
+      // For text files (.txt, .md, etc)
+      return await file.text();
+    }
+  }
+
+  const handleDocDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingDoc(false);
+    
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    
+    try {
+      const extractedText = await extractTextFromFile(file);
+      setDocFile(file);
+      // Store the extracted text in formData for later use
+      setFormData(prev => ({
+        ...prev,
+        documentationUrl: extractedText
+      }));
+    } catch (error) {
+      console.error('Error extracting text from file:', error);
+      toast({
+        title: 'Error Processing File',
+        description: 'Could not extract text from the uploaded file',
+        variant: 'destructive'
+      });
+    }
+  }
+
+  const handleDocFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    try {
+      const extractedText = await extractTextFromFile(file);
+      setDocFile(file);
+      // Store the extracted text in formData for later use
+      setFormData(prev => ({
+        ...prev,
+        documentationUrl: extractedText
+      }));
+    } catch (error) {
+      console.error('Error extracting text from file:', error);
+      toast({
+        title: 'Error Processing File',
+        description: 'Could not extract text from the uploaded file',
+        variant: 'destructive'
+      });
+    }
+  }
+
   // Update form data when prefillData changes or when modal is opened
   useEffect(() => {
     if (prefillData && open) {
@@ -447,15 +532,63 @@ const result = await superglue.call({
               
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <Label htmlFor="documentationUrl">API Documentation (Optional)</Label>
-                  <HelpTooltip text="Link to the API's documentation if available" />
+                  <Label htmlFor="documentationUrl">API Documentation</Label>
+                  <HelpTooltip text="Link to the API's documentation or upload a documentation file" />
                 </div>
-                <Input
-                  id="documentationUrl"
-                  value={formData.documentationUrl}
-                  onChange={handleChange('documentationUrl')}
-                  placeholder="https://docs.example.com"
-                />
+                
+                {docFile ? (
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 flex items-center gap-3 bg-blue-500/10 px-4 py-2 rounded-lg">
+                      <Upload className="h-4 w-4 text-blue-500 shrink-0" />
+                      <span className="text-white font-medium text-sm truncate">{formData.documentationUrl.slice(0, 300)}</span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="shrink-0 text-muted-foreground hover:text-destructive transition-colors"
+                      onClick={() => {
+                        setFormData(prev => ({ ...prev, documentationUrl: '' }))
+                        setDocFile(null)
+                      }}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <Input
+                      id="documentationUrl"
+                      value={formData.documentationUrl}
+                      onChange={handleChange('documentationUrl')}
+                      placeholder="https://docs.example.com"
+                      className="flex-1"
+                    />
+                    <div 
+                      className={cn(
+                        "relative shrink-0",
+                        isDraggingDoc && "after:absolute after:inset-0 after:bg-primary/5 after:backdrop-blur-[1px] after:rounded-lg after:border-2 after:border-primary"
+                      )}
+                      onDragOver={handleDocDragOver}
+                      onDragLeave={handleDocDragLeave}
+                      onDrop={handleDocDrop}
+                    >
+                      <Button
+                        variant="outline"
+                        className="h-9"
+                        onClick={() => document.getElementById('doc-file-upload')?.click()}
+                      >
+                        Upload PDF
+                      </Button>
+                      <input
+                        type="file"
+                        id="doc-file-upload"
+                        className="hidden"
+                        onChange={handleDocFileUpload}
+                        accept=".pdf,.txt,.md"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
               
               <div>
