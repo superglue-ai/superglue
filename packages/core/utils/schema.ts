@@ -49,10 +49,8 @@ async function attemptSchemaGeneration(
   const openaiConfig: any = {
     apiKey: process.env.OPENAI_API_KEY,
     baseURL: process.env.OPENAI_API_BASE_URL,
+    posthog: telemetryClient
   };
-  if (telemetryClient) {
-    openaiConfig.posthog = telemetryClient;
-  }
   const openai = new OpenAI(openaiConfig);
 
   const modelName = process.env.SCHEMA_GENERATION_MODEL || process.env.OPENAI_MODEL;

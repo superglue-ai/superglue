@@ -263,10 +263,8 @@ async function generateApiConfig(
   const openaiConfig: any = {
     apiKey: process.env.OPENAI_API_KEY,
     baseURL: process.env.OPENAI_API_BASE_URL,
+    posthog: telemetryClient
   };
-  if (telemetryClient) {
-    openaiConfig.posthog = telemetryClient;
-  }
   const openai = new OpenAI(openaiConfig);
 
   const userProvidedAdditionalInfo = Boolean(
