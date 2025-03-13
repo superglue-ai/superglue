@@ -9,9 +9,6 @@
         "lint": "next lint"
     },
     "dependencies": {
-        "@types/prismjs": "^1.26.5",
-        "prismjs": "^1.29.0",
-        "react-simple-code-editor": "^0.14.1",    
         "@apollo/client": "^3.13.1",
         "@radix-ui/react-accordion": "^1.2.3",
         "@radix-ui/react-alert-dialog": "^1.1.6",
@@ -24,17 +21,21 @@
         "@radix-ui/react-toast": "^1.2.6",
         "@radix-ui/react-tooltip": "^1.1.8",
         "@superglue/shared": "file:../shared",
+        "@types/prismjs": "^1.26.5",
         "autoprefixer": "^10.4.20",
-        "axios": "^1.8.1",
+        "axios": "^1.8.2",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "framer-motion": "^12.4.7",
         "graphql": "^16.10.0",
         "lucide-react": "^0.474.0",
         "next": "15.1.6",
+        "pdfjs-dist": "^4.10.38",
         "posthog-js": "^1.230.4",
+        "prismjs": "^1.30.0",
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
+        "react-simple-code-editor": "^0.14.1",
         "react-virtualized": "^9.22.6",
         "shadcn-ui": "^0.9.5",
         "tailwind-merge": "^2.6.0",
@@ -49,5 +50,10 @@
         "postcss": "^8.5.3",
         "tailwindcss": "^3.4.17",
         "typescript": "^5.7.3"
-    }
+    },
+    "overrides": {
+        "pdfjs-dist": {
+          "@napi-rs/canvas": false
+        }
+    }    
 }
