@@ -577,7 +577,7 @@ const result = await superglue.call({
                         className="h-9"
                         onClick={() => document.getElementById('doc-file-upload')?.click()}
                       >
-                        Upload PDF
+                        Upload Document
                       </Button>
                       <input
                         type="file"
