@@ -1,32 +1,24 @@
 import { TransformInput } from '@superglue/shared';
-import dotenv from 'dotenv';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('@posthog/ai');
+vi.mock('./telemetry.js', () => ({
+  telemetryClient: { capture: vi.fn() }
+}));
+
+import { setupOpenAIMock } from '../tests/test-utils.js';
+
+vi.stubEnv('OPENAI_API_KEY', 'test-key');
+vi.stubEnv('OPENAI_MODEL', 'gpt-4o');
+
+const mockOpenAI = setupOpenAIMock();
+
 import { applyJsonataWithValidation } from './tools.js';
 import { generateMapping, prepareTransform } from './transform.js';
 
-// Define mockOpenAI at the top level
-const mockOpenAI = {
-  chat: {
-    completions: {
-      create: vi.fn()
-    }
-  }
-};
-vi.mock('openai', () => ({
-    default: class {
-      constructor() {
-        return mockOpenAI;
-      }
-    }
-  }));          
-
 describe('transform utils', () => {  
   beforeEach(() => {
-    // Reset all mocks before each test
     vi.clearAllMocks();
-    dotenv.config();
-    // Reset the mock implementation
-    mockOpenAI.chat.completions.create.mockReset();
   });
 
   describe('prepareTransform', () => {
@@ -41,14 +33,14 @@ describe('transform utils', () => {
       }
     };
     const samplePayload = {
-        user: {
-          firstName: 'John',
-          lastName: 'Doe'
-        }
-      };  
+      user: {
+        firstName: 'John',
+        lastName: 'Doe'
+      }
+    };
 
     it('should return null if responseSchema is empty', async () => {
-      let mockDataStore = {
+      const mockDataStore = {
         getTransformConfigFromRequest: vi.fn(),
       } as any;      
       const input = { ...sampleInput, responseSchema: {} };
@@ -56,10 +48,19 @@ describe('transform utils', () => {
       expect(result).toBeNull();
     });
 
+    it('should return null if data is empty', async () => {
+      const mockDataStore = {
+        getTransformConfigFromRequest: vi.fn(),
+      } as any;
+      
+      const result = await prepareTransform(mockDataStore, false, sampleInput, {}, testOrgId);
+      expect(result).toBeNull();
+    });
+
     it('should return cached config if fromCache is true and cache exists', async () => {
-        let mockDataStore = {
-            getTransformConfigFromRequest: vi.fn(),
-          } as any;          
+      const mockDataStore = {
+        getTransformConfigFromRequest: vi.fn(),
+      } as any;          
       const cachedConfig = {
         id: 'cached-id',
         responseMapping: 'cached-mapping',
@@ -67,7 +68,7 @@ describe('transform utils', () => {
         updatedAt: new Date()
       };
       
-      (mockDataStore.getTransformConfigFromRequest as any).mockResolvedValue(cachedConfig);
+      mockDataStore.getTransformConfigFromRequest.mockResolvedValue(cachedConfig);
       
       const result = await prepareTransform(mockDataStore, true, sampleInput, { product: { name: 'test' } }, testOrgId);
       
@@ -78,7 +79,7 @@ describe('transform utils', () => {
     });
 
     it('should create new config if responseMapping is provided', async () => {
-      let mockDataStore = {
+      const mockDataStore = {
         getTransformConfigFromRequest: vi.fn(),
       } as any;          
       const input = {
@@ -99,20 +100,20 @@ describe('transform utils', () => {
 
     
     it('should generate new mapping if no responseMapping is provided', async () => {
-        let mockDataStore = {
-            getTransformConfigFromRequest: vi.fn(),
-          } as any;      
-          mockOpenAI.chat.completions.create.mockResolvedValueOnce({
-            choices: [{
-              message: {
-                content: JSON.stringify({
-                  jsonata: '{"name": user.firstName & " " & user.lastName}',
-                  confidence: 95,
-                  confidence_reasoning: 'Direct field mapping available'
-                })
-              }
-            }]
-          });    
+      const mockDataStore = {
+        getTransformConfigFromRequest: vi.fn(),
+      } as any;      
+      mockOpenAI.chat.completions.create.mockResolvedValueOnce({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              jsonata: '{"name": user.firstName & " " & user.lastName}',
+              confidence: 95,
+              confidence_reasoning: 'Direct field mapping available'
+            })
+          }
+        }]
+      });    
       const transform = await prepareTransform(mockDataStore, false, sampleInput, samplePayload, testOrgId);
       const result = await applyJsonataWithValidation(samplePayload, transform.responseMapping, sampleInput.responseSchema);
       expect(result).toMatchObject({
