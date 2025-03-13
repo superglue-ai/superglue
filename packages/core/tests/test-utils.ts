@@ -3,7 +3,7 @@ import express from "express";
 import fs from "node:fs";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
-import { afterAll, beforeAll } from "vitest";
+import { afterAll, beforeAll, vi } from "vitest";
 import { FileStore } from "../datastore/filestore.js";
 import { MemoryStore } from "../datastore/memory.js";
 
@@ -177,3 +177,59 @@ export class EnvVarManager {
     });
   }
 }
+
+/**
+ * Create a shared mock for OpenAI that can be used across tests
+ */
+const globalMockOpenAI = {
+  chat: {
+    completions: {
+      create: vi.fn()
+    }
+  }
+};
+
+/**
+ * Setup function to create and configure OpenAI mock for a test suite
+ * Returns the mock client for assertions and configuring responses
+ */
+export const setupOpenAIMock = () => {
+  // Clear any previous mock responses
+  globalMockOpenAI.chat.completions.create.mockReset();
+  
+  vi.stubEnv('OPENAI_API_KEY', 'test-key');
+  vi.stubEnv('OPENAI_MODEL', 'gpt-4o');
+  
+  vi.mock('@posthog/ai', () => ({
+    OpenAI: function() {
+      return globalMockOpenAI;
+    }
+  }));
+  
+  vi.mock('../utils/telemetry.js', () => ({
+    telemetryClient: { capture: vi.fn() }
+  }));
+  
+  return globalMockOpenAI;
+};
+
+export const createMockCompletionResponse = (content: string) => {
+  return {
+    choices: [{
+      message: {
+        content
+      }
+    }]
+  };
+};
+
+export const setupTestEnvironment = () => {
+  vi.stubEnv('OPENAI_API_KEY', 'test-key');
+  vi.stubEnv('OPENAI_MODEL', 'gpt-4o');
+};
+
+export const restoreAllMocks = () => {
+  vi.restoreAllMocks();
+  vi.resetModules();
+  vi.clearAllMocks();
+};

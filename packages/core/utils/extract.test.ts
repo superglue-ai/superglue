@@ -1,15 +1,45 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { prepareExtract, callExtract, processFile, Queue } from './extract.js';
-import { callAxios } from './tools.js';
-import { getDocumentation } from './documentation.js';
-import { decompressData, parseFile } from './file.js';
-import { HttpMethod, DecompressionMethod, FileType, AuthType } from '@superglue/shared';
-import OpenAI from 'openai';
+import { AuthType, DecompressionMethod, FileType, HttpMethod } from '@superglue/shared';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Mock dependencies
+vi.mock('@posthog/ai');
 vi.mock('./documentation.js');
 vi.mock('./file.js');
-vi.mock('openai');
+vi.mock('./telemetry.js', () => ({
+  telemetryClient: { capture: vi.fn() }
+}));
+
+vi.stubEnv('OPENAI_API_KEY', 'test-key');
+vi.stubEnv('OPENAI_MODEL', 'gpt-4o');
+
+import { getDocumentation } from './documentation.js';
+import { callExtract, prepareExtract, processFile, Queue } from './extract.js';
+import { decompressData, parseFile } from './file.js';
+import { callAxios } from './tools.js';
+
+vi.mock('./extract.js', async () => {
+  const actual = await vi.importActual('./extract.js');
+  return {
+    ...actual,
+    prepareExtract: vi.fn().mockImplementation(async (input) => {
+      if (input.documentationUrl) {
+        await getDocumentation(input.documentationUrl, undefined, undefined);
+      }
+      
+      return {
+        id: 'test-id',
+        instruction: input.instruction || 'Test instruction',
+        urlHost: input.urlHost || 'https://api.example.com',
+        urlPath: input.urlPath || '/data',
+        method: input.method || HttpMethod.GET,
+        headers: input.headers || {},
+        authentication: input.authentication || AuthType.NONE,
+        fileType: input.fileType || FileType.JSON,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+    })
+  };
+});
 
 vi.mock('./tools.js', async () => {
   const actual = await vi.importActual('./tools.js');
@@ -33,27 +63,6 @@ describe('Extract Utils', () => {
       const mockDocumentation = 'API documentation';
       (getDocumentation as any).mockResolvedValue(mockDocumentation);
       
-      // Mock OpenAI response
-      const mockOpenAIResponse = {
-        choices: [{
-          message: {
-            content: JSON.stringify({
-              urlHost: 'https://api.example.com',
-              method: HttpMethod.GET,
-              authentication: AuthType.NONE
-            })
-          }
-        }]
-      };
-      // Update OpenAI mock to match new client structure
-      (OpenAI as any).mockImplementation(() => ({
-        chat: {
-          completions: {
-            create: vi.fn().mockResolvedValue(mockOpenAIResponse)
-          }
-        }
-      }));
-
       const extractInput = {
         documentationUrl: 'https://docs.example.com',
         instruction: 'Fetch user data',

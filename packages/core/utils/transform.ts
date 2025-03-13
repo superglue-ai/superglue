@@ -1,11 +1,11 @@
-import OpenAI from "openai";
-import { PROMPT_MAPPING } from "./prompts.js";
-import {  applyJsonataWithValidation, getSchemaFromData, sample } from "./tools.js";
-import { ApiInput, DataStore, TransformConfig, TransformInput } from "@superglue/shared";
-import crypto from 'crypto';
-import { createHash } from "crypto";
-import { ChatCompletionMessageParam } from "openai/resources/chat/index.mjs";
+import { OpenAI } from "@posthog/ai";
+import type { DataStore, TransformConfig, TransformInput } from "@superglue/shared";
+import { createHash } from "node:crypto";
+import type { ChatCompletionMessageParam } from "openai/resources/chat/completions.mjs";
 import toJsonSchema from "to-json-schema";
+import { PROMPT_MAPPING } from "./prompts.js";
+import { telemetryClient } from "./telemetry.js";
+import { applyJsonataWithValidation, getSchemaFromData, sample } from "./tools.js";
 
 export async function prepareTransform(
     datastore: DataStore,
@@ -68,13 +68,16 @@ export async function prepareTransform(
     return null;
   } 
 
-export async function generateMapping(schema: any, payload: any, instruction?: string, retry = 0, messages?: ChatCompletionMessageParam[]): Promise<{jsonata: string, confidence: number, confidence_reasoning: string} | null> {
-  console.log("generating mapping" + (retry ? `, attempt ${retry} with temperature ${retry * 0.1}` : ""));
+export async function generateMapping(schema: any, payload: any, instruction?: string, retry = 0, incomingMessages?: ChatCompletionMessageParam[]): Promise<{jsonata: string, confidence: number, confidence_reasoning: string} | null> {
+  console.log(`Generating mapping${retry ? `: (retry ${retry})` : ""}`);
   try {
-    const openai = new OpenAI({
+    const openaiConfig: any = {
       apiKey: process.env.OPENAI_API_KEY,
       baseURL: process.env.OPENAI_API_BASE_URL,
-    });
+      posthog: telemetryClient
+    };
+    const openai = new OpenAI(openaiConfig);
+
     const userPrompt = 
 `Given a source data and structure, create a jsonata expression in JSON FORMAT.
 
@@ -91,12 +94,11 @@ ${JSON.stringify(toJsonSchema(payload, {required: true,arrays: {mode: 'first'}})
 Source data Sample:
 ${JSON.stringify(sample(payload, 2), null, 2).slice(0,30000)}`
 
-    if(!messages) {
-      messages = [
-        {role: "system", content: PROMPT_MAPPING},
-        {role: "user", content: userPrompt}
-      ]
-    }
+    const messages: ChatCompletionMessageParam[] = incomingMessages ? [...incomingMessages] : [
+      { role: "system", content: PROMPT_MAPPING } as ChatCompletionMessageParam,
+      { role: "user", content: userPrompt } as ChatCompletionMessageParam
+    ];
+    
     const temperature = String(process.env.OPENAI_MODEL).startsWith("o") ? undefined : Math.min(retry * 0.1, 1);
   
     const reasoning = await openai.chat.completions.create({
@@ -113,7 +115,7 @@ ${JSON.stringify(sample(payload, 2), null, 2).slice(0,30000)}`
     });
 
     const assistantResponse = String(reasoning.choices[0].message.content);
-    messages.push({role: "assistant", content: assistantResponse});
+    messages.push({role: "assistant", content: assistantResponse} as ChatCompletionMessageParam);
     const content = JSON.parse(assistantResponse);
     console.log("generated mapping", content?.jsonata);
     const transformation = await applyJsonataWithValidation(payload, content.jsonata, schema);
@@ -129,8 +131,11 @@ ${JSON.stringify(sample(payload, 2), null, 2).slice(0,30000)}`
 
   } catch (error) {
       if(retry < 5) {
-        messages.push({role: "user", content: error.message});
-        return generateMapping(schema, payload, instruction, retry + 1, messages);
+        const retryMessages: ChatCompletionMessageParam[] = incomingMessages ? [...incomingMessages] : [
+          { role: "system", content: PROMPT_MAPPING } as ChatCompletionMessageParam
+        ];
+        retryMessages.push({ role: "user", content: error.message } as ChatCompletionMessageParam);
+        return generateMapping(schema, payload, instruction, retry + 1, retryMessages);
       }
       console.error('Error generating mapping:', String(error));
   }

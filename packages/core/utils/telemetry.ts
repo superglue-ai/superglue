@@ -15,9 +15,15 @@ export const telemetryClient = !isTelemetryDisabled && !isDebug ?
       host: config.posthog.host,
       enableExceptionAutocapture: true 
      }
-  ) : null;
+  ) : new PostHog(
+    'dummy_api_key_for_disabled_telemetry',
+    { 
+      host: 'https://localhost',
+      disabled: true
+    }
+  );
 
-if(telemetryClient) {
+if(!isTelemetryDisabled && !isDebug) {
   console.log("superglue uses telemetry to understand how many users are using the platform. See self-hosting guide for more info.");
 }
 
@@ -37,10 +43,6 @@ export const extractOperationName = (query: string): string => {
 };
 
 export const telemetryMiddleware = (req, res, next) => {
-  if(!telemetryClient) {
-    return next();
-  }
-
   if(req?.body?.query && !(req.body.query.includes("IntrospectionQuery") || req.body.query.includes("__schema"))) {
     const operation = extractOperationName(req.body.query);
 
@@ -64,7 +66,7 @@ const createCallProperties = (query: string, responseBody: any, isSelfHosted: bo
   properties.query = query;
 
   switch(operation) {
-    case 'call':
+    case 'call': {
       const call = responseBody?.singleResult?.data?.call;
       if(!call) break;
       properties.endpointHost = call?.config?.urlHost;
@@ -75,6 +77,7 @@ const createCallProperties = (query: string, responseBody: any, isSelfHosted: bo
       properties.authType = call?.config?.authentication;
       properties.responseTimeMs = call?.completedAt?.getTime() - call?.startedAt?.getTime()
       break;
+    }
     default:
       break;
   }
@@ -89,9 +92,9 @@ export const handleQueryError = (errors: any[], query: string, orgId: string, re
   const operation = extractOperationName(query);
   const properties = createCallProperties(query, requestContext.response?.body, isSelfHosted, operation);
   properties.success = false;
-  telemetryClient?.capture({
+  telemetryClient.capture({
     distinctId: orgId || sessionId,
-    event: operation + '_error',
+    event: `${operation}_error`,
     properties: {
       ...properties,
       orgId: orgId,
@@ -113,7 +116,7 @@ const handleQuerySuccess = (query: string, orgId: string, requestContext: any) =
   const properties = createCallProperties(query, requestContext.response?.body, isSelfHosted, operation);
   properties.success = true;
 
-  telemetryClient?.capture({
+  telemetryClient.capture({
     distinctId: distinctId,
     event: operation,
     properties: properties,
@@ -131,20 +134,13 @@ export const createTelemetryPlugin = () => {
           requestContext?.response?.body?.singleResult?.errors ||
           Object.values(requestContext?.response?.body?.singleResult?.data || {}).map((d: any) => d.error).filter(Boolean);
 
-        if (telemetryClient) {
-          if(errors && errors.length > 0) {
-            console.error(errors);
-            const orgId = requestContext.contextValue.orgId;
-            handleQueryError(errors, requestContext.request.query, orgId, requestContext);
-          } else {
-            const orgId = requestContext.contextValue.orgId;
-            handleQuerySuccess(requestContext.request.query, orgId, requestContext);
-          }
+        if(errors && errors.length > 0) {
+          console.error(errors);
+          const orgId = requestContext.contextValue.orgId;
+          handleQueryError(errors, requestContext.request.query, orgId, requestContext);
         } else {
-          // disabled telemetry
-          if(errors && errors.length > 0) {
-            console.error(errors);
-          }
+          const orgId = requestContext.contextValue.orgId;
+          handleQuerySuccess(requestContext.request.query, orgId, requestContext);
         }
       }
     })
