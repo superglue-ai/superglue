@@ -8,7 +8,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "openai": "^4.85.4"
+    "openai": "^4.87.0"
   },
   "devDependencies": {
     "@types/node": "^20.17.19",
