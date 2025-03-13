@@ -1,11 +1,11 @@
-import OpenAI from "openai";
-import { PROMPT_MAPPING } from "./prompts.js";
-import {  applyJsonataWithValidation, getSchemaFromData, sample } from "./tools.js";
-import { ApiInput, DataStore, TransformConfig, TransformInput } from "@superglue/shared";
-import crypto from 'crypto';
-import { createHash } from "crypto";
-import { ChatCompletionMessageParam } from "openai/resources/chat/index.mjs";
+import { OpenAI } from "@posthog/ai";
+import type { DataStore, TransformConfig, TransformInput } from "@superglue/shared";
+import { createHash } from "node:crypto";
+import type { ChatCompletionMessageParam } from "openai/resources/chat/completions.mjs";
 import toJsonSchema from "to-json-schema";
+import { PROMPT_MAPPING } from "./prompts.js";
+import { telemetryClient } from "./telemetry.js";
+import { applyJsonataWithValidation, getSchemaFromData, sample } from "./tools.js";
 
 export async function prepareTransform(
     datastore: DataStore,
@@ -69,12 +69,17 @@ export async function prepareTransform(
   } 
 
 export async function generateMapping(schema: any, payload: any, instruction?: string, retry = 0, messages?: ChatCompletionMessageParam[]): Promise<{jsonata: string, confidence: number, confidence_reasoning: string} | null> {
-  console.log("generating mapping" + (retry ? `, attempt ${retry} with temperature ${retry * 0.1}` : ""));
+  console.log(`Generating mapping${retry ? `: (retry ${retry})` : ""}`);
   try {
-    const openai = new OpenAI({
+    const openaiConfig: any = {
       apiKey: process.env.OPENAI_API_KEY,
       baseURL: process.env.OPENAI_API_BASE_URL,
-    });
+    };
+    if (telemetryClient) {
+      openaiConfig.posthog = telemetryClient;
+    }
+    const openai = new OpenAI(openaiConfig);
+
     const userPrompt = 
 `Given a source data and structure, create a jsonata expression in JSON FORMAT.
 

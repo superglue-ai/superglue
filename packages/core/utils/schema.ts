@@ -1,7 +1,8 @@
+import { OpenAI } from "@posthog/ai";
 import { Validator } from "jsonschema";
-import OpenAI from "openai";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { GENERATE_SCHEMA_PROMPT } from "./prompts.js";
+import { telemetryClient } from "./telemetry.js";
 
 export async function generateSchema(instruction: string, responseData: string) : Promise<string> {
   const messages: ChatCompletionMessageParam[] = [
@@ -20,7 +21,7 @@ export async function generateSchema(instruction: string, responseData: string) 
   while (retryCount <= MAX_RETRIES) {
     try {
       const schema = await attemptSchemaGeneration(messages, retryCount);
-      console.log(`Schema generated`);
+      console.log("Schema generated");
       return schema;
     } catch (error) {
       retryCount++;
@@ -44,11 +45,16 @@ async function attemptSchemaGeneration(
   retry: number
 ): Promise<string> {
   console.log(`Generating schema${retry ? `: (retry ${retry})` : ""}`);
-  const openai = new OpenAI({
+
+  const openaiConfig: any = {
     apiKey: process.env.OPENAI_API_KEY,
-    baseURL: process.env.OPENAI_API_BASE_URL
-  });
-  
+    baseURL: process.env.OPENAI_API_BASE_URL,
+  };
+  if (telemetryClient) {
+    openaiConfig.posthog = telemetryClient;
+  }
+  const openai = new OpenAI(openaiConfig);
+
   const modelName = process.env.SCHEMA_GENERATION_MODEL || process.env.OPENAI_MODEL;
   
   let temperature = Math.min(0.3 * retry, 1.0);

@@ -1,13 +1,14 @@
-import axios, { AxiosRequestConfig } from "axios";
-import {  AuthType, RequestOptions, DecompressionMethod, ExtractConfig, ExtractInput, FileType, HttpMethod } from "@superglue/shared";
-import { callAxios, composeUrl, getSchemaFromData, replaceVariables } from "./tools.js";
+import { OpenAI } from "@posthog/ai";
+import { AuthType, DecompressionMethod, type ExtractConfig, type ExtractInput, FileType, HttpMethod, type RequestOptions } from "@superglue/shared";
+import type { AxiosRequestConfig } from "axios";
+import { createHash } from "node:crypto";
 import { z } from "zod";
-import OpenAI from "openai";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { API_PROMPT } from "./prompts.js";
 import { getDocumentation } from "./documentation.js";
 import { decompressData, parseFile } from "./file.js";
-import { createHash } from "crypto";
+import { API_PROMPT } from "./prompts.js";
+import { telemetryClient } from "./telemetry.js";
+import { callAxios, composeUrl, getSchemaFromData, replaceVariables } from "./tools.js";
 
 export async function prepareExtract(extractInput: ExtractInput, payload: any, credentials: any, lastError: string | null = null): Promise<ExtractConfig> {
     // Set the current timestamp
@@ -17,7 +18,7 @@ export async function prepareExtract(extractInput: ExtractInput, payload: any, c
     const hash = createHash('md5')
       .update(JSON.stringify({request: extractInput, payloadKeys: getSchemaFromData(payload)}))
       .digest('hex');
-    let extractConfig: Partial<ExtractConfig> = { 
+    const extractConfig: Partial<ExtractConfig> = { 
       ...extractInput,
       createdAt: currentTime,
       updatedAt: currentTime,
@@ -65,12 +66,12 @@ export async function callExtract(extract: ExtractConfig, payload: Record<string
     throw new Error(`API call failed with status ${response.status}. Response: ${message}`);
   }
 
-  let responseData = response.data;
+  const responseData = response.data;
   return responseData;
 }
 
 export async function processFile(data: Buffer, extractConfig: ExtractConfig) {
-  if (extractConfig.decompressionMethod && extractConfig.decompressionMethod != DecompressionMethod.NONE) {
+  if (extractConfig.decompressionMethod && extractConfig.decompressionMethod !== DecompressionMethod.NONE) {
     data = await decompressData(data, extractConfig.decompressionMethod);
   }
 
@@ -101,10 +102,16 @@ async function generateExtractConfig(extractConfig: Partial<ExtractConfig>, docu
     fileType: z.enum(Object.values(FileType) as [string, ...string[]]).optional(),
   }));
 
-  const openai = new OpenAI({
+  const openaiConfig: any = {
     apiKey: process.env.OPENAI_API_KEY,
-    baseURL: process.env.OPENAI_API_BASE_URL
-  });
+    baseURL: process.env.OPENAI_API_BASE_URL,
+  };
+  if (telemetryClient) {
+    openaiConfig.posthog = telemetryClient;
+  }
+  const openai = new OpenAI(openaiConfig);
+
+
   const completion = await openai.chat.completions.create({
     model: process.env.OPENAI_MODEL,
     response_format: {
@@ -161,7 +168,7 @@ export class Queue {
   private isProcessing = false;
   private jobSet: Set<string> = new Set();
   public type: string;
-  constructor(queueType: string = "queue") {
+  constructor(queueType = "queue") {
     this.type = queueType;
   }
 

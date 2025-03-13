@@ -1,11 +1,13 @@
+import { OpenAI } from "@posthog/ai";
 import { type ApiConfig, type ApiInput, AuthType, HttpMethod, PaginationType, type RequestOptions } from "@superglue/shared";
 import type { AxiosRequestConfig } from "axios";
-import OpenAI from "openai";
+import type { ChatCompletionMessageParam, ChatCompletionSystemMessageParam, ChatCompletionUserMessageParam } from "openai/resources/chat/completions.mjs";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { DOCUMENTATION_MAX_LENGTH } from "../config.js";
 import { getDocumentation } from "./documentation.js";
 import { API_ERROR_HANDLING_USER_PROMPT, API_PROMPT } from "./prompts.js";
+import { telemetryClient } from "./telemetry.js";
 import { callAxios, composeUrl, replaceVariables } from "./tools.js";
 
 export async function prepareEndpoint(
@@ -13,8 +15,8 @@ export async function prepareEndpoint(
   payload: any, 
   credentials: any, 
   lastError: string | null = null,
-  previousMessages: OpenAI.Chat.ChatCompletionMessageParam[] = []
-): Promise<{ config: ApiConfig; messages: OpenAI.Chat.ChatCompletionMessageParam[] }> {
+  previousMessages: ChatCompletionMessageParam[] = []
+): Promise<{ config: ApiConfig; messages: ChatCompletionMessageParam[] }> {
     // Set the current timestamp
     const currentTime = new Date();
 
@@ -240,8 +242,8 @@ async function generateApiConfig(
   documentation: string, 
   vars: string[] = [], 
   lastError: string | null = null,
-  previousMessages: OpenAI.Chat.ChatCompletionMessageParam[] = []
-): Promise<{ config: ApiConfig; messages: OpenAI.Chat.ChatCompletionMessageParam[] }> {
+  previousMessages: ChatCompletionMessageParam[] = []
+): Promise<{ config: ApiConfig; messages: ChatCompletionMessageParam[] }> {
   const schema = zodToJsonSchema(z.object({
     urlHost: z.string(),
     urlPath: z.string(),
@@ -257,10 +259,15 @@ async function generateApiConfig(
       cursorPath: z.string().optional().describe("If cursor_based: The path to the cursor in the response. E.g. cursor.current or next_cursor")
     }).optional()
   }));
-  const openai = new OpenAI({
+
+  const openaiConfig: any = {
     apiKey: process.env.OPENAI_API_KEY,
-    baseURL: process.env.OPENAI_API_BASE_URL
-  });
+    baseURL: process.env.OPENAI_API_BASE_URL,
+  };
+  if (telemetryClient) {
+    openaiConfig.posthog = telemetryClient;
+  }
+  const openai = new OpenAI(openaiConfig);
 
   const userProvidedAdditionalInfo = Boolean(
     apiConfig.headers ||
@@ -272,7 +279,7 @@ async function generateApiConfig(
     apiConfig.method
   );
 
-  const initialUserMessage: OpenAI.Chat.ChatCompletionUserMessageParam = {
+  const initialUserMessage: ChatCompletionUserMessageParam = {
     role: "user", 
     content: 
 `Generate API configuration for the following:
@@ -300,17 +307,17 @@ Documentation: ${String(documentation)}`
     .replace("{error}", lastError)
     .replace("{previous_config}", JSON.stringify(apiConfig));
 
-  const subsequentUserMessage: OpenAI.Chat.ChatCompletionUserMessageParam = {
+  const subsequentUserMessage: ChatCompletionUserMessageParam = {
     role: "user",
     content: errorHandlingMessage
   }
 
-  const systemMessage: OpenAI.Chat.ChatCompletionSystemMessageParam = {
+  const systemMessage: ChatCompletionSystemMessageParam = {
     role: "system",
     content: API_PROMPT
   };
 
-  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = previousMessages.length > 0 
+  const messages: ChatCompletionMessageParam[] = previousMessages.length > 0 
     ? [...previousMessages, subsequentUserMessage]
     : [systemMessage, initialUserMessage];
 
@@ -365,13 +372,13 @@ Documentation: ${String(documentation)}`
 }
 
 function validateVariables(generatedConfig: any, vars: string[]) {
-  vars = [
+  const allVars = [
     ...vars,
     "page",
     "limit",
     "offset",
     "cursor"
-  ]
+  ];
   
   // Helper function to find only template variables in a string
   const findTemplateVars = (str: string) => {
@@ -388,6 +395,6 @@ function validateVariables(generatedConfig: any, vars: string[]) {
     generatedConfig.body
   ].flatMap(value => findTemplateVars(String(value)));
 
-  const invalidVars = varMatches.filter(v => !vars.includes(v));
+  const invalidVars = varMatches.filter(v => !allVars.includes(v));
   return invalidVars;
 }
