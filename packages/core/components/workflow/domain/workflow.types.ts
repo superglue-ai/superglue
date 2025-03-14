@@ -18,13 +18,12 @@ export interface StepAnalysis {
 
 export interface ExecutionStep {
   id: string;
-  description: string;
+  instruction: string;
   endpoint: string;
-  method: string;
   apiConfig?: ApiConfig;
   dependencies?: string[];
   generateSchema?: boolean;
-  executionMode?: ExecutionMode;
+  executionMode: ExecutionMode;
 }
 
 export interface ExecutionPlan {

@@ -40,13 +40,12 @@ export class DataExtractor {
       if ("message" in this.data && typeof this.data.message === "object" && this.data.message !== null) {
         const messageObj = this.data.message as Record<string, unknown>;
 
-        // If message is an object, return its keys
-        if (!Array.isArray(messageObj)) {
+        if (!Array.isArray(messageObj) && Object.keys(messageObj).length > 0) {
           return Object.keys(messageObj);
         }
 
         // If message is an array, return it
-        return messageObj as unknown[];
+        return Object.values(messageObj);
       }
 
       // Return the object's values as a fallback

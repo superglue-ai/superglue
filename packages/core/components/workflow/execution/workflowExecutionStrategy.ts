@@ -38,7 +38,7 @@ export abstract class WorkflowExecutionStrategy {
     credentials: Record<string, unknown>,
     options?: RequestOptions,
   ): Promise<unknown> {
-    return executeApiCall(apiConfig, callPayload, credentials, this.step.id, options);
+    return executeApiCall(apiConfig, callPayload, credentials, options);
   }
 
   protected extractTemplateVariables(text: string): string[] {
@@ -164,7 +164,7 @@ export class LoopExecutionStrategy extends WorkflowExecutionStrategy {
         return false;
       }
 
-      console.log(`🔄 [LOOP] Found ${loopValues.length} values, using '${loopValues[0]}'`);
+      console.log(`🔄 [LOOP] Found ${loopValues.length} values, example: '${loopValues[0]}'`);
 
       // For simplicity in this PoC, we'll just use the first value
       // In a real implementation, we'd handle multiple values and combine results

@@ -1,5 +1,4 @@
 import type { ApiConfig, ApiInput, RequestOptions } from "@superglue/shared";
-import { HttpMethod } from "@superglue/shared";
 import OpenAI from "openai";
 import { v4 as uuidv4 } from "uuid";
 import { generateApiConfig } from "../../utils/api.js";
@@ -20,10 +19,10 @@ import type {
   WorkflowResult,
 } from "./domain/workflow.types.js";
 import type { WorkflowOrchestrator } from "./domain/workflowOrchestrator.js";
+import { executeApiCall } from "./execution/workflowUtils.js";
 
 import { DirectExecutionStrategy, ExecutionStrategyFactory } from "./execution/workflowExecutionStrategy.js";
 import {
-  executeApiCall,
   extractTemplateVariables,
   processStepResult,
   storeStepResult
@@ -86,10 +85,18 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
 
   public async registerExecutionPlan(plan: ExecutionPlan): Promise<ExecutionPlanId> {
     try {
-      this.validateExecutionPlan(plan);
-      const planId = plan.id || this.generatePlanId();
-      const planWithId: ExecutionPlan = {
+      const planWithDefaultModes: ExecutionPlan = {
         ...plan,
+        steps: plan.steps.map(step => ({
+          ...step,
+          executionMode: step.executionMode || "DIRECT"
+        }))
+      };
+      
+      this.validateExecutionPlan(planWithDefaultModes);
+      const planId = planWithDefaultModes.id || this.generatePlanId();
+      const planWithId: ExecutionPlan = {
+        ...planWithDefaultModes,
         id: planId,
       };
 
@@ -119,64 +126,11 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
   }
 
   public async setStepMapping(planId: ExecutionPlanId, stepId: string, mapping: StepMapping): Promise<void> {
-    // Initialize mappings for this plan if they don't exist
     if (!this.stepMappings[planId]) {
       this.stepMappings[planId] = {};
     }
 
-    // Set the mapping for this step
     this.stepMappings[planId][stepId] = mapping;
-  }
-
-  // TODO: simplified method for testing
-  public async handleSimpleChain(
-    payload: Record<string, unknown>,
-    credentials: Record<string, unknown>,
-    options?: RequestOptions,
-  ): Promise<Record<string, unknown>> {
-    // This is a simplified example of chaining two calls
-    // In a real implementation, this would use a proper execution plan
-
-    // Define a mock first step, using baseApiInput as template if available
-    const firstStepConfig: ApiConfig = {
-      ...(this.baseApiInput ? await generateApiConfig(this.baseApiInput, "").then((result) => result.config) : {}),
-      id: "first_step",
-      urlHost: "https://api.example.com",
-      urlPath: "/first-endpoint",
-      method: HttpMethod.GET,
-      instruction: "Get initial data",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    // Make the first call
-    const firstResult = await this.handleSingleApiCall(firstStepConfig, payload, credentials, options);
-
-    // Define a mock second step that uses the first result
-    const secondStepConfig: ApiConfig = {
-      ...(this.baseApiInput ? await generateApiConfig(this.baseApiInput, "").then((result) => result.config) : {}),
-      id: "second_step",
-      urlHost: "https://api.example.com",
-      urlPath: "/second-endpoint",
-      method: HttpMethod.GET,
-      instruction: "Get additional data using the first result",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    // Make the second call
-    const secondResult = await this.handleSingleApiCall(
-      secondStepConfig,
-      { ...payload, firstResult },
-      credentials,
-      options,
-    );
-
-    // Return the combined results
-    return {
-      firstResult,
-      secondResult,
-    };
   }
 
   public async executeWorkflowPlan(
@@ -256,7 +210,7 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
             apiConfig = config;
           }
 
-          const apiResponse = await this.handleSingleApiCall(apiConfig, stepInput, credentials, options);
+          const apiResponse = await executeApiCall(apiConfig, stepInput, credentials, options);
           console.log("API Response: ", apiResponse);
 
           // Process the result using response mapping
@@ -353,12 +307,19 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
     }
     console.log(`Step '${step.id}' on endpoint '${step.endpoint}' has template variables:`, templateVars);
 
-    // 2. First, attempt to use LLM to analyze the step and determine execution mode
+    // 2. Use the executionMode that's already defined on the step
     try {
-      console.log(`Determine execution mode for step '${step.id}' with LLM`);
-      const stepAnalysis = await this.analyzeStep(step, result, payload);
-      console.log(`Completed, Execution Mode: ${stepAnalysis.executionMode}`);
-      console.log("Variable Mappings: ", JSON.stringify(stepAnalysis.variableMapping, null, 2));
+      console.log(`Using predefined execution mode for step '${step.id}': ${step.executionMode}`);
+      
+      // We still need to analyze the variables to build mapping information
+      const variableMappings = await this.analyzeVariableMappings(step, result, payload);
+      console.log("Variable Mappings: ", JSON.stringify(variableMappings, null, 2));
+      
+      // Create the step analysis using the step's executionMode and the analyzed variable mappings
+      const stepAnalysis: StepAnalysis = {
+        executionMode: step.executionMode,
+        variableMapping: variableMappings
+      };
 
       const strategy = ExecutionStrategyFactory.createStrategy(
         step,
@@ -410,29 +371,11 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
     }
   }
 
-  private async handleSingleApiCall(
-    apiConfig: ApiConfig,
-    payload: Record<string, unknown>,
-    credentials: Record<string, unknown>,
-    options?: RequestOptions,
-  ): Promise<unknown> {
-    try {
-      if (!apiConfig) {
-        throw new Error("No API configuration provided");
-      }
-      
-      return executeApiCall(apiConfig, payload, credentials, apiConfig.id, options);
-    } catch (error) {
-      throw new Error(`API call '${apiConfig.id}' failed: ${String(error)}`);
-    }
-  }
-
   private generatePlanId(): ExecutionPlanId {
     return `wfplan_${uuidv4()}`;
   }
 
   private validateExecutionPlan(plan: ExecutionPlan): void {
-    // Validate that the execution plan has the required properties
     if (!plan.apiHost) {
       throw new Error("Execution plan must have an API host");
     }
@@ -441,7 +384,6 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
       throw new Error("Execution plan must have at least one step");
     }
 
-    // Validate each step
     for (const step of plan.steps) {
       if (!step.id) {
         throw new Error("Each step must have an ID");
@@ -450,10 +392,6 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
       if (!step.endpoint && !step.apiConfig) {
         throw new Error("Each step must have either an endpoint or an API config");
       }
-
-      if (!step.method && !step.apiConfig) {
-        throw new Error("Each step must have either a method or an API config");
-      }
     }
 
     // Check for circular dependencies
@@ -461,15 +399,12 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
   }
 
   private checkForCircularDependencies(steps: ExecutionStep[]): void {
-    // Create a dependency graph
     const graph: Record<string, string[]> = {};
 
-    // Initialize
     for (const step of steps) {
       graph[step.id] = [];
     }
 
-    // Build the graph
     for (const step of steps) {
       if (step.dependencies) {
         for (const depId of step.dependencies) {
@@ -530,8 +465,48 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
       // Check if the endpoint has ${var} template variables
       const templateVars = this.extractTemplateVariables(step.endpoint || "");
 
-      // If there are template variables but no explicit mapping, try to provide them from context
-      if (templateVars.length > 0 && (!mapping?.inputMapping || mapping.inputMapping === "$")) {
+      // If mapping is provided, use it first
+      if (mapping?.inputMapping && mapping.inputMapping !== "$") {
+        console.log(`Applying explicit input mapping for step ${step.id}`);
+        // Apply the JSONata mapping
+        try {
+          // Make step results and their transformed data available to the JSONata expression
+          // Important: Create a context structure that will work with the JSONata expression
+          // by making the step data available at the root level
+          const mappingContext = {
+            ...context,
+            // Add dependent steps' data at the root level for direct access in JSONata
+            ...Object.entries(currentResult.stepResults).reduce((acc, [stepId, stepResult]) => {
+              // Only include steps that this step depends on
+              if (step.dependencies?.includes(stepId) && stepResult.transformedData) {
+                acc[stepId] = stepResult.transformedData;
+              }
+              return acc;
+            }, {} as Record<string, unknown>)
+          };
+
+          console.log(`Input mapping context for ${step.id}:`, JSON.stringify(mappingContext, null, 2));
+          
+          const transformResult = await applyJsonataWithValidation(
+            mappingContext,
+            mapping.inputMapping,
+            undefined
+          );
+
+          if (transformResult.success) {
+            console.log(`Input mapping for ${step.id} succeeded:`, transformResult.data);
+            return transformResult.data as Record<string, unknown>;
+          } else {
+            console.error(`Input mapping for ${step.id} failed:`, transformResult.error);
+          }
+        } catch (mappingError) {
+          console.error(`Input mapping error for step ${step.id}:`, mappingError);
+          // Fall through to auto-detection if mapping fails
+        }
+      }
+
+      // If there are template variables but no explicit mapping or mapping failed, try to provide them from context
+      if (templateVars.length > 0) {
         const autoVars: Record<string, unknown> = {};
 
         for (const varName of templateVars) {
@@ -546,15 +521,28 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
                   autoVars[varName] = (depResult as Record<string, unknown>)[varName];
                   break;
                 } else if (depResult && "message" in (depResult as Record<string, unknown>)) {
-                  // Special handling for APIs that wrap responses in a 'message' field (like dog.ceo)
+                  // Handle APIs that wrap responses in a 'message' field
                   const messageData = (depResult as Record<string, unknown>).message;
-                  if (
-                    messageData &&
-                    typeof messageData === "object" &&
-                    varName in (messageData as Record<string, unknown>)
-                  ) {
-                    autoVars[varName] = (messageData as Record<string, unknown>)[varName];
-                    break;
+
+                  if (messageData && typeof messageData === "object") {
+                    // Direct match in message object
+                    if (varName in (messageData as Record<string, unknown>)) {
+                      autoVars[varName] = (messageData as Record<string, unknown>)[varName];
+                      break;
+                    }
+
+                    // If message contains an object with keys, use the first key for template variables
+                    // This is a common pattern in many APIs that return collections
+                    if (typeof messageData === "object" && !Array.isArray(messageData) && 
+                        Object.keys(messageData as Record<string, unknown>).length > 0) {
+                      // For any template variable that looks like it needs a key/identifier
+                      const firstKey = Object.keys(messageData as Record<string, unknown>)[0];
+                      if (firstKey) {
+                        autoVars[varName] = firstKey;
+                        console.log(`Using key from message object for ${varName}: ${firstKey}`);
+                        break;
+                      }
+                    }
                   }
                 }
               }
@@ -617,18 +605,14 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
     return extractTemplateVariables(text);
   }
 
-  private async analyzeStep(
+  private async analyzeVariableMappings(
     step: ExecutionStep,
     currentResult: WorkflowResult,
     originalPayload: Record<string, unknown>,
-  ): Promise<StepAnalysis> {
-    // If there are no template variables, just use DIRECT mode
+  ): Promise<Record<string, VariableMapping>> {
     const templateVars = this.extractTemplateVariables(step.endpoint || "");
     if (templateVars.length === 0) {
-      return {
-        executionMode: "DIRECT",
-        variableMapping: {},
-      };
+      return {};
     }
 
     try {
@@ -639,6 +623,7 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
         description: step.description,
         dependencies: step.dependencies || [],
         templateVariables: templateVars,
+        executionMode: step.executionMode, // Pass in the predefined execution mode
       };
 
       // Get dependency data
@@ -652,7 +637,7 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
       }
 
       const prompt = `
-Analyze this API workflow step:
+Analyze this API workflow step to determine variable mappings:
 ${JSON.stringify(stepInfo, null, 2)}
 
 Previous step results:
@@ -660,6 +645,9 @@ ${JSON.stringify(dependencyData, null, 2)}
 
 Original payload:
 ${JSON.stringify(originalPayload, null, 2)}
+
+NOTE: The execution mode is already determined as "${step.executionMode}". 
+Focus only on analyzing the optimal variable mappings for this execution mode.
 `;
 
       const openai = new OpenAI({
@@ -678,27 +666,69 @@ ${JSON.stringify(originalPayload, null, 2)}
         },
       ];
 
-      console.log("Analyzing step with LLM:", step.id);
+      console.log(`Analyzing variable mappings for step ${step.id} with predefined mode ${step.executionMode}`);
       const completion = await openai.chat.completions.create({
         model: "gpt-4o",
         response_format: { type: "json_object" },
         messages: messages as any,
       });
       const result = JSON.parse(completion.choices[0].message.content) as StepAnalysis;
-      console.log(`LLM step analysis result for ${step.id}:`, result);
+      console.log(`LLM variable mapping analysis for ${step.id}:`, result.variableMapping);
 
-      return result;
+      return result.variableMapping;
     } catch (error) {
-      console.error("Error analyzing step:", error);
-      // Fallback to DIRECT mode
+      console.error(`Error analyzing variable mappings for step ${step.id}:`, error);
+      // Fallback to simple mappings
+      return templateVars.reduce(
+        (acc, varName) => {
+          acc[varName] = {
+            source: "payload",
+            path: varName,
+            isArray: step.executionMode === "LOOP", // Set isArray based on execution mode
+          };
+          return acc;
+        },
+        {} as Record<string, VariableMapping>,
+      );
+    }
+  }
+  
+  // Keep this method for backward compatibility, but now it calls analyzeVariableMappings
+  // and uses the step's executionMode
+  private async analyzeStep(
+    step: ExecutionStep,
+    currentResult: WorkflowResult,
+    originalPayload: Record<string, unknown>,
+  ): Promise<StepAnalysis> {
+    // If there are no template variables, just use DIRECT mode with empty mappings
+    const templateVars = this.extractTemplateVariables(step.endpoint || "");
+    if (templateVars.length === 0) {
       return {
-        executionMode: "DIRECT",
+        executionMode: step.executionMode,
+        variableMapping: {},
+      };
+    }
+
+    try {
+      // Get variable mappings while respecting the step's execution mode
+      const variableMappings = await this.analyzeVariableMappings(step, currentResult, originalPayload);
+      
+      // Return a StepAnalysis that uses the step's predefined execution mode
+      return {
+        executionMode: step.executionMode,
+        variableMapping: variableMappings,
+      };
+    } catch (error) {
+      console.error(`Error in analyzeStep for ${step.id}:`, error);
+      // Fallback using the step's predefined execution mode
+      return {
+        executionMode: step.executionMode,
         variableMapping: templateVars.reduce(
           (acc, varName) => {
             acc[varName] = {
               source: "payload",
               path: varName,
-              isArray: false,
+              isArray: step.executionMode === "LOOP",
             };
             return acc;
           },

@@ -10,9 +10,8 @@ export function extractTemplateVariables(text: string): string[] {
 
 export async function executeApiCall(
   apiConfig: ApiConfig,
-  callPayload: Record<string, unknown>,
-  credentials: Record<string, unknown>,
-  stepId: string,
+  callPayload?: Record<string, unknown>,
+  credentials?: Record<string, unknown>,
   options?: RequestOptions,
 ): Promise<unknown> {
   try {
@@ -38,7 +37,7 @@ export async function executeApiCall(
       };
 
       console.log(
-        `[API Call] ${stepId}: ${processedConfig.urlPath} (with ${templateVars[0]}=${callPayload[templateVars[0]]})`,
+        `[API Call] ${apiConfig.id}: ${processedConfig.urlPath} (with ${templateVars[0]}=${callPayload[templateVars[0]]})`,
       );
     }
 
