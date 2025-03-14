@@ -2,7 +2,7 @@ import type { ApiConfig, ApiInput, RequestOptions } from "@superglue/shared";
 
 export type ExecutionPlanId = string;
 
-export type ExecutionMode = "DIRECT" | "LOOP" | "FILTER";
+export type ExecutionMode = "DIRECT" | "LOOP";
 
 export interface VariableMapping {
   source: string;

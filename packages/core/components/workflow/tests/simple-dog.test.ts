@@ -7,7 +7,6 @@ describe("ApiWorkflowOrchestrator-dog", { timeout: 600000 }, () => {
   it("should execute a manual workflow plan successfully", async () => {
     process.env = { ...process.env, ...require("dotenv").config({ path: ".env" }).parsed };
 
-    // Create orchestrator with baseApiInput for Dog API
     const dogApiHost = "https://dog.ceo/api";
     const baseApiInput = {
       urlHost: dogApiHost,
@@ -67,7 +66,6 @@ describe("ApiWorkflowOrchestrator-dog", { timeout: 600000 }, () => {
     console.log("\n[DOG] Registering execution plan");
     const planId = await orchestrator.registerExecutionPlan(manualExecutionPlan);
 
-    // Set step mappings
     await orchestrator.setStepMapping(planId, "getAllBreeds", {
       inputMapping: "$",
       responseMapping: "$",
@@ -92,7 +90,7 @@ describe("ApiWorkflowOrchestrator-dog", { timeout: 600000 }, () => {
         {
           affenpinscher: "https://images.dog.ceo/breeds/hound-afghan/n02088094_357.jpg"
         }
-        // More breeds would follow in the real result
+        // ... more breeds would follow in the real result
       ]
     };
     

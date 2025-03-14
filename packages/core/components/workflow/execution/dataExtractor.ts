@@ -147,22 +147,11 @@ export class DataExtractor {
    * @returns The found value or undefined
    */
   private searchNestedObjects(obj: Record<string, unknown>, targetKey: string): unknown {
-    // Check special cases first (common in APIs)
-
     // Check in "message" object, which is common in many APIs
     if ("message" in obj && typeof obj.message === "object" && obj.message !== null) {
       const messageObj = obj.message as Record<string, unknown>;
-
-      // Direct match in message
       if (targetKey in messageObj) {
         return messageObj[targetKey];
-      }
-
-      // If message is an object with keys that might be what we're looking for (e.g., breeds)
-      if (!Array.isArray(messageObj) && Object.keys(messageObj).length > 0) {
-        // Return first key as a sample value if we're looking for that type of data
-        // This is useful for APIs that return data like { message: { breed1: [], breed2: [] } }
-        return Object.keys(messageObj)[0];
       }
     }
 

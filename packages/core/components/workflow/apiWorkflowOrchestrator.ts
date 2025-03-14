@@ -404,54 +404,40 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
   }
 
   private checkForCircularDependencies(steps: ExecutionStep[]): void {
-    const graph: Record<string, string[]> = {};
-
-    for (const step of steps) {
-      graph[step.id] = [];
-    }
-
-    for (const step of steps) {
-      if (step.dependencies) {
-        for (const depId of step.dependencies) {
-          if (!graph[depId]) {
-            throw new Error(`Step ${step.id} depends on non-existent step ${depId}`);
-          }
-          graph[depId].push(step.id);
-        }
-      }
-    }
-
-    // Check for cycles using DFS
     const visited = new Set<string>();
-    const currentPath = new Set<string>();
+    const recursionStack = new Set<string>();
 
-    const hasCycle = (nodeId: string): boolean => {
-      if (currentPath.has(nodeId)) {
-        return true;
-      }
-
-      if (visited.has(nodeId)) {
-        return false;
-      }
-
-      visited.add(nodeId);
-      currentPath.add(nodeId);
-
-      for (const neighbor of graph[nodeId]) {
-        if (hasCycle(neighbor)) {
-          return true;
-        }
-      }
-
-      currentPath.delete(nodeId);
-      return false;
-    };
-
-    for (const stepId in graph) {
-      if (hasCycle(stepId)) {
-        throw new Error("Execution plan contains circular dependencies");
+    for (const step of steps) {
+      if (!visited.has(step.id)) {
+        this.detectCircularDependencies(step.id, steps, visited, recursionStack);
       }
     }
+  }
+
+  private detectCircularDependencies(
+    stepId: string,
+    steps: ExecutionStep[],
+    visited: Set<string>,
+    recursionStack: Set<string>,
+  ): void {
+    visited.add(stepId);
+    recursionStack.add(stepId);
+
+    const step = steps.find((s) => s.id === stepId);
+    if (!step) return;
+
+    if (step.dependencies) {
+      for (const depId of step.dependencies) {
+        if (!visited.has(depId)) {
+          this.detectCircularDependencies(depId, steps, visited, recursionStack);
+        }
+        if (recursionStack.has(depId)) {
+          throw new Error(`Circular dependency detected: ${stepId} -> ${depId}`);
+        }
+      }
+    }
+
+    recursionStack.delete(stepId);
   }
 
   private async prepareStepInput(
@@ -698,51 +684,6 @@ Focus only on analyzing the optimal variable mappings for this execution mode.
     }
   }
   
-  // Keep this method for backward compatibility, but now it calls analyzeVariableMappings
-  // and uses the step's executionMode
-  private async analyzeStep(
-    step: ExecutionStep,
-    currentResult: WorkflowResult,
-    originalPayload: Record<string, unknown>,
-  ): Promise<StepAnalysis> {
-    // If there are no template variables, just use DIRECT mode with empty mappings
-    const templateVars = this.extractTemplateVariables(step.endpoint || "");
-    if (templateVars.length === 0) {
-      return {
-        executionMode: step.executionMode,
-        variableMapping: {},
-      };
-    }
-
-    try {
-      // Get variable mappings while respecting the step's execution mode
-      const variableMappings = await this.analyzeVariableMappings(step, currentResult, originalPayload);
-      
-      // Return a StepAnalysis that uses the step's predefined execution mode
-      return {
-        executionMode: step.executionMode,
-        variableMapping: variableMappings,
-      };
-    } catch (error) {
-      console.error(`Error in analyzeStep for ${step.id}:`, error);
-      // Fallback using the step's predefined execution mode
-      return {
-        executionMode: step.executionMode,
-        variableMapping: templateVars.reduce(
-          (acc, varName) => {
-            acc[varName] = {
-              source: "payload",
-              path: varName,
-              isArray: step.executionMode === "LOOP",
-            };
-            return acc;
-          },
-          {} as Record<string, VariableMapping>,
-        ),
-      };
-    }
-  }
-
   private async processStepResult(step: ExecutionStep, result: unknown, mapping: StepMapping): Promise<unknown> {
     return processStepResult(step.id, result, mapping);
   }

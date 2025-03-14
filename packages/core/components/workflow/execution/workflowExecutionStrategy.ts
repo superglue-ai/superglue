@@ -380,44 +380,6 @@ export class LoopExecutionStrategy extends WorkflowExecutionStrategy {
   }
 }
 
-/**
- * Strategy for filter execution (filtering results before processing)
- */
-export class FilterExecutionStrategy extends WorkflowExecutionStrategy {
-  constructor(
-    step: ExecutionStep,
-    stepMapping: StepMapping | undefined,
-    executionPlan: ExecutionPlan,
-    result: WorkflowResult,
-    apiDocumentation: string,
-    private stepAnalysis: StepAnalysis,
-    baseApiInput?: ApiInput,
-  ) {
-    super(step, stepMapping, executionPlan, result, apiDocumentation, baseApiInput);
-  }
-
-  async execute(
-    payload: Record<string, unknown>,
-    credentials: Record<string, unknown>,
-    options?: RequestOptions,
-  ): Promise<boolean> {
-    // For now, this is just a placeholder for future implementation
-    // In a real implementation, this would filter results from previous steps
-    console.log(`Filter execution not fully implemented yet for step ${this.step.id}`);
-
-    // Fall back to direct execution
-    const directStrategy = new DirectExecutionStrategy(
-      this.step,
-      this.stepMapping,
-      this.executionPlan,
-      this.result,
-      this.apiDocumentation,
-      this.baseApiInput,
-    );
-
-    return await directStrategy.execute(payload, credentials, options);
-  }
-}
 
 // biome-ignore lint/complexity/noStaticOnlyClass: Decider class - whats a TS way?
 export class ExecutionStrategyFactory {
@@ -427,36 +389,15 @@ export class ExecutionStrategyFactory {
     executionPlan: ExecutionPlan,
     result: WorkflowResult,
     apiDocumentation: string,
-    stepAnalysis: StepAnalysis,
+    stepAnalysis?: StepAnalysis,
     baseApiInput?: ApiInput,
   ): WorkflowExecutionStrategy {
-    const mode = stepAnalysis.executionMode;
-
-    switch (mode) {
-      case "LOOP":
-        return new LoopExecutionStrategy(
-          step,
-          stepMapping,
-          executionPlan,
-          result,
-          apiDocumentation,
-          stepAnalysis,
-          baseApiInput,
-        );
-      case "FILTER":
-        return new FilterExecutionStrategy(
-          step,
-          stepMapping,
-          executionPlan,
-          result,
-          apiDocumentation,
-          stepAnalysis,
-          baseApiInput,
-        );
-      // biome-ignore lint/correctness/noUselessSwitchCase: for clarity
-      case "DIRECT":
-      default:
-        return new DirectExecutionStrategy(step, stepMapping, executionPlan, result, apiDocumentation, baseApiInput);
+    if (step.executionMode === "LOOP") {
+      if (!stepAnalysis) {
+        throw new Error("Step analysis is required for LOOP execution mode");
+      }
+      return new LoopExecutionStrategy(step, stepMapping, executionPlan, result, apiDocumentation, stepAnalysis, baseApiInput);
     }
+    return new DirectExecutionStrategy(step, stepMapping, executionPlan, result, apiDocumentation, baseApiInput);
   }
 }
