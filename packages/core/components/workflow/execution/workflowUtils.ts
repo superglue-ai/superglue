@@ -42,6 +42,15 @@ export async function executeApiCall(
     }
 
     const result = await callEndpoint(processedConfig, callPayload, credentials, options || { timeout: 60000 });
+    
+    // Update the baseApiConfig with headers from the response
+    if (result.headers) {
+      processedConfig.headers = {
+        ...processedConfig.headers,
+        ...result.headers
+      };
+    }
+    
     return result.data;
   } catch (error) {
     console.error(`Error calling '${apiConfig.id}': ${String(error)}`);
@@ -105,19 +114,24 @@ export async function prepareApiConfig(
   urlPath: string = step.endpoint,
 ): Promise<ApiConfig> {
   if (step.apiConfig) {
-    return step.apiConfig;
+    return {
+      ...step.apiConfig,
+      headers: {
+        ...(baseApiInput?.headers || {}),
+        ...(step.apiConfig.headers || {})
+      }
+    };
   }
 
   const apiInput: ApiInput = {
     ...(baseApiInput || {}),
     urlHost: executionPlan.apiHost,
     urlPath: urlPath,
-    method: step.method as any,
-    instruction: step.description,
+    instruction: step.instruction,
   };
 
   if (!apiDocumentation) {
-    throw new Error("No API documentation available. Please call retrieveApiDocumentation first.");
+    console.warn("No API documentation available. Please call retrieveApiDocumentation first.");
   }
 
   const { config } = await generateApiConfig(apiInput, apiDocumentation);

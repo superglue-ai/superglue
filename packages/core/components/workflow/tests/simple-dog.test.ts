@@ -1,7 +1,7 @@
 import { HttpMethod } from "@superglue/shared";
 import { describe, expect, it } from "vitest";
 import { ApiWorkflowOrchestrator } from "../apiWorkflowOrchestrator.js";
-import { type ExecutionPlan } from "../domain/workflow.types.js";
+import type { ExecutionPlan } from "../domain/workflow.types.js";
 
 describe("ApiWorkflowOrchestrator-dog", { timeout: 600000 }, () => {
   it("should execute a manual workflow plan successfully", async () => {
@@ -22,7 +22,7 @@ describe("ApiWorkflowOrchestrator-dog", { timeout: 600000 }, () => {
     const orchestrator = new ApiWorkflowOrchestrator(baseApiInput);
 
     console.log("\n[DOG] Retrieving API documentation");
-    await orchestrator.retrieveApiDocumentation(baseApiInput.documentationUrl);
+    // await orchestrator.retrieveApiDocumentation(baseApiInput.documentationUrl);
 
     const manualExecutionPlan: ExecutionPlan = {
       id: `manual-plan-${Date.now()}`,
@@ -44,15 +44,24 @@ describe("ApiWorkflowOrchestrator-dog", { timeout: 600000 }, () => {
           dependencies: ["getAllBreeds"],
           executionMode: "LOOP",
           loopVariable: "breed", // Explicitly specify which variable to loop over
+          loopMaxIters: 5,
         },
       ],
       finalTransform: `{
-        "breeds": $map($keys(getAllBreeds.message), function($breed, $index) {
-          {
-            $breed: getBreedImage[$index].message
+      "breeds": $map(
+        $filter(
+          $keys($.getAllBreeds),
+          function($b) {
+            $count($.getBreedImage[$split(message, "/")[4] = $b]) > 0
           }
-        })
-      }`,
+        ),
+        function($b) {
+          {
+            $b: $.getBreedImage[$split(message, "/")[4] = $b].message[0]
+          }
+        }
+      )
+    }`,
     };
 
     console.log("\n[DOG] Registering execution plan");
@@ -65,17 +74,16 @@ describe("ApiWorkflowOrchestrator-dog", { timeout: 600000 }, () => {
     });
 
     await orchestrator.setStepMapping(planId, "getBreedImage", {
-      inputMapping: `$`, // Use identity mapping since loopVariable will handle extracting values
+      inputMapping: "$", // Use identity mapping since loopVariable will handle extracting values
       responseMapping: "$",
     });
 
     const payload = {};
-    const credentials = {}; // No credentials needed for dog.ceo
+    const credentials = {};
 
     console.log("\n[DOG] Executing workflow plan");
     const result = await orchestrator.executeWorkflowPlan(planId, payload, credentials);
     
-    // Assert success
     expect(result.success).toBe(true);
     
     // Expected output structure 
@@ -109,15 +117,12 @@ describe("ApiWorkflowOrchestrator-dog", { timeout: 600000 }, () => {
     
     if (data?.breeds && data.breeds.length > 0) {
       const firstBreed = data.breeds[0];
-      
       // Should be an object with exactly one key (the breed name)
       expect(typeof firstBreed).toBe("object");
       expect(Object.keys(firstBreed).length).toBe(1);
-      
       // Get the breed name and image URL
       const breedName = Object.keys(firstBreed)[0];
       const imageUrl = firstBreed[breedName];
-      
       // Image URL should be a string
       expect(typeof imageUrl).toBe("string");
     }

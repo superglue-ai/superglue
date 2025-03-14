@@ -164,17 +164,22 @@ export class LoopExecutionStrategy extends WorkflowExecutionStrategy {
         return false;
       }
 
-      console.log(`🔄 [LOOP] Found ${loopValues.length} values, example: '${loopValues[0]}'`);
+      let effectiveLoopValues = loopValues;
+      if (this.step.loopMaxIters !== undefined && this.step.loopMaxIters >= 0) {
+        effectiveLoopValues = loopValues.slice(0, this.step.loopMaxIters);
+        if (effectiveLoopValues.length < loopValues.length) {
+          console.log(`🔄 [LOOP] Limiting to ${effectiveLoopValues.length} of ${loopValues.length} values due to loopMaxIters=${this.step.loopMaxIters}`);
+        }
+      }
 
-      // Prepare the API config
+      console.log(`🔄 [LOOP] Found ${effectiveLoopValues.length} values, example: '${effectiveLoopValues[0]}'`);
+
       const apiConfig = await this.prepareApiConfig();
-
-      // Execute API calls for all values and collect results
       const results = [];
 
-      for (let i = 0; i < loopValues.length; i++) {
-        const loopValue = loopValues[i];
-        console.log(`🔄 [LOOP] Processing value ${i + 1}/${loopValues.length}: ${loopValue}`);
+      for (let i = 0; i < effectiveLoopValues.length; i++) {
+        const loopValue = effectiveLoopValues[i];
+        console.log(`🔄 [LOOP] Processing value ${i + 1}/${effectiveLoopValues.length}: ${loopValue}`);
 
         // Create payload with the loop variable
         const loopPayload = {

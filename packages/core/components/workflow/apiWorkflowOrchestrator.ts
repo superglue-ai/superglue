@@ -191,18 +191,23 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
           let apiConfig: ApiConfig;
 
           if (step.apiConfig) {
-            apiConfig = step.apiConfig;
+            apiConfig = {
+              ...step.apiConfig,
+              headers: {
+                ...(this.baseApiInput?.headers || {}),
+                ...(step.apiConfig.headers || {})
+              }
+            };
           } else {
             const apiInput: ApiInput = {
               ...(this.baseApiInput || {}),
               urlHost: executionPlan.apiHost,
               urlPath: step.endpoint,
-              method: step.method as any,
-              instruction: step.description,
+              instruction: step.instruction,
             };
 
             if (!this.apiDocumentation) {
-              throw new Error("No API documentation available. Please call retrieveApiDocumentation first.");
+              console.warn("No API documentation available. Please call retrieveApiDocumentation first.");
             }
 
             const { config } = await generateApiConfig(apiInput, this.apiDocumentation);
@@ -620,7 +625,7 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
       const stepInfo = {
         id: step.id,
         endpoint: step.endpoint,
-        description: step.description,
+        instruction: step.instruction,
         dependencies: step.dependencies || [],
         templateVariables: templateVars,
         executionMode: step.executionMode, // Pass in the predefined execution mode

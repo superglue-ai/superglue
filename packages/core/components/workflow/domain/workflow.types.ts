@@ -26,6 +26,7 @@ export interface ExecutionStep {
   executionMode: ExecutionMode;
   outputIsArray?: boolean;
   loopVariable?: string;
+  loopMaxIters?: number;
   
   // Output extraction configurations
   arrayPath?: string;    // JSONPath-like path to array data (e.g., "message.items")
