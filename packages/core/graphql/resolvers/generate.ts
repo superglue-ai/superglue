@@ -1,9 +1,8 @@
 import { Context } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
-import toJsonSchema from "to-json-schema";
 import { generateSchema } from "../../utils/schema.js";
 import { telemetryClient } from "../../utils/telemetry.js";
-
+import { getSchemaFromData } from "../../utils/tools.js";
 export const generateSchemaResolver = async (
     _: any,
     { instruction, responseData }: { instruction: string; responseData?: string; },
@@ -15,7 +14,7 @@ export const generateSchemaResolver = async (
     }
     if(responseData) {
       try {
-        responseData = JSON.stringify(toJsonSchema(JSON.parse(responseData), {required: true,arrays: {mode: 'first'}}));
+        responseData = getSchemaFromData(JSON.parse(responseData));
       } catch (error) {
         telemetryClient?.captureException(error, context.orgId, {
           instruction: instruction,

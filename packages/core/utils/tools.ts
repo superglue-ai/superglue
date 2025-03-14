@@ -331,7 +331,7 @@ function makeNullable(schema: any): any {
   return newSchema;
 }
 
-export function getSchemaFromData(data: any): any {
+export function getSchemaFromData(data: any): string {
   if(!data) return null;
-  return toJsonSchema(data);
+  return JSON.stringify(toJsonSchema(data, {required: true, arrays: {mode: 'first'}}), null, 2).slice(0, 5000);
 }
