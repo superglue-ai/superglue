@@ -292,7 +292,6 @@ describe("ApiWorkflowOrchestrator", () => {
             instruction: "Get posts by this user",
             id: "api_config_postsByUser"
           },
-          dependencies: ["userData"], // This step depends on userData
           executionMode: "DIRECT",
         },
       ],
@@ -402,8 +401,7 @@ describe("ApiWorkflowOrchestrator", () => {
             instruction: "Get posts for each user",
             id: "api_config_getUserPosts"
           },
-          dependencies: ["getUsers"],
-          executionMode: "LOOP", // Using LOOP mode explicitly
+          executionMode: "LOOP",
         },
       ],
       finalTransform: "$",

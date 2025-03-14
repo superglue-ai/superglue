@@ -40,7 +40,6 @@ describe("ApiWorkflowOrchestrator-dog", { timeout: 600000 }, () => {
           id: "getBreedImage",
           endpoint: "/breed/${breed}/images/random",
           instruction: "Get a random image for a specific dog breed",
-          dependencies: ["getAllBreeds"],
           executionMode: "LOOP",
           loopVariable: "breed", // Explicitly specify which variable to loop over
           loopMaxIters: 5,

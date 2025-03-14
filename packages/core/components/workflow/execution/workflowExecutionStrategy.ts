@@ -87,18 +87,14 @@ export class DirectExecutionStrategy extends WorkflowExecutionStrategy {
         if (varName in enhancedPayload) continue;
 
         // Try to find in previous steps
-        if (this.step.dependencies) {
-          for (const depId of this.step.dependencies) {
-            const depResult = this.result.stepResults[depId]?.transformedData;
-
-            if (depResult && typeof depResult === "object") {
-              const extractor = new DataExtractor(depResult as Record<string, unknown>);
-              const value = extractor.findValue(varName);
-
-              if (value !== undefined) {
-                enhancedPayload[varName] = value;
-                break;
-              }
+        for (const [stepId, stepResult] of Object.entries(this.result.stepResults)) {
+          const depResult = stepResult?.transformedData;
+          if (depResult && typeof depResult === "object") {
+            const extractor = new DataExtractor(depResult as Record<string, unknown>);
+            const value = extractor.findValue(varName);
+            if (value !== undefined) {
+              enhancedPayload[varName] = value;
+              break;
             }
           }
         }
@@ -238,10 +234,13 @@ export class LoopExecutionStrategy extends WorkflowExecutionStrategy {
       }
       
       // If we have the name but no mapping, create a default mapping
-      // pointing to the first dependency
-      if (this.step.dependencies && this.step.dependencies.length > 0) {
+      // looking for the variable in previous steps
+      const previousStepIds = Object.keys(this.result.stepResults);
+      if (previousStepIds.length > 0) {
+        // Use the most recent step as the source
+        const lastStepId = previousStepIds[previousStepIds.length - 1];
         const defaultMapping: VariableMapping = {
-          source: this.step.dependencies[0],
+          source: lastStepId,
           path: this.step.loopVariable,
           isArray: true
         };
@@ -276,7 +275,9 @@ export class LoopExecutionStrategy extends WorkflowExecutionStrategy {
       const payloadValue = payload[loopVarName];
       if (Array.isArray(payloadValue)) {
         return payloadValue;
-      } else if (payloadValue !== undefined) {
+      }
+      
+      if (payloadValue !== undefined) {
         return [payloadValue];
       }
       return [];

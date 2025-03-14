@@ -21,7 +21,6 @@ export interface ExecutionStep {
   instruction: string;
   endpoint: string;
   apiConfig?: ApiConfig;
-  dependencies?: string[];
   executionMode: ExecutionMode;
   outputIsArray?: boolean;
   loopVariable?: string;

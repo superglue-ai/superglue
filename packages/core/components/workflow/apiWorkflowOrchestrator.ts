@@ -160,15 +160,6 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
       for (const step of executionPlan.steps) {
         console.log("Step: ", step);
         try {
-          // Check dependencies (if any)
-          if (step.dependencies && step.dependencies.length > 0) {
-            for (const depId of step.dependencies) {
-              if (!result.stepResults[depId] || !result.stepResults[depId].success) {
-                throw new Error(`Dependency step ${depId} has not been executed successfully`);
-              }
-            }
-          }
-
           // Prepare input for this step using mappings if available
           const stepMapping = this.stepMappings[planId]?.[step.id];
           const stepInput = await this.prepareStepInput(step, stepMapping, result, payload);
@@ -244,14 +235,6 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
             false,
             String(stepError)
           );
-          const dependentSteps = executionPlan.steps.filter((s) => s.dependencies?.includes(step.id));
-
-          if (dependentSteps.length > 0) {
-            const dependentIds = dependentSteps.map((s) => s.id).join(", ");
-            throw new Error(
-              `Step ${step.id} failed and has dependent steps: ${dependentIds}. Workflow execution cannot continue.`,
-            );
-          }
         }
       }
 
@@ -399,45 +382,7 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
       }
     }
 
-    // Check for circular dependencies
-    this.checkForCircularDependencies(plan.steps);
-  }
-
-  private checkForCircularDependencies(steps: ExecutionStep[]): void {
-    const visited = new Set<string>();
-    const recursionStack = new Set<string>();
-
-    for (const step of steps) {
-      if (!visited.has(step.id)) {
-        this.detectCircularDependencies(step.id, steps, visited, recursionStack);
-      }
-    }
-  }
-
-  private detectCircularDependencies(
-    stepId: string,
-    steps: ExecutionStep[],
-    visited: Set<string>,
-    recursionStack: Set<string>,
-  ): void {
-    visited.add(stepId);
-    recursionStack.add(stepId);
-
-    const step = steps.find((s) => s.id === stepId);
-    if (!step) return;
-
-    if (step.dependencies) {
-      for (const depId of step.dependencies) {
-        if (!visited.has(depId)) {
-          this.detectCircularDependencies(depId, steps, visited, recursionStack);
-        }
-        if (recursionStack.has(depId)) {
-          throw new Error(`Circular dependency detected: ${stepId} -> ${depId}`);
-        }
-      }
-    }
-
-    recursionStack.delete(stepId);
+    // Dependency checks removed
   }
 
   private async prepareStepInput(
@@ -466,10 +411,9 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
           // by making the step data available at the root level
           const mappingContext = {
             ...context,
-            // Add dependent steps' data at the root level for direct access in JSONata
+            // Add previous steps' data at the root level for direct access in JSONata
             ...Object.entries(currentResult.stepResults).reduce((acc, [stepId, stepResult]) => {
-              // Only include steps that this step depends on
-              if (step.dependencies?.includes(stepId) && stepResult.transformedData) {
+              if (stepResult.transformedData) {
                 acc[stepId] = stepResult.transformedData;
               }
               return acc;
@@ -487,9 +431,9 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
           if (transformResult.success) {
             console.log(`Input mapping for ${step.id} succeeded:`, transformResult.data);
             return transformResult.data as Record<string, unknown>;
-          } else {
-            console.error(`Input mapping for ${step.id} failed:`, transformResult.error);
           }
+          
+          console.error(`Input mapping for ${step.id} failed:`, transformResult.error);
         } catch (mappingError) {
           console.error(`Input mapping error for step ${step.id}:`, mappingError);
           // Fall through to auto-detection if mapping fails
@@ -501,38 +445,38 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
         const autoVars: Record<string, unknown> = {};
 
         for (const varName of templateVars) {
-          // try to get the variable from a prior step with the same name
-          if (step.dependencies && step.dependencies.length > 0) {
-            for (const depId of step.dependencies) {
-              const depResult = currentResult.stepResults[depId]?.transformedData;
+          // try to get the variable from a prior step with matching data
+          for (const [stepId, stepResult] of Object.entries(currentResult.stepResults)) {
+            const depResult = stepResult?.transformedData;
 
-              // Check if the dependency has a property matching our template variable
-              if (depResult && typeof depResult === "object") {
-                if (varName in (depResult as Record<string, unknown>)) {
-                  autoVars[varName] = (depResult as Record<string, unknown>)[varName];
-                  break;
-                } else if (depResult && "message" in (depResult as Record<string, unknown>)) {
-                  // Handle APIs that wrap responses in a 'message' field
-                  const messageData = (depResult as Record<string, unknown>).message;
+            // Check if the result has a property matching our template variable
+            if (depResult && typeof depResult === "object") {
+              if (varName in (depResult as Record<string, unknown>)) {
+                autoVars[varName] = (depResult as Record<string, unknown>)[varName];
+                break;
+              }
 
-                  if (messageData && typeof messageData === "object") {
-                    // Direct match in message object
-                    if (varName in (messageData as Record<string, unknown>)) {
-                      autoVars[varName] = (messageData as Record<string, unknown>)[varName];
+              if ("message" in (depResult as Record<string, unknown>)) {
+                // Handle APIs that wrap responses in a 'message' field
+                const messageData = (depResult as Record<string, unknown>).message;
+
+                if (messageData && typeof messageData === "object") {
+                  // Direct match in message object
+                  if (varName in (messageData as Record<string, unknown>)) {
+                    autoVars[varName] = (messageData as Record<string, unknown>)[varName];
+                    break;
+                  }
+
+                  // If message contains an object with keys, use the first key for template variables
+                  // This is a common pattern in many APIs that return collections
+                  if (typeof messageData === "object" && !Array.isArray(messageData) && 
+                      Object.keys(messageData as Record<string, unknown>).length > 0) {
+                    // For any template variable that looks like it needs a key/identifier
+                    const firstKey = Object.keys(messageData as Record<string, unknown>)[0];
+                    if (firstKey) {
+                      autoVars[varName] = firstKey;
+                      console.log(`Using key from message object for ${varName}: ${firstKey}`);
                       break;
-                    }
-
-                    // If message contains an object with keys, use the first key for template variables
-                    // This is a common pattern in many APIs that return collections
-                    if (typeof messageData === "object" && !Array.isArray(messageData) && 
-                        Object.keys(messageData as Record<string, unknown>).length > 0) {
-                      // For any template variable that looks like it needs a key/identifier
-                      const firstKey = Object.keys(messageData as Record<string, unknown>)[0];
-                      if (firstKey) {
-                        autoVars[varName] = firstKey;
-                        console.log(`Using key from message object for ${varName}: ${firstKey}`);
-                        break;
-                      }
                     }
                   }
                 }
@@ -556,23 +500,19 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
         }
       }
 
-      // If there's no mapping or it's just the identity mapping, return a simple merge
+      // If there's no mapping or it's just the identity mapping, return a simple merge with previous results
       if (!mapping?.inputMapping || mapping.inputMapping === "$") {
         return {
           ...originalPayload,
-          ...(step.dependencies
-            ? {
-                previousResults: step.dependencies.reduce(
-                  (acc, depId) => {
-                    if (currentResult.stepResults[depId]?.transformedData) {
-                      acc[depId] = currentResult.stepResults[depId].transformedData;
-                    }
-                    return acc;
-                  },
-                  {} as Record<string, unknown>,
-                ),
+          previousResults: Object.entries(currentResult.stepResults).reduce(
+            (acc, [stepId, stepResult]) => {
+              if (stepResult?.transformedData) {
+                acc[stepId] = stepResult.transformedData;
               }
-            : {}),
+              return acc;
+            },
+            {} as Record<string, unknown>,
+          ),
         };
       }
 
@@ -612,18 +552,15 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
         id: step.id,
         endpoint: step.endpoint,
         instruction: step.instruction,
-        dependencies: step.dependencies || [],
         templateVariables: templateVars,
-        executionMode: step.executionMode, // Pass in the predefined execution mode
+        executionMode: step.executionMode,
       };
 
-      // Get dependency data
-      const dependencyData: Record<string, unknown> = {};
-      if (step.dependencies) {
-        for (const depId of step.dependencies) {
-          if (currentResult.stepResults[depId]?.transformedData) {
-            dependencyData[depId] = currentResult.stepResults[depId].transformedData;
-          }
+      // Get previous step data
+      const previousStepData: Record<string, unknown> = {};
+      for (const [stepId, stepResult] of Object.entries(currentResult.stepResults)) {
+        if (stepResult?.transformedData) {
+          previousStepData[stepId] = stepResult.transformedData;
         }
       }
 
@@ -632,7 +569,7 @@ Analyze this API workflow step to determine variable mappings:
 ${JSON.stringify(stepInfo, null, 2)}
 
 Previous step results:
-${JSON.stringify(dependencyData, null, 2)}
+${JSON.stringify(previousStepData, null, 2)}
 
 Original payload:
 ${JSON.stringify(originalPayload, null, 2)}
@@ -675,7 +612,7 @@ Focus only on analyzing the optimal variable mappings for this execution mode.
           acc[varName] = {
             source: "payload",
             path: varName,
-            isArray: step.executionMode === "LOOP", // Set isArray based on execution mode
+            isArray: step.executionMode === "LOOP",
           };
           return acc;
         },
