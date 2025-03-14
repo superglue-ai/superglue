@@ -249,7 +249,7 @@ export class LoopExecutionStrategy extends WorkflowExecutionStrategy {
       }
     }
     
-    // Fall back to the original approach - find first array variable in mappings
+    // Otherwise, find first array variable in mappings
     for (const [varName, mapping] of Object.entries(this.stepAnalysis.variableMapping)) {
       if (mapping.isArray) {
         return [varName, mapping];
@@ -267,11 +267,7 @@ export class LoopExecutionStrategy extends WorkflowExecutionStrategy {
     loopVarName: string,
     payload: Record<string, unknown>,
   ): Promise<any[]> {
-    console.log(`🔄 [LOOP] Getting values for ${loopVarName} from source ${mapping.source}`);
-    
-    // If selected values are provided, use those
     if (mapping.selectedValues && mapping.selectedValues.length > 0) {
-      console.log(`🔄 [LOOP] Using provided selectedValues`);
       return mapping.selectedValues;
     }
 

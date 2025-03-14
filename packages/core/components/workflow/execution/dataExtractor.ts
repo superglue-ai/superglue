@@ -124,7 +124,6 @@ export class DataExtractor {
         }
         if (current && typeof current === "object") {
           // If it's an object, return either its values or its keys
-          // For Dog API: return object keys as values to use as breeds
           if (Object.keys(current as Record<string, unknown>).length > 0) {
             return Object.keys(current as Record<string, unknown>);
           }
@@ -147,14 +146,6 @@ export class DataExtractor {
    * @returns The found value or undefined
    */
   private searchNestedObjects(obj: Record<string, unknown>, targetKey: string): unknown {
-    // Check in "message" object, which is common in many APIs
-    if ("message" in obj && typeof obj.message === "object" && obj.message !== null) {
-      const messageObj = obj.message as Record<string, unknown>;
-      if (targetKey in messageObj) {
-        return messageObj[targetKey];
-      }
-    }
-
     // For each property in the object
     for (const [key, value] of Object.entries(obj)) {
       // Direct match
