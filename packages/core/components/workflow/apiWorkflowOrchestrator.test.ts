@@ -33,6 +33,16 @@ vi.mock("../../utils/tools.js", () => ({
       }
     }
 
+    // Add special handling for LOOP test case
+    if (expression === "{ userId: $.getUsers.*.id }") {
+      return {
+        success: true,
+        data: {
+          userId: [1, 2, 3] // Array of user IDs for the loop execution
+        }
+      };
+    }
+
     // Default behavior for other cases
     return {
       success: true,
@@ -44,6 +54,11 @@ vi.mock("../../utils/tools.js", () => ({
           { id: 1, userId: 1, title: "Post 1", body: "Post body 1" },
           { id: 2, userId: 1, title: "Post 2", body: "Post body 2" },
         ],
+        getUsers: [
+          { id: 1, name: "User 1" },
+          { id: 2, name: "User 2" },
+          { id: 3, name: "User 3" }
+        ]
       },
     };
   }),
@@ -140,9 +155,15 @@ describe("ApiWorkflowOrchestrator", () => {
       steps: [
         {
           id: "getUserData",
-          description: "Get user data",
+          instruction: "Get user data",
           endpoint: "/users/1",
-          method: HttpMethod.GET,
+          apiConfig: {
+            urlPath: "/users/1",
+            method: HttpMethod.GET,
+            urlHost: "https://jsonplaceholder.typicode.com",
+            instruction: "Get user data",
+            id: "api_config_getUserData"
+          },
           executionMode: "DIRECT",
         },
       ],
@@ -194,9 +215,15 @@ describe("ApiWorkflowOrchestrator", () => {
       steps: [
         {
           id: "getData",
-          description: "Get data",
+          instruction: "Get data",
           endpoint: "/users/1",
-          method: HttpMethod.GET,
+          apiConfig: {
+            urlPath: "/users/1",
+            method: HttpMethod.GET,
+            urlHost: "https://jsonplaceholder.typicode.com",
+            instruction: "Get data",
+            id: "api_config_getData"
+          },
           executionMode: "DIRECT",
         },
       ],
@@ -243,16 +270,28 @@ describe("ApiWorkflowOrchestrator", () => {
       steps: [
         {
           id: "userData",
-          description: "Get user information",
+          instruction: "Get user information",
           endpoint: "/users/1",
-          method: HttpMethod.GET,
+          apiConfig: {
+            urlPath: "/users/1",
+            method: HttpMethod.GET,
+            urlHost: "https://jsonplaceholder.typicode.com",
+            instruction: "Get user information",
+            id: "api_config_userData"
+          },
           executionMode: "DIRECT",
         },
         {
           id: "postsByUser",
-          description: "Get posts by this user",
+          instruction: "Get posts by this user",
           endpoint: "/posts",
-          method: HttpMethod.GET,
+          apiConfig: {
+            urlPath: "/posts",
+            method: HttpMethod.GET,
+            urlHost: "https://jsonplaceholder.typicode.com",
+            instruction: "Get posts by this user",
+            id: "api_config_postsByUser"
+          },
           dependencies: ["userData"], // This step depends on userData
           executionMode: "DIRECT",
         },
@@ -341,16 +380,28 @@ describe("ApiWorkflowOrchestrator", () => {
       steps: [
         {
           id: "getUsers",
-          description: "Get list of users",
+          instruction: "Get list of users",
           endpoint: "/users",
-          method: HttpMethod.GET,
+          apiConfig: {
+            urlPath: "/users",
+            method: HttpMethod.GET,
+            urlHost: "https://jsonplaceholder.typicode.com",
+            instruction: "Get list of users",
+            id: "api_config_getUsers"
+          },
           executionMode: "DIRECT",
         },
         {
           id: "getUserPosts",
-          description: "Get posts for each user",
+          instruction: "Get posts for each user",
           endpoint: "/posts?userId=${userId}",
-          method: HttpMethod.GET,
+          apiConfig: {
+            urlPath: "/posts?userId=${userId}",
+            method: HttpMethod.GET,
+            urlHost: "https://jsonplaceholder.typicode.com",
+            instruction: "Get posts for each user",
+            id: "api_config_getUserPosts"
+          },
           dependencies: ["getUsers"],
           executionMode: "LOOP", // Using LOOP mode explicitly
         },
@@ -368,7 +419,7 @@ describe("ApiWorkflowOrchestrator", () => {
     });
 
     await orchestrator.setStepMapping(planId, "getUserPosts", {
-      inputMapping: "{ userId: getUsers[0].id }", // Get the ID of the first user
+      inputMapping: "{ userId: $.getUsers.*.id }", 
       responseMapping: "$",
     });
 
