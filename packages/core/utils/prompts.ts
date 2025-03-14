@@ -187,7 +187,7 @@ You must analyze:
 OUTPUT FORMAT:
 Return a JSON object with these fields:
 {
-  "executionMode": "DIRECT|LOOP|FILTER",
+  "executionMode": "DIRECT|LOOP",
   "variableMapping": {
     "variableName": {
       "source": "stepId|payload",

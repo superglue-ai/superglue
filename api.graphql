@@ -223,6 +223,23 @@ input TransformInputRequest @oneOf {
   id: ID
 }
 
+input ApiConfigInput {
+  urlHost: String
+  urlPath: String
+  instruction: String
+  method: HttpMethod
+  queryParams: JSON
+  headers: JSON
+  body: String
+  documentationUrl: String
+  responseSchema: JSONSchema
+  responseMapping: JSONata
+  authentication: AuthType
+  pagination: PaginationInput
+  dataPath: String
+  version: String
+}
+
 type Query {
   listRuns(limit: Int = 10, offset: Int = 0, configId: ID): RunList!
   listApis(limit: Int = 10, offset: Int = 0): ApiList!
@@ -242,6 +259,76 @@ type Query {
 type TenantInfo {
   email: String
   emailEntrySkipped: Boolean!
+}
+
+type ExecutionStep {
+  id: String!
+  endpoint: String!
+  instruction: String!
+  dependencies: [String!]
+  apiConfig: ApiConfig
+  executionMode: String
+  outputIsArray: Boolean
+  loopVariable: String
+  loopMaxIters: Int
+  arrayPath: String
+  objectKeysAsArray: Boolean
+  responseField: String
+}
+
+input ExecutionStepInput {
+  id: String!
+  endpoint: String!
+  instruction: String!
+  dependencies: [String!]
+  apiConfig: ApiConfigInput
+  executionMode: String  # DIRECT | LOOP
+  outputIsArray: Boolean
+  loopVariable: String
+  loopMaxIters: Int
+  arrayPath: String
+  objectKeysAsArray: Boolean
+  responseField: String
+}
+
+type ExecutionPlan {
+  id: String!
+  apiHost: String!
+  steps: [ExecutionStep!]!
+  finalTransform: String
+}
+
+input ExecutionPlanInput {
+  id: String
+  apiHost: String!
+  steps: [ExecutionStepInput!]!
+  finalTransform: String
+}
+
+type WorkflowStepResult {
+  stepId: String!
+  success: Boolean!
+  rawData: JSON
+  transformedData: JSON
+  error: String
+}
+
+type WorkflowResult {
+  success: Boolean!
+  data: JSON!
+  stepResults: JSON!
+  error: String
+  startedAt: DateTime!
+  completedAt: DateTime
+}
+
+input WorkflowInput {
+  planId: String
+  plan: ExecutionPlanInput
+  payload: JSON
+  credentials: JSON
+  options: RequestOptions
+  baseApiInput: ApiInput
 }
 
 type Mutation {
@@ -266,6 +353,10 @@ type Mutation {
     data: JSON!
     options: RequestOptions
   ): RunResult!
+  
+  executeWorkflow(
+    input: WorkflowInput!
+  ): WorkflowResult!
   
   upsertApi(id: ID!, input: JSON!): ApiConfig!
   deleteApi(id: ID!): Boolean!
