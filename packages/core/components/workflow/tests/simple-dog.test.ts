@@ -33,6 +33,9 @@ describe("ApiWorkflowOrchestrator-dog", { timeout: 600000 }, () => {
           endpoint: "/breeds/list/all",
           instruction: "Get all dog breeds",
           executionMode: "DIRECT",
+          outputIsArray: true,
+          responseField: "message", // The Dog API wraps response in a message field
+          objectKeysAsArray: true,  // We want to use the keys of the message object as breeds
         },
         {
           id: "getBreedImage",
@@ -40,6 +43,7 @@ describe("ApiWorkflowOrchestrator-dog", { timeout: 600000 }, () => {
           instruction: "Get a random image for a specific dog breed",
           dependencies: ["getAllBreeds"],
           executionMode: "LOOP",
+          loopVariable: "breed", // Explicitly specify which variable to loop over
         },
       ],
       finalTransform: `{
@@ -61,9 +65,7 @@ describe("ApiWorkflowOrchestrator-dog", { timeout: 600000 }, () => {
     });
 
     await orchestrator.setStepMapping(planId, "getBreedImage", {
-      inputMapping: `{
-        "breed": $keys(getAllBreeds.message)[0]
-      }`,
+      inputMapping: `$`, // Use identity mapping since loopVariable will handle extracting values
       responseMapping: "$",
     });
 
