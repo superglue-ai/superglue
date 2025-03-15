@@ -1,6 +1,5 @@
 "use client"
 
-import { HttpMethod } from '@superglue/shared';
 import { useState } from 'react';
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
@@ -54,22 +53,15 @@ export default function WorkflowsPage() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   
-  // Base API Input state
+  // Base API Input state - keep these but remove editing capability
   const [instruction, setInstruction] = useState('Get a link to a single random picture for all dog breeds');
-  const [method, setMethod] = useState(HttpMethod.GET);
   const [documentationUrl, setDocumentationUrl] = useState('https://dog.ceo/dog-api/documentation');
-  const [headersText, setHeadersText] = useState(JSON.stringify({
-    "Content-Type": "application/json",
-    "Accept": "application/json"
-  }, null, 2));
   
   const executeWorkflow = async () => {
     try {
       setLoading(true);
-      // Parse steps from textarea
       const steps = JSON.parse(stepsText);
       
-      // Create execution plan
       const executionPlan = {
         id: `manual-plan-${Date.now()}`,
         apiHost,
@@ -77,40 +69,23 @@ export default function WorkflowsPage() {
         finalTransform
       };
       
-      // Parse headers from text
-      let headers = {};
-      try {
-        headers = JSON.parse(headersText);
-      } catch (e) {
-        console.error("Error parsing headers JSON:", e);
-        toast({
-          title: 'Invalid Headers JSON',
-          description: 'Please check your headers format',
-          variant: 'destructive',
-        });
-        return;
-      }
-      
-      // Create the workflow input with documentationUrl in the baseApiInput
       const workflowInput = {
         plan: executionPlan,
         payload: {},
         credentials: {},
         baseApiInput: {
           urlHost: apiHost,
-          method: method,
           instruction: instruction,
-          headers: headers,
           documentationUrl: documentationUrl
         }
       };
       
-      // Execute the GraphQL query with the correct endpoint from .env
+      // TODO: remove this once we have a real endpoint
       const response = await fetch('http://localhost:3000/graphql', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer hi' // Fixed linter error by removing template literal
+          'Authorization': 'Bearer hi'
         },
         body: JSON.stringify({
           query: `
@@ -180,32 +155,14 @@ export default function WorkflowsPage() {
             </div>
             
             <div>
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                  <Label htmlFor="instruction">Instruction</Label>
-                  <Input 
-                    id="instruction" 
-                    value={instruction} 
-                    onChange={(e) => setInstruction(e.target.value)} 
-                    placeholder="Execute workflow"
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="method">HTTP Method</Label>
-                  <select 
-                    id="method"
-                    value={method}
-                    onChange={(e) => setMethod(e.target.value as HttpMethod)}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <option value={HttpMethod.GET}>GET</option>
-                    <option value={HttpMethod.POST}>POST</option>
-                    <option value={HttpMethod.PUT}>PUT</option>
-                    <option value={HttpMethod.DELETE}>DELETE</option>
-                    <option value={HttpMethod.PATCH}>PATCH</option>
-                  </select>
-                </div>
+              <div className="mb-4">
+                <Label htmlFor="instruction">Instruction</Label>
+                <Input 
+                  id="instruction" 
+                  value={instruction} 
+                  onChange={(e) => setInstruction(e.target.value)} 
+                  placeholder="Execute workflow"
+                />
               </div>
               
               <div className="mb-4">
@@ -217,17 +174,6 @@ export default function WorkflowsPage() {
                   placeholder="URL to API documentation"
                 />
               </div>
-              
-              <div className="mb-4">
-                <Label htmlFor="headers">Headers (JSON)</Label>
-                <Textarea 
-                  id="headers" 
-                  value={headersText} 
-                  onChange={(e) => setHeadersText(e.target.value)} 
-                  placeholder="Enter headers as JSON object"
-                  className="h-24 font-mono"
-                />
-              </div>
             </div>
             
             <div>
@@ -237,7 +183,7 @@ export default function WorkflowsPage() {
                 value={stepsText} 
                 onChange={(e) => setStepsText(e.target.value)} 
                 placeholder="Enter workflow steps as JSON array"
-                className="h-64 font-mono"
+                className="h-96 font-mono"
               />
             </div>
             
@@ -258,7 +204,7 @@ export default function WorkflowsPage() {
               disabled={loading}
               className="w-full"
             >
-              {loading ? 'Executing...' : 'Execute Workflow'}
+              {loading ? 'Running...' : 'Run Workflow'}
             </Button>
           </CardFooter>
         </Card>
@@ -286,16 +232,12 @@ export default function WorkflowsPage() {
                   )}
                   
                   <div>
-                    <p className="font-semibold">Started at:</p>
-                    <p>{new Date(result.startedAt).toLocaleString()}</p>
+                    <p className="font-semibold inline-block mr-2">Time:</p>
+                    <p className="inline">
+                      Started: {new Date(result.startedAt).toLocaleString()}
+                      {result.completedAt && ` • Duration: ${((new Date(result.completedAt).getTime() - new Date(result.startedAt).getTime()) / 1000).toFixed(2)}s`}
+                    </p>
                   </div>
-                  
-                  {result.completedAt && (
-                    <div>
-                      <p className="font-semibold">Completed at:</p>
-                      <p>{new Date(result.completedAt).toLocaleString()}</p>
-                    </div>
-                  )}
                 </div>
                 
                 <div>
