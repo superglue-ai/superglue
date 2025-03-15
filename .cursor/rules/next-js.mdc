@@ -32,3 +32,6 @@ if (retries > MAX_RETRIES) {...}
 ```
 
 always be mindful of deleting tests and explicitly let the user know when you do so (ask for consent!).
+
+## Structure
+we're using `.ts` files. while we have to import files with `.js`, the files we edit have `.ts` or `.tsx` endings - NEVER SEARCH FOR THE JS files.

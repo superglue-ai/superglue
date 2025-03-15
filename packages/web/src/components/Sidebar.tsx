@@ -3,12 +3,13 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Layout, History, Book, PlayCircle } from "lucide-react";
+import { Layout, History, Book, PlayCircle, GitBranch } from "lucide-react";
 
 const navItems = [
   { icon: Layout, label: 'Configurations', href: '/' },
   { icon: History, label: 'Runs', href: '/runs' },
   { icon: PlayCircle, label: 'Playground', href: '/playground' },
+  { icon: GitBranch, label: 'Workflows', href: '/workflows' },
   { icon: Book, label: 'Documentation', href: 'https://docs.superglue.cloud', target: '_blank' },
 /*  { icon: AlertCircle, label: 'Error Monitoring', href: '/analytics' },
   { icon: Shield, label: 'Access Control', href: '/access-control' },
