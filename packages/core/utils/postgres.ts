@@ -24,27 +24,24 @@ export async function callPostgres(endpoint: ApiConfig, payload: Record<string, 
   let attempts = 0;
   const maxRetries = options.retries ?? DEFAULT_RETRIES;
 
-  while (true) {
+  do {
     try {
       const result = await pool.query(query);
+      await pool.end();
       return result.rows;
     } catch (error) {
       attempts++;
       
       if (attempts > maxRetries) {
+        await pool.end();
         if (error instanceof Error) {
           throw new Error(`PostgreSQL error after ${attempts} attempts: ${error.message}`);
         }
         throw new Error('Unknown PostgreSQL error occurred');
       }
 
-      // Wait before retrying
       const retryDelay = options.retryDelay ?? DEFAULT_RETRY_DELAY;
       await new Promise(resolve => setTimeout(resolve, retryDelay));
-    } finally {
-      if (attempts > maxRetries) {
-        await pool.end();
-      }
     }
-  }
+  } while (attempts <= maxRetries);
 }
