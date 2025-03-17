@@ -1,3 +1,33 @@
+/*
+
+MIT License
+
+Scope: json-schema.ts
+
+Based on https://github.com/robere2/gen-json-schema, a fork of https://github.com/ruzicka/to-json-schema
+
+Copyright (c) 2025 David Ruzicka, Erik Roberts, Stefan Faistenauer
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+*/
+
 import isEqual from 'lodash.isequal'
 import xor from 'lodash.xor'
 import keys from 'lodash.keys'
@@ -67,32 +97,7 @@ format?: string | undefined;
 }
 
 interface Options {
-/**
-     * specify `true` to make all properties required.
-     *
-     * @default false
-     * @example
-     * const schema = toJsonSchema(33, {required: false});
-     * // { type: "integer" }
-     * const schema = toJsonSchema(33, {required: true});
-     * // { type: "integer", "required": true }
-     */
     required?: boolean | undefined;
-/**
-     * By providing `postProcessFnc`, you can modify or replace generated
-     * schema. This function will be called recursively for all the properties
-     * and sub-properties and array items from leaves to the root. If you want
-     * to preserve default functionality, don't forget to call defaultFunc
-     * which is currently responsible for setting `required` for the schema
-     * items if there is common option `required` set to true.
-     *
-     * @param type JSON schema type of the `value`
-     * @param schema Generated JSON schema
-     * @param value - input value
-     * @param defaultFunc standard function that is used to post-process
-     *                    generated schema. Takes the `type`, `schema`,
-     *                    `value` params.
-     */
     postProcessFnc?(
         type: JSONSchema4TypeName,
         schema: JSONSchema3or4,
@@ -105,77 +110,21 @@ interface Options {
         ): JSONSchema3or4;
 
 arrays?: {
-    /**
-         * * `all` option causes parser to go through all array items, finding
-         *   the most compatible yet most descriptive schema possible. If
-         *   multiple types are found, the type is omitted so it can be
-         *   validated.
-         * * `first` option takes only first item in the array into account. If
-         *   performance is a concern, you may consider this option.
-         * * `uniform` option requires all items in array to have same structure
-         *   (to convert to the same schema). If not, error is thrown.
-         * * `tuple` option generates a
-         *   [tuple array](https://json-schema.org/understanding-json-schema/reference/array.html#tuple-validation)
-         *   (array of objects) from arrays.
-         *
-         * @default 'all'
-         */
         mode?: "all" | "first" | "uniform" | "tuple" | undefined;
 } | undefined;
 objects?: {
-    /**
-         * By providing custom function you will be able to modify any object
-         * value (including nested ones) and pre-process it before it gets
-         * converted into schema or modify generated schema or do the schema
-         * conversion entirely by yourself.
-         *
-         * @param obj input object value that is supposed to be converted into
-         *            JSON schema
-         * @param defaultFunc standard function that is used to generate schema
-         *                    from object. Takes just the `obj` param.
-         */
         preProcessFnc?(
             obj: any,
             defaultFunc: (obj: any) => JSONSchema3or4,
             ): JSONSchema3or4;
-    /**
-         * By providing `postProcessFnc`, you can modify or replace generated
-         * schema. This function will be called recursively for all the
-         * properties and sub-properties and array items from leaves to the root
-         * of the `obj` object.
-         *
-         * @param schema Generated JSON schema
-         * @param obj input value
-         * @param defaultFunc standard function that is used to post-process
-         *                    generated schema. Takes the `schema`, `obj`
-         *                    params.
-         */
         postProcessFnc?(
             schema: JSONSchema3or4,
             obj: any,
             defaultFnc: (schema: JSONSchema3or4, obj: any) => JSONSchema3or4,
             ): JSONSchema3or4;
-    /**
-         * if set to `false`, all object schemas will include JSON schema
-         * property `additionalProperties: false` which makes generated schema
-         * to perevent any extra properties.
-         *
-         * @default true
-         */
         additionalProperties?: boolean | undefined;
 } | undefined;
 strings?: {
-    /**
-         * By providing custom function you will be able to modify any string
-         * value (including nested ones) and pre-process it before it gets
-         * converted to schema, modify generated schema or do the schema
-         * conversion entirely by yourself.
-         *
-         * @param value `string` to be converted into JSON schema
-         * @param defaultFnc default function that normally generates the
-         *                   schema. This function receives only `string` to be
-         *                   converted to JSON schema
-         */
         preProcessFnc?(
             value: string,
             defaultFnc: (value: string) => JSONSchema3or4,
@@ -256,13 +205,6 @@ const types = {
       return helpers.typeNames.find(typeName => types[typeName](val))
     },
   
-    /**
-     * Tries to find the least common schema from two supplied JSON schemas. If it is unable to find
-     * such a schema, it returns null. Incompatibility in structure/types leads to returning null,
-     * except when the difference is only integer/number. Than the 'number' is used instead 'int'.
-     * Types/Structure incompatibility in array items only leads to schema that doesn't specify
-     * items structure/type.
-     */
     mergeSchemaObjs(schema1: JSONSchema3or4, schema2: JSONSchema3or4): JSONSchema3or4 | null {
       if (!schema1 || !schema2) {
         return null
@@ -363,12 +305,6 @@ class ToJsonSchema {
     this.objectPostProcessDefault = this.objectPostProcessDefault.bind(this)
   }
 
-  /**
-   * Tries to find the least common schema that would validate all items in the array. More details
-   * helpers.mergeSchemaObjs description
-   * @param {array} arr
-   * @returns {object|null}
-   */
   getCommonArrayItemSchema(arr: Array<any>): object | null {
     const schemas = arr.map(item => this.getSchema(item))
     // schemas.forEach(schema => console.log(JSON.stringify(schema, '\t')))
