@@ -4,7 +4,7 @@ Guidelines for creating JSONata mappings:
 
 1. Source References:
    - Use exact field paths from the source data, e.g. $.merchant_category
-   - For accessing fields with names containing spaces, use backticks, e.g. $.\`merchant category\`
+   - For accessing fields with names containing spaces, use backticks, e.g. $.\`merchant category\`. Never use single quotes.
    - Jsonata will automatically extract all the fields from the current context. E.g. if you need all variants from all products, you can use $.products.variants. No need to do nested map reduce operations.
    - $. The variable with no name refers to the context value at any point in the input JSON hierarchy. E.g. if the current context is products.price, then $.currency is products.price.currency
    - %. The parent of the current context value. E.g. if the current context is products.variants.size and you want variant name, use %.name
