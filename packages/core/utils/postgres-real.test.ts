@@ -22,7 +22,7 @@ describe('callPostgres', () => {
     const testConfig: ApiConfig = {
       id: '1',
       instruction: 'test',
-      urlHost: 'postgresql://user:password@localhost:5432',
+      urlHost: 'postgres://user:password@localhost:5432',
       urlPath: '/testdb',
       body: JSON.stringify({
         query: 'SELECT NOW()'
