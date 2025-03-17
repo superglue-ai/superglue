@@ -3,7 +3,7 @@ import axios, { AxiosRequestConfig } from "axios";
 import { GraphQLResolveInfo } from "graphql";
 import jsonata from "jsonata";
 import { Validator } from "jsonschema";
-import { toJsonSchema } from "./json-schema.js";
+import { toJsonSchema } from "../external/json-schema.js";
 
 export function isRequested(field: string, info: GraphQLResolveInfo) {
     return info.fieldNodes.some(
