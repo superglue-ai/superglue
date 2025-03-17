@@ -1,5 +1,6 @@
 'use server'
 
+import axios from 'axios';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
@@ -30,15 +31,18 @@ export async function middleware(request: NextRequest) {
   const GQL_ENDPOINT = process.env.GRAPHQL_ENDPOINT
   const GQL_API_KEY = process.env.AUTH_TOKEN
   try {
-    console.log('fetching gql');
     // TODO: remove once client SDK is updated
-    const response = await fetch(`${GQL_ENDPOINT}/graphql`, {
-      method: 'POST',
+    const response = await axios({
+      method: 'post',
+      url: `${GQL_ENDPOINT}`,
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${GQL_API_KEY}`,
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
       },
-      body: JSON.stringify({
+      data: {
         query: `
           query GetTenantInfo {
             getTenantInfo {
@@ -47,11 +51,11 @@ export async function middleware(request: NextRequest) {
             }
           }
         `,
-      }),
+      },
     });
 
-    if (response.ok) {
-      const { data } = await response.json();
+    if (response.status === 200) {
+      const { data } = response.data;
       const redirectResponse = NextResponse.redirect(new URL('/welcome', request.url));
       const nextResponse = NextResponse.next();
       if (data?.getTenantInfo?.email !== undefined) {
@@ -82,12 +86,15 @@ export async function middleware(request: NextRequest) {
         });
       }
       
-      if (data?.getTenantInfo?.email || data?.getTenantInfo?.emailEntrySkipped === true) {
+      const hasEmail = Boolean(data?.getTenantInfo?.email);
+      const hasSkipped = Boolean(data?.getTenantInfo?.emailEntrySkipped);
+      if (hasEmail || hasSkipped) {
         return nextResponse;
-      } else {
-        // Either emailEntrySkipped is false or both values are null
-        return redirectResponse;
       }
+      
+      // Either emailEntrySkipped is false or both values are null
+      console.log('Middleware: GQL shows redirect to welcome needed');
+      return redirectResponse;
     }
   } catch (err) {
     // do nothing, will fall through to default redirect
