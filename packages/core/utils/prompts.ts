@@ -115,6 +115,7 @@ export const API_PROMPT = `You are an API configuration assistant. Generate API 
   }
 - Think hard before producing a response, and be aware that the response is not checked for validity if the response is not an error, so only suggest endpoints that you are sure are valid.
 - If this is a store / e-commerce site, try products.json, collections.json, categories.json, etc.
+- You can use the following format to access a postgres database: urlHost: "postgres://{user}:{password}@{hostname}:{port}", urlPath: "{database}", body: {query: "{query}"}
 `;
 
 export const API_ERROR_HANDLING_USER_PROMPT = `An error occured during the API because you probably generated a bad configuration.
