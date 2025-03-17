@@ -152,12 +152,8 @@ const jsonataSchema = {
       Give a low confidence score if there are missing fields in the source data. 
       Give a low confidence score if there are multiple options for a field and it is unclear which one to choose.
       `,
-    },
-    "confidence_reasoning": {
-      "type": "string",
-      "description": "Reasoning for the confidence score"
     }
   },
-  "required": ["jsonata", "confidence", "confidence_reasoning"],
+  "required": ["jsonata", "confidence"],
   "additionalProperties": false
 }
