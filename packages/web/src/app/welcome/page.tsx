@@ -27,7 +27,7 @@ export default function WelcomePage() {
     const checkTenantInfo = async () => {
       try {
         // TODO: remove once client SDK is updated
-        const response = await fetch(`${config.superglueEndpoint}/graphql`, {
+        const response = await fetch(`${config.superglueEndpoint}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -95,7 +95,7 @@ export default function WelcomePage() {
       })
 
       // TODO: remove once client SDK is updated
-      const response = await fetch(`${config.superglueEndpoint}/graphql`, {
+      const response = await fetch(`${config.superglueEndpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -134,7 +134,10 @@ export default function WelcomePage() {
         email: email
       })
 
-      router.push('/')
+      // Use window.location instead of router.push to force a full page reload
+      // probably cloud still use router.push if i do a router.refresh() before
+      // see: https://github.com/vercel/next.js/issues/58025
+      window.location.href = '/';
     } catch (err) {
       console.error(err)
       setError('Failed to submit email. Please try again.')
@@ -146,7 +149,7 @@ export default function WelcomePage() {
   const handleSkip = async () => {
     try {
       // TODO: remove once client SDK is updated
-      const response = await fetch(`${config.superglueEndpoint}/graphql`, {
+      const response = await fetch(`${config.superglueEndpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -178,7 +181,8 @@ export default function WelcomePage() {
       // Store in cookies
       document.cookie = "sg_tenant_emailEntrySkipped=true; path=/; max-age=31536000; SameSite=Strict";
       
-      router.push('/');
+      // Use window.location instead of router.push to force a full page reload
+      window.location.href = '/';
     } catch (err) {
       console.error(err);
     }
