@@ -29,7 +29,6 @@ export default function WorkflowsPage() {
       id: "getBreedImage",
       endpoint: "/breed/${breed}/images/random",
       instruction: "Get a random image for a specific dog breed",
-      dependencies: ["getAllBreeds"],
       executionMode: "LOOP",
       loopVariable: "breed",
       loopMaxIters: 5
