@@ -4,7 +4,7 @@ import keys from 'lodash.keys'
 import merge from 'lodash.merge'
 import { JSONSchema4, JSONSchema4TypeName } from "json-schema";
 
-interface JSONSchema3or4 {
+export interface JSONSchema3or4 {
 id?: JSONSchema4["id"] | undefined;
 $ref?: JSONSchema4["$ref"] | undefined;
 $schema?: JSONSchema4["$schema"] | undefined;
@@ -180,27 +180,6 @@ strings?: {
             value: string,
             defaultFnc: (value: string) => JSONSchema3or4,
             ): JSONSchema3or4;
-    /**
-         * When set to true format of the strings values may be detected based
-         * on it's content.
-         *
-         * These JSON schema string formats can be detected:
-         *
-         * * date-time
-         * * date
-         * * time
-         * * utc-millisec
-         * * color
-         * * style
-         * * phone
-         * * uri
-         * * email
-         * * ip-address
-         * * ipv6
-         *
-         * @default true
-         */
-        detectFormat?: boolean | undefined;
 } | undefined;
 }
 
@@ -209,7 +188,6 @@ const defaultOptions: Options = {
   postProcessFnc: null,
 
   strings: {
-    detectFormat: true,
     preProcessFnc: null,
   },
   arrays: {
@@ -262,58 +240,7 @@ const types = {
     },
   }
   
-  const FORMAT_REGEXPS = {
-    'date-time': /^\d{4}-(?:0[0-9]{1}|1[0-2]{1})-(3[01]|0[1-9]|[12][0-9])[tT ](2[0-4]|[01][0-9]):([0-5][0-9]):(60|[0-5][0-9])(\.\d+)?([zZ]|[+-]([0-5][0-9]):(60|[0-5][0-9]))$/,
-    date: /^\d{4}-(?:0[0-9]{1}|1[0-2]{1})-(3[01]|0[1-9]|[12][0-9])$/,
-    time: /^(2[0-4]|[01][0-9]):([0-5][0-9]):(60|[0-5][0-9])$/,
-  
-    email: /^(?:[\w!#$%&'*+-/=?^`{|}~]+\.)*[\w!#$%&'*+-/=?^`{|}~]+@(?:(?:(?:[a-zA-Z0-9](?:[a-zA-Z0-9-](?!\.)){0,61}[a-zA-Z0-9]?\.)+[a-zA-Z0-9](?:[a-zA-Z0-9-](?!$)){0,61}[a-zA-Z0-9]?)|(?:\[(?:(?:[01]?\d{1,2}|2[0-4]\d|25[0-5])\.){3}(?:[01]?\d{1,2}|2[0-4]\d|25[0-5])\]))$/,
-    'ip-address': /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/,
-    ipv6: /^\s*((([0-9A-Fa-f]{1,4}:){7}([0-9A-Fa-f]{1,4}|:))|(([0-9A-Fa-f]{1,4}:){6}(:[0-9A-Fa-f]{1,4}|((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:){5}(((:[0-9A-Fa-f]{1,4}){1,2})|:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:){4}(((:[0-9A-Fa-f]{1,4}){1,3})|((:[0-9A-Fa-f]{1,4})?:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){3}(((:[0-9A-Fa-f]{1,4}){1,4})|((:[0-9A-Fa-f]{1,4}){0,2}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){2}(((:[0-9A-Fa-f]{1,4}){1,5})|((:[0-9A-Fa-f]{1,4}){0,3}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){1}(((:[0-9A-Fa-f]{1,4}){1,6})|((:[0-9A-Fa-f]{1,4}){0,4}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(:(((:[0-9A-Fa-f]{1,4}){1,7})|((:[0-9A-Fa-f]{1,4}){0,5}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:)))(%.+)?\s*$/,
-    uri: /^[a-zA-Z][a-zA-Z0-9+-.]*:[^\s]*$/,
-  
-    color: /^(#?([0-9A-Fa-f]{3}){1,2}\b|aqua|black|blue|fuchsia|gray|green|lime|maroon|navy|olive|orange|purple|red|silver|teal|white|yellow|(rgb\(\s*\b([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\b\s*,\s*\b([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\b\s*,\s*\b([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\b\s*\))|(rgb\(\s*(\d?\d%|100%)+\s*,\s*(\d?\d%|100%)+\s*,\s*(\d?\d%|100%)+\s*\)))$/,
-  
-    // hostname regex from: http://stackoverflow.com/a/1420225/5628
-    hostname: /^(?=.{1,255}$)[0-9A-Za-z](?:(?:[0-9A-Za-z]|-){0,61}[0-9A-Za-z])?(?:\.[0-9A-Za-z](?:(?:[0-9A-Za-z]|-){0,61}[0-9A-Za-z])?)*\.?$/,
-    'host-name': /^(?=.{1,255}$)[0-9A-Za-z](?:(?:[0-9A-Za-z]|-){0,61}[0-9A-Za-z])?(?:\.[0-9A-Za-z](?:(?:[0-9A-Za-z]|-){0,61}[0-9A-Za-z])?)*\.?$/,
-  
-    alpha: /^[a-zA-Z]+$/,
-    alphanumeric: /^[a-zA-Z0-9]+$/,
-    'utc-millisec': input => (typeof input === 'string') && parseFloat(input) === parseInt(input, 10) && !isNaN(parseFloat(input)), // eslint-disable-line no-restricted-globals
-    regex /* istanbul ignore next: not supporting regex right now */ (input) { // eslint-disable-line space-before-function-paren
-      let result = true
-      try {
-        new RegExp(input) // eslint-disable-line no-new
-      } catch (e) {
-        result = false
-      }
-      return result
-    },
-    style: /\s*(.+?):\s*([^;]+);?/g,
-    phone: /^\+(?:[0-9] ?){6,14}[0-9]$/,
-  } as Record<string, any>
-
-  FORMAT_REGEXPS.regexp = FORMAT_REGEXPS.regex
-  FORMAT_REGEXPS.pattern = FORMAT_REGEXPS.regex
-  FORMAT_REGEXPS.ipv4 = FORMAT_REGEXPS['ip-address']
-  
-  const isFormat = function isFormat(input, format) {
-    if (typeof input === 'string' && FORMAT_REGEXPS[format] !== undefined) {
-      if (FORMAT_REGEXPS[format] instanceof RegExp) {
-        return FORMAT_REGEXPS[format].test(input)
-      }
-      if (typeof FORMAT_REGEXPS[format] === 'function') {
-        return FORMAT_REGEXPS[format](input)
-      }
-    }
-    return true
-  }
-
-  
   const helpers = {
-    stringFormats: keys(FORMAT_REGEXPS),
-    isFormat,
     typeNames: [
       'integer',
       'number', // make sure number is after integer (for proper type detection)
@@ -335,11 +262,8 @@ const types = {
      * except when the difference is only integer/number. Than the 'number' is used instead 'int'.
      * Types/Structure incompatibility in array items only leads to schema that doesn't specify
      * items structure/type.
-     * @param {object} schema1 - JSON schema
-     * @param {object} schema2 - JSON schema
-     * @returns {object|null}
      */
-    mergeSchemaObjs(schema1, schema2) {
+    mergeSchemaObjs(schema1: JSONSchema3or4, schema2: JSONSchema3or4): JSONSchema3or4 | null {
       if (!schema1 || !schema2) {
         return null
       }
@@ -405,10 +329,7 @@ const types = {
     },
   }
   
-const skipReverseFind = ['hostname', 'host-name', 'alpha', 'alphanumeric', 'regex', 'regexp', 'pattern']
-const filteredFormats = helpers.stringFormats.filter(item => skipReverseFind.indexOf(item) < 0)
-
-function getCommonTypeFromArrayOfTypes(arrOfTypes) {
+function getCommonTypeFromArrayOfTypes(arrOfTypes: string[]): JSONSchema4TypeName | null {
   let lastVal
   for (let i = 0, {length} = arrOfTypes; i < length; i++) {
     let currentType = arrOfTypes[i]
@@ -425,7 +346,7 @@ function getCommonTypeFromArrayOfTypes(arrOfTypes) {
   return lastVal
 }
 
-function getCommonArrayItemsType(arr) {
+function getCommonArrayItemsType(arr: any[]): JSONSchema4TypeName | null {
   return getCommonTypeFromArrayOfTypes(arr.map(item => helpers.getType(item)))
 }
 
@@ -448,13 +369,13 @@ class ToJsonSchema {
    * @param {array} arr
    * @returns {object|null}
    */
-  getCommonArrayItemSchema(arr) {
+  getCommonArrayItemSchema(arr: Array<any>): object | null {
     const schemas = arr.map(item => this.getSchema(item))
     // schemas.forEach(schema => console.log(JSON.stringify(schema, '\t')))
     return schemas.reduce((acc, current) => helpers.mergeSchemaObjs(acc, current), schemas.pop())
   }
 
-  getObjectSchemaDefault(obj) {
+  getObjectSchemaDefault(obj: any): JSONSchema3or4 {
     const schema: JSONSchema3or4 = {type: 'object'}
     const objKeys = Object.keys(obj)
     if (objKeys.length > 0) {
@@ -466,14 +387,14 @@ class ToJsonSchema {
     return schema
   }
 
-  getObjectSchema(obj) {
+  getObjectSchema(obj: any): JSONSchema3or4 {
     if (this.options.objects.preProcessFnc) {
       return this.options.objects.preProcessFnc(obj, this.getObjectSchemaDefault)
     }
     return this.getObjectSchemaDefault(obj)
   }
 
-  getArraySchemaMerging(arr) {
+  getArraySchemaMerging(arr: Array<any>): JSONSchema3or4 {
     const schema: JSONSchema3or4 = {type: 'array'}
     const commonType = getCommonArrayItemsType(arr)
     if (commonType) {
@@ -490,7 +411,7 @@ class ToJsonSchema {
     return schema
   }
 
-  getArraySchemaNoMerging(arr) {
+  getArraySchemaNoMerging(arr: Array<any>): JSONSchema3or4 {
     const schema: JSONSchema3or4 = {type: 'array'}
     if (arr.length > 0) {
       schema.items = this.getSchema(arr[0])
@@ -498,7 +419,7 @@ class ToJsonSchema {
     return schema
   }
 
-  getArraySchemaTuple(arr) {
+  getArraySchemaTuple(arr: Array<any>): JSONSchema3or4 {
     const schema: JSONSchema3or4 = {type: 'array'}
     if (arr.length > 0) {
       schema.items = arr.map(item => this.getSchema(item))
@@ -506,7 +427,7 @@ class ToJsonSchema {
     return schema
   }
 
-  getArraySchemaUniform(arr) {
+  getArraySchemaUniform(arr: Array<any>): JSONSchema3or4 {
     const schema: JSONSchema3or4 = this.getArraySchemaNoMerging(arr)
 
     if (arr.length > 1) {
@@ -519,7 +440,7 @@ class ToJsonSchema {
     return schema
   }
 
-  getArraySchema(arr) {
+  getArraySchema(arr: Array<any>): JSONSchema3or4 {
     if (arr.length === 0) { return {type: 'array'} }
     switch (this.options.arrays.mode) {
       case 'all': return this.getArraySchemaMerging(arr)
@@ -530,36 +451,26 @@ class ToJsonSchema {
     }
   }
 
-  getStringSchemaDefault(value) {
+  getStringSchemaDefault(value: any): JSONSchema3or4 {
     const schema: JSONSchema3or4 = {type: 'string'}
-
-    if (!this.options.strings.detectFormat) {
-      return schema
-    }
-
-    const index = filteredFormats.findIndex(item => helpers.isFormat(value, item))
-    if (index >= 0) {
-      schema.format = filteredFormats[index]
-    }
-
     return schema
   }
 
-  getStringSchema(value) {
+  getStringSchema(value: any): JSONSchema3or4 {
     if (this.options.strings.preProcessFnc) {
       return this.options.strings.preProcessFnc(value, this.getStringSchemaDefault)
     }
     return this.getStringSchemaDefault(value)
   }
 
-  commmonPostProcessDefault(type, schema, value) { // eslint-disable-line no-unused-vars
+  commmonPostProcessDefault(type: JSONSchema4TypeName, schema: JSONSchema3or4, value: any): JSONSchema3or4 { // eslint-disable-line no-unused-vars
     if (this.options.required) {
       return merge({}, schema, {required: true})
     }
     return schema
   }
 
-  objectPostProcessDefault(schema, obj) {
+  objectPostProcessDefault(schema: JSONSchema3or4, obj: any): JSONSchema3or4 {
     if (this.options.objects.additionalProperties === false && Object.getOwnPropertyNames(obj).length > 0) {
       return merge({}, schema, {additionalProperties: false})
     }
@@ -571,7 +482,7 @@ class ToJsonSchema {
    * @param value
    * @returns {object}
    */
-  getSchema(value) {
+  getSchema(value: any): JSONSchema3or4 {
     let type = helpers.getType(value)
     if (!type) {
       type = 'null'
