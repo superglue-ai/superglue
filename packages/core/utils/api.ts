@@ -117,6 +117,9 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
       "";
 
     const url = replaceVariables(composeUrl(endpoint.urlHost, endpoint.urlPath), requestVars);
+
+    console.log(`${endpoint.method} ${url}`);
+
     const axiosConfig: AxiosRequestConfig = {
       method: endpoint.method,
       url: url,
@@ -126,7 +129,6 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
       timeout: options?.timeout || 60000,
     };
 
-    console.log(`${endpoint.method} ${url}`);
     const response = await callAxios(axiosConfig, options);
 
     if(![200, 201, 204].includes(response?.status) || 

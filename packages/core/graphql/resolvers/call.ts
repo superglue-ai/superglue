@@ -7,6 +7,7 @@ import { telemetryClient } from "../../utils/telemetry.js";
 import { applyJsonataWithValidation, maskCredentials } from "../../utils/tools.js";
 import { prepareTransform } from "../../utils/transform.js";
 import { notifyWebhook } from "../../utils/webhook.js";
+import { callPostgres } from "../../utils/postgres.js";
 
 export const callResolver = async (
   _: any,
@@ -54,7 +55,12 @@ export const callResolver = async (
           throw new Error("Did not find a valid endpoint configuration. If you did provide an id, please ensure cache reading is enabled.");
         }
 
-        response = await callEndpoint(preparedEndpoint, payload, credentials, options);
+        if(preparedEndpoint.urlHost.startsWith("postgres")) {
+          response = await callPostgres(preparedEndpoint, payload, credentials, options);
+        }
+        else {
+          response = await callEndpoint(preparedEndpoint, payload, credentials, options);
+        }
 
         if(!response.data) {
           response = null;
