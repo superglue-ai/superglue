@@ -15,46 +15,14 @@ export async function executeApiCall(
   options?: RequestOptions,
 ): Promise<unknown> {
   try {
-    let processedConfig = { ...apiConfig };
-    if (apiConfig.urlPath?.includes("${")) {
-      const templateVars = extractTemplateVariables(apiConfig.urlPath);
-
-      for (const varName of templateVars) {
-        if (!(varName in callPayload)) {
-          throw new Error(`The following variables are not defined: ${varName}`);
-        }
-      }
-
-      let processedPath = apiConfig.urlPath;
-      for (const varName of templateVars) {
-        const value = callPayload[varName];
-        processedPath = processedPath.replace(`\${${varName}}`, String(value));
-      }
-
-      processedConfig = {
-        ...apiConfig,
-        urlPath: processedPath,
-      };
-
-      console.log(
-        `[API Call] ${apiConfig.id}: ${processedConfig.urlPath} (with ${templateVars[0]}=${callPayload[templateVars[0]]})`,
-      );
-    }
-
-    const result = await callEndpoint(processedConfig, callPayload, credentials, options || { timeout: 60000 });
+    console.log(`[API Call] ${apiConfig.id || 'unnamed'}: ${apiConfig.urlHost}${apiConfig.urlPath}`);
     
-    // Update the baseApiConfig with headers from the response
-    if (result.headers) {
-      processedConfig.headers = {
-        ...processedConfig.headers,
-        ...result.headers
-      };
-    }
+    const result = await callEndpoint(apiConfig, callPayload || {}, credentials || {}, options || { timeout: 60000 });
     
     return result.data;
   } catch (error) {
-    console.error(`Error calling '${apiConfig.id}': ${String(error)}`);
-    throw new Error(`API call '${apiConfig.id}' failed: ${String(error)}`);
+    console.error(`Error calling '${apiConfig.id || 'unnamed'}': ${String(error)}`);
+    throw new Error(`API call '${apiConfig.id || 'unnamed'}' failed: ${String(error)}`);
   }
 }
 
@@ -113,6 +81,7 @@ export async function prepareApiConfig(
   baseApiInput?: ApiInput,
   urlPath: string = step.endpoint,
 ): Promise<ApiConfig> {
+  // If step already has a config, just merge in the base headers
   if (step.apiConfig) {
     return {
       ...step.apiConfig,
@@ -130,10 +99,6 @@ export async function prepareApiConfig(
     instruction: step.instruction,
   };
 
-  if (!apiDocumentation) {
-    console.warn("No API documentation available. Please call retrieveApiDocumentation first.");
-  }
-
-  const { config } = await generateApiConfig(apiInput, apiDocumentation);
+  const { config } = await generateApiConfig(apiInput, apiDocumentation || "");
   return config;
 }
