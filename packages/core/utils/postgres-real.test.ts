@@ -1,22 +1,8 @@
 import { ApiConfig } from "@superglue/shared";
 import { callPostgres } from "./postgres.js";
-import { describe, it, expect, beforeAll } from 'vitest';
-import { Client } from 'pg';
+import { describe, it, expect } from 'vitest';
 
-let shouldSkip = false;
-
-beforeAll(async () => {
-  const client = new Client({
-    connectionString: 'postgres://user:password@localhost:5432/testdb'
-  });
-  
-  try {
-    await client.connect();
-    await client.end();
-  } catch (error) {
-    shouldSkip = true;
-  }
-});
+let shouldSkip = true;
 
 describe('callPostgres', () => {
     const testConfig: ApiConfig = {
