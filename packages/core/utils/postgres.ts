@@ -22,14 +22,14 @@ export async function callPostgres(endpoint: ApiConfig, payload: Record<string, 
 
   const pool = new Pool(poolConfig);
   let attempts = 0;
-  
+  const maxRetries = options.retries ?? DEFAULT_RETRIES;
+
   while (true) {
     try {
       const result = await pool.query(query);
       return result.rows;
     } catch (error) {
       attempts++;
-      const maxRetries = options.retries ?? DEFAULT_RETRIES;
       
       if (attempts > maxRetries) {
         if (error instanceof Error) {
@@ -42,7 +42,7 @@ export async function callPostgres(endpoint: ApiConfig, payload: Record<string, 
       const retryDelay = options.retryDelay ?? DEFAULT_RETRY_DELAY;
       await new Promise(resolve => setTimeout(resolve, retryDelay));
     } finally {
-      if (attempts >= (options.retries ?? DEFAULT_RETRIES)) {
+      if (attempts > maxRetries) {
         await pool.end();
       }
     }
