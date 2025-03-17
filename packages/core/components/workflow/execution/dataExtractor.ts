@@ -1,179 +1,57 @@
+import { applyJsonata } from "../../../utils/tools.js";
+
 /**
- * Utility class for extracting data from complex nested objects
- * This class provides methods to find values in JSON objects by key or path
+ * Find a value by key in the data object, searching through nested objects
+ * @param data The data object to search in
+ * @param key The key to search for
+ * @returns The found value or undefined
  */
-export class DataExtractor {
-  constructor(private data: Record<string, unknown>) {}
-
-  /**
-   * Find a value by key in the data object, searching through nested objects
-   * @param key The key to search for
-   * @returns The found value or undefined
-   */
-  findValue(key: string): unknown {
-    // Check if it exists directly on the data object
-    if (key in this.data) {
-      return this.data[key];
-    }
-
-    // Look for it in nested objects
-    return this.searchNestedObjects(this.data, key);
+export function findValue(data: Record<string, unknown>, key: string): unknown {
+  if (key in data) {
+    return data[key];
   }
-
-  /**
-   * Extract values by path from the data object
-   * Handles both simple paths (e.g., "data.items") and array paths (e.g., "data.items[].id")
-   * @param path The path to extract values from
-   * @returns Array of extracted values
-   */
-  extractValues(path: string): unknown[] {
-    // If path is empty, search for values at top level
-    if (!path || path === "$") {
-      const values: unknown[] = [];
-
-      // If data is already an array, return it
-      if (Array.isArray(this.data)) {
-        return this.data;
-      }
-
-      // If data has a message property that's an object, get its keys (common in APIs)
-      if ("message" in this.data && typeof this.data.message === "object" && this.data.message !== null) {
-        const messageObj = this.data.message as Record<string, unknown>;
-
-        if (!Array.isArray(messageObj) && Object.keys(messageObj).length > 0) {
-          return Object.keys(messageObj);
-        }
-
-        // If message is an array, return it
-        return Object.values(messageObj);
-      }
-
-      // Return the object's values as a fallback
-      return Object.values(this.data);
-    }
-
-    // Handle JsonPath-like notation
-    try {
-      const pathParts = path.split(".");
-      let current: unknown = this.data;
-
-      for (const part of pathParts) {
-        if (!current || typeof current !== "object") {
-          return []; // Path doesn't exist
-        }
-
-        // Handle array indexing or collection
-        if (part.includes("[") && part.includes("]")) {
-          const [propName, indexOrEmpty] = part.split("[");
-
-          // Get the property
-          if (propName && propName in (current as Record<string, unknown>)) {
-            current = (current as Record<string, unknown>)[propName];
-          } else {
-            return []; // Property doesn't exist
-          }
-
-          // Handle empty brackets '[]' - return all items in array
-          if (indexOrEmpty === "]") {
-            if (Array.isArray(current)) {
-              return current;
-            }
-
-            // If it's an object, return its values
-            if (current && typeof current === "object") {
-              return Object.values(current as Record<string, unknown>);
-            }
-          }
-          // Handle specific index
-          else {
-            const index = Number.parseInt(indexOrEmpty.slice(0, -1));
-            if (Array.isArray(current) && index >= 0 && index < current.length) {
-              current = current[index];
-            } else {
-              return []; // Invalid index
-            }
-          }
-        }
-        // Regular property access
-        else if (current && typeof current === "object" && part in (current as Record<string, unknown>)) {
-          current = (current as Record<string, unknown>)[part];
-        }
-        // Try "message" as a fallback (common in many APIs)
-        else if (
-          current &&
-          typeof current === "object" &&
-          "message" in (current as Record<string, unknown>) &&
-          typeof (current as Record<string, unknown>).message === "object"
-        ) {
-          const messageObj = (current as Record<string, unknown>).message as Record<string, unknown>;
-
-          if (part in messageObj) {
-            current = messageObj[part];
-          } else {
-            return []; // Path doesn't exist in message object
-          }
-        } else {
-          return []; // Path doesn't exist
-        }
-      }
-
-      // If we found something, return it as an array
-      if (current !== undefined) {
-        if (Array.isArray(current)) {
-          return current;
-        }
-        if (current && typeof current === "object") {
-          // If it's an object, return either its values or its keys
-          if (Object.keys(current as Record<string, unknown>).length > 0) {
-            return Object.keys(current as Record<string, unknown>);
-          }
-          return Object.values(current as Record<string, unknown>);
-        }
-        return [current];
-      }
-
-      return [];
-    } catch (error) {
-      console.error(`Error extracting values from path ${path}:`, error);
-      return [];
-    }
-  }
-
-  /**
-   * Recursively search nested objects for a key
-   * @param obj The object to search in
-   * @param targetKey The key to find
-   * @returns The found value or undefined
-   */
-  private searchNestedObjects(obj: Record<string, unknown>, targetKey: string): unknown {
-    // For each property in the object
-    for (const [key, value] of Object.entries(obj)) {
-      // Direct match
-      if (key === targetKey) {
-        return value;
-      }
-
-      // If value is an object, search recursively
-      if (value && typeof value === "object" && !Array.isArray(value)) {
-        const found = this.searchNestedObjects(value as Record<string, unknown>, targetKey);
-        if (found !== undefined) {
-          return found;
-        }
-      }
-
-      // If value is an array, search each item
-      if (Array.isArray(value)) {
-        for (const item of value) {
-          if (item && typeof item === "object") {
-            const found = this.searchNestedObjects(item as Record<string, unknown>, targetKey);
-            if (found !== undefined) {
-              return found;
-            }
-          }
-        }
-      }
-    }
-
+  try {
+    // Use JSONata to find the value with a simple search pattern at any level of nesting
+    return applyJsonata(data, `**[$.${key}]`);
+  } catch (error) {
+    console.error(`Error finding value for key ${key}:`, error);
     return undefined;
+  }
+}
+
+/**
+ * Extract values by path from the data object
+ * @param data The data object to extract from
+ * @param path The path or JSONata expression to use
+ * @returns Array of extracted values
+ */
+export function extractValues(data: Record<string, unknown>, path: string): unknown[] {
+  if (!path || path === "$") {
+    if (Array.isArray(data)) {
+      return data;
+    }
+    // we can handle various patterns here, e.g. if certain APIs store stuff in certain keys
+    // e.g. messages, results, data, etc.
+
+    return Object.values(data);
+  }
+
+  try {
+    // Convert simple dot notation to JSONata
+    const jsonataExpr = path.includes("$") ? path : path.split(".").join(".");
+    const result = applyJsonata(data, jsonataExpr);
+
+    if (Array.isArray(result)) {
+      return result;
+    }
+
+    if (result && typeof result === "object") {
+      return Object.keys(result as Record<string, unknown>);
+    }
+
+    return result ? [result] : [];
+  } catch (error) {
+    console.error(`Error extracting values with path ${path}:`, error);
+    return [];
   }
 }
