@@ -3,7 +3,7 @@ import axios, { AxiosRequestConfig } from "axios";
 import { GraphQLResolveInfo } from "graphql";
 import jsonata from "jsonata";
 import { Validator } from "jsonschema";
-import toJsonSchema from "to-json-schema";
+import { toJsonSchema } from "../external/json-schema.js";
 
 export function isRequested(field: string, info: GraphQLResolveInfo) {
     return info.fieldNodes.some(
@@ -333,5 +333,5 @@ function makeNullable(schema: any): any {
 
 export function getSchemaFromData(data: any): string {
   if(!data) return null;
-  return JSON.stringify(toJsonSchema(data, {required: true, arrays: {mode: 'first'}}), null, 2).slice(0, 5000);
+  return JSON.stringify(toJsonSchema(data, {arrays: {mode: 'first'}}), null, 2).slice(0, 50000);
 }
