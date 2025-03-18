@@ -38,8 +38,8 @@ vi.mock("../../utils/tools.js", () => ({
       return {
         success: true,
         data: {
-          userId: [1, 2, 3] // Array of user IDs for the loop execution
-        }
+          userId: [1, 2, 3], // Array of user IDs for the loop execution
+        },
       };
     }
 
@@ -57,8 +57,8 @@ vi.mock("../../utils/tools.js", () => ({
         getUsers: [
           { id: 1, name: "User 1" },
           { id: 2, name: "User 2" },
-          { id: 3, name: "User 3" }
-        ]
+          { id: 3, name: "User 3" },
+        ],
       },
     };
   }),
@@ -162,7 +162,7 @@ describe("ApiWorkflowOrchestrator", () => {
             method: HttpMethod.GET,
             urlHost: "https://jsonplaceholder.typicode.com",
             instruction: "Get user data",
-            id: "api_config_getUserData"
+            id: "api_config_getUserData",
           },
           executionMode: "DIRECT",
         },
@@ -190,7 +190,7 @@ describe("ApiWorkflowOrchestrator", () => {
     expect(result.stepResults.getUserData.success).toBe(true);
   });
 
-  it("should handle a workflow with a complete input object", async () => {
+  it("should handle a workflow with a plan directly", async () => {
     const orchestrator = new ApiWorkflowOrchestrator({
       urlHost: "https://jsonplaceholder.typicode.com",
       method: HttpMethod.GET,
@@ -208,7 +208,7 @@ describe("ApiWorkflowOrchestrator", () => {
       "https://jsonplaceholder.typicode.com",
     );
 
-    // Create a plan to include directly in the input
+    // Create a plan to register and execute
     const plan: ExecutionPlan = {
       id: "inline_plan",
       apiHost: "https://jsonplaceholder.typicode.com",
@@ -222,7 +222,7 @@ describe("ApiWorkflowOrchestrator", () => {
             method: HttpMethod.GET,
             urlHost: "https://jsonplaceholder.typicode.com",
             instruction: "Get data",
-            id: "api_config_getData"
+            id: "api_config_getData",
           },
           executionMode: "DIRECT",
         },
@@ -230,12 +230,17 @@ describe("ApiWorkflowOrchestrator", () => {
       finalTransform: "$",
     };
 
-    // Use the executeWorkflow method with a complete input object
-    const result = await orchestrator.executeWorkflow({
-      plan,
-      payload: { test: true },
-      credentials: { apiKey: "test-key" },
+    // Register the plan
+    const planId = await orchestrator.registerExecutionPlan(plan);
+
+    // Set up step mapping
+    await orchestrator.setStepMapping(planId, "getData", {
+      inputMapping: "$",
+      responseMapping: "$",
     });
+
+    // Execute the workflow plan directly
+    const result = await orchestrator.executeWorkflowPlan(planId, { test: true }, { apiKey: "test-key" });
 
     expect(result.success).toBe(true);
     expect(result.data).toBeDefined();
@@ -277,7 +282,7 @@ describe("ApiWorkflowOrchestrator", () => {
             method: HttpMethod.GET,
             urlHost: "https://jsonplaceholder.typicode.com",
             instruction: "Get user information",
-            id: "api_config_userData"
+            id: "api_config_userData",
           },
           executionMode: "DIRECT",
         },
@@ -290,7 +295,7 @@ describe("ApiWorkflowOrchestrator", () => {
             method: HttpMethod.GET,
             urlHost: "https://jsonplaceholder.typicode.com",
             instruction: "Get posts by this user",
-            id: "api_config_postsByUser"
+            id: "api_config_postsByUser",
           },
           executionMode: "DIRECT",
         },
@@ -386,7 +391,7 @@ describe("ApiWorkflowOrchestrator", () => {
             method: HttpMethod.GET,
             urlHost: "https://jsonplaceholder.typicode.com",
             instruction: "Get list of users",
-            id: "api_config_getUsers"
+            id: "api_config_getUsers",
           },
           executionMode: "DIRECT",
         },
@@ -399,7 +404,7 @@ describe("ApiWorkflowOrchestrator", () => {
             method: HttpMethod.GET,
             urlHost: "https://jsonplaceholder.typicode.com",
             instruction: "Get posts for each user",
-            id: "api_config_getUserPosts"
+            id: "api_config_getUserPosts",
           },
           executionMode: "LOOP",
         },
@@ -417,7 +422,7 @@ describe("ApiWorkflowOrchestrator", () => {
     });
 
     await orchestrator.setStepMapping(planId, "getUserPosts", {
-      inputMapping: "{ userId: $.getUsers.*.id }", 
+      inputMapping: "{ userId: $.getUsers.*.id }",
       responseMapping: "$",
     });
 

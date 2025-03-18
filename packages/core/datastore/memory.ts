@@ -1,5 +1,5 @@
-import type { ApiConfig, ApiInput, DataStore, ExtractConfig, ExtractInput, RunResult, TransformConfig, TransformInput } from "@superglue/shared";
-import { createHash } from 'crypto';
+import type { ApiConfig, ApiInput, DataStore, ExtractConfig, ExtractInput, RunResult, SavedWorkflow, TransformConfig, TransformInput } from "@superglue/shared";
+import { createHash } from 'node:crypto';
 import { getSchemaFromData } from "../utils/tools.js";
 
 export class MemoryStore implements DataStore {
@@ -9,6 +9,7 @@ export class MemoryStore implements DataStore {
     transforms: Map<string, TransformConfig>;
     runs: Map<string, RunResult>;
     runsIndex: Map<string, { id: string; timestamp: number; configId: string }[]>;
+    workflows: Map<string, SavedWorkflow>;
   };
 
   private tenant: { email: string | null; emailEntrySkipped: boolean } = {
@@ -22,7 +23,8 @@ export class MemoryStore implements DataStore {
       extracts: new Map(),
       transforms: new Map(),
       runs: new Map(),
-      runsIndex: new Map()
+      runsIndex: new Map(),
+      workflows: new Map()
     };
   }
 
@@ -256,6 +258,7 @@ export class MemoryStore implements DataStore {
     this.storage.transforms.clear();
     this.storage.runs.clear();
     this.storage.runsIndex.clear();
+    this.storage.workflows.clear();
   }
 
   async disconnect(): Promise<void> {
@@ -276,5 +279,34 @@ export class MemoryStore implements DataStore {
       email: email !== undefined ? email : currentInfo.email,
       emailEntrySkipped: emailEntrySkipped !== undefined ? emailEntrySkipped : currentInfo.emailEntrySkipped
     };
+  }
+
+  // Workflow Methods
+  async getWorkflow(id: string, orgId?: string): Promise<SavedWorkflow | null> {
+    if (!id) return null;
+    const key = this.getKey('workflow', id, orgId);
+    const workflow = this.storage.workflows.get(key);
+    return workflow ? { ...workflow, id } : null;
+  }
+
+  async listWorkflows(limit = 10, offset = 0, orgId?: string): Promise<{ items: SavedWorkflow[], total: number }> {
+    const items = this.getOrgItems(this.storage.workflows, 'workflow', orgId)
+      .slice(offset, offset + limit);
+    const total = this.getOrgItems(this.storage.workflows, 'workflow', orgId).length;
+    return { items, total };
+  }
+
+  async upsertWorkflow(id: string, workflow: SavedWorkflow, orgId?: string): Promise<SavedWorkflow> {
+    if (!id || !workflow) return null;
+    const key = this.getKey('workflow', id, orgId);
+    this.storage.workflows.set(key, workflow);
+    return { ...workflow, id };
+  }
+
+  async deleteWorkflow(id: string, orgId?: string): Promise<boolean> {
+    if (!id) return false;
+    const key = this.getKey('workflow', id, orgId);
+    const deleted = this.storage.workflows.delete(key);
+    return deleted;
   }
 } 

@@ -1,4 +1,4 @@
-import { ApiConfig, ApiInput, ExtractConfig, ExtractInput, RunResult, TransformConfig, TransformInput } from "./types.js";
+import type { ApiConfig, ApiInput, ExtractConfig, ExtractInput, RunResult, SavedWorkflow, TransformConfig, TransformInput } from "./types.js";
 
 
 export interface DataStore {
@@ -34,6 +34,12 @@ export interface DataStore {
     createRun(result: RunResult, orgId?: string): Promise<RunResult>;
     deleteRun(id: string, orgId?: string): Promise<boolean>;
     deleteAllRuns(orgId?: string): Promise<boolean>;
+
+    // Workflow Methods
+    getWorkflow(id: string, orgId?: string): Promise<SavedWorkflow | null>;
+    listWorkflows(limit?: number, offset?: number, orgId?: string): Promise<{ items: SavedWorkflow[], total: number }>;
+    upsertWorkflow(id: string, workflow: SavedWorkflow, orgId?: string): Promise<SavedWorkflow>;
+    deleteWorkflow(id: string, orgId?: string): Promise<boolean>;
 
     // Tenant Information Methods
     getTenantInfo(): Promise<{ email: string | null, emailEntrySkipped: boolean }>;

@@ -25,9 +25,9 @@ export interface ExecutionStep {
   outputIsArray?: boolean;
   loopVariable?: string;
   loopMaxIters?: number;
-  
+
   // Output extraction configurations
-  arrayPath?: string;    // JSONPath-like path to array data (e.g., "message.items")
+  arrayPath?: string; // JSONPath-like path to array data (e.g., "message.items")
   objectKeysAsArray?: boolean; // Use object keys as array values
   responseField?: string; // Primary field containing response data (e.g., "message" for Dog API)
 }

@@ -13,7 +13,6 @@ import type {
   StepMapping,
   StepMappings,
   VariableMapping,
-  WorkflowInput,
   WorkflowResult,
 } from "./domain/workflow.types.js";
 import type { WorkflowOrchestrator } from "./domain/workflowOrchestrator.js";
@@ -49,32 +48,6 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
 
   public getExecutionPlans(): Record<string, ExecutionPlan> {
     return this.executionPlans;
-  }
-
-  public async executeWorkflow(input: WorkflowInput): Promise<WorkflowResult> {
-    try {
-      // If we have a plan directly in the input, register it first
-      if (input.plan) {
-        const planId = input.plan.id || this.generatePlanId();
-        await this.registerExecutionPlan(input.plan);
-        return this.executeWorkflowPlan(planId, input.payload, input.credentials, input.options);
-      }
-
-      if (!input.planId) {
-        throw new Error("Either a plan or a planId must be provided");
-      }
-
-      return this.executeWorkflowPlan(input.planId, input.payload, input.credentials, input.options);
-    } catch (error) {
-      return {
-        success: false,
-        error: String(error),
-        data: {},
-        stepResults: {},
-        startedAt: new Date(),
-        completedAt: new Date(),
-      };
-    }
   }
 
   public async registerExecutionPlan(plan: ExecutionPlan): Promise<ExecutionPlanId> {
@@ -192,7 +165,12 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
             };
 
             if (!this.apiDocumentation) {
-              console.warn("No API documentation available. Please call retrieveApiDocumentation first.");
+              this.retrieveApiDocumentation(
+                this.baseApiInput.documentationUrl,
+                this.baseApiInput.headers,
+                this.baseApiInput.queryParams,
+                this.baseApiInput.urlHost,
+              );
             }
 
             const { config } = await generateApiConfig(apiInput, this.apiDocumentation);

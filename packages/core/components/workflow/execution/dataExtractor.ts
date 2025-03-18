@@ -46,7 +46,7 @@ export function extractValues(data: Record<string, unknown>, path: string): unkn
     }
 
     if (result && typeof result === "object") {
-      return Object.keys(result as Record<string, unknown>);
+      return Object.keys(result);
     }
 
     return result ? [result] : [];

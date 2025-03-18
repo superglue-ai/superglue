@@ -11,7 +11,14 @@ import { getTenantInfoResolver, setTenantInfoResolver } from "./resolvers/tenant
 import { transformResolver } from "./resolvers/transform.js";
 import { updateApiConfigIdResolver } from "./resolvers/updateId.js";
 import { upsertApiResolver, upsertExtractResolver, upsertTransformResolver } from "./resolvers/upsert.js";
-import { workflowResolver } from "./resolvers/workflow.js";
+import {
+  deleteWorkflowResolver,
+  getWorkflowResolver,
+  listWorkflowsResolver,
+  upsertWorkflowResolver,
+  workflowResolver
+} from "./resolvers/workflow.js";
+
 export const resolvers = {
   Query: {
     listRuns: listRunsResolver,
@@ -24,6 +31,8 @@ export const resolvers = {
     getExtract: getExtractResolver,
     generateSchema: generateSchemaResolver,
     getTenantInfo: getTenantInfoResolver,
+    getWorkflow: getWorkflowResolver,
+    listWorkflows: listWorkflowsResolver,
   },
   Mutation: {
     setTenantInfo: setTenantInfoResolver,
@@ -31,6 +40,8 @@ export const resolvers = {
     extract: extractResolver,
     transform: transformResolver,
     executeWorkflow: workflowResolver,
+    upsertWorkflow: upsertWorkflowResolver,
+    deleteWorkflow: deleteWorkflowResolver,
     upsertApi: upsertApiResolver,
     deleteApi: deleteApiResolver,
     updateApiConfigId: updateApiConfigIdResolver,

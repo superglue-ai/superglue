@@ -1,6 +1,6 @@
-import { FileUpload } from "graphql-upload-minimal";
-import { JSONSchema } from "openai/src/lib/jsonschema.js";
-import { DataStore } from "./datastore.js";
+import type { FileUpload } from "graphql-upload-minimal";
+import type { JSONSchema } from "openai/src/lib/jsonschema.js";
+import type { DataStore } from "./datastore.js";
 export type Context = {
   datastore: DataStore;
   orgId: string;
@@ -189,3 +189,31 @@ export type ConfigList = {
   items: ApiConfig[];
   total: number;
 };
+
+// Workflow related types
+export interface ExecutionStep {
+  id: string;
+  instruction: string;
+  endpoint: string;
+  apiConfig?: ApiConfig;
+  executionMode: "DIRECT" | "LOOP";
+  outputIsArray?: boolean;
+  loopVariable?: string;
+  loopMaxIters?: number;
+  arrayPath?: string;
+  objectKeysAsArray?: boolean;
+  responseField?: string;
+}
+
+export interface ExecutionPlan {
+  id: string;
+  apiHost: string;
+  steps: ExecutionStep[];
+  finalTransform?: string;
+}
+
+export interface SavedWorkflow extends BaseConfig {
+  name: string;
+  description?: string;
+  plan: ExecutionPlan;
+}

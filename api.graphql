@@ -254,6 +254,10 @@ type Query {
   generateSchema(instruction: String!, responseData: String): JSONSchema!
   
   getTenantInfo: TenantInfo
+  
+  # Workflow queries
+  getWorkflow(id: ID!): SavedWorkflow
+  listWorkflows(limit: Int = 10, offset: Int = 0): [SavedWorkflow!]!
 }
 
 type TenantInfo {
@@ -298,6 +302,14 @@ type ExecutionPlan {
   finalTransform: String
 }
 
+type SavedWorkflow {
+  id: ID!
+  name: String!
+  plan: ExecutionPlan!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
 input ExecutionPlanInput {
   id: String
   apiHost: String!
@@ -331,6 +343,11 @@ input WorkflowInput {
   baseApiInput: ApiInput
 }
 
+input SaveWorkflowInput {
+  name: String!
+  plan: ExecutionPlanInput!
+}
+
 type Mutation {
   setTenantInfo(email: String, emailEntrySkipped: Boolean): TenantInfo!
   
@@ -357,6 +374,10 @@ type Mutation {
   executeWorkflow(
     input: WorkflowInput!
   ): WorkflowResult!
+  
+  # Workflow persistence mutations
+  upsertWorkflow(id: ID!, input: SaveWorkflowInput!): SavedWorkflow!
+  deleteWorkflow(id: ID!): Boolean!
   
   upsertApi(id: ID!, input: JSON!): ApiConfig!
   deleteApi(id: ID!): Boolean!
