@@ -4,6 +4,12 @@ import { ApiWorkflowOrchestrator } from "../apiWorkflowOrchestrator.js";
 import type { ExecutionPlan } from "../domain/workflow.types.js";
 
 describe("ApiWorkflowOrchestrator-dog", { timeout: 600000 }, () => {
+  // Skip all tests when API key isn't available
+  if(!process.env.VITE_OPENAI_API_KEY) {
+    it.skip('skips all tests when VITE_OPENAI_API_KEY is not set', () => {})
+    return;
+  }
+  
   it("should execute a manual workflow plan successfully", async () => {
     process.env = { ...process.env, ...require("dotenv").config({ path: ".env" }).parsed };
 
@@ -125,8 +131,5 @@ describe("ApiWorkflowOrchestrator-dog", { timeout: 600000 }, () => {
     }
   });
 
-  // Skip live API tests when API key isn't available
-  if(!process.env.VITE_OPENAI_API_KEY) {
-    it('skips live tests when VITE_OPENAI_API_KEY is not set', () => {})
-  }
+
 });
