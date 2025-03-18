@@ -19,7 +19,7 @@ import type {
 import type { WorkflowOrchestrator } from "./domain/workflowOrchestrator.js";
 import { executeApiCall } from "./execution/workflowUtils.js";
 
-import { ExecutionStrategyFactory } from "./execution/workflowExecutionStrategy.js";
+import { executeWorkflowStep } from "./execution/workflowExecutionStrategy.js";
 import { extractTemplateVariables, processStepResult, storeStepResult } from "./execution/workflowUtils.js";
 
 export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
@@ -287,17 +287,18 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
         variableMapping: variableMappings,
       };
 
-      const strategy = ExecutionStrategyFactory.createStrategy(
+      return await executeWorkflowStep(
         step,
         stepMapping,
         executionPlan,
         result,
         this.apiDocumentation,
+        payload,
+        credentials,
         stepAnalysis,
         this.baseApiInput,
+        options,
       );
-
-      return await strategy.execute(payload, credentials, options);
     } catch (error) {
       console.error(`[Step ${step.id}] Execution failed: ${String(error)}`);
 
