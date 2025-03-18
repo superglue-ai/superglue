@@ -1,201 +1,247 @@
-# Workflow README
+# Workflow Component
 
-This module provides a workflow orchestration system for executing multi-step API workflows.
+The Workflow Component enables chaining multiple API calls together to achieve complex data transformations and retrieval patterns. It orchestrates a sequence of API operations where the output of one step can feed into subsequent steps, allowing data to flow through a defined pipeline.
 
-## High-Level Overview
+## Architecture Overview
+
+```mermaid
+graph TD
+    Client[Client Application] --> ApiWorkflowOrchestrator
+    
+    subgraph "Workflow Core"
+        ApiWorkflowOrchestrator --> WorkflowExecutionStrategy
+        WorkflowExecutionStrategy --> DirectStrategy
+        WorkflowExecutionStrategy --> LoopStrategy
+        ApiWorkflowOrchestrator --> WorkflowUtils
+        WorkflowUtils --> DataExtractor
+    end
+    
+    subgraph "External Services"
+        DirectStrategy --> ApiCall
+        LoopStrategy --> ApiCall
+        ApiCall --> ExternalAPI[External API Service]
+    end
+    
+    style ApiWorkflowOrchestrator fill:#f9f,stroke:#333,stroke-width:2px
+    style WorkflowExecutionStrategy fill:#bbf,stroke:#333,stroke-width:2px
+    style ExternalAPI fill:#bfb,stroke:#333,stroke-width:2px
+```
+
+## Workflow Execution Flow
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Orchestrator as ApiWorkflowOrchestrator
+    participant Strategy as WorkflowExecutionStrategy
+    participant Utils as WorkflowUtils
+    participant API as External API
+    
+    Client->>Orchestrator: executeWorkflow(workflow)
+    Orchestrator->>Orchestrator: registerExecutionPlan()
+    Orchestrator->>Orchestrator: validateExecutionPlan()
+    
+    loop For each step
+        Orchestrator->>Orchestrator: prepareStepInput()
+        Orchestrator->>Orchestrator: processTemplatedStep()
+        Orchestrator->>Strategy: executeWorkflowStep()
+        
+        alt Direct Execution
+            Strategy->>Utils: prepareApiConfig()
+            Strategy->>Utils: executeApiCall()
+            Utils->>API: API Request
+            API-->>Utils: API Response
+            Utils->>Strategy: Return Response
+            Strategy->>Utils: processStepResult()
+            Utils->>Strategy: Processed Data
+            Strategy->>Orchestrator: Return Result
+        else Loop Execution
+            Strategy->>Strategy: findLoopVariable()
+            Strategy->>Strategy: getLoopValues()
+            loop For each value
+                Strategy->>Utils: prepareApiConfig()
+                Strategy->>Utils: executeApiCall()
+                Utils->>API: API Request
+                API-->>Utils: API Response
+                Utils->>Strategy: Return Response
+            end
+            Strategy->>Utils: processStepResult()
+            Utils->>Strategy: Processed Data
+            Strategy->>Orchestrator: Return Results Array
+        end
+        
+        Orchestrator->>Utils: storeStepResult()
+    end
+    
+    alt Final Transform
+        Orchestrator->>Orchestrator: Apply finalTransform
+    end
+    
+    Orchestrator-->>Client: Return WorkflowResult
+```
+
+## Dog API Example (based on simple-dog.test.ts)
+
+```mermaid
+graph LR
+    Client[Test Client] --> |1. Register Plan| Orchestrator[ApiWorkflowOrchestrator]
+    Orchestrator --> |2. Execute Plan| ExecutionEngine[Workflow Engine]
+    
+    subgraph "Execution Plan"
+        Step1[Step: getAllBreeds] --> |Breed List| Step2[Step: getBreedImage]
+        Step2 --> |Process 5 Random Breeds| FinalTransform[Final Transform]
+    end
+    
+    ExecutionEngine --> |3. Execute Step 1| DogAPI1[Dog API: /breeds/list/all]
+    DogAPI1 --> |List of All Breeds| Step1
+    
+    ExecutionEngine --> |4. Loop Through Breeds| DogAPI2[Dog API: /breed/$BREED/images/random]
+    DogAPI2 --> |Random Images| Step2
+    
+    FinalTransform --> |5. Format Results| Result[Final Result: Breeds with Images]
+    
+    Result --> Client
+    
+    style Orchestrator fill:#f9f,stroke:#333,stroke-width:2px
+    style ExecutionEngine fill:#bbf,stroke:#333,stroke-width:2px
+    style DogAPI1 fill:#bfb,stroke:#333,stroke-width:2px
+    style DogAPI2 fill:#bfb,stroke:#333,stroke-width:2px
+```
+
+## Data Flow in Dog API Example
 
 ```mermaid
 flowchart TD
-    Client[Client Application] -->|Executes| Workflow[Workflow Orchestration]
-    Workflow -->|Contains| Domain[Domain Model]
-    Workflow -->|Uses| Execution[Execution Strategies]
-    Workflow -->|Calls| External[External APIs]
+    A[Start] --> B[Register Execution Plan]
+    B --> C[Set Step Mappings]
+    C --> D[Execute getAllBreeds Step]
+    D --> E[Get All Dog Breeds]
+    E --> F[Process Response]
+    F --> G[Execute getBreedImage Step in LOOP mode]
     
-    subgraph Domain[Domain Model]
-        Types[workflow.types.ts]
-        Interface[workflowOrchestrator.ts]
-    end
+    G --> |breed1| H1[Fetch Random Image]
+    G --> |breed2| H2[Fetch Random Image]
+    G --> |breed3| H3[Fetch Random Image]
+    G --> |breed4| H4[Fetch Random Image]
+    G --> |breed5| H5[Fetch Random Image]
     
-    subgraph Execution[Execution Strategies]
-        Strategies[workflowExecutionStrategy.ts]
-        Utils[workflowUtils.ts]
-        DataEx[dataExtractor.ts]
-    end
+    H1 --> I[Collect All Results]
+    H2 --> I
+    H3 --> I
+    H4 --> I
+    H5 --> I
     
-    subgraph Workflow[Workflow Orchestration]
-        Orchestrator[apiWorkflowOrchestrator.ts]
-    end
+    I --> J[Apply Final Transform]
+    J --> K[Return Final Result]
+    
+    style G fill:#bbf,stroke:#333,stroke-width:2px
+    style J fill:#f9f,stroke:#333,stroke-width:2px
 ```
 
-## Core Components
+## Key Components
 
-```mermaid
-classDiagram
-    class WorkflowOrchestrator {
-        <<interface>>
-        +retrieveApiDocumentation()
-        +registerExecutionPlan()
-        +setStepMapping()
-        +executeWorkflow()
-        +executeWorkflowPlan()
-    }
-    
-    class ApiWorkflowOrchestrator {
-        -apiDocumentation
-        -executionPlans
-        -stepMappings
-        -baseApiInput
-        +setBaseApiInput()
-        +getBaseApiInput()
-        +getApiDocumentation()
-        +getExecutionPlans()
-        +executeWorkflow()
-        +registerExecutionPlan()
-        +retrieveApiDocumentation()
-        +setStepMapping()
-        +executeWorkflowPlan()
-        -prepareStepInput()
-        -processTemplatedStep()
-        -processStepResult()
-    }
-    
-    class WorkflowExecutionStrategy {
-        <<abstract>>
-        #step
-        #stepMapping
-        #executionPlan
-        #result
-        #apiDocumentation
-        #baseApiInput
-        +execute()*
-        #executeApiCall()
-        #extractTemplateVariables()
-        #processStepResult()
-        #storeStepResult()
-    }
-    
-    class DirectExecutionStrategy {
-        +execute()
-    }
-    
-    class LoopExecutionStrategy {
-        -stepAnalysis
-        +execute()
-        -findLoopVariable()
-        -getLoopValues()
-    }
-    
-    class ExecutionStrategyFactory {
-        +createStrategy()
-    }
-    
-    class DataExtractor {
-        -data
-        +findValue()
-        +extractValues()
-        -searchNestedObjects()
-    }
-    
-    WorkflowOrchestrator <|.. ApiWorkflowOrchestrator
-    WorkflowExecutionStrategy <|-- DirectExecutionStrategy
-    WorkflowExecutionStrategy <|-- LoopExecutionStrategy
-    ApiWorkflowOrchestrator --> ExecutionStrategyFactory
-    ExecutionStrategyFactory --> WorkflowExecutionStrategy
-    LoopExecutionStrategy --> DataExtractor
+### ApiWorkflowOrchestrator
+
+The main entry point for workflow execution that:
+- Manages execution plans and step mappings
+- Validates workflow definitions
+- Coordinates step execution
+- Applies final transformations
+- Handles error states
+
+### Execution Strategies
+
+#### DirectStrategy
+- Executes a single API call for a step
+- Resolves template variables from previous steps
+- Processes and stores results
+
+#### LoopStrategy
+- Identifies loop variables and their sources
+- Executes the same API call for each value in an array
+- Manages collection of results from multiple iterations
+- Supports limits on loop iterations
+
+### DataExtractor
+- Extracts data from complex objects using JSONata expressions
+- Finds values by key in nested data structures
+- Handles array transformations
+
+### WorkflowUtils
+- Processes template strings (${variable})
+- Executes API calls
+- Transforms API responses
+- Stores step results in the workflow context
+
+## Workflow Definition Structure
+
+```typescript
+interface ExecutionPlan {
+  id: string;
+  apiHost: string;
+  steps: ExecutionStep[];
+  finalTransform?: string; // JSONata expression
+}
+
+interface ExecutionStep {
+  id: string;
+  instruction: string;
+  endpoint: string;
+  executionMode: "DIRECT" | "LOOP";
+  
+  // Optional configurations
+  outputIsArray?: boolean;
+  loopVariable?: string;
+  loopMaxIters?: number;
+  responseField?: string;
+  objectKeysAsArray?: boolean;
+}
 ```
 
-## Workflow Architecture
+## Example Usage
 
-```mermaid
-flowchart TD
-    A[Client] -->|1. Initialize| B[ApiWorkflowOrchestrator]
-    B -->|2. Register Execution Plan| C[Execution Plan]
-    B -->|Optional: Retrieve API Documentation| D[API Documentation]
-    C -->|Contains| E[Steps with Dependencies]
-    B -->|3. Set Step Mappings| F[Step Mappings]
-    A -->|4. Execute Workflow| B
-    B -->|5. Process Steps| G[Step Execution]
-    G -->|For Each Step| H{Check Dependencies}
-    H -->|Dependencies Met| I[Prepare Step Input]
-    I -->|Template Variables?| J{Has Template Vars?}
-    J -->|Yes| K[Process Templated Step]
-    J -->|No| L[Standard Execution]
-    K -->|Choose Strategy| M{Execution Mode}
-    M -->|DIRECT| N[Direct Execution]
-    M -->|LOOP| O[Loop Execution]
-    M -->|CONDITION| P[Conditional Execution]
-    N -->|Execute API Call| Q[API Response]
-    O -->|Execute API Call| Q
-    P -->|Execute API Call| Q
-    L -->|Execute API Call| Q
-    Q -->|Process Result| R[Store Step Result]
-    R --> S{More Steps?}
-    S -->|Yes| G
-    S -->|No| T[Apply Final Transform]
-    T --> U[Return Workflow Result]
+```typescript
+// Define a workflow execution plan
+const executionPlan = {
+  id: "dog-workflow",
+  apiHost: "https://dog.ceo/api",
+  steps: [
+    {
+      id: "getAllBreeds",
+      endpoint: "/breeds/list/all",
+      instruction: "Get all dog breeds",
+      executionMode: "DIRECT",
+      responseField: "message",
+      objectKeysAsArray: true,
+    },
+    {
+      id: "getBreedImage",
+      endpoint: "/breed/${breed}/images/random",
+      instruction: "Get a random image for a specific dog breed",
+      executionMode: "LOOP",
+      loopVariable: "breed",
+      loopMaxIters: 5,
+    }
+  ],
+  finalTransform: `{
+    "breeds": $map(
+      $filter(
+        $keys($.getAllBreeds),
+        function($b) {
+          $count($.getBreedImage[$split(message, "/")[4] = $b]) > 0
+        }
+      ),
+      function($b) {
+        {
+          $b: $.getBreedImage[$split(message, "/")[4] = $b].message[0]
+        }
+      }
+    )
+  }`
+};
+
+// Execute the workflow
+const orchestrator = new ApiWorkflowOrchestrator(baseApiInput);
+const planId = await orchestrator.registerExecutionPlan(executionPlan);
+const result = await orchestrator.executeWorkflowPlan(planId, payload, credentials);
 ```
-
-## Templated Step Processing
-
-```mermaid
-flowchart LR
-    A[Template Variables in Endpoint] -->|Extract| B[Analyze Variable Mappings]
-    B -->|Use Execution Mode| C[Create Strategy]
-    C -->|DIRECT| D[DirectExecutionStrategy]
-    C -->|LOOP| E[LoopExecutionStrategy]
-    E -->|Find Loop Variable| F[Find Values to Loop Over]
-    F -->|For Each Value| G[Execute API Call]
-    D -->|Single Execution| G
-    G -->|Process Response| H[Store Results]
-```
-
-## Execution Flow
-
-1. **Initialize the Orchestrator**: Create an instance with base API configuration
-2. **Register Execution Plan**: Define steps, dependencies, and transforms
-3. **Set Step Mappings**: Configure input/output mappings for each step
-4. **Execute Workflow**: Run the workflow with input payload and credentials
-5. **Process Steps**: For each step:
-   - Check dependencies are met
-   - Prepare input based on mappings and prior steps
-   - Process templated variables if present
-   - Execute using appropriate strategy (DIRECT, LOOP, CONDITION)
-   - Store step results for subsequent steps
-6. **Apply Final Transform**: Process all step results into final output format
-7. **Return Result**: Provide complete workflow results
-
-## Example: Dog API Workflow
-
-The `simple-dog.test.ts` demonstrates a workflow with the Dog API:
-
-```mermaid
-flowchart TD
-    A[Initialize Orchestrator] -->|With Dog API config| B[Register Execution Plan]
-    B -->|Define Steps| C[Step: getAllBreeds]
-    B -->|Define Steps| D[Step: getBreedImage]
-    B -->|Set Step Mappings| E[Configure Input/Output Mappings]
-    E -->|For getAllBreeds| F[Identity Mapping]
-    E -->|For getBreedImage| G[Identity Mapping + Loop]
-    C --> H[Execute getAllBreeds]
-    H -->|DIRECT Mode| I[Get All Breeds List]
-    I -->|Returns list of breeds| J[Execute getBreedImage]
-    J -->|LOOP Mode| K[Iterate Through Breeds]
-    K -->|For each breed| L[Get Random Image]
-    L -->|Collect results| M[Apply Final Transform]
-    M -->|Format as breeds array| N[Return Result]
-```
-
-### Execution Mode Strategies
-
-- **DIRECT**: Simple one-time execution of the API call
-- **LOOP**: Executes the step multiple times, iterating over a collection
-- **CONDITION**: Executes the step only if a condition is met
-
-### Variable Mapping
-
-Template variables in endpoints (like `${breed}`) are automatically matched with:
-1. Values from dependent step results
-2. Values from the original payload
-3. Custom mappings defined in the step configuration
-
-The orchestrator analyzes the variables to determine the best mapping strategy for each step's execution mode.
