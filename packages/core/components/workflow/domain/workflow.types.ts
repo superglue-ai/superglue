@@ -18,9 +18,7 @@ export interface StepAnalysis {
 
 export interface ExecutionStep {
   id: string;
-  instruction: string;
-  endpoint: string;
-  apiConfig?: ApiConfig;
+  apiConfig: ApiConfig;
   executionMode: ExecutionMode;
   outputIsArray?: boolean;
   loopVariable?: string;

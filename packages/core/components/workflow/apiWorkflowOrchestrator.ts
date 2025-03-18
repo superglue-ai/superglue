@@ -1,6 +1,5 @@
-import type { ApiConfig, ApiInput, RequestOptions } from "@superglue/shared";
+import type { ApiInput, RequestOptions } from "@superglue/shared";
 import { v4 as uuidv4 } from "uuid";
-import { generateApiConfig } from "../../utils/api.js";
 import { getDocumentation } from "../../utils/documentation.js";
 import { applyJsonata } from "../../utils/tools.js";
 
@@ -146,37 +145,13 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
           }
 
           // Standard execution path for steps without template variables or with DIRECT mode
-          let apiConfig: ApiConfig;
-
-          if (step.apiConfig) {
-            apiConfig = {
-              ...step.apiConfig,
-              headers: {
-                ...(this.baseApiInput?.headers || {}),
-                ...(step.apiConfig.headers || {}),
-              },
-            };
-          } else {
-            const apiInput: ApiInput = {
-              ...(this.baseApiInput || {}),
-              urlHost: executionPlan.apiHost,
-              urlPath: step.endpoint,
-              instruction: step.instruction,
-            };
-
-            if (!this.apiDocumentation) {
-              this.retrieveApiDocumentation(
-                this.baseApiInput.documentationUrl,
-                this.baseApiInput.headers,
-                this.baseApiInput.queryParams,
-                this.baseApiInput.urlHost,
-              );
-            }
-
-            const { config } = await generateApiConfig(apiInput, this.apiDocumentation);
-
-            apiConfig = config;
-          }
+          const apiConfig = {
+            ...step.apiConfig,
+            headers: {
+              ...(this.baseApiInput?.headers || {}),
+              ...(step.apiConfig.headers || {}),
+            },
+          };
 
           const apiResponse = await executeApiCall(apiConfig, stepInput, credentials, options);
           console.log("API Response: ", apiResponse);
@@ -184,7 +159,7 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
           // Process the result using response mapping
           let processedResult = apiResponse;
           if (stepMapping?.responseMapping) {
-            processedResult = await this.processStepResult(step, apiResponse, stepMapping);
+            processedResult = await processStepResult(step.id, apiResponse, stepMapping);
           }
 
           // Store the step result
@@ -246,7 +221,7 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
     options?: RequestOptions,
   ): Promise<boolean> {
     // Check if this step has template variables
-    const templateVars = this.extractTemplateVariables(step.endpoint || "");
+    const templateVars = this.extractTemplateVariables(step.apiConfig.urlPath || "");
     if (templateVars.length === 0) {
       return false;
     }
@@ -307,8 +282,13 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
         throw new Error("Each step must have an ID");
       }
 
-      if (!step.endpoint && !step.apiConfig) {
-        throw new Error("Each step must have either an endpoint or an API config");
+      if (!step.apiConfig) {
+        throw new Error("Each step must have an API config");
+      }
+      
+      // TODO: should also work without one in the end (e.g. root path for API call)
+      if (!step.apiConfig.urlPath) {
+        throw new Error("Each step's API config must have a URL path");
       }
     }
   }
@@ -409,7 +389,7 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
     currentResult: WorkflowResult,
     originalPayload: Record<string, unknown>,
   ): Promise<Record<string, VariableMapping>> {
-    const templateVars = this.extractTemplateVariables(step.endpoint || "");
+    const templateVars = this.extractTemplateVariables(step.apiConfig.urlPath || "");
     if (templateVars.length === 0) {
       return {};
     }
@@ -466,7 +446,4 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
     return mappings;
   }
 
-  private async processStepResult(step: ExecutionStep, result: unknown, mapping: StepMapping): Promise<unknown> {
-    return processStepResult(step.id, result, mapping);
-  }
 }

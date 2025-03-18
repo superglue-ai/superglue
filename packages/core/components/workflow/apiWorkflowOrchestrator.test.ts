@@ -155,8 +155,6 @@ describe("ApiWorkflowOrchestrator", () => {
       steps: [
         {
           id: "getUserData",
-          instruction: "Get user data",
-          endpoint: "/users/1",
           apiConfig: {
             urlPath: "/users/1",
             method: HttpMethod.GET,
@@ -215,8 +213,6 @@ describe("ApiWorkflowOrchestrator", () => {
       steps: [
         {
           id: "getData",
-          instruction: "Get data",
-          endpoint: "/users/1",
           apiConfig: {
             urlPath: "/users/1",
             method: HttpMethod.GET,
@@ -275,8 +271,6 @@ describe("ApiWorkflowOrchestrator", () => {
       steps: [
         {
           id: "userData",
-          instruction: "Get user information",
-          endpoint: "/users/1",
           apiConfig: {
             urlPath: "/users/1",
             method: HttpMethod.GET,
@@ -288,8 +282,6 @@ describe("ApiWorkflowOrchestrator", () => {
         },
         {
           id: "postsByUser",
-          instruction: "Get posts by this user",
-          endpoint: "/posts",
           apiConfig: {
             urlPath: "/posts",
             method: HttpMethod.GET,
@@ -384,26 +376,22 @@ describe("ApiWorkflowOrchestrator", () => {
       steps: [
         {
           id: "getUsers",
-          instruction: "Get list of users",
-          endpoint: "/users",
           apiConfig: {
             urlPath: "/users",
             method: HttpMethod.GET,
             urlHost: "https://jsonplaceholder.typicode.com",
-            instruction: "Get list of users",
+            instruction: "Get list of users",  // UNUSED currently
             id: "api_config_getUsers",
           },
           executionMode: "DIRECT",
         },
         {
           id: "getUserPosts",
-          instruction: "Get posts for each user",
-          endpoint: "/posts?userId=${userId}",
           apiConfig: {
             urlPath: "/posts?userId=${userId}",
             method: HttpMethod.GET,
             urlHost: "https://jsonplaceholder.typicode.com",
-            instruction: "Get posts for each user",
+            instruction: "Get posts for each user",  // UNUSED currently
             id: "api_config_getUserPosts",
           },
           executionMode: "LOOP",

@@ -267,10 +267,7 @@ type TenantInfo {
 
 type ExecutionStep {
   id: String!
-  endpoint: String!
-  instruction: String!
-  dependencies: [String!]
-  apiConfig: ApiConfig
+  apiConfig: ApiConfig!
   executionMode: String
   outputIsArray: Boolean
   loopVariable: String
@@ -282,10 +279,7 @@ type ExecutionStep {
 
 input ExecutionStepInput {
   id: String!
-  endpoint: String!
-  instruction: String!
-  dependencies: [String!]
-  apiConfig: ApiConfigInput
+  apiConfig: ApiConfigInput!
   executionMode: String  # DIRECT | LOOP
   outputIsArray: Boolean
   loopVariable: String

@@ -21,8 +21,13 @@ export default function WorkflowsPage() {
       [
         {
           id: "getAllBreeds",
-          endpoint: "/breeds/list/all",
-          instruction: "Get all dog breeds",
+          apiConfig: {
+            urlPath: "/breeds/list/all",
+            instruction: "Get all dog breeds",
+            id: "getAllBreeds_config",
+            urlHost: "https://dog.ceo/api",
+            method: "GET"
+          },
           executionMode: "DIRECT",
           outputIsArray: true,
           responseField: "message",
@@ -30,8 +35,13 @@ export default function WorkflowsPage() {
         },
         {
           id: "getBreedImage",
-          endpoint: "/breed/${breed}/images/random",
-          instruction: "Get a random image for a specific dog breed",
+          apiConfig: {
+            urlPath: "/breed/{breed}/images/random",
+            instruction: "Get a random image for a specific dog breed",
+            id: "getBreedImage_config",
+            urlHost: "https://dog.ceo/api",
+            method: "GET"
+          },
           executionMode: "LOOP",
           loopVariable: "breed",
           loopMaxIters: 5,
@@ -135,8 +145,13 @@ export default function WorkflowsPage() {
                   apiHost
                   steps {
                     id
-                    instruction
-                    endpoint
+                    apiConfig {
+                      id
+                      urlPath
+                      instruction
+                      method
+                      urlHost
+                    }
                     executionMode
                     outputIsArray
                     loopVariable
@@ -229,7 +244,17 @@ export default function WorkflowsPage() {
         setWorkflowName("New Workflow");
         setApiHost("https://dog.ceo/api");
         setStepsText(
-          JSON.stringify([{ id: "step1", endpoint: "/", instruction: "First step", executionMode: "DIRECT" }], null, 2),
+          JSON.stringify([{ 
+            id: "step1", 
+            apiConfig: {
+              urlPath: "/",
+              instruction: "First step",
+              id: "step1_config",
+              urlHost: "https://dog.ceo/api",
+              method: "GET"
+            },
+            executionMode: "DIRECT" 
+          }], null, 2),
         );
         setFinalTransform("");
 

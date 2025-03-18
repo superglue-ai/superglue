@@ -5,11 +5,11 @@ import type { ExecutionPlan } from "../domain/workflow.types.js";
 
 describe("ApiWorkflowOrchestrator-dog", { timeout: 600000 }, () => {
   // Skip all tests when API key isn't available
-  if(!process.env.VITE_OPENAI_API_KEY) {
-    it.skip('skips all tests when VITE_OPENAI_API_KEY is not set', () => {})
-    return;
-  }
-  
+  // if(!process.env.VITE_OPENAI_API_KEY) {
+  //   it.skip('skips all tests when VITE_OPENAI_API_KEY is not set', () => {})
+  //   return;
+  // }
+
   it("should execute a manual workflow plan successfully", async () => {
     process.env = { ...process.env, ...require("dotenv").config({ path: ".env" }).parsed };
 
@@ -35,17 +35,27 @@ describe("ApiWorkflowOrchestrator-dog", { timeout: 600000 }, () => {
       steps: [
         {
           id: "getAllBreeds",
-          endpoint: "/breeds/list/all",
-          instruction: "Get all dog breeds",
+          apiConfig: {
+            urlPath: "/breeds/list/all",
+            instruction: "Get all dog breeds",  // UNUSED currently
+            method: HttpMethod.GET,
+            urlHost: dogApiHost,
+            id: "getAllBreeds_apiConfig",
+          },
           executionMode: "DIRECT",
           outputIsArray: true,
-          responseField: "message", // The Dog API wraps response in a message field
+          responseField: "message",  // The Dog API wraps response in a message field
           objectKeysAsArray: true,  // We want to use the keys of the message object as breeds
         },
         {
           id: "getBreedImage",
-          endpoint: "/breed/${breed}/images/random",
-          instruction: "Get a random image for a specific dog breed",
+          apiConfig: {
+            urlPath: "/breed/{breed}/images/random",
+            instruction: "Get a random image for a specific dog breed", // UNUSED currently
+            method: HttpMethod.GET,
+            urlHost: dogApiHost,
+            id: "getBreedImage_apiConfig",
+          },
           executionMode: "LOOP",
           loopVariable: "breed", // Explicitly specify which variable to loop over
           loopMaxIters: 5,
@@ -54,7 +64,7 @@ describe("ApiWorkflowOrchestrator-dog", { timeout: 600000 }, () => {
       finalTransform: `{
       "breeds": $map(
         $filter(
-          $keys($.getAllBreeds),
+          $keys($.getAllBreeds.message),
           function($b) {
             $count($.getBreedImage[$split(message, "/")[4] = $b]) > 0
           }
@@ -86,38 +96,41 @@ describe("ApiWorkflowOrchestrator-dog", { timeout: 600000 }, () => {
 
     console.log("\n[DOG] Executing workflow plan");
     const result = await orchestrator.executeWorkflowPlan(planId, payload, credentials);
-    
     expect(result.success).toBe(true);
-    
-    // Expected output structure 
+    // Expected output structure
     const expectedStructure = {
       breeds: [
         {
-          affenpinscher: "https://images.dog.ceo/breeds/hound-afghan/n02088094_357.jpg"
-        }
+          affenpinscher: "https://images.dog.ceo/breeds/hound-afghan/n02088094_357.jpg",
+        },
         // ... more breeds would follow in the real result
-      ]
+      ],
     };
-    
+
     // Define the expected types for our data
     type BreedEntry = Record<string, string>;
     type ResultData = {
       breeds?: BreedEntry[];
     };
     const data = result.data as ResultData | undefined;
-    
+
     // Log actual result for comparison
     console.log("Actual result structure (first breed):");
     if (data?.breeds && Array.isArray(data.breeds) && data.breeds.length > 0) {
-      console.log(JSON.stringify({
-        breeds: [data.breeds[0]]
-      }, null, 2));
+      console.log(
+        JSON.stringify(
+          {
+            breeds: [data.breeds[0]],
+          },
+          null,
+          2,
+        ),
+      );
     }
-    
+
     // Only assert the structure
     expect(data).toBeDefined();
     expect(Array.isArray(data?.breeds)).toBe(true);
-    
     if (data?.breeds && data.breeds.length > 0) {
       const firstBreed = data.breeds[0];
       // Should be an object with exactly one key (the breed name)
@@ -130,6 +143,4 @@ describe("ApiWorkflowOrchestrator-dog", { timeout: 600000 }, () => {
       expect(typeof imageUrl).toBe("string");
     }
   });
-
-
 });

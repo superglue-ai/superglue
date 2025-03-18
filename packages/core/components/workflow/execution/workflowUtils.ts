@@ -1,12 +1,14 @@
 import type { ApiConfig, ApiInput, RequestOptions } from "@superglue/shared";
-import { callEndpoint, generateApiConfig } from "../../../utils/api.js";
+import { callEndpoint } from "../../../utils/api.js";
 import { applyJsonataWithValidation } from "../../../utils/tools.js";
 import type { ExecutionPlan, ExecutionStep, StepMapping, WorkflowResult } from "../domain/workflow.types.js";
 
-export function extractTemplateVariables(text: string): string[] {
-  const matches = text.match(/\$\{([^}]+)\}/g) || [];
-  return matches.map((match) => match.slice(2, -1));
-}
+export function extractTemplateVariables(str: string): string[] {
+  if (!str) return [];
+  // Only match {varName} patterns that aren't within JSON quotes
+  const matches = str.match(/\{(\w+)\}/g) || [];
+  return matches.map(match => match.slice(1, -1));
+};
 
 export async function executeApiCall(
   apiConfig: ApiConfig,
@@ -15,14 +17,14 @@ export async function executeApiCall(
   options?: RequestOptions,
 ): Promise<unknown> {
   try {
-    console.log(`[API Call] ${apiConfig.id || 'unnamed'}: ${apiConfig.urlHost}${apiConfig.urlPath}`);
-    
+    console.log(`[API Call] ${apiConfig.id || "unnamed"}: ${apiConfig.urlHost}${apiConfig.urlPath}`);
+
     const result = await callEndpoint(apiConfig, callPayload || {}, credentials || {}, options || { timeout: 60000 });
-    
+
     return result.data;
   } catch (error) {
-    console.error(`Error calling '${apiConfig.id || 'unnamed'}': ${String(error)}`);
-    throw new Error(`API call '${apiConfig.id || 'unnamed'}' failed: ${String(error)}`);
+    console.error(`Error calling '${apiConfig.id || "unnamed"}': ${String(error)}`);
+    throw new Error(`API call '${apiConfig.id || "unnamed"}' failed: ${String(error)}`);
   }
 }
 
@@ -79,26 +81,14 @@ export async function prepareApiConfig(
   executionPlan: ExecutionPlan,
   apiDocumentation: string,
   baseApiInput?: ApiInput,
-  urlPath: string = step.endpoint,
 ): Promise<ApiConfig> {
-  // If step already has a config, just merge in the base headers
-  if (step.apiConfig) {
-    return {
-      ...step.apiConfig,
-      headers: {
-        ...(baseApiInput?.headers || {}),
-        ...(step.apiConfig.headers || {})
-      }
-    };
-  }
-
-  const apiInput: ApiInput = {
-    ...(baseApiInput || {}),
-    urlHost: executionPlan.apiHost,
-    urlPath: urlPath,
-    instruction: step.instruction,
+  // All steps must have apiConfig, so just merge in the base headers
+  // TODO: could do a prepareApiConfig step to generate the apiConfig here anyway
+  return {
+    ...step.apiConfig,
+    headers: {
+      ...(baseApiInput?.headers || {}),
+      ...(step.apiConfig.headers || {}),
+    },
   };
-
-  const { config } = await generateApiConfig(apiInput, apiDocumentation || "");
-  return config;
 }

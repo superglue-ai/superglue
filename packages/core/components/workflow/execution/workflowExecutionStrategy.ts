@@ -290,7 +290,7 @@ const directStrategy: ExecutionStrategy = {
     try {
       const { step, stepMapping, executionPlan, result, apiDocumentation, baseApiInput } = ctx;
       const apiConfig = await prepareApiConfig(step, executionPlan, apiDocumentation, baseApiInput);
-      const templateVars = extractTemplateVariables(step.endpoint || "");
+      const templateVars = extractTemplateVariables(apiConfig.urlPath || "");
       const enhancedPayload = { ...payload };
 
       // Add template variables from previous steps
@@ -383,6 +383,13 @@ const loopStrategy: ExecutionStrategy = {
           [loopVarName]: loopValue,
         };
 
+        // TODO: create api config per call?
+        // For each loop value, create a copy of the API config with the variables replaced
+        // const urlPathWithVars = apiConfig.urlPath?.replace(new RegExp(`\\{${loopVarName}\\}`, "g"), String(loopValue));
+        // const apiConfig = {
+        //   ...baseApiConfig,
+        //   urlPath: urlPathWithVars,
+        // };
         try {
           const apiResponse = await executeApiCall(apiConfig, loopPayload, credentials, options);
           const processedResult = await processStepResult(step.id, apiResponse, stepMapping);
