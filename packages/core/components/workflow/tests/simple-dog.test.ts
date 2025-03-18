@@ -124,4 +124,9 @@ describe("ApiWorkflowOrchestrator-dog", { timeout: 600000 }, () => {
       expect(typeof imageUrl).toBe("string");
     }
   });
+
+  // Skip live API tests when API key isn't available
+  if(!process.env.VITE_OPENAI_API_KEY) {
+    it('skips live tests when VITE_OPENAI_API_KEY is not set', () => {})
+  }
 });
