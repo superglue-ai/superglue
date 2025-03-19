@@ -1,5 +1,5 @@
-import type { ApiConfig, ApiInput, DataStore, ExtractConfig, ExtractInput, RunResult, TransformConfig, TransformInput } from "@superglue/shared";
-import { createHash } from 'crypto';
+import type { ApiConfig, ApiInput, DataStore, ExtractConfig, ExtractInput, RunResult, SavedWorkflow, TransformConfig, TransformInput } from "@superglue/shared";
+import { createHash } from 'node:crypto';
 import { type RedisClientType, createClient } from 'redis';
 import { getSchemaFromData } from "../utils/tools.js";
 
@@ -9,6 +9,7 @@ export class RedisService implements DataStore {
   private readonly API_PREFIX = 'api:';
   private readonly EXTRACT_PREFIX = 'extract:';
   private readonly TRANSFORM_PREFIX = 'transform:';
+  private readonly WORKFLOW_PREFIX = 'workflow:';
   private readonly TTL = 60 * 60 * 24 * 90; // 90 days
 
   constructor(config: { 
@@ -337,6 +338,69 @@ export class RedisService implements DataStore {
       await this.redis.set(this.tenantKey(), JSON.stringify(tenantInfo));
     } catch (error) {
       console.error('Error setting tenant info:', error);
+    }
+  }
+
+  // Workflow Methods
+  async getWorkflow(id: string, orgId?: string): Promise<SavedWorkflow | null> {
+    try {
+      if (!id) return null;
+      const key = this.getKey(this.WORKFLOW_PREFIX, id, orgId);
+      const data = await this.redis.get(key);
+      return parseWithId(data, id);
+    } catch (error) {
+      console.error('Error getting workflow:', error);
+      return null;
+    }
+  }
+
+  async listWorkflows(limit = 10, offset = 0, orgId?: string): Promise<{ items: SavedWorkflow[], total: number }> {
+    try {
+      const pattern = this.getPattern(this.WORKFLOW_PREFIX, orgId);
+      const keys = await this.redis.keys(pattern);
+      const slicedKeys = keys.slice(offset, offset + limit);
+      
+      const workflows = await Promise.all(
+        slicedKeys.map(async (key) => {
+          const data = await this.redis.get(key);
+          const id = key.split(':').pop()?.replace(this.WORKFLOW_PREFIX, '');
+          return parseWithId(data, id);
+        })
+      );
+      
+      return { 
+        items: workflows.filter((workflow): workflow is SavedWorkflow => workflow !== null), 
+        total: keys.length 
+      };
+    } catch (error) {
+      console.error('Error listing workflows:', error);
+      return { items: [], total: 0 };
+    }
+  }
+
+  async upsertWorkflow(id: string, workflow: SavedWorkflow, orgId?: string): Promise<SavedWorkflow> {
+    try {
+      if (!id || !workflow) return null;
+      const key = this.getKey(this.WORKFLOW_PREFIX, id, orgId);
+      await this.redis.set(key, JSON.stringify(workflow), {
+        EX: this.TTL
+      });
+      return { ...workflow, id };
+    } catch (error) {
+      console.error('Error upserting workflow:', error);
+      throw error;
+    }
+  }
+
+  async deleteWorkflow(id: string, orgId?: string): Promise<boolean> {
+    try {
+      if (!id) return false;
+      const key = this.getKey(this.WORKFLOW_PREFIX, id, orgId);
+      const result = await this.redis.del(key);
+      return result > 0;
+    } catch (error) {
+      console.error('Error deleting workflow:', error);
+      return false;
     }
   }
 }

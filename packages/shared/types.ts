@@ -1,6 +1,6 @@
-import { FileUpload } from "graphql-upload-minimal";
-import { JSONSchema } from "openai/src/lib/jsonschema.js";
-import { DataStore } from "./datastore.js";
+import type { FileUpload } from "graphql-upload-minimal";
+import type { JSONSchema } from "openai/src/lib/jsonschema.js";
+import type { DataStore } from "./datastore.js";
 export type Context = {
   datastore: DataStore;
   orgId: string;
@@ -13,14 +13,14 @@ export enum HttpMethod {
   DELETE = "DELETE",
   PATCH = "PATCH",
   HEAD = "HEAD",
-  OPTIONS = "OPTIONS"
+  OPTIONS = "OPTIONS",
 }
 
 export enum CacheMode {
   ENABLED = "ENABLED",
   READONLY = "READONLY",
   WRITEONLY = "WRITEONLY",
-  DISABLED = "DISABLED"
+  DISABLED = "DISABLED",
 }
 
 export enum FileType {
@@ -28,14 +28,14 @@ export enum FileType {
   JSON = "JSON",
   XML = "XML",
   EXCEL = "EXCEL",
-  AUTO = "AUTO"
+  AUTO = "AUTO",
 }
 
 export enum AuthType {
   NONE = "NONE",
   OAUTH2 = "OAUTH2",
   HEADER = "HEADER",
-  QUERY_PARAM = "QUERY_PARAM"
+  QUERY_PARAM = "QUERY_PARAM",
 }
 
 export enum DecompressionMethod {
@@ -43,19 +43,19 @@ export enum DecompressionMethod {
   DEFLATE = "DEFLATE",
   NONE = "NONE",
   AUTO = "AUTO",
-  ZIP = "ZIP"
+  ZIP = "ZIP",
 }
 
 export enum PaginationType {
   OFFSET_BASED = "OFFSET_BASED",
   PAGE_BASED = "PAGE_BASED",
   CURSOR_BASED = "CURSOR_BASED",
-  DISABLED = "DISABLED"
+  DISABLED = "DISABLED",
 }
 
 export interface BaseConfig {
   id: string;
-  version?: string; 
+  version?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -189,3 +189,24 @@ export type ConfigList = {
   items: ApiConfig[];
   total: number;
 };
+
+// Workflow related types
+export interface ExecutionStep {
+  id: string;
+  apiConfig: ApiConfig;
+  executionMode: "DIRECT" | "LOOP";
+  loopVariable?: string;
+  loopMaxIters?: number;
+}
+
+export interface ExecutionPlan {
+  id: string;
+  steps: ExecutionStep[];
+  finalTransform?: string;
+}
+
+export interface SavedWorkflow extends BaseConfig {
+  name: string;
+  description?: string;
+  plan: ExecutionPlan;
+}

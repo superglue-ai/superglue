@@ -237,7 +237,7 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
   };
 }
 
-async function generateApiConfig(
+export async function generateApiConfig(
   apiConfig: Partial<ApiConfig>, 
   documentation: string, 
   vars: string[] = [], 

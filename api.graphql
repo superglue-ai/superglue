@@ -223,6 +223,7 @@ input TransformInputRequest @oneOf {
   id: ID
 }
 
+
 type Query {
   listRuns(limit: Int = 10, offset: Int = 0, configId: ID): RunList!
   listApis(limit: Int = 10, offset: Int = 0): ApiList!
@@ -237,11 +238,87 @@ type Query {
   generateSchema(instruction: String!, responseData: String): JSONSchema!
   
   getTenantInfo: TenantInfo
+  
+  # Workflow queries
+  getWorkflow(id: ID!): SavedWorkflow
+  listWorkflows(limit: Int = 10, offset: Int = 0): [SavedWorkflow!]!
 }
 
 type TenantInfo {
   email: String
   emailEntrySkipped: Boolean!
+}
+
+type ExecutionStep {
+  id: String!
+  apiConfig: ApiConfig!
+  executionMode: String
+  loopVariable: String
+  loopMaxIters: Int
+  inputMapping: String
+  responseMapping: String
+}
+
+input ExecutionStepInput {
+  id: String!
+  apiConfig: ApiInput!
+  executionMode: String  # DIRECT | LOOP
+  loopVariable: String
+  loopMaxIters: Int
+  inputMapping: String
+  responseMapping: String
+}
+
+type ExecutionPlan {
+  id: String!
+  steps: [ExecutionStep!]!
+  finalTransform: String
+}
+
+type SavedWorkflow {
+  id: ID!
+  name: String!
+  plan: ExecutionPlan!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+input ExecutionPlanInput {
+  id: String
+  apiHost: String!
+  steps: [ExecutionStepInput!]!
+  finalTransform: String
+}
+
+type WorkflowStepResult {
+  stepId: String!
+  success: Boolean!
+  rawData: JSON
+  transformedData: JSON
+  error: String
+}
+
+type WorkflowResult {
+  success: Boolean!
+  data: JSON!
+  stepResults: JSON!
+  error: String
+  startedAt: DateTime!
+  completedAt: DateTime
+}
+
+input WorkflowInput {
+  planId: String
+  plan: ExecutionPlanInput
+  payload: JSON
+  credentials: JSON
+  options: RequestOptions
+  baseApiInput: ApiInput
+}
+
+input SaveWorkflowInput {
+  name: String!
+  plan: ExecutionPlanInput!
 }
 
 type Mutation {
@@ -266,6 +343,14 @@ type Mutation {
     data: JSON!
     options: RequestOptions
   ): RunResult!
+  
+  executeWorkflow(
+    input: WorkflowInput!
+  ): WorkflowResult!
+  
+  # Workflow persistence mutations
+  upsertWorkflow(id: ID!, input: SaveWorkflowInput!): SavedWorkflow!
+  deleteWorkflow(id: ID!): Boolean!
   
   upsertApi(id: ID!, input: JSON!): ApiConfig!
   deleteApi(id: ID!): Boolean!

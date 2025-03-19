@@ -26,7 +26,8 @@
     "dev": "npm run build && node -r dotenv/config ./dist/index.js dotenv_config_path=../../.env",
     "test": "vitest",
     "test-no-watch": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "test:workflow": "vitest run -t ApiWorkflowOrchestrator-dog"
   },
   "type": "module",
   "dependencies": {
