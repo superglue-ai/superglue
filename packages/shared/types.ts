@@ -193,20 +193,14 @@ export type ConfigList = {
 // Workflow related types
 export interface ExecutionStep {
   id: string;
-  instruction: string;
-  endpoint: string;
-  apiConfig?: ApiConfig;
+  apiConfig: ApiConfig;
   executionMode: "DIRECT" | "LOOP";
   loopVariable?: string;
   loopMaxIters?: number;
-  arrayPath?: string;
-  objectKeysAsArray?: boolean;
-  responseField?: string;
 }
 
 export interface ExecutionPlan {
   id: string;
-  apiHost: string;
   steps: ExecutionStep[];
   finalTransform?: string;
 }

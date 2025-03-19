@@ -223,23 +223,6 @@ input TransformInputRequest @oneOf {
   id: ID
 }
 
-input ApiConfigInput {
-  id: ID
-  urlHost: String
-  urlPath: String
-  instruction: String
-  method: HttpMethod
-  queryParams: JSON
-  headers: JSON
-  body: String
-  documentationUrl: String
-  responseSchema: JSONSchema
-  responseMapping: JSONata
-  authentication: AuthType
-  pagination: PaginationInput
-  dataPath: String
-  version: String
-}
 
 type Query {
   listRuns(limit: Int = 10, offset: Int = 0, configId: ID): RunList!
@@ -272,29 +255,22 @@ type ExecutionStep {
   executionMode: String
   loopVariable: String
   loopMaxIters: Int
-  arrayPath: String
-  objectKeysAsArray: Boolean
-  responseField: String
   inputMapping: String
   responseMapping: String
 }
 
 input ExecutionStepInput {
   id: String!
-  apiConfig: ApiConfigInput!
+  apiConfig: ApiInput!
   executionMode: String  # DIRECT | LOOP
   loopVariable: String
   loopMaxIters: Int
-  arrayPath: String
-  objectKeysAsArray: Boolean
-  responseField: String
   inputMapping: String
   responseMapping: String
 }
 
 type ExecutionPlan {
   id: String!
-  apiHost: String!
   steps: [ExecutionStep!]!
   finalTransform: String
 }
