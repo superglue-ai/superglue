@@ -62,9 +62,48 @@ vi.mock("../../utils/tools.js", () => ({
       },
     };
   }),
+  applyJsonata: vi.fn().mockImplementation((input, expression) => {
+    // Default mock implementation for basic transformations
+    if (expression === "$") {
+      return input;
+    }
+
+    // For the joined data test
+    if (expression === '{ "posts": postsByUser, "user": userData }') {
+      return {
+        posts: [
+          { id: 1, userId: 1, title: "Post 1", body: "Post body 1" },
+          { id: 2, userId: 1, title: "Post 2", body: "Post body 2" },
+        ],
+        user: { id: 1, name: "Leanne Graham", username: "Bret", email: "Sincere@april.biz" },
+      };
+    }
+
+    // For loop case
+    if (expression === "{ userId: $.getUsers.*.id }") {
+      return {
+        userId: [1, 2, 3],
+      };
+    }
+
+    // Generic fallback
+    return {
+      getUserData: { id: 1, name: "Test User" },
+      getData: { id: 2, name: "Test Data" },
+      userData: { id: 1, name: "Leanne Graham", username: "Bret", email: "Sincere@april.biz" },
+      postsByUser: [
+        { id: 1, userId: 1, title: "Post 1", body: "Post body 1" },
+        { id: 2, userId: 1, title: "Post 2", body: "Post body 2" },
+      ],
+      getUsers: [
+        { id: 1, name: "User 1" },
+        { id: 2, name: "User 2" },
+        { id: 3, name: "User 3" },
+      ],
+    };
+  }),
 }));
 
-// Mock the api module
 vi.mock("../../utils/api.js", () => {
   const mockCallEndpoint = vi.fn().mockImplementation((apiConfig) => {
     let responseData: any;
@@ -108,14 +147,12 @@ vi.mock("../../utils/api.js", () => {
   };
 });
 
-// Mock documentation module
 vi.mock("../../utils/documentation.js", () => ({
   getDocumentation: vi.fn().mockImplementation(() => {
     return Promise.resolve("Mock API documentation");
   }),
 }));
 
-// Mock schema module
 vi.mock("../../utils/schema.js", () => ({
   generateSchema: vi.fn().mockImplementation(() => {
     return Promise.resolve("{}");
@@ -123,13 +160,11 @@ vi.mock("../../utils/schema.js", () => ({
 }));
 
 describe("ApiWorkflowOrchestrator", () => {
-  // Reset mocks before each test
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it("should execute a manually defined workflow plan", async () => {
-    // Create a minimal workflow orchestrator with base API input
     const baseApiInput = {
       urlHost: "https://jsonplaceholder.typicode.com",
       method: HttpMethod.GET,
@@ -140,18 +175,10 @@ describe("ApiWorkflowOrchestrator", () => {
     };
     const orchestrator = new ApiWorkflowOrchestrator(baseApiInput);
 
-    // Set up API documentation
-    await orchestrator.retrieveApiDocumentation(
-      "https://jsonplaceholder.typicode.com",
-      {},
-      {},
-      "https://jsonplaceholder.typicode.com",
-    );
+    await orchestrator.retrieveApiDocumentation("https://jsonplaceholder.typicode.com", {}, {});
 
-    // Define a simple execution plan with mappings directly in the steps
     const plan: ExecutionPlan = {
       id: "test_plan",
-      apiHost: "https://jsonplaceholder.typicode.com",
       steps: [
         {
           id: "getUserData",
@@ -170,14 +197,11 @@ describe("ApiWorkflowOrchestrator", () => {
       finalTransform: "$",
     };
 
-    // Register the plan
     const planId = await orchestrator.registerExecutionPlan(plan);
     expect(planId).toBe("test_plan");
 
-    // Execute the workflow plan
     const result = await orchestrator.executeWorkflowPlan(planId, { query: "test" }, { apiKey: "fake-key" });
 
-    // Check the result
     expect(result.success).toBe(true);
     expect(result.data).toHaveProperty("getUserData");
     expect(result.stepResults).toHaveProperty("getUserData");
@@ -194,18 +218,10 @@ describe("ApiWorkflowOrchestrator", () => {
       },
     });
 
-    // Set up API documentation first
-    await orchestrator.retrieveApiDocumentation(
-      "https://jsonplaceholder.typicode.com",
-      {},
-      {},
-      "https://jsonplaceholder.typicode.com",
-    );
+    await orchestrator.retrieveApiDocumentation("https://jsonplaceholder.typicode.com", {}, {});
 
-    // Create a plan to register and execute
     const plan: ExecutionPlan = {
       id: "inline_plan",
-      apiHost: "https://jsonplaceholder.typicode.com",
       steps: [
         {
           id: "getData",
@@ -224,10 +240,8 @@ describe("ApiWorkflowOrchestrator", () => {
       finalTransform: "$",
     };
 
-    // Register the plan
     const planId = await orchestrator.registerExecutionPlan(plan);
 
-    // Execute the workflow plan directly
     const result = await orchestrator.executeWorkflowPlan(planId, { test: true }, { apiKey: "test-key" });
 
     expect(result.success).toBe(true);
@@ -248,18 +262,10 @@ describe("ApiWorkflowOrchestrator", () => {
     };
     const orchestrator = new ApiWorkflowOrchestrator(baseApiInput);
 
-    // Set up API documentation
-    await orchestrator.retrieveApiDocumentation(
-      "https://jsonplaceholder.typicode.com",
-      {},
-      {},
-      "https://jsonplaceholder.typicode.com",
-    );
+    await orchestrator.retrieveApiDocumentation("https://jsonplaceholder.typicode.com", {}, {});
 
-    // Define a plan that fetches user data and posts by that user
     const plan: ExecutionPlan = {
       id: "user_posts_plan",
-      apiHost: "https://jsonplaceholder.typicode.com",
       steps: [
         {
           id: "userData",
@@ -294,36 +300,29 @@ describe("ApiWorkflowOrchestrator", () => {
       finalTransform: '{ "posts": postsByUser, "user": userData }',
     };
 
-    // Register the plan and get its ID
     const planId = await orchestrator.registerExecutionPlan(plan);
 
-    // Execute the workflow
     const result = await orchestrator.executeWorkflowPlan(
       planId,
       { userId: 1 }, // Input payload with user ID
       { apiKey: "test-key" },
     );
 
-    // Verify the result
     expect(result.success).toBe(true);
 
-    // Check that both steps executed successfully
     expect(result.stepResults).toHaveProperty("userData");
     expect(result.stepResults).toHaveProperty("postsByUser");
     expect(result.stepResults.userData.success).toBe(true);
     expect(result.stepResults.postsByUser.success).toBe(true);
 
-    // Check the joined data structure
     expect(result.data).toHaveProperty("user");
     expect(result.data).toHaveProperty("posts");
 
-    // Verify user data
     const userData = result.data.user as Record<string, any>;
     expect(userData).toHaveProperty("id", 1);
     expect(userData).toHaveProperty("name", "Leanne Graham");
     expect(userData).toHaveProperty("email", "Sincere@april.biz");
 
-    // Verify posts data
     const posts = result.data.posts as Array<Record<string, any>>;
     expect(Array.isArray(posts)).toBe(true);
     expect(posts.length).toBeGreaterThan(0);
@@ -344,17 +343,10 @@ describe("ApiWorkflowOrchestrator", () => {
     };
     const orchestrator = new ApiWorkflowOrchestrator(baseApiInput);
 
-    await orchestrator.retrieveApiDocumentation(
-      "https://jsonplaceholder.typicode.com",
-      {},
-      {},
-      "https://jsonplaceholder.typicode.com",
-    );
+    await orchestrator.retrieveApiDocumentation("https://jsonplaceholder.typicode.com", {}, {});
 
-    // Define a plan with a LOOP step
     const plan: ExecutionPlan = {
       id: "loop_mode_plan",
-      apiHost: "https://jsonplaceholder.typicode.com",
       steps: [
         {
           id: "getUsers",

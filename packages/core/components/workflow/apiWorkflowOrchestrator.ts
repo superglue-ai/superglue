@@ -3,7 +3,6 @@ import { v4 as uuidv4 } from "uuid";
 import { getDocumentation } from "../../utils/documentation.js";
 import { applyJsonata } from "../../utils/tools.js";
 
-import { applyJsonataWithValidation } from "../../utils/tools.js";
 import type {
   ExecutionPlan,
   ExecutionPlanId,
@@ -74,13 +73,12 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
     documentationUrl: string,
     headers?: Record<string, any>,
     queryParams?: Record<string, any>,
-    apiHost?: string,
   ): Promise<void> {
     try {
       if (!documentationUrl) {
         throw new Error("Documentation URL is required");
       }
-      const documentation = await getDocumentation(documentationUrl, headers || {}, queryParams || {}, apiHost);
+      const documentation = await getDocumentation(documentationUrl, headers || {}, queryParams || {});
       this.apiDocumentation = documentation;
     } catch (error) {
       throw new Error(`Failed to retrieve API documentation: ${String(error)}`);
@@ -161,21 +159,24 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
       // Apply final transformation if specified
       if (executionPlan.finalTransform) {
         try {
-          console.log("Applying final transform with data: ", result.data);
-          const finalResult = await applyJsonataWithValidation(result.data, executionPlan.finalTransform, undefined);
+          // Object to easily access just the step raw data for transform
+          const rawStepData = {
+            ...Object.entries(result.stepResults).reduce(
+              (acc, [stepId, stepResult]) => {
+                acc[stepId] = stepResult.rawData;
+                return acc;
+              },
+              {} as Record<string, unknown>,
+            ),
+          };
+
+          // Apply the final transform using the original data
+          const finalResult = await applyJsonata(rawStepData, executionPlan.finalTransform);
           console.log("Final transform result: ", finalResult);
 
-          if (finalResult.success) {
-            result.data = finalResult.data as Record<string, unknown>;
-          } else {
-            // TODO: add schema validation
-            try {
-              result.data = await applyJsonata(result.data, executionPlan.finalTransform);
-              console.log("JSONATA transform succeeded:", result.data);
-            } catch (directError) {
-              throw new Error(`Final transform failed: ${finalResult.error}`);
-            }
-          }
+          result.data = finalResult as Record<string, unknown>;
+          result.success = true;
+          // TODO: add schema validation
         } catch (transformError) {
           console.error("Final transform error:", transformError);
           result.error = `Final transformation error: ${String(transformError)}`;
@@ -252,10 +253,6 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
   }
 
   private validateExecutionPlan(plan: ExecutionPlan): void {
-    if (!plan.apiHost) {
-      throw new Error("Execution plan must have an API host");
-    }
-
     if (!plan.steps || !Array.isArray(plan.steps) || plan.steps.length === 0) {
       throw new Error("Execution plan must have at least one step");
     }
@@ -302,10 +299,8 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
         };
 
         try {
-          const result = await applyJsonataWithValidation(mappingContext, step.inputMapping || "$", undefined);
-          if (result.success) {
-            return result.data as Record<string, unknown>;
-          }
+          const result = await applyJsonata(mappingContext, step.inputMapping || "$");
+          return result as Record<string, unknown>;
         } catch (err) {
           console.warn(`[Step ${step.id}] Input mapping failed, falling back to auto-detection`, err);
         }

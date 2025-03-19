@@ -6,7 +6,6 @@ export interface WorkflowOrchestrator {
     documentationUrl: string,
     headers?: Record<string, any>,
     queryParams?: Record<string, any>,
-    apiHost?: string,
   ): Promise<void>;
 
   getApiDocumentation(): string;

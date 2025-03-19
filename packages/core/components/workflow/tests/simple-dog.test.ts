@@ -31,7 +31,6 @@ describe("ApiWorkflowOrchestrator-dog", { timeout: 600000 }, () => {
 
     const manualExecutionPlan: ExecutionPlan = {
       id: `manual-plan-${Date.now()}`,
-      apiHost: dogApiHost,
       steps: [
         {
           id: "getAllBreeds",
@@ -43,11 +42,8 @@ describe("ApiWorkflowOrchestrator-dog", { timeout: 600000 }, () => {
             id: "getAllBreeds_apiConfig",
           },
           executionMode: "DIRECT",
-          outputIsArray: true,
-          responseField: "message", // The Dog API wraps response in a message field
-          objectKeysAsArray: true, // We want to use the keys of the message object as breeds
           inputMapping: "$",
-          responseMapping: "$",
+          responseMapping: "$keys($.message)", // Extract the keys (breed names) from the message object
         },
         {
           id: "getBreedImage",

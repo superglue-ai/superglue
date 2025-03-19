@@ -29,10 +29,8 @@ export default function WorkflowsPage() {
             method: "GET",
           },
           executionMode: "DIRECT",
-          responseField: "message",
-          objectKeysAsArray: true,
           inputMapping: "$",
-          responseMapping: "$",
+          responseMapping: "$keys($.message)",
         },
         {
           id: "getBreedImage",
@@ -46,7 +44,7 @@ export default function WorkflowsPage() {
           executionMode: "LOOP",
           loopVariable: "breed",
           loopMaxIters: 5,
-          inputMapping: "$",
+          inputMapping: "$", // Use identity mapping since loopVariable will handle extracting values
           responseMapping: "$",
         },
       ],
@@ -158,9 +156,6 @@ export default function WorkflowsPage() {
                     executionMode
                     loopVariable
                     loopMaxIters
-                    arrayPath
-                    objectKeysAsArray
-                    responseField
                     inputMapping
                     responseMapping
                   }
@@ -464,6 +459,27 @@ export default function WorkflowsPage() {
                     onClick={() => {
                       setWorkflowId("");
                       setWorkflowName("New Workflow");
+                      setStepsText(
+                        JSON.stringify(
+                          [
+                            {
+                              id: "step1",
+                              apiConfig: {
+                                urlPath: "/",
+                                instruction: "First step",
+                                id: "step1_config",
+                                urlHost: "https://dog.ceo/api",
+                                method: "GET",
+                              },
+                              executionMode: "DIRECT",
+                              inputMapping: "$",
+                              responseMapping: "$",
+                            },
+                          ],
+                          null,
+                          2,
+                        ),
+                      );
                     }}
                     size="icon"
                     title="New Workflow"

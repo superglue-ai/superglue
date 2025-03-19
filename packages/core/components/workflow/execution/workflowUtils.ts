@@ -1,6 +1,6 @@
 import type { ApiConfig, ApiInput, RequestOptions } from "@superglue/shared";
 import { callEndpoint } from "../../../utils/api.js";
-import { applyJsonataWithValidation } from "../../../utils/tools.js";
+import { applyJsonata } from "../../../utils/tools.js";
 import type { ExecutionPlan, ExecutionStep, WorkflowResult } from "../domain/workflow.types.js";
 
 export function extractTemplateVariables(str: string): string[] {
@@ -34,16 +34,8 @@ export async function processStepResult(stepId: string, result: unknown, step: E
     if (!step.responseMapping || step.responseMapping === "$") {
       return result;
     }
-
-    const transformResult = await applyJsonataWithValidation(result, step.responseMapping, undefined);
-
-    if (!transformResult.success) {
-      console.error(`Mapping Error: Step '${stepId}' - Failed to apply response mapping`);
-      throw new Error(`Response mapping failed: ${transformResult.error}`);
-    }
-
-    console.log(`Transform Step '${stepId}' - Applied response mapping`);
-    return transformResult.data;
+    const transformResult = await applyJsonata(result, step.responseMapping);
+    return transformResult;
   } catch (error) {
     console.error(`Mapping Error: Step '${stepId}' - ${String(error)}`);
     return result;

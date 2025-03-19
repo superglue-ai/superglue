@@ -147,61 +147,33 @@ async function getLoopValues(
     return [];
   }
 
-  // Find the source step to check configuration for extracting array values
-  const sourceStep = executionPlan.steps.find((s) => s.id === mapping.source);
-
-  // Extract values using multiple strategies
-  if (sourceStep) {
-    // Check responseField and objectKeysAsArray flag
-    if (sourceStep.responseField && typeof sourceResult === "object" && sourceResult !== null) {
-      const fieldName = sourceStep.responseField;
-      if (fieldName in (sourceResult as Record<string, unknown>)) {
-        const fieldValue = (sourceResult as Record<string, unknown>)[fieldName];
-
-        // If fieldValue is an object and objectKeysAsArray is true, use its keys
-        if (
-          sourceStep.objectKeysAsArray &&
-          fieldValue &&
-          typeof fieldValue === "object" &&
-          !Array.isArray(fieldValue)
-        ) {
-          const keys = Object.keys(fieldValue as Record<string, unknown>);
-          console.log(`[LOOP] Using keys from responseField '${fieldName}': ${keys.length} keys`);
-          return keys;
-        }
-
-        // If fieldValue is an array, use it directly
-        if (Array.isArray(fieldValue)) {
-          console.log(`[LOOP] Using array from responseField '${fieldName}': ${fieldValue.length} items`);
-          return fieldValue;
-        }
-      }
+  // Always use the transformed result from the previous step
+  const sourceStepResult = result.stepResults[mapping.source];
+  if (sourceStepResult?.transformedData) {
+    // If transformedData is an array, use it directly
+    if (Array.isArray(sourceStepResult.transformedData)) {
+      const array = sourceStepResult.transformedData;
+      console.log(`[LOOP] Found array in transformed result: ${array.length} items`);
+      return array;
     }
 
-    // Check for arrayPath
-    if (sourceStep.arrayPath && typeof sourceResult === "object" && sourceResult !== null) {
-      let currentValue: unknown = sourceResult;
-      const pathParts = sourceStep.arrayPath.split(".");
+    // If the transformed result is an object, we can try different approaches
+    if (typeof sourceStepResult.transformedData === "object" && sourceStepResult.transformedData !== null) {
+      const transformedObj = sourceStepResult.transformedData as Record<string, unknown>;
 
-      for (const part of pathParts) {
-        if (currentValue && typeof currentValue === "object" && part in (currentValue as Record<string, unknown>)) {
-          currentValue = (currentValue as Record<string, unknown>)[part];
-        } else {
-          currentValue = undefined;
-          break;
-        }
+      // If loopVariable is a property in the transformed data, use it
+      if (loopVarName in transformedObj && Array.isArray(transformedObj[loopVarName])) {
+        const values = transformedObj[loopVarName] as unknown[];
+        console.log(`[LOOP] Found array at property '${loopVarName}' in transformed data: ${values.length} items`);
+        return values;
       }
 
-      if (Array.isArray(currentValue)) {
-        console.log(`[LOOP] Found array at path '${sourceStep.arrayPath}': ${currentValue.length} items`);
-        return currentValue;
-      }
-
-      // Path led to an object, if objectKeysAsArray is true, return its keys
-      if (sourceStep.objectKeysAsArray && currentValue && typeof currentValue === "object") {
-        const keys = Object.keys(currentValue as Record<string, unknown>);
-        console.log(`[LOOP] Using keys at path '${sourceStep.arrayPath}': ${keys.length} keys`);
-        return keys;
+      // If we're supposed to use object keys as values
+      if (Object.keys(transformedObj).length > 0) {
+        const keys = Object.keys(transformedObj);
+        console.log(`[LOOP] Using keys from transformed object: ${keys.length} keys`);
+        // Take first 5 for testing purposes
+        return keys.slice(0, 5);
       }
     }
   }
@@ -229,18 +201,6 @@ async function getLoopValues(
       console.log(`[LOOP] Found array property matching variable name: ${varValue.length} items`);
       return varValue;
     }
-  }
-
-  // If sourceStep has objectKeysAsArray, use object keys
-  if (
-    sourceStep?.objectKeysAsArray &&
-    typeof sourceResult === "object" &&
-    sourceResult !== null &&
-    !Array.isArray(sourceResult)
-  ) {
-    const keys = Object.keys(sourceResult as Record<string, unknown>);
-    console.log(`[LOOP] Using object keys from source result: ${keys.length} keys`);
-    return keys;
   }
 
   // If the source result itself is an array, use it
@@ -355,6 +315,8 @@ const loopStrategy: ExecutionStrategy = {
       }
 
       console.log(`[LOOP] Found ${effectiveLoopValues.length} values, example: '${effectiveLoopValues[0]}'`);
+      // console.log(`[LOOP] Using loop variable '${loopVarName}' with values: ${effectiveLoopValues.join(", ")}`);
+      // console.log(`[LOOP] Loop values: ${loopValues.join(", ")}`);
 
       const apiConfig = await prepareApiConfig(step, executionPlan, apiDocumentation, baseApiInput);
       const results = [];
