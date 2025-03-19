@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "../../components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../../components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
@@ -300,9 +300,9 @@ export default function WorkflowsPage() {
       const mutation = "upsertWorkflow";
       const variables = {
         id: workflowId || `workflow-${Date.now()}`,
-        input: { 
-          name: workflowName, 
-          plan: executionPlan
+        input: {
+          name: workflowName,
+          plan: executionPlan,
         },
       };
 
@@ -428,18 +428,17 @@ export default function WorkflowsPage() {
   };
 
   return (
-    <div className="container mx-auto p-6 flex flex-col h-[calc(100vh-2rem)]">
-      <h1 className="text-2xl font-bold mb-6">Workflow Executor</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-grow">
-        <Card className="h-full flex flex-col overflow-auto">
-          <CardHeader>
+    <div className="p-8 max-w-none w-full min-h-full">
+      <h1 className="text-2xl font-bold mb-4">Workflow Executor</h1>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-[calc(100vh-120px)]">
+        <Card className="flex flex-col h-full">
+          <CardHeader className="pb-2">
             <CardTitle>Workflow Configuration</CardTitle>
-            <CardDescription>Define your API workflow parameters</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4 flex-grow overflow-auto">
+          <CardContent className="flex-grow overflow-auto p-4 flex flex-col">
             {/* Workflow selector - only shown if workflows exist */}
             {workflows.length > 0 && (
-              <div className="mb-6">
+              <div className="mb-4">
                 <Label htmlFor="workflowSelect" className="mb-2 block">
                   Load Workflow
                 </Label>
@@ -496,74 +495,46 @@ export default function WorkflowsPage() {
               </div>
             )}
 
-            {/* Workflow name and description */}
-            <div className="grid grid-cols-1 gap-4 mb-4">
-              <div>
-                <Label htmlFor="workflowName">Workflow Name</Label>
-                <Input
-                  id="workflowName"
-                  value={workflowName}
-                  onChange={(e) => setWorkflowName(e.target.value)}
-                  placeholder="Enter workflow name"
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="apiHost">API Host</Label>
+            {/* Workflow name */}
+            <div className="mb-4">
+              <Label htmlFor="workflowName">Workflow Name</Label>
               <Input
-                id="apiHost"
-                value={apiHost}
-                onChange={(e) => setApiHost(e.target.value)}
-                placeholder="https://api.example.com"
+                id="workflowName"
+                value={workflowName}
+                onChange={(e) => setWorkflowName(e.target.value)}
+                placeholder="Enter workflow name"
               />
             </div>
 
-            <div>
-              <div className="mb-4">
-                <Label htmlFor="instruction">Instruction</Label>
-                <Input
-                  id="instruction"
-                  value={instruction}
-                  onChange={(e) => setInstruction(e.target.value)}
-                  placeholder="Execute workflow"
+            <div className="flex flex-col gap-4 h-full min-h-0 flex-grow">
+              <div className="flex-1 flex flex-col min-h-0">
+                <Label htmlFor="steps" className="mb-1">
+                  Steps (JSON)
+                </Label>
+                <Textarea
+                  id="steps"
+                  value={stepsText}
+                  onChange={(e) => setStepsText(e.target.value)}
+                  placeholder="Enter workflow steps as JSON array"
+                  className="font-mono resize-none h-full flex-1 min-h-0"
                 />
               </div>
 
-              <div className="mb-4">
-                <Label htmlFor="documentationUrl">Documentation URL</Label>
-                <Input
-                  id="documentationUrl"
-                  value={documentationUrl}
-                  onChange={(e) => setDocumentationUrl(e.target.value)}
-                  placeholder="URL to API documentation"
+              <div className="flex-1 flex flex-col min-h-0">
+                <Label htmlFor="finalTransform" className="mb-1">
+                  Final Transform (JSONata)
+                </Label>
+                <Textarea
+                  id="finalTransform"
+                  value={finalTransform}
+                  onChange={(e) => setFinalTransform(e.target.value)}
+                  placeholder="Enter final transform expression"
+                  className="font-mono resize-none h-full flex-1 min-h-0"
                 />
               </div>
-            </div>
-
-            <div>
-              <Label htmlFor="steps">Steps (JSON)</Label>
-              <Textarea
-                id="steps"
-                value={stepsText}
-                onChange={(e) => setStepsText(e.target.value)}
-                placeholder="Enter workflow steps as JSON array"
-                className="h-96 font-mono"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="finalTransform">Final Transform (JSONata)</Label>
-              <Textarea
-                id="finalTransform"
-                value={finalTransform}
-                onChange={(e) => setFinalTransform(e.target.value)}
-                placeholder="Enter final transform expression"
-                className="h-32 font-mono"
-              />
             </div>
           </CardContent>
-          <CardFooter className="flex flex-col gap-4">
+          <CardFooter className="flex flex-col gap-4 pt-2">
             <div className="flex justify-between gap-4 w-full">
               <Button
                 variant="outline"
@@ -591,14 +562,13 @@ export default function WorkflowsPage() {
           </CardFooter>
         </Card>
 
-        <Card className="h-full flex flex-col">
-          <CardHeader>
+        <Card className="flex flex-col h-full">
+          <CardHeader className="pb-2">
             <CardTitle>Results</CardTitle>
-            <CardDescription>Workflow execution results</CardDescription>
           </CardHeader>
-          <CardContent className="flex-grow overflow-auto">
+          <CardContent className="flex-grow overflow-auto p-4 flex flex-col">
             {result ? (
-              <div className="space-y-4">
+              <div className="flex flex-col h-full space-y-4">
                 <div className="bg-muted p-4 rounded-md">
                   <h3 className="font-semibold mb-2">
                     Status:
@@ -624,22 +594,24 @@ export default function WorkflowsPage() {
                   </div>
                 </div>
 
-                <div>
+                <div className="flex-1 min-h-0">
                   <h3 className="font-semibold mb-2">Final Data:</h3>
-                  <pre className="bg-muted p-4 rounded-md font-mono text-sm overflow-auto h-[30vh]">
+                  <pre className="bg-muted p-4 rounded-md font-mono text-sm overflow-auto h-[calc(100%-32px)]">
                     {JSON.stringify(result.data, null, 2)}
                   </pre>
                 </div>
 
-                <div>
+                <div className="flex-1 min-h-0">
                   <h3 className="font-semibold mb-2">Step Results:</h3>
-                  <pre className="bg-muted p-4 rounded-md font-mono text-sm overflow-auto h-[30vh]">
+                  <pre className="bg-muted p-4 rounded-md font-mono text-sm overflow-auto h-[calc(100%-32px)]">
                     {JSON.stringify(result.stepResults, null, 2)}
                   </pre>
                 </div>
               </div>
             ) : (
-              <div className="text-gray-500 italic">No results yet. Execute a workflow to see results here.</div>
+              <div className="h-full flex items-center justify-center">
+                <p className="text-gray-500 italic">No results yet. Execute a workflow to see results here.</p>
+              </div>
             )}
           </CardContent>
         </Card>
