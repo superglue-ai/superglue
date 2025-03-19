@@ -46,16 +46,7 @@ sequenceDiagram
     
     loop For each step
         Orchestrator->>Orchestrator: prepareStepInput(inputMapping)
-        
-        alt Step with template variables
-            Orchestrator->>Strategy: executeWorkflowStep()
-        else Standard step
-            Orchestrator->>Utils: executeApiCall()
-            Utils->>API: API Request
-            API-->>Utils: API Response
-            Orchestrator->>Utils: processStepResult(responseMapping)
-            Orchestrator->>Utils: storeStepResult()
-        end
+        Orchestrator->>Strategy: executeWorkflowStep()
         
         alt Direct Execution Strategy
             Strategy->>Utils: prepareApiConfig()
@@ -147,12 +138,13 @@ graph LR
 flowchart TD
     A[Start] --> B[Register Execution Plan]
     B --> D[Execute getAllBreeds Step]
-    D --> E[Dog API: GET /breeds/list/all]
+    D --> |DIRECT Strategy| E[Dog API: GET /breeds/list/all]
     E --> |API Response| F1[Raw Response]
     F1 --> |Apply responseMapping: keys-message| F2[Transform Response]
     F2 --> |Store Result| F3[Step Result Storage]
     
-    F3 --> G[Execute getBreedImage Step in LOOP mode]
+    F3 --> G[Execute getBreedImage Step]
+    G --> |LOOP Strategy| G1[Find Loop Variable: breed]
     G1 --> |Extract values from previous step| G2[Get breed names]
     G2 --> |Apply loopMaxIters=5| G3[Limit to 5 breeds]
     
@@ -178,13 +170,10 @@ flowchart TD
     J1 --> |Apply finalTransform| J2[Transform data]
     J2 --> |Create final result| K[Return Final Result]
     
-    subgraph "Data Flow"
-    F1 --> F2 --> F3
-    end
-    
     style G fill:#bbf,stroke:#333,stroke-width:2px
     style J2 fill:#f9f,stroke:#333,stroke-width:2px
     style F2 fill:#cce,stroke:#333,stroke-width:2px
+    style G1 fill:#ddf,stroke:#333,stroke-width:2px
     style G2 fill:#cce,stroke:#333,stroke-width:2px
 ```
 
@@ -195,7 +184,8 @@ flowchart TD
 The main entry point for workflow execution that:
 - Manages execution plans
 - Validates workflow definitions
-- Coordinates step execution
+- Prepares input data for steps
+- Delegates execution to strategies
 - Applies final transformations
 - Handles error states
 
@@ -207,10 +197,10 @@ The main entry point for workflow execution that:
 - Processes and stores results
 
 #### LoopStrategy
-- Identifies loop variables and their sources
-- Executes the same API call for each value in an array
+- Executes the same API call for each value in the loop
+- Extracts array values from previous steps
 - Manages collection of results from multiple iterations
-- Supports limits on loop iterations
+- Supports limits on loop iterations (loopMaxIters)
 
 ### DataExtractor
 - Extracts data from complex objects using JSONata expressions
@@ -220,7 +210,7 @@ The main entry point for workflow execution that:
 ### WorkflowUtils
 - Processes template strings ({variable})
 - Executes API calls
-- Transforms API responses using step mappings
+- Transforms API responses using JSONata expressions (responseMapping)
 - Stores step results in the workflow context
 
 ## Workflow Definition Structure
@@ -237,7 +227,6 @@ interface ExecutionStep {
   apiConfig: ApiConfig;
   executionMode: "DIRECT" | "LOOP";
   
-  // Optional configurations
   loopVariable?: string;
   loopMaxIters?: number;
   
@@ -249,7 +238,6 @@ interface ExecutionStep {
 ## Example Usage
 
 ```typescript
-// Define a workflow execution plan
 const executionPlan = {
   id: "dog-workflow",
   steps: [
