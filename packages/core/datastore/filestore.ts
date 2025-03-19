@@ -1,7 +1,7 @@
-import type { ApiConfig, ApiInput, DataStore, ExtractConfig, ExtractInput, RunResult, TransformConfig, TransformInput } from "@superglue/shared";
-import { createHash } from 'crypto';
-import fs from 'fs';
-import path from 'path';
+import type { ApiConfig, ApiInput, DataStore, ExtractConfig, ExtractInput, RunResult, SavedWorkflow, TransformConfig, TransformInput } from "@superglue/shared";
+import { createHash } from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import { getSchemaFromData } from "../utils/tools.js";
 
 export class FileStore implements DataStore {
@@ -12,6 +12,7 @@ export class FileStore implements DataStore {
     transforms: Map<string, TransformConfig>;
     runs: Map<string, RunResult>;
     runsIndex: Map<string, { id: string; timestamp: number; configId: string }[]>;
+    workflows: Map<string, SavedWorkflow>;
     tenant: {
       email: string | null;
       emailEntrySkipped: boolean;
@@ -27,6 +28,7 @@ export class FileStore implements DataStore {
       transforms: new Map(),
       runs: new Map(),
       runsIndex: new Map(),
+      workflows: new Map(),
       tenant: {
         email: null,
         emailEntrySkipped: false
@@ -68,6 +70,7 @@ export class FileStore implements DataStore {
         transforms: new Map(Object.entries(parsed.transforms || {})),
         runs: new Map(Object.entries(parsed.runs || {})),
         runsIndex: new Map(Object.entries(parsed.runsIndex || {})),
+        workflows: new Map(Object.entries(parsed.workflows || {})),
         tenant: {
           email: parsed.tenant?.email || null,
           emailEntrySkipped: parsed.tenant?.emailEntrySkipped || false
@@ -87,6 +90,7 @@ export class FileStore implements DataStore {
         transforms: Object.fromEntries(this.storage.transforms),
         runs: Object.fromEntries(this.storage.runs),
         runsIndex: Object.fromEntries(this.storage.runsIndex),
+        workflows: Object.fromEntries(this.storage.workflows),
         tenant: this.storage.tenant
       };
       // Use temporary file to ensure atomic writes
@@ -343,6 +347,7 @@ export class FileStore implements DataStore {
     this.storage.transforms.clear();
     this.storage.runs.clear();
     this.storage.runsIndex.clear();
+    this.storage.workflows.clear();
     await this.persist();
   }
 
@@ -365,5 +370,36 @@ export class FileStore implements DataStore {
       emailEntrySkipped: emailEntrySkipped !== undefined ? emailEntrySkipped : currentInfo.emailEntrySkipped
     };
     await this.persist();
+  }
+
+  // Workflow Methods
+  async getWorkflow(id: string, orgId?: string): Promise<SavedWorkflow | null> {
+    if (!id) return null;
+    const key = this.getKey('workflow', id, orgId);
+    const workflow = this.storage.workflows.get(key);
+    return workflow ? { ...workflow, id } : null;
+  }
+
+  async listWorkflows(limit = 10, offset = 0, orgId?: string): Promise<{ items: SavedWorkflow[], total: number }> {
+    const items = this.getOrgItems(this.storage.workflows, 'workflow', orgId)
+      .slice(offset, offset + limit);
+    const total = this.getOrgItems(this.storage.workflows, 'workflow', orgId).length;
+    return { items, total };
+  }
+
+  async upsertWorkflow(id: string, workflow: SavedWorkflow, orgId?: string): Promise<SavedWorkflow> {
+    if (!id || !workflow) return null;
+    const key = this.getKey('workflow', id, orgId);
+    this.storage.workflows.set(key, workflow);
+    await this.persist();
+    return { ...workflow, id };
+  }
+
+  async deleteWorkflow(id: string, orgId?: string): Promise<boolean> {
+    if (!id) return false;
+    const key = this.getKey('workflow', id, orgId);
+    const deleted = this.storage.workflows.delete(key);
+    await this.persist();
+    return deleted;
   }
 } 

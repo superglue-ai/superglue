@@ -1,9 +1,9 @@
+import type { DataStore, TransformConfig, TransformInput } from "@superglue/shared";
+import { createHash } from "node:crypto";
 import OpenAI from "openai";
+import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { PROMPT_MAPPING } from "./prompts.js";
-import {  applyJsonataWithValidation, getSchemaFromData, sample } from "./tools.js";
-import { ApiInput, DataStore, TransformConfig, TransformInput } from "@superglue/shared";
-import { createHash } from "crypto";
-import { ChatCompletionMessageParam } from "openai/resources/chat/index.mjs";
+import { applyJsonataWithValidation, getSchemaFromData, sample } from "./tools.js";
 
 export async function prepareTransform(
     datastore: DataStore,
