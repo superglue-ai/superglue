@@ -291,6 +291,7 @@ export default function WorkflowsPage() {
       const steps = JSON.parse(stepsText);
 
       const executionPlan = {
+        id: `plan-${Date.now()}`,
         apiHost,
         steps,
         finalTransform,
@@ -299,7 +300,10 @@ export default function WorkflowsPage() {
       const mutation = "upsertWorkflow";
       const variables = {
         id: workflowId || `workflow-${Date.now()}`,
-        input: { name: workflowName, plan: executionPlan },
+        input: { 
+          name: workflowName, 
+          plan: executionPlan
+        },
       };
 
       const response = await fetch(`${config.superglueEndpoint}`, {
@@ -354,6 +358,7 @@ export default function WorkflowsPage() {
       const steps = JSON.parse(stepsText);
 
       const executionPlan = {
+        id: `plan-${Date.now()}`,
         apiHost,
         steps,
         finalTransform,
@@ -423,15 +428,15 @@ export default function WorkflowsPage() {
   };
 
   return (
-    <div className="container mx-auto p-6">
+    <div className="container mx-auto p-6 flex flex-col h-[calc(100vh-2rem)]">
       <h1 className="text-2xl font-bold mb-6">Workflow Executor</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-grow">
+        <Card className="h-full flex flex-col overflow-auto">
           <CardHeader>
             <CardTitle>Workflow Configuration</CardTitle>
             <CardDescription>Define your API workflow parameters</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 flex-grow overflow-auto">
             {/* Workflow selector - only shown if workflows exist */}
             {workflows.length > 0 && (
               <div className="mb-6">
@@ -586,12 +591,12 @@ export default function WorkflowsPage() {
           </CardFooter>
         </Card>
 
-        <Card>
+        <Card className="h-full flex flex-col">
           <CardHeader>
             <CardTitle>Results</CardTitle>
             <CardDescription>Workflow execution results</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex-grow overflow-auto">
             {result ? (
               <div className="space-y-4">
                 <div className="bg-muted p-4 rounded-md">
@@ -621,14 +626,14 @@ export default function WorkflowsPage() {
 
                 <div>
                   <h3 className="font-semibold mb-2">Final Data:</h3>
-                  <pre className="bg-muted p-4 rounded-md font-mono text-sm overflow-auto max-h-64">
+                  <pre className="bg-muted p-4 rounded-md font-mono text-sm overflow-auto h-[30vh]">
                     {JSON.stringify(result.data, null, 2)}
                   </pre>
                 </div>
 
                 <div>
                   <h3 className="font-semibold mb-2">Step Results:</h3>
-                  <pre className="bg-muted p-4 rounded-md font-mono text-sm overflow-auto max-h-64">
+                  <pre className="bg-muted p-4 rounded-md font-mono text-sm overflow-auto h-[30vh]">
                     {JSON.stringify(result.stepResults, null, 2)}
                   </pre>
                 </div>
