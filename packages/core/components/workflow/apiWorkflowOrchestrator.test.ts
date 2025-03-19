@@ -53,18 +53,25 @@ vi.mock("../../utils/tools.js", () => ({
 }));
 
 vi.mock("../../utils/api.js", () => {
-  const mockCallEndpoint = vi.fn().mockImplementation((apiConfig) => {
+  const mockCallEndpoint = vi.fn().mockImplementation((apiConfig, payload) => {
     let responseData: any;
 
+    let urlPath = apiConfig.urlPath;
+    if (urlPath && payload) {
+      for (const key of Object.keys(payload)) {
+        urlPath = urlPath.replace(new RegExp(`\\{${key}\\}`, "g"), payload[key]);
+      }
+    }
+
     // Return different mock data based on the endpoint
-    if (apiConfig.urlPath === "/users/1") {
+    if (urlPath === "/users/1") {
       responseData = {
         id: 1,
         name: "Leanne Graham",
         username: "Bret",
         email: "Sincere@april.biz",
       };
-    } else if (apiConfig.urlPath === "/posts") {
+    } else if (urlPath === "/posts") {
       responseData = [
         { id: 1, userId: 1, title: "Post 1", body: "Post body 1" },
         { id: 2, userId: 1, title: "Post 2", body: "Post body 2" },
@@ -319,6 +326,7 @@ describe("ApiWorkflowOrchestrator", () => {
             id: "api_config_getUserPosts",
           },
           executionMode: "LOOP",
+          loopVariable: "userId",
           inputMapping: "{ userId: $.getUsers.*.id }",
           responseMapping: "$",
         },
