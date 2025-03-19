@@ -302,7 +302,7 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
         };
 
         try {
-          const result = await applyJsonataWithValidation(mappingContext, step.inputMapping!, undefined);
+          const result = await applyJsonataWithValidation(mappingContext, step.inputMapping || "$", undefined);
           if (result.success) {
             return result.data as Record<string, unknown>;
           }

@@ -13,14 +13,14 @@ export enum HttpMethod {
   DELETE = "DELETE",
   PATCH = "PATCH",
   HEAD = "HEAD",
-  OPTIONS = "OPTIONS"
+  OPTIONS = "OPTIONS",
 }
 
 export enum CacheMode {
   ENABLED = "ENABLED",
   READONLY = "READONLY",
   WRITEONLY = "WRITEONLY",
-  DISABLED = "DISABLED"
+  DISABLED = "DISABLED",
 }
 
 export enum FileType {
@@ -28,14 +28,14 @@ export enum FileType {
   JSON = "JSON",
   XML = "XML",
   EXCEL = "EXCEL",
-  AUTO = "AUTO"
+  AUTO = "AUTO",
 }
 
 export enum AuthType {
   NONE = "NONE",
   OAUTH2 = "OAUTH2",
   HEADER = "HEADER",
-  QUERY_PARAM = "QUERY_PARAM"
+  QUERY_PARAM = "QUERY_PARAM",
 }
 
 export enum DecompressionMethod {
@@ -43,19 +43,19 @@ export enum DecompressionMethod {
   DEFLATE = "DEFLATE",
   NONE = "NONE",
   AUTO = "AUTO",
-  ZIP = "ZIP"
+  ZIP = "ZIP",
 }
 
 export enum PaginationType {
   OFFSET_BASED = "OFFSET_BASED",
   PAGE_BASED = "PAGE_BASED",
   CURSOR_BASED = "CURSOR_BASED",
-  DISABLED = "DISABLED"
+  DISABLED = "DISABLED",
 }
 
 export interface BaseConfig {
   id: string;
-  version?: string; 
+  version?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -197,7 +197,6 @@ export interface ExecutionStep {
   endpoint: string;
   apiConfig?: ApiConfig;
   executionMode: "DIRECT" | "LOOP";
-  outputIsArray?: boolean;
   loopVariable?: string;
   loopMaxIters?: number;
   arrayPath?: string;

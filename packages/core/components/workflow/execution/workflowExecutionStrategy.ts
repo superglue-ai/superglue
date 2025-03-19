@@ -204,15 +204,6 @@ async function getLoopValues(
         return keys;
       }
     }
-
-    // Direct use of outputIsArray and objectKeysAsArray flags
-    if (sourceStep.outputIsArray && sourceStep.objectKeysAsArray) {
-      if (typeof sourceResult === "object" && sourceResult !== null && !Array.isArray(sourceResult)) {
-        const keys = Object.keys(sourceResult as Record<string, unknown>);
-        console.log(`[LOOP] Using object keys from root: ${keys.length} keys`);
-        return keys;
-      }
-    }
   }
 
   // Try using data extractor with the provided path

@@ -29,7 +29,6 @@ export default function WorkflowsPage() {
             method: "GET",
           },
           executionMode: "DIRECT",
-          outputIsArray: true,
           responseField: "message",
           objectKeysAsArray: true,
           inputMapping: "$",
@@ -157,7 +156,6 @@ export default function WorkflowsPage() {
                       urlHost
                     }
                     executionMode
-                    outputIsArray
                     loopVariable
                     loopMaxIters
                     arrayPath
@@ -439,41 +437,43 @@ export default function WorkflowsPage() {
             <CardDescription>Define your API workflow parameters</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Workflow selector */}
-            <div className="mb-6">
-              <Label htmlFor="workflowSelect" className="mb-2 block">
-                Load Workflow
-              </Label>
-              <div className="flex gap-2">
-                <Select
-                  disabled={loadingWorkflows || loading || saving || deleting}
-                  onValueChange={(value) => loadWorkflow(value)}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder={loadingWorkflows ? "Loading workflows..." : "Select a workflow"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {workflows.map((workflow) => (
-                      <SelectItem key={workflow.id} value={workflow.id}>
-                        {workflow.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setWorkflowId("");
-                    setWorkflowName("New Workflow");
-                  }}
-                  size="icon"
-                  title="New Workflow"
-                  disabled={loading || saving || deleting}
-                >
-                  +
-                </Button>
+            {/* Workflow selector - only shown if workflows exist */}
+            {workflows.length > 0 && (
+              <div className="mb-6">
+                <Label htmlFor="workflowSelect" className="mb-2 block">
+                  Load Workflow
+                </Label>
+                <div className="flex gap-2">
+                  <Select
+                    disabled={loadingWorkflows || loading || saving || deleting}
+                    onValueChange={(value) => loadWorkflow(value)}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder={loadingWorkflows ? "Loading workflows..." : "Select a workflow"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {workflows.map((workflow) => (
+                        <SelectItem key={workflow.id} value={workflow.id}>
+                          {workflow.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setWorkflowId("");
+                      setWorkflowName("New Workflow");
+                    }}
+                    size="icon"
+                    title="New Workflow"
+                    disabled={loading || saving || deleting}
+                  >
+                    +
+                  </Button>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Workflow name and description */}
             <div className="grid grid-cols-1 gap-4 mb-4">

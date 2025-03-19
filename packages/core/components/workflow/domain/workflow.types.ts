@@ -20,7 +20,6 @@ export interface ExecutionStep {
   id: string;
   apiConfig: ApiConfig;
   executionMode: ExecutionMode;
-  outputIsArray?: boolean;
   loopVariable?: string;
   loopMaxIters?: number;
 

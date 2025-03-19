@@ -270,7 +270,6 @@ type ExecutionStep {
   id: String!
   apiConfig: ApiConfig!
   executionMode: String
-  outputIsArray: Boolean
   loopVariable: String
   loopMaxIters: Int
   arrayPath: String
@@ -284,7 +283,6 @@ input ExecutionStepInput {
   id: String!
   apiConfig: ApiConfigInput!
   executionMode: String  # DIRECT | LOOP
-  outputIsArray: Boolean
   loopVariable: String
   loopMaxIters: Int
   arrayPath: String
