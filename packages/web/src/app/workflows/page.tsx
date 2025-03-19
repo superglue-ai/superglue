@@ -13,38 +13,35 @@ import { useConfig } from "../config-context";
 export default function WorkflowsPage() {
   const { toast } = useToast();
   const config = useConfig();
-  const [workflowName, setWorkflowName] = useState("Dog Breed Workflow");
+  const [workflowName, setWorkflowName] = useState("New Workflow");
   const [workflowId, setWorkflowId] = useState("");
-  const [apiHost, setApiHost] = useState("https://dog.ceo/api");
   const [stepsText, setStepsText] = useState(
     JSON.stringify(
       [
         {
-          id: "getAllBreeds",
+          id: "step1",
           apiConfig: {
-            urlPath: "/breeds/list/all",
-            instruction: "Get all dog breeds",
-            id: "getAllBreeds_config",
-            urlHost: "https://dog.ceo/api",
+            urlPath: "/",
+            instruction: "First step",
+            id: "step1_config",
+            urlHost: "https://example.com",
             method: "GET",
           },
           executionMode: "DIRECT",
           inputMapping: "$",
-          responseMapping: "$keys($.message)",
+          responseMapping: "$",
         },
         {
-          id: "getBreedImage",
+          id: "step2",
           apiConfig: {
-            urlPath: "/breed/{breed}/images/random",
-            instruction: "Get a random image for a specific dog breed",
-            id: "getBreedImage_config",
-            urlHost: "https://dog.ceo/api",
+            urlPath: "/",
+            instruction: "Second step",
+            id: "step2_config",
+            urlHost: "https://example.com",
             method: "GET",
           },
-          executionMode: "LOOP",
-          loopVariable: "breed",
-          loopMaxIters: 5,
-          inputMapping: "$", // Use identity mapping since loopVariable will handle extracting values
+          executionMode: "DIRECT",
+          inputMapping: "$",
           responseMapping: "$",
         },
       ],
@@ -53,19 +50,7 @@ export default function WorkflowsPage() {
     ),
   );
   const [finalTransform, setFinalTransform] = useState(`{
-  "breeds": $map(
-    $filter(
-      $keys($.getAllBreeds.message),
-      function($b) {
-        $count($.getBreedImage[$split(message, "/")[4] = $b]) > 0
-      }
-    ),
-    function($b) {
-      {
-        $b: $.getBreedImage[$split(message, "/")[4] = $b].message[0]
-      }
-    }
-  )
+  "result": $
 }`);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -73,10 +58,6 @@ export default function WorkflowsPage() {
   const [result, setResult] = useState(null);
   const [workflows, setWorkflows] = useState([]);
   const [loadingWorkflows, setLoadingWorkflows] = useState(false);
-
-  // Base API Input state - keep these but remove editing capability
-  const [instruction, setInstruction] = useState("Get a link to a single random picture for all dog breeds");
-  const [documentationUrl, setDocumentationUrl] = useState("https://dog.ceo/dog-api/documentation");
 
   useEffect(() => {
     fetchWorkflows();
@@ -110,8 +91,7 @@ export default function WorkflowsPage() {
         throw new Error(jsonResponse.errors[0].message);
       }
 
-      const workflowsList = jsonResponse.data.listWorkflows;
-      setWorkflows(workflowsList);
+      setWorkflows(jsonResponse.data.listWorkflows);
     } catch (error) {
       console.error("Error fetching workflows:", error);
       toast({
@@ -143,15 +123,14 @@ export default function WorkflowsPage() {
                 name
                 plan {
                   id
-                  apiHost
                   steps {
                     id
                     apiConfig {
                       id
+                      urlHost
                       urlPath
                       instruction
                       method
-                      urlHost
                     }
                     executionMode
                     loopVariable
@@ -164,9 +143,7 @@ export default function WorkflowsPage() {
               }
             }
           `,
-          variables: {
-            id,
-          },
+          variables: { id },
         }),
       });
 
@@ -180,7 +157,6 @@ export default function WorkflowsPage() {
 
       setWorkflowId(workflow.id);
       setWorkflowName(workflow.name);
-      setApiHost(workflow.plan.apiHost);
       setStepsText(JSON.stringify(workflow.plan.steps, null, 2));
       setFinalTransform(workflow.plan.finalTransform || "");
 
@@ -239,32 +215,7 @@ export default function WorkflowsPage() {
           description: `"${workflowName}" deleted successfully`,
         });
 
-        setWorkflowId("");
-        setWorkflowName("New Workflow");
-        setApiHost("https://dog.ceo/api");
-        setStepsText(
-          JSON.stringify(
-            [
-              {
-                id: "step1",
-                apiConfig: {
-                  urlPath: "/",
-                  instruction: "First step",
-                  id: "step1_config",
-                  urlHost: "https://dog.ceo/api",
-                  method: "GET",
-                },
-                executionMode: "DIRECT",
-                inputMapping: "$",
-                responseMapping: "$",
-              },
-            ],
-            null,
-            2,
-          ),
-        );
-        setFinalTransform("");
-
+        resetForm();
         fetchWorkflows();
       } else {
         throw new Error("Failed to delete workflow");
@@ -281,6 +232,108 @@ export default function WorkflowsPage() {
     }
   };
 
+  const resetForm = () => {
+    setWorkflowId("");
+    setWorkflowName("New Workflow");
+    setStepsText(
+      JSON.stringify(
+        [
+          {
+            id: "step1",
+            apiConfig: {
+              urlPath: "/",
+              instruction: "First step",
+              id: "step1_config",
+              urlHost: "https://example.com",
+              method: "GET",
+            },
+            executionMode: "DIRECT",
+            inputMapping: "$",
+            responseMapping: "$",
+          },
+          {
+            id: "step2",
+            apiConfig: {
+              urlPath: "/",
+              instruction: "Second step",
+              id: "step2_config",
+              urlHost: "https://example.com",
+              method: "GET",
+            },
+            executionMode: "DIRECT",
+            inputMapping: "$",
+            responseMapping: "$",
+          },
+        ],
+        null,
+        2,
+      ),
+    );
+    setFinalTransform(`{
+  "result": $
+}`);
+  };
+
+  const fillDogExample = () => {
+    setWorkflowName("Dog Breed Workflow");
+    setStepsText(
+      JSON.stringify(
+        [
+          {
+            id: "getAllBreeds",
+            apiConfig: {
+              urlPath: "/breeds/list/all",
+              instruction: "Get all dog breeds",
+              id: "getAllBreeds_config",
+              urlHost: "https://dog.ceo/api",
+              method: "GET",
+            },
+            executionMode: "DIRECT",
+            inputMapping: "$",
+            responseMapping: "$keys($.message)",
+          },
+          {
+            id: "getBreedImage",
+            apiConfig: {
+              urlPath: "/breed/{breed}/images/random",
+              instruction: "Get a random image for a specific dog breed",
+              id: "getBreedImage_config",
+              urlHost: "https://dog.ceo/api",
+              method: "GET",
+            },
+            executionMode: "LOOP",
+            loopVariable: "breed",
+            loopMaxIters: 5,
+            inputMapping: "$",
+            responseMapping: "$",
+          },
+        ],
+        null,
+        2,
+      ),
+    );
+    setFinalTransform(`{
+  "breeds": $map(
+    $filter(
+      $keys($.getAllBreeds.message),
+      function($b) {
+        $count($.getBreedImage[$split(message, "/")[4] = $b]) > 0
+      }
+    ),
+    function($b) {
+      {
+        $b: $.getBreedImage[$split(message, "/")[4] = $b].message[0]
+      }
+    }
+  )
+}`);
+
+    toast({
+      title: "Example loaded",
+      description: "Dog breed example has been loaded",
+    });
+  };
+
   const saveWorkflow = async () => {
     try {
       if (!workflowName.trim()) {
@@ -288,21 +341,16 @@ export default function WorkflowsPage() {
       }
 
       setSaving(true);
-      const steps = JSON.parse(stepsText);
 
-      const executionPlan = {
-        id: `plan-${Date.now()}`,
-        apiHost,
-        steps,
-        finalTransform,
-      };
-
-      const mutation = "upsertWorkflow";
       const variables = {
         id: workflowId || `workflow-${Date.now()}`,
         input: {
           name: workflowName,
-          plan: executionPlan,
+          plan: {
+            id: `plan-${Date.now()}`,
+            steps: JSON.parse(stepsText),
+            finalTransform,
+          },
         },
       };
 
@@ -331,7 +379,7 @@ export default function WorkflowsPage() {
         throw new Error(jsonResponse.errors[0].message);
       }
 
-      const savedWorkflow = jsonResponse.data[mutation];
+      const savedWorkflow = jsonResponse.data.upsertWorkflow;
       setWorkflowId(savedWorkflow.id);
 
       toast({
@@ -357,25 +405,25 @@ export default function WorkflowsPage() {
       setLoading(true);
       const steps = JSON.parse(stepsText);
 
-      const executionPlan = {
-        id: `plan-${Date.now()}`,
-        apiHost,
-        steps,
-        finalTransform,
-      };
+      // Get first step's urlHost for baseApiInput if available
+      const firstStepUrlHost =
+        steps.length > 0 && steps[0].apiConfig?.urlHost ? steps[0].apiConfig.urlHost : "https://example.com";
 
       const workflowInput = {
-        plan: executionPlan,
+        plan: {
+          id: `plan-${Date.now()}`,
+          steps,
+          finalTransform,
+        },
         payload: {},
         credentials: {},
         baseApiInput: {
-          urlHost: apiHost,
-          instruction: instruction,
-          documentationUrl: documentationUrl,
+          urlHost: firstStepUrlHost,
+          instruction: "Execute workflow steps",
+          documentationUrl: "",
         },
       };
 
-      // TODO: remove this once we have a real endpoint
       const response = await fetch(`${config.superglueEndpoint}`, {
         method: "POST",
         headers: {
@@ -395,9 +443,7 @@ export default function WorkflowsPage() {
               }
             }
           `,
-          variables: {
-            input: workflowInput,
-          },
+          variables: { input: workflowInput },
         }),
       });
 
@@ -443,10 +489,7 @@ export default function WorkflowsPage() {
                   Load Workflow
                 </Label>
                 <div className="flex gap-2">
-                  <Select
-                    disabled={loadingWorkflows || loading || saving || deleting}
-                    onValueChange={(value) => loadWorkflow(value)}
-                  >
+                  <Select disabled={loadingWorkflows || loading || saving || deleting} onValueChange={loadWorkflow}>
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder={loadingWorkflows ? "Loading workflows..." : "Select a workflow"} />
                     </SelectTrigger>
@@ -460,31 +503,7 @@ export default function WorkflowsPage() {
                   </Select>
                   <Button
                     variant="outline"
-                    onClick={() => {
-                      setWorkflowId("");
-                      setWorkflowName("New Workflow");
-                      setStepsText(
-                        JSON.stringify(
-                          [
-                            {
-                              id: "step1",
-                              apiConfig: {
-                                urlPath: "/",
-                                instruction: "First step",
-                                id: "step1_config",
-                                urlHost: "https://dog.ceo/api",
-                                method: "GET",
-                              },
-                              executionMode: "DIRECT",
-                              inputMapping: "$",
-                              responseMapping: "$",
-                            },
-                          ],
-                          null,
-                          2,
-                        ),
-                      );
-                    }}
+                    onClick={resetForm}
                     size="icon"
                     title="New Workflow"
                     disabled={loading || saving || deleting}
@@ -495,9 +514,14 @@ export default function WorkflowsPage() {
               </div>
             )}
 
-            {/* Workflow name */}
+            {/* Workflow name and example button */}
             <div className="mb-4">
-              <Label htmlFor="workflowName">Workflow Name</Label>
+              <div className="flex items-center justify-between mb-1">
+                <Label htmlFor="workflowName">Workflow Name</Label>
+                <Button variant="outline" size="sm" onClick={fillDogExample} disabled={loading || saving || deleting}>
+                  Fill Dog Example
+                </Button>
+              </div>
               <Input
                 id="workflowName"
                 value={workflowName}
