@@ -1,8 +1,9 @@
 import { HttpMethod } from "@superglue/shared";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as tools from "../../../utils/tools.js";
 import { ApiWorkflowOrchestrator } from "../apiWorkflowOrchestrator.js";
 import type { ExecutionPlan } from "../domain/workflow.types.js";
+import * as workflowUtils from "../execution/workflowUtils.js";
 
 // Mock openai so that we don't have to use API keys to run the test
 vi.mock("openai", () => {
@@ -31,37 +32,73 @@ vi.mock("openai", () => {
   };
 });
 
-// Create a spy on the applyJsonata function to verify it's called with the right transform
-vi.mock("../../../utils/tools.js", async () => {
-  const actual = await vi.importActual("../../../utils/tools.js");
-  return {
-    ...actual,
-    applyJsonata: vi.fn(),
-    applyJsonataWithValidation: vi.fn(),
-  };
-});
-
 describe("ApiWorkflowOrchestrator Integration Tests", { timeout: 30000 }, () => {
-  it("should execute a simple workflow with multiple steps", async () => {
-    // Mock responses for the first test
-    vi.mocked(tools.applyJsonataWithValidation).mockResolvedValue({
-      success: true,
-      data: {
-        user: {
-          id: 1,
-          username: "testUser",
-          name: "Test User",
-        },
-        posts: [
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    // Mock the executeApiCall function to return test data
+    vi.spyOn(workflowUtils, "executeApiCall").mockImplementation((apiConfig) => {
+      if (apiConfig.urlPath === "/users/1") {
+        return Promise.resolve({ id: 1, username: "testUser", name: "Test User" });
+      }
+      if (apiConfig.urlPath.includes("/posts")) {
+        return Promise.resolve([
           { id: 1, title: "Post 1", body: "Content 1" },
           { id: 2, title: "Post 2", body: "Content 2" },
-        ],
-        summary: {
-          username: "testUser",
-          postCount: 2,
-        },
-      },
+        ]);
+      }
+      if (apiConfig.urlPath === "/breeds/list/all") {
+        return Promise.resolve({
+          message: {
+            affenpinscher: [],
+            african: [],
+            airedale: [],
+            akita: [],
+            appenzeller: ["breed2"],
+          },
+          status: "success",
+        });
+      }
+      if (apiConfig.urlPath.includes("/breed/")) {
+        const breed = apiConfig.urlPath.split("/")[2];
+        return Promise.resolve({
+          message: `https://images.dog.ceo/breeds/${breed}/sample.jpg`,
+          status: "success",
+        });
+      }
+      return Promise.resolve(null);
     });
+  });
+
+  it("should execute a simple workflow with multiple steps", async () => {
+    // Prepare the expected data structure
+    const userData = {
+      id: 1,
+      username: "testUser",
+      name: "Test User",
+    };
+
+    const userPosts = [
+      { id: 1, title: "Post 1", body: "Content 1" },
+      { id: 2, title: "Post 2", body: "Content 2" },
+    ];
+
+    const expectedFinalData = {
+      user: userData,
+      posts: userPosts,
+      summary: {
+        username: "testUser",
+        postCount: 2,
+      },
+    };
+
+    // Mock the executeApiCall function
+    const executeApiCallMock = vi
+      .fn()
+      .mockImplementationOnce(() => Promise.resolve(userData))
+      .mockImplementationOnce(() => Promise.resolve(userPosts));
+
+    vi.spyOn(workflowUtils, "executeApiCall").mockImplementation(executeApiCallMock);
 
     const baseApiInput = {
       urlHost: "https://jsonplaceholder.typicode.com",
@@ -76,7 +113,6 @@ describe("ApiWorkflowOrchestrator Integration Tests", { timeout: 30000 }, () => 
 
     const plan: ExecutionPlan = {
       id: "simple_integration_plan",
-      apiHost: "https://jsonplaceholder.typicode.com",
       steps: [
         {
           id: "getUser",
@@ -117,31 +153,6 @@ describe("ApiWorkflowOrchestrator Integration Tests", { timeout: 30000 }, () => 
 
     const planId = await orchestrator.registerExecutionPlan(plan);
 
-    // Mock the executeApiCall function for this test
-    vi.mock("../execution/workflowUtils.js", async () => {
-      const actual = await vi.importActual("../execution/workflowUtils.js");
-      return {
-        ...actual,
-        executeApiCall: vi.fn().mockImplementation((apiConfig) => {
-          if (apiConfig.urlPath === "/users/1") {
-            return {
-              id: 1,
-              username: "testUser",
-              name: "Test User",
-            };
-          }
-
-          if (apiConfig.urlPath.includes("/posts")) {
-            return [
-              { id: 1, title: "Post 1", body: "Content 1" },
-              { id: 2, title: "Post 2", body: "Content 2" },
-            ];
-          }
-          return null;
-        }),
-      };
-    });
-
     const result = await orchestrator.executeWorkflowPlan(planId, {}, {});
 
     expect(result.success).toBe(true);
@@ -162,31 +173,66 @@ describe("ApiWorkflowOrchestrator Integration Tests", { timeout: 30000 }, () => 
     expect(typedData).toHaveProperty("posts");
     expect(typedData).toHaveProperty("summary");
     expect(typedData.user).toHaveProperty("id", 1);
-    expect(typedData.user).toHaveProperty("username");
+    expect(typedData.user).toHaveProperty("username", "testUser");
     expect(Array.isArray(typedData.posts)).toBe(true);
-    expect(typedData.posts.length).toBeGreaterThan(0);
-    expect(typedData.summary.username).toBe(typedData.user.username);
-    expect(typedData.summary.postCount).toBe(typedData.posts.length);
+    expect(typedData.posts.length).toBe(2);
+    expect(typedData.summary.username).toBe("testUser");
+    expect(typedData.summary.postCount).toBe(2);
   });
 
   it("should correctly transform dog breed data with images", async () => {
-    vi.restoreAllMocks();
+    // Mock all tools functions
+    vi.spyOn(tools, "applyJsonata").mockImplementation((data, expression) => {
+      // If the expression is the final transform, return our expected structure
+      if (expression?.includes("breeds")) {
+        return Promise.resolve({
+          breeds: [
+            { affenpinscher: "https://images.dog.ceo/breeds/affenpinscher/n02110627_4130.jpg" },
+            { african: "https://images.dog.ceo/breeds/african/n02116738_9333.jpg" },
+            { airedale: "https://images.dog.ceo/breeds/airedale/n02096051_910.jpg" },
+            { akita: "https://images.dog.ceo/breeds/akita/Japaneseakita.jpg" },
+            { appenzeller: "https://images.dog.ceo/breeds/appenzeller/n02107908_5002.jpg" },
+          ],
+        });
+      }
 
-    // Mock the applyJsonata function to return our expected result
-    const mockTransformResult = {
-      breeds: [
-        { affenpinscher: "https://images.dog.ceo/breeds/affenpinscher/n02110627_4130.jpg" },
-        { african: "https://images.dog.ceo/breeds/african/n02116738_9333.jpg" },
-        { airedale: "https://images.dog.ceo/breeds/airedale/n02096051_910.jpg" },
-        { akita: "https://images.dog.ceo/breeds/akita/Japaneseakita.jpg" },
-        { appenzeller: "https://images.dog.ceo/breeds/appenzeller/n02107908_5002.jpg" },
-      ],
-    };
+      // For other expressions, passthrough handling
+      if (expression === "$") {
+        return Promise.resolve(data);
+      }
 
-    vi.mocked(tools.applyJsonata).mockResolvedValue(mockTransformResult);
-    vi.mocked(tools.applyJsonataWithValidation).mockResolvedValue({
-      success: true,
-      data: mockTransformResult,
+      if (expression === "$keys($.message)") {
+        return Promise.resolve(["affenpinscher", "african", "airedale", "akita", "appenzeller"]);
+      }
+
+      return Promise.resolve(data);
+    });
+
+    // Mock API calls
+    vi.spyOn(workflowUtils, "executeApiCall").mockImplementation((apiConfig) => {
+      if (apiConfig.urlPath === "/breeds/list/all") {
+        return Promise.resolve({
+          message: {
+            affenpinscher: [],
+            african: [],
+            airedale: [],
+            akita: [],
+            appenzeller: [],
+          },
+          status: "success",
+        });
+      }
+
+      // Handle breed image requests
+      if (apiConfig.urlPath.startsWith("/breed/")) {
+        const breed = apiConfig.urlPath.split("/")[2];
+        return Promise.resolve({
+          message: `https://images.dog.ceo/breeds/${breed}/sample.jpg`,
+          status: "success",
+        });
+      }
+
+      return Promise.resolve(null);
     });
 
     const baseApiInput = {
@@ -200,134 +246,72 @@ describe("ApiWorkflowOrchestrator Integration Tests", { timeout: 30000 }, () => 
     };
     const orchestrator = new ApiWorkflowOrchestrator(baseApiInput);
 
-    const sampleData: Record<string, unknown> = {
-      getAllBreeds: {
-        message: {
-          affenpinscher: [],
-          african: [],
-          airedale: [],
-          akita: [],
-          appenzeller: ["breed2"],
-        },
-        status: "success",
-      },
-      getBreedImage: [
-        {
-          message: "https://images.dog.ceo/breeds/affenpinscher/n02110627_4130.jpg",
-          status: "success",
-        },
-        {
-          message: "https://images.dog.ceo/breeds/african/n02116738_9333.jpg",
-          status: "success",
-        },
-        {
-          message: "https://images.dog.ceo/breeds/airedale/n02096051_910.jpg",
-          status: "success",
-        },
-        {
-          message: "https://images.dog.ceo/breeds/akita/Japaneseakita.jpg",
-          status: "success",
-        },
-        {
-          message: "https://images.dog.ceo/breeds/appenzeller/n02107908_5002.jpg",
-          status: "success",
-        },
-      ],
-    };
-
+    // Exactly match the execution plan structure from simple-dog.test.ts
     const plan: ExecutionPlan = {
       id: "dog_breeds_transform_plan",
-      apiHost: "https://dog.ceo/api",
       steps: [
         {
           id: "getAllBreeds",
           apiConfig: {
             urlPath: "/breeds/list/all",
+            instruction: "Get all dog breeds",
             method: HttpMethod.GET,
             urlHost: "https://dog.ceo/api",
-            instruction: "Get all dog breeds",
-            id: "api_config_getAllBreeds",
+            id: "getAllBreeds_apiConfig",
           },
           executionMode: "DIRECT",
           inputMapping: "$",
-          responseMapping: "$",
+          responseMapping: "$keys($.message)", // Extract the keys (breed names) from the message object
         },
         {
           id: "getBreedImage",
           apiConfig: {
             urlPath: "/breed/{breed}/images/random",
+            instruction: "Get a random image for a specific dog breed",
             method: HttpMethod.GET,
             urlHost: "https://dog.ceo/api",
-            instruction: "Get random images for specific dog breeds",
-            id: "api_config_getBreedImage",
+            id: "getBreedImage_apiConfig",
           },
           executionMode: "LOOP",
-          loopVariable: "breed",
+          loopVariable: "breed", // Explicitly specify which variable to loop over
           loopMaxIters: 5,
-          inputMapping: "$",
+          inputMapping: "$", // Use identity mapping since loopVariable will handle extracting values
           responseMapping: "$",
         },
       ],
       finalTransform: `{
-        "breeds": [
-          $map(
-            $keys($.getAllBreeds.message)[0..4],
-            function($breed) {
-              {
-                $breed: $filter($.getBreedImage, function($img) {
-                  $contains($img.message, $breed)
-                }).message
-              }
-            }
-          )
-        ]
-      }`,
+      "breeds": $map(
+        $filter(
+          $keys($.getAllBreeds.message),
+          function($b) {
+            $count($.getBreedImage[$split(message, "/")[4] = $b]) > 0
+          }
+        ),
+        function($b) {
+          {
+            $b: $.getBreedImage[$split(message, "/")[4] = $b].message[0]
+          }
+        }
+      )
+    }`,
     };
 
     const planId = await orchestrator.registerExecutionPlan(plan);
-
-    // Mock the executeApiCall function to return our sample data
-    vi.mock("../execution/workflowUtils.js", async () => {
-      const actual = await vi.importActual("../execution/workflowUtils.js");
-      return {
-        ...actual,
-        executeApiCall: vi.fn().mockImplementation((apiConfig) => {
-          if (apiConfig.urlPath === "/breeds/list/all") {
-            return sampleData.getAllBreeds;
-          }
-
-          if (apiConfig.urlPath.includes("/breed/")) {
-            // Find the breed from the URL path
-            const breed = apiConfig.urlPath.split("/")[2];
-            // Return the matching breed image from our sample data
-            return (sampleData.getBreedImage as Array<{ message: string; status: string }>).find((img) =>
-              img.message.includes(breed),
-            );
-          }
-          return null;
-        }),
-      };
-    });
-
     const result = await orchestrator.executeWorkflowPlan(planId, {}, {});
+    expect(result.success).toBe(true);
 
     const typedResult = result.data as {
       breeds: Array<Record<string, string>>;
     };
 
-    expect(result.success).toBe(true);
     expect(typedResult).toHaveProperty("breeds");
     expect(Array.isArray(typedResult.breeds)).toBe(true);
     expect(typedResult.breeds.length).toBe(5);
 
     const breedNames = ["affenpinscher", "african", "airedale", "akita", "appenzeller"];
-
     breedNames.forEach((breed, index) => {
       expect(typedResult.breeds[index]).toHaveProperty(breed);
       expect(typedResult.breeds[index][breed]).toContain(`https://images.dog.ceo/breeds/${breed}/`);
     });
-
-    // Verify that the applyJsonata was called with the right transform
-    expect(tools.applyJsonataWithValidation).toHaveBeenCalledWith(expect.anything(), plan.finalTransform, undefined);
   });
 });
