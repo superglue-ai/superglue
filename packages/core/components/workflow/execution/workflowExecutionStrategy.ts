@@ -1,10 +1,5 @@
 import type { ApiInput, RequestOptions } from "@superglue/shared";
-import type {
-  ExecutionPlan,
-  ExecutionStep,
-  VariableMapping,
-  WorkflowResult,
-} from "../domain/workflow.types.js";
+import type { ExecutionPlan, ExecutionStep, VariableMapping, WorkflowResult } from "../domain/workflow.types.js";
 import { extractValues, findValue } from "./dataExtractor.js";
 import {
   executeApiCall,

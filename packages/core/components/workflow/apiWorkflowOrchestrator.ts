@@ -5,10 +5,9 @@ import { applyJsonata } from "../../utils/tools.js";
 
 import type { ExecutionPlan, ExecutionPlanId, ExecutionStep, WorkflowResult } from "./domain/workflow.types.js";
 import type { WorkflowOrchestrator } from "./domain/workflowOrchestrator.js";
-import { executeApiCall } from "./execution/workflowUtils.js";
 
 import { executeWorkflowStep } from "./execution/workflowExecutionStrategy.js";
-import { extractTemplateVariables, processStepResult, storeStepResult } from "./execution/workflowUtils.js";
+import { extractTemplateVariables, storeStepResult } from "./execution/workflowUtils.js";
 
 export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
   private apiDocumentation: string;
@@ -105,42 +104,23 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
       for (const step of executionPlan.steps) {
         console.log("Step: ", step);
         try {
-          // Prepare input for this step using mapping in the step
-          const stepInput = await this.prepareStepInput(step, result, payload);
-
-          // Try to process this step as a templated step
-          const isTemplatedStep = await this.processTemplatedStep(
+          const stepInputPayload = await this.prepareStepInput(step, result, payload);
+          const success = await executeWorkflowStep(
             step,
             executionPlan,
             result,
-            payload,
+            this.apiDocumentation,
+            stepInputPayload,
             credentials,
+            this.baseApiInput,
             options,
           );
-          if (isTemplatedStep) {
-            continue;
+
+          if (success) {
+            console.log(`Result Step '${step.id}' - Complete`);
+          } else {
+            console.log(`Result Step '${step.id}' - Failed`);
           }
-
-          // Standard execution path for steps without template variables or with DIRECT mode
-          const apiConfig = {
-            ...step.apiConfig,
-            headers: {
-              ...(this.baseApiInput?.headers || {}),
-              ...(step.apiConfig.headers || {}),
-            },
-          };
-
-          const apiResponse = await executeApiCall(apiConfig, stepInput, credentials, options);
-          console.log("API Response: ", apiResponse);
-
-          // Process the result using response mapping from step
-          let processedResult = apiResponse;
-          if (step.responseMapping) {
-            processedResult = await processStepResult(step.id, apiResponse, step);
-          }
-
-          // Store the step result
-          storeStepResult(step.id, result, apiResponse, processedResult, true);
         } catch (stepError) {
           console.error(`Error executing step ${step.id}:`, stepError);
 
@@ -188,46 +168,6 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
         startedAt: new Date(),
         completedAt: new Date(),
       };
-    }
-  }
-
-  private async processTemplatedStep(
-    step: ExecutionStep,
-    executionPlan: ExecutionPlan,
-    result: WorkflowResult,
-    payload: Record<string, unknown>,
-    credentials: Record<string, unknown>,
-    options?: RequestOptions,
-  ): Promise<boolean> {
-    const templateVars = this.extractTemplateVariables(step.apiConfig.urlPath || "");
-    if (templateVars.length === 0) {
-      return false;
-    }
-
-    console.log(
-      `[Step ${step.id}] Processing templated step with ${templateVars.length} variables: ${templateVars.join(", ")}`,
-    );
-
-    try {
-      return await executeWorkflowStep(
-        step,
-        executionPlan,
-        result,
-        this.apiDocumentation,
-        payload,
-        credentials,
-        this.baseApiInput,
-        options,
-      );
-    } catch (error) {
-      console.error(`[Step ${step.id}] Execution failed: ${String(error)}`);
-
-      result.stepResults[step.id] = {
-        stepId: step.id,
-        success: false,
-        error: String(error),
-      };
-      return false;
     }
   }
 
@@ -290,7 +230,7 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
       }
 
       // Detect template variables if present
-      const templateVars = this.extractTemplateVariables(step.apiConfig.urlPath || "");
+      const templateVars = extractTemplateVariables(step.apiConfig.urlPath || "");
       if (templateVars.length > 0) {
         const autoVars: Record<string, unknown> = {};
 
@@ -337,9 +277,5 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
       console.error(`[Step ${step.id}] Error preparing input:`, error);
       return { ...originalPayload };
     }
-  }
-
-  private extractTemplateVariables(text: string): string[] {
-    return extractTemplateVariables(text);
   }
 }
