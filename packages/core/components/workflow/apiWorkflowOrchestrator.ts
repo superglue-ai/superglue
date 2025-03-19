@@ -3,14 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 import { getDocumentation } from "../../utils/documentation.js";
 import { applyJsonata } from "../../utils/tools.js";
 
-import type {
-  ExecutionPlan,
-  ExecutionPlanId,
-  ExecutionStep,
-  StepAnalysis,
-  VariableMapping,
-  WorkflowResult,
-} from "./domain/workflow.types.js";
+import type { ExecutionPlan, ExecutionPlanId, ExecutionStep, WorkflowResult } from "./domain/workflow.types.js";
 import type { WorkflowOrchestrator } from "./domain/workflowOrchestrator.js";
 import { executeApiCall } from "./execution/workflowUtils.js";
 
@@ -216,15 +209,6 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
     );
 
     try {
-      // Analyze variables to build mapping information
-      const variableMappings = await this.analyzeVariableMappings(step, result, payload);
-
-      // Create the step analysis
-      const stepAnalysis: StepAnalysis = {
-        executionMode: step.executionMode,
-        variableMapping: variableMappings,
-      };
-
       return await executeWorkflowStep(
         step,
         executionPlan,
@@ -232,7 +216,6 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
         this.apiDocumentation,
         payload,
         credentials,
-        stepAnalysis,
         this.baseApiInput,
         options,
       );
@@ -358,67 +341,5 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
 
   private extractTemplateVariables(text: string): string[] {
     return extractTemplateVariables(text);
-  }
-
-  private async analyzeVariableMappings(
-    step: ExecutionStep,
-    currentResult: WorkflowResult,
-    originalPayload: Record<string, unknown>,
-  ): Promise<Record<string, VariableMapping>> {
-    const templateVars = this.extractTemplateVariables(step.apiConfig.urlPath || "");
-    if (templateVars.length === 0) {
-      return {};
-    }
-
-    const mappings: Record<string, VariableMapping> = {};
-    const previousStepIds = Object.keys(currentResult.stepResults);
-
-    // If we have an explicitly configured loop variable, prioritize that
-    if (step.loopVariable && step.executionMode === "LOOP") {
-      // Always assume the loop variable needs to come from a previous step in a LOOP
-      if (previousStepIds.length > 0) {
-        const targetStepId = previousStepIds[0];
-        // Create the mapping for the loop variable - this needs to be an array
-        mappings[step.loopVariable] = {
-          source: targetStepId,
-          path: step.loopVariable,
-          isArray: true,
-        };
-
-        console.log(`Loop variable ${step.loopVariable} mapped to source step ${targetStepId}`);
-      } else {
-        // Fallback to payload if no previous steps
-        mappings[step.loopVariable] = {
-          source: "payload",
-          path: step.loopVariable,
-          isArray: true,
-        };
-      }
-    }
-
-    // Process all template variables, including the loop variable if not already set
-    for (const varName of templateVars) {
-      // Skip if already processed as loop variable
-      if (varName in mappings) {
-        continue;
-      }
-
-      // By default, we look in previous steps first
-      if (previousStepIds.length > 0) {
-        mappings[varName] = {
-          source: previousStepIds[0], // Use first step as default source
-          path: varName,
-          isArray: false,
-        };
-      } else {
-        // Fallback to payload if no previous steps
-        mappings[varName] = {
-          source: "payload",
-          path: varName,
-          isArray: false,
-        };
-      }
-    }
-    return mappings;
   }
 }

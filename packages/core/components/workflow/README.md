@@ -48,8 +48,6 @@ sequenceDiagram
         Orchestrator->>Orchestrator: prepareStepInput(inputMapping)
         
         alt Step with template variables
-            Orchestrator->>Orchestrator: analyzeVariableMappings()
-            Orchestrator->>Orchestrator: createStepAnalysis()
             Orchestrator->>Strategy: executeWorkflowStep()
         else Standard step
             Orchestrator->>Utils: executeApiCall()
@@ -107,7 +105,7 @@ graph LR
         end
         
         subgraph "Step 2: getBreedImage"
-            Step2Config[apiConfig: GET /breed/{breed}/images/random]
+            Step2Config[apiConfig: GET /breed/BREED/images/random]
             Step2Loop[executionMode: LOOP<br>loopVariable: breed<br>loopMaxIters: 5]
         end
         
@@ -123,7 +121,7 @@ graph LR
     Step1Mapping --> |Extracted breed names| Data1[Transformed Data]
     
     Data1 --> |Loop through breeds| Step2Loop
-    Step2Loop --> |For each breed| DogAPI2[Dog API: /breed/{breed}/images/random]
+    Step2Loop --> |For each breed| DogAPI2[Dog API: /breed/BREED/images/random]
     DogAPI2 --> |Random Images| Data2[Image URLs]
     
     Data1 --> |Step Results| TransformInput[Input to Transform]
@@ -155,15 +153,14 @@ flowchart TD
     F2 --> |Store Result| F3[Step Result Storage]
     
     F3 --> G[Execute getBreedImage Step in LOOP mode]
-    G --> |Analyze Loop Variable| G1[Find 'breed' variable]
     G1 --> |Extract values from previous step| G2[Get breed names]
     G2 --> |Apply loopMaxIters=5| G3[Limit to 5 breeds]
     
-    G3 --> |breed1| H1[Dog API: GET /breed/{breed}/images/random]
-    G3 --> |breed2| H2[Dog API: GET /breed/{breed}/images/random]
-    G3 --> |breed3| H3[Dog API: GET /breed/{breed}/images/random]
-    G3 --> |breed4| H4[Dog API: GET /breed/{breed}/images/random]
-    G3 --> |breed5| H5[Dog API: GET /breed/{breed}/images/random]
+    G3 --> |breed1| H1[Dog API: GET /breed/BREED/images/random]
+    G3 --> |breed2| H2[Dog API: GET /breed/BREED/images/random]
+    G3 --> |breed3| H3[Dog API: GET /breed/BREED/images/random]
+    G3 --> |breed4| H4[Dog API: GET /breed/BREED/images/random]
+    G3 --> |breed5| H5[Dog API: GET /breed/BREED/images/random]
     
     H1 --> |API Response| I1[Process Response 1]
     H2 --> |API Response| I2[Process Response 2]

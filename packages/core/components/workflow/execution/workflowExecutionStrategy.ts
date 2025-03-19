@@ -2,7 +2,6 @@ import type { ApiInput, RequestOptions } from "@superglue/shared";
 import type {
   ExecutionPlan,
   ExecutionStep,
-  StepAnalysis,
   VariableMapping,
   WorkflowResult,
 } from "../domain/workflow.types.js";
@@ -20,7 +19,6 @@ export interface ExecutionContext {
   executionPlan: ExecutionPlan;
   result: WorkflowResult;
   apiDocumentation: string;
-  stepAnalysis?: StepAnalysis;
   baseApiInput?: ApiInput;
 }
 
@@ -55,7 +53,6 @@ export async function executeWorkflowStep(
   apiDocumentation: string,
   payload: Record<string, unknown>,
   credentials: Record<string, unknown>,
-  stepAnalysis?: StepAnalysis,
   baseApiInput?: ApiInput,
   options?: RequestOptions,
 ): Promise<boolean> {
@@ -64,7 +61,6 @@ export async function executeWorkflowStep(
     executionPlan,
     result,
     apiDocumentation,
-    stepAnalysis,
     baseApiInput,
   };
 
@@ -75,16 +71,11 @@ export async function executeWorkflowStep(
 // ======= Helper functions =======
 
 function findLoopVariable(ctx: ExecutionContext): [string, VariableMapping | undefined] {
-  const { step, stepAnalysis, result } = ctx;
+  const { step, result } = ctx;
 
-  // If the step has a loopVariable defined, use it first
+  // Require explicit loopVariable for loop steps
   if (step.loopVariable) {
     console.log(`Using explicitly configured loop variable: ${step.loopVariable}`);
-
-    // Find this variable in the mappings
-    if (stepAnalysis?.variableMapping?.[step.loopVariable]) {
-      return [step.loopVariable, stepAnalysis.variableMapping[step.loopVariable]];
-    }
 
     // Create a default mapping using a previous step as source
     const previousStepIds = Object.keys(result.stepResults);
@@ -96,15 +87,6 @@ function findLoopVariable(ctx: ExecutionContext): [string, VariableMapping | und
         isArray: true,
       };
       return [step.loopVariable, defaultMapping];
-    }
-  }
-
-  // Otherwise, find first array variable in mappings
-  if (stepAnalysis?.variableMapping) {
-    for (const [varName, mapping] of Object.entries(stepAnalysis.variableMapping)) {
-      if (mapping.isArray) {
-        return [varName, mapping];
-      }
     }
   }
 
@@ -280,9 +262,9 @@ const loopStrategy: ExecutionStrategy = {
     try {
       const { step, executionPlan, result, apiDocumentation, baseApiInput } = ctx;
 
-      // Verify step analysis exists
-      if (!ctx.stepAnalysis) {
-        throw new Error("Step analysis is required for LOOP execution mode");
+      // LOOP mode requires an explicit loopVariable
+      if (!step.loopVariable) {
+        throw new Error("loopVariable is required for LOOP execution mode");
       }
 
       const [loopVarName, loopMapping] = findLoopVariable(ctx);

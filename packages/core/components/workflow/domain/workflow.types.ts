@@ -11,11 +11,6 @@ export interface VariableMapping {
   selectedValues?: string[];
 }
 
-export interface StepAnalysis {
-  executionMode: ExecutionMode;
-  variableMapping: Record<string, VariableMapping>;
-}
-
 export interface ExecutionStep {
   id: string;
   apiConfig: ApiConfig;
