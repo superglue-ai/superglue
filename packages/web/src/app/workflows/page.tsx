@@ -26,12 +26,14 @@ export default function WorkflowsPage() {
             instruction: "Get all dog breeds",
             id: "getAllBreeds_config",
             urlHost: "https://dog.ceo/api",
-            method: "GET"
+            method: "GET",
           },
           executionMode: "DIRECT",
           outputIsArray: true,
           responseField: "message",
           objectKeysAsArray: true,
+          inputMapping: "$",
+          responseMapping: "$",
         },
         {
           id: "getBreedImage",
@@ -40,11 +42,13 @@ export default function WorkflowsPage() {
             instruction: "Get a random image for a specific dog breed",
             id: "getBreedImage_config",
             urlHost: "https://dog.ceo/api",
-            method: "GET"
+            method: "GET",
           },
           executionMode: "LOOP",
           loopVariable: "breed",
           loopMaxIters: 5,
+          inputMapping: "$",
+          responseMapping: "$",
         },
       ],
       null,
@@ -54,7 +58,7 @@ export default function WorkflowsPage() {
   const [finalTransform, setFinalTransform] = useState(`{
   "breeds": $map(
     $filter(
-      $keys($.getAllBreeds),
+      $keys($.getAllBreeds.message),
       function($b) {
         $count($.getBreedImage[$split(message, "/")[4] = $b]) > 0
       }
@@ -159,6 +163,8 @@ export default function WorkflowsPage() {
                     arrayPath
                     objectKeysAsArray
                     responseField
+                    inputMapping
+                    responseMapping
                   }
                   finalTransform
                 }
@@ -244,17 +250,25 @@ export default function WorkflowsPage() {
         setWorkflowName("New Workflow");
         setApiHost("https://dog.ceo/api");
         setStepsText(
-          JSON.stringify([{ 
-            id: "step1", 
-            apiConfig: {
-              urlPath: "/",
-              instruction: "First step",
-              id: "step1_config",
-              urlHost: "https://dog.ceo/api",
-              method: "GET"
-            },
-            executionMode: "DIRECT" 
-          }], null, 2),
+          JSON.stringify(
+            [
+              {
+                id: "step1",
+                apiConfig: {
+                  urlPath: "/",
+                  instruction: "First step",
+                  id: "step1_config",
+                  urlHost: "https://dog.ceo/api",
+                  method: "GET",
+                },
+                executionMode: "DIRECT",
+                inputMapping: "$",
+                responseMapping: "$",
+              },
+            ],
+            null,
+            2,
+          ),
         );
         setFinalTransform("");
 

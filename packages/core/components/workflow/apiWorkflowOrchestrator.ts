@@ -9,8 +9,6 @@ import type {
   ExecutionPlanId,
   ExecutionStep,
   StepAnalysis,
-  StepMapping,
-  StepMappings,
   VariableMapping,
   WorkflowResult,
 } from "./domain/workflow.types.js";
@@ -23,13 +21,11 @@ import { extractTemplateVariables, processStepResult, storeStepResult } from "./
 export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
   private apiDocumentation: string;
   private executionPlans: Record<string, ExecutionPlan>;
-  private stepMappings: Record<string, StepMappings>;
   private baseApiInput: ApiInput;
 
   constructor(baseApiInput: ApiInput) {
     this.apiDocumentation = "";
     this.executionPlans = {};
-    this.stepMappings = {};
     this.baseApiInput = baseApiInput;
   }
 
@@ -91,14 +87,6 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
     }
   }
 
-  public async setStepMapping(planId: ExecutionPlanId, stepId: string, mapping: StepMapping): Promise<void> {
-    if (!this.stepMappings[planId]) {
-      this.stepMappings[planId] = {};
-    }
-
-    this.stepMappings[planId][stepId] = mapping;
-  }
-
   public async executeWorkflowPlan(
     planId: ExecutionPlanId,
     payload: Record<string, unknown>,
@@ -126,14 +114,12 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
       for (const step of executionPlan.steps) {
         console.log("Step: ", step);
         try {
-          // Prepare input for this step using mappings if available
-          const stepMapping = this.stepMappings[planId]?.[step.id];
-          const stepInput = await this.prepareStepInput(step, stepMapping, result, payload);
+          // Prepare input for this step using mapping in the step
+          const stepInput = await this.prepareStepInput(step, result, payload);
 
           // Try to process this step as a templated step
           const isTemplatedStep = await this.processTemplatedStep(
             step,
-            stepMapping,
             executionPlan,
             result,
             payload,
@@ -156,10 +142,10 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
           const apiResponse = await executeApiCall(apiConfig, stepInput, credentials, options);
           console.log("API Response: ", apiResponse);
 
-          // Process the result using response mapping
+          // Process the result using response mapping from step
           let processedResult = apiResponse;
-          if (stepMapping?.responseMapping) {
-            processedResult = await processStepResult(step.id, apiResponse, stepMapping);
+          if (step.responseMapping) {
+            processedResult = await processStepResult(step.id, apiResponse, step);
           }
 
           // Store the step result
@@ -213,14 +199,12 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
 
   private async processTemplatedStep(
     step: ExecutionStep,
-    stepMapping: StepMapping | undefined,
     executionPlan: ExecutionPlan,
     result: WorkflowResult,
     payload: Record<string, unknown>,
     credentials: Record<string, unknown>,
     options?: RequestOptions,
   ): Promise<boolean> {
-    // Check if this step has template variables
     const templateVars = this.extractTemplateVariables(step.apiConfig.urlPath || "");
     if (templateVars.length === 0) {
       return false;
@@ -242,7 +226,6 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
 
       return await executeWorkflowStep(
         step,
-        stepMapping,
         executionPlan,
         result,
         this.apiDocumentation,
@@ -285,7 +268,6 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
       if (!step.apiConfig) {
         throw new Error("Each step must have an API config");
       }
-      
       // TODO: should also work without one in the end (e.g. root path for API call)
       if (!step.apiConfig.urlPath) {
         throw new Error("Each step's API config must have a URL path");
@@ -295,13 +277,12 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
 
   private async prepareStepInput(
     step: ExecutionStep,
-    mapping: StepMapping | undefined,
     currentResult: WorkflowResult,
     originalPayload: Record<string, unknown>,
   ): Promise<Record<string, unknown>> {
     try {
       // if explicit mapping exists, use it first
-      if (mapping?.inputMapping && mapping.inputMapping !== "$") {
+      if (step.inputMapping && step.inputMapping !== "$") {
         console.log(`[Step ${step.id}] Using explicit input mapping`);
 
         // Prepare context for JSONata expression
@@ -321,7 +302,7 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
         };
 
         try {
-          const result = await applyJsonataWithValidation(mappingContext, mapping.inputMapping, undefined);
+          const result = await applyJsonataWithValidation(mappingContext, step.inputMapping!, undefined);
           if (result.success) {
             return result.data as Record<string, unknown>;
           }
@@ -331,7 +312,7 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
       }
 
       // Detect template variables if present
-      const templateVars = this.extractTemplateVariables(step.endpoint || "");
+      const templateVars = this.extractTemplateVariables(step.apiConfig.urlPath || "");
       if (templateVars.length > 0) {
         const autoVars: Record<string, unknown> = {};
 
@@ -445,5 +426,4 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
     }
     return mappings;
   }
-
 }

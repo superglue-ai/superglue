@@ -3,7 +3,6 @@ import type {
   ExecutionPlan,
   ExecutionStep,
   StepAnalysis,
-  StepMapping,
   VariableMapping,
   WorkflowResult,
 } from "../domain/workflow.types.js";
@@ -18,7 +17,6 @@ import {
 
 export interface ExecutionContext {
   step: ExecutionStep;
-  stepMapping?: StepMapping;
   executionPlan: ExecutionPlan;
   result: WorkflowResult;
   apiDocumentation: string;
@@ -52,7 +50,6 @@ export function getStrategy(mode: string): ExecutionStrategy {
 
 export async function executeWorkflowStep(
   step: ExecutionStep,
-  stepMapping: StepMapping | undefined,
   executionPlan: ExecutionPlan,
   result: WorkflowResult,
   apiDocumentation: string,
@@ -62,10 +59,8 @@ export async function executeWorkflowStep(
   baseApiInput?: ApiInput,
   options?: RequestOptions,
 ): Promise<boolean> {
-  // Create execution context
   const ctx: ExecutionContext = {
     step,
-    stepMapping,
     executionPlan,
     result,
     apiDocumentation,
@@ -220,7 +215,6 @@ async function getLoopValues(
     }
   }
 
-  // Fallback strategies
   // Try using data extractor with the provided path
   try {
     const values = extractValues(sourceResult as Record<string, unknown>, mapping.path);
@@ -288,7 +282,7 @@ const directStrategy: ExecutionStrategy = {
     options?: RequestOptions,
   ): Promise<boolean> {
     try {
-      const { step, stepMapping, executionPlan, result, apiDocumentation, baseApiInput } = ctx;
+      const { step, executionPlan, result, apiDocumentation, baseApiInput } = ctx;
       const apiConfig = await prepareApiConfig(step, executionPlan, apiDocumentation, baseApiInput);
       const templateVars = extractTemplateVariables(apiConfig.urlPath || "");
       const enhancedPayload = { ...payload };
@@ -312,7 +306,7 @@ const directStrategy: ExecutionStrategy = {
       }
 
       const apiResponse = await executeApiCall(apiConfig, enhancedPayload, credentials, options);
-      const processedResult = await processStepResult(step.id, apiResponse, stepMapping);
+      const processedResult = await processStepResult(step.id, apiResponse, step);
       storeStepResult(step.id, result, apiResponse, processedResult, true);
 
       return true;
@@ -333,7 +327,7 @@ const loopStrategy: ExecutionStrategy = {
     options?: RequestOptions,
   ): Promise<boolean> {
     try {
-      const { step, stepMapping, executionPlan, result, apiDocumentation, baseApiInput } = ctx;
+      const { step, executionPlan, result, apiDocumentation, baseApiInput } = ctx;
 
       // Verify step analysis exists
       if (!ctx.stepAnalysis) {
@@ -392,7 +386,7 @@ const loopStrategy: ExecutionStrategy = {
         // };
         try {
           const apiResponse = await executeApiCall(apiConfig, loopPayload, credentials, options);
-          const processedResult = await processStepResult(step.id, apiResponse, stepMapping);
+          const processedResult = await processStepResult(step.id, apiResponse, step);
           results.push({ raw: apiResponse, processed: processedResult });
         } catch (callError) {
           console.error(`[LOOP] Error processing value '${loopValue}': ${String(callError)}`);

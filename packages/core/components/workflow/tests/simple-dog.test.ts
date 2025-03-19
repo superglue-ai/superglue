@@ -37,21 +37,23 @@ describe("ApiWorkflowOrchestrator-dog", { timeout: 600000 }, () => {
           id: "getAllBreeds",
           apiConfig: {
             urlPath: "/breeds/list/all",
-            instruction: "Get all dog breeds",  // UNUSED currently
+            instruction: "Get all dog breeds", // UNUSED, just for later
             method: HttpMethod.GET,
             urlHost: dogApiHost,
             id: "getAllBreeds_apiConfig",
           },
           executionMode: "DIRECT",
           outputIsArray: true,
-          responseField: "message",  // The Dog API wraps response in a message field
-          objectKeysAsArray: true,  // We want to use the keys of the message object as breeds
+          responseField: "message", // The Dog API wraps response in a message field
+          objectKeysAsArray: true, // We want to use the keys of the message object as breeds
+          inputMapping: "$",
+          responseMapping: "$",
         },
         {
           id: "getBreedImage",
           apiConfig: {
             urlPath: "/breed/{breed}/images/random",
-            instruction: "Get a random image for a specific dog breed", // UNUSED currently
+            instruction: "Get a random image for a specific dog breed", // UNUSED, just for later
             method: HttpMethod.GET,
             urlHost: dogApiHost,
             id: "getBreedImage_apiConfig",
@@ -59,6 +61,8 @@ describe("ApiWorkflowOrchestrator-dog", { timeout: 600000 }, () => {
           executionMode: "LOOP",
           loopVariable: "breed", // Explicitly specify which variable to loop over
           loopMaxIters: 5,
+          inputMapping: "$", // Use identity mapping since loopVariable will handle extracting values
+          responseMapping: "$",
         },
       ],
       finalTransform: `{
@@ -80,16 +84,6 @@ describe("ApiWorkflowOrchestrator-dog", { timeout: 600000 }, () => {
 
     console.log("\n[DOG] Registering execution plan");
     const planId = await orchestrator.registerExecutionPlan(manualExecutionPlan);
-
-    await orchestrator.setStepMapping(planId, "getAllBreeds", {
-      inputMapping: "$",
-      responseMapping: "$",
-    });
-
-    await orchestrator.setStepMapping(planId, "getBreedImage", {
-      inputMapping: "$", // Use identity mapping since loopVariable will handle extracting values
-      responseMapping: "$",
-    });
 
     const payload = {};
     const credentials = {};

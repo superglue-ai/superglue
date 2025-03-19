@@ -24,6 +24,9 @@ export interface ExecutionStep {
   loopVariable?: string;
   loopMaxIters?: number;
 
+  inputMapping?: string;
+  responseMapping?: string;
+
   // Output extraction configurations
   arrayPath?: string; // JSONPath-like path to array data (e.g., "message.items")
   objectKeysAsArray?: boolean; // Use object keys as array values
@@ -37,14 +40,7 @@ export interface ExecutionPlan {
   finalTransform?: string;
 }
 
-export interface StepMapping {
-  inputMapping: string;
-  responseMapping: string;
-}
-
-export interface StepMappings {
-  [stepId: string]: StepMapping;
-}
+// StepMapping and StepMappings are removed as mappings are now part of ExecutionStep
 
 export interface WorkflowStepResult {
   stepId: string;

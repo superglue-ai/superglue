@@ -148,7 +148,7 @@ describe("ApiWorkflowOrchestrator", () => {
       "https://jsonplaceholder.typicode.com",
     );
 
-    // Define a simple execution plan
+    // Define a simple execution plan with mappings directly in the steps
     const plan: ExecutionPlan = {
       id: "test_plan",
       apiHost: "https://jsonplaceholder.typicode.com",
@@ -163,6 +163,8 @@ describe("ApiWorkflowOrchestrator", () => {
             id: "api_config_getUserData",
           },
           executionMode: "DIRECT",
+          inputMapping: "$",
+          responseMapping: "$",
         },
       ],
       finalTransform: "$",
@@ -171,12 +173,6 @@ describe("ApiWorkflowOrchestrator", () => {
     // Register the plan
     const planId = await orchestrator.registerExecutionPlan(plan);
     expect(planId).toBe("test_plan");
-
-    // Define input/output mappings for steps
-    await orchestrator.setStepMapping(planId, "getUserData", {
-      inputMapping: "$",
-      responseMapping: "$",
-    });
 
     // Execute the workflow plan
     const result = await orchestrator.executeWorkflowPlan(planId, { query: "test" }, { apiKey: "fake-key" });
@@ -221,6 +217,8 @@ describe("ApiWorkflowOrchestrator", () => {
             id: "api_config_getData",
           },
           executionMode: "DIRECT",
+          inputMapping: "$",
+          responseMapping: "$",
         },
       ],
       finalTransform: "$",
@@ -228,12 +226,6 @@ describe("ApiWorkflowOrchestrator", () => {
 
     // Register the plan
     const planId = await orchestrator.registerExecutionPlan(plan);
-
-    // Set up step mapping
-    await orchestrator.setStepMapping(planId, "getData", {
-      inputMapping: "$",
-      responseMapping: "$",
-    });
 
     // Execute the workflow plan directly
     const result = await orchestrator.executeWorkflowPlan(planId, { test: true }, { apiKey: "test-key" });
@@ -279,6 +271,8 @@ describe("ApiWorkflowOrchestrator", () => {
             id: "api_config_userData",
           },
           executionMode: "DIRECT",
+          inputMapping: "$",
+          responseMapping: "$",
         },
         {
           id: "postsByUser",
@@ -290,6 +284,10 @@ describe("ApiWorkflowOrchestrator", () => {
             id: "api_config_postsByUser",
           },
           executionMode: "DIRECT",
+          // Use the user ID from the userData step
+          inputMapping: "{ userId: payload.userId || previousSteps.userData.id }",
+          // Return only posts matching the user ID
+          responseMapping: "$",
         },
       ],
       // Join the data from both endpoints in the final result
@@ -298,20 +296,6 @@ describe("ApiWorkflowOrchestrator", () => {
 
     // Register the plan and get its ID
     const planId = await orchestrator.registerExecutionPlan(plan);
-
-    // Set up mapping for the user data step (simple pass-through)
-    await orchestrator.setStepMapping(planId, "userData", {
-      inputMapping: "$",
-      responseMapping: "$",
-    });
-
-    // Set up mapping for the posts step (filter posts by user ID)
-    await orchestrator.setStepMapping(planId, "postsByUser", {
-      // Use the user ID from the userData step
-      inputMapping: "{ userId: payload.userId || previousSteps.userData.id }",
-      // Return only posts matching the user ID
-      responseMapping: "$",
-    });
 
     // Execute the workflow
     const result = await orchestrator.executeWorkflowPlan(
@@ -349,7 +333,6 @@ describe("ApiWorkflowOrchestrator", () => {
   });
 
   it("should execute a workflow with LOOP execution mode", async () => {
-    // Create orchestrator instance with base API input
     const baseApiInput = {
       urlHost: "https://jsonplaceholder.typicode.com",
       method: HttpMethod.GET,
@@ -361,7 +344,6 @@ describe("ApiWorkflowOrchestrator", () => {
     };
     const orchestrator = new ApiWorkflowOrchestrator(baseApiInput);
 
-    // Set up API documentation
     await orchestrator.retrieveApiDocumentation(
       "https://jsonplaceholder.typicode.com",
       {},
@@ -380,48 +362,34 @@ describe("ApiWorkflowOrchestrator", () => {
             urlPath: "/users",
             method: HttpMethod.GET,
             urlHost: "https://jsonplaceholder.typicode.com",
-            instruction: "Get list of users",  // UNUSED currently
+            instruction: "Get list of users",
             id: "api_config_getUsers",
           },
           executionMode: "DIRECT",
+          inputMapping: "$",
+          responseMapping: "$",
         },
         {
           id: "getUserPosts",
           apiConfig: {
-            urlPath: "/posts?userId=${userId}",
+            urlPath: "/posts?userId={userId}",
             method: HttpMethod.GET,
             urlHost: "https://jsonplaceholder.typicode.com",
-            instruction: "Get posts for each user",  // UNUSED currently
+            instruction: "Get posts for each user",
             id: "api_config_getUserPosts",
           },
           executionMode: "LOOP",
+          inputMapping: "{ userId: $.getUsers.*.id }",
+          responseMapping: "$",
         },
       ],
       finalTransform: "$",
     };
 
-    // Register the plan
     const planId = await orchestrator.registerExecutionPlan(plan);
 
-    // Set up mappings
-    await orchestrator.setStepMapping(planId, "getUsers", {
-      inputMapping: "$",
-      responseMapping: "$",
-    });
+    const result = await orchestrator.executeWorkflowPlan(planId, {}, { apiKey: "test-key" });
 
-    await orchestrator.setStepMapping(planId, "getUserPosts", {
-      inputMapping: "{ userId: $.getUsers.*.id }",
-      responseMapping: "$",
-    });
-
-    // Execute the workflow
-    const result = await orchestrator.executeWorkflowPlan(
-      planId,
-      {}, // No specific input needed
-      { apiKey: "test-key" },
-    );
-
-    // Verify the result
     expect(result.success).toBe(true);
     expect(result.stepResults).toHaveProperty("getUsers");
     expect(result.stepResults).toHaveProperty("getUserPosts");

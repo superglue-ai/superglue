@@ -224,6 +224,7 @@ input TransformInputRequest @oneOf {
 }
 
 input ApiConfigInput {
+  id: ID
   urlHost: String
   urlPath: String
   instruction: String
@@ -275,6 +276,8 @@ type ExecutionStep {
   arrayPath: String
   objectKeysAsArray: Boolean
   responseField: String
+  inputMapping: String
+  responseMapping: String
 }
 
 input ExecutionStepInput {
@@ -287,6 +290,8 @@ input ExecutionStepInput {
   arrayPath: String
   objectKeysAsArray: Boolean
   responseField: String
+  inputMapping: String
+  responseMapping: String
 }
 
 type ExecutionPlan {

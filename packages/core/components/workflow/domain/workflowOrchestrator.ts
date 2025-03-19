@@ -1,5 +1,5 @@
 import type { ApiInput, RequestOptions } from "@superglue/shared";
-import type { ExecutionPlan, ExecutionPlanId, StepMapping, WorkflowResult } from "./workflow.types.js";
+import type { ExecutionPlan, ExecutionPlanId, WorkflowResult } from "./workflow.types.js";
 
 export interface WorkflowOrchestrator {
   retrieveApiDocumentation(
@@ -18,8 +18,6 @@ export interface WorkflowOrchestrator {
   getExecutionPlans(): Record<string, ExecutionPlan>;
 
   registerExecutionPlan(plan: ExecutionPlan): Promise<ExecutionPlanId>;
-
-  setStepMapping(planId: ExecutionPlanId, stepId: string, mapping: StepMapping): Promise<void>;
 
   executeWorkflowPlan(
     planId: ExecutionPlanId,

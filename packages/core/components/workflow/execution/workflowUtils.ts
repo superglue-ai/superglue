@@ -1,14 +1,14 @@
 import type { ApiConfig, ApiInput, RequestOptions } from "@superglue/shared";
 import { callEndpoint } from "../../../utils/api.js";
 import { applyJsonataWithValidation } from "../../../utils/tools.js";
-import type { ExecutionPlan, ExecutionStep, StepMapping, WorkflowResult } from "../domain/workflow.types.js";
+import type { ExecutionPlan, ExecutionStep, WorkflowResult } from "../domain/workflow.types.js";
 
 export function extractTemplateVariables(str: string): string[] {
   if (!str) return [];
   // Only match {varName} patterns that aren't within JSON quotes
   const matches = str.match(/\{(\w+)\}/g) || [];
-  return matches.map(match => match.slice(1, -1));
-};
+  return matches.map((match) => match.slice(1, -1));
+}
 
 export async function executeApiCall(
   apiConfig: ApiConfig,
@@ -28,14 +28,14 @@ export async function executeApiCall(
   }
 }
 
-export async function processStepResult(stepId: string, result: unknown, stepMapping?: StepMapping): Promise<unknown> {
+export async function processStepResult(stepId: string, result: unknown, step: ExecutionStep): Promise<unknown> {
   try {
     // If there's no mapping or it's the identity mapping, return as-is
-    if (!stepMapping?.responseMapping || stepMapping.responseMapping === "$") {
+    if (!step.responseMapping || step.responseMapping === "$") {
       return result;
     }
 
-    const transformResult = await applyJsonataWithValidation(result, stepMapping.responseMapping, undefined);
+    const transformResult = await applyJsonataWithValidation(result, step.responseMapping, undefined);
 
     if (!transformResult.success) {
       console.error(`Mapping Error: Step '${stepId}' - Failed to apply response mapping`);

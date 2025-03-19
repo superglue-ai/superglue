@@ -21,16 +21,17 @@ export const workflowResolver = async (
 
     // If we have a plan, register it first
     if (input.plan) {
+      for (const step of input.plan.steps) {
+        if (!step.inputMapping) {
+          step.inputMapping = "$";
+        }
+        if (!step.responseMapping) {
+          step.responseMapping = "$";
+        }
+      }
+
       // Register the plan to ensure it exists
       planId = await orchestrator.registerExecutionPlan(input.plan);
-
-      // Set step mappings for each step in the plan
-      for (const step of input.plan.steps) {
-        await orchestrator.setStepMapping(planId, step.id, {
-          inputMapping: "$", // Default identity mapping
-          responseMapping: "$",
-        });
-      }
     } else if (input.planId) {
       planId = input.planId;
     } else {
