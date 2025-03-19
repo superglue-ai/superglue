@@ -103,7 +103,7 @@ graph LR
     subgraph "Execution Plan"
         subgraph "Step 1: getAllBreeds"
             Step1Config[apiConfig: GET /breeds/list/all]
-            Step1Mapping[responseMapping: $keys($.message)]
+            Step1Mapping[responseMapping: keys(.message)]
         end
         
         subgraph "Step 2: getBreedImage"
@@ -151,7 +151,7 @@ flowchart TD
     B --> D[Execute getAllBreeds Step]
     D --> E[Dog API: GET /breeds/list/all]
     E --> |API Response| F1[Raw Response]
-    F1 --> |Apply responseMapping: $keys($.message)| F2[Transform Response]
+    F1 --> |Apply responseMapping: keys(.message)| F2[Transform Response]
     F2 --> |Store Result| F3[Step Result Storage]
     
     F3 --> G[Execute getBreedImage Step in LOOP mode]
