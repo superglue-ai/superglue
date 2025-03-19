@@ -285,7 +285,6 @@ type SavedWorkflow {
 
 input ExecutionPlanInput {
   id: String
-  apiHost: String!
   steps: [ExecutionStepInput!]!
   finalTransform: String
 }
