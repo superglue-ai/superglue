@@ -5,89 +5,37 @@ import type { ExecutionPlan } from "./domain/workflow.types.js";
 
 // Mock the tools module
 vi.mock("../../utils/tools.js", () => ({
-  applyJsonataWithValidation: vi.fn().mockImplementation((input, expression) => {
+  applyJsonata: vi.fn().mockImplementation((input, expression) => {
     // Special handling for our finalTransform in the joined data test
     if (expression === '{ "posts": postsByUser, "user": userData }') {
-      return {
-        success: true,
-        data: {
-          posts: [
-            { id: 1, userId: 1, title: "Post 1", body: "Post body 1" },
-            { id: 2, userId: 1, title: "Post 2", body: "Post body 2" },
-          ],
-          user: { id: 1, name: "Leanne Graham", username: "Bret", email: "Sincere@april.biz" },
-        },
-      };
-    }
-
-    // For user's posts transformation
-    if (expression === "$") {
-      if (input && typeof input === "object" && "userId" in input) {
-        return {
-          success: true,
-          data: [
-            { id: 1, userId: 1, title: "Post 1", body: "Post body 1" },
-            { id: 2, userId: 1, title: "Post 2", body: "Post body 2" },
-          ],
-        };
-      }
-    }
-
-    // Add special handling for LOOP test case
-    if (expression === "{ userId: $.getUsers.*.id }") {
-      return {
-        success: true,
-        data: {
-          userId: [1, 2, 3], // Array of user IDs for the loop execution
-        },
-      };
-    }
-
-    // Default behavior for other cases
-    return {
-      success: true,
-      data: {
-        getUserData: { id: 1, name: "Test User" },
-        getData: { id: 2, name: "Test Data" },
-        userData: { id: 1, name: "Leanne Graham", username: "Bret", email: "Sincere@april.biz" },
-        postsByUser: [
-          { id: 1, userId: 1, title: "Post 1", body: "Post body 1" },
-          { id: 2, userId: 1, title: "Post 2", body: "Post body 2" },
-        ],
-        getUsers: [
-          { id: 1, name: "User 1" },
-          { id: 2, name: "User 2" },
-          { id: 3, name: "User 3" },
-        ],
-      },
-    };
-  }),
-  applyJsonata: vi.fn().mockImplementation((input, expression) => {
-    // Default mock implementation for basic transformations
-    if (expression === "$") {
-      return input;
-    }
-
-    // For the joined data test
-    if (expression === '{ "posts": postsByUser, "user": userData }') {
-      return {
+      return Promise.resolve({
         posts: [
           { id: 1, userId: 1, title: "Post 1", body: "Post body 1" },
           { id: 2, userId: 1, title: "Post 2", body: "Post body 2" },
         ],
         user: { id: 1, name: "Leanne Graham", username: "Bret", email: "Sincere@april.biz" },
-      };
+      });
     }
 
-    // For loop case
+    // For user's posts transformation
+    if (expression === "$") {
+      if (input && typeof input === "object" && "userId" in input) {
+        return Promise.resolve([
+          { id: 1, userId: 1, title: "Post 1", body: "Post body 1" },
+          { id: 2, userId: 1, title: "Post 2", body: "Post body 2" },
+        ]);
+      }
+    }
+
+    // Add special handling for LOOP test case
     if (expression === "{ userId: $.getUsers.*.id }") {
-      return {
-        userId: [1, 2, 3],
-      };
+      return Promise.resolve({
+        userId: [1, 2, 3], // Array of user IDs for the loop execution
+      });
     }
 
-    // Generic fallback
-    return {
+    // Default behavior for other cases
+    return Promise.resolve({
       getUserData: { id: 1, name: "Test User" },
       getData: { id: 2, name: "Test Data" },
       userData: { id: 1, name: "Leanne Graham", username: "Bret", email: "Sincere@april.biz" },
@@ -100,7 +48,7 @@ vi.mock("../../utils/tools.js", () => ({
         { id: 2, name: "User 2" },
         { id: 3, name: "User 3" },
       ],
-    };
+    });
   }),
 }));
 
