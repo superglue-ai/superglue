@@ -4,12 +4,11 @@ import { getDocumentation } from "../../utils/documentation.js";
 import { applyJsonata } from "../../utils/tools.js";
 
 import type { ExecutionPlan, ExecutionPlanId, ExecutionStep, WorkflowResult } from "./domain/workflow.types.js";
-import type { WorkflowOrchestrator } from "./domain/workflowOrchestrator.js";
 
 import { executeWorkflowStep } from "./execution/workflowExecutionStrategy.js";
 import { extractTemplateVariables, storeStepResult } from "./execution/workflowUtils.js";
 
-export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
+export class ApiWorkflowOrchestrator {
   private apiDocumentation: string;
   private executionPlans: Record<string, ExecutionPlan>;
   private baseApiInput: ApiInput;
@@ -98,11 +97,11 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
         completedAt: undefined,
       };
 
-      console.log("Execution Plan: ", executionPlan);
+      console.log("Executing workflow plan: ", executionPlan);
 
       // Execute each step in order
       for (const step of executionPlan.steps) {
-        console.log("Step: ", step);
+        console.log("Executing step: ", step);
         try {
           const stepInputPayload = await this.prepareStepInput(step, result, payload);
           const success = await executeWorkflowStep(
@@ -203,8 +202,6 @@ export class ApiWorkflowOrchestrator implements WorkflowOrchestrator {
     try {
       // if explicit mapping exists, use it first
       if (step.inputMapping && step.inputMapping !== "$") {
-        console.log(`[Step ${step.id}] Using explicit input mapping`);
-
         // Prepare context for JSONata expression
         const mappingContext = {
           payload: originalPayload,

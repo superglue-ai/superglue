@@ -28,8 +28,6 @@ export interface ExecutionPlan {
   finalTransform?: string;
 }
 
-// StepMapping and StepMappings are removed as mappings are now part of ExecutionStep
-
 export interface WorkflowStepResult {
   stepId: string;
   success: boolean;

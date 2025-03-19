@@ -120,7 +120,6 @@ async function getLoopValues(
   // Get values from a previous step
   const sourceResult = result.stepResults[mapping.source]?.transformedData;
   if (!sourceResult) {
-    console.log(`[LOOP] No data found for source step ${mapping.source}`);
     return [];
   }
 
@@ -130,7 +129,6 @@ async function getLoopValues(
     // If transformedData is an array, use it directly
     if (Array.isArray(sourceStepResult.transformedData)) {
       const array = sourceStepResult.transformedData;
-      console.log(`[LOOP] Found array in transformed result: ${array.length} items`);
       return array;
     }
 
@@ -148,9 +146,7 @@ async function getLoopValues(
       // If we're supposed to use object keys as values
       if (Object.keys(transformedObj).length > 0) {
         const keys = Object.keys(transformedObj);
-        console.log(`[LOOP] Using keys from transformed object: ${keys.length} keys`);
-        // Take first 5 for testing purposes
-        return keys.slice(0, 5);
+        return keys;
       }
     }
   }
@@ -159,7 +155,6 @@ async function getLoopValues(
   try {
     const values = extractValues(sourceResult as Record<string, unknown>, mapping.path);
     if (values.length > 0) {
-      console.log(`[LOOP] Extracted ${values.length} values using path '${mapping.path}'`);
       return values;
     }
   } catch (error) {
@@ -175,7 +170,6 @@ async function getLoopValues(
   ) {
     const varValue = (sourceResult as Record<string, unknown>)[loopVarName];
     if (Array.isArray(varValue)) {
-      console.log(`[LOOP] Found array property matching variable name: ${varValue.length} items`);
       return varValue;
     }
   }
@@ -196,7 +190,7 @@ async function getLoopValues(
     }
   }
 
-  console.log(`[LOOP] No array values found for loop variable '${loopVarName}'`);
+  console.warn(`[LOOP] No array values found for loop variable '${loopVarName}'`);
   return [];
 }
 
@@ -292,8 +286,6 @@ const loopStrategy: ExecutionStrategy = {
       }
 
       console.log(`[LOOP] Found ${effectiveLoopValues.length} values, example: '${effectiveLoopValues[0]}'`);
-      // console.log(`[LOOP] Using loop variable '${loopVarName}' with values: ${effectiveLoopValues.join(", ")}`);
-      // console.log(`[LOOP] Loop values: ${loopValues.join(", ")}`);
 
       const apiConfig = await prepareApiConfig(step, executionPlan, apiDocumentation, baseApiInput);
       const results = [];
