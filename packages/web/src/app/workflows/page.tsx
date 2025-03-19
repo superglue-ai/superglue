@@ -23,7 +23,6 @@ export default function WorkflowsPage() {
           apiConfig: {
             urlPath: "/",
             instruction: "First step",
-            id: "step1_config",
             urlHost: "https://example.com",
             method: "GET",
           },
@@ -36,7 +35,6 @@ export default function WorkflowsPage() {
           apiConfig: {
             urlPath: "/",
             instruction: "Second step",
-            id: "step2_config",
             urlHost: "https://example.com",
             method: "GET",
           },
@@ -58,6 +56,7 @@ export default function WorkflowsPage() {
   const [result, setResult] = useState(null);
   const [workflows, setWorkflows] = useState([]);
   const [loadingWorkflows, setLoadingWorkflows] = useState(false);
+  const [activeResultTab, setActiveResultTab] = useState("finalData");
 
   useEffect(() => {
     fetchWorkflows();
@@ -155,9 +154,12 @@ export default function WorkflowsPage() {
 
       const workflow = jsonResponse.data.getWorkflow;
 
+      // Just use the API config directly - no transformation needed
+      const transformedSteps = workflow.plan.steps;
+
       setWorkflowId(workflow.id);
       setWorkflowName(workflow.name);
-      setStepsText(JSON.stringify(workflow.plan.steps, null, 2));
+      setStepsText(JSON.stringify(transformedSteps, null, 2));
       setFinalTransform(workflow.plan.finalTransform || "");
 
       toast({
@@ -243,7 +245,6 @@ export default function WorkflowsPage() {
             apiConfig: {
               urlPath: "/",
               instruction: "First step",
-              id: "step1_config",
               urlHost: "https://example.com",
               method: "GET",
             },
@@ -256,7 +257,6 @@ export default function WorkflowsPage() {
             apiConfig: {
               urlPath: "/",
               instruction: "Second step",
-              id: "step2_config",
               urlHost: "https://example.com",
               method: "GET",
             },
@@ -284,7 +284,6 @@ export default function WorkflowsPage() {
             apiConfig: {
               urlPath: "/breeds/list/all",
               instruction: "Get all dog breeds",
-              id: "getAllBreeds_config",
               urlHost: "https://dog.ceo/api",
               method: "GET",
             },
@@ -297,7 +296,6 @@ export default function WorkflowsPage() {
             apiConfig: {
               urlPath: "/breed/{breed}/images/random",
               instruction: "Get a random image for a specific dog breed",
-              id: "getBreedImage_config",
               urlHost: "https://dog.ceo/api",
               method: "GET",
             },
@@ -474,18 +472,20 @@ export default function WorkflowsPage() {
   };
 
   return (
-    <div className="p-8 max-w-none w-full min-h-full">
-      <h1 className="text-2xl font-bold mb-4">Workflow Executor</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-[calc(100vh-120px)]">
+    <div className="p-6 max-w-none w-full h-full flex flex-col">
+      <h1 className="text-2xl font-bold mb-3 flex-shrink-0">Workflow Executor</h1>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-h-0 flex-grow overflow-hidden">
+        {/* Left Column - Workflow Configuration */}
         <Card className="flex flex-col h-full">
-          <CardHeader className="pb-2">
+          <CardHeader className="py-3 px-4 flex-shrink-0">
             <CardTitle>Workflow Configuration</CardTitle>
           </CardHeader>
-          <CardContent className="flex-grow overflow-auto p-4 flex flex-col">
-            {/* Workflow selector - only shown if workflows exist */}
+
+          <CardContent className="p-4 overflow-auto flex-grow">
+            {/* Workflow selector */}
             {workflows.length > 0 && (
-              <div className="mb-4">
-                <Label htmlFor="workflowSelect" className="mb-2 block">
+              <div className="mb-3">
+                <Label htmlFor="workflowSelect" className="mb-1 block">
                   Load Workflow
                 </Label>
                 <div className="flex gap-2">
@@ -515,7 +515,7 @@ export default function WorkflowsPage() {
             )}
 
             {/* Workflow name and example button */}
-            <div className="mb-4">
+            <div className="mb-3">
               <div className="flex items-center justify-between mb-1">
                 <Label htmlFor="workflowName">Workflow Name</Label>
                 <Button variant="outline" size="sm" onClick={fillDogExample} disabled={loading || saving || deleting}>
@@ -530,9 +530,10 @@ export default function WorkflowsPage() {
               />
             </div>
 
-            <div className="flex flex-col gap-4 h-full min-h-0 flex-grow">
+            {/* Steps and Final Transform */}
+            <div className="space-y-3 flex flex-col flex-grow">
               <div className="flex-1 flex flex-col min-h-0">
-                <Label htmlFor="steps" className="mb-1">
+                <Label htmlFor="steps" className="mb-1 block">
                   Steps (JSON)
                 </Label>
                 <Textarea
@@ -540,12 +541,12 @@ export default function WorkflowsPage() {
                   value={stepsText}
                   onChange={(e) => setStepsText(e.target.value)}
                   placeholder="Enter workflow steps as JSON array"
-                  className="font-mono resize-none h-full flex-1 min-h-0"
+                  className="font-mono resize-none flex-1 min-h-[250px] overflow-auto w-full text-xs"
                 />
               </div>
 
               <div className="flex-1 flex flex-col min-h-0">
-                <Label htmlFor="finalTransform" className="mb-1">
+                <Label htmlFor="finalTransform" className="mb-1 block">
                   Final Transform (JSONata)
                 </Label>
                 <Textarea
@@ -553,87 +554,126 @@ export default function WorkflowsPage() {
                   value={finalTransform}
                   onChange={(e) => setFinalTransform(e.target.value)}
                   placeholder="Enter final transform expression"
-                  className="font-mono resize-none h-full flex-1 min-h-0"
+                  className="font-mono resize-none flex-1 min-h-[250px] overflow-auto w-full text-xs"
                 />
               </div>
             </div>
           </CardContent>
-          <CardFooter className="flex flex-col gap-4 pt-2">
-            <div className="flex justify-between gap-4 w-full">
-              <Button
-                variant="outline"
-                onClick={saveWorkflow}
-                disabled={saving || loading || deleting}
-                className="w-full"
-              >
-                {saving ? "Saving..." : workflowId ? "Update Workflow" : "Save Workflow"}
-              </Button>
-              <Button onClick={executeWorkflow} disabled={loading || saving || deleting} className="w-full">
-                {loading ? "Running..." : "Run Workflow"}
-              </Button>
-            </div>
 
+          <CardFooter className="flex gap-2 p-3 flex-shrink-0 border-t">
+            <Button
+              variant="outline"
+              onClick={saveWorkflow}
+              disabled={saving || loading || deleting}
+              className="w-full"
+            >
+              {saving ? "Saving..." : workflowId ? "Update Workflow" : "Save Workflow"}
+            </Button>
+            <Button onClick={executeWorkflow} disabled={loading || saving || deleting} className="w-full">
+              {loading ? "Running..." : "Run Workflow"}
+            </Button>
             {workflowId && (
               <Button
                 variant="destructive"
                 onClick={deleteWorkflow}
                 disabled={saving || loading || deleting}
-                className="w-full"
+                className="shrink-0"
               >
-                {deleting ? "Deleting..." : "Delete Workflow"}
+                {deleting ? "Deleting..." : "Delete"}
               </Button>
             )}
           </CardFooter>
         </Card>
 
+        {/* Right Column - Results */}
         <Card className="flex flex-col h-full">
-          <CardHeader className="pb-2">
+          <CardHeader className="py-3 px-4 flex-shrink-0">
             <CardTitle>Results</CardTitle>
           </CardHeader>
-          <CardContent className="flex-grow overflow-auto p-4 flex flex-col">
+
+          <CardContent className="p-0 flex-grow flex flex-col overflow-hidden">
             {result ? (
-              <div className="flex flex-col h-full space-y-4">
-                <div className="bg-muted p-4 rounded-md">
-                  <h3 className="font-semibold mb-2">
-                    Status:
-                    <span className={result.success ? "text-green-600" : "text-red-600"}>
-                      {result.success ? " Success" : " Failed"}
-                    </span>
-                  </h3>
-
-                  {result.error && (
-                    <div className="text-red-600 mb-2">
-                      <p className="font-semibold">Error:</p>
-                      <p>{result.error}</p>
+              <>
+                {/* Status Bar */}
+                <div className="p-3 bg-muted border-b flex-shrink-0">
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center">
+                      <span className="font-semibold mr-2">Status:</span>
+                      <span className={result.success ? "text-green-600" : "text-red-600"}>
+                        {result.success ? "Success" : "Failed"}
+                      </span>
                     </div>
-                  )}
 
-                  <div>
-                    <p className="font-semibold inline-block mr-2">Time:</p>
-                    <p className="inline">
-                      Started: {new Date(result.startedAt).toLocaleString()}
-                      {result.completedAt &&
-                        ` • Duration: ${((new Date(result.completedAt).getTime() - new Date(result.startedAt).getTime()) / 1000).toFixed(2)}s`}
-                    </p>
+                    <div className="flex items-center">
+                      <span className="font-semibold mr-2">Time:</span>
+                      <span className="text-sm">
+                        Started: {new Date(result.startedAt).toLocaleString()}
+                        {result.completedAt &&
+                          ` • Duration: ${((new Date(result.completedAt).getTime() - new Date(result.startedAt).getTime()) / 1000).toFixed(2)}s`}
+                      </span>
+                    </div>
+
+                    {result.error && (
+                      <div className="text-red-600">
+                        <span className="font-semibold mr-2">Error:</span>
+                        <span>{result.error}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                <div className="flex-1 min-h-0">
-                  <h3 className="font-semibold mb-2">Final Data:</h3>
-                  <pre className="bg-muted p-4 rounded-md font-mono text-sm overflow-auto h-[calc(100%-32px)]">
-                    {JSON.stringify(result.data, null, 2)}
-                  </pre>
-                </div>
+                {/* Custom Tab Implementation */}
+                <div className="flex-grow flex flex-col overflow-hidden">
+                  <div className="flex border-b px-4 pt-2 pb-0 bg-background flex-shrink-0">
+                    <button
+                      type="button"
+                      className={`px-4 py-2 mr-2 ${
+                        activeResultTab === "finalData"
+                          ? "border-b-2 border-primary font-medium"
+                          : "text-muted-foreground"
+                      }`}
+                      onClick={() => setActiveResultTab("finalData")}
+                    >
+                      Final Data
+                    </button>
+                    <button
+                      type="button"
+                      className={`px-4 py-2 ${
+                        activeResultTab === "stepResults"
+                          ? "border-b-2 border-primary font-medium"
+                          : "text-muted-foreground"
+                      }`}
+                      onClick={() => setActiveResultTab("stepResults")}
+                    >
+                      Step Results
+                    </button>
+                  </div>
 
-                <div className="flex-1 min-h-0">
-                  <h3 className="font-semibold mb-2">Step Results:</h3>
-                  <pre className="bg-muted p-4 rounded-md font-mono text-sm overflow-auto h-[calc(100%-32px)]">
-                    {JSON.stringify(result.stepResults, null, 2)}
-                  </pre>
+                  <div className="flex-grow overflow-auto relative">
+                    <div
+                      className={`absolute inset-0 overflow-auto transition-opacity duration-200 ${
+                        activeResultTab === "finalData" ? "opacity-100 z-10" : "opacity-0 z-0"
+                      }`}
+                    >
+                      <pre className="bg-muted/50 p-4 font-mono text-xs min-h-full">
+                        {JSON.stringify(result.data, null, 2)}
+                      </pre>
+                    </div>
+
+                    <div
+                      className={`absolute inset-0 overflow-auto transition-opacity duration-200 ${
+                        activeResultTab === "stepResults" ? "opacity-100 z-10" : "opacity-0 z-0"
+                      }`}
+                    >
+                      <pre className="bg-muted/50 p-4 font-mono text-xs min-h-full">
+                        {JSON.stringify(result.stepResults, null, 2)}
+                      </pre>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              </>
             ) : (
-              <div className="h-full flex items-center justify-center">
+              <div className="h-full flex items-center justify-center p-4">
                 <p className="text-gray-500 italic">No results yet. Execute a workflow to see results here.</p>
               </div>
             )}
