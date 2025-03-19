@@ -113,10 +113,9 @@ graph LR
 ```mermaid
 flowchart TD
     A[Start] --> B[Register Execution Plan]
-    B --> C[Set Step Mappings]
-    C --> D[Execute getAllBreeds Step]
+    B --> D[Execute getAllBreeds Step]
     D --> E[Get All Dog Breeds]
-    E --> F[Process Response]
+    E --> F[Process Response with Step Mapping]
     F --> G[Execute getBreedImage Step in LOOP mode]
     
     G --> |breed1| H1[Fetch Random Image]
@@ -143,7 +142,7 @@ flowchart TD
 ### ApiWorkflowOrchestrator
 
 The main entry point for workflow execution that:
-- Manages execution plans and step mappings
+- Manages execution plans
 - Validates workflow definitions
 - Coordinates step execution
 - Applies final transformations
@@ -168,9 +167,9 @@ The main entry point for workflow execution that:
 - Handles array transformations
 
 ### WorkflowUtils
-- Processes template strings (${variable})
+- Processes template strings ({variable})
 - Executes API calls
-- Transforms API responses
+- Transforms API responses using step mappings
 - Stores step results in the workflow context
 
 ## Workflow Definition Structure
@@ -185,8 +184,7 @@ interface ExecutionPlan {
 
 interface ExecutionStep {
   id: string;
-  instruction: string;
-  endpoint: string;
+  apiConfig: ApiConfig;
   executionMode: "DIRECT" | "LOOP";
   
   // Optional configurations
@@ -195,6 +193,9 @@ interface ExecutionStep {
   loopMaxIters?: number;
   responseField?: string;
   objectKeysAsArray?: boolean;
+  
+  inputMapping: string; // JSONata expression, defaults to "$"
+  responseMapping: string; // JSONata expression, defaults to "$"
 }
 ```
 
@@ -208,25 +209,39 @@ const executionPlan = {
   steps: [
     {
       id: "getAllBreeds",
-      endpoint: "/breeds/list/all",
-      instruction: "Get all dog breeds",
+      apiConfig: {
+        id: "getAllBreeds_config",
+        urlHost: "https://dog.ceo/api",
+        urlPath: "/breeds/list/all",
+        instruction: "Get all dog breeds",
+        method: "GET"
+      },
       executionMode: "DIRECT",
       responseField: "message",
       objectKeysAsArray: true,
+      inputMapping: "$",
+      responseMapping: "$"
     },
     {
       id: "getBreedImage",
-      endpoint: "/breed/${breed}/images/random",
-      instruction: "Get a random image for a specific dog breed",
+      apiConfig: {
+        id: "getBreedImage_config",
+        urlHost: "https://dog.ceo/api",
+        urlPath: "/breed/{breed}/images/random",
+        instruction: "Get a random image for a specific dog breed",
+        method: "GET"
+      },
       executionMode: "LOOP",
       loopVariable: "breed",
       loopMaxIters: 5,
+      inputMapping: "$",
+      responseMapping: "$"
     }
   ],
   finalTransform: `{
     "breeds": $map(
       $filter(
-        $keys($.getAllBreeds),
+        $keys($.getAllBreeds.message),
         function($b) {
           $count($.getBreedImage[$split(message, "/")[4] = $b]) > 0
         }
