@@ -29,7 +29,7 @@
         "framer-motion": "^12.4.7",
         "graphql": "^16.10.0",
         "lucide-react": "^0.474.0",
-        "next": "15.1.6",
+        "next": "15.2.4",
         "pdfjs-dist": "^4.10.38",
         "posthog-js": "^1.224.0",
         "prismjs": "^1.30.0",
