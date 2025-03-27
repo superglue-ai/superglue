@@ -113,6 +113,10 @@ function validateEnvironment() {
       throw new Error(`Environment variable ${envVar} is not set.`);
     }
   });
+
+  if (!process.env.AUTH_TOKEN && !process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    throw new Error('AUTH_TOKEN is not set and no other authentication provider is configured.');
+  }
 }
 
 // Server Setup
