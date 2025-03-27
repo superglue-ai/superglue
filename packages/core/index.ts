@@ -13,7 +13,7 @@ import { createTelemetryPlugin, telemetryMiddleware } from './utils/telemetry.js
 
 // Constants
 const PORT = process.env.GRAPHQL_PORT || 3000;
-const authManager = process.env.AUTH_TOKEN ? new LocalKeyManager() : new SupabaseKeyManager();
+const authManager = process.env.NEXT_PUBLIC_SUPABASE_URL ? new SupabaseKeyManager() : new LocalKeyManager();
 
 const DEBUG = process.env.DEBUG === 'true';
 export const DEFAULT_QUERY = `
