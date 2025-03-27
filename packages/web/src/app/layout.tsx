@@ -17,6 +17,9 @@ export default function RootLayout({
     postHogKey: nextConfig.env?.NEXT_PUBLIC_POSTHOG_KEY,
     postHogHost: nextConfig.env?.NEXT_PUBLIC_POSTHOG_HOST,
   }
+  if(!config.superglueApiKey) {
+    throw new Error('AUTH_TOKEN is not set and no other authentication provider is configured.');
+  }
   return (
     <html lang="en" className={`dark ${geistSans.variable} ${geistMono.variable}`}>
       <body>
