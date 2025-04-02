@@ -1,3 +1,4 @@
+import { logMessage } from "../utils/logs.js";
 import { ApiKeyManager } from "./apiKeyManager.js";
 
 export class SupabaseKeyManager implements ApiKeyManager {
@@ -40,7 +41,7 @@ export class SupabaseKeyManager implements ApiKeyManager {
     }
 
     const url = `${SUPABASE_URL}/rest/v1/sg_superglue_api_keys`;
-    console.log('Fetching API keys from:', url);
+    logMessage('debug', `Fetching API keys from: ${url}`);
     const response = await fetch(url, {
       method: 'GET',
       headers: {
@@ -50,7 +51,7 @@ export class SupabaseKeyManager implements ApiKeyManager {
     });
 
     if (!response.ok) {
-      console.error('Failed to fetch API keys:', response.statusText);
+      logMessage('error', `Failed to fetch API keys: ${response.statusText}`);
       return [];
     }
 

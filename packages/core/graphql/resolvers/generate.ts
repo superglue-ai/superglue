@@ -1,4 +1,4 @@
-import { Context } from "@superglue/shared";
+import { Context, Metadata } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { generateSchema } from "../../utils/schema.js";
 import { telemetryClient } from "../../utils/telemetry.js";
@@ -9,6 +9,10 @@ export const generateSchemaResolver = async (
     context: Context,
     info: GraphQLResolveInfo
   ) => {
+    const metadata: Metadata = {
+      runId: crypto.randomUUID(),
+      orgId: context.orgId
+    };
     if(!instruction) {
       throw new Error("Instruction is required");
     }
@@ -23,7 +27,7 @@ export const generateSchemaResolver = async (
         responseData = String(responseData).slice(0, 1000);
       }
     }
-    const schema = await generateSchema(instruction, responseData);
+    const schema = await generateSchema(instruction, responseData, metadata);
     
     return schema;
 };

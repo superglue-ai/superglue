@@ -1,9 +1,11 @@
 import { Validator } from "jsonschema";
 import OpenAI from "openai";
-import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
+import type { ChatCompletionCreateParams, ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { GENERATE_SCHEMA_PROMPT } from "./prompts.js";
+import { Metadata } from "@playwright/test";
+import { logMessage } from "./logs.js";
 
-export async function generateSchema(instruction: string, responseData: string) : Promise<string> {
+export async function generateSchema(instruction: string, responseData: string, metadata: Metadata) : Promise<string> {
   const messages: ChatCompletionMessageParam[] = [
     {
       role: "system",
@@ -19,23 +21,22 @@ export async function generateSchema(instruction: string, responseData: string) 
 
   while (retryCount <= MAX_RETRIES) {
     try {
+      logMessage('info', `Generating schema${retryCount ? `: (retry ${retryCount})` : ""}`);
       const schema = await attemptSchemaGeneration(messages, retryCount);
-      console.log("Schema generated");
       return schema;
     } catch (error) {
       retryCount++;
       if (retryCount > MAX_RETRIES) {
-        console.error("Schema generation failed after 3 retries");
+        logMessage('error', `Schema generation failed after ${MAX_RETRIES} retries. Last error: ${error.message}`);
         throw error;
       }
-      console.log(`Schema generation failed (retry ${retryCount}/${MAX_RETRIES}): ${error.message}`);
+      logMessage('warn', `Schema generation failed. Retrying...`);
       messages.push({
         role: "user",
         content: `The previous attempt failed with error: ${error.message}. Please try again.`
       });
     }
   }
-  // Should never be reached (try/catch)
   throw new Error("Unexpected error in schema generation");
 }
 
@@ -43,7 +44,6 @@ async function attemptSchemaGeneration(
   messages: ChatCompletionMessageParam[],
   retry: number
 ): Promise<string> {
-  console.log(`Generating schema${retry ? `: (retry ${retry})` : ""}`);
   const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
     baseURL: process.env.OPENAI_API_BASE_URL
@@ -55,10 +55,9 @@ async function attemptSchemaGeneration(
   let useTemperature = false;
   
   if (modelName.startsWith('gpt-4')) {
-    temperature = Math.min(0.3 * retry, 1.0);
     useTemperature = true;
   }
-  const completionRequest: any = {
+  const completionRequest: ChatCompletionCreateParams = {
     model: modelName,
     ...(useTemperature ? { temperature: temperature } : {}),
     response_format: { "type": "json_object" },

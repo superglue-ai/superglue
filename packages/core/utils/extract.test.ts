@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { prepareExtract, callExtract, processFile, Queue } from './extract.js';
+import { prepareExtract, callExtract, processFile } from './extract.js';
 import { callAxios } from './tools.js';
 import { getDocumentation } from './documentation.js';
 import { decompressData, parseFile } from './file.js';
@@ -277,66 +277,6 @@ describe('Extract Utils', () => {
         FileType.EXCEL
       );
       expect(resultObj).toEqual([{ name: 'John', age: 30 }]);
-    });
-  });
-
-  describe('Queue', () => {
-    it('should process jobs in order', async () => {
-      const queue = new Queue('test');
-      const results: number[] = [];
-
-      const task1 = async () => {
-        await new Promise(resolve => setTimeout(resolve, 10));
-        results.push(1);
-      };
-      const task2 = async () => {
-        results.push(2);
-      };
-
-      queue.enqueue('1', task1);
-      queue.enqueue('2', task2);
-
-      // Wait for queue to process
-      await new Promise(resolve => setTimeout(resolve, 50));
-
-      expect(results).toEqual([1, 2]);
-    });
-
-    it('should not add duplicate jobs', () => {
-      const queue = new Queue();
-      const task = async () => {
-        await new Promise(resolve => setTimeout(resolve, 100000));
-      };
-
-      queue.enqueue('1', task);
-      queue.enqueue('1', task);
-
-      // @ts-ignore - accessing private property for testing
-      expect(queue.queue.length).toBe(0);
-    });
-
-    it('should handle job errors without stopping the queue', async () => {
-      const queue = new Queue();
-      const results: string[] = [];
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-      const failingTask = async () => {
-        throw new Error('Task failed');
-      };
-      const successTask = async () => {
-        results.push('success');
-      };
-
-      queue.enqueue('1', failingTask);
-      queue.enqueue('2', successTask);
-
-      // Wait for queue to process
-      await new Promise(resolve => setTimeout(resolve, 50));
-
-      expect(results).toEqual(['success']);
-      expect(consoleSpy).toHaveBeenCalled();
-      
-      consoleSpy.mockRestore();
     });
   });
 }); 

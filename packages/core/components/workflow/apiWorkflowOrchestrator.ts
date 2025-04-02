@@ -1,5 +1,4 @@
 import type { ApiInput, RequestOptions } from "@superglue/shared";
-import { v4 as uuidv4 } from "uuid";
 import { getDocumentation } from "../../utils/documentation.js";
 import { applyJsonata } from "../../utils/tools.js";
 
@@ -171,7 +170,7 @@ export class ApiWorkflowOrchestrator {
   }
 
   private generatePlanId(): ExecutionPlanId {
-    return `wfplan_${uuidv4()}`;
+    return `wfplan_${crypto.randomUUID()}`;
   }
 
   private validateExecutionPlan(plan: ExecutionPlan): void {

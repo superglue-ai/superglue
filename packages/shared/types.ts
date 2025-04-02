@@ -210,3 +210,17 @@ export interface SavedWorkflow extends BaseConfig {
   description?: string;
   plan: ExecutionPlan;
 }
+
+export interface Metadata {
+  runId?: string;
+  orgId?: string;
+}
+export interface LogEntry {
+  id: string;
+  message: string;
+  level: string;
+  timestamp: Date;
+  metadata: Record<string, any>;
+  runId?: string;
+  orgId?: string;
+}

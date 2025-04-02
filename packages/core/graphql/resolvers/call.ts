@@ -1,13 +1,13 @@
-import { ApiConfig, ApiInputRequest, CacheMode, Context, RequestOptions, TransformConfig } from "@superglue/shared";
+import { ApiConfig, ApiInputRequest, CacheMode, Context, Metadata, RequestOptions, TransformConfig } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import OpenAI from "openai";
-import { v4 as uuidv4 } from 'uuid';
 import { callEndpoint, prepareEndpoint } from "../../utils/api.js";
 import { telemetryClient } from "../../utils/telemetry.js";
-import { applyJsonataWithValidation, maskCredentials } from "../../utils/tools.js";
+import { applyJsonataWithValidation, composeUrl, maskCredentials } from "../../utils/tools.js";
 import { prepareTransform } from "../../utils/transform.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 import { callPostgres } from "../../utils/postgres.js";
+import { logMessage } from "../../utils/logs.js";
 
 export const callResolver = async (
   _: any,
@@ -21,8 +21,11 @@ export const callResolver = async (
   info: GraphQLResolveInfo
 ) => {
   const startedAt = new Date();
-  const callId = uuidv4() as string;
-
+  const callId = crypto.randomUUID();
+  const metadata: Metadata = {
+    runId: callId,
+    orgId: context.orgId
+  };
   let preparedEndpoint: ApiConfig;
   let messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
 
@@ -46,7 +49,7 @@ export const callResolver = async (
             await context.datastore.getApiConfigFromRequest(input.endpoint, payload, context.orgId) 
         }
         else if(preparedEndpoint || input.endpoint) {
-          const result = await prepareEndpoint(preparedEndpoint || input.endpoint, payload, credentials, lastError, messages);
+          const result = await prepareEndpoint(preparedEndpoint || input.endpoint, payload, credentials, metadata, retryCount, messages);
           preparedEndpoint = result.config;
           messages = result.messages;
         }
@@ -54,6 +57,9 @@ export const callResolver = async (
         if(!preparedEndpoint) {
           throw new Error("Did not find a valid endpoint configuration. If you did provide an id, please ensure cache reading is enabled.");
         }
+
+        const url = composeUrl(preparedEndpoint.urlHost, preparedEndpoint.urlPath);
+        logMessage('info', `API call: ${preparedEndpoint.method} ${url}`, metadata);
 
         if(preparedEndpoint.urlHost.startsWith("postgres")) {
           response = await callPostgres(preparedEndpoint, payload, credentials, options);
@@ -66,13 +72,12 @@ export const callResolver = async (
           response = null;
           throw new Error("No data returned from API. This could be due to a configuration error.");
         }
+
+
       } catch (error) {
-        console.log(`API call failed. ${error?.message}`);
-        telemetryClient?.captureException(maskCredentials(error.message, credentials), context.orgId, {
-          preparedEndpoint: preparedEndpoint,
-          retryCount: retryCount,
-        });
+        logMessage('warn', `API call failed. ${error?.message}`, { runId: callId, orgId: context.orgId });
         lastError = error?.message || JSON.stringify(error || {});
+        messages.push({role: "user", content: `There was an error with the configuration, please retry: ${lastError}`});
       }
       retryCount++;
     } while (!response && retryCount < 5);
@@ -87,7 +92,7 @@ export const callResolver = async (
 
     // Transform response
     const responseMapping = preparedEndpoint.responseMapping || 
-      (await prepareTransform(context.datastore, readCache, preparedEndpoint as TransformConfig, response.data))?.responseMapping;
+      (await prepareTransform(context.datastore, readCache, preparedEndpoint as TransformConfig, response.data, { runId: callId, orgId: context.orgId }))?.responseMapping;
     const transformedResponse = responseMapping ? 
       await applyJsonataWithValidation(response.data, responseMapping, preparedEndpoint.responseSchema) : 
       { success: true, data: response.data };
