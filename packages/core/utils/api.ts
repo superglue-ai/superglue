@@ -1,19 +1,20 @@
-import { type ApiConfig, type ApiInput, AuthType, HttpMethod, PaginationType, type RequestOptions } from "@superglue/shared";
+import { type ApiConfig, type ApiInput, AuthType, HttpMethod, Metadata, PaginationType, type RequestOptions } from "@superglue/shared";
 import type { AxiosRequestConfig } from "axios";
 import OpenAI from "openai";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { DOCUMENTATION_MAX_LENGTH } from "../config.js";
 import { getDocumentation } from "./documentation.js";
-import { API_ERROR_HANDLING_USER_PROMPT, API_PROMPT } from "./prompts.js";
 import { callAxios, composeUrl, replaceVariables } from "./tools.js";
+import { API_PROMPT } from "./prompts.js";
+import { logMessage } from "./logs.js";
 
 export async function prepareEndpoint(
   endpointInput: ApiInput, 
   payload: any, 
   credentials: any, 
-  lastError: string | null = null,
-  previousMessages: OpenAI.Chat.ChatCompletionMessageParam[] = []
+  metadata: Metadata,
+  retryCount: number = 0,
+  messages: OpenAI.Chat.ChatCompletionMessageParam[] = []
 ): Promise<{ config: ApiConfig; messages: OpenAI.Chat.ChatCompletionMessageParam[] }> {
     // Set the current timestamp
     const currentTime = new Date();
@@ -23,24 +24,19 @@ export async function prepareEndpoint(
       ...endpointInput,
       createdAt: currentTime,
       updatedAt: currentTime,
-      id: crypto.randomUUID()
+      id: metadata?.runId
     };
+    logMessage('info', `Generating API config for ${endpointInput.urlHost}${retryCount > 0 ? ` (retry ${retryCount})` : ""}`, metadata);
 
     const documentation = await getDocumentation(apiCallConfig.documentationUrl, apiCallConfig.headers, apiCallConfig.queryParams, apiCallConfig?.urlPath);
-    if(documentation.length >= DOCUMENTATION_MAX_LENGTH) {
-      console.warn(`Documentation length at limit: ${documentation.length}`);
-    }
-    if(documentation.length <= 10000) {
-      console.warn(`Documentation length is short: ${documentation.length}`);
-    }
 
     const availableVars = [...Object.keys(payload || {}), ...Object.keys(credentials || {})];
-    const computedApiCallConfig = await generateApiConfig(apiCallConfig, documentation, availableVars, lastError, previousMessages);
+    const computedApiCallConfig = await generateApiConfig(apiCallConfig, documentation, availableVars, retryCount, messages);
     
     return computedApiCallConfig;
 }
 
-export function convertBasicAuthToBase64(headerValue){
+export function convertBasicAuthToBase64(headerValue: string){
     if(!headerValue) return headerValue;
     // Get the part of the 'Basic '
     const credentials = headerValue.substring('Basic '.length).trim();
@@ -117,8 +113,6 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
       "";
 
     const url = replaceVariables(composeUrl(endpoint.urlHost, endpoint.urlPath), requestVars);
-
-    console.log(`${endpoint.method} ${url}`);
 
     const axiosConfig: AxiosRequestConfig = {
       method: endpoint.method,
@@ -241,8 +235,8 @@ export async function generateApiConfig(
   apiConfig: Partial<ApiConfig>, 
   documentation: string, 
   vars: string[] = [], 
-  lastError: string | null = null,
-  previousMessages: OpenAI.Chat.ChatCompletionMessageParam[] = []
+  retryCount = 0,
+  messages: OpenAI.Chat.ChatCompletionMessageParam[] = []
 ): Promise<{ config: ApiConfig; messages: OpenAI.Chat.ChatCompletionMessageParam[] }> {
   const schema = zodToJsonSchema(z.object({
     urlHost: z.string(),
@@ -264,27 +258,13 @@ export async function generateApiConfig(
     baseURL: process.env.OPENAI_API_BASE_URL
   });
 
-  const userProvidedAdditionalInfo = Boolean(
-    apiConfig.headers ||
-    apiConfig.queryParams ||
-    apiConfig.body ||
-    apiConfig.authentication ||
-    apiConfig.dataPath ||
-    apiConfig.pagination ||
-    apiConfig.method
-  );
-
-  const initialUserMessage: OpenAI.Chat.ChatCompletionUserMessageParam = {
-    role: "user", 
-    content: 
-`Generate API configuration for the following:
+  const userPrompt = `Generate API configuration for the following:
 
 Instructions: ${apiConfig.instruction}
 
 Base URL: ${composeUrl(apiConfig.urlHost, apiConfig.urlPath)}
 
-${userProvidedAdditionalInfo ? "Also, the user provided the following information, which is probably correct: " : ""}
-${userProvidedAdditionalInfo ? "Ensure to use the provided information. You must try them at least where they make sense." : ""}
+${Object.values(apiConfig).filter(Boolean).length > 0 ? "Also, the user provided the following information, which is probably correct. Ensure to at least try where it makes sense: " : ""}
 ${apiConfig.headers ? `Headers: ${JSON.stringify(apiConfig.headers)}` : ""}
 ${apiConfig.queryParams ? `Query Params: ${JSON.stringify(apiConfig.queryParams)}` : ""}
 ${apiConfig.body ? `Body: ${JSON.stringify(apiConfig.body)}` : ''}
@@ -296,31 +276,15 @@ ${apiConfig.method ? `Method: ${apiConfig.method}` : ''}
 Available variables: ${vars.join(", ")}
 
 Documentation: ${String(documentation)}`
+
+  if(!messages) {
+    messages = [
+      {role: "system", content: API_PROMPT}, 
+      {role: "user", content: userPrompt}
+    ];
   }
 
-  const errorHandlingMessage = API_ERROR_HANDLING_USER_PROMPT
-    .replace("{error}", lastError)
-    .replace("{previous_config}", JSON.stringify(apiConfig));
-
-  const subsequentUserMessage: OpenAI.Chat.ChatCompletionUserMessageParam = {
-    role: "user",
-    content: errorHandlingMessage
-  }
-
-  const systemMessage: OpenAI.Chat.ChatCompletionSystemMessageParam = {
-    role: "system",
-    content: API_PROMPT
-  };
-
-  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = previousMessages.length > 0 
-    ? [...previousMessages, subsequentUserMessage]
-    : [systemMessage, initialUserMessage];
-
-  const numInitialMessages = 2;
-  const retryCount = previousMessages.length > 0 ? (messages.length - numInitialMessages) / 2 : 0;
-  const temperature = String(process.env.OPENAI_MODEL).startsWith("o") ? undefined : Math.min(retryCount * 0.1, 1);
-  console.log(`Generating API config for ${apiConfig.urlHost}${retryCount > 0 ? ` (retry ${retryCount})` : ""}`);
-
+  const temperature = String(process.env.OPENAI_MODEL).startsWith("o") ? undefined : Math.min(retryCount * 0.2, 1);
   const completion = await openai.chat.completions.create({
     model: process.env.OPENAI_MODEL,
     response_format: {

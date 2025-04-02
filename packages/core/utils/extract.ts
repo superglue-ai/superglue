@@ -1,5 +1,5 @@
 import axios, { AxiosRequestConfig } from "axios";
-import {  AuthType, RequestOptions, DecompressionMethod, ExtractConfig, ExtractInput, FileType, HttpMethod } from "@superglue/shared";
+import {  AuthType, RequestOptions, DecompressionMethod, ExtractConfig, ExtractInput, FileType, HttpMethod, Metadata } from "@superglue/shared";
 import { callAxios, composeUrl, getSchemaFromData, replaceVariables } from "./tools.js";
 import { z } from "zod";
 import OpenAI from "openai";
@@ -8,6 +8,7 @@ import { API_PROMPT } from "./prompts.js";
 import { getDocumentation } from "./documentation.js";
 import { decompressData, parseFile } from "./file.js";
 import { createHash } from "crypto";
+import { logMessage } from "./logs.js";
 
 export async function prepareExtract(extractInput: ExtractInput, payload: any, credentials: any, lastError: string | null = null): Promise<ExtractConfig> {
     // Set the current timestamp
@@ -33,7 +34,7 @@ export async function prepareExtract(extractInput: ExtractInput, payload: any, c
     return computedExtractConfig;
 }
 
-export async function callExtract(extract: ExtractConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions): Promise<any> {
+export async function callExtract(extract: ExtractConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions, metadata?: Metadata): Promise<any> {
   const allVariables = { ...payload, ...credentials };
   const headers = Object.fromEntries(
     Object.entries(extract.headers || {}).map(([key, value]) => [key, replaceVariables(value, allVariables)])
@@ -52,7 +53,7 @@ export async function callExtract(extract: ExtractConfig, payload: Record<string
     params: queryParams,
     timeout: options?.timeout || 300000,
   };
-  console.log(`${extract.method} ${url}`);
+  logMessage('info', `${extract.method} ${url}`, metadata);
   const response = await callAxios(axiosConfig, options);
 
   if(![200, 201, 204].includes(response?.status) || response.data?.error) {
@@ -137,61 +138,9 @@ ${lastError}` : ''}`
       }
     ]
   });
-  console.log(completion.choices[0].message.content);
   const generatedConfig = JSON.parse(completion.choices[0].message.content);
   return {
     ...extractConfig,
     ...generatedConfig,
   } as ExtractConfig;
-}
-
-
-export async function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-
-interface Process {
-  id: string;
-  task: () => Promise<void>;
-}
-
-export class Queue {
-  private queue: Process[] = [];
-  private isProcessing = false;
-  private jobSet: Set<string> = new Set();
-  public type: string;
-  constructor(queueType: string = "queue") {
-    this.type = queueType;
-  }
-
-  enqueue(id: string, task: () => Promise<void>) {
-    if (!this.jobSet.has(id)) {
-      this.queue.push({ id, task });
-      this.jobSet.add(id);
-      this.processQueue();
-    } else {
-      console.log(`Job with ID ${id} is already in the queue.`);
-    }
-  }
-
-  private async processQueue() {
-    if (this.isProcessing) return;
-    this.isProcessing = true;
-    while (this.queue.length > 0) {
-      const job = this.queue.shift();
-      if (job) {
-        try {
-          console.log(`Processing ${this.type} ${job.id}`);
-          await job.task();
-        } catch (error) {
-          console.error(`Error processing ${this.type} ${job.id}:`, error);
-        } finally {
-          this.jobSet.delete(job.id);
-        }
-      }
-    }
-
-    this.isProcessing = false;
-  }
 }

@@ -1,16 +1,17 @@
-import type { DataStore, TransformConfig, TransformInput } from "@superglue/shared";
+import type { DataStore, Metadata, TransformConfig, TransformInput } from "@superglue/shared";
 import { createHash } from "node:crypto";
 import OpenAI from "openai";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { PROMPT_MAPPING } from "./prompts.js";
 import { applyJsonataWithValidation, getSchemaFromData, sample } from "./tools.js";
+import { logMessage } from "./logs.js";
 
 export async function prepareTransform(
     datastore: DataStore,
     fromCache: boolean,
     input: TransformInput,
     data: any,
-    orgId?: string
+    metadata: Metadata
   ): Promise<TransformConfig | null> {
 
     // Check if the response schema is empty
@@ -28,7 +29,7 @@ export async function prepareTransform(
 
     // Check if the transform config is cached
     if(fromCache) {
-      const cached = await datastore.getTransformConfigFromRequest(input as TransformInput, data, orgId);
+      const cached = await datastore.getTransformConfigFromRequest(input as TransformInput, data, metadata.orgId);
       if (cached) return { ...cached, ...input };
     }
 
@@ -48,7 +49,7 @@ export async function prepareTransform(
     }
 
     // Generate the response mapping
-    const mapping = await generateMapping(input.responseSchema, data, input.instruction);
+    const mapping = await generateMapping(input.responseSchema, data, input.instruction, metadata);
 
     // Check if the mapping is generated successfully
     if(mapping) {
@@ -59,16 +60,15 @@ export async function prepareTransform(
         ...input, 
         responseSchema: input.responseSchema,
         responseMapping: mapping.jsonata,
-        confidence: mapping.confidence,
-        confidence_reasoning: mapping.confidence_reasoning
+        confidence: mapping.confidence
       };
     }
     return null;
   } 
 
-export async function generateMapping(schema: any, payload: any, instruction?: string, retry = 0, messages?: ChatCompletionMessageParam[]): Promise<{jsonata: string, confidence: number, confidence_reasoning: string} | null> {
-  console.log("generating mapping" + (retry ? `, attempt ${retry} with temperature ${retry * 0.1}` : ""));
+export async function generateMapping(schema: any, payload: any, instruction: string, metadata: Metadata, retry = 0, messages?: ChatCompletionMessageParam[]): Promise<{jsonata: string, confidence: number} | null> {
   try {
+    logMessage('info', "Generating mapping", metadata);
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
       baseURL: process.env.OPENAI_API_BASE_URL,
@@ -113,24 +113,19 @@ ${JSON.stringify(sample(payload, 2), null, 2).slice(0,30000)}`
     const assistantResponse = String(reasoning.choices[0].message.content);
     messages.push({role: "assistant", content: assistantResponse});
     const content = JSON.parse(assistantResponse);
-    console.log("generated mapping", content?.jsonata);
     const transformation = await applyJsonataWithValidation(payload, content.jsonata, schema);
 
     if(!transformation.success) {
-      console.log("validation failed", String(transformation?.error).substring(0, 100));
       throw new Error(`Validation failed: ${transformation.error}`);
     }
-
-    console.log("validation succeeded");
-    // Unwrap the data property
     return content;
 
   } catch (error) {
       if(retry < 5) {
+        logMessage('warn', "Error generating mapping: " + String(error), metadata);
         messages.push({role: "user", content: error.message});
-        return generateMapping(schema, payload, instruction, retry + 1, messages);
+        return generateMapping(schema, payload, instruction, metadata, retry + 1, messages);
       }
-      console.error('Error generating mapping:', String(error));
   }
   return null;
 }

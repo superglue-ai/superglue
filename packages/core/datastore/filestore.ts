@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { getSchemaFromData } from "../utils/tools.js";
+import { logMessage } from "../utils/logs.js";
 
 export class FileStore implements DataStore {
 
@@ -37,12 +38,12 @@ export class FileStore implements DataStore {
 
     // Check if /data exists synchronously
     if (storageDir === '/data' && !fs.existsSync('/data')) {
-      console.log('File Datastore: "/data" directory not found, using local ".superglue" directory instead');
+      logMessage('warn', 'File Datastore: "/data" directory not found, using local ".superglue" directory instead');
       storageDir = './.superglue';
     }
 
     this.filePath = path.join(storageDir, 'superglue_data.json');
-    console.log(`File Datastore: Using storage path: ${this.filePath}`);
+    logMessage('info', `File Datastore: Using storage path: ${this.filePath}`);
     
     this.initializeStorage();
   }
@@ -51,7 +52,7 @@ export class FileStore implements DataStore {
     try {
       // Ensure the directory exists with proper permissions
       fs.mkdirSync(path.dirname(this.filePath), { recursive: true, mode: 0o755 });
-      console.log(`File Datastore: Created/verified directory: ${path.dirname(this.filePath)}`);
+      logMessage('info', `File Datastore: Created/verified directory: ${path.dirname(this.filePath)}`);
       
       const data = fs.readFileSync(this.filePath, 'utf-8');
       const parsed = JSON.parse(data, (key, value) => {
@@ -61,7 +62,7 @@ export class FileStore implements DataStore {
         }
         return value;
       });
-      console.log('File Datastore: Successfully loaded existing data');
+      logMessage('info', 'File Datastore: Successfully loaded existing data');
       
       // Convert plain objects back to Maps
       this.storage = {
@@ -77,7 +78,7 @@ export class FileStore implements DataStore {
         }
       };
     } catch (error) {
-      console.log('File Datastore: No existing data found, starting with empty storage');
+      logMessage('info', 'File Datastore: No existing data found, starting with empty storage');
       await this.persist();
     }
   }
@@ -98,7 +99,7 @@ export class FileStore implements DataStore {
       fs.writeFileSync(tempPath, JSON.stringify(serialized, null, 2), { mode: 0o644 });
       fs.renameSync(tempPath, this.filePath);
     } catch (error) {
-      console.error('Failed to persist data:', error);
+      logMessage('error', 'Failed to persist data: ' + error);
       throw error;
     }
   }
