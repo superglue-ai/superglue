@@ -29,8 +29,8 @@ export const callResolver = async (
   let preparedEndpoint: ApiConfig;
   let messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
 
-  const readCache = options ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.READONLY : true;
-  const writeCache = options ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.WRITEONLY : true;
+  const readCache = options?.cacheMode ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.READONLY : true;
+  const writeCache = options?.cacheMode ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.WRITEONLY : true;
 
   // Check if response schema is zod and throw an error if it is
   if((input.endpoint?.responseSchema as any)?._def?.typeName === "ZodObject") {
@@ -44,11 +44,13 @@ export const callResolver = async (
     let lastError: string | null = null;
     do {
       try {
+        let didReadFromCache = false;
         if(readCache && !lastError) {
           preparedEndpoint = await context.datastore.getApiConfig(input.id, context.orgId) || 
             await context.datastore.getApiConfigFromRequest(input.endpoint, payload, context.orgId) 
+          didReadFromCache = true;
         }
-        else if(preparedEndpoint || input.endpoint) {
+        if(!didReadFromCache || !preparedEndpoint) {
           const result = await prepareEndpoint(preparedEndpoint || input.endpoint, payload, credentials, metadata, retryCount, messages);
           preparedEndpoint = result.config;
           messages = result.messages;

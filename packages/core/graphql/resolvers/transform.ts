@@ -17,8 +17,8 @@ export const transformResolver = async (
 ) => {
   const callId = crypto.randomUUID();
   const startedAt = new Date();
-  const readCache = options ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.READONLY : true;
-  const writeCache = options ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.WRITEONLY : true;
+  const readCache = options?.cacheMode ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.READONLY : true;
+  const writeCache = options?.cacheMode ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.WRITEONLY : true;
   let preparedTransform: TransformConfig | null = null;
 
   if((input.endpoint?.responseSchema as any)?._def?.typeName === "ZodObject") {

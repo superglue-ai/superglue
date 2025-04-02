@@ -21,8 +21,8 @@ export const extractResolver = async (
   const callId = crypto.randomUUID();
   const startedAt = new Date();
   let preparedExtract: ExtractConfig;
-  const readCache = options ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.READONLY : true;
-  const writeCache = options ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.WRITEONLY : true;
+  const readCache = options?.cacheMode ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.READONLY : true;
+  const writeCache = options?.cacheMode ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.WRITEONLY : true;
   try {
     // Resolve endpoint configuration from cache or prepare new one
     let response: any;
