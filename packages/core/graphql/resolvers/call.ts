@@ -59,9 +59,7 @@ export const callResolver = async (
         if(!preparedEndpoint) {
           throw new Error("Did not find a valid endpoint configuration. If you did provide an id, please ensure cache reading is enabled.");
         }
-
-        const url = composeUrl(preparedEndpoint.urlHost, preparedEndpoint.urlPath);
-        logMessage('info', `API call: ${preparedEndpoint.method} ${url}`, metadata);
+        logMessage('info', `API call: ${preparedEndpoint.method} ${preparedEndpoint.urlHost}`, metadata);
 
         if(preparedEndpoint.urlHost.startsWith("postgres")) {
           response = await callPostgres(preparedEndpoint, payload, credentials, options);
@@ -77,15 +75,16 @@ export const callResolver = async (
 
 
       } catch (error) {
-        logMessage('warn', `API call failed. ${error?.message}`, { runId: callId, orgId: context.orgId });
-        lastError = error?.message || JSON.stringify(error || {});
-        messages.push({role: "user", content: `There was an error with the configuration, please retry: ${lastError}`});
+        const rawErrorString = error?.message || JSON.stringify(error || {});
+        lastError = maskCredentials(rawErrorString, credentials);
+        messages.push({role: "user", content: `There was an error with the configuration, please retry: ${rawErrorString}`});
+        logMessage('warn', `API call failed. ${lastError}`, { runId: callId, orgId: context.orgId });
       }
       retryCount++;
     } while (!response && retryCount < 5);
     
     if(!response) {
-      telemetryClient?.captureException(new Error(`API call failed after ${retryCount} retries. Last error: ${maskCredentials(lastError, credentials)}`), context.orgId, {
+      telemetryClient?.captureException(new Error(`API call failed after ${retryCount} retries. Last error: ${lastError}`), context.orgId, {
         preparedEndpoint: preparedEndpoint,
         retryCount: retryCount,
       });

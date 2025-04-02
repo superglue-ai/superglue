@@ -11,10 +11,12 @@ export const logsResolver = {
             
             // Handler for new logs
             const logHandler = (log: LogEntry) => {
-            // Only emit if org matches and runId matches (if specified)
-            if (log.orgId === orgId) {
-                emitter.emit('data', { logs: log });
-            }
+                if (log.orgId === orgId || (!orgId)) {
+                    // Add small delay to ensure subscription is ready
+                    setTimeout(() => {
+                        emitter.emit('data', { logs: log });
+                    }, 0);
+                }
             };
 
             // Subscribe to log events

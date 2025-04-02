@@ -6,7 +6,7 @@ import { cleanApiDomain, cn } from '@/src/lib/utils'
 import { ApiConfig, AuthType, CacheMode, SuperglueClient } from '@superglue/client'
 import { Copy, Loader2, Terminal, Upload, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { InteractiveApiPlayground } from '../InteractiveApiPlayground'
 import { Button } from '../ui/button'
 import { StepIndicator, type StepperStep } from './StepIndicator'
@@ -14,6 +14,9 @@ import { Label } from '@radix-ui/react-label'
 import { Textarea } from '../ui/textarea'
 import { parseCredentialsHelper, HelpTooltip, inputErrorStyles } from './Helpers'
 import { Input } from '../ui/input'
+import { ApolloClient, gql, InMemoryCache, useSubscription } from '@apollo/client'
+import { createClient } from 'graphql-ws'
+import { GraphQLWsLink } from '@apollo/client/link/subscriptions'
 
 interface ConfigCreateStepperProps {
   configId?: string
@@ -51,12 +54,71 @@ export function ConfigCreateStepper({ configId: initialConfigId, mode = 'create'
     },
     responseSchema: '{}'
   })
+  const LOGS_SUBSCRIPTION = gql`
+  subscription OnNewLog {
+    logs {
+      id
+      message
+      level
+      timestamp
+      runId
+    }
+  }
+`  
+  const config = useConfig();
 
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({})
   
   const [docFile, setDocFile] = useState<File | null>(null)
   const [isDraggingDoc, setIsDraggingDoc] = useState(false)
 
+  const [latestLog, setLatestLog] = useState<string>('')
+  const client = useMemo(() => {
+    const wsLink = new GraphQLWsLink(createClient({
+      url: config.superglueEndpoint?.replace('https', 'ws')?.replace('http', 'ws') || 'ws://localhost:3000/graphql',
+      connectionParams: {
+        Authorization: `Bearer ${config.superglueApiKey}`
+      },
+      retryAttempts: Infinity,
+      shouldRetry: () => true,
+      retryWait: (retries) => new Promise((resolve) => setTimeout(resolve, Math.min(retries * 1000, 5000))),
+      keepAlive: 10000, // Send keep-alive every 10 seconds
+    }))
+
+    return new ApolloClient({
+      link: wsLink,
+      cache: new InMemoryCache(),
+      defaultOptions: {
+        watchQuery: {
+          fetchPolicy: 'no-cache',
+        },
+        query: {
+          fetchPolicy: 'no-cache',
+        },
+      },
+    })
+  }, [config.superglueEndpoint, config.superglueApiKey])
+
+  useEffect(() => {
+    return () => {
+      client.stop()
+    }
+  }, [client])
+
+  useSubscription(LOGS_SUBSCRIPTION, {
+    client,
+    shouldResubscribe: true,
+    onError: (error) => {
+      console.error('Subscription error:', error)
+    },
+    onData: ({ data }) => {
+      console.log('Subscription data:', data)
+      if (data.data?.logs) {
+        setLatestLog(data.data.logs.message)
+      }
+    }
+  })
+  
   const handleChange = (field: string) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | string
   ) => {
@@ -469,6 +531,19 @@ const result = await superglue.call({
     }
   }, [prefillData]);
 
+  useSubscription(LOGS_SUBSCRIPTION, {
+    client,
+    shouldResubscribe: true,
+    onError: (error) => {
+      console.error('Subscription error:', error)
+    },
+    onData: ({ data }) => {
+      if (data.data?.logs) {
+        setLatestLog(data.data.logs.message)
+      }
+    }
+  })
+
   return (
     <div className="flex-1 flex flex-col h-full p-6">
       <div className="flex-none mb-4">
@@ -756,22 +831,23 @@ const result = await superglue.call({
             <Button
               onClick={step === 'try_and_output' && !mappedResponseData ? handleRun : handleNext}
               disabled={isAutofilling || (step === 'try_and_output' && !mappedResponseData && isRunning)}
+              className="animate-pulse"
             >
               {isAutofilling ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {initialRawResponse ? 'Generating schema...' : 'Creating configuration...'}
+                  {latestLog ? latestLog.slice(0, 21) + '...' : 'Creating configuration...'}
                 </>
               ) : (
                 step === 'try_and_output' ? 
                   (isRunning ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Running...
-                    </>
+                      {latestLog ? latestLog.slice(0, 21) + '...' : 'Creating transformation...'}
+                      </>
                   ) : (!mappedResponseData ? (
                     <>
-                      ✨ Run
+                      <span>✨ Run</span>
                     </>
                   ) : 'Complete')) : 
                   'Next'
