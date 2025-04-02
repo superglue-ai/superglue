@@ -130,21 +130,21 @@ async function startServer() {
   // Setup graphql-ws server
   const serverCleanup = useServer({
     schema,
-    // You might want to add context/authentication logic here for WebSockets
     context: async (ctx: any, msg, args) => {
-      // Example: Authenticate based on connectionParams
-      const token = ctx.connectionParams?.Authorization?.split(" ")?.[1]?.trim() || ctx.extra?.request?.url?.split("token=")?.[1]?.split("&")?.[0];
+      const token = ctx.connectionParams?.Authorization?.split(" ")?.[1]?.trim() || 
+        ctx.extra?.request?.url?.split("token=")?.[1]?.split("&")?.[0];
       if (token) {
         const authResult = await authManager.authenticate(token);
         if (authResult.success) {
+          logMessage('info', `Subscription connected`);
           return { datastore: datastore, orgId: authResult.orgId };
         } else {
-           logMessage('warn', `Subscription authentication failed for token: ${token}`);
-           throw new Error('Authentication failed');
+          logMessage('warn', `Subscription authentication failed for token: ${token}`);
+          return false; // Return false to reject with 401
         }
       }
-       logMessage('warn', `Subscription connection attempt without valid token`);
-       throw new Error('Authentication required');
+      logMessage('warn', `Subscription connection attempt without valid token`);
+      return false; // Return false to reject with 401
     },
     onDisconnect(ctx, code, reason) {
       logMessage('info', `Subscription disconnected. code=${code} reason=${reason}`);

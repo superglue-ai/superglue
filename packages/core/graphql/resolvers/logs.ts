@@ -23,9 +23,9 @@ export const logsResolver = {
             return {
             next() {
                 return new Promise((resolve) => {
-                emitter.once('data', (value) => {
-                    resolve({ value, done: false });
-                });
+                    emitter.once('data', (value) => {
+                        resolve({ value, done: false });
+                    });
                 });
             },
             return() {

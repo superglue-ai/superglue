@@ -7,6 +7,7 @@ import { Toaster } from '../components/ui/toaster'
 import { ConfigProvider } from './config-context'
 import { geistMono, geistSans } from './fonts'
 import { CSPostHogProvider } from './providers'
+import { LogSidebar } from '../components/LogSidebar'
 
 interface Props {
   children: React.ReactNode
@@ -37,6 +38,7 @@ export function ClientWrapper({ children, config }: Props) {
                   {children}
                 </motion.div>
               </AnimatePresence>
+              {config.superglueApiKey && <LogSidebar />}
             </div>
           )}
           <Toaster />

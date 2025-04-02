@@ -23,18 +23,13 @@ if(telemetryClient) {
 }
 
 // Precompile the regex for better performance
-const OPERATION_REGEX = /(?:query|mutation)\s+\w+\s*[({][\s\S]*?{([\s\S]*?){/;
+const OPERATION_REGEX = /(?:query|mutation|subscription)\s+(\w+)/;
 
 export const extractOperationName = (query: string): string => {
-  // Early return for invalid input
   if (!query) return 'unknown_query';
 
   const match = OPERATION_REGEX.exec(query);
-  if (!match?.[1]) return 'unknown_query';
-
-  // Split only the relevant captured group and take first word
-  const firstWord = match[1].trim().split(/[\s({]/)[0];
-  return firstWord || 'unknown_query';
+  return match?.[1] || 'unknown_query';
 };
 
 export const telemetryMiddleware = (req: any, res: any, next: any) => {
