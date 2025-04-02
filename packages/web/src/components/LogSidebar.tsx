@@ -85,10 +85,16 @@ export function LogSidebar() {
     }
   }, [logs]);
 
-  // Reset notification when expanding
+  // Reset notification and scroll when expanding
   useEffect(() => {
     if (isExpanded) {
       setHasNewLogs(false)
+      const scrollArea = document.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollArea) {
+        setTimeout(() => {
+          scrollArea.scrollTop = scrollArea.scrollHeight;
+        }, 100); // Small delay to ensure animation completes
+      }
     }
   }, [isExpanded]);
 
@@ -114,12 +120,12 @@ export function LogSidebar() {
       </Button>
 
       {isExpanded ? (
-        <ScrollArea className="flex-1">
-          <div className="p-4">
+        <ScrollArea className="max-w-full block">
+          <div className="p-4 max-w-[100%-5rem]">
             {logs.map((log) => (
               <div
                 key={log.id}
-                className={`mb-2 p-2 rounded text-sm ${
+                className={`mb-2 p-2 rounded text-sm max-w-full  overflow-hidden ${
                   log.level === "ERROR"
                     ? "bg-red-500/10"
                     : log.level === "WARN"
@@ -131,7 +137,7 @@ export function LogSidebar() {
                   <span className="font-mono">{new Date(log.timestamp).toLocaleTimeString()}</span>
                   <span className="font-semibold">{log.level}</span>
                 </div>
-                <p>{log.message}</p>
+                <p className="max-w-full text-wrap">{log.message}</p>
               </div>
             ))}
           </div>
