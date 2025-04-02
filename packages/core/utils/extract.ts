@@ -26,7 +26,7 @@ export async function prepareExtract(extractInput: ExtractInput, payload: any, c
     };
 
     // If a documentation URL is provided, fetch and parse additional details
-    const documentation = await getDocumentation(extractConfig.documentationUrl, extractConfig.headers, extractConfig.queryParams);
+    const documentation = await getDocumentation(extractConfig.documentationUrl, extractConfig.headers, extractConfig.queryParams, extractConfig.urlHost, extractConfig.urlPath);
 
     const availableVars = [...Object.keys(payload || {}), ...Object.keys(credentials || {})];
     const computedExtractConfig = await generateExtractConfig(extractConfig, documentation, availableVars, lastError);

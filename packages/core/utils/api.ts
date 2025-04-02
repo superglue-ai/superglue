@@ -28,7 +28,7 @@ export async function prepareEndpoint(
     };
     logMessage('info', `Generating API config for ${endpointInput.urlHost}${retryCount > 0 ? ` (retry ${retryCount})` : ""}`, metadata);
 
-    const documentation = await getDocumentation(apiCallConfig.documentationUrl, apiCallConfig.headers, apiCallConfig.queryParams, apiCallConfig?.urlPath);
+    const documentation = await getDocumentation(apiCallConfig.documentationUrl, apiCallConfig.headers, apiCallConfig.queryParams, apiCallConfig?.urlHost, apiCallConfig?.urlPath);
 
     const availableVars = [...Object.keys(payload || {}), ...Object.keys(credentials || {})];
     const computedApiCallConfig = await generateApiConfig(apiCallConfig, documentation, availableVars, retryCount, messages);
@@ -277,7 +277,7 @@ Available variables: ${vars.join(", ")}
 
 Documentation: ${String(documentation)}`
 
-  if(!messages) {
+  if(!messages || messages.length === 0) {
     messages = [
       {role: "system", content: API_PROMPT}, 
       {role: "user", content: userPrompt}

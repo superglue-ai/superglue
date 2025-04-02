@@ -3,6 +3,7 @@ import { getIntrospectionQuery } from "graphql";
 import { NodeHtmlMarkdown } from "node-html-markdown";
 import playwright from '@playwright/test';
 import { DOCUMENTATION_MAX_LENGTH } from "../config.js";
+import { composeUrl } from "./tools.js";
 
 let browserInstance: playwright.Browser | null = null;
 
@@ -174,8 +175,15 @@ export function postProcessLargeDoc(documentation: string, endpointPath: string)
   return finalDoc;
 }
 
-export async function getDocumentation(documentationUrl: string, headers: Record<string, string>, queryParams: Record<string, string>, apiEndpoint?: string): Promise<string> {
+export async function getDocumentation(documentationUrl: string, headers: Record<string, string>, queryParams: Record<string, string>, urlHost?: string, urlPath?: string): Promise<string> {
     if(!documentationUrl) {
+      const fullUrl = composeUrl(urlHost, urlPath);
+      if(fullUrl.includes("graphql")) {
+        const graphqlDocumentation = await getGraphQLSchema(fullUrl, headers, queryParams);
+        if(graphqlDocumentation) {
+          return JSON.stringify(graphqlDocumentation); 
+        }
+      }
       return "";
     }
     let documentation = "";
@@ -265,7 +273,7 @@ export async function getDocumentation(documentationUrl: string, headers: Record
     }
 
     if(documentation.length > DOCUMENTATION_MAX_LENGTH) {
-      documentation = postProcessLargeDoc(documentation, apiEndpoint || '');
+      documentation = postProcessLargeDoc(documentation, urlPath || '');
     }
 
     return documentation;
