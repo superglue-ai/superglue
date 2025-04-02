@@ -18,6 +18,7 @@ import {
   upsertWorkflowResolver,
   workflowResolver
 } from "./resolvers/workflow.js";
+import { logsResolver } from "./resolvers/logs.js";
 
 export const resolvers = {
   Query: {
@@ -49,6 +50,9 @@ export const resolvers = {
     deleteExtraction: deleteExtractResolver,
     upsertTransformation: upsertTransformResolver,
     deleteTransformation: deleteTransformResolver,
+  },
+  Subscription: {
+    logs: logsResolver,
   },
   JSON: JSONResolver,
   JSONSchema: JSONSchemaResolver,
