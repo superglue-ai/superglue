@@ -220,7 +220,6 @@ export interface LogEntry {
   message: string;
   level: string;
   timestamp: Date;
-  metadata: Record<string, any>;
   runId?: string;
   orgId?: string;
 }

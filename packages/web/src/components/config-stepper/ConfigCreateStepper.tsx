@@ -4,22 +4,19 @@ import { useConfig } from '@/src/app/config-context'
 import { useToast } from '@/src/hooks/use-toast'
 import { cleanApiDomain, cn } from '@/src/lib/utils'
 import { ApiConfig, AuthType, CacheMode, SuperglueClient } from '@superglue/client'
-import { Copy, Loader2, Terminal, Upload } from 'lucide-react'
+import { Copy, Loader2, Terminal, Upload, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { InteractiveApiPlayground } from '../InteractiveApiPlayground'
 import { Button } from '../ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
-import { Input } from '../ui/input'
-import { Label } from '../ui/label'
-import { Textarea } from '../ui/textarea'
-import { HelpTooltip, inputErrorStyles, parseCredentialsHelper } from './Helpers'
 import { StepIndicator, type StepperStep } from './StepIndicator'
+import { Label } from '@radix-ui/react-label'
+import { Textarea } from '../ui/textarea'
+import { parseCredentialsHelper, HelpTooltip, inputErrorStyles } from './Helpers'
+import { Input } from '../ui/input'
 
 interface ConfigCreateStepperProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  configId?: string // not used, but if we later want to edit through this flow
+  configId?: string
   mode?: 'create' | 'edit'
   prefillData?: {
     fullUrl: string
@@ -29,7 +26,7 @@ interface ConfigCreateStepperProps {
   onComplete?: () => void
 }
 
-export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfigId, mode = 'create', prefillData, onComplete }: ConfigCreateStepperProps) {
+export function ConfigCreateStepper({ configId: initialConfigId, mode = 'create', prefillData, onComplete }: ConfigCreateStepperProps) {
   const [step, setStep] = useState<StepperStep>('basic')
   const [isAutofilling, setIsAutofilling] = useState(false)
   const { toast } = useToast()
@@ -278,7 +275,6 @@ export function ConfigCreateStepper({ open, onOpenChange, configId: initialConfi
     } else {
       router.push(`/configs/${configId}/edit`)
     }
-    onOpenChange(false)
   }
 
   const getCurlCommand = () => {
@@ -463,7 +459,7 @@ const result = await superglue.call({
 
   // Update form data when prefillData changes or when modal is opened
   useEffect(() => {
-    if (prefillData && open) {
+    if (prefillData) {
       setFormData(prevData => ({
         ...prevData,
         fullUrl: prefillData.fullUrl || prevData.fullUrl,
@@ -471,318 +467,319 @@ const result = await superglue.call({
         documentationUrl: prefillData.documentationUrl || prevData.documentationUrl
       }));
     }
-  }, [prefillData, open]);
+  }, [prefillData]);
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent 
-        className="h-[100vh] w-[100vw] max-w-[100vw] p-3 sm:p-6 lg:p-12 gap-0 rounded-none border-none flex flex-col"
-        onPointerDownOutside={e => e.preventDefault()}
-      >
-        <div className="flex-none mb-4">
-          <DialogHeader>
-            <div className="flex flex-col lg:flex-row items-center justify-between gap-4 mb-4">
-              <DialogTitle>
-                {step === 'success' ? 'Configuration Complete!' : 'Create New API Configuration'}
-              </DialogTitle>
-              {!step.includes('success') && (
-                <Button
-                  variant="outline"
-                  className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-200/50 hover:border-blue-300/50 text-blue-600 hover:text-blue-700 text-sm px-4 py-1 h-8 rounded-full animate-pulse shrink-0"
-                  onClick={() => window.open('https://cal.com/teamindex/onboarding', '_blank')}
-                >
-                  ✨ Get help from our team
-                </Button>
+    <div className="flex-1 flex flex-col h-full p-6">
+      <div className="flex-none mb-4">
+        <div className="flex flex-col lg:flex-row items-center justify-between gap-4 mb-4">
+          <h1 className="text-2xl font-semibold">
+            {step === 'success' ? 'Configuration Complete!' : 'Create New API Configuration'}
+          </h1>
+          <div className="flex items-center gap-2">
+            {!step.includes('success') && (
+              <Button
+                variant="outline"
+                className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-200/50 hover:border-blue-300/50 text-blue-600 hover:text-blue-700 text-sm px-4 py-1 h-8 rounded-full animate-pulse shrink-0"
+                onClick={() => window.open('https://cal.com/teamindex/onboarding', '_blank')}
+              >
+                ✨ Get help from our team
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="shrink-0"
+              onClick={() => router.push('/configs')}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        <StepIndicator currentStep={step} />
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-1 min-h-0">
+        {step === 'basic' && (
+          <div className="space-y-3">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <Label htmlFor="fullUrl">API Endpoint URL</Label>
+                <HelpTooltip text="The API URL (e.g., https://api.example.com/v1). Don't include the endpoint, e.g. /books/list, we figure it out." />
+              </div>
+              <Input
+                id="fullUrl"
+                value={formData.fullUrl}
+                onChange={(e) => {
+                  handleChange('fullUrl')(e)
+                  if (e.target.value) {
+                    setValidationErrors(prev => ({ ...prev, fullUrl: false }))
+                  }
+                }}
+                placeholder="https://api.example.com/v1"
+                required
+                autoFocus
+                className={cn(
+                  validationErrors.fullUrl && inputErrorStyles,
+                  validationErrors.fullUrl && "focus:!border-destructive"
+                )}
+              />
+              {validationErrors.fullUrl && (
+                <p className="text-sm text-destructive mt-1">API endpoint URL is required</p>
               )}
             </div>
-          </DialogHeader>
-
-          <StepIndicator currentStep={step} />
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-1 min-h-0">
-          {step === 'basic' && (
-            <div className="space-y-3">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <Label htmlFor="fullUrl">API Endpoint URL</Label>
-                  <HelpTooltip text="The API URL (e.g., https://api.example.com/v1). Don't include the endpoint, e.g. /books/list, we figure it out." />
-                </div>
-                <Input
-                  id="fullUrl"
-                  value={formData.fullUrl}
-                  onChange={(e) => {
-                    handleChange('fullUrl')(e)
-                    if (e.target.value) {
-                      setValidationErrors(prev => ({ ...prev, fullUrl: false }))
-                    }
-                  }}
-                  placeholder="https://api.example.com/v1"
-                  required
-                  autoFocus
-                  className={cn(
-                    validationErrors.fullUrl && inputErrorStyles,
-                    validationErrors.fullUrl && "focus:!border-destructive"
-                  )}
-                />
-                {validationErrors.fullUrl && (
-                  <p className="text-sm text-destructive mt-1">API endpoint URL is required</p>
-                )}
+            
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <Label htmlFor="documentationUrl">API Documentation</Label>
+                <HelpTooltip text="Link to the API's documentation or upload a documentation file" />
               </div>
               
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <Label htmlFor="documentationUrl">API Documentation</Label>
-                  <HelpTooltip text="Link to the API's documentation or upload a documentation file" />
+              {docFile ? (
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 flex items-center gap-3 bg-blue-500/10 px-4 py-2 rounded-lg max-w-[calc(100%-5.5rem)]">
+                    <Upload className="h-4 w-4 text-blue-500 shrink-0" />
+                    <span className="text-white font-medium text-sm truncate">{formData.documentationUrl.slice(0, 300)}</span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="shrink-0 text-muted-foreground hover:text-destructive transition-colors w-20"
+                    onClick={() => {
+                      setFormData(prev => ({ ...prev, documentationUrl: '' }))
+                      setDocFile(null)
+                    }}
+                  >
+                    Remove
+                  </Button>
                 </div>
-                
-                {docFile ? (
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 flex items-center gap-3 bg-blue-500/10 px-4 py-2 rounded-lg max-w-[calc(100%-5.5rem)]">
-                      <Upload className="h-4 w-4 text-blue-500 shrink-0" />
-                      <span className="text-white font-medium text-sm truncate">{formData.documentationUrl.slice(0, 300)}</span>
-                    </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Input
+                    id="documentationUrl"
+                    value={formData.documentationUrl}
+                    onChange={handleChange('documentationUrl')}
+                    placeholder="https://docs.example.com"
+                    className="flex-1"
+                  />
+                  <div 
+                    className={cn(
+                      "relative shrink-0",
+                      isDraggingDoc && "after:absolute after:inset-0 after:bg-primary/5 after:backdrop-blur-[1px] after:rounded-lg after:border-2 after:border-primary"
+                    )}
+                    onDragOver={handleDocDragOver}
+                    onDragLeave={handleDocDragLeave}
+                    onDrop={handleDocDrop}
+                  >
                     <Button
-                      variant="ghost"
-                      size="sm"
-                      className="shrink-0 text-muted-foreground hover:text-destructive transition-colors w-20"
-                      onClick={() => {
-                        setFormData(prev => ({ ...prev, documentationUrl: '' }))
-                        setDocFile(null)
-                      }}
+                      variant="outline"
+                      className="h-9"
+                      onClick={() => document.getElementById('doc-file-upload')?.click()}
                     >
-                      Remove
+                      Upload Document
                     </Button>
-                  </div>
-                ) : (
-                  <div className="flex gap-2">
-                    <Input
-                      id="documentationUrl"
-                      value={formData.documentationUrl}
-                      onChange={handleChange('documentationUrl')}
-                      placeholder="https://docs.example.com"
-                      className="flex-1"
+                    <input
+                      type="file"
+                      id="doc-file-upload"
+                      className="hidden"
+                      onChange={handleDocFileUpload}
+                      accept=".pdf,.txt,.md"
                     />
-                    <div 
-                      className={cn(
-                        "relative shrink-0",
-                        isDraggingDoc && "after:absolute after:inset-0 after:bg-primary/5 after:backdrop-blur-[1px] after:rounded-lg after:border-2 after:border-primary"
-                      )}
-                      onDragOver={handleDocDragOver}
-                      onDragLeave={handleDocDragLeave}
-                      onDrop={handleDocDrop}
-                    >
-                      <Button
-                        variant="outline"
-                        className="h-9"
-                        onClick={() => document.getElementById('doc-file-upload')?.click()}
-                      >
-                        Upload Document
-                      </Button>
-                      <input
-                        type="file"
-                        id="doc-file-upload"
-                        className="hidden"
-                        onChange={handleDocFileUpload}
-                        accept=".pdf,.txt,.md"
-                      />
-                    </div>
                   </div>
-                )}
-              </div>
-              
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <Label htmlFor="auth">API Key or Token (Optional)</Label>
-                  <HelpTooltip text="Enter API secret here (not stored, just for initial setup). Omit prefixes like Bearer. Alternatively, you can put a JSON object here with multiple keys and values." />
                 </div>
-                <Input
-                  id="auth"
-                  value={formData.auth.value}
-                  onChange={(e) => handleAuthChange(e.target.value)}
-                  placeholder="Enter your API key or token"
-                />
-              </div>
-              
-              <div className="mt-6">
-                <div className="flex items-center gap-2 mb-1">
-                  <Label htmlFor="instruction">What do you want to get from this API?</Label>
-                  <HelpTooltip text="Describe what data you want to extract from this API in plain English" />
-                </div>
-                <Textarea
-                  id="instruction"
-                  value={formData.instruction}
-                  onChange={(e) => {
-                    handleChange('instruction')(e)
-                    if (e.target.value) {
-                      setValidationErrors(prev => ({ ...prev, instruction: false }))
-                    }
-                  }}
-                  placeholder="E.g. 'Get all products with price and name'"
-                  className={cn(
-                    "h-48",
-                    validationErrors.instruction && inputErrorStyles,
-                    validationErrors.instruction && "focus:!border-destructive"
-                  )}
-                  required
-                />
-                {validationErrors.instruction && (
-                  <p className="text-sm text-destructive mt-1">Instruction is required</p>
-                )}
-              </div>
+              )}
             </div>
-          )}
-
-          {step === 'try_and_output' && configId && (
-            <div className="space-y-2 h-full">
-              <InteractiveApiPlayground 
-                configId={configId}
-                instruction={formData.instruction}
-                onInstructionChange={handleChange('instruction')}
-                responseSchema={formData.responseSchema}
-                onResponseSchemaChange={handleChange('responseSchema')}
-                initialRawResponse={initialRawResponse}
-                onMappedResponse={handleMappedResponse}
-                onRun={handleRun}
-                isRunning={isRunning}
-                mappedResponseData={mappedResponseData}
-                responseMapping={responseMapping}
-                hideRunButton={true}
+            
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <Label htmlFor="auth">API Key or Token (Optional)</Label>
+                <HelpTooltip text="Enter API secret here (not stored, just for initial setup). Omit prefixes like Bearer. Alternatively, you can put a JSON object here with multiple keys and values." />
+              </div>
+              <Input
+                id="auth"
+                value={formData.auth.value}
+                onChange={(e) => handleAuthChange(e.target.value)}
+                placeholder="Enter your API key or token"
               />
             </div>
-          )}
-
-          {step === 'success' && (
-            <div className="space-y-4 h-full">
-              <p className="text-m font-medium">Done!</p>
-              <p className="text-sm font-medium">You can now call the endpoint from your app. The call is proxied to the targeted endpoint without AI inbewteen. Predictable and millisecond latency.</p>
-              <div className="rounded-md bg-muted p-4">
-                <div className="flex items-start space-x-2">
-                  <Terminal className="mt-0.5 h-5 w-5 text-muted-foreground" />
-                  <div className="space-y-1 w-full">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium">Try the endpoint locally with curl: </p>
-                      <Button
-                        variant="ghost" 
-                        size="icon"
-                        className="h-8 w-8 flex-none"
-                        onClick={() => {
-                          navigator.clipboard.writeText(getCurlCommand());
-                        }}
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <div className="relative">
-                      <pre className="rounded-lg bg-secondary p-4 text-sm overflow-x-auto">
-                        <code>{getCurlCommand()}</code>
-                      </pre>
-                    </div>
-                  </div>
-                </div>
+            
+            <div className="mt-6">
+              <div className="flex items-center gap-2 mb-1">
+                <Label htmlFor="instruction">What do you want to get from this API?</Label>
+                <HelpTooltip text="Describe what data you want to extract from this API in plain English" />
               </div>
-              
-              <div className="rounded-md bg-muted p-4">
-                <div className="flex items-start space-x-2">
-                  <Terminal className="mt-0.5 h-5 w-5 text-muted-foreground" />
-                  <div className="space-y-1 w-full">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium">Or use the TypeScript SDK in your application: </p>
-                      <Button
-                        variant="ghost" 
-                        size="icon"
-                        className="h-8 w-8 flex-none"
-                        onClick={() => {
-                          navigator.clipboard.writeText(getSdkCode());
-                        }}
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <div className="relative">
-                      <pre className="rounded-lg bg-secondary p-4 text-sm overflow-x-auto">
-                        <code>{getSdkCode()}</code>
-                      </pre>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-
-            </div>
-          )}
-        </div>
-
-        <div className="flex-none mt-2 sm:mt-4 flex flex-col lg:flex-row gap-2 justify-between">
-          {step === 'success' ? (
-            <>
-              <Button
-                variant="outline"
-                onClick={handleBack}
-              >
-                Back
-              </Button>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    router.push(`/configs/${configId}/edit`)
-                    onOpenChange(false)
-                  }}
-                >
-                  Advanced Edit
-                </Button>
-                <Button
-                  onClick={() => {
-                    router.push('/configs')
-                    // Call onComplete before closing if provided
-                    if (onComplete) {
-                      onComplete()
-                    }
-                    onOpenChange(false)
-                  }}
-                >
-                  Done
-                </Button>
-              </div>
-            </>
-          ) : (
-            <>
-              <Button
-                variant="outline"
-                onClick={handleBack}
-                disabled={step === 'basic'}
-              >
-                Back
-              </Button>
-              <Button
-                onClick={step === 'try_and_output' && !mappedResponseData ? handleRun : handleNext}
-                disabled={isAutofilling || (step === 'try_and_output' && !mappedResponseData && isRunning)}
-              >
-                {isAutofilling ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {initialRawResponse ? 'Generating schema...' : 'Creating configuration...'}
-                  </>
-                ) : (
-                  step === 'try_and_output' ? 
-                    (isRunning ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Running...
-                      </>
-                    ) : (!mappedResponseData ? (
-                      <>
-                        ✨ Run
-                      </>
-                    ) : 'Complete')) : 
-                    'Next'
+              <Textarea
+                id="instruction"
+                value={formData.instruction}
+                onChange={(e) => {
+                  handleChange('instruction')(e)
+                  if (e.target.value) {
+                    setValidationErrors(prev => ({ ...prev, instruction: false }))
+                  }
+                }}
+                placeholder="E.g. 'Get all products with price and name'"
+                className={cn(
+                  "h-48",
+                  validationErrors.instruction && inputErrorStyles,
+                  validationErrors.instruction && "focus:!border-destructive"
                 )}
+                required
+              />
+              {validationErrors.instruction && (
+                <p className="text-sm text-destructive mt-1">Instruction is required</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {step === 'try_and_output' && configId && (
+          <div className="space-y-2 h-full">
+            <InteractiveApiPlayground 
+              configId={configId}
+              instruction={formData.instruction}
+              onInstructionChange={handleChange('instruction')}
+              responseSchema={formData.responseSchema}
+              onResponseSchemaChange={handleChange('responseSchema')}
+              initialRawResponse={initialRawResponse}
+              onMappedResponse={handleMappedResponse}
+              onRun={handleRun}
+              isRunning={isRunning}
+              mappedResponseData={mappedResponseData}
+              responseMapping={responseMapping}
+              hideRunButton={true}
+            />
+          </div>
+        )}
+
+        {step === 'success' && (
+          <div className="space-y-4 h-full">
+            <p className="text-m font-medium">Done!</p>
+            <p className="text-sm font-medium">You can now call the endpoint from your app. The call is proxied to the targeted endpoint without AI inbewteen. Predictable and millisecond latency.</p>
+            <div className="rounded-md bg-muted p-4">
+              <div className="flex items-start space-x-2">
+                <Terminal className="mt-0.5 h-5 w-5 text-muted-foreground shrink-0" />
+                <div className="space-y-1 w-full">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium">Try the endpoint locally with curl: </p>
+                    <Button
+                      variant="ghost" 
+                      size="icon"
+                      className="h-8 w-8 flex-none"
+                      onClick={() => {
+                        navigator.clipboard.writeText(getCurlCommand());
+                      }}
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="relative">
+                    <pre className="rounded-lg bg-secondary p-4 text-sm overflow-x-auto whitespace-pre-wrap break-all">
+                      <code>{getCurlCommand()}</code>
+                    </pre>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="rounded-md bg-muted p-4">
+              <div className="flex items-start space-x-2">
+                <Terminal className="mt-0.5 h-5 w-5 text-muted-foreground shrink-0" />
+                <div className="space-y-1 w-full">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium">Or use the TypeScript SDK in your application: </p>
+                    <Button
+                      variant="ghost" 
+                      size="icon"
+                      className="h-8 w-8 flex-none"
+                      onClick={() => {
+                        navigator.clipboard.writeText(getSdkCode());
+                      }}
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="relative">
+                    <pre className="rounded-lg bg-secondary p-4 text-sm overflow-x-auto whitespace-pre-wrap break-all">
+                      <code>{getSdkCode()}</code>
+                    </pre>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+
+          </div>
+        )}
+      </div>
+
+      <div className="flex-none mt-2 sm:mt-4 flex flex-col lg:flex-row gap-2 justify-between">
+        {step === 'success' ? (
+          <>
+            <Button
+              variant="outline"
+              onClick={handleBack}
+            >
+              Back
+            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  router.push(`/configs/${configId}/edit`)
+                }}
+              >
+                Advanced Edit
               </Button>
-            </>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+              <Button
+                onClick={() => {
+                  router.push('/configs')
+                  // Call onComplete before closing if provided
+                  if (onComplete) {
+                    onComplete()
+                  }
+                }}
+              >
+                Done
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <Button
+              variant="outline"
+              onClick={handleBack}
+              disabled={step === 'basic'}
+            >
+              Back
+            </Button>
+            <Button
+              onClick={step === 'try_and_output' && !mappedResponseData ? handleRun : handleNext}
+              disabled={isAutofilling || (step === 'try_and_output' && !mappedResponseData && isRunning)}
+            >
+              {isAutofilling ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {initialRawResponse ? 'Generating schema...' : 'Creating configuration...'}
+                </>
+              ) : (
+                step === 'try_and_output' ? 
+                  (isRunning ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Running...
+                    </>
+                  ) : (!mappedResponseData ? (
+                    <>
+                      ✨ Run
+                    </>
+                  ) : 'Complete')) : 
+                  'Next'
+              )}
+            </Button>
+          </>
+        )}
+      </div>
+    </div>
   )
 }

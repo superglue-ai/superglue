@@ -235,7 +235,6 @@ type Log {
   message: String!
   level: LogLevel!
   timestamp: DateTime!
-  metadata: JSON
   runId: ID
 }
 
