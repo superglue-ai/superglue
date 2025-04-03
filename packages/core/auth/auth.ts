@@ -83,6 +83,6 @@ export const extractToken = (source: { headers?: any, query?: any } | { connecti
     `;
   }
 
-  export const _resetAuthManager = () => {
-    _authManager = null;
+  export const _resetAuthManager = (manager: LocalKeyManager | SupabaseKeyManager | null = null) => {
+    _authManager = manager;
   }; 

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { authMiddleware, validateToken, extractToken, _resetAuthManager } from './auth.js'
 import { LocalKeyManager } from './localKeyManager.js'
+import { SupabaseKeyManager } from './supabaseKeyManager.js'
 
 vi.mock('./localKeyManager.js')
 vi.mock('./supabaseKeyManager.js')
@@ -42,14 +43,16 @@ describe('Auth Module', () => {
         authenticate: vi.fn()
       };
       
-      // Reset the mock before each test
+      // Reset the mock function calls before each test
       mockAuthManager.authenticate.mockReset();
       
-      // Replace LocalKeyManager constructor mock to return our instance
-      vi.mocked(LocalKeyManager).mockImplementation(() => mockAuthManager);
+      // Directly set the internal auth manager to our mock instance
+      _resetAuthManager(mockAuthManager); 
     })
 
     it('returns failure when no token provided', async () => {
+      // Reset manager to null for this specific test case where getAuthManager shouldn't be called with a token
+      _resetAuthManager(null); 
       const result = await validateToken(undefined)
       expect(result).toEqual({
         success: false,
@@ -63,6 +66,7 @@ describe('Auth Module', () => {
       mockAuthManager.authenticate.mockResolvedValue(mockAuthResult);
 
       const result = await validateToken('test123');
+      expect(mockAuthManager.authenticate).toHaveBeenCalledWith('test123');
       expect(result).toEqual({
         success: true,
         message: '',
@@ -88,7 +92,8 @@ describe('Auth Module', () => {
       mockAuthManager = {
         authenticate: vi.fn()
       };
-      vi.mocked(LocalKeyManager).mockImplementation(() => mockAuthManager);
+      // Directly set the internal auth manager to our mock instance
+       _resetAuthManager(mockAuthManager);
     })
 
     it('skips auth for websocket connections', async () => {
@@ -112,6 +117,7 @@ describe('Auth Module', () => {
       })
 
       await authMiddleware(mockReq, mockRes, mockNext)
+      expect(mockAuthManager.authenticate).toHaveBeenCalledWith('invalid');
       expect(mockRes.status).toHaveBeenCalledWith(401)
     })
 
@@ -123,6 +129,7 @@ describe('Auth Module', () => {
       })
 
       await authMiddleware(mockReq, mockRes, mockNext)
+      expect(mockAuthManager.authenticate).toHaveBeenCalledWith('valid');
       expect(mockReq.orgId).toBe('org123')
       expect(mockReq.headers.orgId).toBe('org123')
       expect(mockNext).toHaveBeenCalled()
