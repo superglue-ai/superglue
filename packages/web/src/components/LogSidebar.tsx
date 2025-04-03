@@ -64,10 +64,9 @@ export function LogSidebar() {
     client,
     shouldResubscribe: true,
     onError: (error) => {
-      console.error('Subscription error:', error)
+      console.warn('Subscription error:', error)
     },
     onData: ({ data }) => {
-      console.log('Subscription data:', data)
       if (data.data?.logs) {
         setLogs(prev => [...prev, data.data.logs].slice(-100))
         if (!isExpanded) {
@@ -106,7 +105,7 @@ export function LogSidebar() {
       }}
       className="border-l border-border bg-background flex flex-col relative"
     >
-      <div className={`m-2 max-w-full ${isExpanded ? 'h-16' : 'h-24'}`}>
+      <div className={`m-2 max-w-full ${isExpanded ? 'h-12' : 'h-24'}`}>
         <Button
           variant="ghost"
           size="sm"
