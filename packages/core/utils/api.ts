@@ -24,7 +24,7 @@ export async function prepareEndpoint(
       ...endpointInput,
       createdAt: currentTime,
       updatedAt: currentTime,
-      id: metadata?.runId
+      id: crypto.randomUUID()
     };
     logMessage('info', `Generating API config for ${endpointInput.urlHost}${retryCount > 0 ? ` (retry ${retryCount})` : ""}`, metadata);
 
