@@ -1,5 +1,6 @@
 import { PostHog } from 'posthog-node';
 import { config } from '../default.js';
+import { logMessage } from "./logs.js";
 
 // we use a privacy-preserving session id to track queries
 export const sessionId = crypto.randomUUID();
@@ -18,41 +19,35 @@ export const telemetryClient = !isTelemetryDisabled && !isDebug ?
   ) : null;
 
 if(telemetryClient) {
-  console.log("superglue uses telemetry to understand how many users are using the platform. See self-hosting guide for more info.");
+  logMessage('info', "superglue uses telemetry to understand how many users are using the platform. See self-hosting guide for more info.");
 }
 
 // Precompile the regex for better performance
-const OPERATION_REGEX = /(?:query|mutation)\s+\w+\s*[({][\s\S]*?{([\s\S]*?){/;
+const OPERATION_REGEX = /(?:query|mutation|subscription)\s+(\w+)/;
 
 export const extractOperationName = (query: string): string => {
-  // Early return for invalid input
   if (!query) return 'unknown_query';
 
   const match = OPERATION_REGEX.exec(query);
-  if (!match?.[1]) return 'unknown_query';
-
-  // Split only the relevant captured group and take first word
-  const firstWord = match[1].trim().split(/[\s({]/)[0];
-  return firstWord || 'unknown_query';
+  return match?.[1] || 'unknown_query';
 };
 
-export const telemetryMiddleware = (req, res, next) => {
-  if(!telemetryClient) {
+export const telemetryMiddleware = (req: any, res: any, next: any) => {
+  if(!req?.body?.query || req.body.query.includes("IntrospectionQuery") || req.body.query.includes("__schema")) {
     return next();
   }
+  const operation = extractOperationName(req.body.query);
 
-  if(req?.body?.query && !(req.body.query.includes("IntrospectionQuery") || req.body.query.includes("__schema"))) {
-    const operation = extractOperationName(req.body.query);
+  logMessage('debug', `Executing ${operation}`, { orgId: req.orgId });
 
-    telemetryClient.capture({
-        distinctId: req.orgId || sessionId,
-        event: operation,
-        properties: {
-          query: req.body.query,
-          orgId: req.orgId,
-        }
-      });
-    }
+  telemetryClient?.capture({
+      distinctId: req.orgId || sessionId,
+      event: operation,
+      properties: {
+        query: req.body.query,
+        orgId: req.orgId,
+      }
+    });
   next();
 };
 
@@ -89,6 +84,9 @@ export const handleQueryError = (errors: any[], query: string, orgId: string, re
   const operation = extractOperationName(query);
   const properties = createCallProperties(query, requestContext.response?.body, isSelfHosted, operation);
   properties.success = false;
+
+  logMessage('warn', `${operation} failed.\n${errors.map(e => `\n- ${e.message}`).join('')}`, { orgId: orgId });
+
   telemetryClient?.capture({
     distinctId: orgId || sessionId,
     event: operation + '_error',
@@ -108,10 +106,15 @@ export const handleQueryError = (errors: any[], query: string, orgId: string, re
 };
 
 const handleQuerySuccess = (query: string, orgId: string, requestContext: any) => {
+  if(!query || query.includes("IntrospectionQuery") || query.includes("__schema")) {
+    return;
+  }
   const distinctId = isSelfHosted ? `sh-inst-${requestContext.contextValue.datastore.storage?.tenant?.email}` : orgId;
   const operation = extractOperationName(query);
   const properties = createCallProperties(query, requestContext.response?.body, isSelfHosted, operation);
   properties.success = true;
+
+  logMessage('debug', `${operation} successful`, { orgId: orgId });
 
   telemetryClient?.capture({
     distinctId: distinctId,
@@ -131,20 +134,11 @@ export const createTelemetryPlugin = () => {
           requestContext?.response?.body?.singleResult?.errors ||
           Object.values(requestContext?.response?.body?.singleResult?.data || {}).map((d: any) => d.error).filter(Boolean);
 
-        if (telemetryClient) {
-          if(errors && errors.length > 0) {
-            console.error(errors);
-            const orgId = requestContext.contextValue.orgId;
-            handleQueryError(errors, requestContext.request.query, orgId, requestContext);
-          } else {
-            const orgId = requestContext.contextValue.orgId;
-            handleQuerySuccess(requestContext.request.query, orgId, requestContext);
-          }
+        const orgId = requestContext.contextValue.orgId;
+        if (errors && errors.length > 0) {
+          handleQueryError(errors, requestContext.request.query, orgId, requestContext);
         } else {
-          // disabled telemetry
-          if(errors && errors.length > 0) {
-            console.error(errors);
-          }
+          handleQuerySuccess(requestContext.request.query, orgId, requestContext);
         }
       }
     })

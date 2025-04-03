@@ -153,6 +153,13 @@ enum FileType {
   AUTO
 }
 
+enum LogLevel {
+  DEBUG
+  INFO
+  WARN
+  ERROR
+}
+
 input PaginationInput {
   type: PaginationType!
   pageSize: Int
@@ -223,6 +230,13 @@ input TransformInputRequest @oneOf {
   id: ID
 }
 
+type Log {
+  id: ID!
+  message: String!
+  level: LogLevel!
+  timestamp: DateTime!
+  runId: ID
+}
 
 type Query {
   listRuns(limit: Int = 10, offset: Int = 0, configId: ID): RunList!
@@ -361,4 +375,8 @@ type Mutation {
   
   upsertTransformation(id: ID!, input: JSON!): TransformConfig!
   deleteTransformation(id: ID!): Boolean!
+}
+
+type Subscription {
+  logs: Log!
 }

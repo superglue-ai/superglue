@@ -62,7 +62,7 @@ describe('API Utilities', () => {
     });
 
     it('should prepare endpoint configuration', async () => {
-      const result = await prepareEndpoint(testInput, {}, {});
+      const result = await prepareEndpoint(testInput, {}, {}, {});
 
       expect(result.config).toMatchObject({
         urlHost: 'https://api.example.com',
@@ -97,7 +97,7 @@ describe('API Utilities', () => {
         throw new Error('URL composition failed');
       });
 
-      await expect(prepareEndpoint(testInput, {}, {}))
+      await expect(prepareEndpoint(testInput, {}, {}, {}))
         .rejects.toThrow('URL composition failed');
     });
   });

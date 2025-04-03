@@ -307,7 +307,6 @@ class ToJsonSchema {
 
   getCommonArrayItemSchema(arr: Array<any>): object | null {
     const schemas = arr.map(item => this.getSchema(item))
-    // schemas.forEach(schema => console.log(JSON.stringify(schema, '\t')))
     return schemas.reduce((acc, current) => helpers.mergeSchemaObjs(acc, current), schemas.pop())
   }
 

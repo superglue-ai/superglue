@@ -2,7 +2,7 @@
 
 import { useConfig } from '@/src/app/config-context';
 import ApiConfigIdEditModal from '@/src/components/ApiConfigIdEditModal';
-import { ApiPlayground } from '@/src/components/apiPlayground';
+import { ApiPlayground } from '@/src/components/ApiPlayground';
 import JsonSchemaEditor from "@/src/components/JsonSchemaEditor";
 import {
   AlertDialog,

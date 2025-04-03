@@ -1,6 +1,5 @@
 import { CacheMode, Context, RequestOptions, TransformConfig, TransformInputRequest } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
-import { v4 as uuidv4 } from 'uuid';
 import { telemetryClient } from "../../utils/telemetry.js";
 import { applyJsonataWithValidation } from "../../utils/tools.js";
 import { prepareTransform } from "../../utils/transform.js";
@@ -16,10 +15,10 @@ export const transformResolver = async (
   context: Context,
   info: GraphQLResolveInfo
 ) => {
-  const callId = uuidv4();
+  const callId = crypto.randomUUID();
   const startedAt = new Date();
-  const readCache = options ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.READONLY : true;
-  const writeCache = options ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.WRITEONLY : true;
+  const readCache = options?.cacheMode ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.READONLY : true;
+  const writeCache = options?.cacheMode ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.WRITEONLY : true;
   let preparedTransform: TransformConfig | null = null;
 
   if((input.endpoint?.responseSchema as any)?._def?.typeName === "ZodObject") {
@@ -33,7 +32,7 @@ export const transformResolver = async (
       await context.datastore.getTransformConfigFromRequest(input.endpoint, data, context.orgId) 
     : null;
     preparedTransform = preparedTransform?.responseMapping ? preparedTransform : 
-      await prepareTransform(context.datastore, readCache, preparedTransform || input.endpoint, data, context.orgId);
+      await prepareTransform(context.datastore, readCache, preparedTransform || input.endpoint, data, { runId: callId, orgId: context.orgId });
     if(!preparedTransform || !preparedTransform.responseMapping) {
       telemetryClient?.captureException(new Error("Didn't find a valid transformation configuration."), context.orgId, {
         input: input,

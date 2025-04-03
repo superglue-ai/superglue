@@ -176,11 +176,9 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
         
         // Check if we've exceeded the maximum wait time
         if (totalRateLimitWaitTime + waitTime > maxRateLimitWaitMs) {
-          console.log(`Rate limit retry would exceed maximum wait time of ${maxRateLimitWaitMs}ms (60s)`);
           return response; // Return the 429 response, caller will handle the error
         }
         
-        console.log(`Rate limited (429). Waiting ${waitTime}ms before retry.`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
         
         totalRateLimitWaitTime += waitTime;

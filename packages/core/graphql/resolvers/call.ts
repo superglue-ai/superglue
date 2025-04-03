@@ -1,13 +1,13 @@
-import { ApiConfig, ApiInputRequest, CacheMode, Context, RequestOptions, TransformConfig } from "@superglue/shared";
+import { ApiConfig, ApiInputRequest, CacheMode, Context, Metadata, RequestOptions, TransformConfig } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import OpenAI from "openai";
-import { v4 as uuidv4 } from 'uuid';
 import { callEndpoint, prepareEndpoint } from "../../utils/api.js";
 import { telemetryClient } from "../../utils/telemetry.js";
-import { applyJsonataWithValidation, maskCredentials } from "../../utils/tools.js";
+import { applyJsonataWithValidation, composeUrl, maskCredentials } from "../../utils/tools.js";
 import { prepareTransform } from "../../utils/transform.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 import { callPostgres } from "../../utils/postgres.js";
+import { logMessage } from "../../utils/logs.js";
 
 export const callResolver = async (
   _: any,
@@ -21,13 +21,16 @@ export const callResolver = async (
   info: GraphQLResolveInfo
 ) => {
   const startedAt = new Date();
-  const callId = uuidv4() as string;
-
+  const callId = crypto.randomUUID();
+  const metadata: Metadata = {
+    runId: callId,
+    orgId: context.orgId
+  };
   let preparedEndpoint: ApiConfig;
   let messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
 
-  const readCache = options ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.READONLY : true;
-  const writeCache = options ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.WRITEONLY : true;
+  const readCache = options?.cacheMode ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.READONLY : true;
+  const writeCache = options?.cacheMode ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.WRITEONLY : true;
 
   // Check if response schema is zod and throw an error if it is
   if((input.endpoint?.responseSchema as any)?._def?.typeName === "ZodObject") {
@@ -41,12 +44,14 @@ export const callResolver = async (
     let lastError: string | null = null;
     do {
       try {
+        let didReadFromCache = false;
         if(readCache && !lastError) {
           preparedEndpoint = await context.datastore.getApiConfig(input.id, context.orgId) || 
             await context.datastore.getApiConfigFromRequest(input.endpoint, payload, context.orgId) 
+          didReadFromCache = true;
         }
-        else if(preparedEndpoint || input.endpoint) {
-          const result = await prepareEndpoint(preparedEndpoint || input.endpoint, payload, credentials, lastError, messages);
+        if(!didReadFromCache || !preparedEndpoint) {
+          const result = await prepareEndpoint(preparedEndpoint || input.endpoint, payload, credentials, metadata, retryCount, messages);
           preparedEndpoint = result.config;
           messages = result.messages;
         }
@@ -54,6 +59,7 @@ export const callResolver = async (
         if(!preparedEndpoint) {
           throw new Error("Did not find a valid endpoint configuration. If you did provide an id, please ensure cache reading is enabled.");
         }
+        logMessage('info', `API call: ${preparedEndpoint.method} ${preparedEndpoint.urlHost}`, metadata);
 
         if(preparedEndpoint.urlHost.startsWith("postgres")) {
           response = await callPostgres(preparedEndpoint, payload, credentials, options);
@@ -66,19 +72,19 @@ export const callResolver = async (
           response = null;
           throw new Error("No data returned from API. This could be due to a configuration error.");
         }
+
+
       } catch (error) {
-        console.log(`API call failed. ${error?.message}`);
-        telemetryClient?.captureException(maskCredentials(error.message, credentials), context.orgId, {
-          preparedEndpoint: preparedEndpoint,
-          retryCount: retryCount,
-        });
-        lastError = error?.message || JSON.stringify(error || {});
+        const rawErrorString = error?.message || JSON.stringify(error || {});
+        lastError = maskCredentials(rawErrorString, credentials);
+        messages.push({role: "user", content: `There was an error with the configuration, please retry: ${rawErrorString}`});
+        logMessage('warn', `API call failed. ${lastError}`, { runId: callId, orgId: context.orgId });
       }
       retryCount++;
     } while (!response && retryCount < 5);
     
     if(!response) {
-      telemetryClient?.captureException(new Error(`API call failed after ${retryCount} retries. Last error: ${maskCredentials(lastError, credentials)}`), context.orgId, {
+      telemetryClient?.captureException(new Error(`API call failed after ${retryCount} retries. Last error: ${lastError}`), context.orgId, {
         preparedEndpoint: preparedEndpoint,
         retryCount: retryCount,
       });
@@ -87,7 +93,7 @@ export const callResolver = async (
 
     // Transform response
     const responseMapping = preparedEndpoint.responseMapping || 
-      (await prepareTransform(context.datastore, readCache, preparedEndpoint as TransformConfig, response.data))?.responseMapping;
+      (await prepareTransform(context.datastore, readCache, preparedEndpoint as TransformConfig, response.data, { runId: callId, orgId: context.orgId }))?.responseMapping;
     const transformedResponse = responseMapping ? 
       await applyJsonataWithValidation(response.data, responseMapping, preparedEndpoint.responseSchema) : 
       { success: true, data: response.data };

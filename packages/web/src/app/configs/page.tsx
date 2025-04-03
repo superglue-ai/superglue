@@ -306,11 +306,8 @@ const ConfigTable = () => {
         
         {showConfigStepper && (
           <ConfigCreateStepper
-            open={showConfigStepper}
-            onOpenChange={setShowConfigStepper}
             mode="create"
             onComplete={refreshConfigs}
-            {...configStepperProps}
           />
         )}
       </div>
@@ -529,11 +526,8 @@ const ConfigTable = () => {
 
       {showConfigStepper && (
         <ConfigCreateStepper
-          open={showConfigStepper}
-          onOpenChange={setShowConfigStepper}
           mode="create"
           onComplete={refreshConfigs}
-          {...configStepperProps}
         />
       )}
     </div>
