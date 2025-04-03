@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { authMiddleware, validateToken, extractToken } from './auth.js'
 import { LocalKeyManager } from './localKeyManager.js'
-import { SupabaseKeyManager } from './supabaseKeyManager.js'
 
 vi.mock('./localKeyManager.js')
 vi.mock('./supabaseKeyManager.js')
@@ -34,6 +33,10 @@ describe('Auth Module', () => {
   })
 
   describe('validateToken', () => {
+    beforeEach(() => {
+      vi.mocked(LocalKeyManager.prototype.authenticate).mockReset()
+    })
+
     it('returns failure when no token provided', async () => {
       const result = await validateToken(undefined)
       expect(result).toEqual({
@@ -68,6 +71,7 @@ describe('Auth Module', () => {
         send: vi.fn()
       }
       mockNext = vi.fn()
+      vi.mocked(LocalKeyManager.prototype.authenticate).mockReset()
     })
 
     it('skips auth for websocket connections', async () => {
