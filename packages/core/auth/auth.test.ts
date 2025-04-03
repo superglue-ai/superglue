@@ -36,6 +36,7 @@ describe('Auth Module', () => {
     let mockAuthManager: any;
 
     beforeEach(() => {
+      _resetAuthManager();
       // Create mock instance with authenticate method
       mockAuthManager = {
         authenticate: vi.fn()
@@ -78,6 +79,7 @@ describe('Auth Module', () => {
     let mockAuthManager: any
 
     beforeEach(() => {
+      _resetAuthManager();
       mockReq = { headers: {}, path: '/test' }
       mockRes = {
         status: vi.fn().mockReturnThis(),
