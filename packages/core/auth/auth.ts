@@ -2,7 +2,15 @@ import { LocalKeyManager } from "./localKeyManager.js";
 import { SupabaseKeyManager } from "./supabaseKeyManager.js";
 import { logMessage } from "../utils/logs.js";
 
-const authManager = process.env.NEXT_PUBLIC_SUPABASE_URL ? new SupabaseKeyManager() : new LocalKeyManager();
+// Instead, create a getter to ensure manager is initialized after mocks
+let _authManager: LocalKeyManager | SupabaseKeyManager | null = null;
+function getAuthManager() {
+  if (!_authManager) {
+    _authManager = process.env.NEXT_PUBLIC_SUPABASE_URL ? new SupabaseKeyManager() : new LocalKeyManager();
+  }
+  return _authManager;
+}
+
 // HTTP Middleware
 export const authMiddleware = async (req, res, next) => {
     // Skip authentication for websocket connections
@@ -27,18 +35,22 @@ export const authMiddleware = async (req, res, next) => {
 };
   
 // Shared auth function
-export const validateToken = async (token: string | undefined) => {
-    if (!token) {
-      return { success: false, message: 'No token provided' };
-    }
-  
-    const authResult = await authManager.authenticate(token);
+export async function validateToken(token: string | undefined) {
+  if (!token) {
     return {
-      success: authResult.success,
-      orgId: authResult.orgId,
-      message: authResult.success ? '' : 'Invalid token'
-    };
-  };
+      success: false,
+      message: 'No token provided',
+      orgId: undefined
+    }
+  }
+
+  const authResult = await getAuthManager().authenticate(token);
+  return {
+    success: authResult.success,
+    orgId: authResult.orgId,
+    message: authResult.success ? '' : 'Invalid token'
+  }
+}
   
   // Extract token from various sources
 export const extractToken = (source: { headers?: any, query?: any } | { connectionParams?: any, extra?: any }): string | undefined => {
@@ -70,3 +82,7 @@ export const extractToken = (source: { headers?: any, query?: any } | { connecti
       </html>
     `;
   }
+
+  export const _resetAuthManager = () => {
+    _authManager = null;
+  }; 
