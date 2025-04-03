@@ -46,7 +46,9 @@ COPY packages/shared/package*.json ./packages/shared/
 # Install production dependencies and Playwright
 RUN npm ci --omit=dev && \
     npm install -g next turbo cross-env && \
-    npx playwright install --with-deps chromium
+    apt-get update && \
+    apt-get install -y fontconfig fontconfig-config libfontconfig1 && \
+    npx playwright install --with-deps chromium -y --no-install-recommends
 
 # Copy built files from builder stage
 COPY --from=builder /usr/src/app/packages/core/dist ./packages/core/dist
