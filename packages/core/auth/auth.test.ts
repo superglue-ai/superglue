@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { authMiddleware, validateToken, extractToken } from './auth.js'
+import { authMiddleware, validateToken, extractToken, _resetAuthManager } from './auth.js'
 import { LocalKeyManager } from './localKeyManager.js'
 
 vi.mock('./localKeyManager.js')
@@ -33,8 +33,20 @@ describe('Auth Module', () => {
   })
 
   describe('validateToken', () => {
+    let mockAuthManager: any;
+
     beforeEach(() => {
-      vi.mocked(LocalKeyManager.prototype.authenticate).mockReset()
+      // Create mock instance with authenticate method
+      mockAuthManager = {
+        authenticate: vi.fn()
+      };
+      
+      // Reset the mock before each test
+      mockAuthManager.authenticate.mockReset();
+      
+      // Replace LocalKeyManager constructor mock to return our instance
+      vi.mocked(LocalKeyManager).mockImplementation(() => mockAuthManager);
+      _resetAuthManager();
     })
 
     it('returns failure when no token provided', async () => {
@@ -47,15 +59,15 @@ describe('Auth Module', () => {
     })
 
     it('validates token through auth manager', async () => {
-      const mockAuthResult = { success: true, orgId: 'org123' }
-      vi.mocked(LocalKeyManager.prototype.authenticate).mockResolvedValue(mockAuthResult)
+      const mockAuthResult = { success: true, orgId: 'org123' };
+      mockAuthManager.authenticate.mockResolvedValue(mockAuthResult);
 
-      const result = await validateToken('test123')
+      const result = await validateToken('test123');
       expect(result).toEqual({
         success: true,
         message: '',
         orgId: 'org123'
-      })
+      });
     })
   })
 
@@ -63,6 +75,7 @@ describe('Auth Module', () => {
     let mockReq: any
     let mockRes: any
     let mockNext: any
+    let mockAuthManager: any
 
     beforeEach(() => {
       mockReq = { headers: {}, path: '/test' }
@@ -71,7 +84,11 @@ describe('Auth Module', () => {
         send: vi.fn()
       }
       mockNext = vi.fn()
-      vi.mocked(LocalKeyManager.prototype.authenticate).mockReset()
+      mockAuthManager = {
+        authenticate: vi.fn()
+      };
+      vi.mocked(LocalKeyManager).mockImplementation(() => mockAuthManager);
+      _resetAuthManager();
     })
 
     it('skips auth for websocket connections', async () => {
@@ -89,7 +106,7 @@ describe('Auth Module', () => {
 
     it('returns 401 for invalid token', async () => {
       mockReq.headers.authorization = 'Bearer invalid'
-      vi.mocked(LocalKeyManager.prototype.authenticate).mockResolvedValue({ 
+      mockAuthManager.authenticate.mockResolvedValue({ 
         success: false, 
         orgId: undefined 
       })
@@ -100,7 +117,7 @@ describe('Auth Module', () => {
 
     it('adds orgId to request and proceeds for valid token', async () => {
       mockReq.headers.authorization = 'Bearer valid'
-      vi.mocked(LocalKeyManager.prototype.authenticate).mockResolvedValue({ 
+      mockAuthManager.authenticate.mockResolvedValue({ 
         success: true, 
         orgId: 'org123' 
       })
