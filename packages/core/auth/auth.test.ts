@@ -37,15 +37,16 @@ describe('Auth Module', () => {
 
     beforeEach(() => {
       _resetAuthManager();
+      // Create mock instance with authenticate method
       mockAuthManager = {
-        authenticate: vi.fn().mockResolvedValue({
-          success: false,
-          orgId: undefined
-        })
+        authenticate: vi.fn()
       };
       
+      // Reset the mock before each test
+      mockAuthManager.authenticate.mockReset();
+      
+      // Replace LocalKeyManager constructor mock to return our instance
       vi.mocked(LocalKeyManager).mockImplementation(() => mockAuthManager);
-      _resetAuthManager();
     })
 
     it('returns failure when no token provided', async () => {
@@ -58,11 +59,8 @@ describe('Auth Module', () => {
     })
 
     it('validates token through auth manager', async () => {
-      mockAuthManager.authenticate.mockResolvedValue({
-        success: true,
-        orgId: 'org123',
-        message: ''
-      });
+      const mockAuthResult = { success: true, orgId: 'org123' };
+      mockAuthManager.authenticate.mockResolvedValue(mockAuthResult);
 
       const result = await validateToken('test123');
       expect(result).toEqual({
@@ -91,7 +89,6 @@ describe('Auth Module', () => {
         authenticate: vi.fn()
       };
       vi.mocked(LocalKeyManager).mockImplementation(() => mockAuthManager);
-      _resetAuthManager();
     })
 
     it('skips auth for websocket connections', async () => {
@@ -111,8 +108,7 @@ describe('Auth Module', () => {
       mockReq.headers.authorization = 'Bearer invalid'
       mockAuthManager.authenticate.mockResolvedValue({ 
         success: false, 
-        orgId: undefined,
-        message: 'Invalid token'
+        orgId: undefined 
       })
 
       await authMiddleware(mockReq, mockRes, mockNext)
@@ -123,8 +119,7 @@ describe('Auth Module', () => {
       mockReq.headers.authorization = 'Bearer valid'
       mockAuthManager.authenticate.mockResolvedValue({ 
         success: true, 
-        orgId: 'org123',
-        message: ''
+        orgId: 'org123' 
       })
 
       await authMiddleware(mockReq, mockRes, mockNext)
