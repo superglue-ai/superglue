@@ -47,8 +47,8 @@ COPY packages/shared/package*.json ./packages/shared/
 RUN npm ci --omit=dev && \
     npm install -g next turbo cross-env && \
     apt-get update && \
-    apt-get install -y fontconfig fontconfig-config libfontconfig1 && \
-    npx playwright install --with-deps chromium -y --no-install-recommends
+    DEBIAN_FRONTEND=noninteractive apt-get install -y fontconfig fontconfig-config libfontconfig1 && \
+    npx playwright install --with-deps chromium
 
 # Copy built files from builder stage
 COPY --from=builder /usr/src/app/packages/core/dist ./packages/core/dist
