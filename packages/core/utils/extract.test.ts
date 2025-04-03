@@ -68,6 +68,8 @@ describe('Extract Utils', () => {
       expect(getDocumentation).toHaveBeenCalledWith(
         extractInput.documentationUrl,
         undefined,
+        undefined,
+        extractInput.urlHost,
         undefined
       );
     });

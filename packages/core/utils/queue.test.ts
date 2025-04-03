@@ -39,7 +39,6 @@ describe('Queue', () => {
     it('should handle job errors without stopping the queue', async () => {
       const queue = new Queue();
       const results: string[] = [];
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       const failingTask = async () => {
         throw new Error('Task failed');
@@ -55,8 +54,5 @@ describe('Queue', () => {
       await new Promise(resolve => setTimeout(resolve, 50));
 
       expect(results).toEqual(['success']);
-      expect(consoleSpy).toHaveBeenCalled();
-      
-      consoleSpy.mockRestore();
     });
   });

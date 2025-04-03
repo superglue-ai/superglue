@@ -1,7 +1,7 @@
 "use client"
 import { useState, useEffect, useMemo } from "react"
 import { motion } from "framer-motion"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { ChevronLeft, ChevronRight, X } from "lucide-react"
 import { LogEntry } from "@superglue/shared"
 import { Button } from "./ui/button"
 import { ScrollArea } from "./ui/scroll-area"
@@ -102,24 +102,31 @@ export function LogSidebar() {
     <motion.div
       animate={{ width: isExpanded ? 400 : 50 }}
       onAnimationComplete={(definition) => {
-        // Update CSS variable when animation completes
         document.documentElement.style.setProperty('--log-sidebar-width', `${typeof definition === 'object' && 'width' in definition ? definition.width : isExpanded ? 400 : 50}px`)
       }}
       className="border-l border-border bg-background flex flex-col relative"
     >
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-10 w-10 flex items-center justify-center"
-        onClick={() => setIsExpanded(!isExpanded)}
-      >
-        {isExpanded ? <ChevronRight /> : <ChevronLeft />}
-        {!isExpanded && hasNewLogs && (
-          <div className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full" />
-        )}
-      </Button>
+      <div className={`m-2 max-w-full ${isExpanded ? 'h-16' : 'h-24'}`}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="h-full w-full flex items-center justify-center"
+        >
+          <div className={`flex items-center justify-center w-full ${!isExpanded && '-rotate-90'}`}>
+            <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              {hasNewLogs && !isExpanded && <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-500"></span>
+              </span>}
+              Logs
+            </span>
+            {isExpanded ? <X className="ml-auto" /> : <ChevronRight className="ml-2" />}
+          </div>
+        </Button>
+      </div>
 
-      {isExpanded ? (
+      {isExpanded && (
         <ScrollArea className="max-w-full block">
           <div className="p-4 max-w-[100%-5rem]">
             {logs.map((log) => (
@@ -142,10 +149,6 @@ export function LogSidebar() {
             ))}
           </div>
         </ScrollArea>
-      ) : (
-        <div className="flex-1 flex items-center justify-center">
-          <span className="-rotate-90 text-sm text-muted-foreground">Logs</span>
-        </div>
       )}
     </motion.div>
   )

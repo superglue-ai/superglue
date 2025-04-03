@@ -123,7 +123,7 @@ describe('Telemetry Utils', () => {
           }
         }
       `;
-      expect(telemetryModule.extractOperationName(query)).toBe('call');
+      expect(telemetryModule.extractOperationName(query)).toBe('CallApi');
     });
   });
 

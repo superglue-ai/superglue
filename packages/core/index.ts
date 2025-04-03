@@ -9,19 +9,15 @@ import http from 'http';
 import { WebSocketServer } from 'ws';
 import { useServer } from 'graphql-ws/use/ws';
 import { makeExecutableSchema } from '@graphql-tools/schema';
-import { LocalKeyManager } from './auth/localKeyManager.js';
-import { SupabaseKeyManager } from './auth/supabaseKeyManager.js';
 import { createDataStore } from './datastore/datastore.js';
 import { resolvers, typeDefs } from './graphql/graphql.js';
 import { createTelemetryPlugin, telemetryMiddleware } from './utils/telemetry.js';
 import { logMessage } from "./utils/logs.js";
-
+import { authMiddleware, validateToken, extractToken } from './auth/auth.js';
 
 // Constants
 const PORT = process.env.GRAPHQL_PORT || 3000;
-const authManager = process.env.NEXT_PUBLIC_SUPABASE_URL ? new SupabaseKeyManager() : new LocalKeyManager();
 
-const DEBUG = process.env.DEBUG === 'true';
 export const DEFAULT_QUERY = `
 query Query {
   listRuns(limit: 10) {
@@ -46,54 +42,6 @@ const getHttpContext = async ({ req }) => {
     orgId: req.orgId || ''
   };
 };
-
-// Authentication Middleware
-const authMiddleware = async (req, res, next) => {
-  // Allow WebSocket connections through without this middleware initially
-  // Auth can be handled within the WebSocket context if needed
-  if (req.headers.upgrade === 'websocket') {
-    return next();
-  }
-
-  if (req.path === '/health') {
-    return res.status(200).send('OK');
-  }
-
-  const token = req.headers?.authorization?.split(" ")?.[1]?.trim() || req.query.token;
-  if (!token) {
-    logMessage('warn', `Authentication failed for token: ${token}`);
-    return res.status(401).send(getAuthErrorHTML(token));
-  }
-
-  const authResult = await authManager.authenticate(token);
-
-  if (!authResult.success) {
-    logMessage('warn', `Authentication failed for token: ${token}`);
-    return res.status(401).send(getAuthErrorHTML(token));
-  }
-  req.orgId = authResult.orgId;
-  req.headers["orgId"] = authResult.orgId; // Pass orgId in headers
-  return next();
-};
-
-// Helper Functions
-function getAuthErrorHTML(token: string | undefined) {
-  return `
-    <html>
-      <body style="display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif;">
-        <div style="text-align: center;">
-          <h1>🔐 Authentication ${token ? 'Failed' : 'Required'}</h1>
-          <p>Please provide a valid auth token via:</p>
-          <ul style="list-style: none; padding: 0;">
-            <li>Authorization header: <code>Authorization: Bearer TOKEN</code></li>
-            <li>Query parameter: <code>?token=TOKEN</code></li>
-            <li>WebSocket connectionParams: <code>{ "Authorization": "Bearer TOKEN" }</code></li>
-          </ul>
-        </div>
-      </body>
-    </html>
-  `;
-}
 
 function validateEnvironment() {
   const requiredEnvVars = [
@@ -131,20 +79,16 @@ async function startServer() {
   const serverCleanup = useServer({
     schema,
     context: async (ctx: any, msg, args) => {
-      const token = ctx.connectionParams?.Authorization?.split(" ")?.[1]?.trim() || 
-        ctx.extra?.request?.url?.split("token=")?.[1]?.split("&")?.[0];
-      if (token) {
-        const authResult = await authManager.authenticate(token);
-        if (authResult.success) {
-          logMessage('info', `Subscription connected`);
-          return { datastore: datastore, orgId: authResult.orgId };
-        } else {
-          logMessage('warn', `Subscription authentication failed for token: ${token}`);
-          return false; // Return false to reject with 401
-        }
+      const token = extractToken(ctx);
+      const authResult = await validateToken(token);
+
+      if (!authResult.success) {
+        logMessage('warn', `Subscription authentication failed for token: ${token}`);
+        return false;
       }
-      logMessage('warn', `Subscription connection attempt without valid token`);
-      return false; // Return false to reject with 401
+
+      logMessage('info', `Subscription connected`);
+      return { datastore, orgId: authResult.orgId };
     },
     onDisconnect(ctx, code, reason) {
       logMessage('info', `Subscription disconnected. code=${code} reason=${reason}`);
