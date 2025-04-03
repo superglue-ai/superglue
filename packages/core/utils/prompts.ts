@@ -116,23 +116,16 @@ export const API_PROMPT = `You are an API configuration assistant. Generate API 
 - Think hard before producing a response, and be aware that the response is not checked for validity if the response is not an error, so only suggest endpoints that you are sure are valid.
 - If this is a store / e-commerce site, try products.json, collections.json, categories.json, etc.
 - You can use the following format to access a postgres database: urlHost: "postgres://{user}:{password}@{hostname}:{port}", urlPath: "{database}", body: {query: "{query}"}
-`;
 
-export const API_ERROR_HANDLING_USER_PROMPT = `An error occured during the API because you probably generated a bad configuration.
-The error message is: {error}
-
-The previous configuration was: {previous_config}
-
-Look at the error code and message and understand, in relation to the documentation, what went wrong.
-- ERROR 400: please pay special attention to the request body and url params. Maybe not all are requried? skip pagination? be creative here! this can be specific to the specific route.
-- ERROR 401: please pay special attention to the authentication type and headers.
-- ERROR 403: please pay special attention to the authentication type and headers.
-- ERROR 404: check the documentation, then check the request parameters and be creative.
-- ERROR 500: please pay special attention to the documentation to understand if the resource exists.
+- The user might flag that a configuration did not run successfully: Look at the error code and message and understand, in relation to the documentation, what went wrong.
+  - ERROR 400: please pay special attention to the request body and url params. Maybe not all are requried? skip pagination? be creative here! this can be specific to the specific route.
+  - ERROR 401: please pay special attention to the authentication type and headers.
+  - ERROR 403: please pay special attention to the authentication type and headers.
+  - ERROR 404: check the documentation, then check the request parameters and be creative.
+  - ERROR 500: please pay special attention to the documentation to understand if the resource exists.
 
 You will get to try again, so feel free to experiment and iterate on the configuration.
-Make sure to try a fix before generating a new configuration. I will loose my job if I don't get this right.
-`;
+Make sure to try a fix before generating a new configuration. I will loose my job if I don't get this right.`;
 
 export const GENERATE_SCHEMA_PROMPT = `You are a json schema generator assistant. Generate a JSON schema based on instructions and response data.
 If the response data is an array, make the schema an array of objects and name the array object "results".

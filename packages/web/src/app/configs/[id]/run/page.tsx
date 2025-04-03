@@ -1,6 +1,6 @@
 'use client'
 
-import { ApiPlayground } from "@/src/components/apiPlayground";
+import { ApiPlayground } from "@/src/components/ApiPlayground";
 import { Button } from "@/src/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
@@ -13,7 +13,7 @@ export default function ApiPlaygroundPage({ configId }: { configId?: string }) {
   return (
     <div className="mx-auto">
       <div className="lg:p-6">
-        <div className="flex justify-between items-center my-4">
+        <div className="flex justify-between items-stretch my-4">
           <Button
             variant="ghost"
             onClick={() => router.push('/configs')} 

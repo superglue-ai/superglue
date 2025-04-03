@@ -2,6 +2,7 @@ import type { ApiConfig, ApiInput, DataStore, ExtractConfig, ExtractInput, RunRe
 import { createHash } from 'node:crypto';
 import { type RedisClientType, createClient } from 'redis';
 import { getSchemaFromData } from "../utils/tools.js";
+import { logMessage } from "../utils/logs.js";
 
 export class RedisService implements DataStore {
   private redis: RedisClientType;
@@ -30,7 +31,7 @@ export class RedisService implements DataStore {
       console.error('redis error:', err);
     });
     this.redis.on('connect', () => {
-      console.log('🔥 redis connected');
+      logMessage('info', '🔥 redis connected');
     });
     this.redis.connect();
   }

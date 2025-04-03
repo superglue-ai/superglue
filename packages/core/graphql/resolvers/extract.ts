@@ -1,10 +1,11 @@
 import { CacheMode, Context, DecompressionMethod, ExtractConfig, ExtractInputRequest, FileType, RequestOptions } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
-import { v4 as uuidv4 } from 'uuid';
 import { callExtract, prepareExtract, processFile } from "../../utils/extract.js";
 import { telemetryClient } from "../../utils/telemetry.js";
 import { maskCredentials } from "../../utils/tools.js";
 import { notifyWebhook } from "../../utils/webhook.js";
+import { logMessage } from "../../utils/logs.js";
+import { Metadata } from "openai/resources/index.mjs";
 
 export const extractResolver = async (
   _: any,
@@ -17,16 +18,20 @@ export const extractResolver = async (
   context: Context,
   info: GraphQLResolveInfo
 ) => {
-  const callId = uuidv4();
+  const callId = crypto.randomUUID();
   const startedAt = new Date();
   let preparedExtract: ExtractConfig;
-  const readCache = options ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.READONLY : true;
-  const writeCache = options ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.WRITEONLY : true;
+  const readCache = options?.cacheMode ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.READONLY : true;
+  const writeCache = options?.cacheMode ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.WRITEONLY : true;
   try {
     // Resolve endpoint configuration from cache or prepare new one
     let response: any;
     let retryCount = 0;
     let lastError: string | null = null;
+    const metadata: Metadata = {
+      runId: input.id || callId,
+      orgId: context.orgId
+    };
     do {
       if(input.file) {
         const { createReadStream, filename } = await input.file;
@@ -37,7 +42,7 @@ export const extractResolver = async (
         }
         const buffer = Buffer.concat(chunks);
         preparedExtract = {
-          id: input.id || uuidv4(),
+          id: input.id || callId,
           urlHost: filename,
           instruction: "extract from file",
           decompressionMethod: DecompressionMethod.AUTO,
@@ -50,24 +55,22 @@ export const extractResolver = async (
           await context.datastore.getExtractConfig(input.id, context.orgId) || 
           await context.datastore.getExtractConfigFromRequest(input.endpoint, payload, context.orgId) 
           : null;
-        preparedExtract = preparedExtract || 
-          await prepareExtract(input.endpoint, payload, credentials, lastError);
+        if(!preparedExtract) {
+          preparedExtract = await prepareExtract(input.endpoint, payload, credentials, lastError);
+        }
         try {
           const buffer = await callExtract(preparedExtract, payload, credentials, options);
           response = await processFile(buffer, preparedExtract);
         } catch (error) {
-          console.log(`Extract call failed. Retrying...`);
+          logMessage('warn', "Extraction failed. Retrying...", metadata);
           lastError = error?.message || JSON.stringify(error || {});
-          telemetryClient?.captureException(maskCredentials(lastError, credentials), context.orgId, {
-            preparedEndpoint: preparedExtract || input.endpoint,
-            retryCount: retryCount,
-          });
         }
       }
       retryCount++;
     } while (!response && retryCount < 5);
     
     if(!response) {
+      logMessage('error', `Extract call failed after ${retryCount} retries. Last error: ${lastError}`, metadata);
       telemetryClient?.captureException(new Error(`Extract call failed after ${retryCount} retries. Last error: ${maskCredentials(lastError, credentials)}`), context.orgId, {
         preparedEndpoint: preparedExtract || input.endpoint,
         retryCount: retryCount,

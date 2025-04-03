@@ -16,16 +16,13 @@ export async function decompressData(compressed: Buffer, method: DecompressionMe
     const signature = compressed.slice(0, 4).toString('hex');
     
     if (method == DecompressionMethod.ZIP || method == DecompressionMethod.AUTO && signature.startsWith('504b')) {
-      console.log("Decompressing with zip");
       return await decompressZip(compressed);
     }
     else if (method == DecompressionMethod.GZIP || method == DecompressionMethod.AUTO && signature.startsWith('1f8b')) {
-      console.log("Decompressing with gzip");
       const buffer = await gunzipAsync(compressed);
       return buffer;
     }
     else if(method == DecompressionMethod.DEFLATE || method == DecompressionMethod.AUTO && signature.startsWith('1f9d')) { 
-      console.log("Decompressing with deflate");
       const buffer = await inflateAsync(compressed);
       return buffer;
     }
@@ -54,7 +51,6 @@ export async function decompressZip(buffer: Buffer): Promise<Buffer> {
         }
         return Buffer.concat(chunks);
     } catch (error) {
-        console.error("Error decompressing zip.", error);
         throw "Error decompressing zip: " + error;
     }
 }
@@ -136,12 +132,10 @@ async function parseCSV(buffer: Buffer): Promise<any> {
                     }
                     results.push(dataObject);
                 } catch(error) {
-                    console.error("Error parsing CSV", error);
                     parser.abort();
                 }
             },
             complete: () => {
-                console.log('Finished parsing CSV');
                 if(metadata.length > 0) {
                     resolve({
                         data: results,
@@ -153,7 +147,6 @@ async function parseCSV(buffer: Buffer): Promise<any> {
                 }
             },
             error: (error) => {
-                console.error('Failed parsing CSV');
                 reject(error);
             },
         });
@@ -236,7 +229,6 @@ async function parseXML(buffer: Buffer): Promise<any[]> {
 
     parser.on('end', async () => {
         try {
-            console.log('Finished parsing XML');
             resolve(results);
         } catch (error) {
             reject(error);

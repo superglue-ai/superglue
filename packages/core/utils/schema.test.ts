@@ -70,7 +70,7 @@ describe('generateSchema', () => {
       ]
     })
 
-    const schema = await generateSchema(instruction, responseData)
+    const schema = await generateSchema(instruction, responseData, {})
     expect(schema).toEqual(expectedSchema)
     expect(mockCreate).toHaveBeenCalledTimes(1)
   })
@@ -89,7 +89,7 @@ describe('generateSchema', () => {
       ]
     })
 
-    const schema = await generateSchema(instruction, responseData)
+    const schema = await generateSchema(instruction, responseData, {})
     expect(schema).toEqual(expectedSchema)
 
     expect(mockCreate).toHaveBeenCalledTimes(2)
@@ -111,7 +111,7 @@ describe('generateSchema', () => {
       ]
     })
 
-    await generateSchema(instruction, responseData)
+    await generateSchema(instruction, responseData, {})
 
     const o3MiniCallArgs = mockCreate.mock.calls[0][0]
     expect(o3MiniCallArgs.temperature).toBeUndefined()
@@ -132,7 +132,7 @@ describe('generateSchema', () => {
       ]
     })
     
-    await generateSchema(instruction, responseData)
+    await generateSchema(instruction, responseData, {})
     
     const gpt4oCallArgs = mockCreate.mock.calls[0][0]
     // Verify temperature parameter is included for gpt-4o
