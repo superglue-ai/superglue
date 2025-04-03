@@ -37,15 +37,13 @@ describe('Auth Module', () => {
 
     beforeEach(() => {
       _resetAuthManager();
-      // Create mock instance with authenticate method
       mockAuthManager = {
-        authenticate: vi.fn()
+        authenticate: vi.fn().mockResolvedValue({
+          success: false,
+          orgId: undefined
+        })
       };
       
-      // Reset the mock before each test
-      mockAuthManager.authenticate.mockReset();
-      
-      // Replace LocalKeyManager constructor mock to return our instance
       vi.mocked(LocalKeyManager).mockImplementation(() => mockAuthManager);
       _resetAuthManager();
     })
@@ -60,8 +58,11 @@ describe('Auth Module', () => {
     })
 
     it('validates token through auth manager', async () => {
-      const mockAuthResult = { success: true, orgId: 'org123' };
-      mockAuthManager.authenticate.mockResolvedValue(mockAuthResult);
+      mockAuthManager.authenticate.mockResolvedValue({
+        success: true,
+        orgId: 'org123',
+        message: ''
+      });
 
       const result = await validateToken('test123');
       expect(result).toEqual({
@@ -110,7 +111,8 @@ describe('Auth Module', () => {
       mockReq.headers.authorization = 'Bearer invalid'
       mockAuthManager.authenticate.mockResolvedValue({ 
         success: false, 
-        orgId: undefined 
+        orgId: undefined,
+        message: 'Invalid token'
       })
 
       await authMiddleware(mockReq, mockRes, mockNext)
@@ -121,7 +123,8 @@ describe('Auth Module', () => {
       mockReq.headers.authorization = 'Bearer valid'
       mockAuthManager.authenticate.mockResolvedValue({ 
         success: true, 
-        orgId: 'org123' 
+        orgId: 'org123',
+        message: ''
       })
 
       await authMiddleware(mockReq, mockRes, mockNext)
