@@ -46,10 +46,12 @@ const ConfigTable = () => {
   const [configToDelete, setConfigToDelete] = React.useState<ApiConfig | ExtractConfig | null>(null);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [showConfigStepper, setShowConfigStepper] = React.useState(false);
-  const [configStepperProps, setConfigStepperProps] = React.useState({});
+  const [configStepperProps, setConfigStepperProps] = React.useState<{ prefillData?: any }>({});
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
 
   const refreshConfigs = React.useCallback(async () => {
+    console.log('refreshing configs');
+    setShowConfigStepper(false);
     setIsRefreshing(true);
     setLoading(true);
     try {
@@ -224,8 +226,18 @@ const ConfigTable = () => {
       </div>
     );
   }
-
-  if (configs.length === 0) {
+  else if (showConfigStepper) {
+    return (
+      <div className="p-8 max-w-none w-full min-h-full">
+        <ConfigCreateStepper
+          mode="create"
+          onComplete={refreshConfigs}
+          prefillData={configStepperProps.prefillData}
+        />
+      </div>
+    )
+  }
+  else if (configs.length === 0) {
     return (
       <div className="p-8 max-w-none w-full min-h-full">
         <div className="flex justify-between items-center mb-6">
@@ -303,13 +315,6 @@ const ConfigTable = () => {
             </Button>
           </div>
         </div>
-        
-        {showConfigStepper && (
-          <ConfigCreateStepper
-            mode="create"
-            onComplete={refreshConfigs}
-          />
-        )}
       </div>
     );
   }
@@ -523,13 +528,6 @@ const ConfigTable = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {showConfigStepper && (
-        <ConfigCreateStepper
-          mode="create"
-          onComplete={refreshConfigs}
-        />
-      )}
     </div>
   );
 };

@@ -565,7 +565,12 @@ const result = await superglue.call({
               variant="ghost"
               size="icon"
               className="shrink-0"
-              onClick={() => router.push('/configs')}
+              onClick={() => {
+                router.push('/configs')
+                if (onComplete) {
+                  onComplete()
+                }
+              }}
             >
               <X className="h-4 w-4" />
             </Button>
