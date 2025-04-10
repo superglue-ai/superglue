@@ -42,6 +42,9 @@ export function superglueJsonata(expr: string) {
     return arr;
   });
   expression.registerFunction("number", (value: string) => parseFloat(value));
+  expression.registerFunction("map", async (arr: any[], func: (item: any) => any[]) => 
+    Array.isArray(arr) ? await Promise.all(arr.map(func)) : await Promise.all([arr].map(func))
+  );
   expression.registerFunction("substring", (str: string, start: number, end?: number) => String(str).substring(start, end));
   expression.registerFunction("replace", (obj: any, pattern: string, replacement: string) => {
     if(Array.isArray(obj)) {
@@ -209,6 +212,11 @@ export function composeUrl(host: string, path: string) {
   if (!host) host = '';
   if (!path) path = '';
   
+  // Add https:// if protocol is missing
+  if (!/^https?:\/\//i.test(host)) {
+    host = `https://${host}`;
+  }
+  
   // Trim slashes in one pass
   const cleanHost = host.endsWith('/') ? host.slice(0, -1) : host;
   const cleanPath = path.startsWith('/') ? path.slice(1) : path;
@@ -274,58 +282,39 @@ export function maskCredentials(message: string, credentials?: Record<string, st
   Object.entries(credentials).forEach(([key, value]) => {
     if (value && value.length > 0) {
       // Use global flag to replace all occurrences
-      const regex = new RegExp(value, 'g');
+      const regex = new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
       maskedMessage = maskedMessage.replace(regex, `{masked_${key}}`);
     }
   });
   return maskedMessage;
 }
 
-export function addNullableToOptional(schema: any): any {
+export function addNullableToOptional(schema: any, required: boolean = true): any {
   if (!schema || typeof schema !== 'object') return schema;
 
   const newSchema = { ...schema };
-
-  if (schema.type === 'object' && schema.properties) {
-    const required = new Set(schema.required || []);
-    newSchema.properties = Object.entries(schema.properties).reduce((acc, [key, value]) => ({
-      ...acc,
-      [key]: !required.has(key) ? makeNullable(value) : addNullableToOptional(value)
-    }), {});
-  }
-
-  if (schema.type === 'array' && schema.items) {
-    newSchema.items = addNullableToOptional(schema.items);
-  }
-
-  return newSchema;
-}
-
-function makeNullable(schema: any): any {
-  if (!schema || typeof schema !== 'object') return schema;
-  
-  const newSchema = { ...schema };
-  
-  if (Array.isArray(schema.type)) {
+  if (!required && Array.isArray(schema.type)) {
     if (!schema.type.includes('null')) {
       newSchema.type = [...schema.type, 'null'];
     }
-  } else if (schema.type) {
+  } else if (!required && schema.type) {
     newSchema.type = [schema.type, 'null'];
-  }
-  
-  // Recursively process nested properties
-  if (schema.properties) {
+  }  
+
+  if ((schema.type === 'object' || schema.type?.includes('object')) && schema.properties) {
+    newSchema.additionalProperties = false;
+    const allRequired = new Set(schema.required || []);
+    newSchema.required = Object.keys(schema.properties);
     newSchema.properties = Object.entries(schema.properties).reduce((acc, [key, value]) => ({
       ...acc,
-      [key]: makeNullable(value)
+      [key]: addNullableToOptional(value, allRequired.has(key))
     }), {});
   }
-  
-  if (schema.items) {
-    newSchema.items = makeNullable(schema.items);
+
+  if ((schema.type === 'array' || schema.type?.includes('array')) && schema.items) {
+    newSchema.items = addNullableToOptional(schema.items);
   }
-  
+
   return newSchema;
 }
 
