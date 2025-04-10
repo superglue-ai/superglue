@@ -13,8 +13,6 @@ function getAuthManager() {
 
 // HTTP Middleware
 export const authMiddleware = async (req, res, next) => {
-    // Skip authentication for websocket connections
-    if (req.headers.upgrade === 'websocket') return next();
     // Skip authentication for health check
     if (req.path === '/health') return res.status(200).send('OK');
   
