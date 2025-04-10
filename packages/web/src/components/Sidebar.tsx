@@ -24,7 +24,7 @@ export function Sidebar() {
       <div className="p-6">
         <div className="relative mx-auto">
           <img src="/logo.svg" alt="superglue Logo" className="max-w-full h-[50px] w-[200px] ml-auto mr-auto" />
-          <div className="text-center text-sm text-gray-300 dark:text-gray-300 mt-2">Data Transformer</div>
+          <div className="text-center text-sm text-gray-300 dark:text-gray-300 mt-2">Data Integration Agent</div>
         </div>
       </div>
       <nav className="flex-1">
