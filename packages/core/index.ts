@@ -44,16 +44,21 @@ const getHttpContext = async ({ req }) => {
 };
 
 function validateEnvironment() {
-  const requiredEnvVars = [
-    'OPENAI_MODEL',
-    'GRAPHQL_PORT',
-    'OPENAI_API_KEY'
-  ];
-  requiredEnvVars.forEach((envVar) => {
-    if (!process.env[envVar]) {
-      throw new Error(`Environment variable ${envVar} is not set.`);
-    }
-  });
+  if(!process.env.GRAPHQL_PORT) {
+    throw new Error('GRAPHQL_PORT is not set.');
+  }
+
+  if((process.env.LLM_PROVIDER !== 'GEMINI') && !process.env.OPENAI_API_KEY) {
+    throw new Error('OPENAI_API_KEY is not set.');
+  }
+
+  if((process.env.LLM_PROVIDER === 'GEMINI') && !process.env.GEMINI_API_KEY) {
+    throw new Error('GEMINI_API_KEY is not set.');
+  }
+
+  if(process.env.DATASTORE_TYPE === 'redis' && !process.env.REDIS_HOST) {
+    throw new Error('REDIS_HOST is not set.');
+  }
 
   if (!process.env.AUTH_TOKEN && !process.env.NEXT_PUBLIC_SUPABASE_URL) {
     throw new Error('AUTH_TOKEN is not set and no other authentication provider is configured.');
