@@ -848,8 +848,8 @@ const result = await superglue.call({
                   (isRunning ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {latestLog ? latestLog.slice(0, 21) + '...' : 'Creating transformation...'}
-                      </>
+                      {latestLog ? latestLog.split(' ').slice(0,4).join(' ').slice(0,30) + '...' : 'Creating transformation...'}
+                    </>
                   ) : (!mappedResponseData ? (
                     <>
                       <span>✨ Run</span>
