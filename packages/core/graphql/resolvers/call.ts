@@ -76,8 +76,8 @@ export const callResolver = async (
 
       } catch (error) {
         const rawErrorString = error?.message || JSON.stringify(error || {});
-        lastError = maskCredentials(rawErrorString, credentials);
-        messages.push({role: "user", content: `There was an error with the configuration, please retry: ${rawErrorString}`});
+        lastError = maskCredentials(rawErrorString, credentials).slice(0, 200);
+        messages.push({role: "user", content: `There was an error with the configuration, please retry: ${rawErrorString.slice(0, 2000)}`});
         logMessage('warn', `API call failed. ${lastError}`, { runId: callId, orgId: context.orgId });
       }
       retryCount++;

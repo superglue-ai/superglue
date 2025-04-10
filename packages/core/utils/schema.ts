@@ -1,9 +1,9 @@
 import { Validator } from "jsonschema";
-import OpenAI from "openai";
 import type { ChatCompletionCreateParams, ChatCompletionMessageParam } from "openai/resources/chat/completions";
-import { GENERATE_SCHEMA_PROMPT } from "./prompts.js";
+import { GENERATE_SCHEMA_PROMPT } from "../llm/prompts.js";
 import { Metadata } from "@playwright/test";
 import { logMessage } from "./logs.js";
+import { LanguageModel } from "../llm/llm.js";
 
 export async function generateSchema(instruction: string, responseData: string, metadata: Metadata) : Promise<string> {
   const messages: ChatCompletionMessageParam[] = [
@@ -43,37 +43,13 @@ export async function generateSchema(instruction: string, responseData: string, 
 async function attemptSchemaGeneration(
   messages: ChatCompletionMessageParam[],
   retry: number
-): Promise<string> {
-  const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-    baseURL: process.env.OPENAI_API_BASE_URL
-  });
-  
-  const modelName = process.env.SCHEMA_GENERATION_MODEL || process.env.OPENAI_MODEL;
-  
+): Promise<string> {  
   let temperature = Math.min(0.3 * retry, 1.0);
-  let useTemperature = false;
-  
-  if (modelName.startsWith('gpt-4')) {
-    useTemperature = true;
-  }
-  const completionRequest: ChatCompletionCreateParams = {
-    model: modelName,
-    ...(useTemperature ? { temperature: temperature } : {}),
-    response_format: { "type": "json_object" },
-    messages: messages
-  };
-  
-  const completion = await openai.chat.completions.create(completionRequest);
-  let generatedSchema = JSON.parse(completion.choices[0].message.content);
-  if(generatedSchema?.jsonSchema) {
-    generatedSchema = generatedSchema.jsonSchema;
-  }
+  const { response: generatedSchema } = await LanguageModel.generateObject(messages, null, temperature);
   if(!generatedSchema || Object.keys(generatedSchema).length === 0) {
     throw new Error("No schema generated");
   }
   const validator = new Validator();
   validator.validate({}, generatedSchema);
-
   return generatedSchema;
 }

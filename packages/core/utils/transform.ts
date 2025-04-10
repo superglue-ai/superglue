@@ -1,10 +1,10 @@
 import type { DataStore, Metadata, TransformConfig, TransformInput } from "@superglue/shared";
 import { createHash } from "node:crypto";
-import OpenAI from "openai";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
-import { PROMPT_MAPPING } from "./prompts.js";
+import { PROMPT_MAPPING } from "../llm/prompts.js";
 import { applyJsonataWithValidation, getSchemaFromData, sample } from "./tools.js";
 import { logMessage } from "./logs.js";
+import { LanguageModel } from "../llm/llm.js";
 
 export async function prepareTransform(
     datastore: DataStore,
@@ -68,11 +68,7 @@ export async function prepareTransform(
 
 export async function generateMapping(schema: any, payload: any, instruction: string, metadata: Metadata, retry = 0, messages?: ChatCompletionMessageParam[]): Promise<{jsonata: string, confidence: number} | null> {
   try {
-    logMessage('info', "Generating mapping", metadata);
-    const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-      baseURL: process.env.OPENAI_API_BASE_URL,
-    });
+    logMessage('info', "Generating mapping" + (retry > 0 ? ` (retry ${retry})` : ''), metadata);
     const userPrompt = 
 `Given a source data and structure, create a jsonata expression in JSON FORMAT.
 
@@ -95,35 +91,21 @@ ${JSON.stringify(sample(payload, 2), null, 2).slice(0,30000)}`
         {role: "user", content: userPrompt}
       ]
     }
-    const temperature = String(process.env.OPENAI_MODEL).startsWith("o") ? undefined : Math.min(retry * 0.1, 1);
-  
-    const reasoning = await openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL,
-      temperature,
-      messages,
-      response_format: {
-        type: "json_schema",
-        json_schema: {
-          name: "required_format",
-          schema: jsonataSchema,
-        }
-      },
-    });
-
-    const assistantResponse = String(reasoning.choices[0].message.content);
-    messages.push({role: "assistant", content: assistantResponse});
-    const content = JSON.parse(assistantResponse);
-    const transformation = await applyJsonataWithValidation(payload, content.jsonata, schema);
+    const temperature = Math.min(retry * 0.1, 1);
+    
+    const { response, messages: updatedMessages } = await LanguageModel.generateObject(messages, jsonataSchema, temperature);
+    messages = updatedMessages;
+    const transformation = await applyJsonataWithValidation(payload, response.jsonata, schema);
 
     if(!transformation.success) {
       throw new Error(`Validation failed: ${transformation.error}`);
     }
-    return content;
-
+    return response;
   } catch (error) {
       if(retry < 5) {
-        logMessage('warn', "Error generating mapping: " + String(error), metadata);
-        messages.push({role: "user", content: error.message});
+        const errorMessage = String(error.message).slice(0, 1000);
+        logMessage('warn', "Error generating mapping: " + errorMessage, metadata);
+        messages.push({role: "user", content: errorMessage});
         return generateMapping(schema, payload, instruction, metadata, retry + 1, messages);
       }
   }

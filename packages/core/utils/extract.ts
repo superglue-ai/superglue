@@ -2,14 +2,14 @@ import axios, { AxiosRequestConfig } from "axios";
 import {  AuthType, RequestOptions, DecompressionMethod, ExtractConfig, ExtractInput, FileType, HttpMethod, Metadata } from "@superglue/shared";
 import { callAxios, composeUrl, getSchemaFromData, replaceVariables } from "./tools.js";
 import { z } from "zod";
-import OpenAI from "openai";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { API_PROMPT } from "./prompts.js";
+import { API_PROMPT } from "../llm/prompts.js";
 import { getDocumentation } from "./documentation.js";
 import { decompressData, parseFile } from "./file.js";
 import { createHash } from "crypto";
 import { logMessage } from "./logs.js";
-
+import { LanguageModel } from "../llm/llm.js";
+import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
 export async function prepareExtract(extractInput: ExtractInput, payload: any, credentials: any, lastError: string | null = null): Promise<ExtractConfig> {
     // Set the current timestamp
     const currentTime = new Date();
@@ -101,28 +101,14 @@ async function generateExtractConfig(extractConfig: Partial<ExtractConfig>, docu
     decompressionMethod: z.enum(Object.values(DecompressionMethod) as [string, ...string[]]).optional(),
     fileType: z.enum(Object.values(FileType) as [string, ...string[]]).optional(),
   }));
-
-  const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-    baseURL: process.env.OPENAI_API_BASE_URL
-  });
-  const completion = await openai.chat.completions.create({
-    model: process.env.OPENAI_MODEL,
-    response_format: {
-      type: "json_schema",
-      json_schema: {
-        name: "api_definition",
-        schema: schema,
-      }
+  const messages: ChatCompletionMessageParam[] = [
+    {
+      role: "system",
+      content: API_PROMPT
     },
-    messages: [
-      {
-        role: "system",
-        content: API_PROMPT
-      },
-      {
-        role: "user", 
-        content: 
+    {
+      role: "user", 
+      content: 
 `Generate API configuration for the following:
 
 Instructions: ${extractConfig.instruction}
@@ -135,10 +121,9 @@ Available variables: ${vars.join(", ")}
 
 ${lastError ? `We tried to call the API but it failed with the following error:
 ${lastError}` : ''}`
-      }
-    ]
-  });
-  const generatedConfig = JSON.parse(completion.choices[0].message.content);
+    }
+  ];
+  const { response: generatedConfig } = await LanguageModel.generateObject(messages, schema);
   return {
     ...extractConfig,
     ...generatedConfig,
