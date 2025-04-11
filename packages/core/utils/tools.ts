@@ -112,7 +112,7 @@ export async function applyJsonataWithValidation(data: any, expr: string, schema
     if (!validation.valid) {
       return {
         success: false, 
-        error: validation.errors.map(e => `${e.stack}. Source: ${e.instance ? JSON.stringify(e.instance) : "undefined"}`).join('\n').slice(0, 5000) 
+        error: validation.errors.map(e => `${e.stack}. Computed result: ${e.instance ? JSON.stringify(e.instance) : "undefined"}.`).join('\n').slice(0, 1000) + `\n\nExpected schema: ${JSON.stringify(optionalSchema)}`
       };
     }
     return { success: true, data: result };

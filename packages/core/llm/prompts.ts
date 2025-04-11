@@ -25,17 +25,18 @@ Very important guidelines for creating JSONata mappings:
 3. Array Handling:
    - For mapping to an array of objects, use the following patterns:
      a) When in array scope, use $.{} to map each object:
-        Correct: [$.{"id": id, "name": name}]
-        Incorrect: [{"id": $.id}]
+        Correct: $.{"id": id, "name": name}
+        Incorrect: {"id": $.id}
      b) When outside array scope, include the source path:
-        Correct: [$.items.{"id": id, "name": name}]
-        Incorrect: [{"id": $.items.id}]
+        Correct: $.items.{"id": id, "name": name}
+        Incorrect: {"id": $.items.id}
      c) For nested arrays, chain the array operators:
-        Correct: [products.variants.{"size": size, "color": color}]
-        Incorrect: [products.[{"size": variants.size}]]
+        Correct: products.variants.{"size": size, "color": color}
+        Incorrect: products.[{"size": variants.size}]
      d) You need to use the square brackets [] to map to an array of objects, otherwise it might return an object and fail the validation.
         Correct: variants: [variants.{"size": size, "color": color}]
         Incorrect: variants: variants.{"size": variants.size}
+        Incorrect: variants: variants.[{"size": variants.size}]
    - For array elements, use JSONata array operators like [0] for first element, [-1] for last element
    - Square bracket notation [] can be used with predicates, e.g. items[type='book']
 
@@ -90,12 +91,11 @@ Very important guidelines for creating JSONata mappings:
 - Important: Error handling:
   - If the error is something like \"instance is not of a type(s) array or array/null\". In this case, wrap the source selector in an array to ensure it always returns an array. 
     Good: \"result\": [$.items]
-    Good:
     Bad: \"result\": $.items
-  - If the error is something like \"instance is not of a type(s) object\", make sure you REALLY create the target schema with the correct type.
+  - If the error is something like \"instance is not of a type(s) object\", make sure you REALLY create the target schema with the correct type. E.g. if you screwed up by wrapping the result in an array, this might happen. Remove the array brackets around the result.
   - If you get an error like \"is not of a type(s) string/number/object\", try to convert the source field, but also consider that the original field or one of its parent might be null. In this case, add a default value.
-  - if an object is optional but its fields required, you can add a test and default to {}, but do not set the inner fields to default null.
-
+  - If an object is optional but its fields required, you can add a test and default to {}, but do not set the inner fields to default null.
+  - If you are repeatedly failing and can't figure out why, try a different approach.
 Remember: The goal is to create valid JSONata expressions that accurately transform the source data structure into the required target structure. Follow all of these guidelines or I will lose my job.`;
 
 export const API_PROMPT = `You are an API configuration assistant. Generate API details based on instructions and documentation.
