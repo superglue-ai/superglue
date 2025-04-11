@@ -213,7 +213,7 @@ export function composeUrl(host: string, path: string) {
   if (!path) path = '';
   
   // Add https:// if protocol is missing
-  if (!/^https?:\/\//i.test(host)) {
+  if (!/^(https?|postgres(ql)?):\/\//i.test(host)) {
     host = `https://${host}`;
   }
   

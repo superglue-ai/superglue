@@ -44,7 +44,7 @@ describe('API Utilities', () => {
               urlPath: 'v1/test',
               method: HttpMethod.GET,
               authentication: AuthType.NONE,
-              headers: { 'Content-Type': 'application/json' }
+              headers: [{ key: 'Content-Type', value: 'application/json' }]
             })
           }
         }]

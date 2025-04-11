@@ -1,7 +1,8 @@
 import { HttpMethod } from "@superglue/shared";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiWorkflowOrchestrator } from "../apiWorkflowOrchestrator.js";
 import type { ExecutionPlan } from "../domain/workflow.types.js";
+
 
 describe("ApiWorkflowOrchestrator-dog", { timeout: 600000 }, () => {
   // Skip all tests when API key isn't available
@@ -9,7 +10,9 @@ describe("ApiWorkflowOrchestrator-dog", { timeout: 600000 }, () => {
   //   it.skip('skips all tests when VITE_OPENAI_API_KEY is not set', () => {})
   //   return;
   // }
-
+  beforeEach(() => {
+    process.env.OPENAI_API_KEY = "test";
+  }),
   it("should execute a manual workflow plan successfully", async () => {
     process.env = { ...process.env, ...require("dotenv").config({ path: ".env" }).parsed };
 
@@ -19,10 +22,7 @@ describe("ApiWorkflowOrchestrator-dog", { timeout: 600000 }, () => {
       method: HttpMethod.GET,
       instruction: "Get a link to a single random picture for all dog breeds",
       documentationUrl: "https://dog.ceo/dog-api/documentation",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
+      headers: [{ key: "Content-Type", value: "application/json" }, { key: "Accept", value: "application/json" }],
     };
     const orchestrator = new ApiWorkflowOrchestrator(baseApiInput);
 
