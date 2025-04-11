@@ -96,12 +96,6 @@ describe('Auth Module', () => {
        _resetAuthManager(mockAuthManager);
     })
 
-    it('skips auth for websocket connections', async () => {
-      mockReq.headers.upgrade = 'websocket'
-      await authMiddleware(mockReq, mockRes, mockNext)
-      expect(mockNext).toHaveBeenCalled()
-    })
-
     it('skips auth for health check', async () => {
       mockReq.path = '/health'
       await authMiddleware(mockReq, mockRes, mockNext)

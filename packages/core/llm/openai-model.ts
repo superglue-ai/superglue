@@ -9,7 +9,7 @@ export class OpenAIModel implements LLM {
     private model: OpenAI;
     constructor() {
         this.model = new OpenAI({
-          apiKey: process.env.OPENAI_API_KEY,
+          apiKey: process.env.OPENAI_API_KEY || "",
           baseURL: process.env.OPENAI_BASE_URL,
         });
     }    

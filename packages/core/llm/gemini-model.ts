@@ -62,8 +62,8 @@ export class GeminiModel implements LLM {
           const result = await chatSession.sendMessage(userPrompt);
           let responseText = result.response.text();
 
-          // Clean up any potential prefixes/suffixes
-          responseText = responseText.replace(/^[^{]*/, '').replace(/[^}]*$/, '');
+          // Clean up any potential prefixes/suffixes while preserving arrays
+          responseText = responseText.replace(/^[^[{]*/, '').replace(/[^}\]]*$/, '');
           const generatedObject = JSON.parse(responseText);
           
           // Add response to messages history
