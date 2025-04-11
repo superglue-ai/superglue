@@ -103,8 +103,8 @@ ${JSON.stringify(sample(payload, 2), null, 2).slice(0,30000)}`
     return response;
   } catch (error) {
       if(retry < 5) {
-        const errorMessage = String(error.message).slice(0, 1000);
-        logMessage('warn', "Error generating mapping: " + errorMessage, metadata);
+        const errorMessage = String(error.message);
+        logMessage('warn', "Error generating mapping: " + errorMessage.slice(0, 200), metadata);
         messages.push({role: "user", content: errorMessage});
         return generateMapping(schema, payload, instruction, metadata, retry + 1, messages);
       }
