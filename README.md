@@ -179,10 +179,10 @@ console.log(JSON.stringify(result.data, null, 2));
 
 ## key features
 
-- **LLM-Powered Data Mapping**: Automatically generate data transformations using large language models
-- **API Proxy**: Intercept and transform API responses in real-time with minimal added latency
-- **File Processing**: Handle various file formats (CSV, JSON, XML) with automatic decompression
+- **API Proxy**: Configure APIs and intercept responses in real-time with minimal added latency
+- **LLM-Powered Data Mapping**: Automatically generate data transformations using large language models 
 - **Schema Validation**: Ensure data compliance with your specified schemas
+- **File Processing**: Handle various file formats (CSV, JSON, XML) with automatic decompression
 - **Flexible Authentication**: Support for various auth methods including header auth, api keys, oauth, and more
 - **Smart Pagination**: Handle different pagination styles automatically
 - **Caching & Retry Logic**: Built-in caching and configurable retry strategies
