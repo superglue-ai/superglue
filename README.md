@@ -61,7 +61,7 @@ flowchart LR
 ## quick start
 ### hosted version
 
-1. Sign up for early access to the hosted version of superglue at [superglue.cloud](https://superglue.cloud)
+1. Sign up for early access to the hosted version of superglue at [superglue.ai](https://superglue.ai)
 
 2. Install the superglue js/ts client:
 ```bash
