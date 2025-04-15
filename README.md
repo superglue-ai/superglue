@@ -7,12 +7,12 @@
 
 superglue is a self-healing integration agent. You can deploy it as a proxy between you and any complex / legacy APIs and always get the data that you want in the format you expect.
 
-Here's how it works: You define your desired data schema and provide basic instructions about an API endpoint (like "get all issues from jira"). Superglue then does the following:
-
+Here's how it works: You prompt superglue in natural language (like "get all issues from jira"), provide an API URL, and superglue transforms the prompt into corresponding API calls. 
+What superglue does under the hood:
 - Automatically generates the API configuration by analyzing API docs.
 - Handles pagination, authentication, and error retries.
-- Transforms response data into the exact schema you want using JSONata expressions.
-- Validates that all data coming through follows that schema, and fixes transformations when they break.
+- Creates deterministic transformation rules for response data (using JSONata), in the exact schema you need.
+- Validates that all data coming through follows that schema, and automatically fixes transformations when they break.
 
 <div align="center">
 
