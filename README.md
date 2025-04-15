@@ -3,9 +3,9 @@
   <img src="https://github.com/user-attachments/assets/be0e65d4-dcd8-4133-9841-b08799e087e7" width="350" alt="superglue_logo_white">
 </p>
 
-<h2 align="center">self-healing open source data connector 🍯</h2>
+<h2 align="center">self-healing integration agent 🍯</h2>
 
-superglue is a self-healing open source data connector. You can deploy it as a proxy between you and any complex / legacy APIs and always get the data that you want in the format you expect.
+superglue is a self-healing integration agent. You can deploy it as a proxy between you and any complex / legacy APIs and always get the data that you want in the format you expect.
 
 Here's how it works: You define your desired data schema and provide basic instructions about an API endpoint (like "get all issues from jira"). Superglue then does the following:
 
