@@ -14,6 +14,8 @@ What superglue does under the hood:
 - Creates deterministic transformation rules for response data (using JSONata), in the exact schema you need.
 - Validates that all data coming through follows that schema, and automatically fixes transformations when they break.
 
+If you’re spending a lot of time writing code connecting to weird APIs, fumbling with custom fields in foreign language ERPs, mapping JSONs, extracting data from compressed CSVs sitting on FTP servers, and making sure your integrations don’t break when something unexpected comes through, superglue might be for you.
+
 <div align="center">
 
 [![GitHub](https://img.shields.io/github/license/superglue-ai/superglue?style=flat-square)](https://github.com/superglue-ai/superglue/blob/main/LICENSE)
@@ -26,8 +28,6 @@ What superglue does under the hood:
 
 
 </div>
-
-If you’re spending a lot of time writing code connecting to weird APIs, fumbling with custom fields in foreign language ERPs, mapping JSONs, extracting data from compressed CSVs sitting on FTP servers, and making sure your integrations don’t break when something unexpected comes through, superglue might be for you.
 
 ```mermaid
 flowchart LR
