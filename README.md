@@ -11,8 +11,10 @@ Here's how it works: You prompt superglue in natural language (like "get all iss
 What superglue does under the hood:
 - Automatically generates the API configuration by analyzing API docs.
 - Handles pagination, authentication, and error retries.
-- Creates deterministic transformation rules for response data (using JSONata), in the exact schema you need.
+- Creates deterministic transformations (using JSONata for creating transformation rules), into the exact schema you need.
 - Validates that all data coming through follows that schema, and automatically fixes transformations when they break.
+
+superglue uses LLMs only during configuration setup and transformation rule creation, making the glueing process deterministic and extremely efficient in terms of latency and cost.
 
 If you’re spending a lot of time writing code connecting to weird APIs, fumbling with custom fields in foreign language ERPs, mapping JSONs, extracting data from compressed CSVs sitting on FTP servers, and making sure your integrations don’t break when something unexpected comes through, superglue might be for you.
 
