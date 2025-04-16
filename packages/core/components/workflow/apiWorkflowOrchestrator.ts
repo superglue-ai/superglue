@@ -200,11 +200,10 @@ export class ApiWorkflowOrchestrator {
   ): Promise<Record<string, unknown>> {
     try {
       // if explicit mapping exists, use it first
-      if (step.inputMapping && step.inputMapping !== "$") {
+      if (step.inputMapping) {
         // Prepare context for JSONata expression
         const mappingContext = {
           payload: originalPayload,
-          previousSteps: currentResult.data,
           // Include step results at root level for easier access
           ...Object.entries(currentResult.stepResults).reduce(
             (acc, [stepId, stepResult]) => {
@@ -224,51 +223,8 @@ export class ApiWorkflowOrchestrator {
           console.warn(`[Step ${step.id}] Input mapping failed, falling back to auto-detection`, err);
         }
       }
-
-      // Detect template variables if present
-      const templateVars = extractTemplateVariables(step.apiConfig.urlPath || "");
-      if (templateVars.length > 0) {
-        const autoVars: Record<string, unknown> = {};
-
-        // Find variables from previous step results or payload
-        for (const varName of templateVars) {
-          let found = false;
-
-          for (const stepResult of Object.values(currentResult.stepResults)) {
-            if (!stepResult?.transformedData || typeof stepResult.transformedData !== "object") continue;
-
-            const data = stepResult.transformedData as Record<string, unknown>;
-            if (varName in data) {
-              autoVars[varName] = data[varName];
-              found = true;
-              break;
-            }
-          }
-
-          // look in payload
-          if (!found && varName in originalPayload) {
-            autoVars[varName] = originalPayload[varName];
-          }
-        }
-
-        // If we found any variables, merge them with payload
-        if (Object.keys(autoVars).length > 0) {
-          return { ...originalPayload, ...autoVars };
-        }
-      }
       // Default to simple merging of payload with previous step data
-      return {
-        ...originalPayload,
-        previousResults: Object.entries(currentResult.stepResults).reduce(
-          (acc, [stepId, stepResult]) => {
-            if (stepResult?.transformedData) {
-              acc[stepId] = stepResult.transformedData;
-            }
-            return acc;
-          },
-          {} as Record<string, unknown>,
-        ),
-      };
+      return { ...originalPayload };
     } catch (error) {
       console.error(`[Step ${step.id}] Error preparing input:`, error);
       return { ...originalPayload };
