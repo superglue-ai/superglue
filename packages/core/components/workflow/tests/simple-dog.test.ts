@@ -55,9 +55,9 @@ describe("ApiWorkflowOrchestrator-dog", { timeout: 600000 }, () => {
             id: "getBreedImage_apiConfig",
           },
           executionMode: "LOOP",
-          loopVariable: "breed", // Explicitly specify which variable to loop over
+          loopSelector: "breed", // Explicitly specify which variable to loop over
           loopMaxIters: 5,
-          inputMapping: "$", // Use identity mapping since loopVariable will handle extracting values
+          inputMapping: "$", // Use identity mapping since loopSelector will handle extracting values
           responseMapping: "$",
         },
       ],

@@ -8,6 +8,7 @@ import {
   processStepResult,
   storeStepResult,
 } from "./workflowUtils.js";
+import { applyJsonata } from "../../../utils/tools.js";
 
 export interface ExecutionContext {
   step: ExecutionStep;
@@ -61,137 +62,6 @@ export async function executeWorkflowStep(
 
   const strategy = getStrategy(step.executionMode);
   return strategy.execute(ctx, payload, credentials, options);
-}
-
-// ======= Helper functions =======
-
-function findLoopVariable(ctx: ExecutionContext): [string, VariableMapping | undefined] {
-  const { step, result } = ctx;
-
-  // Require explicit loopVariable for loop steps
-  if (step.loopVariable) {
-    console.log(`Using explicitly configured loop variable: ${step.loopVariable}`);
-
-    // Create a default mapping using a previous step as source
-    const previousStepIds = Object.keys(result.stepResults);
-    if (previousStepIds.length > 0) {
-      const lastStepId = previousStepIds[previousStepIds.length - 1];
-      const defaultMapping: VariableMapping = {
-        source: lastStepId,
-        path: step.loopVariable,
-        isArray: true,
-      };
-      return [step.loopVariable, defaultMapping];
-    }
-  }
-
-  return ["", undefined];
-}
-
-async function getLoopValues(
-  ctx: ExecutionContext,
-  mapping: VariableMapping,
-  loopVarName: string,
-  payload: Record<string, unknown>,
-): Promise<any[]> {
-  const { executionPlan, result } = ctx;
-
-  // Use explicitly selected values if available
-  if (mapping.selectedValues && mapping.selectedValues.length > 0) {
-    console.log(`[LOOP] Using explicitly selected values: ${mapping.selectedValues.length} items`);
-    return mapping.selectedValues;
-  }
-
-  // Get values from payload if that's the source
-  if (mapping.source === "payload") {
-    const payloadValue = payload[loopVarName];
-    if (Array.isArray(payloadValue)) {
-      console.log(`[LOOP] Using array from payload: ${payloadValue.length} items`);
-      return payloadValue;
-    }
-
-    if (payloadValue !== undefined) {
-      console.log("[LOOP] Using single value from payload");
-      return [payloadValue];
-    }
-    return [];
-  }
-
-  // Get values from a previous step
-  const sourceResult = result.stepResults[mapping.source]?.transformedData;
-  if (!sourceResult) {
-    return [];
-  }
-
-  // Always use the transformed result from the previous step
-  const sourceStepResult = result.stepResults[mapping.source];
-  if (sourceStepResult?.transformedData) {
-    // If transformedData is an array, use it directly
-    if (Array.isArray(sourceStepResult.transformedData)) {
-      const array = sourceStepResult.transformedData;
-      return array;
-    }
-
-    // If the transformed result is an object, we can try different approaches
-    if (typeof sourceStepResult.transformedData === "object" && sourceStepResult.transformedData !== null) {
-      const transformedObj = sourceStepResult.transformedData as Record<string, unknown>;
-
-      // If loopVariable is a property in the transformed data, use it
-      if (loopVarName in transformedObj && Array.isArray(transformedObj[loopVarName])) {
-        const values = transformedObj[loopVarName] as unknown[];
-        console.log(`[LOOP] Found array at property '${loopVarName}' in transformed data: ${values.length} items`);
-        return values;
-      }
-
-      // If we're supposed to use object keys as values
-      if (Object.keys(transformedObj).length > 0) {
-        const keys = Object.keys(transformedObj);
-        return keys;
-      }
-    }
-  }
-
-  // Try using data extractor with the provided path
-  try {
-    const values = extractValues(sourceResult as Record<string, unknown>, mapping.path);
-    if (values.length > 0) {
-      return values;
-    }
-  } catch (error) {
-    console.warn(`[LOOP] Error extracting values using path '${mapping.path}'`);
-  }
-
-  // Check if the source has a property matching the loop variable name
-  if (
-    typeof sourceResult === "object" &&
-    !Array.isArray(sourceResult) &&
-    sourceResult !== null &&
-    loopVarName in (sourceResult as Record<string, unknown>)
-  ) {
-    const varValue = (sourceResult as Record<string, unknown>)[loopVarName];
-    if (Array.isArray(varValue)) {
-      return varValue;
-    }
-  }
-
-  // If the source result itself is an array, use it
-  if (Array.isArray(sourceResult)) {
-    console.log(`[LOOP] Source result is already an array: ${sourceResult.length} items`);
-    return sourceResult;
-  }
-
-  // Try to find any array in the source result's properties
-  if (typeof sourceResult === "object" && sourceResult !== null) {
-    for (const [key, value] of Object.entries(sourceResult)) {
-      if (Array.isArray(value) && value.length > 0) {
-        console.log(`[LOOP] Found array in property '${key}': ${value.length} items`);
-        return value;
-      }
-    }
-  }
-
-  console.warn(`[LOOP] No array values found for loop variable '${loopVarName}'`);
-  return [];
 }
 
 // ======= Strategy implementations =======
@@ -251,28 +121,24 @@ const loopStrategy: ExecutionStrategy = {
     try {
       const { step, executionPlan, result, apiDocumentation, baseApiInput } = ctx;
 
-      // LOOP mode requires an explicit loopVariable
-      if (!step.loopVariable) {
-        throw new Error("loopVariable is required for LOOP execution mode");
+      // LOOP mode requires an explicit loopSelector
+      if (!step.loopSelector) {
+        if(!Array.isArray(payload)) {
+          step.loopSelector = "$";
+        }
+        else {
+          throw new Error("loopSelector is required for LOOP execution mode");
+        }
       }
+      
+      const loopValues: any[] = await applyJsonata(payload, step.loopSelector);
 
-      const [loopVarName, loopMapping] = findLoopVariable(ctx);
-
-      if (!loopVarName || !loopMapping) {
-        console.error(`[LOOP] No loop variable found for step ${step.id}`);
-        storeStepResult(step.id, result, undefined, undefined, false, "No loop variable found");
-        return false;
-      }
-
-      console.log(`[LOOP] Step '${step.id}' - Using variable '${loopVarName}' from '${loopMapping.source}'`);
-
-      const loopValues = await getLoopValues(ctx, loopMapping, loopVarName, payload);
-
-      if (loopValues.length === 0) {
-        console.error(`[LOOP] No values found for loop variable '${loopVarName}'`);
+      if (!Array.isArray(loopValues) || loopValues.length === 0) {
+        console.error(`[LOOP] No values found for loop variable '${step.loopSelector}'`);
         storeStepResult(step.id, result, undefined, undefined, false, "No loop values found");
         return false;
       }
+      console.log(`[LOOP] Step '${step.id}' - Using variable '${step.loopSelector}' with ${loopValues.length}`);
 
       // Apply loop max iterations limit if specified
       let effectiveLoopValues = loopValues;
@@ -285,8 +151,6 @@ const loopStrategy: ExecutionStrategy = {
         }
       }
 
-      console.log(`[LOOP] Found ${effectiveLoopValues.length} values, example: '${effectiveLoopValues[0]}'`);
-
       const apiConfig = await prepareApiConfig(step, executionPlan, apiDocumentation, baseApiInput);
       const results = [];
       for (let i = 0; i < effectiveLoopValues.length; i++) {
@@ -296,7 +160,7 @@ const loopStrategy: ExecutionStrategy = {
         // Create payload with loop variable
         const loopPayload = {
           ...payload,
-          [loopVarName]: loopValue,
+          value: loopValue,
         };
 
         // TODO: create api config per call?

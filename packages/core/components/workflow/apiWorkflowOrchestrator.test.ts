@@ -246,7 +246,7 @@ describe("ApiWorkflowOrchestrator", () => {
           },
           executionMode: "DIRECT",
           // Use the user ID from the userData step
-          inputMapping: "{ userId: payload.userId || previousSteps.userData.id }",
+          inputMapping: "{ userId: payload.userId || userData.id }",
           // Return only posts matching the user ID
           responseMapping: "$",
         },
@@ -326,7 +326,7 @@ describe("ApiWorkflowOrchestrator", () => {
             id: "api_config_getUserPosts",
           },
           executionMode: "LOOP",
-          loopVariable: "userId",
+          loopSelector: "userId",
           inputMapping: "{ userId: $.getUsers.*.id }",
           responseMapping: "$",
         },

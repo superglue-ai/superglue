@@ -277,7 +277,7 @@ input ExecutionStepInput {
   id: String!
   apiConfig: ApiInput!
   executionMode: String  # DIRECT | LOOP
-  loopVariable: String
+  loopSelector: String
   loopMaxIters: Int
   inputMapping: String
   responseMapping: String

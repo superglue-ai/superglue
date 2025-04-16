@@ -17,7 +17,7 @@ export async function executeApiCall(
   options?: RequestOptions,
 ): Promise<unknown> {
   try {
-    console.log(`[API Call] ${apiConfig.id || "unnamed"}: ${apiConfig.urlHost}${apiConfig.urlPath}`);
+    console.log(`[API Call] ${apiConfig.id} ${apiConfig.urlHost}${apiConfig.urlPath}`);
 
     const result = await callEndpoint(apiConfig, callPayload || {}, credentials || {}, options || { timeout: 60000 });
 

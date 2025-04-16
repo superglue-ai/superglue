@@ -15,7 +15,7 @@ export interface ExecutionStep {
   id: string;
   apiConfig: ApiConfig;
   executionMode: ExecutionMode;
-  loopVariable?: string;
+  loopSelector?: string;
   loopMaxIters?: number;
 
   inputMapping?: string;

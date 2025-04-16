@@ -195,7 +195,7 @@ export interface ExecutionStep {
   id: string;
   apiConfig: ApiConfig;
   executionMode: "DIRECT" | "LOOP";
-  loopVariable?: string;
+  loopSelector?: string;
   loopMaxIters?: number;
 }
 
