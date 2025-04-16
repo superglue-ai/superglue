@@ -31,35 +31,6 @@ If you’re spending a lot of time writing code connecting to weird APIs, fumbli
 
 </div>
 
-```mermaid
-flowchart LR
-    subgraph Input[data sources]
-        A1[APIs]
-        A2[files]
-        A3[legacy systems]
-    end
-
-    subgraph Process[data transformation]
-        T1[superglue engine]
-    end
-
-    subgraph Output[destination]
-        D1[your system]
-    end
-
-    Input --> Process
-    Process --> Output
-
-    %% Styling
-    classDef sourceStyle fill:#f9f,stroke:#333,stroke-width:2px
-    classDef processStyle fill:#bbf,stroke:#333,stroke-width:2px
-    classDef outputStyle fill:#bfb,stroke:#333,stroke-width:2px
-
-    class Input sourceStyle
-    class Process processStyle
-    class Output outputStyle
-```
-
 ## quick start
 ### hosted version
 
