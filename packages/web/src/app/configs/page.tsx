@@ -27,9 +27,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/src/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/src/components/ui/dropdown-menu";
+
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/src/components/ui/tooltip";
 import { ApiConfig, ExtractConfig, SuperglueClient } from '@superglue/client';
-import { Check, Copy, History, Play, Plus, RotateCw, Settings, ShoppingBag, Trash2 } from "lucide-react";
+import { Check, Copy, FileText, GitBranch, Globe, History, Play, Plus, RotateCw, Settings, ShoppingBag, Trash2 } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import React from 'react';
 
@@ -50,7 +57,6 @@ const ConfigTable = () => {
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
 
   const refreshConfigs = React.useCallback(async () => {
-    console.log('refreshing configs');
     setShowConfigStepper(false);
     setIsRefreshing(true);
     setLoading(true);
@@ -59,19 +65,52 @@ const ConfigTable = () => {
         endpoint: config.superglueEndpoint,
         apiKey: config.superglueApiKey
       });
-      
-      const [apiConfigs, extractConfigs] = await Promise.all([
+
+      // Fetch APIs, Extracts, and Workflows concurrently
+      const [apiConfigs, extractConfigs, workflowResponse] = await Promise.all([
         superglueClient.listApis(1000, 0),
-        superglueClient.listExtracts(1000, 0)
+        superglueClient.listExtracts(1000, 0),
+        fetch(`${config.superglueEndpoint}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${config.superglueApiKey}`,
+          },
+          body: JSON.stringify({
+            query: `
+              query ListWorkflows($limit: Int, $offset: Int) {
+                listWorkflows(limit: $limit, offset: $offset) {
+                  id
+                  version
+                  createdAt
+                  updatedAt
+                }
+              }
+            `,
+            variables: { limit: 1000, offset: 0 }, // Match limit/offset logic
+          }),
+        }),
       ]);
 
+      const workflowJson = await workflowResponse.json();
+      if (!workflowResponse.ok || workflowJson.errors) {
+        console.error('Error fetching workflows:', workflowJson.errors);
+        // Decide how to handle partial failure, e.g., show error, proceed with partial data
+        // For now, let's throw an error or log it and proceed
+        throw new Error(`Failed to fetch workflows: ${workflowJson.errors?.[0]?.message || workflowResponse.statusText}`);
+      }
+      const workflowItems = workflowJson.data.listWorkflows || [];
+
+
       const combinedConfigs = [
-        ...apiConfigs.items.map(item => ({ ...item, type: 'api' })), 
-        ...extractConfigs.items.map(item => ({ ...item, type: 'extract' }))
+        ...apiConfigs.items.map(item => ({ ...item, type: 'api' as const })),
+        ...extractConfigs.items.map(item => ({ ...item, type: 'extract' as const })),
+        ...workflowItems.map((item: any) => ({ ...item, type: 'workflow' as const })) // Add workflow items
       ].sort((a, b) => {
+        // Use updatedAt first, fallback to createdAt
         const dateA = new Date(a.updatedAt || a.createdAt).getTime();
         const dateB = new Date(b.updatedAt || b.createdAt).getTime();
-        return dateB - dateA;
+        return dateB - dateA; // Sort descending (newest first)
       });
 
       const start = page * pageSize;
@@ -80,6 +119,7 @@ const ConfigTable = () => {
       setTotal(combinedConfigs.length);
     } catch (error) {
       console.error('Error fetching configs:', error);
+      // Consider setting an error state to show in the UI
     } finally {
       setLoading(false);
       setIsRefreshing(false);
@@ -92,6 +132,9 @@ const ConfigTable = () => {
 
   const handleCreateNew = () => {
     router.push('/configs/new');
+  };
+  const handleWorkflow = () => {
+    router.push('/workflows');
   };
 
   const handleCreateNewExtract = () => {
@@ -140,25 +183,74 @@ const ConfigTable = () => {
     router.push(`/runs/${id}`);
   };
 
+  const handleEditWorkflow = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    // Navigate to the workflow page, passing the ID as a query param
+    // The workflow page should be updated to potentially load based on this param
+    router.push(`/workflows?id=${encodeURIComponent(id)}`);
+  };
+
+  const handlePlayWorkflow = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    // Navigate to the workflow page, passing the ID. The user can then run it.
+    router.push(`/workflows?id=${encodeURIComponent(id)}`);
+  };
+
   const handleDelete = async () => {
     if (!configToDelete) return;
-    
+
     try {
       const superglueClient = new SuperglueClient({
         endpoint: config.superglueEndpoint,
         apiKey: config.superglueApiKey
       });
 
-      if ((configToDelete as any)?.type === 'api') {
-        await superglueClient.deleteApi(configToDelete.id);
-      } else if ((configToDelete as any)?.type === 'extract') {
-        await superglueClient.deleteExtraction(configToDelete.id);
+      let deletePromise;
+
+      switch ((configToDelete as any)?.type) {
+        case 'api':
+          deletePromise = superglueClient.deleteApi(configToDelete.id);
+          break;
+        case 'extract':
+          deletePromise = superglueClient.deleteExtraction(configToDelete.id);
+          break;
+        case 'workflow':
+          // Manual fetch for deleting workflow
+          deletePromise = fetch(`${config.superglueEndpoint}`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${config.superglueApiKey}`,
+            },
+            body: JSON.stringify({
+              query: `
+                mutation DeleteWorkflow($id: ID!) {
+                  deleteWorkflow(id: $id)
+                }
+              `,
+              variables: { id: configToDelete.id },
+            }),
+          }).then(async response => {
+            const json = await response.json();
+            if (!response.ok || json.errors) {
+              throw new Error(`Failed to delete workflow: ${json.errors?.[0]?.message || response.statusText}`);
+            }
+            return json.data.deleteWorkflow;
+          });
+          break;
+        default:
+          console.error('Unknown config type for deletion:', (configToDelete as any)?.type);
+          return;
       }
+      
+      await deletePromise;
 
       setConfigToDelete(null);
+      // Optimization: remove locally instead of full refresh? For simplicity, refresh:
       refreshConfigs();
     } catch (error) {
       console.error('Error deleting config:', error);
+      // Add user feedback, e.g., toast notification
     }
   };
 
@@ -174,55 +266,13 @@ const ConfigTable = () => {
   if (loading) {
     return (
       <div className="p-8 max-w-none w-full min-h-full">
-        <div className="flex flex-col lg:flex-row justify-between lg:items-center mb-6 gap-2">
-          <h1 className="text-2xl font-bold">Configurations</h1>
-          <div className="flex gap-4">
-            <Button onClick={handleCreateNewExtract}>
-              <Plus className="mr-2 h-4 w-4" />
-              New File
-            </Button>
-            <Button onClick={handleCreateNew}>
-              <Plus className="mr-2 h-4 w-4" />
-              New API
-            </Button>
-          </div>
-        </div>
-
-        <div className="border rounded-lg">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead></TableHead>
-                <TableHead>ID</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Instruction</TableHead>
-                <TableHead>URL</TableHead>
-                <TableHead>Updated At</TableHead>
-                <TableHead className="text-right">
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={refreshConfigs}
-                          className="transition-transform"
-                        >
-                          <RotateCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Refresh Configurations</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-            </TableBody>
-          </Table>
-        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={refreshConfigs}
+          className="transition-transform">
+            Refresh
+        </Button>
       </div>
     );
   }
@@ -324,14 +374,28 @@ const ConfigTable = () => {
       <div className="flex flex-col lg:flex-row justify-between lg:items-center mb-6 gap-2">
         <h1 className="text-2xl font-bold">Configurations</h1>
         <div className="flex gap-4">
-          <Button onClick={handleCreateNewExtract}>
-            <Plus className="mr-2 h-4 w-4" />
-            New File
-          </Button>
-          <Button onClick={handleCreateNew}>
-            <Plus className="mr-2 h-4 w-4" />
-            New API
-          </Button>
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Create
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align='end'>
+              <DropdownMenuItem onClick={handleCreateNew} className='p-4'>
+                <Globe className="mr-2 h-4 w-4" />
+                API Configuration
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleWorkflow} className='p-4'>
+                <GitBranch className="mr-2 h-4 w-4" />
+                Workflow (Alpha)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleCreateNewExtract} className='p-4'>
+                <FileText className="mr-2 h-4 w-4" />
+                File Configuration 
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -342,8 +406,8 @@ const ConfigTable = () => {
               <TableHead></TableHead>
               <TableHead>ID</TableHead>
               <TableHead>Type</TableHead>
-              <TableHead>Instruction</TableHead>
-              <TableHead>URL</TableHead>
+              <TableHead>Instruction / Name</TableHead>
+              <TableHead>URL / Info</TableHead>
               <TableHead>Updated At</TableHead>
               <TableHead className="text-right">
                 <TooltipProvider>
@@ -367,67 +431,81 @@ const ConfigTable = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {configs.map((config) => (
-              <TableRow
-                key={config.id}
-                className="hover:bg-secondary"
-              >
-                <TableCell className="w-[100px]">
-                <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={(e) => (config as any).type === 'extract' ? handlePlayExtract(e, config.id) : handlePlay(e, config.id)}
-                        className="gap-2"
-                      >
-                        <Play className="h-4 w-4" />
-                        Run
-                </Button>
-                </TableCell>
-                <TableCell className="font-medium max-w-[200px] truncate relative group">
-                  <div className="flex items-center space-x-1">
-                    <span className="truncate">{config.id}</span>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={(e) => handleCopyId(e, config.id)}
-                          >
-                            {copiedId === config.id ? (
-                              <Check className="h-3.5 w-3.5 text-green-500" />
-                            ) : (
-                              <Copy className="h-3.5 w-3.5" />
-                            )}
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top">
-                          <p>{copiedId === config.id ? "Copied!" : "Copy ID"}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                </TableCell>
-                <TableCell className="w-[80px]">
-                  <Badge variant={(config as any).type === 'extract' ? 'default' : 'secondary'}>
-                    {(config as any).type === 'extract' ? 'Extract' : 'API'}
-                  </Badge>
-                </TableCell>
-                <TableCell className="max-w-[300px] truncate">
-                  {config.instruction}
-                </TableCell>
-                <TableCell className="font-medium max-w-[100px] truncate">
-                  {config.urlHost}
-                </TableCell>
-                <TableCell className="w-[150px]">
-                  {config.updatedAt ? new Date(config.updatedAt).toLocaleDateString() : ''}
-                </TableCell>
-                <TableCell className="w-[100px]">
-                  <div className="flex justify-end gap-2">
-                    <TooltipProvider>
-                      {(config as any).type === 'api' && (
-                        <>
+            {configs.map((config) => {
+              const configType = (config as any).type;
+              const isApi = configType === 'api';
+              const isExtract = configType === 'extract';
+              const isWorkflow = configType === 'workflow';
+
+              const handleRunClick = (e: React.MouseEvent) => {
+                if (isApi) handlePlay(e, config.id);
+                else if (isExtract) handlePlayExtract(e, config.id);
+                else if (isWorkflow) handlePlayWorkflow(e, config.id);
+              };
+
+              return (
+                <TableRow
+                  key={config.id}
+                  className="hover:bg-secondary"
+                  // Consider adding onClick={() => handleRowClick(config)} if needed
+                >
+                  <TableCell className="w-[100px]">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={handleRunClick}
+                      className="gap-2"
+                    >
+                      {isWorkflow ? <GitBranch className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                      Run
+                    </Button>
+                  </TableCell>
+                  <TableCell className="font-medium max-w-[200px] truncate relative group">
+                    <div className="flex items-center space-x-1">
+                      <span className="truncate">{config.id}</span>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={(e) => handleCopyId(e, config.id)}
+                            >
+                              {copiedId === config.id ? (
+                                <Check className="h-3.5 w-3.5 text-green-500" />
+                              ) : (
+                                <Copy className="h-3.5 w-3.5" />
+                              )}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            <p>{copiedId === config.id ? "Copied!" : "Copy ID"}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                  </TableCell>
+                  <TableCell className="w-[100px]">
+                     {/* Use different variants or specific names */}
+                     <Badge variant={isApi ? 'secondary' : isExtract ? 'default' : 'outline'}>
+                      {isApi ? 'API' : isExtract ? 'Extract' : 'Workflow'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="max-w-[300px] truncate">
+                    {isWorkflow ? config.id : config.instruction} {/* Display ID for workflow name */}
+                  </TableCell>
+                  <TableCell className="font-medium max-w-[100px] truncate">
+                    {isApi || isExtract ? config.urlHost : '-'} {/* No URL for workflow */}
+                  </TableCell>
+                  <TableCell className="w-[150px]">
+                    {config.updatedAt ? new Date(config.updatedAt).toLocaleDateString() : (config.createdAt ? new Date(config.createdAt).toLocaleDateString() : '')}
+                  </TableCell>
+                  <TableCell className="w-[100px]">
+                    <div className="flex justify-end gap-1"> {/* Reduced gap */}
+                      <TooltipProvider>
+                        {/* Common Actions */}
+                        {isApi && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button
@@ -442,46 +520,49 @@ const ConfigTable = () => {
                               <p>View Run History</p>
                             </TooltipContent>
                           </Tooltip>
+                        )}
 
+                        {(isApi || isWorkflow) && ( // Edit for API and Workflow
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={(e) => handleEdit(e, config.id)}
+                                onClick={(e) => isApi ? handleEdit(e, config.id) : handleEditWorkflow(e, config.id)}
                               >
                                 <Settings className="h-4 w-4" />
                               </Button>
                             </TooltipTrigger>
                             <TooltipContent>
-                              <p>Edit Configuration</p>
+                              <p>{isApi ? 'Edit Configuration' : 'Edit Workflow'}</p>
                             </TooltipContent>
                           </Tooltip>
-                        </>
-                      )}
-
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setConfigToDelete(config);
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Delete Configuration</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
+                        )}
+                        
+                        {/* Delete Action (Available for all types) */}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setConfigToDelete(config);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                             <p>Delete {isApi ? 'Configuration' : isExtract ? 'Configuration' : 'Workflow'}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </div>

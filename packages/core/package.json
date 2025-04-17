@@ -33,6 +33,7 @@
   "type": "module",
   "dependencies": {
     "@apollo/server": "^4.11.3",
+    "@google/generative-ai": "^0.24.0",
     "@superglue/shared": "file:../shared",
     "axios": "^1.8.2",
     "console-stamp": "^3.1.2",

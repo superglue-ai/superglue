@@ -1,4 +1,4 @@
-import type { ApiConfig, ApiInput, DataStore, ExtractConfig, ExtractInput, RunResult, SavedWorkflow, TransformConfig, TransformInput } from "@superglue/shared";
+import type { ApiConfig, ApiInput, DataStore, ExtractConfig, ExtractInput, RunResult, Workflow, TransformConfig, TransformInput } from "@superglue/shared";
 import { createHash } from 'node:crypto';
 import { getSchemaFromData } from "../utils/tools.js";
 
@@ -9,7 +9,7 @@ export class MemoryStore implements DataStore {
     transforms: Map<string, TransformConfig>;
     runs: Map<string, RunResult>;
     runsIndex: Map<string, { id: string; timestamp: number; configId: string }[]>;
-    workflows: Map<string, SavedWorkflow>;
+    workflows: Map<string, Workflow>;
   };
 
   private tenant: { email: string | null; emailEntrySkipped: boolean } = {
@@ -282,21 +282,21 @@ export class MemoryStore implements DataStore {
   }
 
   // Workflow Methods
-  async getWorkflow(id: string, orgId?: string): Promise<SavedWorkflow | null> {
+  async getWorkflow(id: string, orgId?: string): Promise<Workflow | null> {
     if (!id) return null;
     const key = this.getKey('workflow', id, orgId);
     const workflow = this.storage.workflows.get(key);
     return workflow ? { ...workflow, id } : null;
   }
 
-  async listWorkflows(limit = 10, offset = 0, orgId?: string): Promise<{ items: SavedWorkflow[], total: number }> {
+  async listWorkflows(limit = 10, offset = 0, orgId?: string): Promise<{ items: Workflow[], total: number }> {
     const items = this.getOrgItems(this.storage.workflows, 'workflow', orgId)
       .slice(offset, offset + limit);
     const total = this.getOrgItems(this.storage.workflows, 'workflow', orgId).length;
     return { items, total };
   }
 
-  async upsertWorkflow(id: string, workflow: SavedWorkflow, orgId?: string): Promise<SavedWorkflow> {
+  async upsertWorkflow(id: string, workflow: Workflow, orgId?: string): Promise<Workflow> {
     if (!id || !workflow) return null;
     const key = this.getKey('workflow', id, orgId);
     this.storage.workflows.set(key, workflow);

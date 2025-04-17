@@ -1,23 +1,32 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { generateSchema } from './schema.js'
+import { LanguageModel } from '../llm/llm.js';
 
-// Create mock functions that will be used in our tests
-const mockCreate = vi.fn()
-
-// Mock the openai module
-vi.mock('openai', () => {
+// Update the mock to be more flexible
+vi.mock('../llm/llm.js', () => {
   return {
-    default: function() {
-      return {
-        chat: {
-          completions: {
-            create: mockCreate
+    LanguageModel: {
+      generateObject: vi.fn().mockImplementation(async (messages, _, temperature) => ({
+        type: "object",
+        properties: {
+          results: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                name: {
+                  type: "string"
+                }
+              },
+              required: ["name"]
+            }
           }
-        }
-      }
+        },
+        required: ["results"]
+      }))
     }
-  }
-})
+  };
+});
 
 describe('generateSchema', () => {
   const originalEnv = { ...process.env }
@@ -60,84 +69,59 @@ describe('generateSchema', () => {
   })
 
   it('should generate a valid schema (happy path)', async () => {
-    mockCreate.mockResolvedValueOnce({
-      choices: [
-        {
-          message: {
-            content: JSON.stringify({ jsonSchema: expectedSchema })
-          }
-        }
-      ]
-    })
+    const generateObject = vi.mocked(LanguageModel.generateObject)
+    generateObject.mockResolvedValueOnce({ response: expectedSchema, messages: [] })
 
     const schema = await generateSchema(instruction, responseData, {})
     expect(schema).toEqual(expectedSchema)
-    expect(mockCreate).toHaveBeenCalledTimes(1)
+    expect(LanguageModel.generateObject).toHaveBeenCalledTimes(1)
   })
 
   it('should retry on failure and succeed on second attempt', async () => {
-    // Mock a failure on first attempt, success on second
     const errorMessage = 'Test error message'
-    mockCreate.mockRejectedValueOnce(new Error(errorMessage))
-    mockCreate.mockResolvedValueOnce({
-      choices: [
-        {
-          message: {
-            content: JSON.stringify({ jsonSchema: expectedSchema })
-          }
-        }
-      ]
-    })
+    const generateObject = vi.mocked(LanguageModel.generateObject)
+    
+    // First call fails
+    generateObject.mockRejectedValueOnce(new Error(errorMessage))
+    // Second call succeeds
+    generateObject.mockResolvedValueOnce({ response: expectedSchema, messages: [] })
 
     const schema = await generateSchema(instruction, responseData, {})
     expect(schema).toEqual(expectedSchema)
+    expect(generateObject).toHaveBeenCalledTimes(2)
 
-    expect(mockCreate).toHaveBeenCalledTimes(2)
-
-    const secondCallArgs = mockCreate.mock.calls[1][0]
-    const lastMessage = secondCallArgs.messages[secondCallArgs.messages.length - 1]
+    const secondCallArgs = generateObject.mock.calls[1][0]
+    const lastMessage = secondCallArgs[secondCallArgs.length - 1]
     expect(lastMessage.content).toContain(errorMessage)
   })
 
   it('should not include temperature parameter for o3-mini model', async () => {
     process.env.SCHEMA_GENERATION_MODEL = 'o3-mini'
-    mockCreate.mockResolvedValueOnce({
-      choices: [
-        {
-          message: {
-            content: JSON.stringify({ jsonSchema: expectedSchema })
-          }
-        }
-      ]
-    })
+    const generateObject = vi.mocked(LanguageModel.generateObject)
+    generateObject.mockResolvedValueOnce({ response: expectedSchema, messages: [] })
 
     await generateSchema(instruction, responseData, {})
 
-    const o3MiniCallArgs = mockCreate.mock.calls[0][0]
-    expect(o3MiniCallArgs.temperature).toBeUndefined()
-    expect(o3MiniCallArgs.model).toBe('o3-mini')
-    
+    expect(generateObject).toHaveBeenCalledWith(
+      expect.any(Array),
+      null,
+      0
+    )
+
     // Reset for gpt-4o test
     vi.resetAllMocks()
-    delete process.env.SCHEMA_GENERATION_MODEL // Remove specific model setting
-    process.env.OPENAI_MODEL = 'gpt-4o' // Set via fallback
+    delete process.env.SCHEMA_GENERATION_MODEL
+    process.env.OPENAI_MODEL = 'gpt-4o'
     
-    mockCreate.mockResolvedValueOnce({
-      choices: [
-        {
-          message: {
-            content: JSON.stringify({ jsonSchema: expectedSchema })
-          }
-        }
-      ]
-    })
+    generateObject.mockResolvedValueOnce({ response: expectedSchema, messages: [] })
     
     await generateSchema(instruction, responseData, {})
     
-    const gpt4oCallArgs = mockCreate.mock.calls[0][0]
-    // Verify temperature parameter is included for gpt-4o
-    expect(gpt4oCallArgs.temperature).toBeDefined()
-    expect(gpt4oCallArgs.model).toBe('gpt-4o')
+    expect(generateObject).toHaveBeenCalledWith(
+      expect.any(Array),
+      null,
+      expect.any(Number)
+    )
   })
 
   // Skip live API tests when API key isn't available

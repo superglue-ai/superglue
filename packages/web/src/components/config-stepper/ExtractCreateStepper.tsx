@@ -413,7 +413,6 @@ if (transformResult?.success) {
           throw new Error(mappedResult.error);
         }
         mappedData = mappedResult.data;
-        console.log('mappedResult.config', mappedResult.config)
         responseMapping = (mappedResult.config as TransformConfig).responseMapping;
       }
       
@@ -466,8 +465,6 @@ if (transformResult?.success) {
 
   // Add this helper function near the top with other functions
   const downloadData = (data: Record<string, any>, format: 'json' | 'csv') => {
-    console.log('downloadData', data)
-
     if (format === 'json') {
       const content = JSON.stringify(data, null, 2);
       const blob = new Blob([content], { type: 'application/json' });
