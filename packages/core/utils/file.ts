@@ -163,7 +163,7 @@ async function parseJSON(buffer: Buffer): Promise<any> {
     }
 }
   
-async function parseXML(buffer: Buffer): Promise<any[]> {
+export async function parseXML(buffer: Buffer): Promise<any> {
     const results: any = {};
     let currentElement: any = null;
     const elementStack: any[] = [];
@@ -173,10 +173,10 @@ async function parseXML(buffer: Buffer): Promise<any[]> {
 
     parser.on('opentag', (node) => {
         // Create a new object for the current element
-        const newElement: any = { };  
+        const newElement: any = node.attributes || {};
         // If there's a current element, add this new one as its child
         if (currentElement) {
-        elementStack.push(currentElement); // Push current to stack
+            elementStack.push(currentElement); // Push current to stack
         }
 
         // Update current element

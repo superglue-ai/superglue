@@ -112,7 +112,6 @@ export function ConfigCreateStepper({ configId: initialConfigId, mode = 'create'
       console.error('Subscription error:', error)
     },
     onData: ({ data }) => {
-      console.log('Subscription data:', data)
       if (data.data?.logs) {
         setLatestLog(data.data.logs.message)
       }
@@ -330,7 +329,9 @@ export function ConfigCreateStepper({ configId: initialConfigId, mode = 'create'
       setStep(steps[currentIndex - 1])
     }
   }
-
+  const handleManualCreate = () => {
+    router.push('/configs/manual-new')
+  }
   const handleClose = () => {
     if (mode === 'create') {
       router.push('/configs')
@@ -825,7 +826,7 @@ const result = await superglue.call({
             </div>
           </>
         ) : (
-          <>
+          <>  
             <Button
               variant="outline"
               onClick={handleBack}
@@ -833,6 +834,15 @@ const result = await superglue.call({
             >
               Back
             </Button>
+            <div className='flex gap-2'>
+            { step === 'basic' && 
+                      <Button
+                      variant="outline"
+                      onClick={handleManualCreate}
+                    >
+                      Manual Configuration
+                    </Button>
+            }
             <Button
               onClick={step === 'try_and_output' && !mappedResponseData ? handleRun : handleNext}
               disabled={isAutofilling || (step === 'try_and_output' && !mappedResponseData && isRunning)}
@@ -848,8 +858,8 @@ const result = await superglue.call({
                   (isRunning ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {latestLog ? latestLog.slice(0, 21) + '...' : 'Creating transformation...'}
-                      </>
+                      {latestLog ? latestLog.split(' ').slice(0,4).join(' ').slice(0,30) + '...' : 'Creating transformation...'}
+                    </>
                   ) : (!mappedResponseData ? (
                     <>
                       <span>✨ Run</span>
@@ -858,6 +868,7 @@ const result = await superglue.call({
                   'Next'
               )}
             </Button>
+            </div>
           </>
         )}
       </div>

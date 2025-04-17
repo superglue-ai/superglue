@@ -5,8 +5,11 @@ import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { getDocumentation } from "./documentation.js";
 import { callAxios, composeUrl, replaceVariables } from "./tools.js";
-import { API_PROMPT } from "./prompts.js";
+import { API_PROMPT } from "../llm/prompts.js";
 import { logMessage } from "./logs.js";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { parseXML } from "./file.js";
+import { LanguageModel } from "../llm/llm.js";
 
 export async function prepareEndpoint(
   endpointInput: ApiInput, 
@@ -51,7 +54,7 @@ export function convertBasicAuthToBase64(headerValue: string){
       return headerValue; 
 }
 
-export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions): Promise<any> {  
+export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions): Promise<{ data: any }> {  
   const allVariables = { ...payload, ...credentials };
   
   let allResults = [];
@@ -130,7 +133,7 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
         (Array.isArray(response?.data?.errors) && response?.data?.errors.length > 0)
       ) {
       const error = JSON.stringify(response?.data?.error || response.data?.errors || response?.data);
-      let message = `${endpoint.method} ${url} failed with status ${response.status}. Response: ${String(error).slice(0, 200)}
+      let message = `${endpoint.method} ${url} failed with status ${response.status}. Response: ${String(error).slice(0, 1000)}
       Headers: ${JSON.stringify(headers)}
       Body: ${JSON.stringify(body)}
       Params: ${JSON.stringify(queryParams)}
@@ -161,6 +164,11 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
     // TODO: we need to remove the data path and just join the data with the next page of data, otherwise we will have to do a lot of gymnastics to get the data path right
 
     let responseData = response.data;
+
+    if(responseData && typeof responseData === 'string' && responseData.startsWith('<')) {
+      responseData = await parseXML(Buffer.from(responseData));
+    }
+
     if (endpoint.dataPath) {
       // Navigate to the specified data path
       const pathParts = endpoint.dataPath.split('.');
@@ -241,9 +249,15 @@ export async function generateApiConfig(
   const schema = zodToJsonSchema(z.object({
     urlHost: z.string(),
     urlPath: z.string(),
-    queryParams: z.record(z.any()).optional(),
+    queryParams: z.array(z.object({
+      key: z.string(),
+      value: z.string()
+    })).optional(),
     method: z.enum(Object.values(HttpMethod) as [string, ...string[]]),
-    headers: z.record(z.string()).optional(),
+    headers: z.array(z.object({
+      key: z.string(),
+      value: z.string()
+    })).optional(),
     body: z.string().optional().describe("Format as JSON if not instructed otherwise."),
     authentication: z.enum(Object.values(AuthType) as [string, ...string[]]),
     dataPath: z.string().optional().describe("The path to the data you want to extract from the response. E.g. products.variants.size"),
@@ -253,10 +267,6 @@ export async function generateApiConfig(
       cursorPath: z.string().optional().describe("If cursor_based: The path to the cursor in the response. E.g. cursor.current or next_cursor")
     }).optional()
   }));
-  const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-    baseURL: process.env.OPENAI_API_BASE_URL
-  });
 
   const userPrompt = `Generate API configuration for the following:
 
@@ -275,46 +285,29 @@ ${apiConfig.method ? `Method: ${apiConfig.method}` : ''}
 
 Available variables: ${vars.join(", ")}
 
-Documentation: ${String(documentation)}`
+Documentation: ${String(documentation)}`;
 
-  if(!messages || messages.length === 0) {
-    messages = [
-      {role: "system", content: API_PROMPT}, 
-      {role: "user", content: userPrompt}
-    ];
+  if(messages.length === 0) {
+    messages.push({
+      role: "system",
+      content: API_PROMPT
+    });
+    messages.push({
+      role: "user",
+      content: userPrompt
+    });
   }
-
-  const temperature = String(process.env.OPENAI_MODEL).startsWith("o") ? undefined : Math.min(retryCount * 0.2, 1);
-  const completion = await openai.chat.completions.create({
-    model: process.env.OPENAI_MODEL,
-    response_format: {
-      type: "json_schema",
-      json_schema: {
-        name: "api_definition",
-        schema: schema,
-      }
-    },
-    temperature,
-    messages
-  });
-
-  const generatedConfig = JSON.parse(completion.choices[0].message.content);
+  const temperature = Math.min(retryCount * 0.2, 1);
+  const {response: generatedConfig, messages: updatedMessages} = await LanguageModel.generateObject(messages, schema, temperature);
   
-  // Add the assistant's response to messages for future context
-  messages.push({
-    role: "assistant",
-    content: completion.choices[0].message.content
-  });
-
   return {
     config: {
-      // we want to iterate, therefore we only use the generated config
       instruction: apiConfig.instruction,
       urlHost: generatedConfig.urlHost,
       urlPath: generatedConfig.urlPath,
       method: generatedConfig.method,
-      queryParams: generatedConfig.queryParams,
-      headers: generatedConfig.headers,
+      queryParams: generatedConfig.queryParams ? Object.fromEntries(generatedConfig.queryParams.map(p => [p.key, p.value])) : undefined,
+      headers: generatedConfig.headers ? Object.fromEntries(generatedConfig.headers.map(p => [p.key, p.value])) : undefined,
       body: generatedConfig.body,
       authentication: generatedConfig.authentication,
       pagination: generatedConfig.pagination,
@@ -326,7 +319,7 @@ Documentation: ${String(documentation)}`
       updatedAt: new Date(),
       id: apiConfig.id,
     } as ApiConfig,
-    messages
+    messages: updatedMessages
   };
 }
 
@@ -344,7 +337,7 @@ function validateVariables(generatedConfig: any, vars: string[]) {
     if (!str) return [];
     // Only match {varName} patterns that aren't within JSON quotes
     const matches = str.match(/\{(\w+)\}/g) || [];
-    return matches.map(match => match.slice(1, -1));
+    return matches.map((match: string) => match.slice(1, -1));
   };
 
   const varMatches = [

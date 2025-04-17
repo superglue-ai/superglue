@@ -167,6 +167,7 @@ input PaginationInput {
 }
 
 input ApiInput {
+  id: ID
   urlHost: String!
   urlPath: String
   instruction: String!
@@ -184,6 +185,7 @@ input ApiInput {
 }
 
 input ExtractInput {
+  id: ID
   urlHost: String!
   urlPath: String
   queryParams: JSON
@@ -200,6 +202,7 @@ input ExtractInput {
 }
 
 input TransformInput {
+  id: ID
   instruction: String!
   responseSchema: JSONSchema!
   responseMapping: JSONata
@@ -230,6 +233,11 @@ input TransformInputRequest @oneOf {
   id: ID
 }
 
+input WorkflowInputRequest @oneOf {
+  workflow: WorkflowInput
+  id: ID
+}
+
 type Log {
   id: ID!
   message: String!
@@ -243,19 +251,19 @@ type Query {
   listApis(limit: Int = 10, offset: Int = 0): ApiList!
   listTransforms(limit: Int = 10, offset: Int = 0): TransformList!
   listExtracts(limit: Int = 10, offset: Int = 0): ExtractList!
-  
+  listWorkflows(limit: Int = 10, offset: Int = 0): [Workflow!]!
+
   getRun(id: ID!): RunResult
   getApi(id: ID!): ApiConfig
   getTransform(id: ID!): TransformConfig
   getExtract(id: ID!): ExtractConfig
+  getWorkflow(id: ID!): Workflow
 
   generateSchema(instruction: String!, responseData: String): JSONSchema!
   
   getTenantInfo: TenantInfo
   
   # Workflow queries
-  getWorkflow(id: ID!): SavedWorkflow
-  listWorkflows(limit: Int = 10, offset: Int = 0): [SavedWorkflow!]!
 }
 
 type TenantInfo {
@@ -266,41 +274,39 @@ type TenantInfo {
 type ExecutionStep {
   id: String!
   apiConfig: ApiConfig!
-  executionMode: String
-  loopVariable: String
+  executionMode: String  # DIRECT | LOOP
+  loopSelector: JSONata
   loopMaxIters: Int
-  inputMapping: String
-  responseMapping: String
+  inputMapping: JSONata
+  responseMapping: JSONata
 }
 
 input ExecutionStepInput {
   id: String!
   apiConfig: ApiInput!
   executionMode: String  # DIRECT | LOOP
-  loopVariable: String
+  loopSelector: JSONata
   loopMaxIters: Int
-  inputMapping: String
-  responseMapping: String
+  inputMapping: JSONata
+  responseMapping: JSONata
 }
 
 type ExecutionPlan {
   id: String!
   steps: [ExecutionStep!]!
-  finalTransform: String
+  finalTransform: JSONata
 }
 
-type SavedWorkflow {
+type Workflow implements BaseConfig {
+  # BaseConfig
   id: ID!
-  name: String!
-  plan: ExecutionPlan!
-  createdAt: DateTime!
-  updatedAt: DateTime!
-}
+  version: String
+  createdAt: DateTime
+  updatedAt: DateTime
 
-input ExecutionPlanInput {
-  id: String
-  steps: [ExecutionStepInput!]!
-  finalTransform: String
+  # Specific implementation
+  steps: [ExecutionStep!]!
+  finalTransform: JSONata
 }
 
 type WorkflowStepResult {
@@ -314,24 +320,16 @@ type WorkflowStepResult {
 type WorkflowResult {
   success: Boolean!
   data: JSON!
-  stepResults: JSON!
+  stepResults: [WorkflowStepResult!]!
   error: String
   startedAt: DateTime!
-  completedAt: DateTime
+  completedAt: DateTime!
 }
 
 input WorkflowInput {
-  planId: String
-  plan: ExecutionPlanInput
-  payload: JSON
-  credentials: JSON
-  options: RequestOptions
-  baseApiInput: ApiInput
-}
-
-input SaveWorkflowInput {
-  name: String!
-  plan: ExecutionPlanInput!
+  id: String!
+  steps: [ExecutionStepInput!]!
+  finalTransform: JSONata
 }
 
 type Mutation {
@@ -358,11 +356,13 @@ type Mutation {
   ): RunResult!
   
   executeWorkflow(
-    input: WorkflowInput!
+    input: WorkflowInputRequest!
+    payload: JSON
+    credentials: JSON
+    options: RequestOptions
   ): WorkflowResult!
   
-  # Workflow persistence mutations
-  upsertWorkflow(id: ID!, input: SaveWorkflowInput!): SavedWorkflow!
+  upsertWorkflow(id: ID!, input: JSON!): Workflow!
   deleteWorkflow(id: ID!): Boolean!
   
   upsertApi(id: ID!, input: JSON!): ApiConfig!

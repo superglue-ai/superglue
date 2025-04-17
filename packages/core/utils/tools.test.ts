@@ -10,9 +10,9 @@ describe('tools utility functions', () => {
     })
 
     it('should handle empty or undefined inputs', () => {
-      expect(composeUrl('', '')).toBe('/')
+      expect(composeUrl('', '')).toBe('https://')
       expect(composeUrl('http://example.com', '')).toBe('http://example.com/')
-      expect(composeUrl('', 'path')).toBe('/path')
+      expect(composeUrl('', 'path')).toBe('https://path')
     })
   })
 

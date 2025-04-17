@@ -93,7 +93,7 @@ export async function middleware(request: NextRequest) {
       }
       
       // Either emailEntrySkipped is false or both values are null
-      console.log('Middleware: GQL shows redirect to welcome needed');
+      // 'Middleware: GQL shows redirect to welcome needed'
       return redirectResponse;
     }
   } catch (err) {
