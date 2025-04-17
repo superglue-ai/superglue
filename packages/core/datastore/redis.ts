@@ -1,4 +1,4 @@
-import type { ApiConfig, ApiInput, DataStore, ExtractConfig, ExtractInput, RunResult, SavedWorkflow, TransformConfig, TransformInput } from "@superglue/shared";
+import type { ApiConfig, ApiInput, DataStore, ExtractConfig, ExtractInput, RunResult, Workflow, TransformConfig, TransformInput } from "@superglue/shared";
 import { createHash } from 'node:crypto';
 import { type RedisClientType, createClient } from 'redis';
 import { getSchemaFromData } from "../utils/tools.js";
@@ -343,7 +343,7 @@ export class RedisService implements DataStore {
   }
 
   // Workflow Methods
-  async getWorkflow(id: string, orgId?: string): Promise<SavedWorkflow | null> {
+  async getWorkflow(id: string, orgId?: string): Promise<Workflow | null> {
     try {
       if (!id) return null;
       const key = this.getKey(this.WORKFLOW_PREFIX, id, orgId);
@@ -355,7 +355,7 @@ export class RedisService implements DataStore {
     }
   }
 
-  async listWorkflows(limit = 10, offset = 0, orgId?: string): Promise<{ items: SavedWorkflow[], total: number }> {
+  async listWorkflows(limit = 10, offset = 0, orgId?: string): Promise<{ items: Workflow[], total: number }> {
     try {
       const pattern = this.getPattern(this.WORKFLOW_PREFIX, orgId);
       const keys = await this.redis.keys(pattern);
@@ -370,7 +370,7 @@ export class RedisService implements DataStore {
       );
       
       return { 
-        items: workflows.filter((workflow): workflow is SavedWorkflow => workflow !== null), 
+        items: workflows.filter((workflow): workflow is Workflow => workflow !== null), 
         total: keys.length 
       };
     } catch (error) {
@@ -379,7 +379,7 @@ export class RedisService implements DataStore {
     }
   }
 
-  async upsertWorkflow(id: string, workflow: SavedWorkflow, orgId?: string): Promise<SavedWorkflow> {
+  async upsertWorkflow(id: string, workflow: Workflow, orgId?: string): Promise<Workflow> {
     try {
       if (!id || !workflow) return null;
       const key = this.getKey(this.WORKFLOW_PREFIX, id, orgId);

@@ -5,109 +5,52 @@ import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Textarea } from "../../components/ui/textarea";
 import { useToast } from "../../hooks/use-toast";
 import { useConfig } from "../config-context";
+import { useSearchParams } from 'next/navigation';
+import { HelpTooltip } from '@/src/components/config-stepper/Helpers';
+
+const parseCredentialsHelper = (value: string): Record<string, any> | string => {
+  try {
+    const parsed = JSON.parse(value);
+    if (typeof parsed === 'object' && parsed !== null) {
+      return parsed;
+    }
+    return value;
+  } catch (e) {
+    return value;
+  }
+};
 
 export default function WorkflowsPage() {
   const { toast } = useToast();
   const config = useConfig();
-  const [workflowName, setWorkflowName] = useState("New Workflow");
+  const searchParams = useSearchParams();
   const [workflowId, setWorkflowId] = useState("");
-  const [stepsText, setStepsText] = useState(
-    JSON.stringify(
-      [
-        {
-          id: "step1",
-          apiConfig: {
-            urlPath: "/",
-            instruction: "First step",
-            urlHost: "https://example.com",
-            method: "GET",
-          },
-          executionMode: "DIRECT",
-          inputMapping: "$",
-          responseMapping: "$",
-        },
-        {
-          id: "step2",
-          apiConfig: {
-            urlPath: "/",
-            instruction: "Second step",
-            urlHost: "https://example.com",
-            method: "GET",
-          },
-          executionMode: "DIRECT",
-          inputMapping: "$",
-          responseMapping: "$",
-        },
-      ],
-      null,
-      2,
-    ),
-  );
+  const [stepsText, setStepsText] = useState("");
   const [finalTransform, setFinalTransform] = useState(`{
   "result": $
 }`);
+  const [credentials, setCredentials] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [result, setResult] = useState(null);
-  const [workflows, setWorkflows] = useState([]);
-  const [loadingWorkflows, setLoadingWorkflows] = useState(false);
   const [activeResultTab, setActiveResultTab] = useState("finalData");
-
-  useEffect(() => {
-    fetchWorkflows();
-  }, []);
-
-  const fetchWorkflows = async () => {
-    try {
-      setLoadingWorkflows(true);
-      const response = await fetch(`${config.superglueEndpoint}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${config.superglueApiKey}`,
-        },
-        body: JSON.stringify({
-          query: `
-            query ListWorkflows {
-              listWorkflows {
-                id
-                name
-                createdAt
-              }
-            }
-          `,
-        }),
-      });
-
-      const jsonResponse = await response.json();
-
-      if (jsonResponse.errors) {
-        throw new Error(jsonResponse.errors[0].message);
-      }
-
-      setWorkflows(jsonResponse.data.listWorkflows);
-    } catch (error) {
-      console.error("Error fetching workflows:", error);
-      toast({
-        title: "Error fetching workflows",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setLoadingWorkflows(false);
-    }
+  
+  const updateWorkflowId = (id: string) => {
+    const sanitizedId = id
+      .replace(/ /g, "-") // Replace spaces with hyphens
+      .replace(/[^a-zA-Z0-9-]/g, ""); // Remove special characters
+    setWorkflowId(sanitizedId);
   };
-
-  const loadWorkflow = async (id) => {
+  
+  const loadWorkflow = async (idToLoad: string) => {
     try {
-      if (!id) return;
+      if (!idToLoad) return;
 
       setLoading(true);
+      setResult(null);
       const response = await fetch(`${config.superglueEndpoint}`, {
         method: "POST",
         headers: {
@@ -119,163 +62,82 @@ export default function WorkflowsPage() {
             query GetWorkflow($id: ID!) {
               getWorkflow(id: $id) {
                 id
-                name
-                plan {
+                steps {
                   id
-                  steps {
+                  apiConfig {
                     id
-                    apiConfig {
-                      id
-                      urlHost
-                      urlPath
-                      instruction
-                      method
-                    }
-                    executionMode
-                    loopVariable
-                    loopMaxIters
-                    inputMapping
-                    responseMapping
+                    urlHost
+                    urlPath
+                    instruction
+                    method
                   }
-                  finalTransform
+                  executionMode
+                  loopSelector
+                  loopMaxIters
+                  inputMapping
+                  responseMapping
                 }
+                finalTransform
               }
             }
           `,
-          variables: { id },
+          variables: { id: idToLoad },
         }),
       });
 
       const jsonResponse = await response.json();
 
-      if (jsonResponse.errors) {
-        throw new Error(jsonResponse.errors[0].message);
+      if (jsonResponse.errors || !jsonResponse.data.getWorkflow) {
+         const errorMessage = jsonResponse.errors ? jsonResponse.errors[0].message : `Workflow with ID "${idToLoad}" not found.`;
+         console.error("Error loading workflow:", errorMessage);
+         toast({
+           title: "Error loading workflow",
+           description: errorMessage,
+           variant: "destructive",
+         });
+         updateWorkflowId('');
+         setStepsText('');
+         setFinalTransform('');
+         return;
       }
 
       const workflow = jsonResponse.data.getWorkflow;
 
       // Just use the API config directly - no transformation needed
-      const transformedSteps = workflow.plan.steps;
+      const transformedSteps = workflow.steps;
 
-      setWorkflowId(workflow.id);
-      setWorkflowName(workflow.name);
+      updateWorkflowId(workflow.id);
       setStepsText(JSON.stringify(transformedSteps, null, 2));
-      setFinalTransform(workflow.plan.finalTransform || "");
+      setFinalTransform(workflow.finalTransform || `{\n  "result": $\n}`);
 
       toast({
         title: "Workflow loaded",
-        description: `Loaded "${workflow.name}" successfully`,
+        description: `Loaded "${workflow.id}" successfully`,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error loading workflow:", error);
       toast({
         title: "Error loading workflow",
         description: error.message,
         variant: "destructive",
       });
+      updateWorkflowId('');
+      setStepsText('');
+      setFinalTransform('');
     } finally {
       setLoading(false);
     }
   };
 
-  const deleteWorkflow = async () => {
-    try {
-      if (!workflowId) {
-        throw new Error("No workflow selected");
-      }
-
-      const confirmDelete = window.confirm(`Are you sure you want to delete "${workflowName}"?`);
-      if (!confirmDelete) return;
-
-      setDeleting(true);
-
-      const response = await fetch(`${config.superglueEndpoint}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${config.superglueApiKey}`,
-        },
-        body: JSON.stringify({
-          query: `
-            mutation DeleteWorkflow($id: ID!) {
-              deleteWorkflow(id: $id)
-            }
-          `,
-          variables: { id: workflowId },
-        }),
-      });
-
-      const jsonResponse = await response.json();
-
-      if (jsonResponse.errors) {
-        throw new Error(jsonResponse.errors[0].message);
-      }
-
-      if (jsonResponse.data.deleteWorkflow) {
-        toast({
-          title: "Workflow deleted",
-          description: `"${workflowName}" deleted successfully`,
-        });
-
-        resetForm();
-        fetchWorkflows();
-      } else {
-        throw new Error("Failed to delete workflow");
-      }
-    } catch (error) {
-      console.error("Error deleting workflow:", error);
-      toast({
-        title: "Error deleting workflow",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setDeleting(false);
+  useEffect(() => {
+    const idFromQuery = searchParams.get('id');
+    if (idFromQuery) {
+      loadWorkflow(idFromQuery);
     }
-  };
-
-  const resetForm = () => {
-    setWorkflowId("");
-    setWorkflowName("New Workflow");
-    setStepsText(
-      JSON.stringify(
-        [
-          {
-            id: "step1",
-            apiConfig: {
-              urlPath: "/",
-              instruction: "First step",
-              urlHost: "https://example.com",
-              method: "GET",
-            },
-            executionMode: "DIRECT",
-            inputMapping: "$",
-            responseMapping: "$",
-          },
-          {
-            id: "step2",
-            apiConfig: {
-              urlPath: "/",
-              instruction: "Second step",
-              urlHost: "https://example.com",
-              method: "GET",
-            },
-            executionMode: "DIRECT",
-            inputMapping: "$",
-            responseMapping: "$",
-          },
-        ],
-        null,
-        2,
-      ),
-    );
-    setFinalTransform(`{
-  "result": $
-}`);
-  };
+  }, [searchParams]);
 
   const fillDogExample = () => {
-    setWorkflowName("Dog Breed Workflow");
+    updateWorkflowId("Dog Breed Workflow");
     setStepsText(
       JSON.stringify(
         [
@@ -294,13 +156,13 @@ export default function WorkflowsPage() {
           {
             id: "getBreedImage",
             apiConfig: {
-              urlPath: "/breed/{breed}/images/random",
+              urlPath: "/breed/{value}/images/random",
               instruction: "Get a random image for a specific dog breed",
               urlHost: "https://dog.ceo/api",
               method: "GET",
             },
             executionMode: "LOOP",
-            loopVariable: "breed",
+            loopSelector: "getAllBreeds",
             loopMaxIters: 5,
             inputMapping: "$",
             responseMapping: "$",
@@ -310,21 +172,9 @@ export default function WorkflowsPage() {
         2,
       ),
     );
-    setFinalTransform(`{
-  "breeds": $map(
-    $filter(
-      $keys($.getAllBreeds.message),
-      function($b) {
-        $count($.getBreedImage[$split(message, "/")[4] = $b]) > 0
-      }
-    ),
-    function($b) {
-      {
-        $b: $.getBreedImage[$split(message, "/")[4] = $b].message[0]
-      }
-    }
-  )
-}`);
+    setFinalTransform(`$.getBreedImage.(
+  {"breed": loopValue, "image": message}
+)`);
 
     toast({
       title: "Example loaded",
@@ -334,21 +184,18 @@ export default function WorkflowsPage() {
 
   const saveWorkflow = async () => {
     try {
-      if (!workflowName.trim()) {
-        throw new Error("Workflow name is required");
+      if (!workflowId.trim()) {
+        updateWorkflowId(`wf-${Date.now()}`);
       }
 
       setSaving(true);
 
       const variables = {
-        id: workflowId || `workflow-${Date.now()}`,
+        id: workflowId,
         input: {
-          name: workflowName,
-          plan: {
-            id: `plan-${Date.now()}`,
-            steps: JSON.parse(stepsText),
-            finalTransform,
-          },
+          id: workflowId,
+          steps: JSON.parse(stepsText),
+          finalTransform
         },
       };
 
@@ -360,10 +207,9 @@ export default function WorkflowsPage() {
         },
         body: JSON.stringify({
           query: `
-            mutation UpsertWorkflow($id: ID!, $input: SaveWorkflowInput!) {
+            mutation UpsertWorkflow($id: ID!, $input: JSON!) {
               upsertWorkflow(id: $id, input: $input) {
                 id
-                name
               }
             }
           `,
@@ -378,14 +224,14 @@ export default function WorkflowsPage() {
       }
 
       const savedWorkflow = jsonResponse.data.upsertWorkflow;
-      setWorkflowId(savedWorkflow.id);
+      updateWorkflowId(savedWorkflow.id);
 
       toast({
         title: "Workflow saved",
-        description: `"${savedWorkflow.name}" saved successfully`,
+        description: `"${savedWorkflow.id}" saved successfully`,
       });
 
-      fetchWorkflows();
+      loadWorkflow(savedWorkflow.id);
     } catch (error) {
       console.error("Error saving workflow:", error);
       toast({
@@ -402,25 +248,15 @@ export default function WorkflowsPage() {
     try {
       setLoading(true);
       const steps = JSON.parse(stepsText);
-
-      // Get first step's urlHost for baseApiInput if available
-      const firstStepUrlHost =
-        steps.length > 0 && steps[0].apiConfig?.urlHost ? steps[0].apiConfig.urlHost : "https://example.com";
-
+      if (!workflowId) {
+        updateWorkflowId(`wf-${Date.now()}`);
+      }
       const workflowInput = {
-        plan: {
-          id: `plan-${Date.now()}`,
-          steps,
-          finalTransform,
-        },
-        payload: {},
-        credentials: {},
-        baseApiInput: {
-          urlHost: firstStepUrlHost,
-          instruction: "Execute workflow steps",
-          documentationUrl: "",
-        },
+        id: workflowId,
+        steps,
+        finalTransform
       };
+      const parsedCredentials = parseCredentialsHelper(credentials);
 
       const response = await fetch(`${config.superglueEndpoint}`, {
         method: "POST",
@@ -430,18 +266,24 @@ export default function WorkflowsPage() {
         },
         body: JSON.stringify({
           query: `
-            mutation ExecuteWorkflow($input: WorkflowInput!) {
-              executeWorkflow(input: $input) {
+            mutation ExecuteWorkflow($input: WorkflowInputRequest!, $credentials: JSON) {
+              executeWorkflow(input: $input, credentials: $credentials) {
                 success
                 data
-                stepResults
+                stepResults {
+                  stepId
+                  success
+                  rawData
+                  transformedData
+                  error
+                }
                 error
                 startedAt
                 completedAt
               }
             }
           `,
-          variables: { input: workflowInput },
+          variables: { input: { workflow: workflowInput }, credentials: parsedCredentials },
         }),
       });
 
@@ -473,60 +315,56 @@ export default function WorkflowsPage() {
 
   return (
     <div className="p-6 max-w-none w-full h-full flex flex-col">
-      <h1 className="text-2xl font-bold mb-3 flex-shrink-0">Workflow Executor</h1>
+      <h1 className="text-2xl font-bold mb-3 flex-shrink-0">Workflows</h1>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-h-0 flex-grow overflow-hidden">
         {/* Left Column - Workflow Configuration */}
         <Card className="flex flex-col h-full">
-          <CardHeader className="py-3 px-4 flex-shrink-0">
-            <CardTitle>Workflow Configuration</CardTitle>
-          </CardHeader>
-
           <CardContent className="p-4 overflow-auto flex-grow">
-            {/* Workflow selector */}
-            {workflows.length > 0 && (
-              <div className="mb-3">
-                <Label htmlFor="workflowSelect" className="mb-1 block">
-                  Load Workflow
-                </Label>
-                <div className="flex gap-2">
-                  <Select disabled={loadingWorkflows || loading || saving || deleting} onValueChange={loadWorkflow}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder={loadingWorkflows ? "Loading workflows..." : "Select a workflow"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {workflows.map((workflow) => (
-                        <SelectItem key={workflow.id} value={workflow.id}>
-                          {workflow.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    variant="outline"
-                    onClick={resetForm}
-                    size="icon"
-                    title="New Workflow"
-                    disabled={loading || saving || deleting}
-                  >
-                    +
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* Workflow name and example button */}
+            {/* Workflow name and example/load buttons */}
             <div className="mb-3">
               <div className="flex items-center justify-between mb-1">
-                <Label htmlFor="workflowName">Workflow Name</Label>
-                <Button variant="outline" size="sm" onClick={fillDogExample} disabled={loading || saving || deleting}>
-                  Fill Dog Example
+                <Label htmlFor="workflowId">Workflow ID</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="workflowId"
+                  value={workflowId}
+                  onChange={(e) => updateWorkflowId(e.target.value)}
+                  placeholder="Enter workflow ID to load or save"
+                  className="flex-grow"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => loadWorkflow(workflowId)}
+                  disabled={loading || saving || !workflowId}
+                  className="flex-shrink-0"
+                >
+                  {loading && !saving ? "Loading..." : "Load"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={fillDogExample}
+                  disabled={loading || saving}
+                  className="flex-shrink-0"
+                >
+                  Example
                 </Button>
               </div>
+            </div>
+
+            {/* Add Credentials Input */}
+            <div className="mb-3">
+              <div className="flex items-center gap-2 mb-1">
+                <Label htmlFor="credentials">Credentials (Optional)</Label>
+                <HelpTooltip text="Enter API keys/tokens needed for steps in this workflow. Can be a single string or a JSON object for multiple keys." />
+              </div>
               <Input
-                id="workflowName"
-                value={workflowName}
-                onChange={(e) => setWorkflowName(e.target.value)}
-                placeholder="Enter workflow name"
+                id="credentials"
+                value={credentials}
+                onChange={(e) => setCredentials(e.target.value)}
+                placeholder="Enter API key, token, or JSON object"
               />
             </div>
 
@@ -547,7 +385,7 @@ export default function WorkflowsPage() {
 
               <div className="flex-1 flex flex-col min-h-0">
                 <Label htmlFor="finalTransform" className="mb-1 block">
-                  Final Transform (JSONata)
+                  Final Transformation (JSONata)
                 </Label>
                 <Textarea
                   id="finalTransform"
@@ -564,24 +402,14 @@ export default function WorkflowsPage() {
             <Button
               variant="outline"
               onClick={saveWorkflow}
-              disabled={saving || loading || deleting}
+              disabled={saving || loading}
               className="w-full"
             >
-              {saving ? "Saving..." : workflowId ? "Update Workflow" : "Save Workflow"}
+              {saving ? "Saving..." : "Save Workflow"}
             </Button>
-            <Button onClick={executeWorkflow} disabled={loading || saving || deleting} className="w-full">
+            <Button onClick={executeWorkflow} disabled={loading || saving} className="w-full">
               {loading ? "Running..." : "Run Workflow"}
             </Button>
-            {workflowId && (
-              <Button
-                variant="destructive"
-                onClick={deleteWorkflow}
-                disabled={saving || loading || deleting}
-                className="shrink-0"
-              >
-                {deleting ? "Deleting..." : "Delete"}
-              </Button>
-            )}
           </CardFooter>
         </Card>
 

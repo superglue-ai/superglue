@@ -54,7 +54,7 @@ export function convertBasicAuthToBase64(headerValue: string){
       return headerValue; 
 }
 
-export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions): Promise<any> {  
+export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions): Promise<{ data: any }> {  
   const allVariables = { ...payload, ...credentials };
   
   let allResults = [];

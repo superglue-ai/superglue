@@ -1,6 +1,7 @@
 import type { FileUpload } from "graphql-upload-minimal";
 import type { JSONSchema } from "openai/src/lib/jsonschema.js";
 import type { DataStore } from "./datastore.js";
+
 export type Context = {
   datastore: DataStore;
   orgId: string;
@@ -191,24 +192,41 @@ export type ConfigList = {
 };
 
 // Workflow related types
+export type ExecutionMode = "DIRECT" | "LOOP";
+
+// Removed VariableMapping as it's not in the GraphQL schema
+
 export interface ExecutionStep {
   id: string;
   apiConfig: ApiConfig;
-  executionMode: "DIRECT" | "LOOP";
+  executionMode: ExecutionMode;
   loopSelector?: string;
   loopMaxIters?: number;
+  inputMapping?: string;
+  responseMapping?: string;
 }
 
-export interface ExecutionPlan {
-  id: string;
+export interface WorkflowStepResult {
+  stepId: string;
+  success: boolean;
+  rawData?: unknown;
+  transformedData?: unknown;
+  error?: string;
+}
+
+export interface WorkflowResult {
+  success: boolean;
+  data: Record<string, unknown>;
+  stepResults: WorkflowStepResult[];
+  error?: string;
+  startedAt: Date;
+  completedAt: Date;
+}
+
+export interface Workflow {
+  id: string; 
   steps: ExecutionStep[];
   finalTransform?: string;
-}
-
-export interface SavedWorkflow extends BaseConfig {
-  name: string;
-  description?: string;
-  plan: ExecutionPlan;
 }
 
 export interface Metadata {
