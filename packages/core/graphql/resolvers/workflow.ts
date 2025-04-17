@@ -1,6 +1,7 @@
 import type { GraphQLResolveInfo } from "graphql";
-import { ApiWorkflowOrchestrator } from "../../components/workflow/apiWorkflowOrchestrator.js";
-import type { WorkflowInput, WorkflowResult } from "../../components/workflow/domain/workflow.types.js";
+import { WorkflowExecutor } from "../../workflow/workflow.js";
+import { Context, Metadata, RequestOptions, Workflow, WorkflowResult } from "@superglue/shared";
+import { createHash } from "crypto";
 
 function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined, defaultValue?: T): T | undefined {
   if (newValue === null) return undefined;
@@ -9,34 +10,35 @@ function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined
   return defaultValue;
 }
 
+interface ExecuteWorkflowArgs {
+  input:  { workflow: Workflow; id?: never } | { workflow?: never; id: string };
+  payload?: any;
+  credentials?: any;
+  options?: RequestOptions;
+}
+
+
 export const workflowResolver = async (
   _: unknown,
-  { input }: { input: WorkflowInput },
-  context: any,
+  args: ExecuteWorkflowArgs,
+  context: Context,
   info: GraphQLResolveInfo,
 ): Promise<WorkflowResult> => {
   try {
-    const orchestrator = new ApiWorkflowOrchestrator(input.baseApiInput);
-    let planId: string;
-
-    // If we have a plan, register it first
-    if (input.plan) {
-      // Register the plan to ensure it exists
-      planId = await orchestrator.registerExecutionPlan(input.plan);
-    } else if (input.planId) {
-      planId = input.planId;
-    } else {
-      throw new Error("Either a plan or a planId must be provided");
-    }
-
-    return await orchestrator.executeWorkflowPlan(planId, input.payload || {}, input.credentials || {}, input.options);
+    const workflow: Workflow = args.input.workflow || 
+      await context.datastore.getWorkflow(args.input.id, context.orgId);
+    const runId = crypto.randomUUID();
+    const metadata: Metadata = { orgId: context.orgId, runId: runId };
+    const executor = new WorkflowExecutor(workflow, metadata);
+    const result = await executor.execute(args.payload, args.credentials, args.options);
+    return result;
   } catch (error) {
     console.error("Workflow execution error:", error);
     return {
       success: false,
       error: String(error),
       data: {},
-      stepResults: {},
+      stepResults: [],
       startedAt: new Date(),
       completedAt: new Date(),
     };
@@ -51,30 +53,23 @@ export const upsertWorkflowResolver = async (_: unknown, { id, input }: { id: st
   try {
     const now = new Date();
     const oldWorkflow = await context.datastore.getWorkflow(id, context.orgId);
-
-    if (oldWorkflow) {
-      // Update existing workflow
-      const updatedWorkflow = {
-        id,
-        name: resolveField(input.name, oldWorkflow.name, ""),
-        plan: resolveField(input.plan, oldWorkflow.plan),
-        createdAt: oldWorkflow.createdAt,
-        updatedAt: now,
-      };
-
-      return context.datastore.upsertWorkflow(id, updatedWorkflow, context.orgId);
-    }
-
-    // Else create new workflow
-    const newWorkflow = {
+    
+    const workflow = {
       id,
-      name: input.name,
-      plan: input.plan,
-      createdAt: now,
-      updatedAt: now,
+      steps: resolveField(input.steps, oldWorkflow?.steps, []),
+      finalTransform: resolveField(input.finalTransform, oldWorkflow?.finalTransform, "$"),
+      createdAt: oldWorkflow?.createdAt || now,
+      updatedAt: now
     };
 
-    return context.datastore.upsertWorkflow(id, newWorkflow, context.orgId);
+    // for each step, make sure that the apiConfig has an id. if not, set it to the step id
+    workflow.steps.forEach((step: any) => {
+      if (!step.apiConfig.id) {
+        step.apiConfig.id = step.id;
+      }
+    });
+
+    return await context.datastore.upsertWorkflow(id, workflow, context.orgId);
   } catch (error) {
     console.error("Error upserting workflow:", error);
     throw error;
@@ -87,7 +82,7 @@ export const deleteWorkflowResolver = async (_: unknown, { id }: { id: string },
   }
 
   try {
-    return context.datastore.deleteWorkflow(id, context.orgId);
+    return await context.datastore.deleteWorkflow(id, context.orgId);
   } catch (error) {
     console.error("Error deleting workflow:", error);
     throw error;
@@ -100,7 +95,15 @@ export const getWorkflowResolver = async (_: unknown, { id }: { id: string }, co
   }
 
   try {
-    return context.datastore.getWorkflow(id, context.orgId);
+    const workflow = await context.datastore.getWorkflow(id, context.orgId);
+
+    // for each step, make sure that the apiConfig has an id. if not, set it to the step id
+    workflow.steps.forEach((step: any) => {
+      if (!step.apiConfig.id) {
+        step.apiConfig.id = step.id;
+      }
+    });
+    return workflow;
   } catch (error) {
     console.error("Error getting workflow:", error);
     throw error;
