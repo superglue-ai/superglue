@@ -15,6 +15,12 @@ import { useConfig } from "@/src/app/config-context";
 // Add this new type and state
 type Credential = { key: string; value: string };
 
+// Define the props for the component including the new callback
+type ApiPlaygroundProps = {
+  configId?: string;
+  onRunApi?: (config: ApiConfig) => void; // Add the callback prop here
+};
+
 // Add this CSS animation class at the top of the file
 const invalidFieldAnimation = `
 @keyframes shake {
@@ -27,7 +33,7 @@ const invalidFieldAnimation = `
 }
 `;
 
-export function ApiPlayground({ configId }: { configId?: string }) {
+export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
   const params = useParams();
   const id = configId || params.id as string;
   const { toast } = useToast();
@@ -130,7 +136,7 @@ export function ApiPlayground({ configId }: { configId?: string }) {
     
     // Clear invalid fields if all are filled
     setInvalidFields(new Set());
-    
+        
     // Save inputs before running
     saveUserInputs();
     
@@ -170,6 +176,10 @@ export function ApiPlayground({ configId }: { configId?: string }) {
           cacheMode: CacheMode.ENABLED
         }
       })
+      // Call the callback if it exists
+      if (onRunApi) {
+        onRunApi(response.config as ApiConfig);
+      }
 
       setResponse(response.data);
       setResponseTime(Date.now() - startTime);

@@ -11,9 +11,9 @@ export async function prepareTransform(
     fromCache: boolean,
     input: TransformInput,
     data: any,
+    lastError: string | null,
     metadata: Metadata
   ): Promise<TransformConfig | null> {
-
     // Check if the response schema is empty
     if(!input?.responseSchema || 
       Object.keys(input.responseSchema).length === 0) {
@@ -37,7 +37,7 @@ export async function prepareTransform(
       .update(JSON.stringify({request: input, payloadKeys: getSchemaFromData(data)}))
       .digest('hex');
 
-    if(input.responseMapping) {
+    if(input.responseMapping && !lastError) {
       return { 
         id: hash,
         createdAt: new Date(),
@@ -102,7 +102,7 @@ ${JSON.stringify(sample(payload, 2), null, 2).slice(0,30000)}`
     }
     return response;
   } catch (error) {
-      if(retry < 5) {
+      if(retry < 8) {
         const errorMessage = String(error.message);
         logMessage('warn', "Error generating mapping: " + errorMessage.slice(0, 200), metadata);
         messages.push({role: "user", content: errorMessage});
