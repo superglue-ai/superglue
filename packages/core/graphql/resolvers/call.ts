@@ -3,11 +3,13 @@ import { GraphQLResolveInfo } from "graphql";
 import OpenAI from "openai";
 import { callEndpoint, prepareEndpoint } from "../../utils/api.js";
 import { telemetryClient } from "../../utils/telemetry.js";
-import { applyJsonataWithValidation, composeUrl, maskCredentials } from "../../utils/tools.js";
+import { applyJsonataWithValidation, composeUrl, maskCredentials, TransformResult } from "../../utils/tools.js";
 import { prepareTransform } from "../../utils/transform.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 import { callPostgres } from "../../utils/postgres.js";
 import { logMessage } from "../../utils/logs.js";
+
+// TODO: This is in dire need for refactoring and proper testing
 
 export const callResolver = async (
   _: any,
@@ -91,16 +93,37 @@ export const callResolver = async (
       throw new Error(`API call failed after ${retryCount} retries. Last error: ${lastError}`);
     }
 
-    // Transform response
-    const responseMapping = preparedEndpoint.responseMapping || 
-      (await prepareTransform(context.datastore, readCache, preparedEndpoint as TransformConfig, response.data, { runId: callId, orgId: context.orgId }))?.responseMapping;
-    const transformedResponse = responseMapping ? 
-      await applyJsonataWithValidation(response.data, responseMapping, preparedEndpoint.responseSchema) : 
-      { success: true, data: response.data };
+    let transformedResponse: TransformResult | null;
+    let responseMapping: string | null;
+    let transformError = null;
+    let transformRetryCount = 0;
 
-    if (!transformedResponse.success) {
-      throw new Error(transformedResponse.error);
-    }
+    do {
+      try {
+        // Transform response
+        const preparedTransform = await prepareTransform(
+          context.datastore, 
+          readCache, 
+          preparedEndpoint as TransformConfig, 
+          response.data, 
+          transformError,
+          { runId: callId, orgId: context.orgId }
+        );
+        responseMapping = preparedTransform?.responseMapping;
+        transformedResponse = responseMapping ? 
+          await applyJsonataWithValidation(response.data, responseMapping, preparedEndpoint?.responseSchema) : 
+          { success: true, data: response.data };
+
+        if (!transformedResponse.success) {
+          throw new Error(transformedResponse.error);
+        }
+      } catch (error) {
+        const rawErrorString = error?.message || JSON.stringify(error || {});
+        transformError = maskCredentials(rawErrorString, credentials).slice(0, 200);
+        logMessage('warn', `Transformation failed. ${transformError}`, { runId: callId, orgId: context.orgId });
+      }
+      transformRetryCount++;
+    } while (!transformedResponse.success && transformRetryCount < 3);
 
     // Save configuration if requested
     const config = { ...preparedEndpoint, responseMapping: responseMapping};

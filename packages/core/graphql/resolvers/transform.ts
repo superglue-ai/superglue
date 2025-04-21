@@ -32,7 +32,7 @@ export const transformResolver = async (
       await context.datastore.getTransformConfigFromRequest(input.endpoint, data, context.orgId) 
     : null;
     preparedTransform = preparedTransform?.responseMapping ? preparedTransform : 
-      await prepareTransform(context.datastore, readCache, preparedTransform || input.endpoint, data, { runId: callId, orgId: context.orgId });
+      await prepareTransform(context.datastore, readCache, preparedTransform || input.endpoint, data, null, { runId: callId, orgId: context.orgId });
     if(!preparedTransform || !preparedTransform.responseMapping) {
       telemetryClient?.captureException(new Error("Didn't find a valid transformation configuration."), context.orgId, {
         input: input,
