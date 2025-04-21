@@ -7,16 +7,17 @@ import { ApiConfig, AuthType, CacheMode, SuperglueClient } from '@superglue/clie
 import { Copy, Loader2, Terminal, Upload, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
-import { InteractiveApiPlayground } from '../InteractiveApiPlayground'
-import { Button } from '../ui/button'
+import { InteractiveApiPlayground } from './InteractiveApiPlayground'
+import { Button } from './ui/button'
 import { StepIndicator, type StepperStep } from './StepIndicator'
 import { Label } from '@radix-ui/react-label'
-import { Textarea } from '../ui/textarea'
-import { parseCredentialsHelper, HelpTooltip, inputErrorStyles } from './Helpers'
-import { Input } from '../ui/input'
+import { Textarea } from './ui/textarea'
+import { HelpTooltip } from './HelpTooltip'
+import { Input } from './ui/input'
 import { ApolloClient, gql, InMemoryCache, useSubscription } from '@apollo/client'
 import { createClient } from 'graphql-ws'
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions'
+import { inputErrorStyles, parseCredentialsHelper } from '@/src/lib/client-utils'
 
 interface ConfigCreateStepperProps {
   configId?: string
@@ -286,10 +287,7 @@ export function ConfigCreateStepper({ configId: initialConfigId, mode = 'create'
           urlHost: url.urlHost,
           instruction: formData.instruction,
           documentationUrl: formData.documentationUrl || undefined,
-          // authentication: formData.auth.value ? AuthType.HEADER : AuthType.NONE,
-          // headers: {},
-          // TODO: enable headers
-          // headers: formData.auth.value ? { 'Authorization': formData.auth.value } : undefined,
+          responseMapping: responseMapping,
           responseSchema: JSON.parse(formData.responseSchema),
           createdAt: new Date(),
           updatedAt: new Date()
@@ -298,12 +296,6 @@ export function ConfigCreateStepper({ configId: initialConfigId, mode = 'create'
         if (!savedConfig) {
           throw new Error('Failed to save configuration')
         }
-
-        // TODO: show some notification to the user that something has been saved
-        // toast({
-        //   title: 'Configuration Saved',
-        //   description: 'Your API configuration has been saved with the updated schema.',
-        // })
       } catch (error: any) {
         console.error('Error saving config:', error)
         toast({
@@ -407,7 +399,8 @@ const result = await superglue.call({
       await superglueClient.upsertApi(configId, {
         id: configId,
         instruction: formData.instruction,
-        responseSchema: JSON.parse(formData.responseSchema)
+        responseSchema: JSON.parse(formData.responseSchema),
+        responseMapping: null
       })
 
       // 2. Call the API using the config ID and get mapped response
@@ -851,14 +844,14 @@ const result = await superglue.call({
               {isAutofilling ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {latestLog ? latestLog.slice(0, 21) + '...' : 'Creating configuration...'}
+                  {latestLog ? latestLog?.split(' ').slice(0,4).join(' ').slice(0,30) + '...' : 'Creating configuration...'}
                 </>
               ) : (
                 step === 'try_and_output' ? 
                   (isRunning ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {latestLog ? latestLog.split(' ').slice(0,4).join(' ').slice(0,30) + '...' : 'Creating transformation...'}
+                      {latestLog ? latestLog?.split(' ').slice(0,4).join(' ').slice(0,30) + '...' : 'Creating transformation...'}
                     </>
                   ) : (!mappedResponseData ? (
                     <>

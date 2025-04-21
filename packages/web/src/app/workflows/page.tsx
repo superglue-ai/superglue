@@ -9,7 +9,7 @@ import { Textarea } from "../../components/ui/textarea";
 import { useToast } from "../../hooks/use-toast";
 import { useConfig } from "../config-context";
 import { useSearchParams } from 'next/navigation';
-import { HelpTooltip } from '@/src/components/config-stepper/Helpers';
+import { HelpTooltip } from '@/src/components/HelpTooltip';
 
 const parseCredentialsHelper = (value: string): Record<string, any> | string => {
   try {
@@ -21,6 +21,32 @@ const parseCredentialsHelper = (value: string): Record<string, any> | string => 
   } catch (e) {
     return value;
   }
+};
+
+const removeNullUndefined = (obj: any): any => {
+  if (Array.isArray(obj)) {
+    // Filter out null/undefined values after mapping
+    return obj
+      .map(removeNullUndefined)
+      .filter(v => v !== null && v !== undefined);
+  } else if (typeof obj === 'object' && obj !== null) {
+    const newObj: Record<string, any> = {};
+    for (const key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        const value = removeNullUndefined(obj[key]);
+        // Only add the key back if the processed value is not null/undefined
+        if (value !== null && value !== undefined) {
+          newObj[key] = value;
+        }
+      }
+    }
+    // Return null if the object becomes empty after cleaning,
+    // or you could return {} depending on desired behavior.
+    // Let's return {} for now to avoid removing empty objects entirely.
+    return newObj;
+  }
+  // Return primitives, null, or undefined as is
+  return obj;
 };
 
 export default function WorkflowsPage() {
@@ -65,11 +91,26 @@ export default function WorkflowsPage() {
                 steps {
                   id
                   apiConfig {
-                    id
+                    version
+                    createdAt
+                    updatedAt
                     urlHost
                     urlPath
                     instruction
                     method
+                    queryParams
+                    headers
+                    body
+                    documentationUrl
+                    responseSchema
+                    responseMapping
+                    authentication
+                    pagination {
+                      type
+                      pageSize
+                      cursorPath
+                    }
+                    dataPath
                   }
                   executionMode
                   loopSelector
@@ -103,16 +144,20 @@ export default function WorkflowsPage() {
 
       const workflow = jsonResponse.data.getWorkflow;
 
-      // Just use the API config directly - no transformation needed
-      const transformedSteps = workflow.steps;
+      // Recursively remove null/undefined values from the entire workflow object
+      const cleanedWorkflow = removeNullUndefined(workflow);
 
-      updateWorkflowId(workflow.id);
-      setStepsText(JSON.stringify(transformedSteps, null, 2));
-      setFinalTransform(workflow.finalTransform || `{\n  "result": $\n}`);
+      // Extract potentially cleaned steps and finalTransform
+      const cleanedSteps = cleanedWorkflow.steps || []; // Default to empty array if steps were removed
+      const cleanedFinalTransform = cleanedWorkflow.finalTransform || `{\n  "result": $\n}`; // Default transform
+
+      updateWorkflowId(cleanedWorkflow.id || ''); // Use cleaned ID, default to empty string
+      setStepsText(JSON.stringify(cleanedSteps, null, 2));
+      setFinalTransform(cleanedFinalTransform);
 
       toast({
         title: "Workflow loaded",
-        description: `Loaded "${workflow.id}" successfully`,
+        description: `Loaded "${cleanedWorkflow.id}" successfully`,
       });
     } catch (error: any) {
       console.error("Error loading workflow:", error);

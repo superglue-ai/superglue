@@ -186,7 +186,6 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
         endpoint: superglueConfig.superglueEndpoint,
         apiKey: superglueConfig.superglueApiKey
       })  
-
       const response = await superglueClient.upsertApi(formData.id, payload);
       if(!response) {
         throw new Error("Failed to save configuration");
@@ -217,12 +216,40 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | string
   ) => {
     const value = typeof e === 'string' ? e : e.target.value;
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData(prev => {
+      const newState = { ...prev, [field]: value };
+      if (field === 'instruction' || field === 'responseSchema') {
+        newState.responseMapping = ''; // Reset responseMapping
+      }
+      return newState;
+    });
     setHasUnsavedChanges(true);
 
     if(field === 'id') {
       setEditingId(value);
     }
+  };
+
+  const handleApiRun = (runConfig: ApiConfig) => {
+    // Update form data based on the config used in the playground run
+    setFormData(prev => ({
+      ...prev, // Keep existing form data
+      id: runConfig.id || prev.id, // Update ID if changed (though unlikely here)
+      urlHost: runConfig.urlHost || prev.urlHost,
+      urlPath: runConfig.urlPath || prev.urlPath,
+      method: runConfig.method || prev.method,
+      // instruction: runConfig.instruction || prev.instruction, // Instruction likely doesn't change on run
+      queryParams: runConfig.queryParams ? JSON.stringify(runConfig.queryParams, null, 2) : prev.queryParams,
+      headers: runConfig.headers ? JSON.stringify(runConfig.headers, null, 2) : prev.headers,
+      body: runConfig.body || prev.body,
+      // documentationUrl: runConfig.documentationUrl || prev.documentationUrl, // Doc URL unlikely to change
+      responseSchema: runConfig.responseSchema ? JSON.stringify(runConfig.responseSchema, null, 2) : prev.responseSchema,
+      responseMapping: runConfig.responseMapping || prev.responseMapping,
+      dataPath: runConfig.dataPath || prev.dataPath,
+      authentication: runConfig.authentication || prev.authentication,
+      paginationType: runConfig.pagination?.type || prev.paginationType,
+      pageSize: runConfig.pagination?.pageSize ? String(runConfig.pagination.pageSize) : prev.pageSize,
+    }));
   };
 
   const handleAutofill = async () => {
@@ -739,7 +766,10 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
                         Please save your changes before running the configuration.
                       </div>
                     ) : (
-                      <ApiPlayground configId={editingId} />
+                      <ApiPlayground 
+                        configId={editingId} 
+                        onRunApi={handleApiRun} // <-- Pass the handler here
+                      />
                     )}
                   </TabsContent>
                 )}

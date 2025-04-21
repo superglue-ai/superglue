@@ -1,3 +1,6 @@
+export const inputErrorStyles = "!border-destructive !border-[1px] focus:!ring-0 focus:!ring-offset-0"
+
+
 export const isJsonEmpty = (inputJson: string) : boolean => {
   try {
     if (!inputJson) return true
@@ -34,3 +37,24 @@ export const findArraysOfObjects = (obj: any): Record<string, any[]> => {
   }
   return arrays;
 };
+
+export const parseCredentialsHelper = (simpleCreds: string) : Record<string, any> => {
+  const creds = simpleCreds?.trim() || ""
+  if(!creds) {
+    return {}
+  }
+
+  if (creds.startsWith('{')) {
+    return JSON.parse(creds)
+  }
+
+  if(creds.startsWith('Bearer ')) {
+    return { apiKey: creds.replace('Bearer ', '') }
+  }
+
+  if(creds.startsWith('Basic ')) {
+    return { apiKey: creds.replace('Basic ', '') }
+  }
+
+  return { apiKey: creds }
+}

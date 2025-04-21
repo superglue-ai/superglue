@@ -1,6 +1,6 @@
 'use client'
 
-import { ConfigCreateStepper } from '@/src/components/config-stepper/ConfigCreateStepper'
+import { ConfigCreateStepper } from '@/src/components/ConfigCreateStepper'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
