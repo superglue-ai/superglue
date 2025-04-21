@@ -48,7 +48,7 @@ describe('transform utils', () => {
         getTransformConfigFromRequest: vi.fn(),
       } as any;      
       const input = { ...sampleInput, responseSchema: {} };
-      const result = await prepareTransform(mockDataStore, false, input, {}, { orgId: testOrgId });
+      const result = await prepareTransform(mockDataStore, false, input, {}, null, { orgId: testOrgId });
       expect(result).toBeNull();
     });
 
@@ -65,7 +65,7 @@ describe('transform utils', () => {
       
       (mockDataStore.getTransformConfigFromRequest as any).mockResolvedValue(cachedConfig);
       
-      const result = await prepareTransform(mockDataStore, true, sampleInput, { product: { name: 'test' } }, { orgId: testOrgId });
+      const result = await prepareTransform(mockDataStore, true, sampleInput, { product: { name: 'test' } }, null, { orgId: testOrgId });
       
       expect(result).toEqual({
         ...cachedConfig,
@@ -82,7 +82,7 @@ describe('transform utils', () => {
         responseMapping: 'test-mapping'
       };
       
-      const result = await prepareTransform(mockDataStore, false, input, { product: { name: 'test' } }, { orgId: testOrgId });
+      const result = await prepareTransform(mockDataStore, false, input, { product: { name: 'test' } }, null, { orgId: testOrgId });
       
       expect(result).toMatchObject({
         responseMapping: 'test-mapping',
@@ -106,7 +106,7 @@ describe('transform utils', () => {
             },
             messages: []
         });    
-        const transform = await prepareTransform(mockDataStore, false, sampleInput, samplePayload, { orgId: testOrgId });
+        const transform = await prepareTransform(mockDataStore, false, sampleInput, samplePayload, null,{ orgId: testOrgId });
         const result = await applyJsonataWithValidation(samplePayload, transform.responseMapping, sampleInput.responseSchema);
         expect(result).toMatchObject({
           success: true,
