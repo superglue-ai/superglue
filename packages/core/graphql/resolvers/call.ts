@@ -125,6 +125,10 @@ export const callResolver = async (
       transformRetryCount++;
     } while (!transformedResponse.success && transformRetryCount < 3);
 
+    if (!transformedResponse?.success) {
+      throw new Error("Transformation failed. " + transformedResponse.error);
+    }
+
     // Save configuration if requested
     const config = { ...preparedEndpoint, responseMapping: responseMapping};
     if(writeCache) {
