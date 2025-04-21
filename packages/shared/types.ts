@@ -120,6 +120,7 @@ export type RunResult = BaseResult & {
 };
 
 export type ApiInput = {
+  id?: string;
   urlHost: string;
   urlPath?: string;
   queryParams?: Record<string, any>;
@@ -153,6 +154,7 @@ export type TransformInputRequest = {
 };
 
 export type ExtractInput = {
+  id?: string;
   urlHost: string;
   urlPath?: string;
   queryParams?: Record<string, any>;
@@ -167,6 +169,7 @@ export type ExtractInput = {
 };
 
 export type TransformInput = {
+  id?: string;
   instruction: string;
   responseSchema: JSONSchema;
   responseMapping?: string;

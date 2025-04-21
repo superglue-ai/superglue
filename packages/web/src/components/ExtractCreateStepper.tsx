@@ -2,20 +2,20 @@
 
 import { useConfig } from '@/src/app/config-context'
 import { useToast } from '@/src/hooks/use-toast'
-import { findArraysOfObjects } from '@/src/lib/client-utils'
+import { findArraysOfObjects, inputErrorStyles, parseCredentialsHelper } from '@/src/lib/client-utils'
 import { cleanApiDomain, cn } from '@/src/lib/utils'
 import { ApiConfig, AuthType, CacheMode, ExtractConfig, SuperglueClient, TransformConfig } from '@superglue/client'
 import { Copy, Download, Loader2, Terminal, Upload } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { InteractiveExtractPlayground } from '../InteractiveExtractPlayground'
-import { Button } from '../ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
-import { Input } from '../ui/input'
-import { Label } from '../ui/label'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs"
-import { Textarea } from '../ui/textarea'
-import { HelpTooltip, inputErrorStyles, parseCredentialsHelper } from './Helpers'
+import { InteractiveExtractPlayground } from './InteractiveExtractPlayground'
+import { Button } from './ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
+import { Input } from './ui/input'
+import { Label } from './ui/label'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
+import { Textarea } from './ui/textarea'
+import { HelpTooltip } from './HelpTooltip'
 import { StepIndicator, type StepperStep } from './StepIndicator'
 
 interface ExtractCreateStepperProps {

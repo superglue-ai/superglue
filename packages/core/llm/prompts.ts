@@ -92,7 +92,8 @@ Very important guidelines for creating JSONata mappings:
   - If the error is something like \"instance is not of a type(s) array or array/null\". In this case, wrap the source selector in an array to ensure it always returns an array. 
     Good: \"result\": [$.items]
     Bad: \"result\": $.items
-  - If the error is something like \"instance is not of a type(s) object\", make sure you REALLY create the target schema with the correct type. E.g. if you screwed up by wrapping the result in an array, this might happen. Remove the array brackets around the result.
+  - If the error is something like \"instance is not of a type(s) object\" or \"does not match function signaure\", make sure you REALLY create the target schema with the correct type.
+  - Specifically, the computed result / input might be wrapped in array brackets. In this case, the array brackets set in the mapping are in the wrong place.
   - If you get an error like \"is not of a type(s) string/number/object\", try to convert the source field, but also consider that the original field or one of its parent might be null. In this case, add a default value.
   - If an object is optional but its fields required, you can add a test and default to {}, but do not set the inner fields to default null.
   - If you are repeatedly failing and can't figure out why, try a different approach.
@@ -163,6 +164,8 @@ Schema:
     "required": ["results"]
   }
 }
+
+Make this fast and do not think too hard, this is just an approximation.
 `;
 
 export const WORKFLOW_STEP_ANALYSIS_PROMPT = `You are a workflow orchestration assistant that analyzes API workflow steps. Your job is to determine how to process API endpoints with template variables.
