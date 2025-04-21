@@ -11,7 +11,7 @@ export function isRequested(field: string, info: GraphQLResolveInfo) {
     );
   }
 
-interface TransformResult {
+export interface TransformResult {
   success: boolean;
   data?: any;
   error?: string;
@@ -105,6 +105,10 @@ export async function applyJsonataWithValidation(data: any, expr: string, schema
     const result = await applyJsonata(data, expr);
     if(result === null || result === undefined || result?.length === 0 || Object.keys(result).length === 0) {
       return { success: false, error: "Result is empty" };
+    }
+    // if no schema is given, skip validation
+    if(!schema) {
+      return { success: true, data: result }
     }
     const validator = new Validator();
     const optionalSchema = addNullableToOptional(schema);
