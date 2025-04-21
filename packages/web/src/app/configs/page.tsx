@@ -2,7 +2,7 @@
 
 import { useConfig } from '@/src/app/config-context';
 import ApiConfigDetail from '@/src/app/configs/[id]/page';
-import { ConfigCreateStepper } from '@/src/components/config-stepper/ConfigCreateStepper';
+import { ConfigCreateStepper } from '@/src/components/ConfigCreateStepper';
 import {
   AlertDialog,
   AlertDialogAction,

@@ -1,30 +1,8 @@
 import { HelpCircle } from "lucide-react"
-import { Tooltip, TooltipContent } from "../ui/tooltip"
-import { TooltipProvider } from "../ui/tooltip"
-import { TooltipTrigger } from "../ui/tooltip"
+import { Tooltip, TooltipContent } from "./ui/tooltip"
+import { TooltipProvider } from "./ui/tooltip"
+import { TooltipTrigger } from "./ui/tooltip"
 
-export const inputErrorStyles = "!border-destructive !border-[1px] focus:!ring-0 focus:!ring-offset-0"
-
-export const parseCredentialsHelper = (simpleCreds: string) : Record<string, any> => {
-  const creds = simpleCreds?.trim() || ""
-  if(!creds) {
-    return {}
-  }
-
-  if (creds.startsWith('{')) {
-    return JSON.parse(creds)
-  }
-
-  if(creds.startsWith('Bearer ')) {
-    return { apiKey: creds.replace('Bearer ', '') }
-  }
-
-  if(creds.startsWith('Basic ')) {
-    return { apiKey: creds.replace('Basic ', '') }
-  }
-
-  return { apiKey: creds }
-}
 
 export function HelpTooltip({ text }: { text: string }) {
   return (
