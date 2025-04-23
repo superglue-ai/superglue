@@ -6,6 +6,7 @@ import { addNullableToOptional } from "../utils/tools.js";
 
 
 export class OpenAIModel implements LLM {
+    public contextLength: number = 128000;
     private model: OpenAI;
     constructor() {
         this.model = new OpenAI({
