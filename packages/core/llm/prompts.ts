@@ -123,7 +123,8 @@ export const API_PROMPT = `You are an API configuration assistant. Generate API 
 - Think hard before producing a response, and be aware that the response is not checked for validity if the response is not an error, so only suggest endpoints that you are sure are valid.
 - If this is a store / e-commerce site, try products.json, collections.json, categories.json, etc.
 - You can use the following format to access a postgres database: urlHost: "postgres://{user}:{password}@{hostname}:{port}", urlPath: "{database}", body: {query: "{query}"}
-
+- For SOAP requests, put the XML request in the body as a string. Make sure to think hard and include all relevant objects and fields as SOAP requests can be complex.
+  e.g. body: "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:urn=\"urn:com:example:types\"><soapenv:Header/><soapenv:Body><urn:getCustomer><urn:customerId>1234567890</urn:customerId></urn:getCustomer></soapenv:Body></soapenv:Envelope>"
 - The user might flag that a configuration did not run successfully: Look at the error code and message and understand, in relation to the documentation, what went wrong.
   - ERROR 400: please pay special attention to the request body and url params. Maybe not all are requried? skip pagination? be creative here! this can be specific to the specific route.
   - ERROR 401: please pay special attention to the authentication type and headers.
