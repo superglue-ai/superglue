@@ -16,10 +16,6 @@ import {
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import {
-  Sheet,
-  SheetContent
-} from "@/src/components/ui/sheet";
-import {
   Table,
   TableBody,
   TableCell,
@@ -39,13 +35,12 @@ import { ApiConfig, ExtractConfig, SuperglueClient } from '@superglue/client';
 import { Check, Copy, FileText, GitBranch, Globe, History, Play, Plus, RotateCw, Settings, ShoppingBag, Trash2 } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import React from 'react';
+import EmptyStateActions from '@/src/components/EmptyStateActions';
 
 const ConfigTable = () => {
   const router = useRouter();
   const [configs, setConfigs] = React.useState<(ApiConfig | ExtractConfig)[]>([]);
   const [loading, setLoading] = React.useState(true);
-  const [selectedConfig, setSelectedConfig] = React.useState<ApiConfig | ExtractConfig | null>(null);
-  const [isDetailOpen, setIsDetailOpen] = React.useState(false);
   const [total, setTotal] = React.useState(0);
   const [page, setPage] = React.useState(0);
   const [pageSize] = React.useState(20);
@@ -311,60 +306,12 @@ const ConfigTable = () => {
           </TooltipProvider>
         </div>
 
-        <div className="flex flex-col items-center justify-center py-16">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 w-full max-w-4xl">
-            <Button 
-              onClick={handleCreateNew} 
-              className="h-64 shadow-md hover:shadow-lg transition-all duration-300 rounded-2xl bg-card border border-primary/20 hover:border-primary/30"
-              variant="outline"
-              size="lg"
-            >
-              <div className="flex flex-col items-center justify-center gap-7">
-                <div className="p-6 rounded-full bg-primary/10 hover:bg-primary/15 transition-colors duration-300">
-                  <Plus className="h-16 w-16 text-primary" strokeWidth={1.5} />
-                </div>
-                <div className="flex flex-col items-center">
-                  <span className="text-2xl font-semibold mb-2">Add new API</span>
-                  <span className="text-muted-foreground text-sm max-w-[12rem] text-center">One click connect to any API</span>
-                </div>
-              </div>
-            </Button>
-            
-            <Button 
-              onClick={handleCreateNewExtract} 
-              className="h-64 shadow-md hover:shadow-lg transition-all duration-300 rounded-2xl bg-card border border-primary/20 hover:border-primary/30"
-              variant="outline"
-              size="lg"
-            >
-              <div className="flex flex-col items-center justify-center gap-7">
-                <div className="p-6 rounded-full bg-primary/10 hover:bg-primary/15 transition-colors duration-300">
-                  <Plus className="h-16 w-16 text-primary" strokeWidth={1.5} />
-                </div>
-                <div className="flex flex-col items-center">
-                  <span className="text-2xl font-semibold mb-2">Add new File</span>
-                  <span className="text-muted-foreground text-sm max-w-[12rem] text-center">Map any file to your structure</span>
-                </div>
-              </div>
-            </Button>
-            
-            <Button 
-              onClick={handleCreateExampleShopify}
-              className="h-40 md:col-span-2 shadow-md hover:shadow-lg transition-all duration-300 rounded-2xl bg-card border border-primary/20 hover:border-primary/30"
-              variant="outline"
-              size="lg"
-            >
-              <div className="flex items-center justify-center gap-10">
-                <div className="p-6 rounded-full bg-primary/10 hover:bg-primary/15 transition-colors duration-300">
-                  <ShoppingBag className="h-16 w-16 text-primary" strokeWidth={1.5} />
-                </div>
-                <div className="flex flex-col items-start">
-                  <span className="text-2xl font-semibold mb-2">Create Example Shopify API</span>
-                  <span className="text-muted-foreground text-sm max-w-[16rem]">Get product data with one click in your format</span>
-                </div>
-              </div>
-            </Button>
-          </div>
-        </div>
+        <EmptyStateActions
+          handleCreateNew={handleCreateNew}
+          handleCreateNewExtract={handleCreateNewExtract}
+          handleWorkflow={handleWorkflow}
+          handleCreateExampleShopify={handleCreateExampleShopify}
+        />
       </div>
     );
   }
@@ -586,14 +533,6 @@ const ConfigTable = () => {
           Next
         </Button>
       </div>
-
-      <Sheet open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-        <SheetContent side="right" className="w-[800px] max-w-full">
-          {selectedConfig && (
-            <ApiConfigDetail id={selectedConfig.id} />
-          )}
-        </SheetContent>
-      </Sheet>
 
       <AlertDialog open={!!configToDelete} onOpenChange={(open) => !open && setConfigToDelete(null)}>
         <AlertDialogContent>
