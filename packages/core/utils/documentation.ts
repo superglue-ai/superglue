@@ -2,10 +2,11 @@ import axios from "axios";
 import { getIntrospectionQuery } from "graphql";
 import { NodeHtmlMarkdown } from "node-html-markdown";
 import playwright from '@playwright/test';
-import { DOCUMENTATION_MAX_LENGTH } from "../config.js";
 import { composeUrl } from "./tools.js";
+import { LanguageModel } from "../llm/llm.js";
 
 let browserInstance: playwright.Browser | null = null;
+const DOCUMENTATION_MAX_LENGTH = Math.min(LanguageModel.contextLength - 50000, 200000);
 
 async function getBrowser() {
   if (!browserInstance) {
@@ -85,7 +86,6 @@ export function postProcessLargeDoc(documentation: string, endpointPath: string)
   const CONTEXT_SIZE = 10000;
   const CONTEXT_SEPARATOR = "\n\n";
   const MIN_SEARCH_TERM_LENGTH = 3;
-
   if (documentation.length <= DOCUMENTATION_MAX_LENGTH) {
     return documentation;
   }
