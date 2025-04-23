@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, Mocked, vi } from 'vitest';
 import playwright from '@playwright/test';
 import axios from 'axios';
-import { DOCUMENTATION_MAX_LENGTH } from '../config.js';
 import { getDocumentation, postProcessLargeDoc, closeBrowser } from './documentation.js';
+import { LanguageModel } from '../llm/llm.js';
 
 // Mock playwright and axios
 vi.mock('@playwright/test', () => ({
@@ -14,6 +14,8 @@ vi.mock('@playwright/test', () => ({
 }));
 
 vi.mock('axios');
+
+const DOCUMENTATION_MAX_LENGTH = Math.min(LanguageModel.contextLength - 50000, 200000);
 
 describe('Documentation Utilities', () => {
   let mockPage: any;
