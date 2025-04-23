@@ -7,7 +7,6 @@ import { getDocumentation } from "./documentation.js";
 import { callAxios, composeUrl, replaceVariables } from "./tools.js";
 import { API_PROMPT } from "../llm/prompts.js";
 import { logMessage } from "./logs.js";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { parseXML } from "./file.js";
 import { LanguageModel } from "../llm/llm.js";
 
@@ -33,8 +32,7 @@ export async function prepareEndpoint(
 
     const documentation = await getDocumentation(apiCallConfig.documentationUrl, apiCallConfig.headers, apiCallConfig.queryParams, apiCallConfig?.urlHost, apiCallConfig?.urlPath);
 
-    const availableVars = [...Object.keys(payload || {}), ...Object.keys(credentials || {})];
-    const computedApiCallConfig = await generateApiConfig(apiCallConfig, documentation, availableVars, retryCount, messages);
+    const computedApiCallConfig = await generateApiConfig(apiCallConfig, documentation, payload, credentials, retryCount, messages);
     
     return computedApiCallConfig;
 }
@@ -120,7 +118,7 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
     const axiosConfig: AxiosRequestConfig = {
       method: endpoint.method,
       url: url,
-      headers: processedHeaders, // added processedHeaders instead of headers
+      headers: processedHeaders,
       data: body,
       params: queryParams,
       timeout: options?.timeout || 60000,
@@ -242,7 +240,8 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
 export async function generateApiConfig(
   apiConfig: Partial<ApiConfig>, 
   documentation: string, 
-  vars: string[] = [], 
+  payload: Record<string, any>, 
+  credentials: Record<string, any>, 
   retryCount = 0,
   messages: OpenAI.Chat.ChatCompletionMessageParam[] = []
 ): Promise<{ config: ApiConfig; messages: OpenAI.Chat.ChatCompletionMessageParam[] }> {
@@ -283,7 +282,9 @@ ${apiConfig.dataPath ? `Data Path: ${apiConfig.dataPath}` : ''}
 ${apiConfig.pagination ? `Pagination: ${JSON.stringify(apiConfig.pagination)}` : ''}
 ${apiConfig.method ? `Method: ${apiConfig.method}` : ''}
 
-Available variables: ${vars.join(", ")}
+Available credential variables: ${Object.keys(credentials).join(", ")}
+Available payload variables: ${Object.keys(payload).join(", ")}
+Example payload: ${JSON.stringify(payload)}
 
 Documentation: ${String(documentation)}`;
 
