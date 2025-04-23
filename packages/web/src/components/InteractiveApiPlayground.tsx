@@ -3,7 +3,7 @@
 import { useConfig } from '@/src/app/config-context'
 import { useToast } from '@/src/hooks/use-toast'
 import { ApiConfig, CacheMode, SuperglueClient } from '@superglue/client'
-import { Loader2 } from 'lucide-react'
+import { Loader2, CopyIcon } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { AutoSizer, List } from 'react-virtualized'
 import JsonSchemaEditor from './JsonSchemaEditor'
@@ -68,6 +68,17 @@ export function InteractiveApiPlayground({
     } catch (error) {
       console.error('Error fetching config:', error)
     }
+  }
+
+  const handleCopy = (content: string, contentType: string) => {
+    if (!content) return;
+    navigator.clipboard.writeText(content)
+      .then(() => {
+        toast({
+          title: `${contentType} Copied`,
+          description: `${contentType} content copied to clipboard.`,
+        })
+      })
   }
 
   // Fetch config on mount
@@ -211,7 +222,17 @@ export function InteractiveApiPlayground({
 
               <div className="flex-1 min-h-0">
                 <TabsContent value="raw" className="m-0 h-full data-[state=active]:flex flex-col">
-                  <div className="flex-1 min-h-0 p-4 overflow-hidden">
+                  <div className="flex-1 min-h-0 p-4 overflow-hidden relative">
+                    {rawResponse && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute top-2 right-8 z-10 h-6 w-6"
+                        onClick={() => handleCopy(JSON.stringify(rawResponse, null, 2), 'Raw Response')}
+                      >
+                        <CopyIcon className="h-4 w-4" />
+                      </Button>
+                    )}
                     <AutoSizer>
                       {({ height, width }) => (
                         <List
@@ -229,7 +250,17 @@ export function InteractiveApiPlayground({
                 </TabsContent>
 
                 <TabsContent value="mapped" className="m-0 h-full data-[state=active]:flex flex-col">
-                  <div className="flex-1 min-h-0 p-4 overflow-hidden">
+                  <div className="flex-1 min-h-0 p-4 overflow-hidden relative">
+                    {mappedResponse && !(isRunning || isLoading) && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute top-2 right-8 z-10 h-6 w-6"
+                        onClick={() => handleCopy(JSON.stringify(mappedResponse, null, 2), 'Output')}
+                      >
+                        <CopyIcon className="h-4 w-4" />
+                      </Button>
+                    )}
                     <AutoSizer>
                       {({ height, width }) => (
                         <List
@@ -247,7 +278,17 @@ export function InteractiveApiPlayground({
                 </TabsContent>
 
                 <TabsContent value="jsonata" className="m-0 h-full data-[state=active]:flex flex-col">
-                  <div className="flex-1 min-h-0 p-4 overflow-y-auto">
+                  <div className="flex-1 min-h-0 p-4 overflow-y-auto relative">
+                    {responseMapping && !(isRunning || isLoading) && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute top-2 right-8 z-10 h-6 w-6"
+                        onClick={() => handleCopy(responseMapping, 'Response Mapping')}
+                      >
+                        <CopyIcon className="h-4 w-4" />
+                      </Button>
+                    )}
                     <pre className="text-xs whitespace-pre-wrap leading-[18px]">
                       {isRunning || isLoading ? 'Loading...' : (responseMapping || 'No JSONata mapping available')}
                     </pre>
