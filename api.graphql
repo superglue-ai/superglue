@@ -238,6 +238,15 @@ input WorkflowInputRequest @oneOf {
   id: ID
 }
 
+input SystemDefinitionInput {
+  id: String!
+  urlHost: String!
+  urlPath: String
+  documentationUrl: String
+  documentation: String
+  credentials: JSON
+}
+
 type Log {
   id: ID!
   message: String!
@@ -362,6 +371,12 @@ type Mutation {
     options: RequestOptions
   ): WorkflowResult!
   
+  buildWorkflow(
+    instruction: String!
+    payload: JSON
+    systems: [SystemDefinitionInput!]!
+  ): Workflow!
+
   upsertWorkflow(id: ID!, input: JSON!): Workflow!
   deleteWorkflow(id: ID!): Boolean!
   

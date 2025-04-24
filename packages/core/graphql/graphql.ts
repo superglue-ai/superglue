@@ -16,7 +16,8 @@ import {
   getWorkflowResolver,
   listWorkflowsResolver,
   upsertWorkflowResolver,
-  executeWorkflowResolver
+  executeWorkflowResolver,
+  buildWorkflowResolver
 } from "./resolvers/workflow.js";
 import { logsResolver } from "./resolvers/logs.js";
 
@@ -41,6 +42,7 @@ export const resolvers = {
     extract: extractResolver,
     transform: transformResolver,
     executeWorkflow: executeWorkflowResolver,
+    buildWorkflow: buildWorkflowResolver,
     upsertWorkflow: upsertWorkflowResolver,
     deleteWorkflow: deleteWorkflowResolver,
     upsertApi: upsertApiResolver,
