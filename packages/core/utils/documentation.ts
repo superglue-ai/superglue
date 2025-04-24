@@ -4,14 +4,15 @@ import { NodeHtmlMarkdown } from "node-html-markdown";
 import playwright from '@playwright/test';
 import { composeUrl } from "./tools.js";
 import { LanguageModel } from "../llm/llm.js";
-import { ApiConfig, ApiInput } from "@superglue/shared";
+import { ApiConfig, ApiInput, Metadata } from "@superglue/shared";
+import { logMessage } from "./logs.js";
 
 // Strategy Interface
 interface FetchingStrategy {
-  tryFetch(config: ApiInput): Promise<string | null>;
+  tryFetch(config: ApiInput, metadata: Metadata): Promise<string | null>;
 }
 interface ProcessingStrategy {
-  tryProcess(rawResult: string, config: ApiInput): Promise<string | null>;
+  tryProcess(rawResult: string, config: ApiInput, metadata: Metadata): Promise<string | null>;
 }
 
 export class Documentation {
@@ -19,11 +20,13 @@ export class Documentation {
 
   // Configuration stored per instance
   private readonly config: ApiInput;
+  private readonly metadata: Metadata;
 
   private lastResult: string | null = null;
 
-  constructor(config: ApiInput) {
+  constructor(config: ApiInput, metadata: Metadata) {
     this.config = config;
+    this.metadata = metadata;
   }
 
   // --- Post Processing ---
@@ -139,7 +142,7 @@ export class Documentation {
     let rawResult: string | null = null;
 
     for (const strategy of fetchingStrategies) {
-      const result = await strategy.tryFetch(this.config);
+      const result = await strategy.tryFetch(this.config, this.metadata);
       if (result == null || result.length === 0) {
         continue;
       }
@@ -148,11 +151,11 @@ export class Documentation {
     }
 
     if(!rawResult) {
-      return "";  
+      return "";
     }
 
     for (const strategy of processingStrategies) {
-      const result = await strategy.tryProcess(rawResult, this.config);
+      const result = await strategy.tryProcess(rawResult, this.config, this.metadata);
       if (result == null || result.length === 0) {
         continue;
       }
@@ -160,6 +163,7 @@ export class Documentation {
       return this.lastResult;
     }
 
+    logMessage('warn', "No processing strategy could handle the fetched documentation.", this.metadata);
     return "";
   }
 }
@@ -167,10 +171,11 @@ export class Documentation {
 // --- Concrete Strategy Implementations ---
 
 class RawContentStrategy implements FetchingStrategy {
-  async tryFetch(config: ApiInput): Promise<string | null> {
+  async tryFetch(config: ApiInput, metadata: Metadata): Promise<string | null> {
     if (!config.documentationUrl?.startsWith("http")) {
       // It's raw content passed directly in the URL field
-      if(config.documentationUrl && config.documentationUrl.length > 0) { 
+      if(config.documentationUrl && config.documentationUrl.length > 0) {
+        logMessage('info', "Using raw content provided directly as documentation.", metadata);
         return config.documentationUrl;
       }
       return null;
@@ -180,7 +185,7 @@ class RawContentStrategy implements FetchingStrategy {
 }
 
 class GraphQLStrategy implements FetchingStrategy {
-  private async fetchGraphQLSchema(url: string, config: ApiInput): Promise<any | null> {
+  private async fetchGraphQLSchema(url: string, config: ApiInput, metadata: Metadata): Promise<any | null> {
     const introspectionQuery = getIntrospectionQuery();
 
     try {
@@ -194,7 +199,6 @@ class GraphQLStrategy implements FetchingStrategy {
       );
 
       if (response.data.errors) {
-        console.warn(`GraphQL Introspection failed for ${url}: ${response.data.errors[0].message}`);
         return null;
       }
       return response.data?.data?.__schema ?? null;
@@ -209,7 +213,7 @@ class GraphQLStrategy implements FetchingStrategy {
            Object.values({...config.queryParams, ...config.headers})
            .some(val => typeof val === 'string' && val.includes('IntrospectionQuery'));
   }
-  async tryFetch(config: ApiInput): Promise<string | null> {
+  async tryFetch(config: ApiInput, metadata: Metadata): Promise<string | null> {
     if (!config.urlHost.startsWith("http")) return null; // Needs a valid HTTP URL
     const endpointUrl = composeUrl(config.urlHost, config.urlPath);
 
@@ -221,13 +225,15 @@ class GraphQLStrategy implements FetchingStrategy {
 
     // Use the endpoint URL if it looks like GraphQL, otherwise use the documentation URL
     const url = urlIsLikelyGraphQL ? endpointUrl : config.documentationUrl;
+    if (!url) {
+        return null;
+    }
 
-    const schema = await this.fetchGraphQLSchema(url, config);
+    const schema = await this.fetchGraphQLSchema(url, config, metadata);
     if (schema) {
+        logMessage('info', `Successfully fetched GraphQL schema from ${url}.`, metadata);
         return JSON.stringify(schema);
     }
-    // Log if it looked like GQL but failed (fetchGraphQLSchema logs internal errors)
-    console.warn(`URL ${config.documentationUrl} looked like GraphQL but introspection failed or returned no schema.`);
     return null;
   }
 }
@@ -239,6 +245,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
 
     private static async getBrowser(): Promise<playwright.Browser> {
       if (!PlaywrightFetchingStrategy.browserInstance) {
+        // Consider adding metadata if logging launch errors becomes necessary
         PlaywrightFetchingStrategy.browserInstance = await playwright.chromium.launch();
       }
       return PlaywrightFetchingStrategy.browserInstance;
@@ -248,10 +255,11 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       if (PlaywrightFetchingStrategy.browserInstance) {
         const closedInstance = PlaywrightFetchingStrategy.browserInstance;
         PlaywrightFetchingStrategy.browserInstance = null;
+        // Consider adding metadata if logging close errors becomes necessary
         await closedInstance.close();
       }
     }
-  private async fetchPageContentWithPlaywright(config: ApiInput): Promise<string | null> {
+  private async fetchPageContentWithPlaywright(config: ApiInput, metadata: Metadata): Promise<string | null> {
 
     if (!config.documentationUrl?.startsWith("http")) {
       return null;
@@ -291,15 +299,18 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
         selectorsToRemove.forEach(selector => {
           document.querySelectorAll(selector).forEach(element => {
              try { element.remove(); }
-             catch(e) { console.warn("Failed to remove element:", e?.message) }
+             catch(e) {
+               // Cannot use logMessage directly here as it's inside page.evaluate
+               console.warn("Failed to remove element:", e?.message);
+             }
           });
         });
       });
 
       const content = await page.content();
+      logMessage('info', `Successfully fetched content for ${config.documentationUrl}`, metadata);
       return content;
     } catch (error) {
-      console.warn(`Playwright fetch failed for ${config.documentationUrl}:`, error?.message);
       return null;
     } finally {
        if (page) await page.close();
@@ -307,16 +318,17 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     }
   }
 
-  async tryFetch(config: ApiInput): Promise<string | null> {
+  async tryFetch(config: ApiInput, metadata: Metadata): Promise<string | null> {
     // Only fetch if it's an HTTP URL and content hasn't been fetched yet
-    const content = await this.fetchPageContentWithPlaywright(config);
+    // Pass metadata
+    const content = await this.fetchPageContentWithPlaywright(config, metadata);
     if(!content) return null;
     return content;
   }
 }
 
 class OpenApiStrategy implements ProcessingStrategy {
-  private extractOpenApiUrl(html: string): string | null {
+  private extractOpenApiUrl(html: string, metadata: Metadata): string | null {
     try {
       // First try to match based on swagger settings
       const settingsMatch = html.match(/<script[^>]*id=["']swagger-settings["'][^>]*>([\s\S]*?)<\/script>/i);
@@ -328,7 +340,6 @@ class OpenApiStrategy implements ProcessingStrategy {
             return settings.url;
           }
         } catch (e) {
-           console.warn('Failed to parse swagger settings JSON:', e?.message);
         }
       }
 
@@ -358,17 +369,17 @@ class OpenApiStrategy implements ProcessingStrategy {
 
       return null;
     } catch (error) {
-      console.warn('Failed to extract OpenAPI URL:', error?.message);
       return null;
     }
   }
-  private async fetchOpenApiFromUrl(openApiUrl: string, config: ApiInput): Promise<string | null> {
+  private async fetchOpenApiFromUrl(openApiUrl: string, config: ApiInput, metadata: Metadata): Promise<string | null> {
     try {
+      let absoluteOpenApiUrl = openApiUrl;
       if(openApiUrl.startsWith("/")) {
-        const baseUrl = config.documentationUrl ? new URL(config.documentationUrl).host : config.urlHost;
-        openApiUrl = composeUrl(baseUrl, openApiUrl);
+        const baseUrl = config.documentationUrl ? new URL(config.documentationUrl).origin : config.urlHost;
+        absoluteOpenApiUrl = composeUrl(baseUrl, openApiUrl);
       }
-      const openApiResponse = await axios.get(openApiUrl, { headers: config.headers });
+      const openApiResponse = await axios.get(absoluteOpenApiUrl, { headers: config.headers });
       const openApiData = openApiResponse.data;
 
       if (!openApiData) return null;
@@ -377,34 +388,34 @@ class OpenApiStrategy implements ProcessingStrategy {
         if (openApiData.openapi || openApiData.swagger) {
           return JSON.stringify(openApiData);
         } else {
-          console.warn(`Fetched object from ${openApiUrl} but doesn't look like OpenAPI/Swagger.`);
           return JSON.stringify(openApiData);
         }
       } else if (typeof openApiData === 'string') {
          try {
            const parsed = JSON.parse(openApiData);
            if (parsed && (parsed.openapi || parsed.swagger)) {
+             logMessage('info', `Successfully fetched valid OpenAPI/Swagger JSON string from ${absoluteOpenApiUrl}`, metadata);
              return openApiData; // Valid JSON spec
            }
          } catch (e) { /* ignore */ }
          const trimmedData = openApiData.trim();
          if (trimmedData.startsWith('openapi:') || trimmedData.startsWith('swagger:')) {
+            logMessage('info', `Successfully fetched likely OpenAPI/Swagger YAML string from ${absoluteOpenApiUrl}`, metadata);
             return openApiData; // Likely YAML spec
          }
-         console.warn(`Content from ${openApiUrl} is a string but not identifiable as JSON or YAML OpenAPI/Swagger.`);
          return openApiData; // Return raw string as fallback
       }
 
-      console.warn(`Unexpected data type received from ${openApiUrl}: ${typeof openApiData}`);
+      logMessage('warn', `Unexpected data type received from ${absoluteOpenApiUrl}: ${typeof openApiData}`, metadata);
       return null;
 
     } catch (error) {
-      console.warn(`Failed to fetch or process OpenAPI spec from ${openApiUrl}:`, error?.message);
+      logMessage('warn', `Failed to fetch or process OpenAPI spec from ${openApiUrl}: ${error?.message}`, metadata);
       return null;
     }
   }
 
-  async tryProcess(content: string, config: ApiConfig): Promise<string | null> {
+  async tryProcess(content: string, config: ApiConfig, metadata: Metadata): Promise<string | null> {
     // Needs page content fetched by PlaywrightFetchingStrategy (or null if fetch failed)
     if (content === undefined || content === null) {
       return null;
@@ -417,30 +428,45 @@ class OpenApiStrategy implements ProcessingStrategy {
        try {
           const parsed = JSON.parse(trimmedContent);
           if (parsed && (parsed.openapi || parsed.swagger)) {
+             logMessage('info', "Provided content is already a valid OpenAPI/Swagger JSON spec.", metadata);
              return trimmedContent; // Content is a valid JSON spec
           }
        } catch(e) { /* ignore parse error */ }
     } 
     if (isYaml) {
+       logMessage('info', "Provided content appears to be an OpenAPI/Swagger YAML spec.", metadata);
        // Basic check is enough for YAML start
        return trimmedContent; // Content is likely a YAML spec
     }
     if(isHtml) {
-      const openApiUrl = this.extractOpenApiUrl(content);
-      if(!openApiUrl) return null;
+      const openApiUrl = this.extractOpenApiUrl(content, metadata);
+      if(!openApiUrl) {
+        return null;
+      }
 
-      const openApiSpec = await this.fetchOpenApiFromUrl(openApiUrl, config);
-      if(!openApiSpec) return null;
+      const openApiSpec = await this.fetchOpenApiFromUrl(openApiUrl, config, metadata);
+      if(!openApiSpec) {
+        return null; // Only return null if fetching the SPEC failed. If HTML->MD fails, we still return the spec.
+      }
 
-      const markdownContent = await new HtmlMarkdownStrategy().tryProcess(content, config);
-      return `${openApiSpec}\n\n${markdownContent === null ? content : markdownContent}`;
+      // Try to convert HTML to Markdown as supplementary info
+      const markdownContent = await new HtmlMarkdownStrategy().tryProcess(content, config, metadata);
+      if (markdownContent) {
+          logMessage('info', "Successfully extracted OpenAPI spec and converted HTML to Markdown.", metadata);
+          return `${openApiSpec}\n\n${markdownContent}`;
+      } else {
+          logMessage('warn', "Successfully extracted OpenAPI spec, but failed to convert HTML to Markdown. Returning spec only.", metadata);
+          // We still have the spec, return it. Don't include the original raw HTML.
+          return openApiSpec;
+      }
     }
+    // Content is not JSON, YAML, or HTML that contained an OpenAPI spec
     return null;
   }
 }
 
 class HtmlMarkdownStrategy implements ProcessingStrategy {
-  async tryProcess(content: string, config: ApiConfig): Promise<string | null> {
+  async tryProcess(content: string, config: ApiConfig, metadata: Metadata): Promise<string | null> {
      // Needs page content fetched by PlaywrightFetchingStrategy
      if (content === undefined || content === null) {
        return null;
@@ -451,19 +477,20 @@ class HtmlMarkdownStrategy implements ProcessingStrategy {
      }
 
      try {
-       // Use NodeHtmlMarkdown, assuming it handles potential errors
-       return NodeHtmlMarkdown.translate(content);
+       const markdown = NodeHtmlMarkdown.translate(content);
+       logMessage('info', "Successfully converted HTML to Markdown.", metadata);
+       return markdown;
      } catch (translateError) {
-       console.warn("Failed to translate HTML to Markdown:", translateError?.message);
        return null; // Failed translation, let RawPageContentStrategy handle it
      }
   }
 }
 
 class RawPageContentStrategy implements ProcessingStrategy {
-  async tryProcess(content: string, config: ApiConfig): Promise<string | null> {
+  async tryProcess(content: string, config: ApiConfig, metadata: Metadata): Promise<string | null> {
     // This is the final fallback if content was fetched but not processed by other strategies
     if (content) {
+      logMessage('info', "Using raw fetched content as final documentation.", metadata);
       return content;
     }
     return null; // No content was fetched or available
