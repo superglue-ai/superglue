@@ -9,14 +9,14 @@ import { listApisResolver, listExtractsResolver, listRunsResolver, listTransform
 import { JSONResolver, JSONSchemaResolver, JSONataResolver } from "./resolvers/scalars.js";
 import { getTenantInfoResolver, setTenantInfoResolver } from "./resolvers/tenant.js";
 import { transformResolver } from "./resolvers/transform.js";
-import { updateApiConfigIdResolver } from "./resolvers/updateId.js";
+import { updateApiConfigIdResolver } from "./resolvers/update-id.js";
 import { upsertApiResolver, upsertExtractResolver, upsertTransformResolver } from "./resolvers/upsert.js";
 import {
   deleteWorkflowResolver,
   getWorkflowResolver,
   listWorkflowsResolver,
   upsertWorkflowResolver,
-  workflowResolver
+  executeWorkflowResolver
 } from "./resolvers/workflow.js";
 import { logsResolver } from "./resolvers/logs.js";
 
@@ -40,7 +40,7 @@ export const resolvers = {
     call: callResolver,
     extract: extractResolver,
     transform: transformResolver,
-    executeWorkflow: workflowResolver,
+    executeWorkflow: executeWorkflowResolver,
     upsertWorkflow: upsertWorkflowResolver,
     deleteWorkflow: deleteWorkflowResolver,
     upsertApi: upsertApiResolver,
