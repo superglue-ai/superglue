@@ -2,6 +2,9 @@ import type { GraphQLResolveInfo } from "graphql";
 import { WorkflowExecutor } from "../../workflow/workflow-executor.js";
 import { Context, Metadata, RequestOptions, Workflow, WorkflowResult } from "@superglue/shared";
 import { createHash } from "crypto";
+import { WorkflowBuilder } from "../../workflow/workflow-builder.js";
+import type { SystemDefinition } from "../../workflow/workflow-builder.js";
+import { logMessage } from "../../utils/logs.js";
 
 function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined, defaultValue?: T): T | undefined {
   if (newValue === null) return undefined;
@@ -17,6 +20,11 @@ interface ExecuteWorkflowArgs {
   options?: RequestOptions;
 }
 
+interface BuildWorkflowArgs {
+  instruction: string;
+  payload?: Record<string, unknown>;
+  systems: SystemDefinition[];
+}
 
 export const executeWorkflowResolver = async (
   _: unknown,
@@ -24,16 +32,18 @@ export const executeWorkflowResolver = async (
   context: Context,
   info: GraphQLResolveInfo,
 ): Promise<WorkflowResult> => {
+  let runId: string | undefined;
+  let metadata: Metadata | undefined;
   try {
-    const workflow: Workflow = args.input.workflow || 
+    const workflow: Workflow = args.input.workflow ||
       await context.datastore.getWorkflow(args.input.id, context.orgId);
-    const runId = crypto.randomUUID();
-    const metadata: Metadata = { orgId: context.orgId, runId: runId };
+    runId = crypto.randomUUID();
+    metadata = { orgId: context.orgId, runId: runId };
     const executor = new WorkflowExecutor(workflow, metadata);
     const result = await executor.execute(args.payload, args.credentials, args.options);
     return result;
   } catch (error) {
-    console.error("Workflow execution error:", error);
+    logMessage('error', "Workflow execution error: " + String(error), metadata || { orgId: context.orgId, runId });
     return {
       success: false,
       error: String(error),
@@ -71,7 +81,7 @@ export const upsertWorkflowResolver = async (_: unknown, { id, input }: { id: st
 
     return await context.datastore.upsertWorkflow(id, workflow, context.orgId);
   } catch (error) {
-    console.error("Error upserting workflow:", error);
+    logMessage('error', "Error upserting workflow: " + String(error), { orgId: context.orgId });
     throw error;
   }
 };
@@ -84,7 +94,7 @@ export const deleteWorkflowResolver = async (_: unknown, { id }: { id: string },
   try {
     return await context.datastore.deleteWorkflow(id, context.orgId);
   } catch (error) {
-    console.error("Error deleting workflow:", error);
+    logMessage('error', "Error deleting workflow: " + String(error), { orgId: context.orgId });
     throw error;
   }
 };
@@ -105,7 +115,7 @@ export const getWorkflowResolver = async (_: unknown, { id }: { id: string }, co
     });
     return workflow;
   } catch (error) {
-    console.error("Error getting workflow:", error);
+    logMessage('error', "Error getting workflow: " + String(error), { orgId: context.orgId });
     throw error;
   }
 };
@@ -119,7 +129,45 @@ export const listWorkflowsResolver = async (
     const result = await context.datastore.listWorkflows(limit, offset, context.orgId);
     return result.items;
   } catch (error) {
-    console.error("Error listing workflows:", error);
+    logMessage('error', "Error listing workflows: " + String(error), { orgId: context.orgId });
     throw error;
   }
 };
+
+export const buildWorkflowResolver = async (
+  _: unknown,
+  args: BuildWorkflowArgs,
+  context: Context,
+  info: GraphQLResolveInfo,
+): Promise<Workflow> => {
+  try {
+    const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
+    const { instruction, payload = {}, systems } = args;
+
+    if (!instruction || instruction.trim() === "") {
+      throw new Error("Instruction is required to build a workflow.");
+    }
+    if (!systems || systems.length === 0) {
+      throw new Error("At least one system definition is required.");
+    }
+
+    // Validate systems structure (basic validation, could be more robust)
+    systems.forEach((sys, index) => {
+      if (!sys.id || !sys.urlHost || !sys.credentials) {
+        throw new Error(`Invalid system definition at index ${index}: 'id', 'urlHost', and 'credentials' are required.`);
+      }
+    });
+
+    const builder = new WorkflowBuilder(systems, instruction, payload, metadata);
+    const workflow = await builder.build();
+
+    await context.datastore.upsertWorkflow(workflow.id, workflow, context.orgId);
+
+    return workflow;
+  } catch (error) {
+    logMessage('error', "Workflow building error: " + String(error), { orgId: context.orgId });
+    // Rethrow or return a structured error for GraphQL
+    throw new Error(`Failed to build workflow: ${error}`);
+  }
+};
+

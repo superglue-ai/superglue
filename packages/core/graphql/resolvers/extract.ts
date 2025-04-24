@@ -57,7 +57,7 @@ export const extractResolver = async (
           await context.datastore.getExtractConfigFromRequest(input.endpoint, payload, context.orgId) 
           : null;
         if(!preparedExtract) {
-          const documentation = new Documentation(preparedExtract);
+          const documentation = new Documentation(preparedExtract, metadata);
           const documentationString = await documentation.fetch();
           preparedExtract = await generateExtractConfig(preparedExtract, documentationString, payload, credentials, lastError);
       
