@@ -55,11 +55,10 @@ export const callResolver = async (
           didReadFromCache = true;
         }
 
-        if(!documentation) {
-          documentation = new Documentation({ documentationUrl: input.endpoint?.documentationUrl, urlHost: input.endpoint?.urlHost, instruction: '' });
-        }
-
         if(!didReadFromCache || !preparedEndpoint) {
+          if(!documentation) {
+            documentation = new Documentation(preparedEndpoint || input.endpoint, metadata);
+          }  
           logMessage('info', `Generating API config for ${input.endpoint?.urlHost}${retryCount > 0 ? ` (retry ${retryCount})` : ""}`, metadata);      
           const documentationString = await documentation.fetch();
           const computedApiCallConfig = await generateApiConfig(input.endpoint, documentationString, payload, credentials, retryCount, messages);      
