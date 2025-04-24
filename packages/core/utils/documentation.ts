@@ -4,312 +4,468 @@ import { NodeHtmlMarkdown } from "node-html-markdown";
 import playwright from '@playwright/test';
 import { composeUrl } from "./tools.js";
 import { LanguageModel } from "../llm/llm.js";
+import { ApiConfig, ApiInput } from "@superglue/shared";
 
-let browserInstance: playwright.Browser | null = null;
-const DOCUMENTATION_MAX_LENGTH = Math.min(LanguageModel.contextLength - 50000, 200000);
-
-async function getBrowser() {
-  if (!browserInstance) {
-    browserInstance = await playwright.chromium.launch();
-  }
-  return browserInstance;
+// Strategy Interface
+interface FetchingStrategy {
+  tryFetch(config: ApiInput): Promise<string | null>;
+}
+interface ProcessingStrategy {
+  tryProcess(rawResult: string, config: ApiInput): Promise<string | null>;
 }
 
-export function extractOpenApiUrl(html: string): string | null {
-  try {
-    // First try to match based on swagger settings
-    const settingsMatch = html.match(/<script[^>]*id=["']swagger-settings["'][^>]*>([\s\S]*?)<\/script>/i);
-    if (settingsMatch && settingsMatch[1]) {
+export class Documentation {
+  private static MAX_LENGTH = Math.min(LanguageModel.contextLength - 50000, 200000);
 
-      const settingsContent = settingsMatch[1].trim();
-      const settings = JSON.parse(settingsContent);
-      
-      if (settings.url) {
-        return settings.url;
+  // Configuration stored per instance
+  private readonly config: ApiInput;
+
+  private lastResult: string | null = null;
+
+  constructor(config: ApiInput) {
+    this.config = config;
+  }
+
+  // --- Post Processing ---
+
+  private postProcess(documentation: string): string {
+    // (Renamed from postProcessLargeDoc - same logic)
+    if (documentation.length <= Documentation.MAX_LENGTH) {
+      return documentation;
+    }
+    const CONTEXT_SEPARATOR = "\n\n";
+    const MIN_SEARCH_TERM_LENGTH = 3;
+
+    const docLower = documentation.toLowerCase();
+    const positions: number[] = [];
+
+    const endpointPath = this.config.urlPath || '';
+    let searchTerms = endpointPath?.toLowerCase()?.split(/[\/=&]/)
+      .map(term => term.trim())
+      .filter(term => term.length >= MIN_SEARCH_TERM_LENGTH);
+
+    for(const searchTerm of searchTerms) {
+      let pos = docLower.indexOf(searchTerm);
+      while (pos !== -1) {
+        positions.push(pos);
+        pos = docLower.indexOf(searchTerm, pos + 1);
       }
     }
-    
-    // Fallback: look for JSON with a url property pointing to openapi.json
-    const jsonMatch = html.match(/({[^}]*"url"[^}]*"[^"]*openapi\.json[^}]*})/i);
-    if (jsonMatch && jsonMatch[1]) {
-      try {
-        const jsonObj = JSON.parse(jsonMatch[1]);
-        if (jsonObj.url) {
-          return jsonObj.url;
-        }
-      } catch (e) {
-        // Continue
+
+    let authPosSecuritySchemes = docLower.indexOf("securityschemes");
+    if (authPosSecuritySchemes !== -1) positions.push(authPosSecuritySchemes);
+    let authPosAuthorization = docLower.indexOf("authorization");
+    if (authPosAuthorization !== -1) positions.push(authPosAuthorization);
+
+    if (positions.length === 0) {
+      return documentation.slice(0, Documentation.MAX_LENGTH);
+    }
+    positions.sort((a, b) => a - b);
+
+    const firstHalfLength = Math.floor(Documentation.MAX_LENGTH * 0.4);
+    const secondHalfLength = Documentation.MAX_LENGTH - firstHalfLength;
+
+    // Calculate chunk size for the second half, ensuring it's an integer
+    const chunkSize = Math.floor(secondHalfLength / positions.length);
+    if (chunkSize <= 0) {
+      // Fallback if MAX_LENGTH is too small or too many positions
+      return documentation.slice(0, Documentation.MAX_LENGTH);
+    }
+
+    // Extract the first half
+    const firstHalf = documentation.slice(0, firstHalfLength);
+
+    // Extract chunks for the second half, avoiding overlaps and out-of-bounds
+    const chunks: string[] = [];
+    let lastChunkEnd = firstHalfLength; // Start checking for overlaps after the first half
+
+    for (const pos of positions) {
+      // Calculate start and end, trying to center the chunk around the position
+      const halfChunk = Math.floor(chunkSize / 2);
+      let start = Math.max(0, pos - halfChunk);
+      let end = start + chunkSize;
+
+      // Adjust if chunk goes beyond document length
+      if (end > documentation.length) {
+        end = documentation.length;
+        start = Math.max(0, end - chunkSize); // Readjust start if possible
+      }
+
+      // Skip if the chunk is entirely contained within the first half or previous chunks
+      if (start >= end || end <= lastChunkEnd) {
+        continue;
+      }
+
+      // Adjust start if it overlaps with the last chunk
+      start = Math.max(start, lastChunkEnd);
+
+      // Only add if the adjusted chunk has content
+      if (start < end) {
+        chunks.push(documentation.slice(start, end));
+        lastChunkEnd = end;
       }
     }
-    
-    // find direct references to openapi.json URLs
-    const openApiUrlMatch = html.match(/["']((?:https?:\/\/)?[^"']*openapi\.json)["']/i);
-    if (openApiUrlMatch && openApiUrlMatch[1]) {
-      return openApiUrlMatch[1];
+
+    // Combine the first half and the extracted chunks
+    let finalDoc = firstHalf + CONTEXT_SEPARATOR + chunks.join(CONTEXT_SEPARATOR);
+
+    // Final trim if we somehow exceeded length due to rounding/logic or separators
+    if (finalDoc.length > Documentation.MAX_LENGTH) {
+      finalDoc = finalDoc.slice(0, Documentation.MAX_LENGTH);
     }
-    
-    return null;
-  } catch (error) {
-    console.warn('Failed to extract OpenAPI URL:', error?.message);
-    return null;
+
+    return finalDoc;
+  }
+
+
+  // --- Main Method using Strategies ---
+  async fetch(): Promise<string> {
+    if (this.lastResult) {
+      return this.postProcess(this.lastResult);
+    }
+
+    const fetchingStrategies: FetchingStrategy[] = [
+      new RawContentStrategy(),
+      new GraphQLStrategy(),
+      new PlaywrightFetchingStrategy()
+    ];
+
+    const processingStrategies: ProcessingStrategy[] = [
+      new OpenApiStrategy(),
+      new HtmlMarkdownStrategy(),
+      new RawPageContentStrategy()
+    ];
+
+    let rawResult: string | null = null;
+
+    for (const strategy of fetchingStrategies) {
+      const result = await strategy.tryFetch(this.config);
+      if (result == null || result.length === 0) {
+        continue;
+      }
+      rawResult = result;
+      break;
+    }
+
+    if(!rawResult) {
+      return "";  
+    }
+
+    for (const strategy of processingStrategies) {
+      const result = await strategy.tryProcess(rawResult, this.config);
+      if (result == null || result.length === 0) {
+        continue;
+      }
+      this.lastResult = this.postProcess(result);
+      return this.lastResult;
+    }
+
+    return "";
   }
 }
 
-async function getOpenApiJsonFromUrl(openApiUrl: string, documentationUrl: string): Promise<string | null> {
-  try {
-    // Determine the full URL based on whether it's relative or absolute
-    const fullOpenApiUrl = openApiUrl.startsWith('http') 
-      ? openApiUrl 
-      : new URL(openApiUrl, documentationUrl).toString();
+// --- Concrete Strategy Implementations ---
 
-    const openApiResponse = await axios.get(fullOpenApiUrl);
-    const openApiData = openApiResponse.data;
-    if (openApiData) {
-      const openApiJson = typeof openApiData === 'object' 
-        ? openApiData 
-        : JSON.parse(openApiData);
-
-      if (openApiJson && !openApiJson.openapi) {
-        console.warn('Fetched JSON does not appear to be a valid OpenAPI document (missing "openapi" key)');
+class RawContentStrategy implements FetchingStrategy {
+  async tryFetch(config: ApiInput): Promise<string | null> {
+    if (!config.documentationUrl?.startsWith("http")) {
+      // It's raw content passed directly in the URL field
+      if(config.documentationUrl && config.documentationUrl.length > 0) { 
+        return config.documentationUrl;
       }
-      return openApiJson;
+      return null;
     }
-  } catch (error) {
-    console.warn(`Failed to fetch OpenAPI JSON from ${openApiUrl}:`, error?.message);
+    return null; // Not applicable
   }
-  return null;
 }
 
-export function postProcessLargeDoc(documentation: string, endpointPath: string): string {
-  const MIN_INITIAL_CHUNK = 20000;
-  const MAX_INITIAL_CHUNK = 40000;
-  const CONTEXT_SIZE = 10000;
-  const CONTEXT_SEPARATOR = "\n\n";
-  const MIN_SEARCH_TERM_LENGTH = 3;
-  if (documentation.length <= DOCUMENTATION_MAX_LENGTH) {
-    return documentation;
-  }
+class GraphQLStrategy implements FetchingStrategy {
+  private async fetchGraphQLSchema(url: string, config: ApiInput): Promise<any | null> {
+    const introspectionQuery = getIntrospectionQuery();
 
-  // Extract search term from endpoint
-  let searchTerm = endpointPath ? endpointPath.startsWith('/') ? endpointPath.slice(1).toLowerCase() : endpointPath.toLowerCase() : endpointPath;
-  searchTerm = searchTerm ? String(searchTerm).trim() : '';
-  const docLower = documentation.toLowerCase();
-
-  if (!endpointPath || searchTerm.length < MIN_SEARCH_TERM_LENGTH) {
-    return documentation.slice(0, DOCUMENTATION_MAX_LENGTH);
-  }
-
-  // Find all occurrences of the search term
-  const positions: number[] = [];
-
-  // Fix the authorization search to properly find all relevant authorization terms
-  let authPosSecuritySchemes = docLower.indexOf("securityschemes");
-  if (authPosSecuritySchemes !== -1) {
-    positions.push(authPosSecuritySchemes);
-  }
-  let authPosAuthorization = docLower.indexOf("authorization");
-  if (authPosAuthorization !== -1) {
-    positions.push(authPosAuthorization);
-  }
-
-  let pos = docLower.indexOf(searchTerm);	
-  while (pos !== -1) {
-    positions.push(pos);
-    pos = docLower.indexOf(searchTerm, pos + 1);
-  }
-
-  // If no occurrences found return max doc length
-  if (positions.length === 0) {
-    return documentation.slice(0, DOCUMENTATION_MAX_LENGTH);
-  }
-
-  // Calculate non-overlapping context regions
-  type Region = { start: number; end: number };
-  const regions: Region[] = [];
-  // Sort positions to ensure we process them in order from start to end of document
-  positions.sort((a, b) => a - b);
-  
-  for (const pos of positions) {
-    const start = Math.max(0, pos - CONTEXT_SIZE);
-    const end = Math.min(documentation.length, pos + CONTEXT_SIZE);
-    // Check if this region overlaps with the last one
-    const lastRegion = regions[regions.length - 1];
-    if (lastRegion && start <= lastRegion.end) {
-      // Merge overlapping regions
-      lastRegion.end = Math.max(lastRegion.end, end);
-    } else {
-      regions.push({ start, end });
-    }
-  }
-
-  // Calculate total space needed for non-overlapping contexts
-  const totalContextSpace = regions.reduce((sum, region) => 
-    sum + (region.end - region.start), 0);
-  const separatorSpace = regions.length * CONTEXT_SEPARATOR.length;
-
-  // If contexts overlap significantly, we might have more space for initial chunk
-  const availableForInitial = DOCUMENTATION_MAX_LENGTH - (totalContextSpace + separatorSpace);
-  
-  // Use up to MAX_INITIAL_CHUNK if we have space due to overlapping contexts
-  const initialChunkSize = Math.max(
-    MIN_INITIAL_CHUNK,
-    Math.min(availableForInitial, MAX_INITIAL_CHUNK)
-  );
-
-  let finalDoc = documentation.slice(0, initialChunkSize);
-  let remainingLength = DOCUMENTATION_MAX_LENGTH - finalDoc.length;
-
-  // Add context for each non-overlapping region
-  for (const region of regions) {
-    if (remainingLength <= 0) break;
-
-    const context = documentation.slice(region.start, region.end);
-    
-    // Only add context if it's not already included and we have space
-    if (!finalDoc.includes(context) && (context.length + CONTEXT_SEPARATOR.length) <= remainingLength) {
-      finalDoc += CONTEXT_SEPARATOR + context;
-      remainingLength -= (context.length + CONTEXT_SEPARATOR.length);
-    }
-  }
-
-  return finalDoc;
-}
-
-export async function getDocumentation(documentationUrl: string, headers: Record<string, string>, queryParams: Record<string, string>, urlHost?: string, urlPath?: string): Promise<string> {
-    if(!documentationUrl) {
-      const fullUrl = composeUrl(urlHost, urlPath);
-      if(fullUrl.includes("graphql")) {
-        const graphqlDocumentation = await getGraphQLSchema(fullUrl, headers, queryParams);
-        if(graphqlDocumentation) {
-          return JSON.stringify(graphqlDocumentation); 
-        }
-      }
-      return "";
-    }
-    let documentation = "";
-    if(!documentationUrl.startsWith("http")) {
-      return documentationUrl;
-    }
-    
     try {
-      const browser = await getBrowser();
-      const context = await browser.newContext();
-      const page = await context.newPage();
+      const response = await axios.post(
+        url,
+        {
+          query: introspectionQuery,
+          operationName: 'IntrospectionQuery'
+        },
+        { headers: config.headers, params: config.queryParams }
+      );
 
-      if (headers) {
-        await context.setExtraHTTPHeaders(headers);
+      if (response.data.errors) {
+        console.warn(`GraphQL Introspection failed for ${url}: ${response.data.errors[0].message}`);
+        return null;
+      }
+      return response.data?.data?.__schema ?? null;
+    } catch (error) {
+      // Don't log warning here, as it's expected to fail if it's not a GQL endpoint
+      return null;
+    }
+  }
+  private isLikelyGraphQL(url: string, config: ApiInput): boolean {
+    if(!url) return false;
+    return url?.includes('graphql') ||
+           Object.values({...config.queryParams, ...config.headers})
+           .some(val => typeof val === 'string' && val.includes('IntrospectionQuery'));
+  }
+  async tryFetch(config: ApiInput): Promise<string | null> {
+    if (!config.urlHost.startsWith("http")) return null; // Needs a valid HTTP URL
+    const endpointUrl = composeUrl(config.urlHost, config.urlPath);
+
+    // Heuristic: Check path or query params typical for GraphQL
+    const urlIsLikelyGraphQL = this.isLikelyGraphQL(endpointUrl, config);
+    const docUrlIsLikelyGraphQL = this.isLikelyGraphQL(config.documentationUrl, config);
+
+    if (!urlIsLikelyGraphQL && !docUrlIsLikelyGraphQL) return null;
+
+    // Use the endpoint URL if it looks like GraphQL, otherwise use the documentation URL
+    const url = urlIsLikelyGraphQL ? endpointUrl : config.documentationUrl;
+
+    const schema = await this.fetchGraphQLSchema(url, config);
+    if (schema) {
+        return JSON.stringify(schema);
+    }
+    // Log if it looked like GQL but failed (fetchGraphQLSchema logs internal errors)
+    console.warn(`URL ${config.documentationUrl} looked like GraphQL but introspection failed or returned no schema.`);
+    return null;
+  }
+}
+
+// Special strategy solely responsible for fetching page content if needed
+export class PlaywrightFetchingStrategy implements FetchingStrategy {
+    // --- Static Helpers (accessible by strategies) ---
+    private static browserInstance: playwright.Browser | null = null;
+
+    private static async getBrowser(): Promise<playwright.Browser> {
+      if (!PlaywrightFetchingStrategy.browserInstance) {
+        PlaywrightFetchingStrategy.browserInstance = await playwright.chromium.launch();
+      }
+      return PlaywrightFetchingStrategy.browserInstance;
+    }
+  
+    static async closeBrowser(): Promise<void> {
+      if (PlaywrightFetchingStrategy.browserInstance) {
+        const closedInstance = PlaywrightFetchingStrategy.browserInstance;
+        PlaywrightFetchingStrategy.browserInstance = null;
+        await closedInstance.close();
+      }
+    }
+  private async fetchPageContentWithPlaywright(config: ApiInput): Promise<string | null> {
+
+    if (!config.documentationUrl?.startsWith("http")) {
+      return null;
+    }
+
+    let page: playwright.Page | null = null;
+    let browserContext: playwright.BrowserContext | null = null;
+    try {
+      const browser = await PlaywrightFetchingStrategy.getBrowser();
+      browserContext = await browser.newContext();
+
+      if (config.headers) {
+        await browserContext.setExtraHTTPHeaders(config.headers);
       }
 
-      const url = new URL(documentationUrl);
-      if (queryParams) {
-        Object.entries(queryParams).forEach(([key, value]) => {
+      const url = new URL(config.documentationUrl);
+      if (config.queryParams) {
+        Object.entries(config.queryParams).forEach(([key, value]) => {
           url.searchParams.append(key, value);
         });
       }
 
+      page = await browserContext.newPage();
       await page.goto(url.toString());
-      await page.waitForLoadState('domcontentloaded');
-      
-      // Remove common non-documentation elements
+      // Wait for network idle might be better for SPAs, but has risks of timeout
+      // Let's stick with domcontentloaded + short timeout
+      await page.waitForLoadState('domcontentloaded', { timeout: 15000 });
+      await page.waitForTimeout(1000); // Allow JS execution
+
       await page.evaluate(() => {
         const selectorsToRemove = [
-          'nav',
-          'header',
-          'footer',
-          '.nav',
-          '.navbar',
-          '.header',
-          '.footer',
-          '.cookie-banner',
-          '.cookie-consent',
-          '.cookies',
-          '#cookie-banner',
-          '.cookie-notice',
-          '.sidebar',
-          '.menu',
-          '[role="navigation"]',
-          '[role="banner"]',
-          '[role="contentinfo"]',
+          'nav', 'header', 'footer', '.nav', '.navbar', '.header', '.footer',
+          '.cookie-banner', '.cookie-consent', '.cookies', '#cookie-banner',
+          '.cookie-notice', '.sidebar', '.menu', '[role="navigation"]',
+          '[role="banner"]', '[role="contentinfo"]', 'script', 'style', // Also remove scripts/styles
         ];
-
         selectorsToRemove.forEach(selector => {
           document.querySelectorAll(selector).forEach(element => {
-            element.remove();
+             try { element.remove(); }
+             catch(e) { console.warn("Failed to remove element:", e?.message) }
           });
         });
       });
 
-      // Get the cleaned HTML content
-      const docData = await page.content();
-
-      await page.close();
-      await context.close();
-      
-      if (docData.toLowerCase().slice(0, 200).includes("<html")) {
-        documentation = NodeHtmlMarkdown.translate(docData);
-        
-        const openApiUrl = extractOpenApiUrl(docData);
-        if (openApiUrl) {
-          const openApiJson = await getOpenApiJsonFromUrl(openApiUrl, documentationUrl);
-          if (openApiJson) {
-            documentation = [JSON.stringify(openApiJson), documentation].join("\n\n");
-          }
-        }
-      }
-      
-      if(!documentation && docData) {
-        documentation = docData;
-      }
-
-      // If the documentation contains GraphQL, fetch the schema and add it to the documentation
-      if(documentationUrl.includes("graphql") || documentation.toLowerCase().includes("graphql")) {
-        const graphqlDocumentation = await getGraphQLSchema(documentationUrl, headers, queryParams);
-        if(graphqlDocumentation) {
-          documentation = [JSON.stringify(graphqlDocumentation), documentation].join("\n\n"); 
-        }
-      }
+      const content = await page.content();
+      return content;
     } catch (error) {
-      console.warn(`Failed to fetch documentation from ${documentationUrl}:`, error?.message);
+      console.warn(`Playwright fetch failed for ${config.documentationUrl}:`, error?.message);
+      return null;
+    } finally {
+       if (page) await page.close();
+       if (browserContext) await browserContext.close();
     }
+  }
 
-    if(documentation.length > DOCUMENTATION_MAX_LENGTH) {
-      documentation = postProcessLargeDoc(documentation, urlPath || '');
-    }
-
-    return documentation;
+  async tryFetch(config: ApiInput): Promise<string | null> {
+    // Only fetch if it's an HTTP URL and content hasn't been fetched yet
+    const content = await this.fetchPageContentWithPlaywright(config);
+    if(!content) return null;
+    return content;
+  }
 }
-  
 
-async function getGraphQLSchema(documentationUrl: string, headers?: Record<string, string>, queryParams?: Record<string, string>) {
-    // The standard introspection query
-  const introspectionQuery = getIntrospectionQuery();
+class OpenApiStrategy implements ProcessingStrategy {
+  private extractOpenApiUrl(html: string): string | null {
+    try {
+      // First try to match based on swagger settings
+      const settingsMatch = html.match(/<script[^>]*id=["']swagger-settings["'][^>]*>([\s\S]*?)<\/script>/i);
+      if (settingsMatch && settingsMatch[1]) {
+        const settingsContent = settingsMatch[1].trim();
+        try {
+          const settings = JSON.parse(settingsContent);
+          if (settings.url && typeof settings.url === 'string') {
+            return settings.url;
+          }
+        } catch (e) {
+           console.warn('Failed to parse swagger settings JSON:', e?.message);
+        }
+      }
 
-  try {
-      const response = await axios.post(
-        documentationUrl,
-        {
-        query: introspectionQuery,
-        operationName: 'IntrospectionQuery'
-        },
-        { headers, params: queryParams }
-      );
+      // Fallback: look for JSON with a url property pointing to openapi/swagger spec
+      const jsonMatch = html.match(/{\s*"url"\s*:\s*"([^"]*(?:openapi|swagger|spec)\.(?:json|yaml|yml))"/i);
+      if (jsonMatch && jsonMatch[1]) {
+        return jsonMatch[1];
+      }
+      // Fallback: look for a slightly different JSON structure often used
+      const jsonMatch2 = html.match(/url:\s*"([^"]*(?:openapi|swagger|spec)\.(?:json|yaml|yml))"/i);
+       if (jsonMatch2 && jsonMatch2[1]) {
+           return jsonMatch2[1];
+       }
 
-      if (response.data.errors) {
-        throw new Error(`GraphQL Introspection failed: ${response.data.errors[0].message}`);
+      // find direct references to common spec file names within quotes
+      const directUrlMatch = html.match(/["']((?:https?:\/\/|\/)[^"']*(?:openapi|swagger)\.(?:json|yaml|yml))["']/i);
+      if (directUrlMatch && directUrlMatch[1]) {
+        return directUrlMatch[1];
+      }
+
+       // find references in script blocks that might assign the URL to a variable
+       const scriptVarMatch = html.match(/url\s*=\s*["']([^"']*(?:openapi|swagger)\.(?:json|yaml|yml))["']/i);
+       if (scriptVarMatch && scriptVarMatch[1]) {
+           return scriptVarMatch[1];
+       }
+
+
+      return null;
+    } catch (error) {
+      console.warn('Failed to extract OpenAPI URL:', error?.message);
+      return null;
     }
+  }
+  private async fetchOpenApiFromUrl(openApiUrl: string, config: ApiInput): Promise<string | null> {
+    try {
+      if(openApiUrl.startsWith("/")) {
+        const baseUrl = config.documentationUrl ? new URL(config.documentationUrl).host : config.urlHost;
+        openApiUrl = composeUrl(baseUrl, openApiUrl);
+      }
+      const openApiResponse = await axios.get(openApiUrl, { headers: config.headers });
+      const openApiData = openApiResponse.data;
 
-      return response.data.data.__schema;
-  } catch (error) {
-    console.error('Failed to fetch GraphQL schema:', error);
+      if (!openApiData) return null;
+
+      if (typeof openApiData === 'object' && openApiData !== null) {
+        if (openApiData.openapi || openApiData.swagger) {
+          return JSON.stringify(openApiData);
+        } else {
+          console.warn(`Fetched object from ${openApiUrl} but doesn't look like OpenAPI/Swagger.`);
+          return JSON.stringify(openApiData);
+        }
+      } else if (typeof openApiData === 'string') {
+         try {
+           const parsed = JSON.parse(openApiData);
+           if (parsed && (parsed.openapi || parsed.swagger)) {
+             return openApiData; // Valid JSON spec
+           }
+         } catch (e) { /* ignore */ }
+         const trimmedData = openApiData.trim();
+         if (trimmedData.startsWith('openapi:') || trimmedData.startsWith('swagger:')) {
+            return openApiData; // Likely YAML spec
+         }
+         console.warn(`Content from ${openApiUrl} is a string but not identifiable as JSON or YAML OpenAPI/Swagger.`);
+         return openApiData; // Return raw string as fallback
+      }
+
+      console.warn(`Unexpected data type received from ${openApiUrl}: ${typeof openApiData}`);
+      return null;
+
+    } catch (error) {
+      console.warn(`Failed to fetch or process OpenAPI spec from ${openApiUrl}:`, error?.message);
+      return null;
+    }
+  }
+
+  async tryProcess(content: string, config: ApiConfig): Promise<string | null> {
+    // Needs page content fetched by PlaywrightFetchingStrategy (or null if fetch failed)
+    if (content === undefined || content === null) {
+      return null;
+    }
+    const trimmedContent = content.trim();
+    const isJson = trimmedContent.startsWith('{') && trimmedContent.endsWith('}');
+    const isYaml = trimmedContent.startsWith('openapi:') || trimmedContent.startsWith('swagger:');
+    const isHtml = trimmedContent.slice(0, 500).toLowerCase().includes("<html");
+    if (isJson) {
+       try {
+          const parsed = JSON.parse(trimmedContent);
+          if (parsed && (parsed.openapi || parsed.swagger)) {
+             return trimmedContent; // Content is a valid JSON spec
+          }
+       } catch(e) { /* ignore parse error */ }
+    } 
+    if (isYaml) {
+       // Basic check is enough for YAML start
+       return trimmedContent; // Content is likely a YAML spec
+    }
+    if(isHtml) {
+      const openApiUrl = this.extractOpenApiUrl(content);
+      if(!openApiUrl) return null;
+
+      const openApiSpec = await this.fetchOpenApiFromUrl(openApiUrl, config);
+      if(!openApiSpec) return null;
+
+      const markdownContent = await new HtmlMarkdownStrategy().tryProcess(content, config);
+      return `${openApiSpec}\n\n${markdownContent === null ? content : markdownContent}`;
+    }
     return null;
   }
 }
 
-// For testing purposes and cleanup
-export async function closeBrowser() {
-  if (browserInstance) {
-    const closedInstance = browserInstance;
-    browserInstance = null;
-    await closedInstance.close();
+class HtmlMarkdownStrategy implements ProcessingStrategy {
+  async tryProcess(content: string, config: ApiConfig): Promise<string | null> {
+     // Needs page content fetched by PlaywrightFetchingStrategy
+     if (content === undefined || content === null) {
+       return null;
+     }
+     // Only apply if content looks like HTML
+     if (!content.slice(0, 500).toLowerCase().includes("<html")) {
+        return null;
+     }
+
+     try {
+       // Use NodeHtmlMarkdown, assuming it handles potential errors
+       return NodeHtmlMarkdown.translate(content);
+     } catch (translateError) {
+       console.warn("Failed to translate HTML to Markdown:", translateError?.message);
+       return null; // Failed translation, let RawPageContentStrategy handle it
+     }
+  }
+}
+
+class RawPageContentStrategy implements ProcessingStrategy {
+  async tryProcess(content: string, config: ApiConfig): Promise<string | null> {
+    // This is the final fallback if content was fetched but not processed by other strategies
+    if (content) {
+      return content;
+    }
+    return null; // No content was fetched or available
   }
 }

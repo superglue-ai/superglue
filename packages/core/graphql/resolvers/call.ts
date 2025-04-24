@@ -1,13 +1,14 @@
 import { ApiConfig, ApiInputRequest, CacheMode, Context, Metadata, RequestOptions, TransformConfig } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import OpenAI from "openai";
-import { callEndpoint, prepareEndpoint } from "../../utils/api.js";
+import { callEndpoint, generateApiConfig } from "../../utils/api.js";
 import { telemetryClient } from "../../utils/telemetry.js";
-import { applyJsonataWithValidation, composeUrl, maskCredentials, TransformResult } from "../../utils/tools.js";
+import { applyJsonataWithValidation, maskCredentials, TransformResult } from "../../utils/tools.js";
 import { prepareTransform } from "../../utils/transform.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 import { callPostgres } from "../../utils/postgres.js";
 import { logMessage } from "../../utils/logs.js";
+import { Documentation } from "../../utils/documentation.js";
 
 // TODO: This is in dire need for refactoring and proper testing
 
@@ -44,6 +45,7 @@ export const callResolver = async (
     let response: any;
     let retryCount = 0;
     let lastError: string | null = null;
+    let documentation: Documentation;
     do {
       try {
         let didReadFromCache = false;
@@ -52,10 +54,17 @@ export const callResolver = async (
             await context.datastore.getApiConfigFromRequest(input.endpoint, payload, context.orgId) 
           didReadFromCache = true;
         }
+
+        if(!documentation) {
+          documentation = new Documentation({ documentationUrl: input.endpoint?.documentationUrl, urlHost: input.endpoint?.urlHost, instruction: '' });
+        }
+
         if(!didReadFromCache || !preparedEndpoint) {
-          const result = await prepareEndpoint(preparedEndpoint || input.endpoint, payload, credentials, metadata, retryCount, messages);
-          preparedEndpoint = result.config;
-          messages = result.messages;
+          logMessage('info', `Generating API config for ${input.endpoint?.urlHost}${retryCount > 0 ? ` (retry ${retryCount})` : ""}`, metadata);      
+          const documentationString = await documentation.fetch();
+          const computedApiCallConfig = await generateApiConfig(input.endpoint, documentationString, payload, credentials, retryCount, messages);      
+          preparedEndpoint = computedApiCallConfig.config;
+          messages = computedApiCallConfig.messages;
         }
 
         if(!preparedEndpoint) {
@@ -74,7 +83,6 @@ export const callResolver = async (
           response = null;
           throw new Error("No data returned from API. This could be due to a configuration error.");
         }
-
 
       } catch (error) {
         const rawErrorString = error?.message || JSON.stringify(error || {});
