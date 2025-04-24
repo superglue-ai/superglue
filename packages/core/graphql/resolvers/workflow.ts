@@ -1,5 +1,5 @@
 import type { GraphQLResolveInfo } from "graphql";
-import { WorkflowExecutor } from "../../workflow/workflow.js";
+import { WorkflowExecutor } from "../../workflow/workflow-executor.js";
 import { Context, Metadata, RequestOptions, Workflow, WorkflowResult } from "@superglue/shared";
 import { createHash } from "crypto";
 
@@ -18,7 +18,7 @@ interface ExecuteWorkflowArgs {
 }
 
 
-export const workflowResolver = async (
+export const executeWorkflowResolver = async (
   _: unknown,
   args: ExecuteWorkflowArgs,
   context: Context,

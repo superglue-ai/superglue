@@ -226,7 +226,7 @@ export interface WorkflowResult {
   completedAt: Date;
 }
 
-export interface Workflow {
+export interface Workflow extends BaseConfig {
   id: string; 
   steps: ExecutionStep[];
   finalTransform?: string;
