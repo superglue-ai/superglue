@@ -254,9 +254,9 @@ ${apiConfig.dataPath ? `Data Path: ${apiConfig.dataPath}` : ''}
 ${apiConfig.pagination ? `Pagination: ${JSON.stringify(apiConfig.pagination)}` : ''}
 ${apiConfig.method ? `Method: ${apiConfig.method}` : ''}
 
-Available credential variables: ${Object.keys(credentials).join(", ")}
-Available payload variables: ${Object.keys(payload).join(", ")}
-Example payload: ${JSON.stringify(payload)}
+Available credential variables: ${Object.keys(credentials || {}).join(", ")}
+Available payload variables: ${Object.keys(payload || {}).join(", ")}
+Example payload: ${JSON.stringify(payload || {})}
 
 Documentation: ${String(documentation)}`;
 
