@@ -1,10 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { prepareExtract, callExtract, processFile } from './extract.js';
+import { callExtract, generateExtractConfig, processFile } from './extract.js';
 import { callAxios } from './tools.js';
-import { getDocumentation } from './documentation.js';
 import { decompressData, parseFile } from './file.js';
 import { DecompressionMethod, FileType, AuthType, HttpMethod } from '@superglue/shared';
-
+import { Documentation } from './documentation.js';
 // Mock dependencies
 vi.mock('./documentation.js');
 vi.mock('./file.js');
@@ -41,28 +40,19 @@ describe('Extract Utils', () => {
   });
 
   describe('prepareExtract', () => {
-    it('should prepare extract config with documentation', async () => {
+    it('should prepare extract config', async () => {
       const mockDocumentation = 'API documentation';
-      (getDocumentation as any).mockResolvedValue(mockDocumentation);
       
       const extractInput = {
         documentationUrl: 'https://docs.example.com',
         instruction: 'Fetch user data',
         urlHost: 'https://api.example.com'
       };
-
-      const result = await prepareExtract(extractInput, {}, {});
+      const result = await generateExtractConfig(extractInput, mockDocumentation, {}, {});
 
       expect(result).toHaveProperty('createdAt');
       expect(result).toHaveProperty('updatedAt');
       expect(result.urlHost).toBe('https://api.example.com');
-      expect(getDocumentation).toHaveBeenCalledWith(
-        extractInput.documentationUrl,
-        undefined,
-        undefined,
-        extractInput.urlHost,
-        undefined
-      );
     });
   });
 

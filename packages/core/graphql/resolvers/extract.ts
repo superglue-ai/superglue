@@ -1,11 +1,12 @@
 import { CacheMode, Context, DecompressionMethod, ExtractConfig, ExtractInputRequest, FileType, RequestOptions } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
-import { callExtract, prepareExtract, processFile } from "../../utils/extract.js";
+import { callExtract, processFile, generateExtractConfig } from "../../utils/extract.js";
 import { telemetryClient } from "../../utils/telemetry.js";
 import { maskCredentials } from "../../utils/tools.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 import { logMessage } from "../../utils/logs.js";
 import { Metadata } from "openai/resources/index.mjs";
+import { Documentation } from "../../utils/documentation.js";
 
 export const extractResolver = async (
   _: any,
@@ -56,7 +57,10 @@ export const extractResolver = async (
           await context.datastore.getExtractConfigFromRequest(input.endpoint, payload, context.orgId) 
           : null;
         if(!preparedExtract) {
-          preparedExtract = await prepareExtract(input.endpoint, payload, credentials, lastError);
+          const documentation = new Documentation(preparedExtract);
+          const documentationString = await documentation.fetch();
+          preparedExtract = await generateExtractConfig(preparedExtract, documentationString, payload, credentials, lastError);
+      
         }
         try {
           const buffer = await callExtract(preparedExtract, payload, credentials, options);

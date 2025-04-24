@@ -3,39 +3,11 @@ import type { AxiosRequestConfig } from "axios";
 import OpenAI from "openai";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { getDocumentation } from "./documentation.js";
 import { callAxios, composeUrl, replaceVariables } from "./tools.js";
 import { API_PROMPT } from "../llm/prompts.js";
 import { logMessage } from "./logs.js";
 import { parseXML } from "./file.js";
 import { LanguageModel } from "../llm/llm.js";
-
-export async function prepareEndpoint(
-  endpointInput: ApiInput, 
-  payload: any, 
-  credentials: any, 
-  metadata: Metadata,
-  retryCount: number = 0,
-  messages: OpenAI.Chat.ChatCompletionMessageParam[] = []
-): Promise<{ config: ApiConfig; messages: OpenAI.Chat.ChatCompletionMessageParam[] }> {
-    // Set the current timestamp
-    const currentTime = new Date();
-
-    // Initialize the ApiCallConfig object with provided input
-    const apiCallConfig: Partial<ApiConfig> = { 
-      ...endpointInput,
-      createdAt: currentTime,
-      updatedAt: currentTime,
-      id: crypto.randomUUID()
-    };
-    logMessage('info', `Generating API config for ${endpointInput.urlHost}${retryCount > 0 ? ` (retry ${retryCount})` : ""}`, metadata);
-
-    const documentation = await getDocumentation(apiCallConfig.documentationUrl, apiCallConfig.headers, apiCallConfig.queryParams, apiCallConfig?.urlHost, apiCallConfig?.urlPath);
-
-    const computedApiCallConfig = await generateApiConfig(apiCallConfig, documentation, payload, credentials, retryCount, messages);
-    
-    return computedApiCallConfig;
-}
 
 export function convertBasicAuthToBase64(headerValue: string){
     if(!headerValue) return headerValue;
@@ -318,10 +290,17 @@ Documentation: ${String(documentation)}`;
       responseMapping: apiConfig.responseMapping,
       createdAt: apiConfig.createdAt || new Date(),
       updatedAt: new Date(),
-      id: apiConfig.id,
+      id: apiConfig.id || generateId(generatedConfig),
     } as ApiConfig,
     messages: updatedMessages
   };
+}
+
+function generateId(config: ApiInput) {
+  const domain = config?.urlHost?.replace(/^https?:\/\//, '') || 'api';
+  const lastPath = config?.urlPath?.split('/').filter(Boolean).pop() || '';
+  const rand = Math.floor(1000 + Math.random() * 9000);
+  return `${domain}-${lastPath}-${rand}`;
 }
 
 function validateVariables(generatedConfig: any, vars: string[]) {
