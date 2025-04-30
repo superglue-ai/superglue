@@ -16,8 +16,6 @@ What superglue does under the hood:
 
 superglue uses LLMs only during configuration setup and transformation rule creation, making the glueing process deterministic and extremely efficient in terms of latency and cost.
 
-If you’re spending a lot of time writing code connecting to weird APIs, fumbling with custom fields in foreign language ERPs, mapping JSONs, extracting data from compressed CSVs sitting on FTP servers, and making sure your integrations don’t break when something unexpected comes through, superglue might be for you.
-
 <div align="center">
 
 [![GitHub](https://img.shields.io/github/license/superglue-ai/superglue?style=flat-square)](https://github.com/superglue-ai/superglue/blob/main/LICENSE)
@@ -34,7 +32,7 @@ If you’re spending a lot of time writing code connecting to weird APIs, fumbli
 ## quick start
 ### hosted version
 
-1. Sign up for early access to the hosted version of superglue at [superglue.ai](https://superglue.ai)
+1. Run on our [cloud-hosted version](https://superglue.ai)
 
 2. Install the superglue js/ts client:
 ```bash
