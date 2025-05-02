@@ -30,10 +30,15 @@ const LOGS_SUBSCRIPTION = gql`
   }
 `
 
+const LOG_MIN_WIDTH = 500;
+const LOG_MAX_WIDTH = 1500;
+const LOG_COLLAPSED_WIDTH = 50;
+
 export function LogSidebar() {
   const [isExpanded, setIsExpanded] = useState(false)
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [hasNewLogs, setHasNewLogs] = useState(false)
+  const [logViewWidth, setLogViewWidth] = useState(LOG_MIN_WIDTH); // Initial width when expanded
   const config = useConfig();
   
   const client = useMemo(() => {
@@ -105,12 +110,33 @@ export function LogSidebar() {
     }
   }, [isExpanded]);
 
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent text selection
+    const startX = e.clientX;
+  
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const newWidth = logViewWidth + (startX - moveEvent.clientX);
+      if (LOG_MAX_WIDTH >= newWidth && newWidth >= LOG_MIN_WIDTH) { 
+        setLogViewWidth(newWidth); 
+      }else if (newWidth > LOG_MAX_WIDTH){
+        setLogViewWidth(LOG_MAX_WIDTH);
+      }else{
+        setLogViewWidth(LOG_MIN_WIDTH);
+      }
+    };
+  
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
   return (
     <motion.div
-      animate={{ width: isExpanded ? 400 : 50 }}
-      onAnimationComplete={(definition) => {
-        document.documentElement.style.setProperty('--log-sidebar-width', `${typeof definition === 'object' && 'width' in definition ? definition.width : isExpanded ? 400 : 50}px`)
-      }}
+      animate={{ width: isExpanded ? Math.max(logViewWidth, LOG_MIN_WIDTH) : LOG_COLLAPSED_WIDTH }}
       className="border-l border-border bg-background flex flex-col relative"
     >
       <div className={`m-2 max-w-full ${isExpanded ? 'h-12' : 'h-24'}`}>
@@ -134,28 +160,36 @@ export function LogSidebar() {
       </div>
 
       {isExpanded && (
-        <ScrollArea className="max-w-full block">
-          <div className="p-4 max-w-[100%-5rem]">
-            {logs.map((log) => (
-              <div
-                key={log.id}
-                className={`mb-2 p-2 rounded text-sm max-w-full  overflow-hidden ${
-                  log.level === "ERROR"
-                    ? "bg-red-500/10"
-                    : log.level === "WARN"
-                    ? "bg-yellow-500/10"
-                    : "bg-muted"
-                }`}
-              >
-                <div className="flex justify-between">
-                  <span className="font-mono">{new Date(log.timestamp).toLocaleTimeString()}</span>
-                  <span className="font-semibold">{log.level}</span>
+        <>
+          <ScrollArea className="max-w-full block">
+            <div className="p-4 max-w-[100%-5rem]">
+              {logs.map((log) => (
+                <div
+                  key={log.id}
+                  className={`mb-2 p-2 rounded text-sm max-w-full overflow-hidden ${
+                    log.level === "ERROR"
+                      ? "bg-red-500/10"
+                      : log.level === "WARN"
+                      ? "bg-yellow-500/10"
+                      : "bg-muted"
+                  }`}
+                >
+                  <div className="flex justify-between">
+                    <span className="font-mono">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                    <span className="font-semibold">{log.level}</span>
+                  </div>
+                  <p className="max-w-full break-words">{log.message}</p>
                 </div>
-                <p className="max-w-full text-wrap">{log.message}</p>
-              </div>
-            ))}
+              ))}
+            </div>
+          </ScrollArea>
+          <div
+            onMouseDown={handleMouseDown}
+            className="absolute left-0 top-0 h-full w-2 cursor-col-resize bg-transparent"
+            style={{ border: 'none', outline: 'none' }}
+          >
           </div>
-        </ScrollArea>
+        </>
       )}
     </motion.div>
   )
