@@ -1,4 +1,4 @@
-import type { DataStore, Metadata, TransformConfig, TransformInput } from "@superglue/shared";
+import type { DataStore, Metadata, TransformConfig } from "@superglue/shared";
 import { createHash } from "node:crypto";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { PROMPT_MAPPING } from "../llm/prompts.js";
@@ -9,7 +9,7 @@ import { LanguageModel } from "../llm/llm.js";
 export async function prepareTransform(
     datastore: DataStore,
     fromCache: boolean,
-    input: TransformInput,
+    input: TransformConfig,
     data: any,
     lastError: string | null,
     metadata: Metadata
@@ -29,7 +29,7 @@ export async function prepareTransform(
 
     // Check if the transform config is cached
     if(fromCache) {
-      const cached = await datastore.getTransformConfigFromRequest(input as TransformInput, data, metadata.orgId);
+      const cached = await datastore.getTransformConfig(input.id, metadata.orgId);
       if (cached) return { ...cached, ...input };
     }
 

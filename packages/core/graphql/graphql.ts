@@ -3,7 +3,7 @@ import fs from "node:fs";
 import { callResolver } from "./resolvers/call.js";
 import { deleteApiResolver, deleteExtractResolver, deleteTransformResolver } from "./resolvers/delete.js";
 import { extractResolver } from "./resolvers/extract.js";
-import { generateSchemaResolver } from "./resolvers/generate.js";
+import { generateInstructionsResolver, generateSchemaResolver } from "./resolvers/generate.js";
 import { getApiResolver, getExtractResolver, getRunResolver, getTransformResolver } from "./resolvers/get.js";
 import { listApisResolver, listExtractsResolver, listRunsResolver, listTransformsResolver } from "./resolvers/list.js";
 import { JSONResolver, JSONSchemaResolver, JSONataResolver } from "./resolvers/scalars.js";
@@ -35,6 +35,7 @@ export const resolvers = {
     getTenantInfo: getTenantInfoResolver,
     getWorkflow: getWorkflowResolver,
     listWorkflows: listWorkflowsResolver,
+    generateInstructions: generateInstructionsResolver,
   },
   Mutation: {
     setTenantInfo: setTenantInfoResolver,

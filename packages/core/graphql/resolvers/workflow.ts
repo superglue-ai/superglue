@@ -37,6 +37,9 @@ export const executeWorkflowResolver = async (
   try {
     const workflow: Workflow = args.input.workflow ||
       await context.datastore.getWorkflow(args.input.id, context.orgId);
+    if(!workflow) {
+      throw new Error("Workflow not found");
+    }
     runId = crypto.randomUUID();
     metadata = { orgId: context.orgId, runId: runId };
     const executor = new WorkflowExecutor(workflow, metadata);
@@ -106,7 +109,9 @@ export const getWorkflowResolver = async (_: unknown, { id }: { id: string }, co
 
   try {
     const workflow = await context.datastore.getWorkflow(id, context.orgId);
-
+    if(!workflow) {
+      throw new Error("Workflow not found");
+    }
     // for each step, make sure that the apiConfig has an id. if not, set it to the step id
     workflow.steps.forEach((step: any) => {
       if (!step.apiConfig.id) {
@@ -153,8 +158,8 @@ export const buildWorkflowResolver = async (
 
     // Validate systems structure (basic validation, could be more robust)
     systems.forEach((sys, index) => {
-      if (!sys.id || !sys.urlHost || !sys.credentials) {
-        throw new Error(`Invalid system definition at index ${index}: 'id', 'urlHost', and 'credentials' are required.`);
+      if (!sys.id || !sys.urlHost) {
+        throw new Error(`Invalid system definition at index ${index}: 'id', and 'urlHost' are required.`);
       }
     });
 

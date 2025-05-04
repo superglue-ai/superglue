@@ -10,7 +10,7 @@ import {
   TableRow,
 } from "@/src/components/ui/table";
 import { RunResult } from '@superglue/client';
-import { useConfig } from '../app/config-context';
+import { useConfig } from '@/src/app/config-context';
 import { SuperglueClient } from '@superglue/client';
 
 const RunsTable = ({ id }: { id?: string }) => {

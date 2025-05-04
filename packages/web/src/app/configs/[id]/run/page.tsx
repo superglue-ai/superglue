@@ -1,6 +1,6 @@
 'use client'
 
-import { ApiPlayground } from "@/src/components/ApiPlayground";
+import { ApiPlayground } from "@/src/components/api/ApiPlayground";
 import { Button } from "@/src/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";

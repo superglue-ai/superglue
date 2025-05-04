@@ -1,6 +1,6 @@
 "use client"
 
-import { RunsTable } from "@/src/components/RunsTable";
+import { RunsTable } from "@/src/components/runs/RunsTable";
 import { Button } from "@/src/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";

@@ -53,8 +53,7 @@ export const extractResolver = async (
       }
       else {
         preparedExtract = readCache ? 
-          await context.datastore.getExtractConfig(input.id, context.orgId) || 
-          await context.datastore.getExtractConfigFromRequest(input.endpoint, payload, context.orgId) 
+          await context.datastore.getExtractConfig(input.id, context.orgId)
           : null;
         if(!preparedExtract) {
           const documentation = new Documentation(preparedExtract, metadata);
@@ -84,11 +83,7 @@ export const extractResolver = async (
 
     // Save configuration if requested
     if(writeCache) {
-      if(input.id || preparedExtract.id) {
-        context.datastore.upsertExtractConfig(input.id || preparedExtract.id, preparedExtract, context.orgId);
-      } else {
-        context.datastore.saveExtractConfig(input.endpoint, payload, preparedExtract, context.orgId);
-      }
+      context.datastore.upsertExtractConfig(input.id || preparedExtract.id, preparedExtract, context.orgId);
     }
     const completedAt = new Date();
 

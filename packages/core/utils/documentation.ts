@@ -4,27 +4,35 @@ import { NodeHtmlMarkdown } from "node-html-markdown";
 import playwright from '@playwright/test';
 import { composeUrl } from "./tools.js";
 import { LanguageModel } from "../llm/llm.js";
-import { ApiConfig, ApiInput, Metadata } from "@superglue/shared";
+import { ApiConfig, Metadata } from "@superglue/shared";
 import { logMessage } from "./logs.js";
 
 // Strategy Interface
 interface FetchingStrategy {
-  tryFetch(config: ApiInput, metadata: Metadata): Promise<string | null>;
+  tryFetch(config: DocumentationConfig, metadata: Metadata): Promise<string | null>;
 }
 interface ProcessingStrategy {
-  tryProcess(rawResult: string, config: ApiInput, metadata: Metadata): Promise<string | null>;
+  tryProcess(rawResult: string, config: DocumentationConfig, metadata: Metadata): Promise<string | null>;
+}
+
+export interface DocumentationConfig {
+  urlHost: string;
+  documentationUrl?: string;
+  urlPath?: string;
+  headers?: Record<string, string>;
+  queryParams?: Record<string, string>;
 }
 
 export class Documentation {
   private static MAX_LENGTH = Math.min(LanguageModel.contextLength - 50000, 200000);
 
   // Configuration stored per instance
-  private readonly config: ApiInput;
+  private readonly config: DocumentationConfig;
   private readonly metadata: Metadata;
 
   private lastResult: string | null = null;
 
-  constructor(config: ApiInput, metadata: Metadata) {
+  constructor(config: DocumentationConfig, metadata: Metadata) {
     this.config = config;
     this.metadata = metadata;
   }
@@ -130,7 +138,8 @@ export class Documentation {
     const fetchingStrategies: FetchingStrategy[] = [
       new RawContentStrategy(),
       new GraphQLStrategy(),
-      new PlaywrightFetchingStrategy()
+      new PlaywrightFetchingStrategy(),
+      new AxiosFetchingStrategy()
     ];
 
     const processingStrategies: ProcessingStrategy[] = [
@@ -171,7 +180,7 @@ export class Documentation {
 // --- Concrete Strategy Implementations ---
 
 class RawContentStrategy implements FetchingStrategy {
-  async tryFetch(config: ApiInput, metadata: Metadata): Promise<string | null> {
+  async tryFetch(config: ApiConfig, metadata: Metadata): Promise<string | null> {
     if (!config.documentationUrl?.startsWith("http")) {
       // It's raw content passed directly in the URL field
       if(config.documentationUrl && config.documentationUrl.length > 0) {
@@ -185,7 +194,7 @@ class RawContentStrategy implements FetchingStrategy {
 }
 
 class GraphQLStrategy implements FetchingStrategy {
-  private async fetchGraphQLSchema(url: string, config: ApiInput, metadata: Metadata): Promise<any | null> {
+  private async fetchGraphQLSchema(url: string, config: ApiConfig, metadata: Metadata): Promise<any | null> {
     const introspectionQuery = getIntrospectionQuery();
 
     try {
@@ -207,13 +216,13 @@ class GraphQLStrategy implements FetchingStrategy {
       return null;
     }
   }
-  private isLikelyGraphQL(url: string, config: ApiInput): boolean {
+  private isLikelyGraphQL(url: string, config: ApiConfig): boolean {
     if(!url) return false;
     return url?.includes('graphql') ||
            Object.values({...config.queryParams, ...config.headers})
            .some(val => typeof val === 'string' && val.includes('IntrospectionQuery'));
   }
-  async tryFetch(config: ApiInput, metadata: Metadata): Promise<string | null> {
+  async tryFetch(config: ApiConfig, metadata: Metadata): Promise<string | null> {
     if (!config.urlHost.startsWith("http")) return null; // Needs a valid HTTP URL
     const endpointUrl = composeUrl(config.urlHost, config.urlPath);
 
@@ -238,6 +247,27 @@ class GraphQLStrategy implements FetchingStrategy {
   }
 }
 
+export class AxiosFetchingStrategy implements FetchingStrategy {
+  async tryFetch(config: ApiConfig, metadata: Metadata): Promise<string | null> {
+    if (!config.documentationUrl?.startsWith("http")) return null;
+
+    try {
+      const url = new URL(config.documentationUrl);
+      if (config.queryParams) {
+        Object.entries(config.queryParams).forEach(([key, value]) => {
+          url.searchParams.append(key, value);
+        });
+      }
+      
+      const response = await axios.get(url.toString(), { headers: config.headers });
+      logMessage('info', `Successfully fetched content with axios for ${config.documentationUrl}`, metadata);
+      return response.data;
+    } catch (error) {
+      logMessage('warn', `Axios fetch failed for ${config.documentationUrl}: ${error?.message}`, metadata);
+      return null;
+    }
+  }
+}
 // Special strategy solely responsible for fetching page content if needed
 export class PlaywrightFetchingStrategy implements FetchingStrategy {
     // --- Static Helpers (accessible by strategies) ---
@@ -259,7 +289,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
         await closedInstance.close();
       }
     }
-  private async fetchPageContentWithPlaywright(config: ApiInput, metadata: Metadata): Promise<string | null> {
+  private async fetchPageContentWithPlaywright(config: ApiConfig, metadata: Metadata): Promise<string | null> {
 
     if (!config.documentationUrl?.startsWith("http")) {
       return null;
@@ -311,6 +341,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       logMessage('info', `Successfully fetched content for ${config.documentationUrl}`, metadata);
       return content;
     } catch (error) {
+      logMessage('warn', `Playwright fetch failed for ${config.documentationUrl}: ${error?.message}`, metadata);
       return null;
     } finally {
        if (page) await page.close();
@@ -318,7 +349,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     }
   }
 
-  async tryFetch(config: ApiInput, metadata: Metadata): Promise<string | null> {
+  async tryFetch(config: ApiConfig, metadata: Metadata): Promise<string | null> {
     // Only fetch if it's an HTTP URL and content hasn't been fetched yet
     // Pass metadata
     const content = await this.fetchPageContentWithPlaywright(config, metadata);
@@ -372,7 +403,7 @@ class OpenApiStrategy implements ProcessingStrategy {
       return null;
     }
   }
-  private async fetchOpenApiFromUrl(openApiUrl: string, config: ApiInput, metadata: Metadata): Promise<string | null> {
+  private async fetchOpenApiFromUrl(openApiUrl: string, config: ApiConfig, metadata: Metadata): Promise<string | null> {
     try {
       let absoluteOpenApiUrl = openApiUrl;
       if(openApiUrl.startsWith("/")) {
