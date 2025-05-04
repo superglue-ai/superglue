@@ -1,4 +1,4 @@
-import { ApiConfig, ApiInput, AuthType, HttpMethod, PaginationType } from '@superglue/shared';
+import { ApiConfig, AuthType, HttpMethod, PaginationType } from '@superglue/shared';
 import OpenAI from 'openai';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mocked } from 'vitest';
 import { callEndpoint, generateApiConfig } from './api.js';
@@ -27,11 +27,12 @@ describe('API Utilities', () => {
   });
 
   describe('prepareEndpoint', () => {
-    const testInput: ApiInput = {
+    const testInput: ApiConfig = {
       urlHost: 'https://api.example.com',
       urlPath: 'v1/test',
-      instruction: 'Test API call',
-      method: HttpMethod.GET
+      method: HttpMethod.GET,
+      id: 'test-uuid-1232-2532-3233',
+      instruction: 'Test API call'
     };
 
     beforeEach(() => {
@@ -66,7 +67,7 @@ describe('API Utilities', () => {
         urlPath: 'v1/test',
         method: HttpMethod.GET,
         authentication: AuthType.NONE,
-        id: expect.stringMatching(/^api.example.com-test-\d{4}$/),
+        id: expect.stringMatching("test-uuid-1232-2532-3233"),
         headers: { 'Content-Type': 'application/json' },
         createdAt: expect.any(Date),
         updatedAt: expect.any(Date)

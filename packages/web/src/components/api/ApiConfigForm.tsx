@@ -1,9 +1,9 @@
 'use client'
 
 import { useConfig } from '@/src/app/config-context';
-import ApiConfigIdEditModal from '@/src/components/ApiConfigIdEditModal';
-import { ApiPlayground } from '@/src/components/ApiPlayground';
-import JsonSchemaEditor from "@/src/components/JsonSchemaEditor";
+import ApiConfigIdEditModal from '@/src/components/api/ApiConfigIdEditModal';
+import { ApiPlayground } from '@/src/components/api/ApiPlayground';
+import JsonSchemaEditor from "@/src/components/utils/JsonSchemaEditor";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,7 +53,7 @@ import {
 } from "@/src/components/ui/tooltip";
 import { useToast } from "@/src/hooks/use-toast";
 import { isJsonEmpty } from '@/src/lib/client-utils';
-import { ApiConfig, ApiInput, AuthType, CacheMode, HttpMethod, PaginationType, SuperglueClient } from '@superglue/client';
+import { ApiConfig, AuthType, CacheMode, HttpMethod, PaginationType, SuperglueClient } from '@superglue/client';
 import { ArrowLeft, Info } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import React from 'react';
@@ -287,8 +287,9 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
     }
   };
 
-  const buildEndpointConfig = (formData: Record<string, any>): ApiInput => {
-    const config: ApiInput = {
+  const buildEndpointConfig = (formData: Record<string, any>): ApiConfig => {
+    const config: ApiConfig = {
+      id: formData.id,
       urlHost: formData.urlHost,
       instruction: formData.instruction,
       urlPath: formData.urlPath,
@@ -303,7 +304,7 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
       documentationUrl: formData.documentationUrl,
       pagination: formData.paginationType !== "auto" ? {
         type: formData.paginationType as PaginationType,
-        pageSize: parseInt(formData.pageSize) || null
+        pageSize: formData.pageSize || null
       } : null
     };
     return config;

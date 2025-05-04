@@ -28,8 +28,7 @@ export const transformResolver = async (
   try {
     // Transform response
     preparedTransform = readCache ? 
-      await context.datastore.getTransformConfig(input.id, context.orgId) || 
-      await context.datastore.getTransformConfigFromRequest(input.endpoint, data, context.orgId) 
+      await context.datastore.getTransformConfig(input.id, context.orgId)
     : null;
     preparedTransform = preparedTransform?.responseMapping ? preparedTransform : 
       await prepareTransform(context.datastore, readCache, preparedTransform || input.endpoint, data, null, { runId: callId, orgId: context.orgId });
@@ -53,11 +52,7 @@ export const transformResolver = async (
 
     // Save configuration if requested
     if(writeCache) {
-      if(input.id || preparedTransform.id) {
-        context.datastore.upsertTransformConfig(input.id || preparedTransform.id, preparedTransform, context.orgId);
-      } else {
-        context.datastore.saveTransformConfig(input.endpoint, data, preparedTransform, context.orgId);
-      }
+      context.datastore.upsertTransformConfig(input.id || preparedTransform.id, preparedTransform, context.orgId);
     }
     const completedAt = new Date();
 

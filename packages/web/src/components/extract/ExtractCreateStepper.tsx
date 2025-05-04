@@ -3,20 +3,20 @@
 import { useConfig } from '@/src/app/config-context'
 import { useToast } from '@/src/hooks/use-toast'
 import { findArraysOfObjects, inputErrorStyles, parseCredentialsHelper } from '@/src/lib/client-utils'
-import { cleanApiDomain, cn } from '@/src/lib/utils'
+import { cn } from '@/src/lib/utils'
 import { ApiConfig, AuthType, CacheMode, ExtractConfig, SuperglueClient, TransformConfig } from '@superglue/client'
 import { Copy, Download, Loader2, Terminal, Upload } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { Button } from '../ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
+import { Input } from '../ui/input'
+import { Label } from '../ui/label'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs"
+import { Textarea } from '../ui/textarea'
+import { HelpTooltip } from '../utils/HelpTooltip'
+import { API_CREATE_STEPS, StepIndicator, type StepperStep } from '../utils/StepIndicator'
 import { InteractiveExtractPlayground } from './InteractiveExtractPlayground'
-import { Button } from './ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
-import { Input } from './ui/input'
-import { Label } from './ui/label'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
-import { Textarea } from './ui/textarea'
-import { HelpTooltip } from './HelpTooltip'
-import { StepIndicator, type StepperStep } from './StepIndicator'
 
 interface ExtractCreateStepperProps {
   open: boolean
@@ -301,6 +301,7 @@ if (transformResult?.success) {
     // Call autofill endpoint
     const response = await superglueClient.extract({
       endpoint: {
+        id: formData.urlHost?.replace(/^https?:\/\//, '').replace(/\//g, '') + '-' + Math.floor(1000 + Math.random() * 9000),
         urlHost: formData.urlHost,
         ...(formData.urlPath ? { urlPath: formData.urlPath } : {}),
         ...(formData.documentationUrl ? { documentationUrl: formData.documentationUrl } : {}),
@@ -525,7 +526,7 @@ if (transformResult?.success) {
             </div>
           </DialogHeader>
 
-          <StepIndicator currentStep={step} />
+          <StepIndicator currentStep={step} steps={API_CREATE_STEPS} />
         </div>
 
         <div className="flex-1 overflow-y-auto px-1 min-h-0">
@@ -673,6 +674,18 @@ if (transformResult?.success) {
                     />
                   </div>
                   <div>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <Label htmlFor="auth">API Key or Token for Target API (Optional)</Label>
+                    <HelpTooltip text="Enter API key/token here, superglue figures out where to put it. Do not include prefixes like Bearer or Basic in the field." />
+                  </div>
+                  <Input
+                    id="auth"
+                    value={formData.auth.value}
+                    onChange={(e) => handleAuthChange(e.target.value)}
+                    placeholder="Enter your API key or token"
+                  />
+                </div>
+                  <div>
                     <div className="flex items-center gap-2 mb-1">
                       <Label htmlFor="documentationUrl">API Documentation (Optional)</Label>
                       <HelpTooltip text="Link to the API's documentation if available" />
@@ -722,32 +735,6 @@ if (transformResult?.success) {
                   </div>
                 </TabsContent>
               </Tabs>
-            </div>
-          )}
-
-          {step === 'auth' && (
-            <div className="space-y-6">
-              <div className="space-y-4 h-full">
-                <div>
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <Label htmlFor="auth">API Key or Token for Target API (Optional)</Label>
-                    <HelpTooltip text="Enter API key/token here, superglue figures out where to put it. Do not include prefixes like Bearer or Basic in the field." />
-                  </div>
-                  <Input
-                    id="auth"
-                    value={formData.auth.value}
-                    onChange={(e) => handleAuthChange(e.target.value)}
-                    placeholder="Enter your API key or token"
-                  />
-                </div>
-              </div>              
-              <div className="space-y-4 h-full">
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t" />
-                  </div>
-                </div>
-              </div>
             </div>
           )}
 

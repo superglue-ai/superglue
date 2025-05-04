@@ -119,61 +119,21 @@ export type RunResult = BaseResult & {
   config: ApiConfig | ExtractConfig | TransformConfig;
 };
 
-export type ApiInput = {
-  id?: string;
-  urlHost: string;
-  urlPath?: string;
-  queryParams?: Record<string, any>;
-  instruction: string;
-  method?: HttpMethod;
-  headers?: Record<string, any>;
-  body?: string;
-  documentationUrl?: string;
-  responseSchema?: JSONSchema;
-  responseMapping?: any;
-  authentication?: AuthType;
-  pagination?: Pagination;
-  dataPath?: string;
-  version?: string;
-};
-
 export type ApiInputRequest = {
   id?: string;
-  endpoint: ApiInput;
+  endpoint?: ApiConfig;
 };
 
 export type ExtractInputRequest = {
   id?: string;
-  endpoint: ExtractInput;
+  endpoint?: ExtractConfig;
   file?: Promise<FileUpload>;
 };
 
 export type TransformInputRequest = {
   id?: string;
-  endpoint?: TransformInput;
-};
-
-export type ExtractInput = {
-  id?: string;
-  urlHost: string;
-  urlPath?: string;
-  queryParams?: Record<string, any>;
-  instruction: string;
-  method?: HttpMethod;
-  headers?: Record<string, any>;
-  body?: string;
-  documentationUrl?: string;
-  decompressionMethod?: DecompressionMethod;
-  authentication?: AuthType;
-  version?: string;
-};
-
-export type TransformInput = {
-  id?: string;
-  instruction: string;
-  responseSchema: JSONSchema;
-  responseMapping?: string;
-  version?: string;
+  endpoint?: TransformConfig;
+  file?: Promise<FileUpload>;
 };
 
 export type RequestOptions = {

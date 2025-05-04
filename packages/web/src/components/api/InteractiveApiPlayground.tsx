@@ -6,10 +6,10 @@ import { ApiConfig, CacheMode, SuperglueClient } from '@superglue/client'
 import { Loader2, CopyIcon } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { AutoSizer, List } from 'react-virtualized'
-import JsonSchemaEditor from './JsonSchemaEditor'
-import { Button } from './ui/button'
-import { Card, CardContent } from './ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
+import JsonSchemaEditor from '../utils/JsonSchemaEditor'
+import { Button } from '../ui/button'
+import { Card, CardContent } from '../ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 
 interface InteractiveApiPlaygroundProps {
   configId: string

@@ -1,7 +1,7 @@
 'use client'
 import posthog, { PostHog } from 'posthog-js'
 import { PostHogProvider } from 'posthog-js/react'
-import SuspendedPostHogPageView from '../components/PHPageView'
+import SuspendedPostHogPageView from '../components/utils/PHPageView'
 
 export function CSPostHogProvider({ children }: { children: any }) {
   return (

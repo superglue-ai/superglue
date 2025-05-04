@@ -10,7 +10,68 @@ import { callPostgres } from "../../utils/postgres.js";
 import { logMessage } from "../../utils/logs.js";
 import { Documentation } from "../../utils/documentation.js";
 
-// TODO: This is in dire need for refactoring and proper testing
+export async function executeApiCall(
+  endpoint: ApiConfig,
+  payload: any,
+  credentials: Record<string, string>,
+  options: RequestOptions,
+  metadata: Metadata,
+): Promise<{
+  data: any;
+  endpoint: ApiConfig;
+}> {
+  let response: any = null;
+  let retryCount = 0;
+  let lastError: string | null = null;
+  let messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
+  let documentation: Documentation;
+  
+  do {
+    try {
+      if(retryCount > 0) {
+        logMessage('info', `Generating API config for ${endpoint?.urlHost}${retryCount > 0 ? ` (retry ${retryCount})` : ""}`, metadata);      
+        if(!documentation) {
+          documentation = new Documentation(endpoint, metadata);
+        }
+        const documentationString = await documentation.fetch();
+        const computedApiCallConfig = await generateApiConfig(endpoint, documentationString, payload, credentials, retryCount, messages);      
+        endpoint = computedApiCallConfig.config;
+        messages = computedApiCallConfig.messages;
+      }
+
+      response = await callEndpoint(endpoint, payload, credentials, options);
+
+      if (!response.data) {
+        throw new Error("No data returned from API. This could be due to a configuration error.");
+      }
+      // TODO: Check if response is valid
+      // success
+      break;
+    }
+    catch(error) {
+      if(retryCount === 0) {
+        logMessage('info', `The initial configuration is not valid. Generating a new configuration. If you are creating a new configuration, this is expected.`, metadata);
+      }
+      else if(retryCount > 0) {
+        const rawErrorString = error?.message || JSON.stringify(error || {});
+        lastError = maskCredentials(rawErrorString, credentials).slice(0, 200);
+        messages.push({role: "user", content: `There was an error with the configuration, please fix: ${rawErrorString.slice(0, 2000)}`});
+        logMessage('warn', `API call failed. ${lastError}`, metadata);
+      }
+    }
+    retryCount++;
+  } while (retryCount < 5);
+
+  if (!response?.data) {
+    telemetryClient?.captureException(new Error(`API call failed after ${retryCount} retries. Last error: ${lastError}`), metadata.orgId, {
+      endpoint: endpoint,
+      retryCount: retryCount,
+    });
+    throw new Error(`API call failed after ${retryCount} retries. Last error: ${lastError}`);
+  }
+
+  return { data: response?.data, endpoint };
+}
 
 export const callResolver = async (
   _: any,
@@ -29,76 +90,27 @@ export const callResolver = async (
     runId: callId,
     orgId: context.orgId
   };
-  let preparedEndpoint: ApiConfig;
-  let messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
-
+  let endpoint: ApiConfig;
   const readCache = options?.cacheMode ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.READONLY : true;
   const writeCache = options?.cacheMode ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.WRITEONLY : true;
 
-  // Check if response schema is zod and throw an error if it is
-  if((input.endpoint?.responseSchema as any)?._def?.typeName === "ZodObject") {
-    throw new Error("zod is not supported for response schema. Please use json schema instead. you can use the zod-to-json-schema package to convert zod to json schema.");
-  }
-
   try {
-    // Resolve endpoint configuration from cache or prepare new one
-    let response: any;
-    let retryCount = 0;
-    let lastError: string | null = null;
-    let documentation: Documentation;
-    do {
-      try {
-        let didReadFromCache = false;
-        if(readCache && !lastError) {
-          preparedEndpoint = await context.datastore.getApiConfig(input.id, context.orgId) || 
-            await context.datastore.getApiConfigFromRequest(input.endpoint, payload, context.orgId) 
-          didReadFromCache = true;
-        }
 
-        if(!didReadFromCache || !preparedEndpoint) {
-          if(!documentation) {
-            documentation = new Documentation(preparedEndpoint || input.endpoint, metadata);
-          }  
-          logMessage('info', `Generating API config for ${input.endpoint?.urlHost}${retryCount > 0 ? ` (retry ${retryCount})` : ""}`, metadata);      
-          const documentationString = await documentation.fetch();
-          const computedApiCallConfig = await generateApiConfig(input.endpoint, documentationString, payload, credentials, retryCount, messages);      
-          preparedEndpoint = computedApiCallConfig.config;
-          messages = computedApiCallConfig.messages;
-        }
-
-        if(!preparedEndpoint) {
-          throw new Error("Did not find a valid endpoint configuration. If you did provide an id, please ensure cache reading is enabled.");
-        }
-        logMessage('info', `API call: ${preparedEndpoint.method} ${preparedEndpoint.urlHost}`, metadata);
-
-        if(preparedEndpoint.urlHost.startsWith("postgres")) {
-          response = await callPostgres(preparedEndpoint, payload, credentials, options);
-        }
-        else {
-          response = await callEndpoint(preparedEndpoint, payload, credentials, options);
-        }
-
-        if(!response.data) {
-          response = null;
-          throw new Error("No data returned from API. This could be due to a configuration error.");
-        }
-
-      } catch (error) {
-        const rawErrorString = error?.message || JSON.stringify(error || {});
-        lastError = maskCredentials(rawErrorString, credentials).slice(0, 200);
-        messages.push({role: "user", content: `There was an error with the configuration, please retry: ${rawErrorString.slice(0, 2000)}`});
-        logMessage('warn', `API call failed. ${lastError}`, { runId: callId, orgId: context.orgId });
-      }
-      retryCount++;
-    } while (!response && retryCount < 5);
-    
-    if(!response) {
-      telemetryClient?.captureException(new Error(`API call failed after ${retryCount} retries. Last error: ${lastError}`), context.orgId, {
-        preparedEndpoint: preparedEndpoint,
-        retryCount: retryCount,
-      });
-      throw new Error(`API call failed after ${retryCount} retries. Last error: ${lastError}`);
+    // Get endpoint from datastore or use the one provided in the input
+    if(input.id) {
+      endpoint = await context.datastore.getApiConfig(input.id, context.orgId);
+    } else {
+      endpoint = input.endpoint;
     }
+
+    // Check if response schema is zod and throw an error if it is
+    if((endpoint?.responseSchema as any)?._def?.typeName === "ZodObject") {
+      throw new Error("zod is not supported for response schema. Please use json schema instead. you can use the zod-to-json-schema package to convert zod to json schema.");
+    }
+
+    const callResult = await executeApiCall(endpoint, payload, credentials, options, metadata);
+    endpoint = callResult.endpoint;
+    const data = callResult.data;
 
     let transformedResponse: TransformResult | null;
     let responseMapping: string | null;
@@ -111,15 +123,15 @@ export const callResolver = async (
         const preparedTransform = await prepareTransform(
           context.datastore, 
           readCache, 
-          preparedEndpoint as TransformConfig, 
-          response.data, 
+          endpoint as TransformConfig, 
+          data, 
           transformError,
           { runId: callId, orgId: context.orgId }
         );
         responseMapping = preparedTransform?.responseMapping;
         transformedResponse = responseMapping ? 
-          await applyJsonataWithValidation(response.data, responseMapping, preparedEndpoint?.responseSchema) : 
-          { success: true, data: response.data };
+          await applyJsonataWithValidation(data, responseMapping, endpoint?.responseSchema) : 
+          { success: true, data };
 
         if (!transformedResponse.success) {
           throw new Error(transformedResponse.error);
@@ -137,13 +149,9 @@ export const callResolver = async (
     }
 
     // Save configuration if requested
-    const config = { ...preparedEndpoint, responseMapping: responseMapping};
+    const config = { ...endpoint, responseMapping: responseMapping};
     if(writeCache) {
-      if(input.id) {
-        context.datastore.upsertApiConfig(input.id, config, context.orgId);
-      } else if(input.endpoint) {
-        context.datastore.saveApiConfig(input.endpoint, payload, config, context.orgId);
-      }
+      context.datastore.upsertApiConfig(input.id || endpoint.id, config, context.orgId);
     }
 
     // Notify webhook if configured
@@ -170,7 +178,7 @@ export const callResolver = async (
       id: callId,
       success: false,
       error: maskedError,
-      config: preparedEndpoint,
+      config: endpoint,
       startedAt,
       completedAt: new Date(),
     };

@@ -2,10 +2,12 @@ import { generateApiConfig } from "../utils/api.js";
 import type { Workflow, ExecutionStep, ApiConfig, ExecutionMode, Metadata } from "@superglue/shared";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { composeUrl } from "../utils/tools.js"; // Assuming path
+import { applyJsonata, composeUrl } from "../utils/tools.js"; // Assuming path
 import { LanguageModel } from "../llm/llm.js";
 import { PLANNING_PROMPT } from "../llm/prompts.js";
 import { logMessage } from "../utils/logs.js"; // Added import
+import { Documentation } from "../utils/documentation.js";
+import { executeApiCall } from "../graphql/resolvers/call.js";
 
 // Define the structure for system input
 export interface SystemDefinition {
@@ -74,7 +76,7 @@ ${sys.documentation || 'No documentation content available.'}
     ).join("\n");
 
     const userPrompt = `
-Create a plan to fulfill the user's request by orchestrating calls across the available systems.
+Create a plan to fulfill the user's request by orchestrating single API calls across the available systems.
 
 Overall Instruction:
 "${this.instruction}"
@@ -106,7 +108,23 @@ Output a JSON object conforming to the WorkflowPlan schema. Define the necessary
     return plan as WorkflowPlan;
   }
 
+  private async fetchDocumentation(): Promise<void> {
+    for(const system of Object.values(this.systems)) {
+      if(system.documentation) {
+        continue;
+      }
+      const documentation = new Documentation({
+        urlHost: system.urlHost,
+        urlPath: system.urlPath,
+        documentationUrl: system.documentationUrl
+      }, this.metadata);
+      system.documentation = await documentation.fetch();
+    }
+  }
+
+
   public async build(): Promise<Workflow> {
+    await this.fetchDocumentation();
     const plan = await this.planWorkflow();
     const executionSteps: ExecutionStep[] = [];
     let currentContext = { ...this.initialPayload }; // Start with initial payload
@@ -119,32 +137,27 @@ Output a JSON object conforming to the WorkflowPlan schema. Define the necessary
         throw new Error(errorMsg);
       }
 
-      const partialApiConfig: Partial<ApiConfig> = {
+      const partialApiConfig: ApiConfig = {
+        id: plannedStep.stepId,
         instruction: plannedStep.instruction,
         urlHost: system.urlHost,
-        urlPath: system.urlPath
+        urlPath: system.urlPath,
+        documentationUrl: system.documentationUrl
       };
-
-      // console.log(`Generating API config for step ${plannedStep.stepId}...`);
-      logMessage('info', `Generating API config for step ${plannedStep.stepId}`, this.metadata);
-      // Pass current context as payload, allowing generateApiConfig to potentially use previous step results
-      const { config: generatedApiConfig, messages } = await generateApiConfig(
+      const apiResult = await executeApiCall(
         partialApiConfig,
-        system.documentation,
-        currentContext, // Provide data from previous steps + initial payload
-        system.credentials, // Pass actual credential values
-        0, // Initial retry count for generateApiConfig
-        [], // Initial messages for generateApiConfig
+        currentContext,
+        system.credentials,
+        { },
+        this.metadata
       );
-      // console.log(`Generated API config for step ${plannedStep.stepId}:`, generatedApiConfig);
-      logMessage('info', `Generated API config for step ${plannedStep.stepId}`, this.metadata);
+      currentContext[plannedStep.stepId] = apiResult.data;
 
       const executionStep: ExecutionStep = {
         id: plannedStep.stepId,
-        apiConfig: generatedApiConfig,
-        // Defaults - Planning/generation could potentially refine these later
+        apiConfig: apiResult.endpoint,
         executionMode: plannedStep.mode,
-        inputMapping: "$", // Default: assumes generateApiConfig uses context correctly
+        inputMapping: "$",
         responseMapping: "$", // Default: takes the whole step output
         // loopSelector, loopMaxIters would need to come from planning
       };

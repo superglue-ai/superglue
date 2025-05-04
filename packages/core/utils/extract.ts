@@ -1,6 +1,6 @@
 import axios, { AxiosRequestConfig } from "axios";
-import {  AuthType, RequestOptions, DecompressionMethod, ExtractConfig, ExtractInput, FileType, HttpMethod, Metadata, ApiInput } from "@superglue/shared";
-import { callAxios, composeUrl, replaceVariables } from "./tools.js";
+import {  AuthType, RequestOptions, DecompressionMethod, ExtractConfig, FileType, HttpMethod, Metadata } from "@superglue/shared";
+import { callAxios, composeUrl, generateId, replaceVariables } from "./tools.js";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { API_PROMPT } from "../llm/prompts.js";
@@ -109,7 +109,7 @@ ${lastError}` : ''}`
   ];
   const { response: generatedConfig } = await LanguageModel.generateObject(messages, schema);
   return {
-    id: extractConfig.id || generateId(generatedConfig),
+    id: extractConfig.id,
     instruction: extractConfig.instruction,
     urlHost: generatedConfig.urlHost,
     urlPath: generatedConfig.urlPath,
@@ -126,10 +126,4 @@ ${lastError}` : ''}`
     createdAt: extractConfig.createdAt || new Date(),
     updatedAt: new Date(),    
   } as ExtractConfig;
-}
-function generateId(config: ExtractInput) {
-  const domain = config?.urlHost?.replace(/^https?:\/\//, '').split('.')[0] || 'api';
-  const lastPath = config?.urlPath?.split('/').filter(Boolean).pop() || '';
-  const rand = Math.floor(1000 + Math.random() * 9000);
-  return `${domain}-${lastPath}-${rand}`;
 }

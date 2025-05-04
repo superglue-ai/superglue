@@ -1,13 +1,14 @@
-import { type ApiConfig, type ApiInput, AuthType, HttpMethod, Metadata, PaginationType, type RequestOptions } from "@superglue/shared";
+import { type ApiConfig, AuthType, HttpMethod, Metadata, PaginationType, type RequestOptions } from "@superglue/shared";
 import type { AxiosRequestConfig } from "axios";
 import OpenAI from "openai";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { callAxios, composeUrl, replaceVariables } from "./tools.js";
+import { callAxios, composeUrl, generateId, replaceVariables } from "./tools.js";
 import { API_PROMPT } from "../llm/prompts.js";
 import { logMessage } from "./logs.js";
 import { parseXML } from "./file.js";
 import { LanguageModel } from "../llm/llm.js";
+import { callPostgres } from "./postgres.js";
 
 export function convertBasicAuthToBase64(headerValue: string){
     if(!headerValue) return headerValue;
@@ -25,6 +26,10 @@ export function convertBasicAuthToBase64(headerValue: string){
 }
 
 export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions): Promise<{ data: any }> {  
+  if(endpoint.urlHost.startsWith("postgres")) {
+    return await callPostgres(endpoint, payload, credentials, options);
+  }
+  
   const allVariables = { ...payload, ...credentials };
   
   let allResults = [];
@@ -39,13 +44,16 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
     let paginationVars = {};
     switch (endpoint.pagination?.type) {
       case PaginationType.PAGE_BASED:
-        paginationVars = { page, limit: endpoint.pagination?.pageSize || 50 };
+        const pageSize = endpoint.pagination?.pageSize || 50;
+        paginationVars = { page, limit: pageSize, pageSize: pageSize };
         break;
       case PaginationType.OFFSET_BASED:
-        paginationVars = { offset, limit: endpoint.pagination?.pageSize || 50 };
+        const offsetPageSize = endpoint.pagination?.pageSize || 50;
+        paginationVars = { offset, limit: offsetPageSize, pageSize: offsetPageSize };
         break;
       case PaginationType.CURSOR_BASED:
-        paginationVars = { cursor: cursor, limit: endpoint.pagination?.pageSize || 50 };
+        const cursorPageSize = endpoint.pagination?.pageSize || 50;
+        paginationVars = { cursor: cursor, limit: cursorPageSize, pageSize: cursorPageSize };
         break;
       default:
         hasMore = false;
@@ -238,7 +246,10 @@ export async function generateApiConfig(
       cursorPath: z.string().optional().describe("If cursor_based: The path to the cursor in the response. E.g. cursor.current or next_cursor")
     }).optional()
   }));
-
+  const availableVariables = [
+    ...Object.keys(credentials || {}),
+    ...Object.keys(payload || {}),
+  ].map(v => `{${v}}`).join(", ");
   const userPrompt = `Generate API configuration for the following:
 
 Instructions: ${apiConfig.instruction}
@@ -254,8 +265,8 @@ ${apiConfig.dataPath ? `Data Path: ${apiConfig.dataPath}` : ''}
 ${apiConfig.pagination ? `Pagination: ${JSON.stringify(apiConfig.pagination)}` : ''}
 ${apiConfig.method ? `Method: ${apiConfig.method}` : ''}
 
-Available credential variables: ${Object.keys(credentials || {}).join(", ")}
-Available payload variables: ${Object.keys(payload || {}).join(", ")}
+Available variables: ${availableVariables}
+Available pagination variables (if pagination is enabled): page, pageSize, offset, cursor, limit
 Example payload: ${JSON.stringify(payload || {})}
 
 Documentation: ${String(documentation)}`;
@@ -290,17 +301,10 @@ Documentation: ${String(documentation)}`;
       responseMapping: apiConfig.responseMapping,
       createdAt: apiConfig.createdAt || new Date(),
       updatedAt: new Date(),
-      id: apiConfig.id || generateId(generatedConfig),
+      id: apiConfig.id || generateId(generatedConfig.urlHost, generatedConfig.urlPath),
     } as ApiConfig,
     messages: updatedMessages
   };
-}
-
-function generateId(config: ApiInput) {
-  const domain = config?.urlHost?.replace(/^https?:\/\//, '') || 'api';
-  const lastPath = config?.urlPath?.split('/').filter(Boolean).pop() || '';
-  const rand = Math.floor(1000 + Math.random() * 9000);
-  return `${domain}-${lastPath}-${rand}`;
 }
 
 function validateVariables(generatedConfig: any, vars: string[]) {
