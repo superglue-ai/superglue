@@ -93,9 +93,9 @@ describe('generateInstructions', () => {
     await generateInstructions(systems, { orgId: 'test-org' })
 
     // Check that temperature increased with each retry
-    expect(generateObject).toHaveBeenNthCalledWith(1, expect.any(Array), null, 0)
-    expect(generateObject).toHaveBeenNthCalledWith(2, expect.any(Array), null, 0.3)
-    expect(generateObject).toHaveBeenNthCalledWith(3, expect.any(Array), null, 0.6)
+    expect(generateObject).toHaveBeenNthCalledWith(1, expect.any(Array), expect.any(Object), 0)
+    expect(generateObject).toHaveBeenNthCalledWith(2, expect.any(Array), expect.any(Object), 0.3)
+    expect(generateObject).toHaveBeenNthCalledWith(3, expect.any(Array), expect.any(Object), 0.6)
   })
 
   it('should fail after max retries', async () => {
