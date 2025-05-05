@@ -1229,41 +1229,41 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
             </CardHeader>
 
             <CardContent className="p-0 flex-grow flex flex-col overflow-hidden">
+              { executionResult && (
+                <div className="p-3 bg-muted border-b flex-shrink-0">
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center">
+                      <span className="font-semibold mr-2">Status:</span>
+                      <span className={executionResult.success ? "text-green-600" : "text-red-600"}>
+                        {executionResult.success ? "Success" : "Failed"}
+                      </span>
+                    </div>
+
+                    {executionResult.startedAt && (
+                      <div className="flex items-center">
+                        <span className="font-semibold mr-2">Time:</span>
+                        <span className="text-sm">
+                          {new Date(executionResult.startedAt).toLocaleString()}
+                          {executionResult.completedAt &&
+                            ` • Duration: ${((new Date(executionResult.completedAt).getTime() - new Date(executionResult.startedAt).getTime()) / 1000).toFixed(2)}s`}
+                        </span>
+                      </div>
+                    )}
+
+                    {executionError && (
+                      <div className="text-red-600">
+                        <span className="font-semibold mr-2">Error:</span>
+                        <span>{executionError}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>)
+              }
               {activeTab === 'results' ? (
                 executionResult ? (
                   <>
-                    {/* Status Bar */}
-                    <div className="p-3 bg-muted border-b flex-shrink-0">
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center">
-                          <span className="font-semibold mr-2">Status:</span>
-                          <span className={executionResult.success ? "text-green-600" : "text-red-600"}>
-                            {executionResult.success ? "Success" : "Failed"}
-                          </span>
-                        </div>
-
-                        {executionResult.startedAt && (
-                          <div className="flex items-center">
-                            <span className="font-semibold mr-2">Time:</span>
-                            <span className="text-sm">
-                              {new Date(executionResult.startedAt).toLocaleString()}
-                              {executionResult.completedAt &&
-                                ` • Duration: ${((new Date(executionResult.completedAt).getTime() - new Date(executionResult.startedAt).getTime()) / 1000).toFixed(2)}s`}
-                            </span>
-                          </div>
-                        )}
-
-                        {executionError && (
-                          <div className="text-red-600">
-                            <span className="font-semibold mr-2">Error:</span>
-                            <span>{executionError}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
                     {/* Results - Replace with virtualized list */}
-                    <div className="flex-grow overflow-hidden">
+                    <div className="flex-grow overflow-hidden p-1">
                       <AutoSizer>
                         {({ height, width }) => (
                           <List
@@ -1305,37 +1305,16 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                   </div>
                 )
               ) : activeTab === 'transform' ? (
-                <div className="flex-grow overflow-hidden">
-                  <AutoSizer>
-                    {({ height, width }) => (
-                      <List
-                        width={width}
-                        height={height}
-                        rowCount={getResponseLines(finalTransform).length}
-                        rowHeight={18}
-                        rowRenderer={({ index, key, style }) => {
-                          const line = getResponseLines(finalTransform)[index];
-                          return (
-                            <div 
-                              key={key} 
-                              style={{
-                                ...style,
-                                whiteSpace: 'pre',
-                              }} 
-                              className="font-mono text-xs overflow-hidden text-ellipsis px-4"
-                            >
-                              {line}
-                            </div>
-                          );
-                        }}
-                        overscanRowCount={100}
-                        className="overflow-auto"
-                      />
-                    )}
-                  </AutoSizer>
+                <div className="flex-grow overflow-auto p-4">
+                  <Textarea
+                    value={finalTransform || ''}
+                    onChange={(e) => setFinalTransform(e.target.value)}
+                    className="font-mono text-xs w-full h-full min-h-[300px]"
+                    spellCheck={false}
+                  />
                 </div>
               ) : (
-                <div className="flex-grow overflow-hidden">
+                <div className="flex-grow overflow-hidden p-1">
                   <AutoSizer>
                     {({ height, width }) => (
                       <List
