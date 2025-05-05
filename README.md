@@ -48,6 +48,7 @@ const superglue = new SuperglueClient({
 });
 
 const config = {
+  id: "futurama-characters",
   urlHost: "https://futuramaapi.com",
   urlPath: "/graphql",
   instruction: "get all characters from the show",
@@ -134,6 +135,7 @@ const superglue = new SuperglueClient({
 
 // either via config object
 const config = {
+  id: "futurama-characters",
   urlHost: "https://futuramaapi.com",
   urlPath: "/graphql",
   instruction: "get all characters from the show",
@@ -142,7 +144,7 @@ const config = {
 const result = await superglue.call({endpoint: config});
 
 // or via the api id if you have already created the endpoint
-const result2 = await superglue.call({id: "futurama-api"});
+const result2 = await superglue.call({id: "futurama-characters"});
 
 console.log(JSON.stringify(result.data, null, 2));
 ```
