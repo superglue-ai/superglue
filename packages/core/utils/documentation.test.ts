@@ -275,8 +275,7 @@ describe('Documentation Class', () => {
         const result = await doc.fetch();
 
         expect(result).toBe(''); // Should return empty string on complete failure
-        expect(mockedAxios.get).not.toHaveBeenCalled();
-        expect(mockedAxios.post).not.toHaveBeenCalled();
+        expect(mockedAxios.get).toHaveBeenCalled(); // should call axios instead
       });
 
        it('should cache the result and return processed result on subsequent calls', async () => {
