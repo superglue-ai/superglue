@@ -10,7 +10,7 @@ import { useToast } from "../../hooks/use-toast";
 import { useConfig } from "@/src/app/config-context";
 import { useSearchParams, useRouter } from 'next/navigation';
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
-import { ExecutionStep } from "@superglue/shared";
+import { ExecutionStep } from "@superglue/client";
 import { SuperglueClient } from "@superglue/client";
 import { parseCredentialsHelper, removeNullUndefined } from "@/src/lib/client-utils";
 
