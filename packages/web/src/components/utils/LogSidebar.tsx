@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { motion } from "framer-motion"
 import { ChevronLeft, ChevronRight, X } from "lucide-react"
 import { Button } from "../ui/button"
@@ -30,17 +30,21 @@ const LOGS_SUBSCRIPTION = gql`
   }
 `
 
-const LOG_MIN_WIDTH = 500;
-const LOG_MAX_WIDTH = 1500;
-const LOG_COLLAPSED_WIDTH = 50;
+const LOG_MIN_WIDTH = 500
+const LOG_MAX_WIDTH = 1500
+const LOG_COLLAPSED_WIDTH = 50
 
 export function LogSidebar() {
   const [isExpanded, setIsExpanded] = useState(false)
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [hasNewLogs, setHasNewLogs] = useState(false)
-  const [logViewWidth, setLogViewWidth] = useState(LOG_MIN_WIDTH); // Initial width when expanded
-  const config = useConfig();
-  
+  const config = useConfig()
+
+  const [transitionDuration, setTransitionDuration] = useState(0.3)
+  const [logViewWidth, setLogViewWidth] = useState(LOG_MIN_WIDTH)
+  const resizingWidthRef = useRef(logViewWidth)
+  const logViewRef = useRef<HTMLDivElement | null>(null)
+
   const client = useMemo(() => {
     const wsLink = new GraphQLWsLink(createClient({
       url: config.superglueEndpoint?.replace('https', 'wss')?.replace('http', 'ws') || 'ws://localhost:3000/graphql',
@@ -111,47 +115,57 @@ export function LogSidebar() {
   }, [isExpanded]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault(); // Prevent text selection
-    const startX = e.clientX;
-  
+    e.preventDefault()
+    setTransitionDuration(0)
+    const startX = e.clientX
+    const startWidth = resizingWidthRef.current
+
     const handleMouseMove = (moveEvent: MouseEvent) => {
-      const newWidth = logViewWidth + (startX - moveEvent.clientX);
-      if (LOG_MAX_WIDTH >= newWidth && newWidth >= LOG_MIN_WIDTH) { 
-        setLogViewWidth(newWidth); 
-      }else if (newWidth > LOG_MAX_WIDTH){
-        setLogViewWidth(LOG_MAX_WIDTH);
-      }else{
-        setLogViewWidth(LOG_MIN_WIDTH);
+      const delta = startX - moveEvent.clientX
+      let newWidth = startWidth + delta
+      newWidth = Math.min(LOG_MAX_WIDTH, Math.max(LOG_MIN_WIDTH, newWidth))
+      
+      resizingWidthRef.current = newWidth
+      if (logViewRef.current) {
+        logViewRef.current.style.width = `${newWidth}px`
       }
-    };
-  
+    }
+
     const handleMouseUp = () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-  };
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      setLogViewWidth(resizingWidthRef.current)
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+  }
 
   return (
     <motion.div
+      ref={logViewRef}
       animate={{ width: isExpanded ? Math.max(logViewWidth, LOG_MIN_WIDTH) : LOG_COLLAPSED_WIDTH }}
-      className="border-l border-border bg-background flex flex-col relative"
+      transition={{ duration: transitionDuration }}
+      className="border-l border-border bg-background flex flex-col relative overflow-hidden"
     >
       <div className={`m-2 max-w-full ${isExpanded ? 'h-12' : 'h-24'}`}>
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => setIsExpanded(!isExpanded)}
+          onClick={() => {
+            setIsExpanded(!isExpanded)
+            setTransitionDuration(0.3)
+          }}
           className="h-full w-full flex items-center justify-center"
         >
           <div className={`flex items-center justify-center w-full ${!isExpanded && '-rotate-90'}`}>
             <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              {hasNewLogs && !isExpanded && <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-500"></span>
-              </span>}
+              {hasNewLogs && !isExpanded && (
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-500" />
+                </span>
+              )}
               Logs
             </span>
             {isExpanded ? <X className="ml-auto" /> : <ChevronRight className="ml-2" />}
@@ -185,10 +199,8 @@ export function LogSidebar() {
           </ScrollArea>
           <div
             onMouseDown={handleMouseDown}
-            className="absolute left-0 top-0 h-full w-2 cursor-col-resize bg-transparent"
-            style={{ border: 'none', outline: 'none' }}
-          >
-          </div>
+            className="absolute left-0 top-0 h-full w-2 cursor-col-resize bg-transparent border-none outline-none"
+          />
         </>
       )}
     </motion.div>
