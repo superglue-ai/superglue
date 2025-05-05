@@ -3,6 +3,8 @@ import { GraphQLResolveInfo } from "graphql";
 import { generateSchema } from "../../utils/schema.js";
 import { telemetryClient } from "../../utils/telemetry.js";
 import { getSchemaFromData } from "../../utils/tools.js";
+import { generateInstructions } from "../../utils/instructions.js";
+import { SystemDefinition } from "../../workflow/workflow-builder.js";
 export const generateSchemaResolver = async (
     _: any,
     { instruction, responseData }: { instruction: string; responseData?: string; },
@@ -30,4 +32,20 @@ export const generateSchemaResolver = async (
     const schema = await generateSchema(instruction, responseData, metadata);
     
     return schema;
+};
+
+export const generateInstructionsResolver = async (
+    _: any,
+    { systems }: { systems: SystemDefinition[] },
+    context: Context,
+    info: GraphQLResolveInfo
+  ) => {
+    try {
+        return generateInstructions(systems, {orgId: context.orgId});
+    } catch (error) {
+        telemetryClient?.captureException(error, context.orgId, {
+            systems: systems
+        });
+        throw error;
+    }
 };

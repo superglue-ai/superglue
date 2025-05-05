@@ -5,23 +5,22 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function cleanApiDomain(url: string): string {
+export function cleanUrl(url: string): URL {
   try {
-    if (!url) return '';
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    if (!url) return new URL("https://example.com");
+    if (!url.includes('://')) {
       url = 'https://' + url;
     }
     
     const urlObj = new URL(url);
-    // Return only origin (protocol + hostname + port if exists & non-standard)
-    return urlObj.origin;
+    return urlObj;
   } catch (e) {
-    // If URL parsing fails, just use the user input verbatim
-    return url;
+    return new URL("https://example.com");
   }
 }
 
 export function composeUrl(host: string, path: string | undefined) {
+  if(!host && !path) return '';
   // Handle empty/undefined inputs
   if (!host) host = '';
   if (!path) path = '';

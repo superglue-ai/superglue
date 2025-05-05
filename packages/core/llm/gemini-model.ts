@@ -5,6 +5,7 @@ import OpenAI from "openai";
 
 
 export class GeminiModel implements LLM {
+    public contextLength: number = 1000000;
     private genAI: GoogleGenerativeAI;
     constructor() {
         this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -77,12 +78,12 @@ export class GeminiModel implements LLM {
           };
     }
 
-    private cleanSchemaForGemini(schema: any): any {        
+    private cleanSchemaForGemini(schema: any): any {
         // Remove $schema property
         if (schema.$schema !== undefined) {
             delete schema.$schema;
         }
-        
+
         // Remove additionalProperties and optional flags
         if (schema.additionalProperties !== undefined) {
             delete schema.additionalProperties;
@@ -92,17 +93,21 @@ export class GeminiModel implements LLM {
         }
 
         // Make all properties required
-        if (schema.properties) {
+        if (schema.properties && typeof schema.properties === 'object') {
+            // Add a 'required' array with all property names
+            schema.required = Object.keys(schema.properties);
+
             for (const prop of Object.values(schema.properties)) {
                 if (typeof prop === 'object') {
-                    this.cleanSchemaForGemini(prop);
+                    this.cleanSchemaForGemini(prop); // Recurse for nested properties
                 }
             }
         }
 
+        // Handle arrays
         if(schema.items) {
             if(typeof schema.items === 'object') {
-                this.cleanSchemaForGemini(schema.items);
+                this.cleanSchemaForGemini(schema.items); // Recurse for items in arrays
             }
         }
         return schema;

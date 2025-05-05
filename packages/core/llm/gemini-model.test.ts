@@ -69,12 +69,15 @@ describe('GeminiModel', () => {
         $schema: 'test',
         additionalProperties: true,
         optional: true,
+        type: 'object',
         properties: {
           nested: {
+            type: 'object',
             additionalProperties: true,
             optional: true,
             properties: {
               deep: {
+                type: 'object',
                 additionalProperties: false
               }
             }
@@ -83,13 +86,19 @@ describe('GeminiModel', () => {
       };
 
       const expectedCleanedSchema = {
+        type: 'object',
         properties: {
           nested: {
+            type: 'object',
             properties: {
-              deep: {}
-            }
-          }
-        }
+              deep: {
+                type: 'object'
+              },
+            },
+            required: ['deep'],
+          },
+        },
+        required: ['nested'],
       };
 
       await model.generateObject([
@@ -179,19 +188,21 @@ describe('GeminiModel', () => {
           type: 'object',
           properties: {
             field: {
-              type: 'string'
+              type: 'string',
             },
             nested: {
               type: 'array',
               items: {
                 type: 'object',
                 properties: {
-                  subField: { type: 'string' }
-                }
-              }
-            }
-          }
-        }
+                  subField: { type: 'string' },
+                },
+                required: ['subField'],
+              },
+            },
+          },
+          required: ['field', 'nested'],
+        },
       };
 
       await model.generateObject([

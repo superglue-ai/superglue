@@ -1,21 +1,18 @@
 import { cn } from '@/src/lib/utils'
 import { Check } from 'lucide-react'
 
-export type StepperStep = 'basic' | 'try_and_output' | 'success' | 'auth'
+export type StepperStep = 'basic' | 'try_and_output' | 'success'
+export type WorkflowCreateStep = 'integrations' | 'prompt' | 'review' | 'success';
 
 interface StepConfig {
-  id: StepperStep
+  id: StepperStep | WorkflowCreateStep
   title: string
 }
 
-export const STEPS: StepConfig[] = [
+export const API_CREATE_STEPS: StepConfig[] = [
   {
     id: 'basic',
     title: 'Basic Info'
-  },
-  {
-    id: 'auth',
-    title: 'Authentication'
   },
   {
     id: 'try_and_output',
@@ -27,18 +24,32 @@ export const STEPS: StepConfig[] = [
   }
 ]
 
+export const WORKFLOW_CREATE_STEPS: StepConfig[] = [
+  {
+    id: 'integrations',
+    title: 'Integrations'
+  },
+  {
+    id: 'prompt',
+    title: 'Prompt'
+  },
+  {
+    id: 'review',
+    title: 'Review'
+  },
+  {
+    id: 'success',
+    title: 'Complete'
+  }
+]
+
 interface StepIndicatorProps {
-  currentStep: StepperStep
-  steps?: StepConfig[]
+  currentStep: StepperStep | WorkflowCreateStep
+  steps: StepConfig[]
 }
 
-export function StepIndicator({ currentStep, steps = STEPS }: StepIndicatorProps) {
-  // Filter out the auth step if not needed for compatibility with existing components
-  const filteredSteps = steps.filter(step => 
-    currentStep === 'auth' ? true : step.id !== 'auth'
-  )
-  
-  const currentIndex = filteredSteps.findIndex(s => s.id === currentStep)
+export function StepIndicator({ currentStep, steps }: StepIndicatorProps) {  
+  const currentIndex = steps.findIndex(s => s.id === currentStep)
 
   return (
     <div className="py-3">
@@ -49,12 +60,12 @@ export function StepIndicator({ currentStep, steps = STEPS }: StepIndicatorProps
         {/* Active progress bar */}
         <div 
           className="absolute top-4 left-0 h-0.5 bg-primary transition-all duration-500 ease-in-out"
-          style={{ width: `${(currentIndex / (filteredSteps.length - 1)) * 100}%` }}
+          style={{ width: `${(currentIndex / (steps.length - 1)) * 100}%` }}
         />
 
         {/* Steps */}
-        <div className="relative grid grid-cols-3 w-full">
-          {filteredSteps.map((step, index) => {
+        <div className={`relative grid grid-cols-${steps.length} w-full`}>
+          {steps.map((step, index) => {
             const isActive = index === currentIndex
             const isCompleted = index < currentIndex
 

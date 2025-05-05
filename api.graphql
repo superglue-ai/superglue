@@ -162,12 +162,12 @@ enum LogLevel {
 
 input PaginationInput {
   type: PaginationType!
-  pageSize: Int
+  pageSize: String
   cursorPath: String
 }
 
 input ApiInput {
-  id: ID
+  id: ID!
   urlHost: String!
   urlPath: String
   instruction: String!
@@ -185,7 +185,7 @@ input ApiInput {
 }
 
 input ExtractInput {
-  id: ID
+  id: ID!
   urlHost: String!
   urlPath: String
   queryParams: JSON
@@ -202,7 +202,7 @@ input ExtractInput {
 }
 
 input TransformInput {
-  id: ID
+  id: ID!
   instruction: String!
   responseSchema: JSONSchema!
   responseMapping: JSONata
@@ -238,6 +238,15 @@ input WorkflowInputRequest @oneOf {
   id: ID
 }
 
+input SystemInput {
+  id: String!
+  urlHost: String!
+  urlPath: String
+  documentationUrl: String
+  documentation: String
+  credentials: JSON
+}
+
 type Log {
   id: ID!
   message: String!
@@ -260,7 +269,7 @@ type Query {
   getWorkflow(id: ID!): Workflow
 
   generateSchema(instruction: String!, responseData: String): JSONSchema!
-  
+  generateInstructions(systems: [SystemInput!]!): [String!]!
   getTenantInfo: TenantInfo
   
   # Workflow queries
@@ -362,6 +371,12 @@ type Mutation {
     options: RequestOptions
   ): WorkflowResult!
   
+  buildWorkflow(
+    instruction: String!
+    payload: JSON
+    systems: [SystemInput!]!
+  ): Workflow!
+
   upsertWorkflow(id: ID!, input: JSON!): Workflow!
   deleteWorkflow(id: ID!): Boolean!
   

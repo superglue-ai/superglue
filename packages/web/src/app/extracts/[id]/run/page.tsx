@@ -3,7 +3,7 @@
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/src/components/ui/button";
-import { ExtractPlayground } from "@/src/components/ExtractPlayground";
+import { ExtractPlayground } from "@/src/components/extract/ExtractPlayground";
 export default function ExtractPlaygroundPage({ extractId }: { extractId?: string }) {
   const params = useParams();
   const id = extractId || params.id as string;

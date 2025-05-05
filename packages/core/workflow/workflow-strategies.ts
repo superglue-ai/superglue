@@ -1,13 +1,13 @@
-import type { ApiConfig, ApiInput, ExecutionStep, Metadata, RequestOptions, Workflow, WorkflowResult, WorkflowStepResult } from "@superglue/shared";
+import type { ExecutionStep, Metadata, RequestOptions, WorkflowStepResult } from "@superglue/shared";
 import { applyJsonata } from "../utils/tools.js";
 import { logMessage } from "../utils/logs.js";
-import { callEndpoint } from "../utils/api.js";
+import { executeApiCall } from "../graphql/resolvers/call.js";
 
 export interface ExecutionStrategy {
   execute(
     step: ExecutionStep,
-    payload: Record<string, unknown>,
-    credentials: Record<string, unknown>,
+    payload: Record<string, any>,
+    credentials: Record<string, string>,
     options: RequestOptions,
     metadata: Metadata
   ): Promise<WorkflowStepResult>;
@@ -23,8 +23,8 @@ export function selectStrategy(step: ExecutionStep): ExecutionStrategy {
 const directStrategy: ExecutionStrategy = {
   async execute(
     step: ExecutionStep,
-    payload: Record<string, unknown>,
-    credentials: Record<string, unknown>,
+    payload: Record<string, any>,
+    credentials: Record<string, string>,
     options: RequestOptions = {},
     metadata: Metadata
   ): Promise<WorkflowStepResult> {
@@ -33,8 +33,7 @@ const directStrategy: ExecutionStrategy = {
       success: false
     }
     try {
-      const apiConfig = await prepareApiConfig(step, payload, credentials, options);
-      const apiResponse = await callEndpoint(apiConfig, payload, credentials, options);
+      const apiResponse = await executeApiCall(step.apiConfig, payload, credentials, options, metadata);
       const transformedData = await applyJsonata(apiResponse.data, step.responseMapping);
 
       result.rawData = apiResponse.data;
@@ -56,8 +55,8 @@ const directStrategy: ExecutionStrategy = {
 const loopStrategy: ExecutionStrategy = {
   async execute(
     step: ExecutionStep,
-    payload: Record<string, unknown>,
-    credentials: Record<string, unknown>,
+    payload: Record<string, any>,
+    credentials: Record<string, string>,
     options: RequestOptions = {},
     metadata: Metadata
   ): Promise<WorkflowStepResult> {
@@ -84,8 +83,6 @@ const loopStrategy: ExecutionStrategy = {
       if (step.loopMaxIters > 0) {
         loopValues = loopValues.slice(0, step.loopMaxIters);
       }
-
-      const apiConfig = await prepareApiConfig(step, payload, credentials, options);
       const stepResults: WorkflowStepResult[] = [];
       for (let i = 0; i < loopValues.length; i++) {
         const loopValue = loopValues[i];
@@ -97,7 +94,7 @@ const loopStrategy: ExecutionStrategy = {
         };
 
         try {
-          const apiResponse = await callEndpoint(apiConfig, loopPayload, credentials, options);
+          const apiResponse = await executeApiCall(step.apiConfig, loopPayload, credentials, options, metadata);
           const rawData = {loopValue: loopValue, ... apiResponse.data};
           const transformedData = await applyJsonata(rawData, step.responseMapping);
           stepResults.push({ 
@@ -124,16 +121,3 @@ const loopStrategy: ExecutionStrategy = {
     return result;
   }
 };
-
-async function prepareApiConfig(
-  step: ExecutionStep,
-  payload: Record<string, unknown>,
-  credentials: Record<string, unknown>,
-  options: RequestOptions = {},
-): Promise<ApiConfig> {
-  // All steps must have apiConfig, so just merge in the base headers
-  // TODO: could do a prepareApiConfig step to generate the apiConfig here anyway
-  return {
-    ...step.apiConfig
-  };
-}

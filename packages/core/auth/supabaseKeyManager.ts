@@ -40,27 +40,38 @@ export class SupabaseKeyManager implements ApiKeyManager {
       throw new Error('Missing required Supabase environment variables');
     }
 
-    const url = `${SUPABASE_URL}/rest/v1/sg_superglue_api_keys`;
-    logMessage('debug', `Fetching API keys from: ${url}`);
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'apikey': SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-      },
-    });
+    const PAGE_SIZE = 1000;
+    let allData: any[] = [];
+    let hasMore = true;
+    let offset = 0;
 
-    if (!response.ok) {
-      logMessage('error', `Failed to fetch API keys: ${response.statusText}`);
-      return [];
+    while (hasMore) {
+      const url = `${SUPABASE_URL}/rest/v1/sg_superglue_api_keys?select=org_id,key,is_active&limit=${PAGE_SIZE}&offset=${offset}`;
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          'Prefer': 'count=exact'
+        },
+      });
+
+      if (!response.ok) {
+        logMessage('error', `Failed to fetch API keys: ${response.statusText}`);
+        return [];
+      }
+
+      const pageData = await response.json();
+      if (!Array.isArray(pageData) || pageData.length === 0) {
+        hasMore = false;
+      } else {
+        allData = [...allData, ...pageData];
+        offset += PAGE_SIZE;
+        hasMore = pageData.length === PAGE_SIZE;
+      }
     }
 
-    const data = await response.json();
-    if (!Array.isArray(data) || data.length === 0) {
-      return [];
-    }
-
-    return data.filter(item => item.is_active === true).map(item => ({orgId: item.org_id, key: item.key}));
+    return allData.filter(item => item.is_active === true).map(item => ({orgId: item.org_id, key: item.key}));
   }
 
   private async refreshApiKeys(): Promise<void> {

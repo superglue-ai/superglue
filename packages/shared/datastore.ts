@@ -1,4 +1,4 @@
-import type { ApiConfig, ApiInput, ExtractConfig, ExtractInput, RunResult, Workflow, TransformConfig, TransformInput } from "./types.js";
+import type { ApiConfig, ExtractConfig, RunResult, Workflow, TransformConfig } from "./types.js";
 
 export interface DataStore {
     // API Config Methods
@@ -7,14 +7,6 @@ export interface DataStore {
     upsertApiConfig(id: string, config: ApiConfig, orgId?: string): Promise<ApiConfig>;
     deleteApiConfig(id: string, orgId?: string): Promise<boolean>;
     
-    getApiConfigFromRequest(request: ApiInput, payload: any, orgId?: string): Promise<ApiConfig | null>;
-    getTransformConfigFromRequest(request: TransformInput, payload: any, orgId?: string): Promise<TransformConfig | null>;
-    getExtractConfigFromRequest(request: ExtractInput, payload: any, orgId?: string): Promise<ExtractConfig | null>;
-
-    saveApiConfig(request: ApiInput, payload: any, config: ApiConfig, orgId?: string): Promise<ApiConfig>;
-    saveExtractConfig(request: ExtractInput, payload: any, config: ExtractConfig, orgId?: string): Promise<ExtractConfig>;
-    saveTransformConfig(request: TransformInput, payload: any, config: TransformConfig, orgId?: string): Promise<TransformConfig>;
-
     // Extract Config Methods
     getExtractConfig(id: string, orgId?: string): Promise<ExtractConfig | null>;
     listExtractConfigs(limit?: number, offset?: number, orgId?: string): Promise<{ items: ExtractConfig[], total: number }>;

@@ -1,6 +1,6 @@
 import { HttpMethod } from "@superglue/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { WorkflowExecutor } from "./workflow.js";
+import { WorkflowExecutor } from "./workflow-executor.js";
 
 /*
 describe("ApiWorkflowOrchestrator-dog", { timeout: 600000 }, () => {

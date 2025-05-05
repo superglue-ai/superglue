@@ -47,6 +47,7 @@ COPY packages/shared/package*.json ./packages/shared/
 RUN npm ci --omit=dev && \
     npm install -g next turbo cross-env && \
     apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get upgrade -y libxml2 && \ 
     DEBIAN_FRONTEND=noninteractive apt-get install -y fontconfig fontconfig-config libfontconfig1 && \
     npx playwright install --with-deps chromium
 
