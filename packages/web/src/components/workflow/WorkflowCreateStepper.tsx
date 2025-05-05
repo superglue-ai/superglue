@@ -718,7 +718,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         payload: JSON.parse(payload || '{}'),
         credentials: systems.reduce((acc, system) => ({...acc, ...system.credentials}), {}),
       });
-      setExecutionResult(result?.data);
+      setExecutionResult(result);
 
       // Generate transform after successful execution
       const transformResult = await superglueClient.transform({
@@ -1238,7 +1238,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                         <div className="flex items-center">
                           <span className="font-semibold mr-2">Status:</span>
                           <span className={executionResult.success ? "text-green-600" : "text-red-600"}>
-                            {executionResult.success ? "Success" : JSON.stringify(executionResult)}
+                            {executionResult.success ? "Success" : "Failed"}
                           </span>
                         </div>
 
@@ -1269,10 +1269,10 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                           <List
                             width={width}
                             height={height}
-                            rowCount={getResponseLines(executionResult).length}
+                            rowCount={getResponseLines(executionResult?.data).length}
                             rowHeight={18}
                             rowRenderer={({ index, key, style }) => {
-                              const line = getResponseLines(executionResult)[index];
+                              const line = getResponseLines(executionResult?.data)[index];
                               const indentMatch = line?.match(/^(\s*)/);
                               const indentLevel = indentMatch ? indentMatch[0].length : 0;
                               
