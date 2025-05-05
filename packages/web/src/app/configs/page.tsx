@@ -31,7 +31,7 @@ import {
 } from "@/src/components/ui/dropdown-menu";
 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/src/components/ui/tooltip";
-import { ApiConfig, ExtractConfig, SuperglueClient } from '@superglue/client';
+import { ApiConfig, ExecutionStep, ExtractConfig, SuperglueClient, Workflow } from '@superglue/client';
 import { Check, Copy, FileText, GitBranch, Globe, History, Play, Plus, RotateCw, Settings, ShoppingBag, Trash2 } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import React from 'react';
@@ -39,13 +39,13 @@ import EmptyStateActions from '@/src/components/utils/EmptyStateActions';
 
 const ConfigTable = () => {
   const router = useRouter();
-  const [configs, setConfigs] = React.useState<(ApiConfig | ExtractConfig)[]>([]);
+  const [configs, setConfigs] = React.useState<(ApiConfig | ExtractConfig | Workflow)[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [total, setTotal] = React.useState(0);
   const [page, setPage] = React.useState(0);
   const [pageSize] = React.useState(20);
   const config = useConfig();
-  const [configToDelete, setConfigToDelete] = React.useState<ApiConfig | ExtractConfig | null>(null);
+  const [configToDelete, setConfigToDelete] = React.useState<ApiConfig | ExtractConfig | Workflow | null>(null);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [showConfigStepper, setShowConfigStepper] = React.useState(false);
   const [configStepperProps, setConfigStepperProps] = React.useState<{ prefillData?: any }>({});
@@ -324,8 +324,7 @@ const ConfigTable = () => {
               <TableHead></TableHead>
               <TableHead>ID</TableHead>
               <TableHead>Type</TableHead>
-              <TableHead>Instruction / Name</TableHead>
-              <TableHead>URL / Info</TableHead>
+              <TableHead>Details</TableHead>
               <TableHead>Updated At</TableHead>
               <TableHead className="text-right">
                 <TooltipProvider>
@@ -411,10 +410,10 @@ const ConfigTable = () => {
                     </Badge>
                   </TableCell>
                   <TableCell className="max-w-[300px] truncate">
-                    {isWorkflow ? config.id : config.instruction} {/* Display ID for workflow name */}
-                  </TableCell>
-                  <TableCell className="font-medium max-w-[100px] truncate">
-                    {isApi || isExtract ? config.urlHost : '-'} {/* No URL for workflow */}
+                    {configType === 'api' || configType === 'extract' ? 
+                      (config as ApiConfig | ExtractConfig).instruction : 
+                      (config as Workflow).steps.map((step: ExecutionStep) => step.id).join(' => ')
+                    }
                   </TableCell>
                   <TableCell className="w-[150px]">
                     {config.updatedAt ? new Date(config.updatedAt).toLocaleDateString() : (config.createdAt ? new Date(config.createdAt).toLocaleDateString() : '')}
