@@ -1,38 +1,14 @@
 import axios, { AxiosRequestConfig } from "axios";
-import {  AuthType, RequestOptions, DecompressionMethod, ExtractConfig, ExtractInput, FileType, HttpMethod, Metadata } from "@superglue/shared";
-import { callAxios, composeUrl, getSchemaFromData, replaceVariables } from "./tools.js";
+import {  AuthType, RequestOptions, DecompressionMethod, ExtractConfig, FileType, HttpMethod, Metadata } from "@superglue/shared";
+import { callAxios, composeUrl, generateId, replaceVariables } from "./tools.js";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { API_PROMPT } from "../llm/prompts.js";
-import { getDocumentation } from "./documentation.js";
 import { decompressData, parseFile } from "./file.js";
-import { createHash } from "crypto";
 import { logMessage } from "./logs.js";
 import { LanguageModel } from "../llm/llm.js";
 import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
-export async function prepareExtract(extractInput: ExtractInput, payload: any, credentials: any, lastError: string | null = null): Promise<ExtractConfig> {
-    // Set the current timestamp
-    const currentTime = new Date();
 
-    // Initialize the ApiCallConfig object with provided input
-    const hash = createHash('md5')
-      .update(JSON.stringify({request: extractInput, payloadKeys: getSchemaFromData(payload)}))
-      .digest('hex');
-    let extractConfig: Partial<ExtractConfig> = { 
-      ...extractInput,
-      createdAt: currentTime,
-      updatedAt: currentTime,
-      id: hash,
-    };
-
-    // If a documentation URL is provided, fetch and parse additional details
-    const documentation = await getDocumentation(extractConfig.documentationUrl, extractConfig.headers, extractConfig.queryParams, extractConfig.urlHost, extractConfig.urlPath);
-
-    const availableVars = [...Object.keys(payload || {}), ...Object.keys(credentials || {})];
-    const computedExtractConfig = await generateExtractConfig(extractConfig, documentation, availableVars, lastError);
-    
-    return computedExtractConfig;
-}
 
 export async function callExtract(extract: ExtractConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions, metadata?: Metadata): Promise<any> {
   const allVariables = { ...payload, ...credentials };
@@ -88,13 +64,19 @@ export async function processFile(data: Buffer, extractConfig: ExtractConfig) {
   return responseJSON;
 }
 
-async function generateExtractConfig(extractConfig: Partial<ExtractConfig>, documentation: string, vars: string[] = [], lastError: string | null = null): Promise<ExtractConfig> {
+export async function generateExtractConfig(extractConfig: Partial<ExtractConfig>, documentation: string, payload: Record<string, any>, credentials: Record<string, any>, lastError: string | null = null): Promise<ExtractConfig> {
   const schema = zodToJsonSchema(z.object({
     urlHost: z.string(),
     urlPath: z.string().optional(),
-    queryParams: z.record(z.any()).optional(),
+    queryParams: z.array(z.object({
+      key: z.string(),
+      value: z.string()
+    })).optional(),
     method: z.enum(Object.values(HttpMethod) as [string, ...string[]]),
-    headers: z.record(z.string()).optional(),
+    headers: z.array(z.object({
+      key: z.string(),
+      value: z.string()
+    })).optional(),
     body: z.string().optional(),
     authentication: z.enum(Object.values(AuthType) as [string, ...string[]]),
     dataPath: z.string().optional().describe('The path to the data array in the response JSON. e.g. "products"'),
@@ -117,7 +99,9 @@ Base URL: ${composeUrl(extractConfig.urlHost, extractConfig.urlPath)}
 
 Documentation: ${documentation}
 
-Available variables: ${vars.join(", ")}
+Available credential variables: ${Object.keys(credentials).join(", ")}
+Available payload variables: ${Object.keys(payload).join(", ")}
+Example payload: ${JSON.stringify(payload)}
 
 ${lastError ? `We tried to call the API but it failed with the following error:
 ${lastError}` : ''}`
@@ -125,7 +109,21 @@ ${lastError}` : ''}`
   ];
   const { response: generatedConfig } = await LanguageModel.generateObject(messages, schema);
   return {
-    ...extractConfig,
-    ...generatedConfig,
+    id: extractConfig.id,
+    instruction: extractConfig.instruction,
+    urlHost: generatedConfig.urlHost,
+    urlPath: generatedConfig.urlPath,
+    method: generatedConfig.method,
+    queryParams: generatedConfig.queryParams ? Object.fromEntries(generatedConfig.queryParams.map(p => [p.key, p.value])) : undefined,
+    headers: generatedConfig.headers ? Object.fromEntries(generatedConfig.headers.map(p => [p.key, p.value])) : undefined,
+    body: generatedConfig.body,
+    authentication: generatedConfig.authentication,
+    pagination: generatedConfig.pagination,
+    dataPath: generatedConfig.dataPath,
+    decompressionMethod: generatedConfig.decompressionMethod,
+    fileType: generatedConfig.fileType,
+    documentationUrl: extractConfig.documentationUrl,
+    createdAt: extractConfig.createdAt || new Date(),
+    updatedAt: new Date(),    
   } as ExtractConfig;
 }

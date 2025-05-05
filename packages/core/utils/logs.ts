@@ -33,8 +33,8 @@ export const logger = pino({
           message: inputArgs[0],
           level: String(levelMap[level]).toUpperCase(),
           timestamp: new Date(),
-          runId: '',
-          orgId: inputArgs[1]?.orgId
+          runId: inputArgs[1]?.runId || '',
+          orgId: inputArgs[1]?.orgId || ''
         };
   
         // Emit log event

@@ -3,20 +3,21 @@ import fs from "node:fs";
 import { callResolver } from "./resolvers/call.js";
 import { deleteApiResolver, deleteExtractResolver, deleteTransformResolver } from "./resolvers/delete.js";
 import { extractResolver } from "./resolvers/extract.js";
-import { generateSchemaResolver } from "./resolvers/generate.js";
+import { generateInstructionsResolver, generateSchemaResolver } from "./resolvers/generate.js";
 import { getApiResolver, getExtractResolver, getRunResolver, getTransformResolver } from "./resolvers/get.js";
 import { listApisResolver, listExtractsResolver, listRunsResolver, listTransformsResolver } from "./resolvers/list.js";
 import { JSONResolver, JSONSchemaResolver, JSONataResolver } from "./resolvers/scalars.js";
 import { getTenantInfoResolver, setTenantInfoResolver } from "./resolvers/tenant.js";
 import { transformResolver } from "./resolvers/transform.js";
-import { updateApiConfigIdResolver } from "./resolvers/updateId.js";
+import { updateApiConfigIdResolver } from "./resolvers/update-id.js";
 import { upsertApiResolver, upsertExtractResolver, upsertTransformResolver } from "./resolvers/upsert.js";
 import {
   deleteWorkflowResolver,
   getWorkflowResolver,
   listWorkflowsResolver,
   upsertWorkflowResolver,
-  workflowResolver
+  executeWorkflowResolver,
+  buildWorkflowResolver
 } from "./resolvers/workflow.js";
 import { logsResolver } from "./resolvers/logs.js";
 
@@ -34,13 +35,15 @@ export const resolvers = {
     getTenantInfo: getTenantInfoResolver,
     getWorkflow: getWorkflowResolver,
     listWorkflows: listWorkflowsResolver,
+    generateInstructions: generateInstructionsResolver,
   },
   Mutation: {
     setTenantInfo: setTenantInfoResolver,
     call: callResolver,
     extract: extractResolver,
     transform: transformResolver,
-    executeWorkflow: workflowResolver,
+    executeWorkflow: executeWorkflowResolver,
+    buildWorkflow: buildWorkflowResolver,
     upsertWorkflow: upsertWorkflowResolver,
     deleteWorkflow: deleteWorkflowResolver,
     upsertApi: upsertApiResolver,

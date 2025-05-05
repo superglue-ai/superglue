@@ -1,43 +1,14 @@
-import { type ApiConfig, type ApiInput, AuthType, HttpMethod, Metadata, PaginationType, type RequestOptions } from "@superglue/shared";
+import { type ApiConfig, AuthType, HttpMethod, Metadata, PaginationType, type RequestOptions } from "@superglue/shared";
 import type { AxiosRequestConfig } from "axios";
 import OpenAI from "openai";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { getDocumentation } from "./documentation.js";
-import { callAxios, composeUrl, replaceVariables } from "./tools.js";
+import { callAxios, composeUrl, generateId, replaceVariables } from "./tools.js";
 import { API_PROMPT } from "../llm/prompts.js";
 import { logMessage } from "./logs.js";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { parseXML } from "./file.js";
 import { LanguageModel } from "../llm/llm.js";
-
-export async function prepareEndpoint(
-  endpointInput: ApiInput, 
-  payload: any, 
-  credentials: any, 
-  metadata: Metadata,
-  retryCount: number = 0,
-  messages: OpenAI.Chat.ChatCompletionMessageParam[] = []
-): Promise<{ config: ApiConfig; messages: OpenAI.Chat.ChatCompletionMessageParam[] }> {
-    // Set the current timestamp
-    const currentTime = new Date();
-
-    // Initialize the ApiCallConfig object with provided input
-    const apiCallConfig: Partial<ApiConfig> = { 
-      ...endpointInput,
-      createdAt: currentTime,
-      updatedAt: currentTime,
-      id: crypto.randomUUID()
-    };
-    logMessage('info', `Generating API config for ${endpointInput.urlHost}${retryCount > 0 ? ` (retry ${retryCount})` : ""}`, metadata);
-
-    const documentation = await getDocumentation(apiCallConfig.documentationUrl, apiCallConfig.headers, apiCallConfig.queryParams, apiCallConfig?.urlHost, apiCallConfig?.urlPath);
-
-    const availableVars = [...Object.keys(payload || {}), ...Object.keys(credentials || {})];
-    const computedApiCallConfig = await generateApiConfig(apiCallConfig, documentation, availableVars, retryCount, messages);
-    
-    return computedApiCallConfig;
-}
+import { callPostgres } from "./postgres.js";
 
 export function convertBasicAuthToBase64(headerValue: string){
     if(!headerValue) return headerValue;
@@ -55,6 +26,10 @@ export function convertBasicAuthToBase64(headerValue: string){
 }
 
 export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions): Promise<{ data: any }> {  
+  if(endpoint.urlHost.startsWith("postgres")) {
+    return await callPostgres(endpoint, payload, credentials, options);
+  }
+  
   const allVariables = { ...payload, ...credentials };
   
   let allResults = [];
@@ -69,13 +44,16 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
     let paginationVars = {};
     switch (endpoint.pagination?.type) {
       case PaginationType.PAGE_BASED:
-        paginationVars = { page, limit: endpoint.pagination?.pageSize || 50 };
+        const pageSize = endpoint.pagination?.pageSize || 50;
+        paginationVars = { page, limit: pageSize, pageSize: pageSize };
         break;
       case PaginationType.OFFSET_BASED:
-        paginationVars = { offset, limit: endpoint.pagination?.pageSize || 50 };
+        const offsetPageSize = endpoint.pagination?.pageSize || 50;
+        paginationVars = { offset, limit: offsetPageSize, pageSize: offsetPageSize };
         break;
       case PaginationType.CURSOR_BASED:
-        paginationVars = { cursor: cursor, limit: endpoint.pagination?.pageSize || 50 };
+        const cursorPageSize = endpoint.pagination?.pageSize || 50;
+        paginationVars = { cursor: cursor, limit: cursorPageSize, pageSize: cursorPageSize };
         break;
       default:
         hasMore = false;
@@ -120,7 +98,7 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
     const axiosConfig: AxiosRequestConfig = {
       method: endpoint.method,
       url: url,
-      headers: processedHeaders, // added processedHeaders instead of headers
+      headers: processedHeaders,
       data: body,
       params: queryParams,
       timeout: options?.timeout || 60000,
@@ -242,7 +220,8 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
 export async function generateApiConfig(
   apiConfig: Partial<ApiConfig>, 
   documentation: string, 
-  vars: string[] = [], 
+  payload: Record<string, any>, 
+  credentials: Record<string, any>, 
   retryCount = 0,
   messages: OpenAI.Chat.ChatCompletionMessageParam[] = []
 ): Promise<{ config: ApiConfig; messages: OpenAI.Chat.ChatCompletionMessageParam[] }> {
@@ -267,7 +246,10 @@ export async function generateApiConfig(
       cursorPath: z.string().optional().describe("If cursor_based: The path to the cursor in the response. E.g. cursor.current or next_cursor")
     }).optional()
   }));
-
+  const availableVariables = [
+    ...Object.keys(credentials || {}),
+    ...Object.keys(payload || {}),
+  ].map(v => `{${v}}`).join(", ");
   const userPrompt = `Generate API configuration for the following:
 
 Instructions: ${apiConfig.instruction}
@@ -283,7 +265,9 @@ ${apiConfig.dataPath ? `Data Path: ${apiConfig.dataPath}` : ''}
 ${apiConfig.pagination ? `Pagination: ${JSON.stringify(apiConfig.pagination)}` : ''}
 ${apiConfig.method ? `Method: ${apiConfig.method}` : ''}
 
-Available variables: ${vars.join(", ")}
+Available variables: ${availableVariables}
+Available pagination variables (if pagination is enabled): page, pageSize, offset, cursor, limit
+Example payload: ${JSON.stringify(payload || {})}
 
 Documentation: ${String(documentation)}`;
 
@@ -317,7 +301,7 @@ Documentation: ${String(documentation)}`;
       responseMapping: apiConfig.responseMapping,
       createdAt: apiConfig.createdAt || new Date(),
       updatedAt: new Date(),
-      id: apiConfig.id,
+      id: apiConfig.id || generateId(generatedConfig.urlHost, generatedConfig.urlPath),
     } as ApiConfig,
     messages: updatedMessages
   };

@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation'
 import { usePostHog } from 'posthog-js/react'
 import { useEffect, useState } from 'react'
 import { useConfig } from '../config-context'
+import { Loader2 } from 'lucide-react'
 
 export default function WelcomePage() {
   const [email, setEmail] = useState('')
@@ -235,7 +236,14 @@ export default function WelcomePage() {
               className="w-full"
               disabled={isSubmitting}
             >
-              {isSubmitting ? 'Submitting...' : 'Continue'}
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                'Continue'
+              )}
             </Button>
           </form>
         </CardContent>

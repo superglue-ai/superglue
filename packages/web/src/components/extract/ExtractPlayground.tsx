@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { ExtractConfig, CacheMode } from "@superglue/client";
-import { composeUrl } from "@/src/lib/utils";
 import { Button } from "@/src/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/src/components/ui/card";
 import { Badge } from "@/src/components/ui/badge";

@@ -123,8 +123,10 @@ export const API_PROMPT = `You are an API configuration assistant. Generate API 
 - Think hard before producing a response, and be aware that the response is not checked for validity if the response is not an error, so only suggest endpoints that you are sure are valid.
 - If this is a store / e-commerce site, try products.json, collections.json, categories.json, etc.
 - You can use the following format to access a postgres database: urlHost: "postgres://{user}:{password}@{hostname}:{port}", urlPath: "{database}", body: {query: "{query}"}
-
+- For SOAP requests, put the XML request in the body as a string. Make sure to think hard and include all relevant objects and fields as SOAP requests can be complex.
+  e.g. body: "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:urn=\"urn:com:example:types\"><soapenv:Header/><soapenv:Body><urn:getCustomer><urn:customerId>1234567890</urn:customerId></urn:getCustomer></soapenv:Body></soapenv:Envelope>"
 - The user might flag that a configuration did not run successfully: Look at the error code and message and understand, in relation to the documentation, what went wrong.
+  - The following variables are not defined: ... - You are using a {variable} that is not defined in the payload, credentials, or pagination. Only use the available variables, they should contain all the information you need.
   - ERROR 400: please pay special attention to the request body and url params. Maybe not all are requried? skip pagination? be creative here! this can be specific to the specific route.
   - ERROR 401: please pay special attention to the authentication type and headers.
   - ERROR 403: please pay special attention to the authentication type and headers.
@@ -214,4 +216,55 @@ you would return:
     }
   }
 }
+`;
+
+export const PLANNING_PROMPT = 
+`You are an expert AI assistant responsible for planning the execution steps needed to fulfill a user's request by orchestrating API calls. 
+Your goal is to create a clear, step-by-step plan based on the provided system documentation and the user's overall instruction. 
+Each step should be a single API call. Adhere to the documentation to understand how to call the API.
+Output the plan as a JSON object adhering to the specified schema.
+
+GUIDELINES:
+1. Create steps that follow a logical progression to fulfill the user's overall request
+2. Each step must correspond to a single API call (no compound operations)
+3. Choose the appropriate system for each step based on the provided documentation
+4. Assign descriptive stepIds in camelCase that indicate the purpose of the step
+5. Set the execution mode to either:
+   - DIRECT: For steps that execute once with specific data
+   - LOOP: For steps that need to iterate over a collection of items
+6. Consider data dependencies between steps (later steps can access results from earlier steps)
+7. Provide a finalTransform (JSONata expression) only if the results need post-processing
+
+EXAMPLE INPUT:
+\`\`\`
+Create a plan to fulfill the user's request by orchestrating single API calls across the available systems.
+
+Overall Instruction:
+"Get all products from Shopify, then create corresponding items in my inventory system"
+
+Available Systems and their API Documentation:
+--- System ID: shopify ---
+Base URL: https://mystore.myshopify.com/admin/api/2023-07
+Credentials available: api_key, api_password
+
+EXAMPLE OUTPUT:
+\`\`\`json
+{
+  "steps": [
+    {
+      "stepId": "getShopifyProducts",
+      "systemId": "shopify",
+      "instruction": "Get a list of all products from Shopify store",
+      "mode": "DIRECT"
+    },
+    {
+      "stepId": "createInventoryItems",
+      "systemId": "inventory",
+      "instruction": "Create inventory items for each Shopify product",
+      "mode": "LOOP"
+    }
+  ],
+  "finalTransform": "$.createInventoryItems[].{\"productId\": product_id, \"inventoryId\": id, \"status\": \"synced\"}"
+}
+\`\`\`
 `;

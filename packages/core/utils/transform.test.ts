@@ -9,11 +9,11 @@ vi.mock('../llm/llm.js', async () => {
   };
 });
 
-import { TransformInput } from '@superglue/shared';
 import dotenv from 'dotenv';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyJsonataWithValidation } from './tools.js';
 import { generateMapping, prepareTransform } from './transform.js';
+import { TransformConfig } from '@superglue/shared';
 
 // Get reference to the mock after imports
 const mockLLM = (await import('../llm/llm.js')).LanguageModel as any;
@@ -27,7 +27,8 @@ describe('transform utils', () => {
 
   describe('prepareTransform', () => {
     const testOrgId = 'test-org';
-    const sampleInput: TransformInput = {
+    const sampleInput: TransformConfig = {
+      id: 'test-transform-id',
       instruction: 'get the full name from the user',
       responseSchema: {
         type: 'object',
@@ -45,37 +46,16 @@ describe('transform utils', () => {
 
     it('should return null if responseSchema is empty', async () => {
       let mockDataStore = {
-        getTransformConfigFromRequest: vi.fn(),
+        getTransformConfig: vi.fn(),
       } as any;      
       const input = { ...sampleInput, responseSchema: {} };
       const result = await prepareTransform(mockDataStore, false, input, {}, null, { orgId: testOrgId });
       expect(result).toBeNull();
     });
 
-    it('should return cached config if fromCache is true and cache exists', async () => {
-        let mockDataStore = {
-            getTransformConfigFromRequest: vi.fn(),
-          } as any;          
-      const cachedConfig = {
-        id: 'cached-id',
-        responseMapping: 'cached-mapping',
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      
-      (mockDataStore.getTransformConfigFromRequest as any).mockResolvedValue(cachedConfig);
-      
-      const result = await prepareTransform(mockDataStore, true, sampleInput, { product: { name: 'test' } }, null, { orgId: testOrgId });
-      
-      expect(result).toEqual({
-        ...cachedConfig,
-        ...sampleInput
-      });
-    });
-
     it('should create new config if responseMapping is provided', async () => {
       let mockDataStore = {
-        getTransformConfigFromRequest: vi.fn(),
+        getTransformConfig: vi.fn(),
       } as any;          
       const input = {
         ...sampleInput,
@@ -96,7 +76,7 @@ describe('transform utils', () => {
     
     it('should generate new mapping if no responseMapping is provided', async () => {
         let mockDataStore = {
-            getTransformConfigFromRequest: vi.fn(),
+          getTransformConfig: vi.fn(),
         } as any;      
         mockLLM.generateObject.mockResolvedValueOnce({
             response: {

@@ -3,12 +3,12 @@ import { useState, useEffect, useMemo } from "react"
 import { motion } from "framer-motion"
 import { ChevronLeft, ChevronRight, X } from "lucide-react"
 import { LogEntry } from "@superglue/shared"
-import { Button } from "./ui/button"
-import { ScrollArea } from "./ui/scroll-area"
+import { Button } from "../ui/button"
+import { ScrollArea } from "../ui/scroll-area"
 import { ApolloClient, gql, InMemoryCache, useSubscription } from "@apollo/client"
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions'
 import { createClient } from 'graphql-ws'
-import { useConfig } from "../app/config-context"
+import { useConfig } from "../../app/config-context"
 
 const LOGS_SUBSCRIPTION = gql`
   subscription OnNewLog {

@@ -1,6 +1,6 @@
 'use client'
 
-import { ExtractCreateStepper } from '@/src/components/ExtractCreateStepper'
+import { ExtractCreateStepper } from '@/src/components/extract/ExtractCreateStepper'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 

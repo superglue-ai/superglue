@@ -7,12 +7,12 @@ import { Loader2 } from "lucide-react"
 import { useEffect, useState } from 'react'
 import { AutoSizer, MultiGrid } from 'react-virtualized'
 import 'react-virtualized/styles.css'
-import JsonSchemaEditor from './JsonSchemaEditor'
-import { Button } from './ui/button'
-import { Card, CardContent } from './ui/card'
-import { Input } from './ui/input'
-import { Label } from './ui/label'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
+import JsonSchemaEditor from '@/src/components/utils/JsonSchemaEditor'
+import { Button } from '@/src/components/ui/button'
+import { Card, CardContent } from '@/src/components/ui/card'
+import { Input } from '@/src/components/ui/input'
+import { Label } from '@/src/components/ui/label'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs'
 
 interface InteractiveExtractPlaygroundProps {
   configId: string

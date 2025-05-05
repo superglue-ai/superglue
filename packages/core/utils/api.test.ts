@@ -1,7 +1,7 @@
-import { ApiConfig, ApiInput, AuthType, HttpMethod, PaginationType } from '@superglue/shared';
+import { ApiConfig, AuthType, HttpMethod, PaginationType } from '@superglue/shared';
 import OpenAI from 'openai';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mocked } from 'vitest';
-import { callEndpoint, prepareEndpoint } from './api.js';
+import { callEndpoint, generateApiConfig } from './api.js';
 import * as tools from './tools.js';
 
 vi.mock('axios');
@@ -27,11 +27,12 @@ describe('API Utilities', () => {
   });
 
   describe('prepareEndpoint', () => {
-    const testInput: ApiInput = {
+    const testInput: ApiConfig = {
       urlHost: 'https://api.example.com',
       urlPath: 'v1/test',
-      instruction: 'Test API call',
-      method: HttpMethod.GET
+      method: HttpMethod.GET,
+      id: 'test-uuid-1232-2532-3233',
+      instruction: 'Test API call'
     };
 
     beforeEach(() => {
@@ -56,20 +57,17 @@ describe('API Utilities', () => {
           create: vi.fn().mockResolvedValue(mockOpenAIResponse)
         }
       };
-
-      // Mock the documentation fetch
-      vi.spyOn(global.crypto, 'randomUUID').mockReturnValue('test-uuid-1232-2532-3233');
     });
 
     it('should prepare endpoint configuration', async () => {
-      const result = await prepareEndpoint(testInput, {}, {}, {});
+      const result = await generateApiConfig(testInput, "", {}, {}, 0, []);
 
       expect(result.config).toMatchObject({
         urlHost: 'https://api.example.com',
         urlPath: 'v1/test',
         method: HttpMethod.GET,
         authentication: AuthType.NONE,
-        id: 'test-uuid-1232-2532-3233',
+        id: expect.stringMatching("test-uuid-1232-2532-3233"),
         headers: { 'Content-Type': 'application/json' },
         createdAt: expect.any(Date),
         updatedAt: expect.any(Date)
@@ -97,7 +95,7 @@ describe('API Utilities', () => {
         throw new Error('URL composition failed');
       });
 
-      await expect(prepareEndpoint(testInput, {}, {}, {}))
+      await expect(generateApiConfig(testInput, "", {}, {}, 0, []))
         .rejects.toThrow('URL composition failed');
     });
   });

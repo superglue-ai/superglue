@@ -1,11 +1,12 @@
 import { CacheMode, Context, DecompressionMethod, ExtractConfig, ExtractInputRequest, FileType, RequestOptions } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
-import { callExtract, prepareExtract, processFile } from "../../utils/extract.js";
+import { callExtract, processFile, generateExtractConfig } from "../../utils/extract.js";
 import { telemetryClient } from "../../utils/telemetry.js";
 import { maskCredentials } from "../../utils/tools.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 import { logMessage } from "../../utils/logs.js";
 import { Metadata } from "openai/resources/index.mjs";
+import { Documentation } from "../../utils/documentation.js";
 
 export const extractResolver = async (
   _: any,
@@ -52,11 +53,13 @@ export const extractResolver = async (
       }
       else {
         preparedExtract = readCache ? 
-          await context.datastore.getExtractConfig(input.id, context.orgId) || 
-          await context.datastore.getExtractConfigFromRequest(input.endpoint, payload, context.orgId) 
+          await context.datastore.getExtractConfig(input.id, context.orgId)
           : null;
         if(!preparedExtract) {
-          preparedExtract = await prepareExtract(input.endpoint, payload, credentials, lastError);
+          const documentation = new Documentation(preparedExtract, metadata);
+          const documentationString = await documentation.fetch();
+          preparedExtract = await generateExtractConfig(preparedExtract, documentationString, payload, credentials, lastError);
+      
         }
         try {
           const buffer = await callExtract(preparedExtract, payload, credentials, options);
@@ -80,11 +83,7 @@ export const extractResolver = async (
 
     // Save configuration if requested
     if(writeCache) {
-      if(input.id || preparedExtract.id) {
-        context.datastore.upsertExtractConfig(input.id || preparedExtract.id, preparedExtract, context.orgId);
-      } else {
-        context.datastore.saveExtractConfig(input.endpoint, payload, preparedExtract, context.orgId);
-      }
+      context.datastore.upsertExtractConfig(input.id || preparedExtract.id, preparedExtract, context.orgId);
     }
     const completedAt = new Date();
 

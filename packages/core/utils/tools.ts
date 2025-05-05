@@ -1,4 +1,4 @@
-import { RequestOptions } from "@superglue/shared";
+import { ApiConfig, RequestOptions } from "@superglue/shared";
 import axios, { AxiosRequestConfig } from "axios";
 import { GraphQLResolveInfo } from "graphql";
 import jsonata from "jsonata";
@@ -18,6 +18,9 @@ export interface TransformResult {
 }
 
 export async function applyJsonata(data: any, expr: string): Promise<any> {
+  if(!expr) {
+    return data;
+  }
   try {
     const expression = superglueJsonata(expr);
     const result = await expression.evaluate(data);
@@ -156,6 +159,12 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
   if(["GET", "HEAD", "DELETE", "OPTIONS"].includes(config.method!)) {
     config.data = undefined;
   }
+  else if(config.data && config.data.trim().startsWith("{")) {
+    config.data = JSON.parse(config.data);
+  }
+  else if(!config.data) {
+    config.data = undefined;
+  }
   
   do {
     try {
@@ -211,6 +220,14 @@ export function applyAuthFormat(format: string, credentials: Record<string, stri
   });
 }
 
+export function generateId(host: string, path: string) {
+  const domain = host?.replace(/^https?:\/\//, '') || 'api';
+  const lastPath = path?.split('/').filter(Boolean).pop() || '';
+  const rand = Math.floor(1000 + Math.random() * 9000);
+  return `${domain}-${lastPath}-${rand}`;
+}
+
+
 export function composeUrl(host: string, path: string) {
   // Handle empty/undefined inputs
   if (!host) host = '';
@@ -246,10 +263,13 @@ export function replaceVariables(template: string, variables: Record<string, any
     }
 
     if (value === undefined || value === null) {
+      if(path == 'cursor') {
+        return "";
+      }
       return match; // Keep original if final value is invalid
     }
 
-    if(Array.isArray(value)) {
+    if(Array.isArray(value) || typeof value === 'object') {
       return JSON.stringify(value);
     }
     

@@ -1,6 +1,6 @@
 'use client'
 
-import ApiConfigForm from "@/src/components/ApiConfigForm";
+import ApiConfigForm from "@/src/components/api/ApiConfigForm";
 import { useParams } from "next/navigation";
 
 export default function EditConfigPage() {

@@ -2,22 +2,24 @@
 
 import { useConfig } from '@/src/app/config-context'
 import { useToast } from '@/src/hooks/use-toast'
-import { cleanApiDomain, cn } from '@/src/lib/utils'
+import { cn, composeUrl } from '@/src/lib/utils'
 import { ApiConfig, AuthType, CacheMode, SuperglueClient } from '@superglue/client'
 import { Copy, Loader2, Terminal, Upload, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { InteractiveApiPlayground } from './InteractiveApiPlayground'
-import { Button } from './ui/button'
-import { StepIndicator, type StepperStep } from './StepIndicator'
+import { Button } from '../ui/button'
+import { API_CREATE_STEPS, StepIndicator, type StepperStep } from '../utils/StepIndicator'
 import { Label } from '@radix-ui/react-label'
-import { Textarea } from './ui/textarea'
-import { HelpTooltip } from './HelpTooltip'
-import { Input } from './ui/input'
+import { Textarea } from '../ui/textarea'
+import { HelpTooltip } from '../utils/HelpTooltip'
+import { Input } from '../ui/input'
 import { ApolloClient, gql, InMemoryCache, useSubscription } from '@apollo/client'
 import { createClient } from 'graphql-ws'
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions'
-import { inputErrorStyles, parseCredentialsHelper } from '@/src/lib/client-utils'
+import { inputErrorStyles, parseCredentialsHelper, splitUrl } from '@/src/lib/client-utils'
+import { integrations } from '@/src/lib/integrations'
+import { URLField } from '../utils/URLField'
 
 interface ConfigCreateStepperProps {
   configId?: string
@@ -136,34 +138,6 @@ export function ConfigCreateStepper({ configId: initialConfigId, mode = 'create'
     }
   }
 
-  const splitUrl = (url: string) => {
-    if (!url) {
-      return {
-        urlHost: '',
-        urlPath: ''
-      }
-    }
-    
-    try {
-      const urlObj = new URL(url.startsWith('http') ? url : `https://${url}`)
-      const cleanedHost = cleanApiDomain(`${urlObj.protocol}//${urlObj.host}`)
-      // Include query params in the path, good context for LLM
-      const path = urlObj.pathname === '/' ? '' : `${urlObj.pathname}${urlObj.search}` 
-      return {
-        urlHost: cleanedHost,
-        urlPath: path
-      }
-    } catch (error) {
-      // If URL parsing fails, just use existing cleanApiDomain
-      console.warn('URL parsing failed:', error)
-      const cleanedUrl = cleanApiDomain(url)
-      return {
-        urlHost: cleanedUrl,
-        urlPath: ''
-      }
-    }
-  }
-
   const handleAuthChange = (value: string) => {
     setFormData(prev => ({
       ...prev,
@@ -211,6 +185,7 @@ export function ConfigCreateStepper({ configId: initialConfigId, mode = 'create'
         // Call autofill endpoint
         const response = await superglueClient.call({
           endpoint: {
+            id: url.urlHost?.replace(/^https?:\/\//, '').replace(/\//g, '') + '-' + Math.floor(1000 + Math.random() * 9000),
             urlHost: url.urlHost,
             ...(url.urlPath ? { urlPath: url.urlPath } : {}),
             ...(formData.documentationUrl ? { documentationUrl: formData.documentationUrl } : {}),
@@ -538,6 +513,32 @@ const result = await superglue.call({
     }
   })
 
+  // Add a new function to handle URL changes from URLField
+  const handleUrlChange = (urlHost: string, urlPath: string, queryParams: Record<string, string>) => {
+    const fullUrl = urlHost + (urlPath || '')
+    
+    setFormData(prev => ({
+      ...prev,
+      fullUrl
+    }))
+    
+    // Auto-fill documentation URL if it's empty
+    if (!formData.documentationUrl && urlHost) {
+      // Check if URL matches any pattern in integrations
+      const fullUrl = composeUrl(urlHost, urlPath)
+      for (const pattern in integrations) {
+        if (new RegExp(pattern).test(fullUrl)) {
+          setFormData(prev => ({
+            ...prev,
+            fullUrl,
+            documentationUrl: integrations[pattern].docsUrl
+          }))
+          break
+        }
+      }
+    }
+  }
+
   return (
     <div className="flex-1 flex flex-col h-full p-6">
       <div className="flex-none mb-4">
@@ -571,7 +572,7 @@ const result = await superglue.call({
           </div>
         </div>
 
-        <StepIndicator currentStep={step} />
+        <StepIndicator currentStep={step} steps={API_CREATE_STEPS} />
       </div>
 
       <div className="flex-1 overflow-y-auto px-1 min-h-0">
@@ -582,22 +583,12 @@ const result = await superglue.call({
                 <Label htmlFor="fullUrl">API Endpoint URL</Label>
                 <HelpTooltip text="The API URL (e.g., https://api.example.com/v1). Don't include the endpoint, e.g. /books/list, we figure it out." />
               </div>
-              <Input
-                id="fullUrl"
-                value={formData.fullUrl}
-                onChange={(e) => {
-                  handleChange('fullUrl')(e)
-                  if (e.target.value) {
-                    setValidationErrors(prev => ({ ...prev, fullUrl: false }))
-                  }
-                }}
+              <URLField
+                url={formData.fullUrl}
+                onUrlChange={handleUrlChange}
                 placeholder="https://api.example.com/v1"
+                error={!!validationErrors.fullUrl}
                 required
-                autoFocus
-                className={cn(
-                  validationErrors.fullUrl && inputErrorStyles,
-                  validationErrors.fullUrl && "focus:!border-destructive"
-                )}
               />
               {validationErrors.fullUrl && (
                 <p className="text-sm text-destructive mt-1">API endpoint URL is required</p>

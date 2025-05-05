@@ -1,4 +1,4 @@
-import type { ApiConfig, ApiInput, DataStore, ExtractConfig, ExtractInput, RunResult, Workflow, TransformConfig, TransformInput } from "@superglue/shared";
+import type { ApiConfig, DataStore, ExtractConfig, RunResult, Workflow, TransformConfig } from "@superglue/shared";
 import { createHash } from 'node:crypto';
 import { getSchemaFromData } from "../utils/tools.js";
 
@@ -58,23 +58,6 @@ export class MemoryStore implements DataStore {
     return { items, total };
   }
 
-  async saveApiConfig(request: ApiInput, payload: any, config: ApiConfig, orgId?: string): Promise<ApiConfig> {
-    if(!request) return null;
-    const hash = this.generateHash({request, payloadKeys: getSchemaFromData(payload)});
-    const key = this.getKey('api', hash, orgId);
-    config.id = hash;
-    this.storage.apis.set(key, config);
-    return { ...config, id: hash };
-  }
-
-  async getApiConfigFromRequest(request: ApiInput, payload: any, orgId?: string): Promise<ApiConfig | null> {
-    if(!request) return null;
-    const hash = this.generateHash({request, payloadKeys: getSchemaFromData(payload)});
-    const key = this.getKey('api', hash, orgId);
-    const config = this.storage.apis.get(key);
-    return config ? { ...config, id: hash } : null;
-  }
-
   async upsertApiConfig(id: string, config: ApiConfig, orgId?: string): Promise<ApiConfig> {
     if(!id || !config) return null;
     const key = this.getKey('api', id, orgId);
@@ -104,23 +87,6 @@ export class MemoryStore implements DataStore {
     return { items, total };
   }
 
-  async saveExtractConfig(request: ExtractInput, payload: any, config: ExtractConfig, orgId: string): Promise<ExtractConfig> {
-    if(!request) return null;
-    const hash = this.generateHash({request, payloadKeys: getSchemaFromData(payload)});
-    const key = this.getKey('extract', hash, orgId);
-    config.id = hash;
-    this.storage.extracts.set(key, config);
-    return { ...config, id: hash };
-  }
-
-  async getExtractConfigFromRequest(request: ExtractInput, payload: any, orgId?: string): Promise<ExtractConfig | null> {
-    if(!request) return null;
-    const hash = this.generateHash({request, payloadKeys: getSchemaFromData(payload)});
-    const key = this.getKey('extract', hash, orgId);
-    const config = this.storage.extracts.get(key);
-    return config ? { ...config, id: hash } : null;
-  }
-
   async upsertExtractConfig(id: string, config: ExtractConfig, orgId: string): Promise<ExtractConfig> {
     if(!id || !config) return null;
     const key = this.getKey('extract', id, orgId);
@@ -148,23 +114,6 @@ export class MemoryStore implements DataStore {
       .slice(offset, offset + limit);
     const total = this.getOrgItems(this.storage.transforms, 'transform', orgId).length;
     return { items, total };
-  }
-
-  async saveTransformConfig(request: TransformInput, payload: any, config: TransformConfig, orgId?: string): Promise<TransformConfig> {
-    if(!request) return null;
-    const hash = this.generateHash({request, payloadKeys: getSchemaFromData(payload)});
-    const key = this.getKey('transform', hash, orgId);
-    config.id = hash;
-    this.storage.transforms.set(key, config);
-    return { ...config, id: hash };
-  }
-
-  async getTransformConfigFromRequest(request: TransformInput, payload: any, orgId?: string): Promise<TransformConfig | null> {
-    if(!request) return null;
-    const hash = this.generateHash({request, payloadKeys: getSchemaFromData(payload)});
-    const key = this.getKey('transform', hash, orgId);
-    const config = this.storage.transforms.get(key);
-    return config ? { ...config, id: hash } : null;
   }
 
   async upsertTransformConfig(id: string, config: TransformConfig, orgId: string): Promise<TransformConfig> {

@@ -28,8 +28,8 @@ export class WorkflowExecutor implements Workflow {
     };
   }
   public async execute(
-    payload: Record<string, unknown>,
-    credentials: Record<string, unknown>,
+    payload: Record<string, any>,
+    credentials: Record<string, string>,
     options?: RequestOptions,
   ): Promise<WorkflowResult> {
     this.result = {
@@ -83,10 +83,8 @@ export class WorkflowExecutor implements Workflow {
 
           // Apply the final transform using the original data
           const finalResult = await applyJsonata(rawStepData, this.finalTransform);
-          console.log("Final transform result: ", finalResult);
           this.result.data = finalResult as Record<string, unknown>;
         } catch (transformError) {
-          console.error("Final transform error:", transformError);
           this.result.error = `Final transformation error: ${String(transformError)}`;
           this.result.success = false;
         }
@@ -130,7 +128,7 @@ export class WorkflowExecutor implements Workflow {
       if (step.inputMapping) {
         // Prepare context for JSONata expression
         const mappingContext = {
-          payload: originalPayload,
+          ...originalPayload,
           // Include step results at root level for easier access
           ...Object.entries(this.result?.stepResults).reduce(
             (acc, [stepIndex, stepResult]) => {
