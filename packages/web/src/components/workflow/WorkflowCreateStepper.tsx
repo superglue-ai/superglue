@@ -2,7 +2,7 @@ import { useConfig } from '@/src/app/config-context';
 import { useToast } from '@/src/hooks/use-toast';
 import { cn, composeUrl } from '@/src/lib/utils';
 import { SuperglueClient, SystemInput, TransformConfig } from '@superglue/client';
-import { Loader2, Plus, Trash2, X, Upload, Link, Check, ChevronsUpDown, Globe, ArrowRight, ArrowDown, RotateCw, Play, Pencil } from 'lucide-react';
+import { Loader2, Plus, Trash2, X, Upload, Link, Check, ChevronsUpDown, Globe, ArrowRight, ArrowDown, RotateCw, Play, Pencil, Copy } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
@@ -630,7 +630,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         if (onComplete) {
             onComplete();
         } else {
-            router.push('/workflows'); // Default redirect
+            router.push('/'); // Default redirect
         }
     }
   };
@@ -1066,28 +1066,33 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                <div className="space-y-2">
                   <Label htmlFor="instruction">Workflow Instruction*</Label>
                   <HelpTooltip text="Describe what you want this workflow to achieve using the integrations you defined. Be specific!" />
-                  <Textarea
+                  <div className="relative">
+                    <Textarea
                       id="instruction"
                       value={instruction}
                       onChange={(e) => { setInstruction(e.target.value); setValidationErrors(prev => ({...prev, instruction: false})); }}
                       placeholder="e.g., 'Fetch customer details from CRM using the input email, then get their recent orders from productApi.'"
                       className={cn("h-40", validationErrors.instruction && inputErrorStyles)}
-                  />
+                    />
+                    {suggestions.length > 0 && !instruction && (
+                      <div className="absolute bottom-0  p-3 pointer-events-none">
+                        <div className="flex flex-wrap gap-2">
+                          {suggestions.map((suggestion, index) => (
+                            <Button
+                              key={index}
+                              variant="outline"
+                              className="text-sm py-2 px-4 h-auto font-normal bg-background/80 hover:bg-accent hover:text-accent-foreground transition-colors flex items-center gap-2 pointer-events-auto"
+                              onClick={() => setInstruction(suggestion)}
+                            >
+                              <ArrowRight className="h-3 w-3" />
+                              {suggestion}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                    {validationErrors.instruction && <p className="text-sm text-destructive mt-1">Instruction is required.</p>}
-                  {suggestions.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {suggestions.map((suggestion, index) => (
-                        <Button
-                          key={index}
-                          variant="outline"
-                          className="text-sm py-1 px-3 h-auto"
-                          onClick={() => setInstruction(suggestion)}
-                        >
-                          {suggestion}
-                        </Button>
-                      ))}
-                    </div>
-                  )}
                </div>
 
                {/* Show loading state */}
@@ -1184,16 +1189,113 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
           )}
 
           {/* Step 4: Success */}
-          {step === 'success' && generatedWorkflow && (
-             <div className="space-y-4">
-                 <p className="text-lg font-medium">Workflow <span className="font-mono text-base bg-muted px-2 py-0.5 rounded">{generatedWorkflow.id}</span> created successfully!</p>
-                 <p>You can now use this workflow ID in the "Workflows" page or call it via the API/SDK.</p>
-                 {/* Maybe add buttons to go to workflow page or copy ID */}
+          {step === 'success' && generatedWorkflow && (() => {
+            // Define code strings once
+            const sdkCode = `const client = new SuperglueClient({
+  apiKey: "${superglueConfig.superglueApiKey}"
+});
+
+const result = await client.executeWorkflow({
+  id: "${generatedWorkflow.id}",
+  payload: ${payload || '{}'},
+  credentials: ${JSON.stringify(systems.reduce((acc, system) => ({ ...acc, ...system.credentials }), {}), null, 2)}
+});`;
+
+            // Correct the curl command based on the GraphQL schema
+            const curlCommand = `curl -X POST "${superglueConfig.superglueEndpoint}/graphql" \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer ${superglueConfig.superglueApiKey}" \\
+  -d '${JSON.stringify({
+              query: `mutation ExecuteWorkflow($input: WorkflowInputRequest!, $payload: JSON, $credentials: JSON) { 
+  executeWorkflow(input: $input, payload: $payload, credentials: $credentials) { 
+    data 
+    error 
+    success 
+  } 
+}`, // Updated query signature
+              variables: {
+                input: { // Nest id under input
+                  id: generatedWorkflow.id 
+                },
+                payload: JSON.parse(payload || '{}'),
+                credentials: systems.reduce((acc, system) => ({ ...acc, ...system.credentials }), {})
+              }
+            })}'`;
+
+            return (
+              <div className="space-y-4">
+                <p className="text-lg font-medium">Workflow <span className="font-mono text-base bg-muted px-2 py-0.5 rounded">{generatedWorkflow.id}</span> created successfully!</p>
+                <p>You can now use this workflow ID in the "Workflows" page or call it via the API/SDK.</p>
+
+                <div className="space-y-4 mt-6">
+                  <div className="rounded-md bg-muted p-4">
+                    <div className="flex items-start space-x-2">
+                      <div className="space-y-1 w-full">
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="font-medium">Using the SDK</h3>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 flex-none"
+                            onClick={() => {
+                              navigator.clipboard.writeText(sdkCode);
+                              toast({ title: 'SDK code copied!' });
+                            }}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <div className="bg-secondary rounded-md overflow-hidden">
+                          <pre className="font-mono text-sm p-4 overflow-x-auto">
+                            <code>
+                              {sdkCode}
+                            </code>
+                          </pre>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-md bg-muted p-4">
+                    <div className="flex items-start space-x-2">
+                      <div className="space-y-1 w-full">
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="font-medium">Using cURL</h3>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 flex-none"
+                            onClick={() => {
+                              navigator.clipboard.writeText(curlCommand); // Use updated command
+                              toast({ title: 'cURL command copied!' });
+                            }}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <div className="bg-secondary rounded-md overflow-hidden">
+                          <pre className="font-mono text-sm p-4 overflow-x-auto">
+                            <code>
+                              {curlCommand} {/* Display updated command */}
+                            </code>
+                          </pre>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 mt-6">
                   <Button variant="outline" onClick={() => router.push(`/workflows/${generatedWorkflow.id}`)}>
                     Go to Workflow
                   </Button>
-             </div>
-          )}
+                  <Button variant="outline" onClick={() => router.push('/workflows')}>
+                    View All Workflows
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Right Column - Test Results (only shown during review) */}
