@@ -60,7 +60,7 @@ export async function executeApiCall(
       }
     }
     retryCount++;
-  } while (retryCount < 5);
+  } while (retryCount < 8);
 
   if (!response?.data) {
     telemetryClient?.captureException(new Error(`API call failed after ${retryCount} retries. Last error: ${lastError}`), metadata.orgId, {
