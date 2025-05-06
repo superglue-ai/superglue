@@ -1,6 +1,5 @@
 'use server'
 
-import axios from 'axios';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
@@ -32,17 +31,17 @@ export async function middleware(request: NextRequest) {
   const GQL_API_KEY = process.env.AUTH_TOKEN
   try {
     // TODO: remove once client SDK is updated
-    const response = await axios({
-      method: 'post',
-      url: `${GQL_ENDPOINT}`,
+    const response = await fetch(`${GQL_ENDPOINT}`, {
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${GQL_API_KEY}`,
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0',
+        // fetch handles caching via the `cache` option below
+        // 'Cache-Control': 'no-cache, no-store, must-revalidate',
+        // 'Pragma': 'no-cache',
+        // 'Expires': '0',
       },
-      data: {
+      body: JSON.stringify({
         query: `
           query GetTenantInfo {
             getTenantInfo {
@@ -51,11 +50,13 @@ export async function middleware(request: NextRequest) {
             }
           }
         `,
-      },
+      }),
+      cache: 'no-store', // This tells fetch not to cache the response
     });
 
-    if (response.status === 200) {
-      const { data } = response.data;
+    if (response.ok) { // Check if the request was successful (status code 200-299)
+      const responseData = await response.json(); // Parse the JSON response body
+      const { data } = responseData; // The actual GraphQL data is nested under 'data'
       const redirectResponse = NextResponse.redirect(new URL('/welcome', request.url));
       const nextResponse = NextResponse.next();
       if (data?.getTenantInfo?.email !== undefined) {
