@@ -1,14 +1,17 @@
-import type { ExecutionStep, RequestOptions, Workflow, WorkflowResult, WorkflowStepResult } from "@superglue/shared";
-import { applyJsonata } from "../utils/tools.js";
+import type { ExecutionStep, RequestOptions, Workflow, WorkflowResult, WorkflowStepResult, TransformConfig } from "@superglue/shared";
+import { applyJsonata, applyJsonataWithValidation } from "../utils/tools.js";
 import { selectStrategy } from "./workflow-strategies.js";
 import { logMessage } from "../utils/logs.js";
 import { Metadata } from "@playwright/test";
+import { JSONSchema } from "openai/lib/jsonschema.mjs";
+import { generateMapping, prepareTransform } from "../utils/transform.js";
 
 export class WorkflowExecutor implements Workflow {
   public id: string;
   public steps: ExecutionStep[];
   public finalTransform?: string;
   public result: WorkflowResult;
+  public responseSchema?: JSONSchema;
   public metadata: Metadata;
 
   constructor(
@@ -18,6 +21,7 @@ export class WorkflowExecutor implements Workflow {
     this.id = workflow.id;
     this.steps = workflow.steps;
     this.finalTransform = workflow.finalTransform || "$";
+    this.responseSchema = workflow.responseSchema;
     this.metadata = metadata;
     this.result = {
       success: true,
@@ -68,26 +72,42 @@ export class WorkflowExecutor implements Workflow {
       }
 
       // Apply final transformation if specified
-      if (this.finalTransform) {
-        try {
-          // Object to easily access just the step raw data for transform
-          const rawStepData = {
-            ...Object.entries(this.result.stepResults).reduce(
-              (acc, [stepIndex, stepResult]) => {
-                acc[this.result.stepResults[stepIndex].stepId] = stepResult.transformedData;
-                return acc;
-              },
-              {} as Record<string, unknown>,
-            ),
-          };
-
-          // Apply the final transform using the original data
-          const finalResult = await applyJsonata(rawStepData, this.finalTransform);
-          this.result.data = finalResult as Record<string, unknown>;
-        } catch (transformError) {
-          this.result.error = `Final transformation error: ${String(transformError)}`;
-          this.result.success = false;
-        }
+      if (this.finalTransform || this.responseSchema) {
+        let currentFinalTransform = this.finalTransform || "$";
+        const rawStepData = {
+          ...Object.entries(this.result.stepResults).reduce(
+            (acc, [stepIndex, stepResult]) => {
+              acc[this.result.stepResults[stepIndex].stepId] = stepResult.transformedData;
+              return acc;
+            },
+            {} as Record<string, unknown>,
+          ),
+        };
+          try {
+            // Apply the final transform using the original data
+            const finalResult = await applyJsonataWithValidation(rawStepData, currentFinalTransform, this.responseSchema);
+            if(!finalResult.success) {
+              throw new Error(finalResult.error);
+            }
+            this.result.data = finalResult.data as Record<string, unknown> || {};
+            this.result.finalTransform = currentFinalTransform; // Store the successful transform
+            this.result.error = undefined; // Clear any previous transform error
+            this.result.success = true; // Ensure success is true if transform succeeds
+          } catch (transformError) {
+            logMessage("info", `Preparing new final transform`, this.metadata);
+            const newTransformConfig = await generateMapping(this.responseSchema, rawStepData, "Generate the final transformation expression in JSONata format.", this.metadata);
+            if(!newTransformConfig) {
+              throw new Error("Failed to generate new final transform");
+            }
+            const finalResult = await applyJsonataWithValidation(rawStepData, newTransformConfig.jsonata, this.responseSchema);
+            if(!finalResult.success) {
+              throw new Error(finalResult.error);
+            }
+            this.result.data = finalResult.data as Record<string, unknown> || {};
+            this.result.finalTransform = currentFinalTransform; // Store the successful transform
+            this.result.error = undefined; // Clear any previous transform error
+            this.result.success = true; // Ensure success is true if transform succeeds
+          }
       }
       this.result.completedAt = new Date();
       return this.result;

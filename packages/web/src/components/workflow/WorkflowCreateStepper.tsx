@@ -1,7 +1,7 @@
 import { useConfig } from '@/src/app/config-context';
 import { useToast } from '@/src/hooks/use-toast';
 import { cn, composeUrl } from '@/src/lib/utils';
-import { SuperglueClient, SystemInput, TransformConfig } from '@superglue/client';
+import { SuperglueClient, SystemInput, TransformConfig, WorkflowResult } from '@superglue/client';
 import { Loader2, Plus, Trash2, X, Upload, Link, Check, ChevronsUpDown, Globe, ArrowRight, ArrowDown, RotateCw, Play, Pencil, Copy } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
@@ -352,7 +352,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const [integrationDropdownOpen, setIntegrationDropdownOpen] = useState(false);
 
   const [isExecuting, setIsExecuting] = useState(false);
-  const [executionResult, setExecutionResult] = useState<any>(null);
+  const [executionResult, setExecutionResult] = useState<WorkflowResult | null>(null);
   const [finalResult, setFinalResult] = useState<any>(null);
   const [executionError, setExecutionError] = useState<string | null>(null);
 
@@ -558,7 +558,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         setSchema(JSON.stringify(schema, null, 2));
 
         // Then build workflow
-        const response = await superglueClient.buildWorkflow(instruction, payload, systems);
+        const response = await superglueClient.buildWorkflow(instruction, payload, systems, schema);
         if (!response) {
           throw new Error('Failed to build workflow');
         }
@@ -714,27 +714,20 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         apiKey: superglueConfig.superglueApiKey,
       });
       const result = await superglueClient.executeWorkflow({
-        id: generatedWorkflow.id,
+        workflow: {
+          id: generatedWorkflow.id,
+          steps: generatedWorkflow.steps,
+          responseSchema: JSON.parse(schema),
+          finalTransform: generatedWorkflow.finalTransform,
+        },
         payload: JSON.parse(payload || '{}'),
         credentials: systems.reduce((acc, system) => ({...acc, ...system.credentials}), {}),
       });
       setExecutionResult(result);
+      setFinalTransform(result.finalTransform);
+      setFinalResult(result.data);
+      setActiveTab('final');
 
-      // Generate transform after successful execution
-      const transformResult = await superglueClient.transform({
-        endpoint: {
-          id: generatedWorkflow.id,
-          instruction: instruction,
-          responseSchema: JSON.parse(schema),
-        },
-        data: result?.data || {}
-      });
-      
-      if (transformResult.success) {
-        setFinalTransform((transformResult.config as TransformConfig).responseMapping);
-        setFinalResult(transformResult.data);
-        setActiveTab('final');
-      }
     } catch (error: any) {
       setExecutionError(error.message);
       toast({
@@ -1072,7 +1065,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                       value={instruction}
                       onChange={(e) => { setInstruction(e.target.value); setValidationErrors(prev => ({...prev, instruction: false})); }}
                       placeholder="e.g., 'Fetch customer details from CRM using the input email, then get their recent orders from productApi.'"
-                      className={cn("h-40", validationErrors.instruction && inputErrorStyles)}
+                      className={cn("min-h-80", validationErrors.instruction && inputErrorStyles)}
                     />
                     {suggestions.length > 0 && !instruction && (
                       <div className="absolute bottom-0  p-3 pointer-events-none">
@@ -1371,10 +1364,10 @@ const result = await client.executeWorkflow({
                           <List
                             width={width}
                             height={height}
-                            rowCount={getResponseLines(executionResult?.data).length}
+                            rowCount={getResponseLines(executionResult?.stepResults).length}
                             rowHeight={18}
                             rowRenderer={({ index, key, style }) => {
-                              const line = getResponseLines(executionResult?.data)[index];
+                              const line = getResponseLines(executionResult?.stepResults)[index];
                               const indentMatch = line?.match(/^(\s*)/);
                               const indentLevel = indentMatch ? indentMatch[0].length : 0;
                               

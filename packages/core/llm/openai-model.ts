@@ -37,9 +37,21 @@ export class OpenAIModel implements LLM {
         messages: messages
         };
     }
-    private enforceStrictSchema(schema: any) {
-      if (typeof schema !== 'object') return schema;
-      if (schema.type === 'object') {
+
+    private enforceStrictSchema(schema: any, isRoot: boolean) {
+      if (!schema || typeof schema !== 'object') return schema;
+
+      // wrap non-object in object with ___results key
+      if (isRoot && schema.type !== 'object') {
+        schema = {
+          type: 'object',
+          properties: {
+            ___results: schema,
+          },
+        };
+      }
+
+      if (schema.type === 'object' || schema.type === 'array') {
         schema.additionalProperties = false;
         schema.strict = true;
         if (schema.properties) {
@@ -47,18 +59,22 @@ export class OpenAIModel implements LLM {
           schema.required = Object.keys(schema.properties);
           delete schema.patternProperties;
           // Recursively process nested properties
-          Object.values(schema.properties).forEach(prop => this.enforceStrictSchema(prop));
+          Object.values(schema.properties).forEach(prop => this.enforceStrictSchema(prop, false));
         }
         if (schema.items) {
-          schema.items = this.enforceStrictSchema(schema.items);
+          schema.items = this.enforceStrictSchema(schema.items, false);
+          delete schema.minItems;
+          delete schema.maxItems;
         }
       }
+
       return schema;
     };
 
     async generateObject(messages: ChatCompletionMessageParam[], schema: any, temperature: number = 0): Promise<LLMObjectResponse> {
       // Recursively set additionalProperties: false for all object properties
       schema = addNullableToOptional(schema)      
+      schema = this.enforceStrictSchema(schema, true);
       // o models don't support temperature
       if (process.env.OPENAI_MODEL?.startsWith('o')) {
           temperature = undefined;
@@ -72,8 +88,10 @@ export class OpenAIModel implements LLM {
         });
         let responseText = result.choices[0].message.content;
 
-        const generatedObject = JSON.parse(responseText);
-        
+        let generatedObject = JSON.parse(responseText);
+        if (generatedObject.___results) {
+          generatedObject = generatedObject.___results;
+        }
         // Add response to messages history
         messages.push({
           role: "assistant",

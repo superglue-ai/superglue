@@ -66,7 +66,7 @@ const EmptyStateActions: React.FC<EmptyStateActionsProps> = ({
               <GitBranch className="h-12 w-12 md:h-16 md:w-16 text-primary" strokeWidth={1.5} />
             </div>
             <div className="flex flex-col items-center text-center">
-              <span className="text-lg md:text-2xl font-semibold mb-1 md:mb-2 max-w-full">Add new Workflow (Alpha)</span>
+              <span className="text-lg md:text-2xl font-semibold mb-1 md:mb-2 max-w-full">Add new Workflow (Beta)</span>
               <span className="text-muted-foreground text-xs md:text-sm max-w-full">Connect steps together</span>
             </div>
           </div>
