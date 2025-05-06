@@ -342,7 +342,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const [instruction, setInstruction] = useState('');
   const [payload, setPayload] = useState('{}');
   const [generatedWorkflow, setGeneratedWorkflow] = useState<any>(null); // To store result from buildWorkflow
-  const [finalTransform, setFinalTransform] = useState<string | null>(null); // For editing in review step
+  const [finalTransform, setFinalTransform] = useState<string>("$"); // For editing in review step
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
   const [systemFormVisible, setSystemFormVisible] = useState(false);
 
@@ -724,6 +724,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         credentials: systems.reduce((acc, system) => ({...acc, ...system.credentials}), {}),
       });
       setExecutionResult(result);
+      console.log(finalTransform);
       setFinalTransform(result.finalTransform);
       setFinalResult(result.data);
       setActiveTab('final');
@@ -1402,7 +1403,7 @@ const result = await client.executeWorkflow({
               ) : activeTab === 'transform' ? (
                 <div className="flex-grow overflow-auto p-4">
                   <Textarea
-                    value={finalTransform || ''}
+                    value={finalTransform}
                     onChange={(e) => setFinalTransform(e.target.value)}
                     className="font-mono text-xs w-full h-full min-h-[300px]"
                     spellCheck={false}

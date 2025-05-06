@@ -74,7 +74,6 @@ export class WorkflowExecutor implements Workflow {
 
       // Apply final transformation if specified
       if (this.finalTransform || this.responseSchema) {
-        let currentFinalTransform = this.finalTransform || "$";
         const rawStepData = {
           ...Object.entries(this.result.stepResults).reduce(
             (acc, [stepIndex, stepResult]) => {
@@ -86,6 +85,7 @@ export class WorkflowExecutor implements Workflow {
         };
           try {
             // Apply the final transform using the original data
+            let currentFinalTransform = this.finalTransform || "$";
             const finalResult = await applyJsonataWithValidation(rawStepData, currentFinalTransform, this.responseSchema);
             if(!finalResult.success) {
               throw new Error(finalResult.error);
@@ -105,7 +105,7 @@ export class WorkflowExecutor implements Workflow {
               throw new Error(finalResult.error);
             }
             this.result.data = finalResult.data as Record<string, unknown> || {};
-            this.result.finalTransform = currentFinalTransform; // Store the successful transform
+            this.result.finalTransform = newTransformConfig.jsonata; // Store the successful transform
             this.result.error = undefined; // Clear any previous transform error
             this.result.success = true; // Ensure success is true if transform succeeds
           }

@@ -127,6 +127,7 @@ export const API_PROMPT = `You are an API configuration assistant. Generate API 
   e.g. body: "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:urn=\"urn:com:example:types\"><soapenv:Header/><soapenv:Body><urn:getCustomer><urn:customerId>1234567890</urn:customerId></urn:getCustomer></soapenv:Body></soapenv:Envelope>"
 - The user might flag that a configuration did not run successfully: Look at the error code and message and understand, in relation to the documentation, what went wrong.
   - The following variables are not defined: ... - You are using a {variable} that is not defined in the payload, credentials, or pagination. Only use the available variables, they should contain all the information you need.
+  - If the error is related to a filter and you can't figure out what the problem is, try to remove the filter. We can always add in the mapping later.
   - ERROR 400: please pay special attention to the request body and url params. Maybe not all are requried? skip pagination? be creative here! this can be specific to the specific route.
   - ERROR 401: please pay special attention to the authentication type and headers.
   - ERROR 403: please pay special attention to the authentication type and headers.
