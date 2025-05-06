@@ -1,5 +1,5 @@
 import { generateApiConfig } from "../utils/api.js";
-import type { Workflow, ExecutionStep, ApiConfig, ExecutionMode, Metadata } from "@superglue/shared";
+import { type Workflow, type ExecutionStep, type ApiConfig, type ExecutionMode, type Metadata, CacheMode } from "@superglue/shared";
 import { object, z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { applyJsonata, composeUrl } from "../utils/tools.js"; // Assuming path
@@ -11,6 +11,7 @@ import { executeApiCall } from "../graphql/resolvers/call.js";
 import { generateMapping, prepareTransform } from "../utils/transform.js";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { WorkflowExecutor } from "./workflow-executor.js";
+import { selectStrategy } from "./workflow-strategies.js";
 // Define the structure for system input
 export interface SystemDefinition {
   id: string;
@@ -25,9 +26,11 @@ export interface SystemDefinition {
 interface WorkflowPlanStep {
   stepId: string;
   systemId: string;
+  urlHost?: string;
+  urlPath?: string;
   instruction: string;
   mode: ExecutionMode;
-  // Future enhancement: Add fields for suggested input/output mapping or looping
+  loopSelector?: string;
 }
 
 interface WorkflowPlan {
@@ -65,9 +68,11 @@ export class WorkflowBuilder {
         stepId: z.string().describe("Unique camelCase identifier for the step (e.g., 'fetchCustomerDetails', 'updateOrderStatus')."),
         systemId: z.string().describe("The ID of the system (from the provided list) to use for this step."),
         instruction: z.string().describe("A specific, concise instruction for what this single API call should achieve (e.g., 'Get user profile by email', 'Create a new order')."),
-        mode: z.enum(["DIRECT", "LOOP"]).describe("The mode of execution for this step. Use 'DIRECT' for simple calls executed once or 'LOOP' for iterative processes.")
-      })).describe("The sequence of steps required to fulfill the overall instruction."),
-      finalTransform: z.string().optional().describe("Optional JSONata expression to apply to the final aggregated results of all steps. Use '$' if no transformation is needed.")
+        mode: z.enum(["DIRECT", "LOOP"]).describe("The mode of execution for this step. Use 'DIRECT' for simple calls executed once or 'LOOP' for iterative processes."),
+        loopSelector: z.string().describe("If mode is loop: The JSONata expression to use for selecting the next iteration of a loop. Use '$' if no selection is needed."),
+        urlHost: z.string().describe("The host of the API to use for this step. Mostly this will be the same as the system's urlHost."),
+        urlPath: z.string().describe("The path of the API to use for this step. This might be different from the system's urlPath, if the API call is for a specific endpoint.")
+      })).describe("The sequence of steps required to fulfill the overall instruction.")
     }));
 
     const systemDescriptions = Object.values(this.systems).map(sys =>`
@@ -110,7 +115,10 @@ Output a JSON object conforming to the WorkflowPlan schema. Define the necessary
         throw new Error(errorMsg);
     }
 
-    return plan as WorkflowPlan;
+    return {
+      ...plan,
+      finalTransform: "$"
+    } as WorkflowPlan;
   }
 
   private async fetchDocumentation(): Promise<void> {
@@ -123,7 +131,7 @@ Output a JSON object conforming to the WorkflowPlan schema. Define the necessary
         urlPath: system.urlPath,
         documentationUrl: system.documentationUrl
       }, this.metadata);
-      system.documentation = await documentation.fetch();
+      system.documentation = await documentation.fetch(this.instruction);
     }
   }
 
@@ -132,7 +140,6 @@ Output a JSON object conforming to the WorkflowPlan schema. Define the necessary
     await this.fetchDocumentation();
     const plan = await this.planWorkflow();
     const executionSteps: ExecutionStep[] = [];
-    let currentContext = { ...this.initialPayload }; // Start with initial payload
 
     for (const plannedStep of plan.steps) {
       const system = this.systems[plannedStep.systemId];
@@ -141,27 +148,18 @@ Output a JSON object conforming to the WorkflowPlan schema. Define the necessary
         logMessage('error', errorMsg, this.metadata);
         throw new Error(errorMsg);
       }
-
       const partialApiConfig: ApiConfig = {
         id: plannedStep.stepId,
         instruction: plannedStep.instruction,
-        urlHost: system.urlHost,
-        urlPath: system.urlPath,
+        urlHost: plannedStep.urlHost,
+        urlPath: plannedStep.urlPath,
         documentationUrl: system.documentationUrl
       };
-      const apiResult = await executeApiCall(
-        partialApiConfig,
-        currentContext,
-        system.credentials,
-        { },
-        this.metadata
-      );
-      currentContext[plannedStep.stepId] = apiResult.data;
-
       const executionStep: ExecutionStep = {
         id: plannedStep.stepId,
-        apiConfig: apiResult.endpoint,
+        apiConfig: partialApiConfig,
         executionMode: plannedStep.mode,
+        loopSelector: "$",
         inputMapping: "$",
         responseMapping: "$", // Default: takes the whole step output
         // loopSelector, loopMaxIters would need to come from planning
@@ -169,30 +167,33 @@ Output a JSON object conforming to the WorkflowPlan schema. Define the necessary
       executionSteps.push(executionStep);
     }
 
-    let responseMapping = "$";
-    if(this.responseSchema && Object.keys(this.responseSchema).length > 0) {
-      try {
-        const transformed = await generateMapping(
-          this.responseSchema,
-          currentContext,
-          this.instruction || "",
-          this.metadata
-        );
-        responseMapping = transformed?.jsonata || "$";
-      } catch (error) {
-        logMessage('error', `Error preparing final transform: ${error}`, this.metadata);
-      }
+    const allCredentials = Object.values(this.systems).reduce((acc, sys) => {
+      return { ...acc, ...sys.credentials };
+    }, {});
+
+    const workflow: Workflow = {
+      id: `wf-${Math.random().toString(36).substring(2, 8)}`,
+      steps: executionSteps,
+      finalTransform: "$",
+      responseSchema: this.responseSchema,
+    };
+
+    const executor = new WorkflowExecutor(workflow, this.metadata);
+    const result = await executor.execute(this.initialPayload, allCredentials, {
+      cacheMode: CacheMode.DISABLED
+    });
+
+    if(!result.success) {
+      throw new Error(result.error);
     }
 
-    const workflowId = `wf-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
-    const workflow: Workflow = {
-      id: workflowId,
-      steps: executionSteps,
-      finalTransform: responseMapping,
-      responseSchema: this.responseSchema,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+    return {
+      id: workflow.id,
+      steps: executor.steps,
+      finalTransform: executor.finalTransform,
+      responseSchema: executor.responseSchema,
+      createdAt: workflow.createdAt,
+      updatedAt: workflow.updatedAt,
     };
-    return workflow;
   }
 }

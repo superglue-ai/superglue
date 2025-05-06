@@ -174,6 +174,7 @@ export interface WorkflowStepResult {
   success: boolean;
   rawData?: unknown;
   transformedData?: unknown;
+  apiConfig?: ApiConfig;
   error?: string;
 }
 

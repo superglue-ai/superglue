@@ -33,7 +33,7 @@ export async function executeApiCall(
         if(!documentation) {
           documentation = new Documentation(endpoint, metadata);
         }
-        const documentationString = await documentation.fetch();
+        const documentationString = await documentation.fetch(endpoint.instruction);
         const computedApiCallConfig = await generateApiConfig(endpoint, documentationString, payload, credentials, retryCount, messages);      
         endpoint = computedApiCallConfig.config;
         messages = computedApiCallConfig.messages;

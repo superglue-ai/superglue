@@ -17,6 +17,7 @@ interface ProcessingStrategy {
 
 export interface DocumentationConfig {
   urlHost: string;
+  instruction?: string;
   documentationUrl?: string;
   urlPath?: string;
   headers?: Record<string, string>;
@@ -27,7 +28,7 @@ export class Documentation {
   private static MAX_LENGTH = Math.min(LanguageModel.contextLength - 50000, 200000);
 
   // Configuration stored per instance
-  private readonly config: DocumentationConfig;
+  public config: DocumentationConfig;
   private readonly metadata: Metadata;
 
   private lastResult: string | null = null;
@@ -39,19 +40,18 @@ export class Documentation {
 
   // --- Post Processing ---
 
-  private postProcess(documentation: string): string {
+  private postProcess(documentation: string, instruction: string): string {
     // (Renamed from postProcessLargeDoc - same logic)
     if (documentation.length <= Documentation.MAX_LENGTH) {
       return documentation;
     }
     const CONTEXT_SEPARATOR = "\n\n";
-    const MIN_SEARCH_TERM_LENGTH = 3;
+    const MIN_SEARCH_TERM_LENGTH = 4;
 
     const docLower = documentation.toLowerCase();
     const positions: number[] = [];
 
-    const endpointPath = this.config.urlPath || '';
-    let searchTerms = endpointPath?.toLowerCase()?.split(/[\/=&]/)
+    let searchTerms = instruction?.toLowerCase()?.split(/[^a-z0-9]/)
       .map(term => term.trim())
       .filter(term => term.length >= MIN_SEARCH_TERM_LENGTH);
 
@@ -130,9 +130,9 @@ export class Documentation {
 
 
   // --- Main Method using Strategies ---
-  async fetch(): Promise<string> {
+  async fetch(instruction: string = ""): Promise<string> {
     if (this.lastResult) {
-      return this.postProcess(this.lastResult);
+      return this.postProcess(this.lastResult, instruction);
     }
 
     const fetchingStrategies: FetchingStrategy[] = [
@@ -168,7 +168,7 @@ export class Documentation {
       if (result == null || result.length === 0) {
         continue;
       }
-      this.lastResult = this.postProcess(result);
+      this.lastResult = this.postProcess(result, instruction);
       return this.lastResult;
     }
 
