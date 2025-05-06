@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { GeminiModel } from "./gemini-model.js";
 import { OpenAIModel } from "./openai-model.js";
+import { logMessage } from "../utils/logs.js";
 
 export interface LLM {
     contextLength: number;
@@ -23,10 +24,13 @@ export const LanguageModel = selectLanguageModel();
 function selectLanguageModel(): LLM {
     switch(String(process.env.LLM_PROVIDER).toUpperCase()) {
         case "OPENAI":
+            logMessage("info", "Using OpenAI model: " + process.env.OPENAI_MODEL);
             return new OpenAIModel();
         case "GEMINI":
+            logMessage("info", "Using Gemini model: " + process.env.GEMINI_MODEL);
             return new GeminiModel();
         default:
+            logMessage("info", "Using default model: " + process.env.OPENAI_MODEL);
             return new OpenAIModel();
     }
 }
