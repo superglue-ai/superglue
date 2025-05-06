@@ -4,7 +4,7 @@ import { cn, composeUrl } from '@/src/lib/utils';
 import { SuperglueClient, SystemInput, TransformConfig, WorkflowResult } from '@superglue/client';
 import { Loader2, Plus, Trash2, X, Upload, Link, Check, ChevronsUpDown, Globe, ArrowRight, ArrowDown, RotateCw, Play, Pencil, Copy } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '../ui/button';
 import { API_CREATE_STEPS, StepIndicator, WORKFLOW_CREATE_STEPS } from '../utils/StepIndicator';
 import { Label } from '../ui/label';
@@ -44,6 +44,7 @@ import {
 } from "@/src/components/ui/select";
 import JsonSchemaEditor from '../utils/JsonSchemaEditor'
 import { AutoSizer, List } from 'react-virtualized';
+import type { URLFieldHandle } from '../utils/URLField'
 
 // Define step types specific to workflow creation
 type WorkflowCreateStep = 'integrations' | 'prompt' | 'review' | 'success'; // Added success step
@@ -779,6 +780,8 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     }
   };
 
+  const urlFieldRef = useRef<URLFieldHandle>(null)
+
   return (
     <div className="flex-1 flex flex-col h-full p-6">
       {/* Header */}
@@ -981,6 +984,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                         <Label htmlFor="systemFullUrl">API Endpoint*</Label>
                         <HelpTooltip text="The base URL of the API (e.g., https://api.example.com/v1)." />
                         <URLField
+                          ref={urlFieldRef}
                           url={composeUrl(currentSystem.urlHost, currentSystem.urlPath) || ''}
                           onUrlChange={handleUrlChange}
                         />
@@ -1283,7 +1287,7 @@ const result = await client.executeWorkflow({
                   <Button variant="outline" onClick={() => router.push(`/workflows/${generatedWorkflow.id}`)}>
                     Go to Workflow
                   </Button>
-                  <Button variant="outline" onClick={() => router.push('/workflows')}>
+                  <Button variant="outline" onClick={() => router.push('/')}>
                     View All Workflows
                   </Button>
                 </div>
@@ -1459,7 +1463,10 @@ const result = await client.executeWorkflow({
           Back
         </Button>
         <Button
-          onClick={handleNext}
+          onClick={() => {
+            urlFieldRef.current?.commit()
+            handleNext()
+          }}
           disabled={isBuilding || isSaving || isGeneratingSuggestions || (step === 'integrations' && systems.length === 0)}
         >
           {isBuilding ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Building...</> :

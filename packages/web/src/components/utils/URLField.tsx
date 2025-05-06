@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, useImperativeHandle, forwardRef } from 'react'
 import { Button } from '@/src/components/ui/button'
 import { Input } from '@/src/components/ui/input'
 import { Link, X } from 'lucide-react'
@@ -22,14 +22,14 @@ interface URLFieldProps {
   required?: boolean
 }
 
-export function URLField({
-  url: initialUrl,
-  onUrlChange,
-  placeholder = "https://api.example.com/v1",
-  className,
-  error = false,
-  required = false
-}: URLFieldProps) { 
+export interface URLFieldHandle {
+  commit: () => void
+}
+
+export const URLField = forwardRef<URLFieldHandle, URLFieldProps>(function URLField(
+  { url: initialUrl, onUrlChange, placeholder = "https://api.example.com/v1", className, error = false, required = false },
+  ref
+) {
   const [url, setUrl] = useState(initialUrl || '')
   const [isValid, setIsValid] = useState<boolean | null>(null)
   const [iconName, setIconName] = useState<string | null>(null)
@@ -93,43 +93,26 @@ export function URLField({
     }
   }
 
+  const commitUrl = useCallback((rawUrl: string) => {
+    let newUrl = rawUrl
+    if (newUrl && !newUrl.startsWith('http://') && !newUrl.startsWith('https://') && newUrl.includes('.')) {
+      newUrl = `https://${newUrl}`
+      setUrl(newUrl)
+    }
+    setIconName(getIconForUrl(newUrl))
+    const { urlHost, urlPath } = splitUrl(newUrl)
+    const queryParams = extractQueryParams(newUrl)
+    onUrlChange(urlHost, urlPath, queryParams)
+  }, [onUrlChange])
+
+  const handleBlur = useCallback(() => {
+    commitUrl(url)
+  }, [url, commitUrl])
+
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const newUrl = e.target.value
     setUrl(newUrl)
-    
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current)
-    }
-
-    debounceTimerRef.current = setTimeout(() => {
-      // Don't auto-modify the URL while typing - only check validity
-      const valid = validateUrl(newUrl)
-      setIsValid(valid)
-      
-      // Check for icon match
-      if (valid) {
-        setIconName(getIconForUrl(newUrl))
-      } else {
-        setIconName(null)
-      }
-      
-      // For the callback, attempt to parse as-is
-      const { urlHost, urlPath } = splitUrl(newUrl)
-      const queryParams = extractQueryParams(newUrl)
-      onUrlChange(urlHost, urlPath, queryParams)
-    }, 300)
   }, [onUrlChange]);
-
-  const handleBlur = useCallback(() => {
-    if (url && !url.startsWith('http://') && !url.startsWith('https://') && url.includes('.')) {
-      const newUrl = `https://${url}`
-      setUrl(newUrl)
-      setIconName(getIconForUrl(newUrl))
-      const { urlHost, urlPath } = splitUrl(newUrl)
-      const queryParams = extractQueryParams(newUrl)
-      onUrlChange(urlHost, urlPath, queryParams)
-    }
-  }, [url, onUrlChange]);
 
   const handleClear = useCallback(() => {
     setUrl('')
@@ -161,6 +144,10 @@ export function URLField({
 
   // Get the simple-icon for the current URL if available
   const simpleIcon = iconName ? getSimpleIcon(iconName) : null
+
+  useImperativeHandle(ref, () => ({
+    commit: () => commitUrl(url)
+  }))
 
   return (
     <div className={className}>
@@ -203,4 +190,4 @@ export function URLField({
       </div>
     </div>
   )
-}
+})
