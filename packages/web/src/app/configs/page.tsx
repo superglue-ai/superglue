@@ -102,6 +102,9 @@ const ConfigTable = () => {
   const handleWorkflow = () => {
     router.push('/workflows');
   };
+  const handleWorkflowManual = () => {
+    router.push('/workflows/manual');
+  };
 
   const handleCreateNewExtract = () => {
     router.push('/extracts/new');
@@ -282,6 +285,7 @@ const ConfigTable = () => {
           handleCreateNewExtract={handleCreateNewExtract}
           handleWorkflow={handleWorkflow}
           handleCreateExampleShopify={handleCreateExampleShopify}
+          handleWorkflowManual={handleWorkflowManual}
         />
       </div>
     );
@@ -300,17 +304,13 @@ const ConfigTable = () => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align='end'>
-              <DropdownMenuItem onClick={handleCreateNew} className='p-4'>
-                <Globe className="mr-2 h-4 w-4" />
-                API Configuration
-              </DropdownMenuItem>
               <DropdownMenuItem onClick={handleWorkflow} className='p-4'>
                 <GitBranch className="mr-2 h-4 w-4" />
-                Workflow (Beta)
+                Workflow
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleCreateNewExtract} className='p-4'>
-                <FileText className="mr-2 h-4 w-4" />
-                File Configuration 
+              <DropdownMenuItem onClick={handleWorkflowManual} className='p-4'>
+                <GitBranch className="mr-2 h-4 w-4" />
+                Workflow (Manual)
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
