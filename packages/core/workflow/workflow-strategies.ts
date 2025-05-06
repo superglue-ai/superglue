@@ -39,6 +39,7 @@ const directStrategy: ExecutionStrategy = {
       result.rawData = apiResponse.data;
       result.transformedData = transformedData;
       result.success = true;
+      result.apiConfig = apiResponse.endpoint;
 
       logMessage("info", `Direct Execution '${step.id}' - Complete`, metadata);
     } catch (error) {
@@ -101,7 +102,8 @@ const loopStrategy: ExecutionStrategy = {
             stepId: step.id, 
             success: true, 
             rawData: rawData, 
-            transformedData: transformedData 
+            transformedData: transformedData,
+            apiConfig: apiResponse.endpoint
           });
         } catch (callError) {
           const errorMessage = `[LOOP] Error processing '${loopValue}': ${String(callError)}`;

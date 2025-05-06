@@ -54,6 +54,7 @@ export class WorkflowExecutor implements Workflow {
           const strategy = selectStrategy(step);
           const stepInputPayload = await this.prepareStepInput(step, payload);
           stepResult = await strategy.execute(step, stepInputPayload, credentials, options, this.metadata);
+          step.apiConfig = stepResult.apiConfig;
         } catch (stepError) {
           stepResult = {
             stepId: step.id,
@@ -131,10 +132,6 @@ export class WorkflowExecutor implements Workflow {
 
       if (!step.apiConfig) {
         throw new Error("Each step must have an API config");
-      }
-      // TODO: should also work without one in the end (e.g. root path for API call)
-      if (!step.apiConfig.urlPath) {
-        throw new Error("Each step's API config must have a URL path");
       }
     }
   }
