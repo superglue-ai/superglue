@@ -306,7 +306,7 @@ const ConfigTable = () => {
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleWorkflow} className='p-4'>
                 <GitBranch className="mr-2 h-4 w-4" />
-                Workflow (Alpha)
+                Workflow (Beta)
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleCreateNewExtract} className='p-4'>
                 <FileText className="mr-2 h-4 w-4" />

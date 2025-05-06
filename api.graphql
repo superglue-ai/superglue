@@ -300,12 +300,6 @@ input ExecutionStepInput {
   responseMapping: JSONata
 }
 
-type ExecutionPlan {
-  id: String!
-  steps: [ExecutionStep!]!
-  finalTransform: JSONata
-}
-
 type Workflow implements BaseConfig {
   # BaseConfig
   id: ID!
@@ -316,6 +310,7 @@ type Workflow implements BaseConfig {
   # Specific implementation
   steps: [ExecutionStep!]!
   finalTransform: JSONata
+  responseSchema: JSONSchema
 }
 
 type WorkflowStepResult {
@@ -330,6 +325,7 @@ type WorkflowResult {
   success: Boolean!
   data: JSON!
   stepResults: [WorkflowStepResult!]!
+  finalTransform: JSONata
   error: String
   startedAt: DateTime!
   completedAt: DateTime!
@@ -339,6 +335,7 @@ input WorkflowInput {
   id: String!
   steps: [ExecutionStepInput!]!
   finalTransform: JSONata
+  responseSchema: JSONSchema
 }
 
 type Mutation {
@@ -375,6 +372,7 @@ type Mutation {
     instruction: String!
     payload: JSON
     systems: [SystemInput!]!
+    responseSchema: JSONSchema
   ): Workflow!
 
   upsertWorkflow(id: ID!, input: JSON!): Workflow!

@@ -1,6 +1,6 @@
 import { generateApiConfig } from "../utils/api.js";
 import type { Workflow, ExecutionStep, ApiConfig, ExecutionMode, Metadata } from "@superglue/shared";
-import { z } from "zod";
+import { object, z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { applyJsonata, composeUrl } from "../utils/tools.js"; // Assuming path
 import { LanguageModel } from "../llm/llm.js";
@@ -8,7 +8,9 @@ import { PLANNING_PROMPT } from "../llm/prompts.js";
 import { logMessage } from "../utils/logs.js"; // Added import
 import { Documentation } from "../utils/documentation.js";
 import { executeApiCall } from "../graphql/resolvers/call.js";
-
+import { generateMapping, prepareTransform } from "../utils/transform.js";
+import { JSONSchema } from "openai/lib/jsonschema.mjs";
+import { WorkflowExecutor } from "./workflow-executor.js";
 // Define the structure for system input
 export interface SystemDefinition {
   id: string;
@@ -38,11 +40,13 @@ export class WorkflowBuilder {
   private instruction: string;
   private initialPayload: Record<string, unknown>;
   private metadata: Metadata;
+  private responseSchema: JSONSchema;
 
   constructor(
     systems: SystemDefinition[],
     instruction: string,
     initialPayload: Record<string, unknown>,
+    responseSchema: JSONSchema,
     metadata: Metadata
   ) {
     this.systems = systems.reduce((acc, sys) => {
@@ -52,6 +56,7 @@ export class WorkflowBuilder {
     this.instruction = instruction;
     this.initialPayload = initialPayload;
     this.metadata = metadata;
+    this.responseSchema = responseSchema;
   }
 
   private async planWorkflow(): Promise<WorkflowPlan> {
@@ -61,7 +66,7 @@ export class WorkflowBuilder {
         systemId: z.string().describe("The ID of the system (from the provided list) to use for this step."),
         instruction: z.string().describe("A specific, concise instruction for what this single API call should achieve (e.g., 'Get user profile by email', 'Create a new order')."),
         mode: z.enum(["DIRECT", "LOOP"]).describe("The mode of execution for this step. Use 'DIRECT' for simple calls executed once or 'LOOP' for iterative processes.")
-      })).min(1).describe("The sequence of steps required to fulfill the overall instruction."),
+      })).describe("The sequence of steps required to fulfill the overall instruction."),
       finalTransform: z.string().optional().describe("Optional JSONata expression to apply to the final aggregated results of all steps. Use '$' if no transformation is needed.")
     }));
 
@@ -164,12 +169,27 @@ Output a JSON object conforming to the WorkflowPlan schema. Define the necessary
       executionSteps.push(executionStep);
     }
 
+    let responseMapping = "$";
+    if(this.responseSchema && Object.keys(this.responseSchema).length > 0) {
+      try {
+        const transformed = await generateMapping(
+          this.responseSchema,
+          currentContext,
+          this.instruction || "",
+          this.metadata
+        );
+        responseMapping = transformed?.jsonata || "$";
+      } catch (error) {
+        logMessage('error', `Error preparing final transform: ${error}`, this.metadata);
+      }
+    }
+
     const workflowId = `wf-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
     const workflow: Workflow = {
       id: workflowId,
       steps: executionSteps,
-      finalTransform: plan.finalTransform || "$", // Use planned transform or default ('$' means identity)
-      // Metadata like version, createdAt, etc., would typically be added by a management layer when saving
+      finalTransform: responseMapping,
+      responseSchema: this.responseSchema,
       createdAt: new Date(),
       updatedAt: new Date(),
     };

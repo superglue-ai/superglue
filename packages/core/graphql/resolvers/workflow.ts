@@ -5,6 +5,7 @@ import { createHash } from "crypto";
 import { WorkflowBuilder } from "../../workflow/workflow-builder.js";
 import type { SystemDefinition } from "../../workflow/workflow-builder.js";
 import { logMessage } from "../../utils/logs.js";
+import { JSONSchema } from "openai/lib/jsonschema.mjs";
 
 function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined, defaultValue?: T): T | undefined {
   if (newValue === null) return undefined;
@@ -24,6 +25,7 @@ interface BuildWorkflowArgs {
   instruction: string;
   payload?: Record<string, unknown>;
   systems: SystemDefinition[];
+  responseSchema?: JSONSchema;
 }
 
 export const executeWorkflowResolver = async (
@@ -147,7 +149,7 @@ export const buildWorkflowResolver = async (
 ): Promise<Workflow> => {
   try {
     const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
-    const { instruction, payload = {}, systems } = args;
+    const { instruction, payload = {}, systems, responseSchema } = args;
 
     if (!instruction || instruction.trim() === "") {
       throw new Error("Instruction is required to build a workflow.");
@@ -163,7 +165,7 @@ export const buildWorkflowResolver = async (
       }
     });
 
-    const builder = new WorkflowBuilder(systems, instruction, payload, metadata);
+    const builder = new WorkflowBuilder(systems, instruction, payload, responseSchema, metadata);
     const workflow = await builder.build();
 
     await context.datastore.upsertWorkflow(workflow.id, workflow, context.orgId);
