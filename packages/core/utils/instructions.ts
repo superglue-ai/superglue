@@ -22,7 +22,7 @@ Integration suggestions:
 - "Retrieve failed Stripe payments from the last 24 hours and cross-reference with customer engagement data in MongoDB"
 
 Return the suggestions as an array of strings, each representing a specific, implementable instruction.
-Do not think long and keep it concise, with maximum 5 options.
+Do not think long and keep it concise and simple, with maximum 4 options.
 `
     },
     {

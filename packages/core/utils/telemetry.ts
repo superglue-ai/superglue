@@ -85,7 +85,7 @@ export const handleQueryError = (errors: any[], query: string, orgId: string, re
   const properties = createCallProperties(query, requestContext.response?.body, isSelfHosted, operation);
   properties.success = false;
 
-  logMessage('warn', `${operation} failed.\n${errors.map(e => `\n- ${e.message}`).join('')}`, { orgId: orgId });
+  logMessage('warn', `${operation} failed.\n${errors.map(e => `\n- ${e.message || e}`).join('\n')}`, { orgId: orgId });
 
   telemetryClient?.capture({
     distinctId: orgId || sessionId,
