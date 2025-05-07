@@ -65,6 +65,7 @@ export const extractToken = (source: { headers?: any, query?: any } | { connecti
   // Helper Functions
  function getAuthErrorHTML(token: string | undefined) {
     return `
+    <!-- AUTH ERROR -->
       <html>
         <body style="display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif;">
           <div style="text-align: center;">
