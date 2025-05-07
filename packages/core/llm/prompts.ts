@@ -144,10 +144,11 @@ Make the schema as simple as possible. No need to include every possible field, 
 
 - The schema should be a JSON schema object.
 - The schema should be valid.
+- Include all instruction filters in the schema element as a description.
 
 Example:
 
-Instructions: Get me all characters with only their name
+Instructions: Get me all characters with only their name where the species is human
 Response data: [{"name": "Rick", "species": "Human"}, {"name": "Morty", "species": "Human"}]
 
 Schema:
@@ -156,6 +157,7 @@ Schema:
   "properties": {
     "results": {
       "type": "array",
+      "description": "only characters with species human",
       "items": {
         "type": "object",
         "properties": {
