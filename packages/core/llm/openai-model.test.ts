@@ -98,6 +98,7 @@ describe('OpenAIModel', () => {
                 key: { type: ['string', 'null'] }
               },
               required: ['key'],
+              strict: true,
               additionalProperties: false
             }
           }
