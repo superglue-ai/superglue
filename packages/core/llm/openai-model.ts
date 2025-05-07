@@ -11,7 +11,7 @@ export class OpenAIModel implements LLM {
     constructor() {
         this.model = new OpenAI({
           apiKey: process.env.OPENAI_API_KEY || "",
-          baseURL: process.env.OPENAI_BASE_URL,
+          baseURL: process.env.OPENAI_API_BASE_URL,
         });
     }    
     async generateText(messages: ChatCompletionMessageParam[], temperature: number = 0): Promise<LLMResponse> {
@@ -78,6 +78,13 @@ export class OpenAIModel implements LLM {
       // o models don't support temperature
       if (process.env.OPENAI_MODEL?.startsWith('o')) {
           temperature = undefined;
+      }
+      // For OpenRouter models, we need to add response format to messages
+      if (schema) {
+        messages.push({
+          role: "system",
+          content: `只返回符合此 JSON schema 的内容: ${JSON.stringify(schema)}`
+        });
       }
       const responseFormat = schema ? { type: "json_schema", json_schema: { name: "response", strict: true, schema: schema } } : { type: "json_object" };
       const result = await this.model.chat.completions.create({
