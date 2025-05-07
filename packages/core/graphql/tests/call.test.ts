@@ -134,7 +134,7 @@ describe('Call Resolver', () => {
         testMetadata
       )).rejects.toThrow(/API call failed after \d+ retries/);
       
-      expect(mockedApi.callEndpoint).toHaveBeenCalledTimes(5);
+      expect(mockedApi.callEndpoint).toHaveBeenCalledTimes(8);
       expect(mockedTelemetry.telemetryClient?.captureException).toHaveBeenCalled();
     });
 
@@ -157,7 +157,7 @@ describe('Call Resolver', () => {
         testMetadata
       )).rejects.toThrow(/API call failed after \d+ retries/);
       
-      expect(mockedApi.callEndpoint).toHaveBeenCalledTimes(5);
+      expect(mockedApi.callEndpoint).toHaveBeenCalledTimes(8);
     });
   });
 

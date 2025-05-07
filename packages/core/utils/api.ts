@@ -209,7 +209,7 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
     return {
       data: {
         next_cursor: cursor,
-        ...allResults
+        ...(Array.isArray(allResults) ? { results: allResults } : allResults)
       }
     };
   }
