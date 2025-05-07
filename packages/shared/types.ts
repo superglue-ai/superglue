@@ -174,12 +174,14 @@ export interface WorkflowStepResult {
   success: boolean;
   rawData?: unknown;
   transformedData?: unknown;
+  apiConfig?: ApiConfig;
   error?: string;
 }
 
 export interface WorkflowResult {
   success: boolean;
   data: Record<string, unknown>;
+  finalTransform?: string;
   stepResults: WorkflowStepResult[];
   error?: string;
   startedAt: Date;
@@ -190,6 +192,7 @@ export interface Workflow extends BaseConfig {
   id: string; 
   steps: ExecutionStep[];
   finalTransform?: string;
+  responseSchema?: JSONSchema;
 }
 
 export interface Metadata {

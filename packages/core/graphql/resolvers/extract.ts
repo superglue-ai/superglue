@@ -57,9 +57,9 @@ export const extractResolver = async (
           : null;
         if(!preparedExtract) {
           const documentation = new Documentation(preparedExtract, metadata);
-          const documentationString = await documentation.fetch();
+          const documentationString = await documentation.fetch(preparedExtract.instruction);
           preparedExtract = await generateExtractConfig(preparedExtract, documentationString, payload, credentials, lastError);
-      
+
         }
         try {
           const buffer = await callExtract(preparedExtract, payload, credentials, options);

@@ -72,6 +72,7 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
     const headers = Object.fromEntries(
       Object.entries(endpoint.headers || {})
         .map(([key, value]) => [key, replaceVariables(value, requestVars)])
+        .filter(([_, value]) => value)
     );
 
     // Process headers for Basic Auth
@@ -87,6 +88,7 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
     const queryParams = Object.fromEntries(
       Object.entries(endpoint.queryParams || {})
         .map(([key, value]) => [key, replaceVariables(value, requestVars)])
+        .filter(([_, value]) => value)
     );
 
     const body = endpoint.body ? 
@@ -206,8 +208,8 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
   if(endpoint.pagination?.type === PaginationType.CURSOR_BASED) {
     return {
       data: {
-        results: allResults,
-        next_cursor: cursor
+        next_cursor: cursor,
+        ...(Array.isArray(allResults) ? { results: allResults } : allResults)
       }
     };
   }

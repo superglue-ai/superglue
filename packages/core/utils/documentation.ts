@@ -17,6 +17,7 @@ interface ProcessingStrategy {
 
 export interface DocumentationConfig {
   urlHost: string;
+  instruction?: string;
   documentationUrl?: string;
   urlPath?: string;
   headers?: Record<string, string>;
@@ -27,7 +28,7 @@ export class Documentation {
   private static MAX_LENGTH = Math.min(LanguageModel.contextLength - 50000, 200000);
 
   // Configuration stored per instance
-  private readonly config: DocumentationConfig;
+  public config: DocumentationConfig;
   private readonly metadata: Metadata;
 
   private lastResult: string | null = null;
@@ -39,19 +40,18 @@ export class Documentation {
 
   // --- Post Processing ---
 
-  private postProcess(documentation: string): string {
+  private postProcess(documentation: string, instruction: string): string {
     // (Renamed from postProcessLargeDoc - same logic)
     if (documentation.length <= Documentation.MAX_LENGTH) {
       return documentation;
     }
     const CONTEXT_SEPARATOR = "\n\n";
-    const MIN_SEARCH_TERM_LENGTH = 3;
+    const MIN_SEARCH_TERM_LENGTH = 4;
 
     const docLower = documentation.toLowerCase();
     const positions: number[] = [];
 
-    const endpointPath = this.config.urlPath || '';
-    let searchTerms = endpointPath?.toLowerCase()?.split(/[\/=&]/)
+    let searchTerms = instruction?.toLowerCase()?.split(/[^a-z0-9]/)
       .map(term => term.trim())
       .filter(term => term.length >= MIN_SEARCH_TERM_LENGTH);
 
@@ -130,9 +130,9 @@ export class Documentation {
 
 
   // --- Main Method using Strategies ---
-  async fetch(): Promise<string> {
+  async fetch(instruction: string = ""): Promise<string> {
     if (this.lastResult) {
-      return this.postProcess(this.lastResult);
+      return this.postProcess(this.lastResult, instruction);
     }
 
     const fetchingStrategies: FetchingStrategy[] = [
@@ -168,7 +168,7 @@ export class Documentation {
       if (result == null || result.length === 0) {
         continue;
       }
-      this.lastResult = this.postProcess(result);
+      this.lastResult = this.postProcess(result, instruction);
       return this.lastResult;
     }
 
@@ -289,9 +289,9 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
         await closedInstance.close();
       }
     }
-  private async fetchPageContentWithPlaywright(config: ApiConfig, metadata: Metadata): Promise<string | null> {
+  private async fetchPageContentWithPlaywright(urlString: string, config: ApiConfig, metadata: Metadata): Promise<{ content: string; links: Record<string, string> } | null> {
 
-    if (!config.documentationUrl?.startsWith("http")) {
+    if (!urlString?.startsWith("http")) {
       return null;
     }
 
@@ -305,7 +305,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
         await browserContext.setExtraHTTPHeaders(config.headers);
       }
 
-      const url = new URL(config.documentationUrl);
+      const url = new URL(urlString);
       if (config.queryParams) {
         Object.entries(config.queryParams).forEach(([key, value]) => {
           url.searchParams.append(key, value);
@@ -318,6 +318,16 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       // Let's stick with domcontentloaded + short timeout
       await page.waitForLoadState('domcontentloaded', { timeout: 15000 });
       await page.waitForTimeout(1000); // Allow JS execution
+
+      const links: Record<string, string> = await page.evaluate(() => {
+        const links = {};
+        const allLinks = document.querySelectorAll('a');
+        allLinks.forEach(link => {
+          const key = link.textContent?.toLowerCase().trim().replace(/[^a-z0-9]/g, ' ');
+          links[key] = link.href;
+        });
+        return links;
+      });
 
       await page.evaluate(() => {
         const selectorsToRemove = [
@@ -338,10 +348,13 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       });
 
       const content = await page.content();
-      logMessage('info', `Successfully fetched content for ${config.documentationUrl}`, metadata);
-      return content;
+      logMessage('info', `Successfully fetched content for ${urlString}`, metadata);
+      return {
+        content,
+        links
+      };
     } catch (error) {
-      logMessage('warn', `Playwright fetch failed for ${config.documentationUrl}: ${error?.message}`, metadata);
+      logMessage('warn', `Playwright fetch failed for ${urlString}: ${error?.message}`, metadata);
       return null;
     } finally {
        if (page) await page.close();
@@ -352,9 +365,37 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
   async tryFetch(config: ApiConfig, metadata: Metadata): Promise<string | null> {
     // Only fetch if it's an HTTP URL and content hasn't been fetched yet
     // Pass metadata
-    const content = await this.fetchPageContentWithPlaywright(config, metadata);
-    if(!content) return null;
-    return content;
+    const docResult = await this.fetchPageContentWithPlaywright(config?.documentationUrl, config, metadata);
+    let fetchedLinks = new Set<string>();
+    if(!config.instruction && docResult?.content) {
+      return docResult?.content;
+    }
+    const instructions = ["auth", "authentication", "introduction", "authorization", "started"];
+    instructions.push(...(config.instruction?.toLowerCase().split(/[^a-z0-9]/g).filter(i => i.length > 3) || []));
+
+    if(!docResult || !docResult.links) return null;
+
+    const rankedLinks: { linkText: string, href: string, matchCount: number }[] = [];
+
+    for(const [linkText, href] of Object.entries(docResult.links)) {
+      const keywords = linkText.split(" ").filter(i => i.length > 3);
+      const matchCount = keywords.filter(k => instructions.some(instr => k.includes(instr) || instr.includes(k))).length;
+      rankedLinks.push({ linkText, href, matchCount });
+    }
+
+    // Sort links by match count in descending order
+    rankedLinks.sort((a, b) => b.matchCount - a.matchCount);
+
+    for(const rankedLink of rankedLinks) {
+      if(fetchedLinks.size > 5) break;
+      if(fetchedLinks.has(rankedLink.href)) continue;
+      const linkResult = await this.fetchPageContentWithPlaywright(rankedLink.href, config, metadata);
+      if(linkResult && linkResult.content) { // Ensure content exists
+        docResult.content += `\n\n${linkResult.content}`;
+        fetchedLinks.add(rankedLink.href);
+      }
+    }
+    return docResult.content;
   }
 }
 

@@ -33,7 +33,7 @@ export async function executeApiCall(
         if(!documentation) {
           documentation = new Documentation(endpoint, metadata);
         }
-        const documentationString = await documentation.fetch();
+        const documentationString = await documentation.fetch(endpoint.instruction);
         const computedApiCallConfig = await generateApiConfig(endpoint, documentationString, payload, credentials, retryCount, messages);      
         endpoint = computedApiCallConfig.config;
         messages = computedApiCallConfig.messages;
@@ -60,7 +60,7 @@ export async function executeApiCall(
       }
     }
     retryCount++;
-  } while (retryCount < 5);
+  } while (retryCount < 8);
 
   if (!response?.data) {
     telemetryClient?.captureException(new Error(`API call failed after ${retryCount} retries. Last error: ${lastError}`), metadata.orgId, {

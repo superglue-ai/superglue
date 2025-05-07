@@ -28,7 +28,7 @@ export async function prepareTransform(
     }
 
     // Check if the transform config is cached
-    if(fromCache) {
+    if(fromCache && datastore) {
       const cached = await datastore.getTransformConfig(input.id, metadata.orgId);
       if (cached) return { ...cached, ...input };
     }

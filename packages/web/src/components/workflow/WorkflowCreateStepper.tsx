@@ -1,10 +1,10 @@
 import { useConfig } from '@/src/app/config-context';
 import { useToast } from '@/src/hooks/use-toast';
 import { cn, composeUrl } from '@/src/lib/utils';
-import { SuperglueClient, SystemInput, TransformConfig } from '@superglue/client';
+import { SuperglueClient, SystemInput, TransformConfig, WorkflowResult } from '@superglue/client';
 import { Loader2, Plus, Trash2, X, Upload, Link, Check, ChevronsUpDown, Globe, ArrowRight, ArrowDown, RotateCw, Play, Pencil, Copy } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '../ui/button';
 import { API_CREATE_STEPS, StepIndicator, WORKFLOW_CREATE_STEPS } from '../utils/StepIndicator';
 import { Label } from '../ui/label';
@@ -44,6 +44,7 @@ import {
 } from "@/src/components/ui/select";
 import JsonSchemaEditor from '../utils/JsonSchemaEditor'
 import { AutoSizer, List } from 'react-virtualized';
+import type { URLFieldHandle } from '../utils/URLField'
 
 // Define step types specific to workflow creation
 type WorkflowCreateStep = 'integrations' | 'prompt' | 'review' | 'success'; // Added success step
@@ -342,7 +343,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const [instruction, setInstruction] = useState('');
   const [payload, setPayload] = useState('{}');
   const [generatedWorkflow, setGeneratedWorkflow] = useState<any>(null); // To store result from buildWorkflow
-  const [finalTransform, setFinalTransform] = useState<string | null>(null); // For editing in review step
+  const [finalTransform, setFinalTransform] = useState<string>("$"); // For editing in review step
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
   const [systemFormVisible, setSystemFormVisible] = useState(false);
 
@@ -352,7 +353,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const [integrationDropdownOpen, setIntegrationDropdownOpen] = useState(false);
 
   const [isExecuting, setIsExecuting] = useState(false);
-  const [executionResult, setExecutionResult] = useState<any>(null);
+  const [executionResult, setExecutionResult] = useState<WorkflowResult | null>(null);
   const [finalResult, setFinalResult] = useState<any>(null);
   const [executionError, setExecutionError] = useState<string | null>(null);
 
@@ -558,7 +559,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         setSchema(JSON.stringify(schema, null, 2));
 
         // Then build workflow
-        const response = await superglueClient.buildWorkflow(instruction, payload, systems);
+        const response = await superglueClient.buildWorkflow(instruction, payload, systems, schema);
         if (!response) {
           throw new Error('Failed to build workflow');
         }
@@ -714,27 +715,21 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         apiKey: superglueConfig.superglueApiKey,
       });
       const result = await superglueClient.executeWorkflow({
-        id: generatedWorkflow.id,
+        workflow: {
+          id: generatedWorkflow.id,
+          steps: generatedWorkflow.steps,
+          responseSchema: JSON.parse(schema),
+          finalTransform: generatedWorkflow.finalTransform,
+        },
         payload: JSON.parse(payload || '{}'),
         credentials: systems.reduce((acc, system) => ({...acc, ...system.credentials}), {}),
       });
       setExecutionResult(result);
+      console.log(finalTransform);
+      setFinalTransform(result.finalTransform);
+      setFinalResult(result.data);
+      setActiveTab('final');
 
-      // Generate transform after successful execution
-      const transformResult = await superglueClient.transform({
-        endpoint: {
-          id: generatedWorkflow.id,
-          instruction: instruction,
-          responseSchema: JSON.parse(schema),
-        },
-        data: result?.data || {}
-      });
-      
-      if (transformResult.success) {
-        setFinalTransform((transformResult.config as TransformConfig).responseMapping);
-        setFinalResult(transformResult.data);
-        setActiveTab('final');
-      }
     } catch (error: any) {
       setExecutionError(error.message);
       toast({
@@ -784,6 +779,8 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       setIsGeneratingSuggestions(false);
     }
   };
+
+  const urlFieldRef = useRef<URLFieldHandle>(null)
 
   return (
     <div className="flex-1 flex flex-col h-full p-6">
@@ -987,6 +984,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                         <Label htmlFor="systemFullUrl">API Endpoint*</Label>
                         <HelpTooltip text="The base URL of the API (e.g., https://api.example.com/v1)." />
                         <URLField
+                          ref={urlFieldRef}
                           url={composeUrl(currentSystem.urlHost, currentSystem.urlPath) || ''}
                           onUrlChange={handleUrlChange}
                         />
@@ -1072,7 +1070,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                       value={instruction}
                       onChange={(e) => { setInstruction(e.target.value); setValidationErrors(prev => ({...prev, instruction: false})); }}
                       placeholder="e.g., 'Fetch customer details from CRM using the input email, then get their recent orders from productApi.'"
-                      className={cn("h-40", validationErrors.instruction && inputErrorStyles)}
+                      className={cn("min-h-80", validationErrors.instruction && inputErrorStyles)}
                     />
                     {suggestions.length > 0 && !instruction && (
                       <div className="absolute bottom-0  p-3 pointer-events-none">
@@ -1289,7 +1287,7 @@ const result = await client.executeWorkflow({
                   <Button variant="outline" onClick={() => router.push(`/workflows/${generatedWorkflow.id}`)}>
                     Go to Workflow
                   </Button>
-                  <Button variant="outline" onClick={() => router.push('/workflows')}>
+                  <Button variant="outline" onClick={() => router.push('/')}>
                     View All Workflows
                   </Button>
                 </div>
@@ -1371,10 +1369,10 @@ const result = await client.executeWorkflow({
                           <List
                             width={width}
                             height={height}
-                            rowCount={getResponseLines(executionResult?.data).length}
+                            rowCount={getResponseLines(executionResult?.stepResults).length}
                             rowHeight={18}
                             rowRenderer={({ index, key, style }) => {
-                              const line = getResponseLines(executionResult?.data)[index];
+                              const line = getResponseLines(executionResult?.stepResults)[index];
                               const indentMatch = line?.match(/^(\s*)/);
                               const indentLevel = indentMatch ? indentMatch[0].length : 0;
                               
@@ -1409,7 +1407,7 @@ const result = await client.executeWorkflow({
               ) : activeTab === 'transform' ? (
                 <div className="flex-grow overflow-auto p-4">
                   <Textarea
-                    value={finalTransform || ''}
+                    value={finalTransform}
                     onChange={(e) => setFinalTransform(e.target.value)}
                     className="font-mono text-xs w-full h-full min-h-[300px]"
                     spellCheck={false}
@@ -1465,7 +1463,10 @@ const result = await client.executeWorkflow({
           Back
         </Button>
         <Button
-          onClick={handleNext}
+          onClick={() => {
+            urlFieldRef.current?.commit()
+            handleNext()
+          }}
           disabled={isBuilding || isSaving || isGeneratingSuggestions || (step === 'integrations' && systems.length === 0)}
         >
           {isBuilding ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Building...</> :
