@@ -56,11 +56,14 @@ export const extractResolver = async (
           await context.datastore.getExtractConfig(input.id, context.orgId)
           : null;
         if(!preparedExtract) {
-          const documentation = new Documentation(preparedExtract, metadata);
-          const documentationString = await documentation.fetch(preparedExtract.instruction);
-          preparedExtract = await generateExtractConfig(preparedExtract, documentationString, payload, credentials, lastError);
-
+          if(!input.endpoint.instruction) {
+            throw new Error("Id could not be found and no endpoint provided.");
+          }
+          const documentation = new Documentation(input.endpoint, metadata);
+          const documentationString = await documentation.fetch(input.endpoint.instruction || "");
+          preparedExtract = await generateExtractConfig(input.endpoint, documentationString, payload, credentials, lastError);
         }
+        
         try {
           const buffer = await callExtract(preparedExtract, payload, credentials, options);
           response = await processFile(buffer, preparedExtract);

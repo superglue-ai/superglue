@@ -99,9 +99,9 @@ Base URL: ${composeUrl(extractConfig.urlHost, extractConfig.urlPath)}
 
 Documentation: ${documentation}
 
-Available credential variables: ${Object.keys(credentials).join(", ")}
-Available payload variables: ${Object.keys(payload).join(", ")}
-Example payload: ${JSON.stringify(payload)}
+Available credential variables: ${Object.keys(credentials || {}).join(", ")}
+Available payload variables: ${Object.keys(payload || {}).join(", ")}
+Example payload: ${JSON.stringify(payload || {})}
 
 ${lastError ? `We tried to call the API but it failed with the following error:
 ${lastError}` : ''}`
