@@ -3,27 +3,20 @@ title: 'Overview'
 description: 'Overview of the superglue GraphQL API'
 ---
 
-The Core API provides GraphQL endpoints for managing API configurations, data extraction, and transformations. The API is built around three main concepts:
+The Core API provides GraphQL endpoints for managing API configurations, data extraction, transformations, and workflows. Main concepts:
 
-* **API Calls**
-
-  : Execute and transform API requests
-
-* **Extractions**
-
-  : Process and parse files/responses
-
-* **Transformations**
-
-  : Convert data between formats
+* **API Calls**: Execute and transform API requests
+* **Extractions**: Process and parse files/responses
+* **Transformations**: Convert data between formats
+* **Workflows**: Chain multiple steps (API, extract, transform) into a single execution
 
 ## Endpoint
 
-You can call the superglue GraphQL API via [`https://graphql.superglue.cloud`](https://graphql.superglue.cloud) or by not specifying an endpoint in the SDK. For the self-hosted version, the default port for the GraphQL interface is 3000.
+Use [`https://graphql.superglue.cloud`](https://graphql.superglue.cloud) or omit endpoint in the SDK. Self-hosted default port: 3000.
 
 ## Authentication
 
-All requests require authentication using a bearer token:
+All requests require a bearer token:
 
 ```http
 Authorization: Bearer YOUR_AUTH_TOKEN
@@ -31,116 +24,136 @@ Authorization: Bearer YOUR_AUTH_TOKEN
 
 ## Base Types
 
-All configuration types inherit from `BaseConfig`:
-
 ```graphql
 interface BaseConfig {
-  id: ID!                 # Unique identifier
-  version: String        # Configuration version
-  createdAt: DateTime    # Creation timestamp
-  updatedAt: DateTime    # Last update timestamp
+  id: ID!
+  version: String
+  createdAt: DateTime
+  updatedAt: DateTime
 }
+
+union ConfigType = ApiConfig | ExtractConfig | TransformConfig
 ```
+
+## Input Types
+
+### ApiInput
+- id: ID!
+- urlHost: String!
+- urlPath: String
+- instruction: String!
+- queryParams: JSON
+- method: HttpMethod
+- headers: JSON
+- body: String
+- documentationUrl: String
+- responseSchema: JSONSchema
+- responseMapping: JSONata
+- authentication: AuthType
+- pagination: PaginationInput
+- dataPath: String
+- version: String
+
+### ExtractInput
+- id: ID!
+- urlHost: String!
+- urlPath: String
+- queryParams: JSON
+- instruction: String!
+- method: HttpMethod
+- headers: JSON
+- body: String
+- documentationUrl: String
+- decompressionMethod: DecompressionMethod
+- fileType: FileType
+- authentication: AuthType
+- dataPath: String
+- version: String
+
+### TransformInput
+- id: ID!
+- instruction: String!
+- responseSchema: JSONSchema!
+- responseMapping: JSONata
+- version: String
+
+### RequestOptions
+- cacheMode: CacheMode
+- timeout: Int
+- retries: Int
+- retryDelay: Int
+- webhookUrl: String
+
+### PaginationInput
+- type: PaginationType!
+- pageSize: String
+- cursorPath: String
+
+### SystemInput
+- id: String!
+- urlHost: String!
+- urlPath: String
+- documentationUrl: String
+- documentation: String
+- credentials: JSON
+
+## Enums
+
+### HttpMethod
+GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS
+
+### CacheMode
+ENABLED, READONLY, WRITEONLY, DISABLED
+
+### FileType
+CSV, JSON, XML, AUTO
+
+### AuthType
+NONE, OAUTH2, HEADER, QUERY_PARAM
+
+### DecompressionMethod
+GZIP, DEFLATE, NONE, AUTO, ZIP
+
+### PaginationType
+OFFSET_BASED, PAGE_BASED, CURSOR_BASED, DISABLED
+
+### LogLevel
+DEBUG, INFO, WARN, ERROR
 
 ## Common Parameters
 
-### Request Options
-
-All execution operations (`call`, `extract`, `transform`) accept an options object:
-
-```graphql
-input RequestOptions {
-  webhookUrl: String     # URL for async completion notifications
-  cacheMode: CacheMode   # Cache behavior (see below)
-  timeout: Int          # Request timeout in milliseconds
-  retries: Int         # Number of retry attempts (max 8 for calls, 5 for extracts)
-  retryDelay: Int      # Delay between retries in milliseconds
-}
-```
-
-### Cache Modes
-
-The `cacheMode` parameter controls caching behavior:
-
-* `ENABLED`
-
-  \- Read and write to cache (default)
-
-* `DISABLED`
-
-  \- No caching (Note: ID lookups require cache)
-
-* `READONLY`
-
-  \- Only read from cache
-
-* `WRITEONLY`
-
-  \- Only write to cache
-
-### Pagination
-
-List operations support pagination parameters:
-
-* `limit`
-
-  (Int, default: 10): Number of items to return
-
-* `offset`
-
-  (Int, default: 0): Number of items to skip
+All execution operations (`call`, `extract`, `transform`, `executeWorkflow`) accept a `RequestOptions` object.
 
 ## Error Handling
 
-All operations return a consistent error format:
+All operations return:
 
 ```graphql
 {
-  success: Boolean!      # Operation success status
-  error: String         # Error message if failed
-  startedAt: DateTime!  # Operation start time
-  completedAt: DateTime! # Operation completion time
+  success: Boolean!
+  error: String
+  startedAt: DateTime!
+  completedAt: DateTime!
 }
 ```
 
-### Retry Logic
+## Retry Logic
 
-* API calls automatically retry up to 8 times on failure
-
-* Extractions retry up to 5 times
-
-* Each retry attempt can generate a new configuration based on the previous error
+- API calls: up to 8 retries
+- Extractions: up to 5 retries
+- Each retry can generate a new config based on the previous error
 
 ## Webhooks
 
-When a `webhookUrl` is provided in the options:
+If `webhookUrl` is set in options:
+- On success: POST `{success: true, data: result}`
+- On failure: POST `{success: false, error: message}`
 
-* Success:
+## Workflows
 
-  `POST`
-
-  request with
-
-  `{success: true, data: result}`
-
-* Failure:
-
-  `POST`
-
-  request with
-
-  `{success: false, error: message}`
+Workflows let you chain multiple steps (API, extract, transform) into a single execution. See queries and mutations for details.
 
 See also:
-
-* [Types Reference](types)
-
-  for detailed type definitions
-
-* [Queries](queries)
-
-  for available queries
-
-* [Mutations](mutations)
-
-  for available mutations
+- [Types Reference](types.md)
+- [Queries](queries.md)
+- [Mutations](mutations.md)

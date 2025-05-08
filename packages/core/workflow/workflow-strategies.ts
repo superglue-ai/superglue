@@ -2,6 +2,7 @@ import type { ExecutionStep, Metadata, RequestOptions, WorkflowStepResult } from
 import { applyJsonata } from "../utils/tools.js";
 import { logMessage } from "../utils/logs.js";
 import { executeApiCall } from "../graphql/resolvers/call.js";
+import { generateMapping } from "../utils/transform.js";
 
 export interface ExecutionStrategy {
   execute(
@@ -76,27 +77,35 @@ const loopStrategy: ExecutionStrategy = {
         }
       }
       
-      let loopValues: any[] = await applyJsonata(payload, step.loopSelector);
-      if (!Array.isArray(loopValues) || loopValues.length === 0) {
-        throw `[LOOP] No values found for loop variable '${step.loopSelector}'`;
+      let loopItems: any[] = await applyJsonata(payload, step.loopSelector);
+
+      if (!Array.isArray(loopItems) || loopItems.length === 0) {
+        if(step.loopSelector !== "$") logMessage("error", `[LOOP] No array found for '${step.loopSelector}' - regenerating loop selector`, metadata);
+        const newLoopSelector = await generateMapping({ type: "array" }, payload, "Find the array of selector values for the following loop: " + step.id, metadata);
+        step.loopSelector = newLoopSelector.jsonata;
+        loopItems = await applyJsonata(payload, step.loopSelector);
+      }
+
+      if(!Array.isArray(loopItems) || loopItems.length === 0) {
+        throw new Error(`[LOOP] No values found for loop variable '${step.loopSelector}'`);
       }
 
       if (step.loopMaxIters > 0) {
-        loopValues = loopValues.slice(0, step.loopMaxIters);
+        loopItems = loopItems.slice(0, step.loopMaxIters);
       }
       const stepResults: WorkflowStepResult[] = [];
-      for (let i = 0; i < loopValues.length; i++) {
-        const loopValue = loopValues[i];
-        logMessage("debug", `[LOOP] Executing for ${loopValue} (${i + 1}/${loopValues.length})`, metadata);
+      for (let i = 0; i < loopItems.length; i++) {
+        const currentItem = loopItems[i];
+        logMessage("debug", `[LOOP] Executing for ${currentItem} (${i + 1}/${loopItems.length})`, metadata);
 
         const loopPayload = {
           ...payload,
-          value: loopValue,
+          currentItem: currentItem,
         };
 
         try {
           const apiResponse = await executeApiCall(step.apiConfig, loopPayload, credentials, options, metadata);
-          const rawData = {loopValue: loopValue, ... apiResponse.data};
+          const rawData = {currentItem: currentItem, ... apiResponse.data};
           const transformedData = await applyJsonata(rawData, step.responseMapping);
           stepResults.push({ 
             stepId: step.id, 
@@ -105,17 +114,23 @@ const loopStrategy: ExecutionStrategy = {
             transformedData: transformedData,
             apiConfig: apiResponse.endpoint
           });
+
+          // update the apiConfig with the new endpoint
+          step.apiConfig = apiResponse.endpoint;
+
         } catch (callError) {
-          const errorMessage = `[LOOP] Error processing '${loopValue}': ${String(callError)}`;
+          const errorMessage = `[LOOP] Error processing '${currentItem}': ${String(callError)}`;
           logMessage("error", errorMessage, metadata);
           throw errorMessage;
         }
       }
+      result.apiConfig = step.apiConfig;
       result.rawData = stepResults.map(r => r.rawData);
       result.transformedData = stepResults.map(r => r.transformedData);
       result.success = stepResults.every(r => r.success);
       result.error = stepResults.filter(s => s.error).join("\n");
     } catch (error) {
+      result.apiConfig = step.apiConfig;
       result.success = false;
       result.error = error.message || error;
     }

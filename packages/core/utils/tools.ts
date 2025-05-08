@@ -26,7 +26,7 @@ export async function applyJsonata(data: any, expr: string): Promise<any> {
     const result = await expression.evaluate(data);
     return result;
   } catch (error) {
-    throw new Error(`Mapping transformation failed: ${error.message}`);
+    throw new Error(`JSONata transformation failed: ${error.message} at ${expr.substring(error.position - 10, error.position + 10)}`);
   }
 }
 
@@ -106,7 +106,7 @@ export function superglueJsonata(expr: string) {
 export async function applyJsonataWithValidation(data: any, expr: string, schema: any): Promise<TransformResult> {
   try {
     const result = await applyJsonata(data, expr);
-    if(result === null || result === undefined || result?.length === 0 || Object.keys(result).length === 0) {
+    if(result === null || result === undefined) {
       return { success: false, error: "Result is empty" };
     }
     // if no schema is given, skip validation
@@ -245,7 +245,35 @@ export function composeUrl(host: string, path: string) {
   return `${cleanHost}/${cleanPath}`;
 }
 
-export function replaceVariables(template: string, variables: Record<string, any>): string {
+export async function replaceVariables(template: string, payload: Record<string, any>): Promise<string> {
+  if (!template) return "";
+  
+  const pattern = /<<([\s\S]*?)>>/g;
+  
+  let result = template;
+  const matches = [...template.matchAll(pattern)];
+  
+  for (const match of matches) {
+    const path = match[1];
+    let value: any;
+    if(payload[path]) {
+      value = payload[path];
+    }
+    else {
+      value = await applyJsonata(payload, path);
+    }
+
+    if(Array.isArray(value) || typeof value === 'object') {
+      value = JSON.stringify(value);
+    }
+    
+    result = result.replace(match[0], String(value));
+  }
+  
+  return oldReplaceVariables(result, payload);
+}
+
+function oldReplaceVariables(template: string, variables: Record<string, any>): string {
   if (!template) return "";
   
   const variableNames = Object.keys(variables);
@@ -276,6 +304,7 @@ export function replaceVariables(template: string, variables: Record<string, any
     return String(value);
   });
 }
+
 
 export function sample(value: any, sampleSize = 10): any {
   if (Array.isArray(value)) {

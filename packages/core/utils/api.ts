@@ -9,6 +9,8 @@ import { logMessage } from "./logs.js";
 import { parseXML } from "./file.js";
 import { LanguageModel } from "../llm/llm.js";
 import { callPostgres } from "./postgres.js";
+import { error } from "console";
+import { JSONSchema } from "openai/lib/jsonschema.mjs";
 
 export function convertBasicAuthToBase64(headerValue: string){
     if(!headerValue) return headerValue;
@@ -62,17 +64,20 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
 
     // Combine all variables
     const requestVars = { ...paginationVars, ...allVariables };
+
     // Check for any {var} in the generated config that isn't in available variables
-    const invalidVars = validateVariables(endpoint, Object.keys(requestVars));
+    //const invalidVars = validateVariables(endpoint, Object.keys(requestVars));
     
-    if (invalidVars.length > 0) {
-      throw new Error(`The following variables are not defined: ${invalidVars.join(', ')}`);  
-    }
+    //if (invalidVars.length > 0) {
+    //  throw new Error(`The following variables are not defined: ${invalidVars.join(', ')}`);  
+    //}
+
     // Generate request parameters with variables replaced
     const headers = Object.fromEntries(
-      Object.entries(endpoint.headers || {})
-        .map(([key, value]) => [key, replaceVariables(value, requestVars)])
-        .filter(([_, value]) => value)
+      (await Promise.all(
+        Object.entries(endpoint.headers || {})
+          .map(async ([key, value]) => [key, await replaceVariables(value, requestVars)])
+      )).filter(([_, value]) => value && value !== "undefined" && value !== "null")
     );
 
     // Process headers for Basic Auth
@@ -86,16 +91,17 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
     }
 
     const queryParams = Object.fromEntries(
-      Object.entries(endpoint.queryParams || {})
-        .map(([key, value]) => [key, replaceVariables(value, requestVars)])
-        .filter(([_, value]) => value)
+      (await Promise.all(
+        Object.entries(endpoint.queryParams || {})
+          .map(async ([key, value]) => [key, await replaceVariables(value, requestVars)])
+      )).filter(([_, value]) => value && value !== "undefined" && value !== "null")
     );
 
     const body = endpoint.body ? 
-      replaceVariables(endpoint.body, requestVars) : 
+      await replaceVariables(endpoint.body, requestVars) : 
       "";
 
-    const url = replaceVariables(composeUrl(endpoint.urlHost, endpoint.urlPath), requestVars);
+    const url = await replaceVariables(composeUrl(endpoint.urlHost, endpoint.urlPath), requestVars);
 
     const axiosConfig: AxiosRequestConfig = {
       method: endpoint.method,
@@ -112,12 +118,10 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
         response.data?.error || 
         (Array.isArray(response?.data?.errors) && response?.data?.errors.length > 0)
       ) {
-      const error = JSON.stringify(response?.data?.error || response.data?.errors || response?.data);
-      let message = `${endpoint.method} ${url} failed with status ${response.status}. Response: ${String(error).slice(0, 1000)}
-      Headers: ${JSON.stringify(headers)}
-      Body: ${JSON.stringify(body)}
-      Params: ${JSON.stringify(queryParams)}
-      `;
+      const error = JSON.stringify(response?.data?.error || response.data?.errors || response?.data || response?.statusText || "undefined");
+      let message = `${endpoint.method} ${url} failed with status ${response.status}.
+Response: ${String(error).slice(0, 1000)}
+config: ${JSON.stringify(axiosConfig)}`;
       
       // Add specific context for rate limit errors
       if (response.status === 429) {
@@ -307,6 +311,31 @@ Documentation: ${String(documentation)}`;
     } as ApiConfig,
     messages: updatedMessages
   };
+}
+
+export async function evaluateResponse(data: any, responseSchema: JSONSchema, instruction: string): Promise<{success: boolean, shortReason: string}> {
+  const request = [
+    {
+      role: "system",
+      content: `You are an API response validator. 
+Validate the following api response and return { success: true, shortReason: "" } if the response aligns with the instruction. 
+If the response does not align with the instruction, return { success: false, shortReason: "reason why it does not align" }.
+
+Do not make the mistake of thinking that the { success: true, shortReason: "" } is the expected API response format. It is YOUR expected response format.
+Keep in mind that the response can come in any shape or form, just validate that the response aligns with the instruction.
+If the instruction contains a filter and the response contains data not matching the filter, that is not a problem and still successful since we filter later.
+
+Instruction: ${instruction}`
+    },
+    {role: "user", content: JSON.stringify(data)}
+  ] as OpenAI.Chat.ChatCompletionMessageParam[];
+
+  const response = await LanguageModel.generateObject(
+    request,
+    {type: "object", properties: {success: {type: "boolean"}, shortReason: {type: "string"}}},
+    0
+  );
+  return response.response;
 }
 
 function validateVariables(generatedConfig: any, vars: string[]) {

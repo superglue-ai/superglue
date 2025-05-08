@@ -10,8 +10,8 @@ const DEFAULT_RETRY_DELAY = 1000; // 1 second
 
 export async function callPostgres(endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions): Promise<any> {
   const requestVars = { ...payload, ...credentials };
-  const connectionString = replaceVariables(composeUrl(endpoint.urlHost, endpoint.urlPath), requestVars);
-  const query = replaceVariables(JSON.parse(endpoint.body).query, requestVars);
+  const connectionString = await replaceVariables(composeUrl(endpoint.urlHost, endpoint.urlPath), requestVars);
+  const query = await replaceVariables(JSON.parse(endpoint.body).query, requestVars);
 
   const poolConfig: PoolConfig = {
     connectionString,

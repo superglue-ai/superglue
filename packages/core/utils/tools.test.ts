@@ -17,28 +17,28 @@ describe('tools utility functions', () => {
   })
 
   describe('replaceVariables', () => {
-    it('should replace variables in template strings', () => {
+    it('should replace variables in template strings', async () => {
       const template = 'Hello {name}, your age is {age}'
       const variables = { name: 'John', age: 30 }
-      expect(replaceVariables(template, variables)).toBe('Hello John, your age is 30')
+      expect(await replaceVariables(template, variables)).toBe('Hello John, your age is 30')
     })
 
-    it('should keep original placeholder if variable not found', () => {
+    it('should keep original placeholder if variable not found', async () => {
       const template = 'Hello {name}, {missing}'
       const variables = { name: 'John' }
-      expect(replaceVariables(template, variables)).toBe('Hello John, {missing}')
+      expect(await replaceVariables(template, variables)).toBe('Hello John, {missing}')
     })
 
-    it('should handle the same placeholder multiple times', () => {
+    it('should handle the same placeholder multiple times', async () => {
       const template = 'Hello {name}, {name}'
       const variables = { name: 'John' }
-      expect(replaceVariables(template, variables)).toBe('Hello John, John')
+      expect(await replaceVariables(template, variables)).toBe('Hello John, John')
     })
 
-    it('should handle JSON template strings', () => {
+    it('should handle JSON template strings', async () => {
       const template = '{"user": "{name}", "details": {"age": {age}}}'
       const variables = { name: 'John', age: 30 }
-      expect(replaceVariables(template, variables)).toBe('{"user": "John", "details": {"age": 30}}')
+      expect(await replaceVariables(template, variables)).toBe('{"user": "John", "details": {"age": 30}}')
     })
   })
 

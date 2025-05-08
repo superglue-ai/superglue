@@ -13,12 +13,16 @@ import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
 export async function callExtract(extract: ExtractConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions, metadata?: Metadata): Promise<any> {
   const allVariables = { ...payload, ...credentials };
   const headers = Object.fromEntries(
-    Object.entries(extract.headers || {}).map(([key, value]) => [key, replaceVariables(value, allVariables)])
+    (await Promise.all(
+      Object.entries(extract.headers || {}).map(async ([key, value]) => [key, await replaceVariables(value, allVariables)])
+    )).filter(([_, value]) => value)
   ) as Record<string, string>;
   const queryParams = Object.fromEntries(
-    Object.entries(extract.queryParams || {}).map(([key, value]) => [key, replaceVariables(value, allVariables)])
+    (await Promise.all(
+      Object.entries(extract.queryParams || {}).map(async ([key, value]) => [key, await replaceVariables(value, allVariables)])
+    )).filter(([_, value]) => value)
   ) as Record<string, string>;
-  const body = extract.body ? replaceVariables(extract.body, allVariables) : undefined;
+  const body = extract.body ? await replaceVariables(extract.body, allVariables) : undefined;
   const url = composeUrl(extract.urlHost, extract.urlPath);
   const axiosConfig: AxiosRequestConfig = {
     method: extract.method,

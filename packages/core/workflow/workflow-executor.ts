@@ -59,7 +59,7 @@ export class WorkflowExecutor implements Workflow {
           stepResult = {
             stepId: step.id,
             success: false,
-            error: stepError
+            error: stepError,
           };
         }
         this.result.stepResults.push(stepResult);
