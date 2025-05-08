@@ -96,9 +96,8 @@ async function buildHubspotWorkflow() {
 
   const instruction = `
     1. Fetch all companies from HubSpot. For each company, include its ID, name, domain, industry, and city.
-    2. For each company fetched, retrieve all its associated contacts. For each contact, include its ID, email, first name, last name, phone number, and job title.
-    3. Structure the final output as a list of companies, where each company object contains a nested array of its associated contacts.
-    Ensure all standard HubSpot API request limits and pagination are handled.
+    2. For each company fetched, retrieve all its associated contacts. 
+    3. For each contact, include its ID, email, first name, last name, phone number, and job title.
   `;
   const workflow = await superglue.buildWorkflow(
     instruction,
