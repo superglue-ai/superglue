@@ -134,7 +134,7 @@ export const API_PROMPT = `You are an API configuration assistant. Generate API 
   - ERROR 404: check the documentation, then check the request parameters and be creative.
   - ERROR 500: please pay special attention to the documentation to understand if the resource exists.
 
-You will get to try again, so feel free to experiment and iterate on the configuration.
+Important: Listen closely to the feedback, identify the cause of the error and adress the cause of the error.
 Make sure to try a fix before generating a new configuration. I will loose my job if I don't get this right.`;
 
 export const GENERATE_SCHEMA_PROMPT = `You are a json schema generator assistant. Generate a JSON schema based on instructions and response data.

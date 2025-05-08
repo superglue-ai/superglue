@@ -336,6 +336,7 @@ input WorkflowInput {
   steps: [ExecutionStepInput!]!
   finalTransform: JSONata
   responseSchema: JSONSchema
+  version: String
 }
 
 type Mutation {
