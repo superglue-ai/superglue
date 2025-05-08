@@ -49,7 +49,7 @@ export async function executeApiCall(
       if(retryCount > 0) {
         const result = await evaluateResponse(response.data, endpoint.responseSchema, endpoint.instruction);
         success = result.success;
-        if(!result.success) throw new Error(result.shortReason);
+        if(!result.success) throw new Error(result.shortReason + " " + JSON.stringify(response.data).slice(0, 1000));
       }
       else {
         success = true;
