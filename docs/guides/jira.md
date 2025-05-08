@@ -11,6 +11,8 @@ When building applications that integrate with JIRA, you often need to:
 
 Let's see how superglue makes this straightforward.
 
+> **Note:** All config objects support the full [ApiConfig](/api-reference/types) schema: `urlHost`, `urlPath`, `documentationUrl`, `instruction`, `responseSchema`, `method`, `headers`, `queryParams`, `body`, `authentication`, `pagination`, `dataPath`, etc. Most fields are inferred if omitted. See the API Reference for all config fields and enum values (`AuthType`, `PaginationType`, etc).
+
 ## Prerequisites
 
 - A JIRA account with access to the JIRA API
@@ -48,7 +50,7 @@ echo -n "your-email:your-token" | base64
 Let's start with a basic example that fetches projects and tasks (called issues in JIRA) from a single project:
 
 ```typescript
-import { SuperglueClient, CacheMode } from "@superglue/client";
+import { SuperglueClient } from "@superglue/client";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 
@@ -96,23 +98,26 @@ const taskListSchema = z.object({
   )
 });
 
-// Configure separate endpoints
-// notice how it is not necessary to specify the exact url path, method, or auth method
-// superglue will automatically infer the correct config based on information found in the documentation url
-
+// Full config objects (all fields optional except urlHost, instruction, responseSchema)
 const projectConfig = {
   urlHost: "https://superglue.atlassian.net",
   documentationUrl: "https://dac-static.atlassian.com/cloud/jira/platform/swagger-v3.v3.json?_v=1.7687.0-0.1317.0",
   instruction: "Extract all project names and their basic information.",
-  responseSchema: zodToJsonSchema(projectListSchema)
+  responseSchema: zodToJsonSchema(projectListSchema),
+  // method: "GET", // optional, inferred
+  // headers: {}, // optional, inferred
+  // queryParams: {}, // optional, inferred
+  // body: undefined, // optional, inferred
+  // authentication: "HEADER", // AuthType, optional, inferred
+  // pagination: { type: "OFFSET_BASED", pageSize: "50" }, // PaginationType, optional, inferred
 };
 
 const taskConfig = {
   urlHost: "https://superglue.atlassian.net",
-
   documentationUrl: "https://dac-static.atlassian.com/cloud/jira/platform/swagger-v3.v3.json?_v=1.7687.0-0.1317.0",
   instruction: "Extract all issues and their detailed information from the issues endpoint.",
-  responseSchema: zodToJsonSchema(taskListSchema)
+  responseSchema: zodToJsonSchema(taskListSchema),
+  // method, headers, queryParams, authentication, pagination, dataPath as above
 };
 
 async function main() {
@@ -242,6 +247,6 @@ The transformed data will look like this:
 
 ## Next Steps
 
-- Check the [API Reference](./api-reference/types.md) for detailed type information
-- Learn about [authentication options](./api-reference/auth.md)
+- Check the [API Reference](../api-reference/types.md) for detailed type information and all config fields
+- Learn about [authentication options](../api-reference/types.md#authtype)
 - Join our [Discord](https://discord.gg/SKRYYQEp) for support

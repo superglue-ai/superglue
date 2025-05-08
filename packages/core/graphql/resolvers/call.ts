@@ -1,7 +1,7 @@
 import { ApiConfig, ApiInputRequest, CacheMode, Context, Metadata, RequestOptions, TransformConfig } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import OpenAI from "openai";
-import { callEndpoint, generateApiConfig } from "../../utils/api.js";
+import { callEndpoint, evaluateResponse, generateApiConfig } from "../../utils/api.js";
 import { telemetryClient } from "../../utils/telemetry.js";
 import { applyJsonataWithValidation, maskCredentials, TransformResult } from "../../utils/tools.js";
 import { prepareTransform } from "../../utils/transform.js";
@@ -9,6 +9,7 @@ import { notifyWebhook } from "../../utils/webhook.js";
 import { callPostgres } from "../../utils/postgres.js";
 import { logMessage } from "../../utils/logs.js";
 import { Documentation } from "../../utils/documentation.js";
+import { PROMPT_MAPPING } from "../../llm/prompts.js";
 
 export async function executeApiCall(
   endpoint: ApiConfig,
@@ -25,11 +26,11 @@ export async function executeApiCall(
   let lastError: string | null = null;
   let messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
   let documentation: Documentation;
-  
+  let success = false;
   do {
     try {
       if(retryCount > 0) {
-        logMessage('info', `Generating API config for ${endpoint?.urlHost}${retryCount > 0 ? ` (retry ${retryCount})` : ""}`, metadata);      
+        logMessage('info', `Generating API config for ${endpoint?.urlHost}${retryCount > 0 ? ` (${retryCount})` : ""}`, metadata);      
         if(!documentation) {
           documentation = new Documentation(endpoint, metadata);
         }
@@ -44,8 +45,15 @@ export async function executeApiCall(
       if (!response.data) {
         throw new Error("No data returned from API. This could be due to a configuration error.");
       }
-      // TODO: Check if response is valid
-      // success
+      // Check if response is valid
+      if(retryCount > 0) {
+        const result = await evaluateResponse(response.data, endpoint.responseSchema, endpoint.instruction);
+        success = result.success;
+        if(!result.success) throw new Error(result.shortReason);
+      }
+      else {
+        success = true;
+      }
       break;
     }
     catch(error) {
@@ -56,13 +64,16 @@ export async function executeApiCall(
         const rawErrorString = error?.message || JSON.stringify(error || {});
         lastError = maskCredentials(rawErrorString, credentials).slice(0, 200);
         messages.push({role: "user", content: `There was an error with the configuration, please fix: ${rawErrorString.slice(0, 2000)}`});
+        if(rawErrorString.startsWith("JSONata")) {
+          messages.push({role: "user", content: "Please find the JSONata guide here: "+ PROMPT_MAPPING});
+        }
         logMessage('warn', `API call failed. ${lastError}`, metadata);
       }
     }
     retryCount++;
   } while (retryCount < 8);
 
-  if (!response?.data) {
+  if (!success) {
     telemetryClient?.captureException(new Error(`API call failed after ${retryCount} retries. Last error: ${lastError}`), metadata.orgId, {
       endpoint: endpoint,
       retryCount: retryCount,

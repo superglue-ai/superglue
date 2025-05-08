@@ -557,9 +557,9 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         // Generate schema first
         const schema = await superglueClient.generateSchema(instruction, "");
         setSchema(JSON.stringify(schema, null, 2));
-
+        const parsedPayload = JSON.parse(payload || '{}');
         // Then build workflow
-        const response = await superglueClient.buildWorkflow(instruction, payload, systems, schema);
+        const response = await superglueClient.buildWorkflow(instruction, parsedPayload, systems, schema);
         if (!response) {
           throw new Error('Failed to build workflow');
         }
