@@ -57,6 +57,7 @@ const superglue = new SuperglueClient({
 // Transform any API response with a single call
 const result = await superglue.call({
   endpoint: {
+    id: "futuramaapi",
     urlHost: "https://futuramaapi.com",
     instruction: "get all characters from the show from the graphql api",
     documentation: "https://futuramaapi.com/graphql",
