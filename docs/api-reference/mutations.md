@@ -23,7 +23,31 @@ Executes an API call with the given configuration. Supports both one-time config
           ... on ApiConfig {
             id
             urlHost
+            urlPath
             method
+            instruction
+            authentication
+            createdAt
+            updatedAt
+          }
+          ... on ExtractConfig {
+            id
+            urlHost
+            urlPath
+            fileType
+            decompressionMethod
+            instruction
+            authentication
+            createdAt
+            updatedAt
+          }
+          ... on TransformConfig {
+            id
+            instruction
+            responseSchema
+            responseMapping
+            createdAt
+            updatedAt
           }
         }
       }
@@ -36,7 +60,6 @@ Executes an API call with the given configuration. Supports both one-time config
       apiKey: 'YOUR_API_KEY'
     });
 
-    // Using a one-time config
     const result = await client.call({
       endpoint: {
         urlHost: "https://api.example.com",
@@ -53,14 +76,6 @@ Executes an API call with the given configuration. Supports both one-time config
       options: {
         cacheMode: "ENABLED",
         timeout: 5000
-      }
-    });
-
-    // Using a saved config ID
-    const result = await client.call({
-      id: "saved-config-id",
-      payload: {
-        userId: "123"
       }
     });
     ```
@@ -84,8 +99,14 @@ Extracts data from a file or API response. Handles decompression and parsing of 
         config {
           ... on ExtractConfig {
             id
+            urlHost
+            urlPath
             fileType
             decompressionMethod
+            instruction
+            authentication
+            createdAt
+            updatedAt
           }
         }
       }
@@ -94,10 +115,6 @@ Extracts data from a file or API response. Handles decompression and parsing of 
   </Tab>
   <Tab title="Client">
     ```typescript
-    const client = new SuperglueClient({
-      apiKey: 'YOUR_API_KEY'
-    });
-
     const result = await client.extract({
       endpoint: {
         urlHost: "https://example.com",
@@ -131,8 +148,11 @@ Transforms data using JSONata expressions and validates against a schema.
         config {
           ... on TransformConfig {
             id
+            instruction
             responseSchema
             responseMapping
+            createdAt
+            updatedAt
           }
         }
       }
@@ -141,10 +161,6 @@ Transforms data using JSONata expressions and validates against a schema.
   </Tab>
   <Tab title="Client">
     ```typescript
-    const client = new SuperglueClient({
-      apiKey: 'YOUR_API_KEY'
-    });
-
     const result = await client.transform({
       endpoint: {
         instruction: "Transform user data",
@@ -168,10 +184,51 @@ Transforms data using JSONata expressions and validates against a schema.
   </Tab>
 </Tabs>
 
+### executeWorkflow
+Executes a workflow (multiple APIs or Endpoints) in a single call.
+
+<Tabs>
+  <Tab title="GraphQL">
+    ```graphql
+    mutation ExecuteWorkflow($input: WorkflowInputRequest!, $payload: JSON, $credentials: JSON, $options: RequestOptions) {
+      executeWorkflow(input: $input, payload: $payload, credentials: $credentials, options: $options) {
+        success
+        data
+        finalTransform
+        stepResults {
+          stepId
+          success
+          rawData
+          transformedData
+          error
+        }
+        error
+        startedAt
+        completedAt
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Client">
+    ```typescript
+    const result = await client.executeWorkflow({
+      workflow: {
+        id: "workflow-id",
+        steps: [/* ... */],
+        finalTransform: "...",
+        responseSchema: {/* ... */}
+      },
+      payload: {/* ... */},
+      options: {/* ... */}
+    });
+    ```
+  </Tab>
+</Tabs>
+
 ## Configuration Management
 
 ### upsertApi
-Creates or updates an API configuration. Preserves existing fields unless explicitly overwritten.
+Creates or updates an API configuration.
 
 <Tabs>
   <Tab title="GraphQL">
@@ -182,10 +239,19 @@ Creates or updates an API configuration. Preserves existing fields unless explic
         urlHost
         urlPath
         method
+        instruction
         headers
         queryParams
         body
         authentication
+        responseSchema
+        responseMapping
+        pagination {
+          type
+          pageSize
+          cursorPath
+        }
+        dataPath
         updatedAt
       }
     }
@@ -193,10 +259,6 @@ Creates or updates an API configuration. Preserves existing fields unless explic
   </Tab>
   <Tab title="Client">
     ```typescript
-    const client = new SuperglueClient({
-      apiKey: 'YOUR_API_KEY'
-    });
-
     const config = await client.upsertApi("config-id", {
       urlHost: "https://api.example.com",
       urlPath: "/users",
@@ -212,18 +274,201 @@ Creates or updates an API configuration. Preserves existing fields unless explic
 ### deleteApi
 Deletes an API configuration. Returns `true` if successful.
 
+<Tabs>
+  <Tab title="GraphQL">
+    ```graphql
+    mutation DeleteApi($id: ID!) {
+      deleteApi(id: $id)
+    }
+    ```
+  </Tab>
+  <Tab title="Client">
+    ```typescript
+    const client = new SuperglueClient({
+      apiKey: 'YOUR_API_KEY'
+    });
+
+    const success = await client.deleteApi("config-id");
+    if (success) {
+      console.log("API config deleted successfully.");
+    }
+    ```
+  </Tab>
+</Tabs>
+
 ### upsertExtraction
-Creates or updates an extraction configuration. Similar to upsertApi but for [ExtractConfig](types.md#extractconfig).
+Creates or updates an extraction configuration.
+
+<Tabs>
+  <Tab title="GraphQL">
+    ```graphql
+    mutation UpsertExtraction($id: ID!, $input: JSON!) {
+      upsertExtraction(id: $id, input: $input) {
+        id
+        urlHost
+        urlPath
+        instruction
+        fileType
+        decompressionMethod
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Client">
+    ```typescript
+    const client = new SuperglueClient({
+      apiKey: 'YOUR_API_KEY'
+    });
+
+    const config = await client.upsertExtraction("extraction-config-id", {
+      urlHost: "https://example.com",
+      fileType: "CSV",
+      instruction: "Extract data from CSV file."
+    });
+    console.log("Extraction config upserted:", config.id);
+    ```
+  </Tab>
+</Tabs>
 
 ### deleteExtraction
 Deletes an extraction configuration. Returns `true` if successful.
 
+<Tabs>
+  <Tab title="GraphQL">
+    ```graphql
+    mutation DeleteExtraction($id: ID!) {
+      deleteExtraction(id: $id)
+    }
+    ```
+  </Tab>
+  <Tab title="Client">
+    ```typescript
+    const client = new SuperglueClient({
+      apiKey: 'YOUR_API_KEY'
+    });
+
+    const success = await client.deleteExtraction("extraction-config-id");
+    if (success) {
+      console.log("Extraction config deleted successfully.");
+    }
+    ```
+  </Tab>
+</Tabs>
+
 ### upsertTransformation
-Creates or updates a transformation configuration. Similar to upsertApi but for [TransformConfig](types.md#transformconfig).
+Creates or updates a transformation configuration.
+
+<Tabs>
+  <Tab title="GraphQL">
+    ```graphql
+    mutation UpsertTransformation($id: ID!, $input: JSON!) {
+      upsertTransformation(id: $id, input: $input) {
+        id
+        instruction
+        responseSchema
+        responseMapping
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Client">
+    ```typescript
+    const client = new SuperglueClient({
+      apiKey: 'YOUR_API_KEY'
+    });
+
+    const config = await client.upsertTransformation("transform-config-id", {
+      instruction: "Transform user data to new schema",
+      responseSchema: { type: "object", properties: { /* ... */ } },
+      responseMapping: "$.users"
+    });
+    console.log("Transformation config upserted:", config.id);
+    ```
+  </Tab>
+</Tabs>
 
 ### deleteTransformation
 Deletes a transformation configuration. Returns `true` if successful.
 
+<Tabs>
+  <Tab title="GraphQL">
+    ```graphql
+    mutation DeleteTransformation($id: ID!) {
+      deleteTransformation(id: $id)
+    }
+    ```
+  </Tab>
+  <Tab title="Client">
+    ```typescript
+    const client = new SuperglueClient({
+      apiKey: 'YOUR_API_KEY'
+    });
+
+    const success = await client.deleteTransformation("transform-config-id");
+    if (success) {
+      console.log("Transformation config deleted successfully.");
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### upsertWorkflow
+Creates or updates a workflow configuration.
+
+<Tabs>
+  <Tab title="GraphQL">
+    ```graphql
+    mutation UpsertWorkflow($id: ID!, $input: JSON!) {
+      upsertWorkflow(id: $id, input: $input) {
+        id
+        steps { id /* ... */ }
+        finalTransform
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Client">
+    ```typescript
+    const client = new SuperglueClient({
+      apiKey: 'YOUR_API_KEY'
+    });
+
+    const workflow = await client.upsertWorkflow("workflow-id", {
+      steps: [
+        // ...ExecutionStepInput objects
+      ],
+      finalTransform: "$.step1.data + $.step2.data"
+    });
+    console.log("Workflow upserted:", workflow.id);
+    ```
+  </Tab>
+</Tabs>
+
+### deleteWorkflow
+Deletes a workflow configuration. Returns `true` if successful.
+
+<Tabs>
+  <Tab title="GraphQL">
+    ```graphql
+    mutation DeleteWorkflow($id: ID!) {
+      deleteWorkflow(id: $id)
+    }
+    ```
+  </Tab>
+  <Tab title="Client">
+    ```typescript
+    const client = new SuperglueClient({
+      apiKey: 'YOUR_API_KEY'
+    });
+
+    const success = await client.deleteWorkflow("workflow-id");
+    if (success) {
+      console.log("Workflow deleted successfully.");
+    }
+    ```
+  </Tab>
+</Tabs>
+
 See also:
-- [Types Reference](types.md) for input type definitions
-- [Overview](overview.md) for authentication and common parameters 
+- [Types Reference](types.md)
+- [Overview](overview.md) 

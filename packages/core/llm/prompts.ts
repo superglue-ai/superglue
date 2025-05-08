@@ -99,42 +99,42 @@ Very important guidelines for creating JSONata mappings:
   - If you are repeatedly failing and can't figure out why, try a different approach.
 Remember: The goal is to create valid JSONata expressions that accurately transform the source data structure into the required target structure. Follow all of these guidelines or I will lose my job.`;
 
-export const API_PROMPT = `You are an API configuration assistant. Generate API details based on instructions and documentation.
+export const API_PROMPT = `You are an API configuration assistant. Generate API details based on instructions and documentation and available variables.
 
-- Evaluate the available variables and use them in the API configuration like so {variable}:
-   e.g. https://api.example.com/v1/items?api_key={api_key}
+- Evaluate the available variables and use them in the API configuration like so <<variable>>:
+   e.g. https://api.example.com/v1/items?api_key=<<api_key>>
    e.g. headers: {
-        "Authorization": "Bearer {access_token}"
+        "Authorization": "Bearer <<access_token>>"
    }
    e.g. headers: {
-        "Authorization": "Basic {username}:{password}"
+        "Authorization": "Basic <<username>>:<<password>>"
   }
-  Note: For Basic Authentication, format as "Basic {username}:{password}" and the system will automatically convert it to Base64.
+  Note: For Basic Authentication, format as "Basic <<username>>:<<password>>" and the system will automatically convert it to Base64.
 - Variables provided starting with 'x-' are probably headers.
-- For pagination, please add {page} or {offset} as well as {limit} to the url / query params / body / headers.
-      e.g. https://api.example.com/v1/items?page={page}&limit={limit}
+- If the API supports pagination, please add <<page>> or <<offset>> as well as <<limit>> to the url / query params / body / headers.
+      e.g. https://api.example.com/v1/items?page=<<page>>&limit=<<limit>>
       e.g. headers: {
-        "X-Page": "{page}"
+        "X-Page": "<<page>>"
       }
-- to insert arrays, use the following format:
-  e.g. body: {
-    "items": {items}
-  }
+- The variables can be accessed via JSONata.
+  e.g. if the payload is {"items": [{"id": 1, "name": "item1"}, {"id": 2, "name": "item2"}]}
+  you could use <<$.items[0].name>> to get the first item's name.
+- The JSONata should be simple and concise. Avoid ~> to execute functions, use $map(arr, $function) instead.
 - Think hard before producing a response, and be aware that the response is not checked for validity if the response is not an error, so only suggest endpoints that you are sure are valid.
 - If this is a store / e-commerce site, try products.json, collections.json, categories.json, etc.
-- You can use the following format to access a postgres database: urlHost: "postgres://{user}:{password}@{hostname}:{port}", urlPath: "{database}", body: {query: "{query}"}
+- You can use the following format to access a postgres database: urlHost: "postgres://<<user>>:<<password>>@<<hostname>>:<<port>>", urlPath: "<<database>>", body: {query: "<<query>>"}
 - For SOAP requests, put the XML request in the body as a string. Make sure to think hard and include all relevant objects and fields as SOAP requests can be complex.
   e.g. body: "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:urn=\"urn:com:example:types\"><soapenv:Header/><soapenv:Body><urn:getCustomer><urn:customerId>1234567890</urn:customerId></urn:getCustomer></soapenv:Body></soapenv:Envelope>"
 - The user might flag that a configuration did not run successfully: Look at the error code and message and understand, in relation to the documentation, what went wrong.
-  - The following variables are not defined: ... - You are using a {variable} that is not defined in the payload, credentials, or pagination. Only use the available variables, they should contain all the information you need.
-  - If the error is related to a filter and you can't figure out what the problem is, try to remove the filter. We can always add in the mapping later.
+  - A jsonata result is undefined causing the configuration to fail. This could be because the jsonata is not correct. Make sure to really look at the payload structure and ensure you are using the right path.
+  - If the error is related to a filter for retrieving data and you can't figure out what the problem is, try to remove the filter. We can always add in the mapping later.
   - ERROR 400: please pay special attention to the request body and url params. Maybe not all are requried? skip pagination? be creative here! this can be specific to the specific route.
   - ERROR 401: please pay special attention to the authentication type and headers.
   - ERROR 403: please pay special attention to the authentication type and headers.
   - ERROR 404: check the documentation, then check the request parameters and be creative.
   - ERROR 500: please pay special attention to the documentation to understand if the resource exists.
 
-You will get to try again, so feel free to experiment and iterate on the configuration.
+Important: Listen closely to the feedback, identify the cause of the error and adress the cause of the error.
 Make sure to try a fix before generating a new configuration. I will loose my job if I don't get this right.`;
 
 export const GENERATE_SCHEMA_PROMPT = `You are a json schema generator assistant. Generate a JSON schema based on instructions and response data.
@@ -236,7 +236,12 @@ GUIDELINES:
    - DIRECT: For steps that execute once with specific data
    - LOOP: For steps that need to iterate over a collection of items
 6. Consider data dependencies between steps (later steps can access results from earlier steps)
-7. Provide a finalTransform (JSONata expression) only if the results need post-processing
+7. Make sure to process all steps of the instruction, do not skip any steps.
+8. Make sure you retrieve all the needed data to fulfill the instruction.
+9. Make absolutely sure that each step can be achieved with a single API call (or a loop of the same call).
+10. Your job is to translate the user's instruction into a set of steps that can be achieved with the available systems. 
+   Consider different ways entities can be named between systems and that the user instruction might not always match the entity name in the documentation.
+   Consider that the user might be unspecific about instructions, e.g. they say "update the users" but they actually mean "update and create if not present".
 
 EXAMPLE INPUT:
 \`\`\`
