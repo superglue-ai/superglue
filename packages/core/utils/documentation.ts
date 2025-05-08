@@ -370,6 +370,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     if(!config.instruction && docResult?.content) {
       return docResult?.content;
     }
+    fetchedLinks.add(config.documentationUrl);
     const instructions = ["auth", "authentication", "introduction", "authorization", "started"];
     instructions.push(...(config.instruction?.toLowerCase().split(/[^a-z0-9]/g).filter(i => i.length > 3) || []));
 
@@ -387,7 +388,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     rankedLinks.sort((a, b) => b.matchCount - a.matchCount);
 
     for(const rankedLink of rankedLinks) {
-      if(fetchedLinks.size > 5) break;
+      if(fetchedLinks.size > 3) break;
       if(fetchedLinks.has(rankedLink.href)) continue;
       const linkResult = await this.fetchPageContentWithPlaywright(rankedLink.href, config, metadata);
       if(linkResult && linkResult.content) { // Ensure content exists
