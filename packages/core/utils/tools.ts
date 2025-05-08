@@ -248,7 +248,7 @@ export function composeUrl(host: string, path: string) {
 export async function replaceVariables(template: string, payload: Record<string, any>): Promise<string> {
   if (!template) return "";
   
-  const pattern = /\{\{([\s\S]*?)\}\}/g;
+  const pattern = /<<([\s\S]*?)>>/g;
   
   let result = template;
   const matches = [...template.matchAll(pattern)];
