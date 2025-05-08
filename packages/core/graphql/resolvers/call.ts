@@ -64,7 +64,7 @@ export async function executeApiCall(
         const rawErrorString = error?.message || JSON.stringify(error || {});
         lastError = maskCredentials(rawErrorString, credentials).slice(0, 200);
         messages.push({role: "user", content: `There was an error with the configuration, please fix: ${rawErrorString.slice(0, 2000)}`});
-        if(rawErrorString.startsWith("JSONata")) {
+        if(rawErrorString.startsWith("JSONata") && !messages.some(m => String(m.content).startsWith("Please find the JSONata guide here:"))) {
           messages.push({role: "user", content: "Please find the JSONata guide here: "+ PROMPT_MAPPING});
         }
         logMessage('warn', `API call failed. ${lastError}`, metadata);
