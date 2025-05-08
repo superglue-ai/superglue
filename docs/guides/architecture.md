@@ -12,7 +12,7 @@ flowchart TB
     subgraph UserClient[User / Your Client System]
         direction LR
         App[Your Application]
-        Trigger[Workflow Trigger (API Call / Schedule)]
+        Trigger["Workflow Trigger (API Call / Schedule)"]
     end
 
     subgraph ExternalSystems[External Systems / Data Sources]
