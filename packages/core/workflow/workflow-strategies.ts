@@ -77,35 +77,35 @@ const loopStrategy: ExecutionStrategy = {
         }
       }
       
-      let cursors: any[] = await applyJsonata(payload, step.loopSelector);
+      let loopItems: any[] = await applyJsonata(payload, step.loopSelector);
 
-      if (!Array.isArray(cursors) || cursors.length === 0) {
+      if (!Array.isArray(loopItems) || loopItems.length === 0) {
         if(step.loopSelector !== "$") logMessage("error", `[LOOP] No array found for '${step.loopSelector}' - regenerating loop selector`, metadata);
         const newLoopSelector = await generateMapping({ type: "array" }, payload, "Find the array of selector values for the following loop: " + step.id, metadata);
         step.loopSelector = newLoopSelector.jsonata;
-        cursors = await applyJsonata(payload, step.loopSelector);
+        loopItems = await applyJsonata(payload, step.loopSelector);
       }
 
-      if(!Array.isArray(cursors) || cursors.length === 0) {
+      if(!Array.isArray(loopItems) || loopItems.length === 0) {
         throw new Error(`[LOOP] No values found for loop variable '${step.loopSelector}'`);
       }
 
       if (step.loopMaxIters > 0) {
-        cursors = cursors.slice(0, step.loopMaxIters);
+        loopItems = loopItems.slice(0, step.loopMaxIters);
       }
       const stepResults: WorkflowStepResult[] = [];
-      for (let i = 0; i < cursors.length; i++) {
-        const cursor = cursors[i];
-        logMessage("debug", `[LOOP] Executing for ${cursor} (${i + 1}/${cursors.length})`, metadata);
+      for (let i = 0; i < loopItems.length; i++) {
+        const currentItem = loopItems[i];
+        logMessage("debug", `[LOOP] Executing for ${currentItem} (${i + 1}/${loopItems.length})`, metadata);
 
         const loopPayload = {
           ...payload,
-          cursor: cursor,
+          currentItem: currentItem,
         };
 
         try {
           const apiResponse = await executeApiCall(step.apiConfig, loopPayload, credentials, options, metadata);
-          const rawData = {cursor: cursor, ... apiResponse.data};
+          const rawData = {currentItem: currentItem, ... apiResponse.data};
           const transformedData = await applyJsonata(rawData, step.responseMapping);
           stepResults.push({ 
             stepId: step.id, 
@@ -119,7 +119,7 @@ const loopStrategy: ExecutionStrategy = {
           step.apiConfig = apiResponse.endpoint;
 
         } catch (callError) {
-          const errorMessage = `[LOOP] Error processing '${cursor}': ${String(callError)}`;
+          const errorMessage = `[LOOP] Error processing '${currentItem}': ${String(callError)}`;
           logMessage("error", errorMessage, metadata);
           throw errorMessage;
         }

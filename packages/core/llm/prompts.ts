@@ -238,7 +238,8 @@ GUIDELINES:
 6. Consider data dependencies between steps (later steps can access results from earlier steps)
 7. Make sure to process all steps of the instruction, do not skip any steps.
 8. Make sure you retrieve all the needed data to fulfill the instruction.
-9. Your job is to translate the user's instruction into a set of steps that can be achieved with the available systems. 
+9. Make absolutely sure that each step can be achieved with a single API call (or a loop of the same call).
+10. Your job is to translate the user's instruction into a set of steps that can be achieved with the available systems. 
    Consider different ways entities can be named between systems and that the user instruction might not always match the entity name in the documentation.
    Consider that the user might be unspecific about instructions, e.g. they say "update the users" but they actually mean "update and create if not present".
 
