@@ -9,29 +9,28 @@ The following diagram illustrates the core components and a typical workflow dat
 
 ```mermaid
 flowchart TB
-    subgraph UserClient[User / Your Client System]
+    subgraph UserClient[User / Client System]
         direction LR
-        App[Your Application]
-        Trigger["Workflow Trigger (API Call / Schedule)"]
+        AppTrigger["Application / Trigger"]
     end
 
-    subgraph ExternalSystems[External Systems / Data Sources]
+    subgraph ExternalSystems[External Data Sources]
         direction LR
-        API_A[API/Service A]
-        API_B[API/Service B]
-        File_C[File Source C]
+        ExternalSource[Generic API / File Source]
     end
 
     subgraph SuperglueAgent[Superglue Integration Agent]
         direction TB
-        Orchestrator[Workflow Engine / Orchestrator]
+        Orchestrator[Workflow Orchestrator]
         
-        subgraph CoreCapabilities[Core Capabilities]
+        subgraph CoreProcessing[Data Processing Pipeline]
             direction LR
-            Extractor[Extract Pipeline]
-            Transformer[LLM Transform Engine]
-            Validator[Schema Validator]
+            Extractor[Extract]
+            Transformer[Transform]
+            Validator[Validate]
         end
+        
+        %% Orchestrator uses/manages these pipeline components
         Orchestrator --> Extractor
         Orchestrator --> Transformer
         Orchestrator --> Validator
@@ -40,29 +39,22 @@ flowchart TB
 
     subgraph PersistentStore[Configuration & Cache]
         direction TB
-        WorkflowDefs[Workflow Definitions]
-        ApiConfigs[API/Step Configurations]
-        MappingCache[Transformation Cache]
-        RunLogs[Execution Logs]
+        Store[Workflow Defs, Step Configs, Cache, Logs]
     end
 
-    %% Data Flow Example for a Workflow
-    Trigger --> Orchestrator
-    Orchestrator -- Request Step 1 Data --> API_A
-    API_A -- Raw Data A --> Extractor
-    Extractor -- Extracted A --> Transformer
-    Transformer -- Transformed A --> Validator
-    Validator -- Validated A (Input for Step 2) --> Orchestrator
+    %% Simplified Data Flow showing one representative step execution cycle
+    AppTrigger -- Initiates Workflow --> Orchestrator
     
-    Orchestrator -- Request Step 2 Data (using Validated A) --> API_B
-    API_B -- Raw Data B --> Extractor
-    Extractor -- Extracted B --> Transformer
-    Transformer -- Transformed B --> Validator
-    Validator -- Validated B (Final Workflow Output) --> App
+    %% Orchestrator coordinates data flow through the pipeline for each step:
+    Orchestrator -- 1. Instructs Data Retrieval --> ExternalSource
+    ExternalSource -- 2. Raw Data --> Extractor
+    Extractor -- 3. Extracted Data --> Transformer
+    Transformer -- 4. Transformed Data --> Validator
+    Validator -- 5. Validated Step Output --> Orchestrator
     
-    Orchestrator -- Process File (Step X) --> File_C
-    File_C -- Raw Data C --> Extractor
-    %% ... further processing of File_C data
+    Orchestrator -- 6. Final Workflow Output to --> AppTrigger
+    %% Note: For multi-step workflows, Orchestrator uses step output (5) from one step
+    %% as input to initiate subsequent steps, repeating the cycle (1-5).
 
     SuperglueAgent <--> PersistentStore
 
@@ -139,8 +131,7 @@ Two main storage modes are supported:
 6.  Status, metrics, and logs for the workflow and each step are recorded.
 
 ## Performance Characteristics
-- Average transformation latency for an individual step: 200-500ms (when transformation rules are cached).
-- Cache hit ratio for transformation rules: ~80% for repeated transformations.
+- Average transformation latency for an individual step with <100KB data: 10-50ms (when transformation rules are cached).
 - Supports a high number of concurrent workflow executions, limited by underlying resources.
 - Maximum payload size per step: 100MB (configurable).
 
