@@ -50,7 +50,8 @@
         "guides/self-hosting",
         "guides/architecture",
         "guides/shopify",
-        "guides/jira"
+        "guides/jira",
+        "guides/hubspot"
       ]
     },
     {
@@ -59,7 +60,8 @@
         "api-reference/overview",
         "api-reference/types",
         "api-reference/queries",
-        "api-reference/mutations"
+        "api-reference/mutations",
+        "api-reference/subscriptions"
       ]
     }
   ],
