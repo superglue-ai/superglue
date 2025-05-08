@@ -30,7 +30,7 @@ describe('GeminiModel', () => {
       const result = await model.generateText(messages);
 
       expect(mockGetGenerativeModel).toHaveBeenCalledWith({
-        model: 'gemini-2.5-pro-preview-03-25',
+        model: 'gemini-2.5-flash-preview-04-17',
         systemInstruction: 'system prompt'
       });
       expect(result.response).toBe('test response');

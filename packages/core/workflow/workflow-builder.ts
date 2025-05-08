@@ -168,7 +168,7 @@ Output a JSON object conforming to the WorkflowPlan schema. Define the necessary
     }
 
     const allCredentials = Object.values(this.systems).reduce((acc, sys) => {
-      return { ...acc, ...sys.credentials };
+      return { ...acc, ...Object.entries(sys.credentials || {}).reduce((obj, [name, value]) => ({ ...obj, [sys.id + "_" + name]: value }), {}) };
     }, {});
 
     const workflow: Workflow = {
