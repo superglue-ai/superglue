@@ -1,6 +1,6 @@
 ---
 title: 'Shopify'
-description: 'How to xtract a product catalog from Shopify'
+description: 'How to extract a product catalog from Shopify'
 ---
 
 When you're building an application that needs Shopify product data, you typically face a few challenges:
@@ -9,6 +9,8 @@ When you're building an application that needs Shopify product data, you typical
 - You want to transform the data into your own format
 
 Let's see how superglue makes this easy.
+
+> **Note:** All config objects support the full [ApiConfig](/api-reference/types) schema: `urlHost`, `urlPath`, `documentationUrl`, `instruction`, `responseSchema`, `method`, `headers`, `queryParams`, `body`, `authentication`, `pagination`, `dataPath`, etc. Most fields are inferred if omitted. See the API Reference for all config fields and enum values (`AuthType`, `PaginationType`, etc).
 
 ## Installation
 
@@ -53,12 +55,19 @@ const productSchema = z.object({
   ),
 });
 
-// give the host url and some basic instruction
+// Full config object (all fields optional except urlHost, instruction, responseSchema)
 const config = {
   urlHost: "https://hydrogen-preview.myshopify.com",
   urlPath: "/products.json",
   instruction: "Extract product details including variants from all products from https://hydrogen-preview.myshopify.com.",
   responseSchema: zodToJsonSchema(productSchema),
+  // method: "GET", // optional, inferred
+  // headers: {}, // optional
+  // queryParams: {}, // optional
+  // body: undefined, // optional
+  // authentication: "NONE", // AuthType, optional
+  // pagination: { type: "PAGE_BASED", pageSize: "50" }, // PaginationType, optional
+  // dataPath: "products" // optional
 };
 
 // Complete working script
@@ -223,7 +232,7 @@ The corresponding mapping instruction will look something like this:
 
 ## Working with Pagination
 
-Shopify limits results to 250 products per page. Usually, superglue will automatically handle this for you. Since this specific part of the API is not well defined, you can also manually handle it by providing the `pagination` configuration. You could also just write it in the instruction, particularly if you are unsure aboute the exact pagination parameters.
+Shopify limits results to 250 products per page. Usually, superglue will automatically handle this for you. Since this specific part of the API is not well defined, you can also manually handle it by providing the `pagination` configuration. You could also just write it in the instruction, particularly if you are unsure about the exact pagination parameters.
 
 ```typescript
 const paginatedConfig = {
@@ -232,8 +241,8 @@ const paginatedConfig = {
   instruction: "Extract product details including variants from all products from https://hydrogen-preview.myshopify.com.",
   method: "GET",
   pagination: {
-    type: "PAGE_BASED",
-    pageSize: 50 // just to be safe
+    type: "PAGE_BASED", // PaginationType
+    pageSize: "50"
   },
   queryParams: {
     "limit": "{pageSize}",
@@ -246,12 +255,7 @@ const result = await superglue.call({
 });
 ```
 
-The pagination config automatically:
-- Fetches all pages
-- Combines the results
-- Handles rate limiting
-
 ## Next Steps
 
-- Check the [API Reference](./api-reference/types.md) for detailed type information
+- Check the [API Reference](../api-reference/types.md) for detailed type information and all config fields
 - Join our [Discord](https://discord.gg/SKRYYQEp) for support 
