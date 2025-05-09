@@ -180,7 +180,7 @@ export class PostgresStore implements DataStore {
 
   async deleteApiConfig(id: string, orgId?: string): Promise<boolean> {
     const result = await this.withClient(async (client) => {
-      const res = await client.query('DELETE FROM api_configs WHERE id = $1 AND ($2 IS NULL OR org_id = $2) RETURNING id', [id, orgId]);
+      const res = await client.query('DELETE FROM api_configs WHERE id = $1 AND ($2::TEXT IS NULL OR org_id = $2::TEXT) RETURNING id', [id, orgId || null]);
       return res.rowCount > 0;
     });
     return result;
@@ -189,7 +189,7 @@ export class PostgresStore implements DataStore {
   // Extract Methods
   async getExtractConfig(id: string, orgId?: string): Promise<ExtractConfig | null> {
     const result = await this.withClient(async (client) => {
-      const res = await client.query('SELECT * FROM extract_configs WHERE id = $1 AND ($2 IS NULL OR org_id = $2)', [id, orgId]);
+      const res = await client.query('SELECT * FROM extract_configs WHERE id = $1 AND ($2::TEXT IS NULL OR org_id = $2::TEXT)', [id, orgId || null]);
       return res.rows[0] || null;
     });
     return result ? this.mapRowToConfig<ExtractConfig>(result) : null;
@@ -239,7 +239,7 @@ export class PostgresStore implements DataStore {
 
   async deleteExtractConfig(id: string, orgId?: string): Promise<boolean> {
     const result = await this.withClient(async (client) => {
-      const res = await client.query('DELETE FROM extract_configs WHERE id = $1 AND ($2 IS NULL OR org_id IS NOT DISTINCT FROM $2) RETURNING id', [id, orgId]);
+      const res = await client.query('DELETE FROM extract_configs WHERE id = $1 AND ($2::TEXT IS NULL OR org_id = $2::TEXT) RETURNING id', [id, orgId || null]);
       return res.rowCount > 0;
     });
     return result;
@@ -298,7 +298,7 @@ export class PostgresStore implements DataStore {
 
   async deleteTransformConfig(id: string, orgId?: string): Promise<boolean> {
     const result = await this.withClient(async (client) => {
-      const res = await client.query('DELETE FROM transform_configs WHERE id = $1 AND ($2 IS NULL OR org_id = $2) RETURNING id', [id, orgId]);
+      const res = await client.query('DELETE FROM transform_configs WHERE id = $1 AND ($2::TEXT IS NULL OR org_id = $2::TEXT) RETURNING id', [id, orgId || null]);
       return res.rowCount > 0;
     });
     return result;
@@ -307,7 +307,7 @@ export class PostgresStore implements DataStore {
   // Run Result Methods
   async getRun(id: string, orgId?: string): Promise<RunResult | null> {
     const result = await this.withClient(async (client) => {
-      const res = await client.query('SELECT * FROM runs WHERE id = $1 AND ($2 IS NULL OR org_id = $2)', [id, orgId]);
+      const res = await client.query('SELECT * FROM runs WHERE id = $1 AND ($2::TEXT IS NULL OR org_id = $2::TEXT)', [id, orgId || null]);
       const row = res.rows[0] || null;
       return row ? this.mapRowToRunResult(row) : null;
     });
@@ -356,7 +356,7 @@ export class PostgresStore implements DataStore {
 
   async deleteRun(id: string, orgId?: string): Promise<boolean> {
     const result = await this.withClient(async (client) => {
-      const res = await client.query('DELETE FROM runs WHERE id = $1 AND ($2 IS NULL OR org_id = $2) RETURNING id', [id, orgId]);
+      const res = await client.query('DELETE FROM runs WHERE id = $1 AND ($2::TEXT IS NULL OR org_id = $2::TEXT) RETURNING id', [id, orgId || null]);
       return res.rowCount > 0;
     });
     return result;
@@ -364,7 +364,7 @@ export class PostgresStore implements DataStore {
 
   async deleteAllRuns(orgId?: string): Promise<boolean> {
     const result = await this.withClient(async (client) => {
-      const res = await client.query('DELETE FROM runs WHERE $1 IS NULL OR org_id = $1 RETURNING id', [orgId]);
+      const res = await client.query('DELETE FROM runs WHERE $1::TEXT IS NULL OR org_id = $1::TEXT RETURNING id', [orgId || null]);
       return res.rowCount > 0;
     });
     return result;
@@ -373,7 +373,7 @@ export class PostgresStore implements DataStore {
   // Workflow Methods
   async getWorkflow(id: string, orgId?: string): Promise<Workflow | null> {
     const result = await this.withClient(async (client) => {
-      const res = await client.query('SELECT * FROM workflows WHERE id = $1 AND ($2 IS NULL OR org_id = $2)', [id, orgId]);
+      const res = await client.query('SELECT * FROM workflows WHERE id = $1 AND ($2::TEXT IS NULL OR org_id = $2::TEXT)', [id, orgId || null]);
       return res.rows[0] || null;
     });
     return result ? this.mapRowToConfig<Workflow>(result) : null;
@@ -426,7 +426,7 @@ export class PostgresStore implements DataStore {
 
   async deleteWorkflow(id: string, orgId?: string): Promise<boolean> {
     const result = await this.withClient(async (client) => {
-      const res = await client.query('DELETE FROM workflows WHERE id = $1 AND ($2 IS NULL OR org_id = $2) RETURNING id', [id, orgId]);
+      const res = await client.query('DELETE FROM workflows WHERE id = $1 AND ($2::TEXT IS NULL OR org_id = $2::TEXT) RETURNING id', [id, orgId || null]);
       return res.rowCount > 0;
     });
     return result;

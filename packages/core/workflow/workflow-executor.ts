@@ -68,6 +68,7 @@ export class WorkflowExecutor implements Workflow {
         if(!stepResult.success){
           this.result.completedAt = new Date();
           this.result.success = false;
+          logMessage("error", `Step ${step.id} failed: ${stepResult.error}`, this.metadata);
           return this.result;
         }
       }

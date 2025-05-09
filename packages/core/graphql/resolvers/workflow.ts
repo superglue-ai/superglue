@@ -172,7 +172,7 @@ export const buildWorkflowResolver = async (
 
     return workflow;
   } catch (error) {
-    logMessage('error', "Workflow building error: " + String(error), { orgId: context.orgId });
+    logMessage('error', `Workflow building error: ${error instanceof Error ? error.stack || error.message : String(error)}`, { orgId: context.orgId });
     // Rethrow or return a structured error for GraphQL
     throw new Error(`Failed to build workflow: ${error}`);
   }
