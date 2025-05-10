@@ -153,7 +153,7 @@ Output a JSON object conforming to the WorkflowPlan schema. Define the necessary
         instruction: plannedStep.instruction,
         urlHost: plannedStep.urlHost,
         urlPath: plannedStep.urlPath,
-        documentationUrl: system.documentationUrl
+        documentationUrl: system.documentationUrl || system.documentation
       };
       const executionStep: ExecutionStep = {
         id: plannedStep.stepId,
