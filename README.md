@@ -3,18 +3,16 @@
   <img src="https://github.com/user-attachments/assets/be0e65d4-dcd8-4133-9841-b08799e087e7" width="350" alt="superglue_logo_white">
 </p>
 
-<h2 align="center">self-healing integration agent 🍯</h2>
+<h2 align="center">one SDK to manage all your data pipelines.
+ 🍯</h2>
 
-superglue is a self-healing integration agent. You can deploy it as a proxy between you and any complex / legacy APIs and always get the data that you want in the format you expect.
+superglue bundles your pipelines into one stable, self-healing endpoint. Comes with automated schema-drift detection, retries and remappings so your data keeps moving no matter what - no connector maintenance, no rewrites. You can deploy it as a proxy between you and any SaaS app, API and data source and always get the data that you want in the format you expect.
 
-Here's how it works: You prompt superglue in natural language (like "get all issues from jira"), provide an API URL, and superglue transforms the prompt into corresponding API calls. 
-What superglue does under the hood:
-- Automatically generates the API configuration by analyzing API docs.
-- Handles pagination, authentication, and error retries.
-- Creates deterministic transformations (using JSONata for creating transformation rules), into the exact schema you need.
-- Validates that all data coming through follows that schema, and automatically fixes transformations when they break.
-
-superglue uses LLMs only during configuration setup and transformation rule creation, making the glueing process deterministic and extremely efficient in terms of latency and cost.
+- Drop‑in proxy: point it at any REST / GraphQL / SQL / file endpoint.
+- LLM‑assisted mapping at setup; cached JSONata transforms at runtime (no LLM latency).
+- Self‑healing drift detector: when the upstream schema changes, superglue regenerates the transform, bumps a version, and keeps the pipeline running.
+- Security‑first: zero data stored; run fully on‑prem or use our hosted version.
+- Agent‑ready: every pipeline is exposed as a single, deterministic endpoint that LangChain, Retool or internal no‑code tools can call without knowing the ugly stuff underneath.
 
 <div align="center">
 
@@ -148,6 +146,14 @@ const result2 = await superglue.call({id: "futurama-characters"});
 
 console.log(JSON.stringify(result.data, null, 2));
 ```
+## what people build with superglue
+- Ship connectors 10x faster, without the maintenance overhead
+- Simple interface for legacy API pipelines
+- CMS or cloud migration
+- Transforming SQL queries into Rest API calls
+- Data lake consolidation
+- Track data lineage
+- And many more...
 
 
 ## key features
