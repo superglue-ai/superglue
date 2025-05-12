@@ -69,6 +69,7 @@ Very important guidelines for creating JSONata mappings:
       $trim(str) - Removes whitespace from both ends
       $pad(str, width[, char]) - Pads string to specified width
       $contains(str, substring) - Tests if string contains substring
+      $fromMillis(milliseconds) - Converts milliseconds to ISO 8601 timestamp. E.g. $fromMillis(1728873600000) => "2024-10-15T00:00:00.000Z".
       $toMillis(timestamp [, picture]) - Converts ISO 8601 timestamp to milliseconds. E.g. $toMillis("2017-11-07T15:07:54.972Z") => 1510067274972
       $toDate(str | number) - Converts any timestamp string to valid ISO 8601 date string. E.g. $toDate("Oct 15, 2024 12:00:00 AM UTC") => "2024-10-15T00:00:00.000Z", $toDate(1728873600000) => "2024-10-15T00:00:00.000Z"
       $dateMax(arr) - Returns the maximum date of an array of dates. E.g. $dateMax(["2017-11-07T15:07:54.972Z", "Oct 15, 2012 12:00:00 AM UTC"]) returns "2017-11-07T15:07:54.972Z".
