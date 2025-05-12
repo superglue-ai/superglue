@@ -56,12 +56,9 @@ Executes an API call with the given configuration. Supports both one-time config
   </Tab>
   <Tab title="Client">
     ```typescript
-    const client = new SuperglueClient({
-      apiKey: 'YOUR_API_KEY'
-    });
-
     const result = await client.call({
       endpoint: {
+        id: "a-unique-id",
         urlHost: "https://api.example.com",
         urlPath: "/data",
         instruction: "Fetch user data",
@@ -117,6 +114,7 @@ Extracts data from a file or API response. Handles decompression and parsing of 
     ```typescript
     const result = await client.extract({
       endpoint: {
+        id: "a-unique-id",
         urlHost: "https://example.com",
         urlPath: "/data.csv",
         instruction: "Extract user data from CSV",
@@ -163,6 +161,7 @@ Transforms data using JSONata expressions and validates against a schema.
     ```typescript
     const result = await client.transform({
       endpoint: {
+        id: "a-unique-id",
         instruction: "Transform user data",
         responseSchema: {
           type: "object",
@@ -284,14 +283,7 @@ Deletes an API configuration. Returns `true` if successful.
   </Tab>
   <Tab title="Client">
     ```typescript
-    const client = new SuperglueClient({
-      apiKey: 'YOUR_API_KEY'
-    });
-
     const success = await client.deleteApi("config-id");
-    if (success) {
-      console.log("API config deleted successfully.");
-    }
     ```
   </Tab>
 </Tabs>
@@ -316,16 +308,11 @@ Creates or updates an extraction configuration.
   </Tab>
   <Tab title="Client">
     ```typescript
-    const client = new SuperglueClient({
-      apiKey: 'YOUR_API_KEY'
-    });
-
     const config = await client.upsertExtraction("extraction-config-id", {
       urlHost: "https://example.com",
       fileType: "CSV",
       instruction: "Extract data from CSV file."
     });
-    console.log("Extraction config upserted:", config.id);
     ```
   </Tab>
 </Tabs>
@@ -343,14 +330,7 @@ Deletes an extraction configuration. Returns `true` if successful.
   </Tab>
   <Tab title="Client">
     ```typescript
-    const client = new SuperglueClient({
-      apiKey: 'YOUR_API_KEY'
-    });
-
     const success = await client.deleteExtraction("extraction-config-id");
-    if (success) {
-      console.log("Extraction config deleted successfully.");
-    }
     ```
   </Tab>
 </Tabs>
@@ -373,16 +353,11 @@ Creates or updates a transformation configuration.
   </Tab>
   <Tab title="Client">
     ```typescript
-    const client = new SuperglueClient({
-      apiKey: 'YOUR_API_KEY'
-    });
-
     const config = await client.upsertTransformation("transform-config-id", {
       instruction: "Transform user data to new schema",
       responseSchema: { type: "object", properties: { /* ... */ } },
       responseMapping: "$.users"
     });
-    console.log("Transformation config upserted:", config.id);
     ```
   </Tab>
 </Tabs>
@@ -400,14 +375,7 @@ Deletes a transformation configuration. Returns `true` if successful.
   </Tab>
   <Tab title="Client">
     ```typescript
-    const client = new SuperglueClient({
-      apiKey: 'YOUR_API_KEY'
-    });
-
     const success = await client.deleteTransformation("transform-config-id");
-    if (success) {
-      console.log("Transformation config deleted successfully.");
-    }
     ```
   </Tab>
 </Tabs>
@@ -429,17 +397,12 @@ Creates or updates a workflow configuration.
   </Tab>
   <Tab title="Client">
     ```typescript
-    const client = new SuperglueClient({
-      apiKey: 'YOUR_API_KEY'
-    });
-
     const workflow = await client.upsertWorkflow("workflow-id", {
       steps: [
         // ...ExecutionStepInput objects
       ],
       finalTransform: "$.step1.data + $.step2.data"
     });
-    console.log("Workflow upserted:", workflow.id);
     ```
   </Tab>
 </Tabs>
@@ -457,14 +420,7 @@ Deletes a workflow configuration. Returns `true` if successful.
   </Tab>
   <Tab title="Client">
     ```typescript
-    const client = new SuperglueClient({
-      apiKey: 'YOUR_API_KEY'
-    });
-
     const success = await client.deleteWorkflow("workflow-id");
-    if (success) {
-      console.log("Workflow deleted successfully.");
-    }
     ```
   </Tab>
 </Tabs>
