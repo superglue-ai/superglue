@@ -234,14 +234,8 @@ const ConfigTable = () => {
 
   if (loading) {
     return (
-      <div className="p-8 max-w-none w-full min-h-full">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={refreshConfigs}
-          className="transition-transform">
-            Refresh
-        </Button>
+      <div className="p-8 max-w-none w-full min-h-full flex items-center justify-center">
+        <RotateCw className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }

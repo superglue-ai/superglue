@@ -31,7 +31,9 @@ export async function applyJsonata(data: any, expr: string): Promise<any> {
 }
 
 export function superglueJsonata(expr: string) {
-  const expression = jsonata(expr);
+  const expression = jsonata(expr, {
+    recover: true
+  });
   expression.registerFunction("max", (arr: any[]) => {
     if(Array.isArray(arr)) {
       return Math.max(...arr);
@@ -46,8 +48,9 @@ export function superglueJsonata(expr: string) {
   });
   expression.registerFunction("number", (value: string) => parseFloat(value));
   expression.registerFunction("map", async (arr: any[], func: (item: any) => any[]) => 
-    Array.isArray(arr) ? await Promise.all(arr.map(func)) : await Promise.all([arr].map(func))
+    (Array.isArray(arr) ? await Promise.all(arr.map(func)) : await Promise.all([arr].map(func))) || []
   );
+  expression.registerFunction("isArray", async (arr: any[]) => Array.isArray(arr));
   expression.registerFunction("substring", (str: string, start: number, end?: number) => String(str).substring(start, end));
   expression.registerFunction("replace", (obj: any, pattern: string, replacement: string) => {
     if(Array.isArray(obj)) {
