@@ -12,6 +12,10 @@ import { generateMapping, prepareTransform } from "../utils/transform.js";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { WorkflowExecutor } from "./workflow-executor.js";
 import { selectStrategy } from "./workflow-strategies.js";
+import { type OpenAI } from "openai";
+
+type ChatMessage = OpenAI.Chat.ChatCompletionMessageParam;
+
 // Define the structure for system input
 export interface SystemDefinition {
   id: string;
@@ -62,17 +66,21 @@ export class WorkflowBuilder {
     this.responseSchema = responseSchema;
   }
 
-  private async planWorkflow(): Promise<WorkflowPlan> {
+  private async planWorkflow(
+    currentMessages: ChatMessage[],
+    lastErrorFromPreviousAttempt: string | null
+  ): Promise<{ plan: WorkflowPlan; messages: ChatMessage[] }> {
     const planSchema = zodToJsonSchema(z.object({
       steps: z.array(z.object({
         stepId: z.string().describe("Unique camelCase identifier for the step (e.g., 'fetchCustomerDetails', 'updateOrderStatus')."),
         systemId: z.string().describe("The ID of the system (from the provided list) to use for this step."),
         instruction: z.string().describe("A specific, concise instruction for what this single API call should achieve (e.g., 'Get user profile by email', 'Create a new order')."),
         mode: z.enum(["DIRECT", "LOOP"]).describe("The mode of execution for this step. Use 'DIRECT' for simple calls executed once or 'LOOP' for iterative processes."),
-        loopSelector: z.string().describe("If mode is loop: The JSONata expression to use for selecting the next iteration of a loop. Use '$' if no selection is needed."),
-        urlHost: z.string().describe("The host of the API to use for this step. Mostly this will be the same as the system's urlHost."),
-        urlPath: z.string().describe("The path of the API to use for this step. This might be different from the system's urlPath, if the API call is for a specific endpoint.")
-      })).describe("The sequence of steps required to fulfill the overall instruction.")
+        loopSelector: z.string().optional().describe("If mode is 'LOOP': JSONata expression for selecting items for next iteration. Use '$' if no specific selection is needed for the loop items. Omit or leave empty if mode is 'DIRECT'."),
+        urlHost: z.string().optional().describe("Optional. Override the system's default host. If not provided, the system's urlHost will be used."),
+        urlPath: z.string().optional().describe("Optional. Specific API path for this step. If not provided, the system's urlPath might be used or the LLM needs to determine it from documentation if the system's base URL is just a host.")
+      })).describe("The sequence of steps required to fulfill the overall instruction."),
+      finalTransform: z.string().optional().describe("A JSONata expression to apply to the final combined output of all steps. Defaults to '$' (identity).")
     }));
 
     const systemDescriptions = Object.values(this.systems).map(sys =>`
@@ -85,7 +93,13 @@ ${sys.documentation || 'No documentation content available.'}
 \`\`\``
     ).join("\n");
 
-    const userPrompt = `
+    const initialPayloadDescription = `Initial Input Payload contains keys: ${Object.keys(this.initialPayload).join(", ") || 'None'}\nPayload example: ${JSON.stringify(this.initialPayload)}`;
+
+    let newMessages = [...currentMessages];
+
+    if (newMessages.length === 0) {
+      newMessages.push({ role: "system", content: PLANNING_PROMPT });
+      const initialUserPrompt = `
 Create a plan to fulfill the user's request by orchestrating single API calls across the available systems.
 
 Overall Instruction:
@@ -94,31 +108,36 @@ Overall Instruction:
 Available Systems and their API Documentation:
 ${systemDescriptions}
 
-Initial Input Payload contains keys: ${Object.keys(this.initialPayload).join(", ") || 'None'}
-Payload example: ${JSON.stringify(this.initialPayload)}
+${initialPayloadDescription}
 
-Output a JSON object conforming to the WorkflowPlan schema. Define the necessary steps, assigning a unique lowercase \`stepId\`, selecting the appropriate \`systemId\`, writing a clear \`instruction\` for that specific API call based on documentation, and setting the execution \`mode\`. Assume data from previous steps is available implicitly for subsequent steps.
-    `;
-    const { response: plan } = await LanguageModel.generateObject(
-      [
-        { role: "system", content: PLANNING_PROMPT },
-        { role: "user", content: userPrompt }
-      ],
-      planSchema
-    );
-    // console.log("Received plan:", plan); // Logging for debug
-    logMessage('info', `Received workflow plan`, this.metadata);
-
-    if (!plan || !plan.steps || plan.steps.length === 0) {
-        const errorMsg = "Workflow planning failed to produce valid steps.";
-        logMessage('error', errorMsg, this.metadata);
-        throw new Error(errorMsg);
+Output a JSON object conforming to the WorkflowPlan schema. Define the necessary steps, assigning a unique lowercase \`stepId\`, selecting the appropriate \`systemId\`, writing a clear \`instruction\` for that specific API call based on documentation, and setting the execution \`mode\`. Assume data from previous steps is available implicitly for subsequent steps. If a step involves iteration, ensure \`loopSelector\` is appropriately defined. The plan should also include a \`finalTransform\` field, which is a JSONata expression for the final output transformation (default to '$' if no specific transformation is needed).
+`;
+      newMessages.push({ role: "user", content: initialUserPrompt });
     }
 
-    return {
-      ...plan,
-      finalTransform: "$"
-    } as WorkflowPlan;
+    if (lastErrorFromPreviousAttempt) {
+      newMessages.push({ role: "user", content: `The previous attempt resulted in an error: "${lastErrorFromPreviousAttempt}". Please analyze this error and provide a revised plan to address it. Ensure the new plan is valid and complete according to the schema.` });
+    }
+    
+    const { response: rawPlanObject, messages: updatedMessagesFromLLM } = await LanguageModel.generateObject(
+      newMessages,
+      planSchema
+    );
+
+    logMessage('info', `Received workflow plan object from LLM`, this.metadata);
+    
+    if (!rawPlanObject || typeof rawPlanObject !== 'object' || !('steps' in rawPlanObject) || !Array.isArray(rawPlanObject.steps) || rawPlanObject.steps.length === 0) {
+      const errorMsg = "Workflow planning failed: LLM did not produce a valid plan with steps.";
+      logMessage('error', errorMsg + `\nPlan attempt: ${JSON.stringify(rawPlanObject)}`, this.metadata);
+      throw new Error(errorMsg);
+    }
+
+    const plan: WorkflowPlan = {
+      steps: rawPlanObject.steps as WorkflowPlanStep[],
+      finalTransform: (rawPlanObject as { finalTransform?: string }).finalTransform || "$",
+    };
+
+    return { plan, messages: updatedMessagesFromLLM };
   }
 
   private async fetchDocumentation(): Promise<void> {
@@ -138,62 +157,98 @@ Output a JSON object conforming to the WorkflowPlan schema. Define the necessary
 
   public async build(): Promise<Workflow> {
     await this.fetchDocumentation();
-    const plan = await this.planWorkflow();
-    const executionSteps: ExecutionStep[] = [];
+    let success = false;
+    let attempts = 0;
+    const MAX_ATTEMPTS = 3;
+    let lastErrorForPlanning: string | null = null;
+    let builtWorkflow: Workflow | null = null;
+    let successfulExecutor: WorkflowExecutor | null = null;
 
-    for (const plannedStep of plan.steps) {
-      const system = this.systems[plannedStep.systemId];
-      if (!system) {
-        const errorMsg = `Configuration error: System with ID "${plannedStep.systemId}" planned for step "${plannedStep.stepId}" not found in provided systems.`;
-        logMessage('error', errorMsg, this.metadata);
-        throw new Error(errorMsg);
+    let conversationMessages: ChatMessage[] = [];
+
+    do {
+      attempts++;
+      logMessage('info', `Workflow build attempt ${attempts}/${MAX_ATTEMPTS}.`, this.metadata);
+      try {
+        const { plan: currentPlan, messages: updatedConvMessages } = await this.planWorkflow(
+          conversationMessages,
+          lastErrorForPlanning
+        );
+        conversationMessages = updatedConvMessages;
+        lastErrorForPlanning = null;
+
+        const executionSteps: ExecutionStep[] = [];
+        for (const plannedStep of currentPlan.steps) {
+          const system = this.systems[plannedStep.systemId];
+          if (!system) {
+            const errorMsg = `Configuration error during step setup: System ID "${plannedStep.systemId}" for step "${plannedStep.stepId}" not found.`;
+            logMessage('error', errorMsg, this.metadata);
+            throw new Error(errorMsg);
+          }
+          const partialApiConfig: ApiConfig = {
+            id: plannedStep.stepId,
+            instruction: plannedStep.instruction,
+            urlHost: plannedStep.urlHost || system.urlHost,
+            urlPath: plannedStep.urlPath || system.urlPath,
+            documentationUrl: system.documentationUrl,
+          };
+          const executionStep: ExecutionStep = {
+            id: plannedStep.stepId,
+            apiConfig: partialApiConfig,
+            executionMode: plannedStep.mode,
+            loopSelector: plannedStep.loopSelector || (plannedStep.mode === "LOOP" ? "$" : undefined),
+            inputMapping: "$",
+            responseMapping: "$",
+          };
+          executionSteps.push(executionStep);
+        }
+
+        const allCredentials = Object.values(this.systems).reduce((acc, sys) => {
+          return { ...acc, ...Object.entries(sys.credentials || {}).reduce((obj, [name, value]) => ({ ...obj, [`${sys.id}_${name}`]: value }), {}) };
+        }, {});
+
+        builtWorkflow = {
+          id: `wf-${Math.random().toString(36).substring(2, 8)}`,
+          steps: executionSteps,
+          finalTransform: currentPlan.finalTransform || "$",
+          responseSchema: this.responseSchema,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+        const executor = new WorkflowExecutor(builtWorkflow, this.metadata);
+        const result = await executor.execute(this.initialPayload, allCredentials);
+
+        if (!result.success) {
+          lastErrorForPlanning = result.error || "Workflow execution failed without a specific error message.";
+          logMessage('warn', `Workflow execution failed on attempt ${attempts}: ${lastErrorForPlanning}`, this.metadata);
+          success = false;
+        } else {
+          logMessage('info', `Workflow execution successful on attempt ${attempts}.`, this.metadata);
+          success = true;
+          successfulExecutor = executor;
+          if (builtWorkflow) builtWorkflow.updatedAt = new Date();
+        }
+      } catch (error: any) {
+        logMessage('error', `Error during workflow build attempt ${attempts}: ${error.message}`, this.metadata);
+        lastErrorForPlanning = error.message || "An unexpected error occurred during the planning or setup phase.";
+        success = false;
       }
-      const partialApiConfig: ApiConfig = {
-        id: plannedStep.stepId,
-        instruction: plannedStep.instruction,
-        urlHost: plannedStep.urlHost,
-        urlPath: plannedStep.urlPath,
-        documentationUrl: system.documentationUrl
-      };
-      const executionStep: ExecutionStep = {
-        id: plannedStep.stepId,
-        apiConfig: partialApiConfig,
-        executionMode: plannedStep.mode,
-        loopSelector: "$",
-        inputMapping: "$",
-        responseMapping: "$", // Default: takes the whole step output
-        // loopSelector, loopMaxIters would need to come from planning
-      };
-      executionSteps.push(executionStep);
-    }
+    } while (!success && attempts < MAX_ATTEMPTS);
 
-    const allCredentials = Object.values(this.systems).reduce((acc, sys) => {
-      return { ...acc, ...Object.entries(sys.credentials || {}).reduce((obj, [name, value]) => ({ ...obj, [sys.id + "_" + name]: value }), {}) };
-    }, {});
-
-    const workflow: Workflow = {
-      id: `wf-${Math.random().toString(36).substring(2, 8)}`,
-      steps: executionSteps,
-      finalTransform: "$",
-      responseSchema: this.responseSchema,
-    };
-
-    const executor = new WorkflowExecutor(workflow, this.metadata);
-    const result = await executor.execute(this.initialPayload, allCredentials, {
-      cacheMode: CacheMode.DISABLED
-    });
-
-    if(!result.success) {
-      throw new Error(result.error);
+    if (!success || !successfulExecutor || !builtWorkflow) {
+      const finalErrorMsg = `Failed to build and execute workflow after ${attempts} attempts. Last error: ${lastErrorForPlanning || "Unknown final error."}`;
+      logMessage('error', finalErrorMsg, this.metadata);
+      throw new Error(finalErrorMsg);
     }
 
     return {
-      id: workflow.id,
-      steps: executor.steps,
-      finalTransform: executor.finalTransform,
-      responseSchema: executor.responseSchema,
-      createdAt: workflow.createdAt,
-      updatedAt: workflow.updatedAt,
+      id: builtWorkflow.id,
+      steps: successfulExecutor.steps,
+      finalTransform: successfulExecutor.finalTransform,
+      responseSchema: successfulExecutor.responseSchema,
+      createdAt: builtWorkflow.createdAt,
+      updatedAt: builtWorkflow.updatedAt,
     };
   }
 }
