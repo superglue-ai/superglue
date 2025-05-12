@@ -59,14 +59,7 @@ Returns a paginated list of execution runs.
   </Tab>
   <Tab title="Client">
     ```typescript
-    const client = new SuperglueClient({
-      apiKey: 'YOUR_API_KEY'
-    });
     const { items, total } = await client.listRuns(100, 0);
-    console.log(`Found ${total} runs`);
-    items.forEach(run => {
-      console.log(`Run ${run.id}: ${run.success ? 'Success' : 'Failed'}`);
-    });
     ```
   </Tab>
 </Tabs>
@@ -96,13 +89,7 @@ Returns a paginated list of API configurations.
   </Tab>
   <Tab title="Client">
     ```typescript
-    const client = new SuperglueClient({
-      apiKey: 'YOUR_API_KEY'
-    });
     const { items, total } = await client.listApis(10, 0);
-    items.forEach(config => {
-      console.log(`API ${config.id}: ${config.urlHost}${config.urlPath}`);
-    });
     ```
   </Tab>
 </Tabs>
@@ -130,13 +117,7 @@ Returns a paginated list of transform configurations.
   </Tab>
   <Tab title="Client">
     ```typescript
-    const client = new SuperglueClient({
-      apiKey: 'YOUR_API_KEY'
-    });
     const { items, total } = await client.listTransforms(10, 0);
-    items.forEach(config => {
-      console.log(`Transform ${config.id}`);
-    });
     ```
   </Tab>
 </Tabs>
@@ -167,13 +148,7 @@ Returns a paginated list of extract configurations.
   </Tab>
   <Tab title="Client">
     ```typescript
-    const client = new SuperglueClient({
-      apiKey: 'YOUR_API_KEY'
-    });
     const { items, total } = await client.listExtracts(10, 0);
-    items.forEach(config => {
-      console.log(`Extract ${config.id}: ${config.fileType}`);
-    });
     ```
   </Tab>
 </Tabs>
@@ -214,13 +189,7 @@ Returns a paginated list of workflow configurations.
   </Tab>
   <Tab title="Client">
     ```typescript
-    const client = new SuperglueClient({
-      apiKey: 'YOUR_API_KEY'
-    });
     const workflows = await client.listWorkflows(10, 0);
-    workflows.forEach(wf => {
-      console.log(`Workflow ${wf.id}`);
-    });
     ```
   </Tab>
 </Tabs>
@@ -278,14 +247,7 @@ Retrieves a specific execution run by ID.
   </Tab>
   <Tab title="Client">
     ```typescript
-    const client = new SuperglueClient({
-      apiKey: 'YOUR_API_KEY'
-    });
     const run = await client.getRun("run-id");
-    console.log(`Run status: ${run.success ? 'Success' : 'Failed'}`);
-    if (run.error) {
-      console.error(`Error: ${run.error}`);
-    }
     ```
   </Tab>
 </Tabs>
@@ -322,11 +284,7 @@ Retrieves a specific API configuration by ID.
   </Tab>
   <Tab title="Client">
     ```typescript
-    const client = new SuperglueClient({
-      apiKey: 'YOUR_API_KEY'
-    });
     const config = await client.getApi("api-config-id");
-    console.log(`API Config: ${config.urlHost}${config.urlPath}`);
     ```
   </Tab>
 </Tabs>
@@ -351,11 +309,7 @@ Retrieves a specific transform configuration by ID.
   </Tab>
   <Tab title="Client">
     ```typescript
-    const client = new SuperglueClient({
-      apiKey: 'YOUR_API_KEY'
-    });
     const config = await client.getTransform("transform-config-id");
-    console.log(`Transform mapping: ${config.responseMapping}`);
     ```
   </Tab>
 </Tabs>
@@ -383,11 +337,7 @@ Retrieves a specific extract configuration by ID.
   </Tab>
   <Tab title="Client">
     ```typescript
-    const client = new SuperglueClient({
-      apiKey: 'YOUR_API_KEY'
-    });
     const config = await client.getExtract("extract-config-id");
-    console.log(`Extract type: ${config.fileType}`);
     ```
   </Tab>
 </Tabs>
@@ -428,11 +378,7 @@ Retrieves a specific workflow configuration by ID.
   </Tab>
   <Tab title="Client">
     ```typescript
-    const client = new SuperglueClient({
-      apiKey: 'YOUR_API_KEY'
-    });
     const workflow = await client.getWorkflow("workflow-id");
-    console.log(`Workflow: ${workflow.id}`);
     ```
   </Tab>
 </Tabs>
@@ -450,18 +396,8 @@ Generates a JSON schema based on instructions and optional response data.
   </Tab>
   <Tab title="Client">
     ```typescript
-    const client = new SuperglueClient({
-      apiKey: 'YOUR_API_KEY'
-    });
     const schema = await client.generateSchema(
       "Get me all characters with only their name",
       '[{"name": "Rick", "species": "Human"}, {"name": "Morty", "species": "Human"}]'
     );
-    console.log(`Generated schema: ${schema}`);
     ```
-  </Tab>
-</Tabs>
-
-See also:
-- [Types Reference](types.md)
-- [Overview](overview.md) 
