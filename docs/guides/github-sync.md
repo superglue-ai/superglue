@@ -20,7 +20,7 @@ The synchronization treats the workflow definitions in the `superglue/workflows/
     *   (Optional) If you use a custom Superglue endpoint (not `https://graphql.superglue.cloud`), create another secret named `SUPERGLUE_API_ENDPOINT` with your custom endpoint URL.
 
 3.  **Ensure Script and Workflow Files Exist:**
-    *   Make sure the `scripts/sync-superglue-workflows.js` file exists and contains the synchronization logic.
+    *   Make sure the `scripts/upsert-superglue-workflows.js` file exists and contains the synchronization logic.
     *   Make sure the `.github/workflows/superglue-sync.yml` file exists and defines the GitHub Actions workflow.
 
 ## How it Works
@@ -32,8 +32,8 @@ The synchronization treats the workflow definitions in the `superglue/workflows/
     1.  Checks out the repository code.
     2.  Sets up Node.js (version 20).
     3.  Installs the `@superglue/client` package.
-    4.  Executes the `scripts/sync-superglue-workflows.js` script.
-*   **Script Logic (`sync-superglue-workflows.js`):**
+    4.  Executes the `scripts/upsert-superglue-workflows.js` script.
+*   **Script Logic (`upsert-superglue-workflows.js`):**
     1.  Reads the `SUPERGLUE_API_KEY` (and optionally `SUPERGLUE_API_ENDPOINT`) from environment variables (provided by GitHub Actions secrets).
     2.  Initializes the `SuperglueClient`.
     3.  Reads all `.json` files from the `superglue/workflows/` directory.
@@ -58,7 +58,9 @@ on:
       - 'superglue/workflows/**.json' # Trigger only if workflow definitions change
 
 jobs:
-  sync:
+  sync_to_superglue:
+    # This job runs on push events to the workflows directory
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -67,21 +69,58 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20' # Use a current LTS version
+          node-version: '20'
 
       - name: Install dependencies
         run: npm install @superglue/client
-        # If you have a package.json, you might prefer:
-        # run: npm ci
 
-      - name: Sync Workflows with Superglue
-        run: node scripts/sync-superglue-workflows.js
+      - name: Sync Workflows TO Superglue
+        run: node scripts/upsert-superglue-workflows.js
         env:
           SUPERGLUE_API_KEY: ${{ secrets.SUPERGLUE_API_KEY }}
-          # SUPERGLUE_API_ENDPOINT: ${{ secrets.SUPERGLUE_API_ENDPOINT }} # Optional: Add if you use a custom endpoint
-```
+          # SUPERGLUE_API_ENDPOINT: ${{ secrets.SUPERGLUE_API_ENDPOINT }} # Optional
 
-## scripts/sync-superglue-workflows.js
+  sync_from_superglue:
+    # This job runs on the scheduled trigger
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+        contents: write # Needed to push changes back to the repo
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install @superglue/client
+
+      - name: Sync Workflows FROM Superglue
+        run: node scripts/fetch-superglue-workflows.js # This is the new script
+        env:
+          SUPERGLUE_API_KEY: ${{ secrets.SUPERGLUE_API_KEY }}
+          # SUPERGLUE_API_ENDPOINT: ${{ secrets.SUPERGLUE_API_ENDPOINT }} # Optional
+
+      - name: Configure Git
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
+      - name: Commit and push changes
+        run: |
+          git add superglue/workflows/*.json
+          # Check if there are changes to commit
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "chore: Sync workflows from Superglue service"
+            git push
+          fi
+
+## scripts/upsert-superglue-workflows.js
 ```
 const fs = require('fs');
 const path = require('path');
@@ -147,6 +186,94 @@ async function syncWorkflows() {
 }
 
 syncWorkflows();
+```
+
+## scripts/fetch-superglue-workflows.js
+```
+const fs = require('fs');
+const path = require('path');
+const { SuperglueClient } = require('@superglue/client');
+const { execSync } = require('child_process'); // Needed for git commands later
+
+const WORKFLOWS_DIR = path.join(__dirname, '..', 'superglue', 'workflows'); // Assumes workflows are in <repo_root>/superglue/workflows/
+const API_KEY = process.env.SUPERGLUE_API_KEY;
+const API_ENDPOINT = process.env.SUPERGLUE_API_ENDPOINT; // Optional: defaults to https://graphql.superglue.cloud
+
+if (!API_KEY) {
+  console.error('Error: SUPERGLUE_API_KEY environment variable is not set.');
+  process.exit(1);
+}
+
+// Ensure the workflows directory exists
+if (!fs.existsSync(WORKFLOWS_DIR)) {
+  console.log(`Creating workflows directory: ${WORKFLOWS_DIR}`);
+  fs.mkdirSync(WORKFLOWS_DIR, { recursive: true });
+}
+
+const client = new SuperglueClient({ apiKey: API_KEY, endpoint: API_ENDPOINT });
+
+async function fetchAndWriteWorkflows() {
+  console.log(`Fetching all workflows from Superglue...`);
+  let allWorkflows = [];
+  let offset = 0;
+  const limit = 50; // Adjust limit as needed, API might have its own max
+
+  try {
+    while (true) {
+      console.log(`Fetching workflows with offset ${offset}...`);
+      const batch = await client.listWorkflows(limit, offset);
+      if (!batch || batch.length === 0) {
+        break; // No more workflows
+      }
+      allWorkflows = allWorkflows.concat(batch);
+      if (batch.length < limit) {
+        break; // Last page
+      }
+      offset += limit;
+    }
+  } catch (error) {
+    console.error('Error fetching workflows:', error.message || error);
+    process.exit(1);
+  }
+
+  console.log(`Fetched ${allWorkflows.length} workflows in total.`);
+
+  // --- Strategy: Clear directory and write all fetched workflows ---
+  console.log(`Clearing existing files in ${WORKFLOWS_DIR}...`);
+  const existingFiles = fs.readdirSync(WORKFLOWS_DIR);
+  for (const file of existingFiles) {
+    if (file.endsWith('.json')) {
+      fs.unlinkSync(path.join(WORKFLOWS_DIR, file));
+      console.log(`  Deleted ${file}`);
+    }
+  }
+
+  console.log(`Writing fetched workflows to ${WORKFLOWS_DIR}...`);
+  let writeCount = 0;
+  for (const workflow of allWorkflows) {
+    if (!workflow || !workflow.id) {
+      console.warn('  Skipping workflow with missing ID:', workflow);
+      continue;
+    }
+    const workflowId = workflow.id;
+    const filePath = path.join(WORKFLOWS_DIR, `${workflowId}.json`);
+    // Remove read-only fields before saving
+    const { version, createdAt, updatedAt, ...workflowData } = workflow;
+    try {
+      // Pretty print JSON
+      fs.writeFileSync(filePath, JSON.stringify(workflowData, null, 2), 'utf-8');
+      console.log(`  Wrote ${workflowId}.json`);
+      writeCount++;
+    } catch (error) {
+      console.error(`  Error writing file ${filePath}:`, error.message || error);
+    }
+  }
+
+  console.log(`\nFinished writing ${writeCount} workflow files.`);
+  // The committing and pushing is handled by the GitHub Action workflow steps
+}
+
+fetchAndWriteWorkflows();
 ```
 ## Monitoring
 
