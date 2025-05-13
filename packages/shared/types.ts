@@ -111,7 +111,7 @@ export interface TransformConfig extends BaseConfig {
 
 export type Pagination = {
   type: PaginationType;
-  pageSize?: number;
+  pageSize?: string;
   cursorPath?: string;
 };
 
