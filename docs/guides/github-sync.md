@@ -1,4 +1,6 @@
-# Superglue Workflow Synchronization with GitHub Actions
+---
+title: 'Superglue Workflow Synchronization with GitHub Actions'
+---
 
 This document describes how to set up and use the GitHub Actions workflow to automatically synchronize Superglue workflow definitions stored in this repository with the Superglue service.
 
@@ -44,7 +46,7 @@ The synchronization treats the workflow definitions in the `superglue/workflows/
     5.  Logs progress and any errors to the GitHub Actions console.
 
 ## .github/workflows/superglue-sync.yml
-```
+```yaml
 name: Sync Superglue Workflows
 
 on:
@@ -119,9 +121,10 @@ jobs:
             git commit -m "chore: Sync workflows from Superglue service"
             git push
           fi
+```
 
 ## scripts/upsert-superglue-workflows.js
-```
+```javascript
 const fs = require('fs');
 const path = require('path');
 const { SuperglueClient } = require('@superglue/client');
@@ -189,7 +192,7 @@ syncWorkflows();
 ```
 
 ## scripts/fetch-superglue-workflows.js
-```
+```javascript
 const fs = require('fs');
 const path = require('path');
 const { SuperglueClient } = require('@superglue/client');
@@ -275,6 +278,7 @@ async function fetchAndWriteWorkflows() {
 
 fetchAndWriteWorkflows();
 ```
+
 ## Monitoring
 
 You can monitor the execution of the workflow in the **Actions** tab of your GitHub repository. Check the logs for successful synchronization messages or any potential errors.

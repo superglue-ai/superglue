@@ -1,11 +1,12 @@
 ---
-title: 'Queries'
-description: 'Queries are used to retrieve configs, logs, and workflow info.'
+title: "Queries"
+description: "Queries are used to retrieve configs, logs, and workflow info."
 ---
 
 ## List Operations
 
 ### listRuns
+
 Returns a paginated list of execution runs.
 
 <Tabs>
@@ -65,6 +66,7 @@ Returns a paginated list of execution runs.
 </Tabs>
 
 ### listApis
+
 Returns a paginated list of API configurations.
 
 <Tabs>
@@ -95,6 +97,7 @@ Returns a paginated list of API configurations.
 </Tabs>
 
 ### listTransforms
+
 Returns a paginated list of transform configurations.
 
 <Tabs>
@@ -123,6 +126,7 @@ Returns a paginated list of transform configurations.
 </Tabs>
 
 ### listExtracts
+
 Returns a paginated list of extract configurations.
 
 <Tabs>
@@ -154,6 +158,7 @@ Returns a paginated list of extract configurations.
 </Tabs>
 
 ### listWorkflows
+
 Returns a paginated list of workflow configurations.
 
 <Tabs>
@@ -197,6 +202,7 @@ Returns a paginated list of workflow configurations.
 ## Get Operations
 
 ### getRun
+
 Retrieves a specific execution run by ID.
 
 <Tabs>
@@ -253,6 +259,7 @@ Retrieves a specific execution run by ID.
 </Tabs>
 
 ### getApi
+
 Retrieves a specific API configuration by ID.
 
 <Tabs>
@@ -290,6 +297,7 @@ Retrieves a specific API configuration by ID.
 </Tabs>
 
 ### getTransform
+
 Retrieves a specific transform configuration by ID.
 
 <Tabs>
@@ -315,6 +323,7 @@ Retrieves a specific transform configuration by ID.
 </Tabs>
 
 ### getExtract
+
 Retrieves a specific extract configuration by ID.
 
 <Tabs>
@@ -343,6 +352,7 @@ Retrieves a specific extract configuration by ID.
 </Tabs>
 
 ### getWorkflow
+
 Retrieves a specific workflow configuration by ID.
 
 <Tabs>
@@ -384,6 +394,7 @@ Retrieves a specific workflow configuration by ID.
 </Tabs>
 
 ### generateSchema
+
 Generates a JSON schema based on instructions and optional response data.
 
 <Tabs>
@@ -401,3 +412,5 @@ Generates a JSON schema based on instructions and optional response data.
       '[{"name": "Rick", "species": "Human"}, {"name": "Morty", "species": "Human"}]'
     );
     ```
+  </Tab>
+</Tabs>
