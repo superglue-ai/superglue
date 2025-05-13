@@ -1,4 +1,4 @@
-import { type ApiConfig, AuthType, HttpMethod, Metadata, PaginationType, type RequestOptions } from "@superglue/shared";
+import { type ApiConfig, AuthType, FileType, HttpMethod, Metadata, PaginationType, type RequestOptions } from "@superglue/shared";
 import type { AxiosRequestConfig } from "axios";
 import OpenAI from "openai";
 import { z } from "zod";
@@ -6,7 +6,7 @@ import { zodToJsonSchema } from "zod-to-json-schema";
 import { callAxios, composeUrl, generateId, replaceVariables } from "./tools.js";
 import { API_PROMPT } from "../llm/prompts.js";
 import { logMessage } from "./logs.js";
-import { parseXML } from "./file.js";
+import { parseFile, parseXML } from "./file.js";
 import { LanguageModel } from "../llm/llm.js";
 import { callPostgres } from "./postgres.js";
 import { error } from "console";
@@ -40,21 +40,22 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
   let cursor = null;
   let hasMore = true;
   let loopCounter = 0;
+  let seenResponseHashes = new Set<string>();
 
   while (hasMore && loopCounter < 500) {
     // Generate pagination variables if enabled
     let paginationVars = {};
     switch (endpoint.pagination?.type) {
       case PaginationType.PAGE_BASED:
-        const pageSize = endpoint.pagination?.pageSize || 50;
+        const pageSize = endpoint.pagination?.pageSize || "50";
         paginationVars = { page, limit: pageSize, pageSize: pageSize };
         break;
       case PaginationType.OFFSET_BASED:
-        const offsetPageSize = endpoint.pagination?.pageSize || 50;
+        const offsetPageSize = endpoint.pagination?.pageSize || "50";
         paginationVars = { offset, limit: offsetPageSize, pageSize: offsetPageSize };
         break;
       case PaginationType.CURSOR_BASED:
-        const cursorPageSize = endpoint.pagination?.pageSize || 50;
+        const cursorPageSize = endpoint.pagination?.pageSize || "50";
         paginationVars = { cursor: cursor, limit: cursorPageSize, pageSize: cursorPageSize };
         break;
       default:
@@ -149,8 +150,8 @@ config: ${JSON.stringify(axiosConfig)}`;
 
     let responseData = response.data;
 
-    if(responseData && typeof responseData === 'string' && responseData.startsWith('<')) {
-      responseData = await parseXML(Buffer.from(responseData));
+    if(responseData && typeof responseData === 'string') {
+      responseData = await parseFile(Buffer.from(responseData), FileType.AUTO);
     }
 
     if (endpoint.dataPath) {
@@ -169,11 +170,13 @@ config: ${JSON.stringify(axiosConfig)}`;
     }
     
     if (Array.isArray(responseData)) {
-      if(responseData.length < endpoint.pagination?.pageSize) {
+      const pageSize = parseInt(endpoint.pagination?.pageSize || "50");
+      if(!pageSize || responseData.length < pageSize) {
         hasMore = false;
       }
-
-      if(JSON.stringify(responseData) !== JSON.stringify(allResults)) {
+      const currentResponseHash = JSON.stringify(responseData);
+      if(!seenResponseHashes.has(currentResponseHash)) {
+        seenResponseHashes.add(currentResponseHash);
         allResults = allResults.concat(responseData);
       }
       else {
@@ -193,7 +196,7 @@ config: ${JSON.stringify(axiosConfig)}`;
       page++;
     }
     else if(endpoint.pagination?.type === PaginationType.OFFSET_BASED) {
-      offset += endpoint.pagination?.pageSize || 50;
+      offset += parseInt(endpoint.pagination?.pageSize || "50");
     }
     else if (endpoint.pagination?.type === PaginationType.CURSOR_BASED) {
         const cursorParts = (endpoint.pagination?.cursorPath || 'next_cursor').split('.');

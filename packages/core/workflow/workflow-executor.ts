@@ -142,22 +142,22 @@ export class WorkflowExecutor implements Workflow {
   ): Promise<Record<string, unknown>> {
     try {
       // if explicit mapping exists, use it first
+      const mappingContext = {
+        ...originalPayload,
+        // Include step results at root level for easier access
+        ...Object.entries(this.result?.stepResults).reduce(
+          (acc, [stepIndex, stepResult]) => {
+            if (stepResult?.transformedData) {
+              acc[this.result.stepResults[stepIndex].stepId] = stepResult.transformedData;
+            }
+            return acc;
+          },
+          {} as Record<string, unknown>,
+        ),
+      };
+
       if (step.inputMapping) {
         // Prepare context for JSONata expression
-        const mappingContext = {
-          ...originalPayload,
-          // Include step results at root level for easier access
-          ...Object.entries(this.result?.stepResults).reduce(
-            (acc, [stepIndex, stepResult]) => {
-              if (stepResult?.transformedData) {
-                acc[this.result.stepResults[stepIndex].stepId] = stepResult.transformedData;
-              }
-              return acc;
-            },
-            {} as Record<string, unknown>,
-          ),
-        };
-
         try {
           const result = await applyJsonata(mappingContext, step.inputMapping || "$");
           return result as Record<string, unknown>;
@@ -166,7 +166,7 @@ export class WorkflowExecutor implements Workflow {
         }
       }
       // Default to simple merging of payload with previous step data
-      return { ...originalPayload };
+      return { ...mappingContext };
     } catch (error) {
       console.error(`[Step ${step.id}] Error preparing input:`, error);
       return { ...originalPayload };
