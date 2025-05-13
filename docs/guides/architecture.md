@@ -145,18 +145,6 @@ Two main storage modes are supported:
 
 The implementation details for core capabilities like extraction and transformation can be found in the relevant utility modules within the codebase.
 
-<CodeGroup>
-```typescript packages/core/utils/extract.ts
-startLine: 1
-endLine: 40
-```
-
-```typescript packages/core/utils/transform.ts
-startLine: 1
-endLine: 35
-```
-</CodeGroup>
-
 ## Monitoring and Maintenance
 - Built-in logging and monitoring capabilities for workflows and individual steps.
 - Performance metrics collection.
