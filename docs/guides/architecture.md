@@ -46,13 +46,13 @@ flowchart TB
     AppTrigger -- Initiates Workflow --> Orchestrator
     
     %% Orchestrator coordinates data flow through the pipeline for each step:
-    Orchestrator -- 1. Instructs Data Retrieval --> ExternalSource
-    ExternalSource -- 2. Raw Data --> Extractor
-    Extractor -- 3. Extracted Data --> Transformer
-    Transformer -- 4. Transformed Data --> Validator
-    Validator -- 5. Validated Step Output --> Orchestrator
+    Orchestrator -- Instructs Data Retrieval --> ExternalSource
+    ExternalSource -- Raw Data --> Extractor
+    Extractor -- Extracted Data --> Transformer
+    Transformer -- Transformed Data --> Validator
+    Validator -- Validated Step Output --> Orchestrator
     
-    Orchestrator -- 6. Final Workflow Output to --> AppTrigger
+    Orchestrator -- Final Workflow Output to --> AppTrigger
     %% Note: For multi-step workflows, Orchestrator uses step output (5) from one step
     %% as input to initiate subsequent steps, repeating the cycle (1-5).
 
