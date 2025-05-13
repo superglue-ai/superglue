@@ -7,6 +7,7 @@ Superglue operates as a self-healing integration agent, designed to connect disp
 
 The following diagram illustrates the core components and a typical workflow data flow:
 
+<Frame>
 ```mermaid
 flowchart TB
     subgraph UserClient[User / Client System]
@@ -30,7 +31,6 @@ flowchart TB
             Validator[Validate]
         end
         
-        %% Orchestrator uses/manages these pipeline components
         Orchestrator --> Extractor
         Orchestrator --> Transformer
         Orchestrator --> Validator
@@ -42,10 +42,8 @@ flowchart TB
         Store[Workflow Defs, Step Configs, Cache, Logs]
     end
 
-    %% Simplified Data Flow showing one representative step execution cycle
     AppTrigger -- Initiates Workflow --> Orchestrator
     
-    %% Orchestrator coordinates data flow through the pipeline for each step:
     Orchestrator -- Instructs Data Retrieval --> ExternalSource
     ExternalSource -- Raw Data --> Extractor
     Extractor -- Extracted Data --> Transformer
@@ -53,12 +51,9 @@ flowchart TB
     Validator -- Validated Step Output --> Orchestrator
     
     Orchestrator -- Final Workflow Output to --> AppTrigger
-    %% Note: For multi-step workflows, Orchestrator uses step output (5) from one step
-    %% as input to initiate subsequent steps, repeating the cycle (1-5).
 
     SuperglueAgent <--> PersistentStore
 
-    %% Styling
     classDef userStyle fill:#e6e6fa,stroke:#333,stroke-width:2px
     classDef externalStyle fill:#ffe4e1,stroke:#333,stroke-width:2px
     classDef superglueStyle fill:#d1e0f0,stroke:#333,stroke-width:2px
@@ -69,6 +64,7 @@ flowchart TB
     class SuperglueAgent superglueStyle
     class PersistentStore storageStyle
 ```
+</Frame>
 
 ## Core Components
  
@@ -149,18 +145,20 @@ Two main storage modes are supported:
 
 The implementation details for core capabilities like extraction and transformation can be found in the relevant utility modules within the codebase.
 
-```typescript:packages/core/utils/extract.ts
+<CodeGroup>
+```typescript packages/core/utils/extract.ts
 startLine: 1
 endLine: 40
 ```
 
-```typescript:packages/core/utils/transform.ts
+```typescript packages/core/utils/transform.ts
 startLine: 1
 endLine: 35
 ```
+</CodeGroup>
 
 ## Monitoring and Maintenance
 - Built-in logging and monitoring capabilities for workflows and individual steps.
 - Performance metrics collection.
 - Error tracking and alerting.
-- Easy configuration management for workflows and their constituent steps. 
+- Easy configuration management for workflows and their constituent steps.
