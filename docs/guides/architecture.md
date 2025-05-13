@@ -71,7 +71,7 @@ flowchart TB
 ```
 
 ## Core Components
-
+ 
 ### External Systems / Data Sources
 Superglue can connect to a wide array of external systems as steps within a workflow:
 - **REST & GraphQL APIs**: Connects to any modern API, handling authentication, rate limiting, and pagination per step. Supports common authentication methods (OAuth, API keys, JWT tokens).
