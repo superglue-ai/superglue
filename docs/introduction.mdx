@@ -1,31 +1,21 @@
 ---
-title: "Welcome to superglue 🍯"
-description: "Self-healing integration agent. Connect to any API, always get the data you want."
+title: "welcome to superglue 🍯"
+description: "one SDK to manage all your data pipelines. c"
 ---
 
-superglue is a self-healing integration agent. Deploy it as a proxy between you and any complex or legacy API, and always get the data you want in the format you expect.
+superglue bundles your pipelines into one stable, self-healing endpoint. Comes with automated schema-drift detection, retries and remappings so your data keeps moving no matter what - no connector maintenance, no rewrites. You can deploy it as a proxy between you and any SaaS app, API and data source and always get the data that you want in the format you expect.
 
-Prompt superglue in natural language (e.g. "get all issues from jira"), provide an API URL, and superglue handles the rest:
-
-- Generates API configs by analyzing docs
-- Handles pagination, authentication, retries
-- Creates deterministic transformations (using JSONata)
-- Validates and fixes data to match your schema
-- Uses LLMs only for config and mapping, so runtime is fast and cheap
+- Drop‑in proxy: point it at any REST / GraphQL / SQL / file endpoint.
+- LLM‑assisted mapping at setup; cached JSONata transforms at runtime (no LLM latency).
+- Self‑healing drift detector: when the upstream schema changes, superglue regenerates the transform, bumps a version, and keeps the pipeline running.
+- Security‑first: zero data stored; run fully on‑prem or use our hosted version.
+- Agent‑ready: every pipeline is exposed as a single, deterministic endpoint that LangChain, Retool or internal no‑code tools can call without knowing the ugly stuff underneath.
 
 It's open source and easy to run in your own infra.
 
-<iframe
-  width="560"
-  height="315"
-  src="https://www.youtube.com/embed/bWO-yp6yLXo"
-  title="YouTube video player"
-  frameborder="0"
-  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-  allowfullscreen
-></iframe>
+<iframe width="560" height="315" src="https://www.youtube.com/embed/bWO-yp6yLXo" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen />
 
-## Core Functionality
+## core functionality
 
 - Understands schema and format of data source
 - Transforms data sources into your target schema
@@ -36,13 +26,23 @@ It's open source and easy to run in your own infra.
 - Real-time log streaming via GraphQL subscriptions
 - Use as a drop-in replacement for any API integration or as lightweight ETL
 
-## Next Steps
+## what people build with superglue
+
+- Ship connectors 10x faster, without the maintenance overhead
+- Simple interface for legacy API pipelines
+- CMS or cloud migration
+- Transforming SQL queries into Rest API calls
+- Data lake consolidation
+- Track data lineage
+- And many more...
+
+## next steps
 
 - Read our [Quick Start Guide](/docs/quickstart) to set up superglue for your usecase
 - Check out our guides, e.g. on [Hubspot](/guides/hubspot), to learn common patterns
 - Learn about [advanced configuration](/api-reference/overview)
 
-## Support & Resources
+## support & resources
 
 - [API Reference](/api-reference/overview)
 - [GitHub Repository](https://github.com/superglue-ai/superglue)
