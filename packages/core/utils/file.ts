@@ -72,8 +72,7 @@ export async function parseFile(buffer: Buffer, fileType: FileType): Promise<any
     }
 }
 
-async function detectCSVHeaders(sample: Buffer): Promise<{ headerValues: string[], headerRowIndex: number, delimiter: string }> {
-    const delimiter = detectDelimiter(sample);
+async function detectCSVHeaders(sample: Buffer, delimiter: string): Promise<{ headerValues: string[], headerRowIndex: number, delimiter: string }> {
     
     return new Promise<{ headerValues: string[], headerRowIndex: number, delimiter: string }>((resolve, reject) => {
         Papa.parse(Readable.from(sample), {
@@ -107,8 +106,9 @@ async function parseCSV(buffer: Buffer): Promise<any> {
     // First pass: parse first chunk to detect headers
     const sampleSize = Math.min(buffer.length, 32768);
     const sample = buffer.slice(0, sampleSize);
-    const { headerValues, headerRowIndex, delimiter } = await detectCSVHeaders(sample);
-
+    const delimiter = detectDelimiter(sample);
+    const { headerValues, headerRowIndex } = await detectCSVHeaders(sample, delimiter);
+    let rawHeader = [];
     // Second pass: parse entire file with detected headers
     let currentLine = -1;
     return new Promise((resolve, reject) => {
@@ -120,8 +120,15 @@ async function parseCSV(buffer: Buffer): Promise<any> {
                 try {
                     currentLine++;
                     // Store metadata rows
-                    if(currentLine <= headerRowIndex) {
-                        if(result.data == null || result.data?.filter(Boolean).length == 0 || currentLine == headerRowIndex) return;
+                    if(currentLine == headerRowIndex) {
+                        rawHeader = result.data.filter(Boolean).reduce((acc, value, index) => {
+                            acc[`${index}`] = value;
+                            return acc;
+                        }, {});
+                        return;
+                    }
+                    else if(currentLine < headerRowIndex) {
+                        if(result.data == null || result.data?.filter(Boolean).length == 0) return;
                         metadata.push(result?.data);
                         return;
                     }
@@ -143,7 +150,12 @@ async function parseCSV(buffer: Buffer): Promise<any> {
                     });
                 }
                 else {
-                    resolve(results);
+                    if(results.length > 0) {
+                        resolve(results);
+                    }
+                    else {
+                        resolve(rawHeader);
+                    }
                 }
             },
             error: (error) => {
@@ -334,7 +346,6 @@ async function detectFileType(buffer: Buffer): Promise<FileType> {
 function detectDelimiter(buffer: Buffer): string {
     const sampleSize = Math.min(buffer.length, 32768);
     const sample = buffer.slice(0, sampleSize).toString('utf8');
-
     const delimiters = [',', '|', '\t', ';', ':'];
     const counts = delimiters.map(delimiter => ({
         delimiter,
@@ -345,6 +356,10 @@ function detectDelimiter(buffer: Buffer): string {
         return curr.count > prev.count ? curr : prev;
     });
 
+    if (detectedDelimiter.count === 0) {
+        return ' ';
+    }
+
     return detectedDelimiter.delimiter;
 }
 
@@ -352,16 +367,16 @@ function countUnescapedDelimiter(text: string, delimiter: string): number {
     let count = 0;
     let inQuotes = false;
     let prevChar = '';
-
+    let delimiterLength = delimiter.length;
     for (let i = 0; i < text.length; i++) {
         const currentChar = text[i];
-        
+        const searchChar = text.substring(i, i + delimiterLength);
         // Toggle quote state, but only if the quote isn't escaped
         if (currentChar === '"' && prevChar !== '\\') {
             inQuotes = !inQuotes;
         }
         // Count delimiter only if we're not inside quotes
-        else if (currentChar === delimiter && !inQuotes) {
+        else if (searchChar === delimiter && !inQuotes) {
             count++;
         }
         
