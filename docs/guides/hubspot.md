@@ -226,7 +226,7 @@ The `result.data` from a successful execution would look something like this:
 
 While Superglue abstracts the complexity, the built workflow conceptually involves:
 1.  **Step 1: Fetch Companies**: An API call to HubSpot's company endpoint (e.g., `GET /crm/v3/objects/companies`). It handles pagination to retrieve all companies.
-2.  **Step 2: Loop/Fetch Associated Contacts**: For each company ID obtained in Step 1, Superglue makes further API calls to HubSpot to get associated contacts. This might involve an endpoint like `GET /crm/v4/objects/companies/{companyId}/associations/contacts` or querying the contacts endpoint with filters.
+2.  **Step 2: Loop/Fetch Associated Contacts**: For each company ID obtained in Step 1, Superglue makes further API calls to HubSpot to get associated contacts. This might involve an endpoint like `GET /crm/v4/objects/companies/<<companyId>>/associations/contacts` or querying the contacts endpoint with filters.
 3.  **Step 3: Data Transformation & Aggregation**: The data from these individual calls is transformed and aggregated according to the `instruction` and `responseSchema` to produce the final nested structure.
 
 Superglue determines the most efficient way to perform these associations and transformations based on the API documentation and your instructions.
