@@ -245,8 +245,8 @@ const paginatedConfig = {
     pageSize: "50"
   },
   queryParams: {
-    "limit": "{pageSize}",
-    "page": "{page}"
+    "limit": "<<pageSize>>",
+    "page": "<<page>>"
   }
 };
 

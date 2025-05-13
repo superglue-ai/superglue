@@ -14,6 +14,16 @@ Prompt superglue in natural language (e.g. "get all issues from jira"), provide 
 
 It's open source and easy to run in your own infra.
 
+<iframe 
+    width="560" 
+    height="315" 
+    src="https://www.youtube.com/embed/bWO-yp6yLXo" 
+    title="YouTube video player" 
+    frameborder="0" 
+    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+    allowfullscreen>
+</iframe>
+
 ## Core Functionality
 
 * Understands schema and format of data source
@@ -32,75 +42,13 @@ It's open source and easy to run in your own infra.
 
 * Use as a drop-in replacement for any API integration or as lightweight ETL
 
-## Quick Start
-
-1. **Get Access**
-
-Get your API key at [https://app.superglue.cloud](https://superglue.cloud) and sign up for early access to the hosted version. Alternatively, you can [self-host](/guides/self-hosting) superglue.
-
-1. **Install the SDK**
-
-```bash
-# Install the SDK
-npm install @superglue/client
-```
-
-1. **Make Your First Call**
-
-```typescript
-import { SuperglueClient } from "@superglue/client";
-
-const superglue = new SuperglueClient({
-  apiKey: "YOUR_API_KEY"
-});
-
-// Transform any API response with a single call
-const result = await superglue.call({
-  endpoint: {
-    id: "futuramaapi",
-    urlHost: "https://futuramaapi.com",
-    instruction: "get all characters from the show from the graphql api",
-    documentation: "https://futuramaapi.com/graphql",
-    responseSchema: {
-      type: "object",
-      properties: {
-        characters: {
-          type: "array",  
-          items: {
-            type: "object",
-            properties: {
-              name: { type: "string" },
-              species: { type: "string", description: "lowercased" }
-            }
-          }
-        }
-      }
-    }
-  }
-});
-```
-
 ## Next Steps
 
-* See [example use cases](/examples) for common integration patterns
+* Read [quickstart](/quickstart) to set up superglue for your usecase
+
+* Check out our guides, e.g. on [Hubspot](/guides/hubspot), to learn common patterns 
 
 * Learn about [advanced configuration](/api-reference/overview)
-
-* Check out our [self-hosting guide](/self-hosting) for deploying your own instance
-
-* Explore [real-time log subscriptions](/api-reference/subscriptions) for monitoring and debugging
-
-## Requirements
-
-* Node.js 16+ for the client SDK
-
-* For self-hosting:
-
-  * Docker 20.10.0+
-
-  * Redis 6.0+
-
-  * OpenAI API key
 
 ## Support & Resources
 
