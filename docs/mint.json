@@ -41,8 +41,8 @@
     {
       "group": "Getting Started",
       "pages": [
-        "docs/introduction",
-        "docs/quickstart"
+        "introduction",
+        "quickstart"
       ]
     },
     {
