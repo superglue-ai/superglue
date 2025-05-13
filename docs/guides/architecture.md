@@ -127,7 +127,7 @@ Two main storage modes are supported:
 6.  Status, metrics, and logs for the workflow and each step are recorded.
 
 ## Performance Characteristics
-- Average transformation latency for an individual step with <100KB data: 10-50ms (when transformation rules are cached).
+- Average transformation latency for an individual step with \<100KB data: 10-50ms (when transformation rules are cached).
 - Supports a high number of concurrent workflow executions, limited by underlying resources.
 - Maximum payload size per step: 100MB (configurable).
 
