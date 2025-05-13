@@ -47,30 +47,49 @@ const superglue = new SuperglueClient({
   apiKey: "************"
 });
 
-const config = {
-  id: "futurama-characters",
-  urlHost: "https://futuramaapi.com",
-  urlPath: "/graphql",
-  instruction: "get all characters from the show",
-  responseSchema: {
-    type: "object",
-    properties: {
-      characters: {
-        type: "array",  
-        items: {
-          type: "object",
-          properties: {
-            name: { type: "string" },
-            species: { type: "string", description: "lowercased" }
-          }
+const workflowResult = await superglue.executeWorkflow({
+  // input can be an ID of a pre-saved workflow or a WorkflowInput object
+    workflow: {
+      id: "myTodoUserWorkflow",
+      steps: [
+        {
+          id: "fetchTodos", // Unique ID for this step
+          apiConfig: {
+            id: "jsonplaceholderTodos",
+            urlHost: "https://jsonplaceholder.typicode.com",
+            urlPath: "/todos",
+            method: HttpMethod.GET,
+            instruction: "Fetch a list of todos. We only need the first one for this example.",
+          },
+        },
+        {
+          id: "fetchUser",
+          apiConfig: {
+            id: "jsonplaceholderUsers",
+            urlHost: "https://jsonplaceholder.typicode.com",
+            urlPath: "/users/<<$.fetchTodos[0].userId>>", // JSONata path parameter for first userId
+            method: HttpMethod.GET,
+            instruction: "Fetch user details by user ID for the first todo."
+          },
+        },
+      ],
+      // Transform the results of the steps into the final desired output. If not given, this will be generated from the reponse schema
+      finalTransform: "$",
+      responseSchema: { // define the expected final output structure
+        type: "object",
+        description: "first todo",
+        properties: {
+            todoTitle: { type: "string" },
+            userName: { type: "string" }
         }
       }
-    }
-  }
-};
-
-const result = await superglue.call({endpoint: config});
-console.log(JSON.stringify(result.data, null, 2));
+  },
+  // `payload` could be used to pass initial data to the first step if needed. E.g. IDs to fetch, filters, etc. In short, things that can change across calls.
+  // payload: { userId: 1 },
+  // `credentials` can be used to authenticate requests. They need to be referenced in the api config (e.g. "headers": {"Authorization": "Bearer <<hubspot_api_key>>"})
+  // credentials: { hubspot_api_key: "pa_xxx" },      
+});
+console.log(JSON.stringify(workflowResult, null, 2));
 
 /*
 output:
