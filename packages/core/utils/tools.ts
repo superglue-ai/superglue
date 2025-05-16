@@ -158,6 +158,11 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
   let rateLimitRetryCount = 0;
   let totalRateLimitWaitTime = 0;
 
+  config.headers = {
+    "Accept": "*/*",
+    ...config.headers,
+  }
+
   // Don't send body for GET, HEAD, DELETE, OPTIONS
   if(["GET", "HEAD", "DELETE", "OPTIONS"].includes(config.method!)) {
     config.data = undefined;
