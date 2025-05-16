@@ -110,7 +110,7 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
           {
             id: "getBreedImage",
             apiConfig: {
-              urlPath: "/breed/{value}/images/random",
+              urlPath: "/breed/{currentItem}/images/random",
               instruction: "Get a random image for a specific dog breed",
               urlHost: "https://dog.ceo/api",
               method: "GET",
