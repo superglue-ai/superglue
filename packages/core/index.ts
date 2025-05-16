@@ -14,7 +14,7 @@ import { resolvers, typeDefs } from './graphql/graphql.js';
 import { createTelemetryPlugin, telemetryMiddleware } from './utils/telemetry.js';
 import { logMessage } from "./utils/logs.js";
 import { authMiddleware, validateToken, extractToken } from './auth/auth.js';
-import { handleMcpSessionRequest, mcpHandler } from './mcp-server.js';
+import { handleMcpSessionRequest, mcpHandler } from './mcp/mcp-server.js';
 // Constants
 const PORT = process.env.GRAPHQL_PORT || 3000;
 
