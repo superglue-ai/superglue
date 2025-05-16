@@ -1,7 +1,6 @@
 import type { GraphQLResolveInfo } from "graphql";
 import { WorkflowExecutor } from "../../workflow/workflow-executor.js";
 import { Context, Metadata, RequestOptions, Workflow, WorkflowResult } from "@superglue/shared";
-import { createHash } from "crypto";
 import { WorkflowBuilder } from "../../workflow/workflow-builder.js";
 import type { SystemDefinition } from "../../workflow/workflow-builder.js";
 import { logMessage } from "../../utils/logs.js";
@@ -134,7 +133,10 @@ export const listWorkflowsResolver = async (
 ) => {
   try {
     const result = await context.datastore.listWorkflows(limit, offset, context.orgId);
-    return result.items;
+    return {
+      items: result.items,
+      total: result.total,
+    };
   } catch (error) {
     logMessage('error', "Error listing workflows: " + String(error), { orgId: context.orgId });
     throw error;

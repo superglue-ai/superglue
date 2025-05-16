@@ -12,10 +12,10 @@ function getAuthManager() {
 }
 
 // HTTP Middleware
-export const authMiddleware = async (req, res, next) => {
+export const authMiddleware = async (req:any, res:any, next:any) => {
     // Skip authentication for health check
     if (req.path === '/health') return res.status(200).send('OK');
-  
+    
     const token = extractToken(req);
     const authResult = await validateToken(token);
   
@@ -28,7 +28,7 @@ export const authMiddleware = async (req, res, next) => {
     // Add orgId to request object
     req.orgId = authResult.orgId;
     req.headers["orgId"] = authResult.orgId;
-
+    req.authInfo = { token: token, clientId: authResult.orgId };
     return next();
 };
   
@@ -58,14 +58,14 @@ export const extractToken = (source: { headers?: any, query?: any } | { connecti
     } else if ('connectionParams' in source) {
       // WebSocket connection
       return source.connectionParams?.Authorization?.split(" ")?.[1]?.trim() || 
-             source.extra?.request?.url?.split("token=")?.[1]?.split("&")?.[0];
+        source.extra?.request?.url?.split("token=")?.[1]?.split("&")?.[0] ||
+        source.extra?.request?.url?.split("superglueApiKey=")?.[1]?.split("&")?.[0];
     }
     return undefined;
 };
   // Helper Functions
  function getAuthErrorHTML(token: string | undefined) {
     return `
-    <!-- AUTH ERROR -->
       <html>
         <body style="display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif;">
           <div style="text-align: center;">
