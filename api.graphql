@@ -107,6 +107,11 @@ type ExtractList {
   total: Int!
 }
 
+type WorkflowList {
+  items: [Workflow!]!
+  total: Int!
+}
+
 enum AuthType {
   NONE
   HEADER
@@ -260,7 +265,7 @@ type Query {
   listApis(limit: Int = 10, offset: Int = 0): ApiList!
   listTransforms(limit: Int = 10, offset: Int = 0): TransformList!
   listExtracts(limit: Int = 10, offset: Int = 0): ExtractList!
-  listWorkflows(limit: Int = 10, offset: Int = 0): [Workflow!]!
+  listWorkflows(limit: Int = 10, offset: Int = 0): WorkflowList!
 
   getRun(id: ID!): RunResult
   getApi(id: ID!): ApiConfig
@@ -309,8 +314,10 @@ type Workflow implements BaseConfig {
 
   # Specific implementation
   steps: [ExecutionStep!]!
+  instruction: String
   finalTransform: JSONata
   responseSchema: JSONSchema
+  inputSchema: JSONSchema
 }
 
 type WorkflowStepResult {
@@ -335,8 +342,10 @@ input WorkflowInput {
   id: String!
   steps: [ExecutionStepInput!]!
   finalTransform: JSONata
+  inputSchema: JSONSchema
   responseSchema: JSONSchema
   version: String
+  instruction: String
 }
 
 type Mutation {

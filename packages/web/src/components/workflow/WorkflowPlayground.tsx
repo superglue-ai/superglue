@@ -127,7 +127,7 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
       ),
     );
     setFinalTransform(`$.getBreedImage.(
-  {"breed": loopValue, "image": message}
+  {"breed": currentItem, "image": data}
 )`);
 
     toast({
