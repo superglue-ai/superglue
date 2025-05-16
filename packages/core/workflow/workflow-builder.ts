@@ -1,18 +1,15 @@
-import { generateApiConfig } from "../utils/api.js";
 import { type Workflow, type ExecutionStep, type ApiConfig, type ExecutionMode, type Metadata, CacheMode } from "@superglue/shared";
 import { object, z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { applyJsonata, composeUrl } from "../utils/tools.js"; // Assuming path
+import { composeUrl } from "../utils/tools.js"; // Assuming path
 import { LanguageModel } from "../llm/llm.js";
 import { PLANNING_PROMPT } from "../llm/prompts.js";
 import { logMessage } from "../utils/logs.js"; // Added import
 import { Documentation } from "../utils/documentation.js";
-import { executeApiCall } from "../graphql/resolvers/call.js";
-import { generateMapping, prepareTransform } from "../utils/transform.js";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { WorkflowExecutor } from "./workflow-executor.js";
-import { selectStrategy } from "./workflow-strategies.js";
 import { type OpenAI } from "openai";
+import { toJsonSchema } from "../external/json-schema.js";
 
 type ChatMessage = OpenAI.Chat.ChatCompletionMessageParam;
 
@@ -48,6 +45,7 @@ export class WorkflowBuilder {
   private initialPayload: Record<string, unknown>;
   private metadata: Metadata;
   private responseSchema: JSONSchema;
+  private inputSchema: JSONSchema;
 
   constructor(
     systems: SystemDefinition[],
@@ -64,6 +62,12 @@ export class WorkflowBuilder {
     this.initialPayload = initialPayload;
     this.metadata = metadata;
     this.responseSchema = responseSchema;
+    try{
+      this.inputSchema = toJsonSchema(initialPayload, {arrays: {mode: 'all'}}) as unknown as JSONSchema;
+    } catch(error) {
+      logMessage('error', `Error during payload parsing: ${error}`, this.metadata);
+      throw new Error(`Error during payload parsing: ${error}`);
+    }
   }
 
   private async planWorkflow(
@@ -163,9 +167,7 @@ Output a JSON object conforming to the WorkflowPlan schema. Define the necessary
     let lastErrorForPlanning: string | null = null;
     let builtWorkflow: Workflow | null = null;
     let successfulExecutor: WorkflowExecutor | null = null;
-
     let conversationMessages: ChatMessage[] = [];
-
     do {
       attempts++;
       logMessage('info', `Workflow build attempt ${attempts}/${MAX_ATTEMPTS}.`, this.metadata);
@@ -212,6 +214,7 @@ Output a JSON object conforming to the WorkflowPlan schema. Define the necessary
           steps: executionSteps,
           finalTransform: currentPlan.finalTransform || "$",
           responseSchema: this.responseSchema,
+          instruction: this.instruction,
           createdAt: new Date(),
           updatedAt: new Date(),
         };
@@ -247,6 +250,7 @@ Output a JSON object conforming to the WorkflowPlan schema. Define the necessary
       steps: successfulExecutor.steps,
       finalTransform: successfulExecutor.finalTransform,
       responseSchema: successfulExecutor.responseSchema,
+      inputSchema: this.inputSchema,
       createdAt: builtWorkflow.createdAt,
       updatedAt: builtWorkflow.updatedAt,
     };

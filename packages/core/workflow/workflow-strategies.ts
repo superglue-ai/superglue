@@ -101,7 +101,7 @@ const loopStrategy: ExecutionStrategy = {
 
         try {
           const apiResponse = await executeApiCall(step.apiConfig, loopPayload, credentials, options, metadata);
-          const rawData = {currentItem: currentItem, ... apiResponse.data};
+          const rawData = {currentItem: currentItem, ...(typeof apiResponse.data === 'object' ? apiResponse.data : {data: apiResponse.data})};
           const transformedData = await applyJsonata(rawData, step.responseMapping);
           stepResults.push({ 
             stepId: step.id, 
