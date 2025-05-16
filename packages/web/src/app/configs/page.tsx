@@ -32,7 +32,7 @@ import {
 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/src/components/ui/tooltip";
 import { ApiConfig, ExecutionStep, ExtractConfig, SuperglueClient, Workflow } from '@superglue/client';
-import { Check, Copy, FileText, GitBranch, Globe, History, Play, Plus, RotateCw, Settings, ShoppingBag, Trash2 } from "lucide-react";
+import { Check, Copy, FileText, GitBranch, Globe, History, Loader2, Play, Plus, RotateCw, Settings, ShoppingBag, Trash2 } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import React from 'react';
 import EmptyStateActions from '@/src/components/utils/EmptyStateActions';
@@ -71,7 +71,7 @@ const ConfigTable = () => {
       const combinedConfigs = [
         ...apiConfigs.items.map(item => ({ ...item, type: 'api' as const })),
         ...extractConfigs.items.map(item => ({ ...item, type: 'extract' as const })),
-        ...workflowConfigs.map((item: any) => ({ ...item, type: 'workflow' as const })) // Add workflow items
+        ...workflowConfigs.items.map((item: any) => ({ ...item, type: 'workflow' as const })) // Add workflow items
       ].sort((a, b) => {
         // Use updatedAt first, fallback to createdAt
         const dateA = new Date(a.updatedAt || a.createdAt).getTime();
@@ -235,7 +235,7 @@ const ConfigTable = () => {
   if (loading) {
     return (
       <div className="p-8 max-w-none w-full min-h-full flex items-center justify-center">
-        <RotateCw className="h-8 w-8 animate-spin text-primary" />
+        <Loader2 className="h-8 w-8 animate-spin text-white" />
       </div>
     );
   }

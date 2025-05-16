@@ -1,10 +1,11 @@
 import type { ExecutionStep, RequestOptions, Workflow, WorkflowResult, WorkflowStepResult, TransformConfig } from "@superglue/shared";
-import { applyJsonata, applyJsonataWithValidation } from "../utils/tools.js";
+import { addNullableToOptional, applyJsonata, applyJsonataWithValidation } from "../utils/tools.js";
 import { selectStrategy } from "./workflow-strategies.js";
 import { logMessage } from "../utils/logs.js";
 import { Metadata } from "@playwright/test";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { generateMapping, prepareTransform } from "../utils/transform.js";
+import { Validator } from "jsonschema";
 
 export class WorkflowExecutor implements Workflow {
   public id: string;
@@ -13,6 +14,8 @@ export class WorkflowExecutor implements Workflow {
   public result: WorkflowResult;
   public responseSchema?: JSONSchema;
   public metadata: Metadata;
+  public instruction?: string;
+  public inputSchema?: JSONSchema;
 
   constructor(
     workflow: Workflow,
@@ -22,7 +25,9 @@ export class WorkflowExecutor implements Workflow {
     this.steps = workflow.steps;
     this.finalTransform = workflow.finalTransform || "$";
     this.responseSchema = workflow.responseSchema;
+    this.instruction = workflow.instruction;
     this.metadata = metadata;
+    this.inputSchema = workflow.inputSchema;
     this.result = {
       success: true,
       data: {},
@@ -44,7 +49,7 @@ export class WorkflowExecutor implements Workflow {
       completedAt: undefined,
     };
     try {
-      this.validateSteps();
+      this.validate(payload);
       logMessage("info", `Executing workflow ${this.id}`);
 
       // Execute each step in order
@@ -96,7 +101,11 @@ export class WorkflowExecutor implements Workflow {
             this.result.success = true; // Ensure success is true if transform succeeds
           } catch (transformError) {
             logMessage("info", `Preparing new final transform`, this.metadata);
-            const newTransformConfig = await generateMapping(this.responseSchema, rawStepData, "Generate the final transformation expression in JSONata format.", this.metadata);
+            const instruction = "Generate the final transformation expression in JSONata format" + 
+              this.instruction ? " with the following instruction: " + this.instruction : "" +
+              this.finalTransform ? "\nOriginally, we used the following transformation, fix it without messing up future transformations with the original data: " + this.finalTransform : "";
+            
+            const newTransformConfig = await generateMapping(this.responseSchema, rawStepData, instruction, this.metadata);
             if(!newTransformConfig) {
               throw new Error("Failed to generate new final transform");
             }
@@ -120,7 +129,7 @@ export class WorkflowExecutor implements Workflow {
     }
   }
 
-  private validateSteps(): void {
+  private validate(payload: Record<string, unknown>): void {
     if (!this.steps || !Array.isArray(this.steps) || this.steps.length === 0) {
       throw new Error("Execution plan must have at least one step");
     }
@@ -132,6 +141,15 @@ export class WorkflowExecutor implements Workflow {
 
       if (!step.apiConfig) {
         throw new Error("Each step must have an API config");
+      }
+    }
+
+    if(this.inputSchema) {
+      const validator = new Validator();
+      const optionalSchema = addNullableToOptional(this.inputSchema);
+      const validation = validator.validate(payload, optionalSchema);
+      if(!validation.valid) {
+        throw new Error("Invalid payload: " + validation.errors.map(e => e.message).join(", "));
       }
     }
   }

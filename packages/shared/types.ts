@@ -193,6 +193,8 @@ export interface Workflow extends BaseConfig {
   steps: ExecutionStep[];
   finalTransform?: string;
   responseSchema?: JSONSchema;
+  instruction?: string;
+  inputSchema?: JSONSchema;
 }
 
 export interface Metadata {
