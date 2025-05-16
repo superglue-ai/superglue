@@ -1,10 +1,6 @@
 // Removed #!/usr/bin/env node - this is now a module
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-  CallToolResultSchema,
-  ListToolsResultSchema,
   ServerRequest,
   ServerNotification,
   CallToolResult,
@@ -13,9 +9,8 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { randomUUID } from 'crypto';
 import { z } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
 import { SuperglueClient } from '@superglue/client';
-import { request, Request, Response } from 'express';
+import { Request, Response } from 'express';
 import { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
 
 
@@ -256,8 +251,9 @@ export const createMcpServer = (apiKey: string) => {
     );
   }
   return mcpServer;
-}; 
-const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
+};
+
+export const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
 
 export const mcpHandler = async (req: Request, res: Response) => {
   // Check for existing session ID
