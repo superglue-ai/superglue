@@ -63,7 +63,7 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
       const cleanedWorkflow = removeNullUndefined(workflow);
       const cleanedSteps = cleanedWorkflow.steps || [];
       const cleanedFinalTransform = cleanedWorkflow.finalTransform || `{\n  "result": $\n}`;
-      const cleanedResponseSchema = cleanedWorkflow.responseSchema || `{"type": "object", "properties": {"result": {"type": "string"}}}`;
+      const cleanedResponseSchema = JSON.stringify(cleanedWorkflow.responseSchema || {"type": "object", "properties": {"result": {"type": "string"}}});
       updateWorkflowId(cleanedWorkflow.id || '');
       setSteps(cleanedSteps);
       setFinalTransform(cleanedFinalTransform);
@@ -220,6 +220,7 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
       }
       console.log(workflowResult);
       setResult(workflowResult);
+      setResponseSchema(JSON.stringify(workflowResult.config.responseSchema));
       setFinalTransform(workflowResult.config.finalTransform);
       setSteps(workflowResult.config.steps);
       setLoading(false);
