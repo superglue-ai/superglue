@@ -11,7 +11,7 @@ interface BaseConfig {
   updatedAt: DateTime
 }
 
-union ConfigType = ApiConfig | ExtractConfig | TransformConfig
+union ConfigType = ApiConfig | ExtractConfig | TransformConfig | Workflow
 
 type ApiConfig implements BaseConfig {
   # BaseConfig
@@ -329,13 +329,15 @@ type WorkflowStepResult {
 }
 
 type WorkflowResult {
+  id: ID!
   success: Boolean!
-  data: JSON!
-  stepResults: [WorkflowStepResult!]!
-  finalTransform: JSONata
+  data: JSON
   error: String
   startedAt: DateTime!
   completedAt: DateTime!
+  config: Workflow
+
+  stepResults: [WorkflowStepResult!]!
 }
 
 input WorkflowInput {

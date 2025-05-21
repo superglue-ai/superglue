@@ -246,7 +246,7 @@ export async function generateApiConfig(
       key: z.string(),
       value: z.string()
     })).optional(),
-    body: z.string().optional().describe("Format as JSON if not instructed otherwise."),
+    body: z.string().optional().describe("Format as JSON if not instructed otherwise. Use <<>> to access variables."),
     authentication: z.enum(Object.values(AuthType) as [string, ...string[]]),
     dataPath: z.string().optional().describe("The path to the data you want to extract from the response. E.g. products.variants.size"),
     pagination: z.object({
@@ -316,18 +316,20 @@ Documentation: ${String(documentation)}`;
   };
 }
 
-export async function evaluateResponse(data: any, responseSchema: JSONSchema, instruction: string): Promise<{success: boolean, shortReason: string}> {
+export async function evaluateResponse(data: any, responseSchema: JSONSchema, instruction: string): Promise<{success: boolean, refactorNeeded: boolean, shortReason: string}> {
   const request = [
     {
       role: "system",
       content: `You are an API response validator. 
-Validate the following api response and return { success: true, shortReason: "" } if the response aligns with the instruction. 
-If the response does not align with the instruction, return { success: false, shortReason: "reason why it does not align" }.
+Validate the following api response and return { success: true, shortReason: "", refactorNeeded: false } if the response aligns with the instruction. 
+If the response does not align with the instruction, return { success: false, shortReason: "reason why it does not align", refactorNeeded: false }.
 
-Do not make the mistake of thinking that the { success: true, shortReason: "" } is the expected API response format. It is YOUR expected response format.
+Do not make the mistake of thinking that the { success: true, shortReason: "", refactorNeeded: false } is the expected API response format. It is YOUR expected response format.
 Keep in mind that the response can come in any shape or form, just validate that the response aligns with the instruction.
-If the instruction contains a filter and the response contains data not matching the filter, that is not a problem and still successful since we filter later.
-
+If the instruction contains a filter and the response contains data not matching the filter, return { success: true, refactorNeeded: true, shortReason: "Only results matching the filter XXX" }.
+If the reponse is valid but hard to comprehend, return { success: true, refactorNeeded: true, shortReason: "The response is valid but hard to comprehend. Please refactor the instruction to make it easier to understand." }.
+E.g. if the response is something like { "data": { "products": [{"id": 1, "name": "Product 1"}, {"id": 2, "name": "Product 2"}] } }, no refactoring is needed.
+If the response reads something like [ "12/2", "22.2", "frejgeiorjgrdelo"] that makes it very hard to parse the required information of the instruction, refactoring is needed. 
 Instruction: ${instruction}`
     },
     {role: "user", content: JSON.stringify(data)}
@@ -335,36 +337,8 @@ Instruction: ${instruction}`
 
   const response = await LanguageModel.generateObject(
     request,
-    {type: "object", properties: {success: {type: "boolean"}, shortReason: {type: "string"}}},
+    {type: "object", properties: {success: {type: "boolean"}, refactorNeeded: {type: "boolean"}, shortReason: {type: "string"}}},
     0
   );
   return response.response;
-}
-
-function validateVariables(generatedConfig: any, vars: string[]) {
-  vars = [
-    ...vars,
-    "page",
-    "limit",
-    "offset",
-    "cursor"
-  ]
-  
-  // Helper function to find only template variables in a string
-  const findTemplateVars = (str: string) => {
-    if (!str) return [];
-    // Only match {varName} patterns that aren't within JSON quotes
-    const matches = str.match(/\{(\w+)\}/g) || [];
-    return matches.map((match: string) => match.slice(1, -1));
-  };
-
-  const varMatches = [
-    generatedConfig.urlPath,
-    ...Object.values(generatedConfig.queryParams || {}),
-    ...Object.values(generatedConfig.headers || {}),
-    generatedConfig.body
-  ].flatMap(value => findTemplateVars(String(value)));
-
-  const invalidVars = varMatches.filter(v => !vars.includes(v));
-  return invalidVars;
 }

@@ -2,19 +2,42 @@ export const PROMPT_MAPPING = `You are an AI that generates JSONata mapping expr
 
 Very important guidelines for creating JSONata mappings:
 
+Approach:
+Define variables you need first, then return the object / result. Every single variable definition block combined with the output must be wrapped in parentheses.
+e.g.
+(
+  $date := $millis();
+  {
+    "date": $date,
+    "vars": $map($.attendees, function($att) {
+      (
+        $name := $att.name;
+        "First Name: " & $name.split(" ")[0]
+      )
+    })
+  }
+)
+Use \n where appropriate for readability.
+
 1. Source References:
    - Use exact field paths from the source data, e.g. $.merchant_category
-   - For accessing fields with names containing spaces, use backticks, e.g. $.\`merchant category\`. Never use single quotes.
+   - For accessing fields with names containing spaces or special characters (like - or @ or whatever), always use backticks, e.g. $.\`merchant category\`. Never use single quotes for field names. 
+   - Do NOT use array selectors (item["name"]) to select the field since jsonata does not support this syntax.
    - Jsonata will automatically extract all the fields from the current context. E.g. if you need all variants from all products, you can use $.products.variants. No need to do nested map reduce operations.
    - $. The variable with no name refers to the context value at any point in the input JSON hierarchy. Never use $ without a dot, this fails the validation. E.g. if the current context is products.price, then $.currency is products.price.currency
     GOOD: $.currency
+    GOOD: $.\`currency item\`
+    GOOD: $.\`currency-item\`
     GOOD: {"results": $.[{"title": title}]}
     BAD: $currency - this is for all currencies, not the current one
-    BAD: {"results": $[{"title": title}]} - 
+    BAD: $.currency-item - field names with special characters must be wrapped in backticks
+    BAD: {"results": $[{"title": title}]} - do not use array selectors like this
+    BAD: $["currency"] - jsonata does not support this syntax
    - %. The parent of the current context value. E.g. if the current context is products.variants.size and you want variant name, use %.name
    - When multiple source fields could map to a target, use a maximum of 3 fallbacks:
     GOOD: source1 ? source1 : source2 ? source2 : source3 ? source3 : 'default'
     BAD: source1 ? source1 : source1 ? source1 : source1 (repeated fields)
+    BAD: ($number(source1) or 0) - this is a boolean test, not a number fallback. use the syntax $number(source1) ? $number(source1) : 0 instead.
 
 2. Expression Rules:
    - Avoid unnecessary array/string operations
@@ -83,13 +106,20 @@ Very important guidelines for creating JSONata mappings:
       $number(arg) - Converts an argument to a number.
       $min(arr) - Returns minimum number of a number array. E.g. $min($map($.variants.price, $number)) returns the minimum price of all variants.
       $max(arr) - Returns maximum number of a number array. E.g. $max($map($.variants.price, $number)) returns the maximum price of all variants.
+      $isArray(arr) - Returns true if the argument is an array, false otherwise.
+      $isString(str) - Returns true if the argument is a string, false otherwise.
+      $isNull(arg) - Returns true if the argument is null, false otherwise.
       $count(array) - Returns array length
       $sort(array[, function]) - Sorts array
       $distinct(array) - Removes duplicates
       $map(array, function) - Applies function to each element
+      $merge([$obj1, $obj2, ...]) - merge an array of objects into a single object
       $filter(array, function) - Filters array based on predicate
+      & - joins two strings together into a new concatenated string. do not use this for joining objects, use $merge instead.
 
 - Important: Error handling:
+  - try to fix the root cause of the error. Examine all source data references, computations, and syntax. Make sure the syntax for accessing fields and all references and all computations are correct.
+  - If you repeatedly get the same error, try a different approach from scratch. Most likely, your syntax is incorrect.
   - If the error is something like \"instance is not of a type(s) array or array/null\". In this case, wrap the source selector in an array to ensure it always returns an array. 
     Good: \"result\": [$.items]
     Bad: \"result\": $.items
@@ -97,7 +127,6 @@ Very important guidelines for creating JSONata mappings:
   - Specifically, the computed result / input might be wrapped in array brackets. In this case, the array brackets set in the mapping are in the wrong place.
   - If you get an error like \"is not of a type(s) string/number/object\", try to convert the source field, but also consider that the original field or one of its parent might be null. In this case, add a default value.
   - If an object is optional but its fields required, you can add a test and default to {}, but do not set the inner fields to default null.
-  - If you are repeatedly failing and can't figure out why, try a different approach.
 Remember: The goal is to create valid JSONata expressions that accurately transform the source data structure into the required target structure. Follow all of these guidelines or I will lose my job.`;
 
 export const API_PROMPT = `You are an API configuration assistant. Generate API details based on instructions and documentation and available variables.
@@ -117,9 +146,10 @@ export const API_PROMPT = `You are an API configuration assistant. Generate API 
       e.g. headers: {
         "X-Page": "<<page>>"
       }
-- The variables can be accessed via JSONata.
+- The variables can be accessed via JSONata wrapped in <<>>.
   e.g. if the payload is {"items": [{"id": 1, "name": "item1"}, {"id": 2, "name": "item2"}]}
   you could use <<$.items[0].name>> to get the first item's name.
+  e.g. body: "{\"name\": \"<<$.name>>\"}". Always wrap the JSONata in <<>>, do not just plainly use it without the <<>>.
 - The JSONata should be simple and concise. Avoid ~> to execute functions, use $map(arr, $function) instead.
 - Think hard before producing a response, and be aware that the response is not checked for validity if the response is not an error, so only suggest endpoints that you are sure are valid.
 - If this is a store / e-commerce site, try products.json, collections.json, categories.json, etc.
