@@ -57,6 +57,7 @@ export const TransformOperationInputSchema = {
   options: RequestOptionsSchema.optional(),
   superglueApiKey: z.string(),
 };
+
 // Workflow-related Schemas
 export const ApiInputSchemaInternal =   {
   id: z.string(),
@@ -162,59 +163,64 @@ export const toolDefinitions: Record<string, {
   execute: (args: any, request: RequestHandlerExtra<ServerRequest, ServerNotification>, extra?: any) => Promise<any>;
 }> = {
   transformData: {
-    description: "Execute a transformation.",
+    description: "Transform JSON data to a different JSONSchema format.",
     inputSchema: TransformOperationInputSchema,
     execute: async (args, request) => {
-      const { client } = args;
-      return client.transform(args);
+      const { client }: { client: SuperglueClient } = args;
+      return client.transform({
+        id: args.id,
+        data: args.data,
+        endpoint: args.endpoint,
+        options: args.options,
+      });
     },
   },
-  listPipelines: {
-    description: "List pipelines with pagination.",
+  listCapabilities: {
+    description: "List capabilities with pagination.",
     inputSchema: ListWorkflowsInputSchema,
-    execute: async (args, request) => {
-      const { limit, offset, client } = args;
+    execute: async (args: any & { client: SuperglueClient }, request) => {
+      const { limit, offset, client }: { limit: number, offset: number, client: SuperglueClient } = args;
       const workflows = await client.listWorkflows(limit, offset);
       return workflows;
     },
   },
-  getPipeline: {
-    description: "Get a specific pipeline by ID.",
+  getCapability: {
+    description: "Get a specific capability by ID.",
     inputSchema: GetWorkflowInputSchema,
-    execute: async (args, request) => {
-      const { id, client } = args;
+    execute: async (args: any & { client: SuperglueClient }, request) => {
+      const { id, client }: { id: string, client: SuperglueClient } = args;
       return client.getWorkflow(id);
     },
   },
-  runPipeline: {
-    description: "Execute a pipeline by ID.",
+  runCapability: {
+    description: "Execute a capability by ID.",
     inputSchema: ExecuteWorkflowInputSchema,
-    execute: async (args, request) => {
-      const { client } = args;
+    execute: async (args: any & { client: SuperglueClient }, request) => {
+      const { client }: { client: SuperglueClient } = args;
       return client.executeWorkflow(args);
     },
   },
-  buildPipeline: {
-    description: "Build a pipeline from an instruction.",
+  buildCapability: {
+    description: "Build a capability from an instruction.",
     inputSchema: BuildWorkflowInputSchema,
-    execute: async (args, request) => {
-      const { client } = args;
+    execute: async (args: any & { client: SuperglueClient }, request) => {
+      const { client }: { client: SuperglueClient } = args;
       return client.buildWorkflow(args.instruction, args.payload, args.systems);
     },
   },
-  upsertPipeline: {
-    description: "Create or update a pipeline.",
+  upsertCapability: {
+    description: "Create or update a capability.",
     inputSchema: UpsertWorkflowInputSchema,
     execute: async (args, request) => {
-      const { id, input, client } = args;
+      const { id, input, client }: { id: string, input: any, client: SuperglueClient } = args;
       return client.upsertWorkflow(id, input);
     },
   },
-  deletePipeline: {
-    description: "Delete a pipeline by ID.",
+  deleteCapability: {
+    description: "Delete a capability by ID.",
     inputSchema: DeleteWorkflowInputSchema,
     execute: async (args, request) => {
-      const { id, client } = args;
+      const { id, client }: { id: string, client: SuperglueClient } = args;
       return client.deleteWorkflow(id);
     },
   },
