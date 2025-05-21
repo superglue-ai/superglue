@@ -1,4 +1,4 @@
-import { type ApiConfig, HttpMethod } from "@superglue/shared";
+import { type ApiConfig, HttpMethod } from "@superglue/client";
 import { describe, expect, it } from "vitest";
 import { callEndpoint } from "../utils/api.js";
 import { MockServerFactory } from "./test-utils.js";

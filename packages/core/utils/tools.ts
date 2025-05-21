@@ -1,4 +1,4 @@
-import { ApiConfig, RequestOptions } from "@superglue/shared";
+import { ApiConfig, RequestOptions } from "@superglue/client";
 import axios, { AxiosRequestConfig } from "axios";
 import { GraphQLResolveInfo } from "graphql";
 import jsonata from "jsonata";
@@ -26,13 +26,14 @@ export async function applyJsonata(data: any, expr: string): Promise<any> {
     const result = await expression.evaluate(data);
     return result;
   } catch (error) {
-    throw new Error(`JSONata transformation failed: ${error.message} at ${expr.substring(error.position - 10, error.position + 10)}`);
+    const errorPositions = (error as any).position ? expr.substring(error.position - 10, error.position + 10) : "";
+    throw new Error(`JSONata transformation failed: ${error.message} at ${errorPositions}`);
   }
 }
 
 export function superglueJsonata(expr: string) {
   const expression = jsonata(expr, {
-    recover: true
+    recover: false
   });
   expression.registerFunction("max", (arr: any[]) => {
     if(Array.isArray(arr)) {
@@ -46,11 +47,16 @@ export function superglueJsonata(expr: string) {
     }
     return arr;
   });
-  expression.registerFunction("number", (value: string) => parseFloat(value));
+  expression.registerFunction("number", (value: string) => parseFloat(String(value).trim()));
   expression.registerFunction("map", async (arr: any[], func: (item: any) => any[]) => 
     (Array.isArray(arr) ? await Promise.all(arr.map(func)) : await Promise.all([arr].map(func))) || []
   );
-  expression.registerFunction("isArray", async (arr: any[]) => Array.isArray(arr));
+  expression.registerFunction("isArray", async (arr: any) => Array.isArray(arr));
+  expression.registerFunction("isString", async (str: any) => typeof str === "string");
+  expression.registerFunction("isNull", async (arg: any) => arg === null || arg === undefined);
+  expression.registerFunction("join", async (arr: any[], separator: string = ",") => 
+    Array.isArray(arr) ? arr.join(separator) : arr
+  );
   expression.registerFunction("substring", (str: string, start: number, end?: number) => String(str).substring(start, end));
   expression.registerFunction("replace", (obj: any, pattern: string, replacement: string) => {
     if(Array.isArray(obj)) {

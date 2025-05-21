@@ -1,4 +1,4 @@
-import { type Workflow, type ExecutionStep, type ApiConfig, type ExecutionMode, type Metadata, CacheMode } from "@superglue/shared";
+import { Metadata, ExecutionMode } from "@superglue/shared";
 import { object, z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { composeUrl } from "../utils/tools.js"; // Assuming path
@@ -10,6 +10,7 @@ import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { WorkflowExecutor } from "./workflow-executor.js";
 import { type OpenAI } from "openai";
 import { toJsonSchema } from "../external/json-schema.js";
+import { Workflow, ExecutionStep, ApiConfig } from "@superglue/client";
 
 type ChatMessage = OpenAI.Chat.ChatCompletionMessageParam;
 
@@ -79,12 +80,10 @@ export class WorkflowBuilder {
         stepId: z.string().describe("Unique camelCase identifier for the step (e.g., 'fetchCustomerDetails', 'updateOrderStatus')."),
         systemId: z.string().describe("The ID of the system (from the provided list) to use for this step."),
         instruction: z.string().describe("A specific, concise instruction for what this single API call should achieve (e.g., 'Get user profile by email', 'Create a new order')."),
-        mode: z.enum(["DIRECT", "LOOP"]).describe("The mode of execution for this step. Use 'DIRECT' for simple calls executed once or 'LOOP' for iterative processes."),
-        loopSelector: z.string().optional().describe("If mode is 'LOOP': JSONata expression for selecting items for next iteration. Use '$' if no specific selection is needed for the loop items. Omit or leave empty if mode is 'DIRECT'."),
+        mode: z.enum(["DIRECT", "LOOP"]).describe("The mode of execution for this step. Use 'DIRECT' for simple calls executed once or 'LOOP' when the call needs to be executed multiple times over a collection (e.g. payload is a list of customer ids and call is executed for each customer id)."),
         urlHost: z.string().optional().describe("Optional. Override the system's default host. If not provided, the system's urlHost will be used."),
         urlPath: z.string().optional().describe("Optional. Specific API path for this step. If not provided, the system's urlPath might be used or the LLM needs to determine it from documentation if the system's base URL is just a host.")
-      })).describe("The sequence of steps required to fulfill the overall instruction."),
-      finalTransform: z.string().optional().describe("A JSONata expression to apply to the final combined output of all steps. Defaults to '$' (identity).")
+      })).describe("The sequence of steps required to fulfill the overall instruction.")
     }));
 
     const systemDescriptions = Object.values(this.systems).map(sys =>`
@@ -138,7 +137,7 @@ Output a JSON object conforming to the WorkflowPlan schema. Define the necessary
 
     const plan: WorkflowPlan = {
       steps: rawPlanObject.steps as WorkflowPlanStep[],
-      finalTransform: (rawPlanObject as { finalTransform?: string }).finalTransform || "$",
+      finalTransform: "$",
     };
 
     return { plan, messages: updatedMessagesFromLLM };
@@ -166,7 +165,6 @@ Output a JSON object conforming to the WorkflowPlan schema. Define the necessary
     const MAX_ATTEMPTS = 3;
     let lastErrorForPlanning: string | null = null;
     let builtWorkflow: Workflow | null = null;
-    let successfulExecutor: WorkflowExecutor | null = null;
     let conversationMessages: ChatMessage[] = [];
     do {
       attempts++;
@@ -198,16 +196,12 @@ Output a JSON object conforming to the WorkflowPlan schema. Define the necessary
             id: plannedStep.stepId,
             apiConfig: partialApiConfig,
             executionMode: plannedStep.mode,
-            loopSelector: plannedStep.loopSelector || (plannedStep.mode === "LOOP" ? "$" : undefined),
+            loopSelector: plannedStep.mode === "LOOP" ? "$" : undefined,
             inputMapping: "$",
             responseMapping: "$",
           };
           executionSteps.push(executionStep);
         }
-
-        const allCredentials = Object.values(this.systems).reduce((acc, sys) => {
-          return { ...acc, ...Object.entries(sys.credentials || {}).reduce((obj, [name, value]) => ({ ...obj, [`${sys.id}_${name}`]: value }), {}) };
-        }, {});
 
         builtWorkflow = {
           id: `wf-${Math.random().toString(36).substring(2, 8)}`,
@@ -218,20 +212,7 @@ Output a JSON object conforming to the WorkflowPlan schema. Define the necessary
           createdAt: new Date(),
           updatedAt: new Date(),
         };
-
-        const executor = new WorkflowExecutor(builtWorkflow, this.metadata);
-        const result = await executor.execute(this.initialPayload, allCredentials);
-
-        if (!result.success) {
-          lastErrorForPlanning = result.error || "Workflow execution failed without a specific error message.";
-          logMessage('warn', `Workflow execution failed on attempt ${attempts}: ${lastErrorForPlanning}`, this.metadata);
-          success = false;
-        } else {
-          logMessage('info', `Workflow execution successful on attempt ${attempts}.`, this.metadata);
-          success = true;
-          successfulExecutor = executor;
-          if (builtWorkflow) builtWorkflow.updatedAt = new Date();
-        }
+        success = true;
       } catch (error: any) {
         logMessage('error', `Error during workflow build attempt ${attempts}: ${error.message}`, this.metadata);
         lastErrorForPlanning = error.message || "An unexpected error occurred during the planning or setup phase.";
@@ -239,7 +220,7 @@ Output a JSON object conforming to the WorkflowPlan schema. Define the necessary
       }
     } while (!success && attempts < MAX_ATTEMPTS);
 
-    if (!success || !successfulExecutor || !builtWorkflow) {
+    if (!builtWorkflow) {
       const finalErrorMsg = `Failed to build and execute workflow after ${attempts} attempts. Last error: ${lastErrorForPlanning || "Unknown final error."}`;
       logMessage('error', finalErrorMsg, this.metadata);
       throw new Error(finalErrorMsg);
@@ -247,9 +228,9 @@ Output a JSON object conforming to the WorkflowPlan schema. Define the necessary
 
     return {
       id: builtWorkflow.id,
-      steps: successfulExecutor.steps,
-      finalTransform: successfulExecutor.finalTransform,
-      responseSchema: successfulExecutor.responseSchema,
+      steps: builtWorkflow.steps,
+      finalTransform: builtWorkflow.finalTransform,
+      responseSchema: builtWorkflow.responseSchema,
       inputSchema: this.inputSchema,
       createdAt: builtWorkflow.createdAt,
       updatedAt: builtWorkflow.updatedAt,

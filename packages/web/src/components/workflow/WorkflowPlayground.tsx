@@ -10,25 +10,29 @@ import { useToast } from "../../hooks/use-toast";
 import { useConfig } from "@/src/app/config-context";
 import { useSearchParams, useRouter } from 'next/navigation';
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
-import { ExecutionStep } from "@superglue/client";
+import { ExecutionStep, WorkflowResult } from "@superglue/client";
 import { SuperglueClient } from "@superglue/client";
 import { parseCredentialsHelper, removeNullUndefined } from "@/src/lib/client-utils";
+import { WorkflowStepsView } from "./WorkflowStepsView";
+import { WorkflowResultsView } from "./WorkflowResultsView";
+import JsonSchemaEditor from "@/src/components/utils/JsonSchemaEditor";
 
 export default function WorkflowPlayground({ id }: { id?: string }) {
   const router = useRouter();
   const { toast } = useToast();
   const config = useConfig();
   const [workflowId, setWorkflowId] = useState("");
-  const [stepsText, setStepsText] = useState("");
+  const [steps, setSteps] = useState<any[]>([]);
   const [finalTransform, setFinalTransform] = useState(`{
   "result": $
 }`);
+  const [responseSchema, setResponseSchema] = useState(`{"type": "object", "properties": {"result": {"type": "object"}}}`);
   const [credentials, setCredentials] = useState("");
   const [payload, setPayload] = useState("{}");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [result, setResult] = useState(null);
-  const [activeResultTab, setActiveResultTab] = useState("finalData");
+  const [result, setResult] = useState<WorkflowResult | null>(null);
+  const [activeResultTab, setActiveResultTab] = useState<'results' | 'transform' | 'final'>("final");
   
   const updateWorkflowId = (id: string) => {
     const sanitizedId = id
@@ -50,20 +54,20 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
       const workflow = await superglueClient.getWorkflow(idToLoad);
       if (!workflow) {
         updateWorkflowId('');
-        setStepsText('');
+        setSteps([]);
         setFinalTransform('');
+        setResponseSchema(`{"type": "object", "properties": {"result": {"type": "string"}}}`);
         throw new Error(`Workflow with ID "${idToLoad}" not found.`);
       }
-      // Recursively remove null/undefined values from the entire workflow object
+      console.log(workflow);
       const cleanedWorkflow = removeNullUndefined(workflow);
-
-      // Extract potentially cleaned steps and finalTransform
-      const cleanedSteps = cleanedWorkflow.steps || []; // Default to empty array if steps were removed
-      const cleanedFinalTransform = cleanedWorkflow.finalTransform || `{\n  "result": $\n}`; // Default transform
-
-      updateWorkflowId(cleanedWorkflow.id || ''); // Use cleaned ID, default to empty string
-      setStepsText(JSON.stringify(cleanedSteps, null, 2));
+      const cleanedSteps = cleanedWorkflow.steps || [];
+      const cleanedFinalTransform = cleanedWorkflow.finalTransform || `{\n  "result": $\n}`;
+      const cleanedResponseSchema = cleanedWorkflow.responseSchema || `{"type": "object", "properties": {"result": {"type": "string"}}}`;
+      updateWorkflowId(cleanedWorkflow.id || '');
+      setSteps(cleanedSteps);
       setFinalTransform(cleanedFinalTransform);
+      setResponseSchema(cleanedResponseSchema);
 
       toast({
         title: "Workflow loaded",
@@ -77,7 +81,7 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
         variant: "destructive",
       });
       updateWorkflowId('');
-      setStepsText('');
+      setSteps([]);
       setFinalTransform('');
     } finally {
       setLoading(false);
@@ -92,42 +96,38 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
 
   const fillDogExample = () => {
     updateWorkflowId("Dog Breed Workflow");
-    setStepsText(
-      JSON.stringify(
-        [
-          {
-            id: "getAllBreeds",
-            apiConfig: {
-              urlPath: "/breeds/list/all",
-              instruction: "Get all dog breeds",
-              urlHost: "https://dog.ceo/api",
-              method: "GET",
-            },
-            executionMode: "DIRECT",
-            inputMapping: "$",
-            responseMapping: "$keys($.message)",
+    setSteps(
+      [
+        {
+          id: "getAllBreeds",
+          apiConfig: {
+            urlPath: "/breeds/list/all",
+            instruction: "Get all dog breeds",
+            urlHost: "https://dog.ceo/api",
+            method: "GET",
           },
-          {
-            id: "getBreedImage",
-            apiConfig: {
-              urlPath: "/breed/{currentItem}/images/random",
-              instruction: "Get a random image for a specific dog breed",
-              urlHost: "https://dog.ceo/api",
-              method: "GET",
-            },
-            executionMode: "LOOP",
-            loopSelector: "getAllBreeds",
-            loopMaxIters: 5,
-            inputMapping: "$",
-            responseMapping: "$",
+          executionMode: "DIRECT",
+          inputMapping: "$",
+          responseMapping: "$keys($.message)",
+        },
+        {
+          id: "getBreedImage",
+          apiConfig: {
+            urlPath: "/breed/{currentItem}/images/random",
+            instruction: "Get a random image for a specific dog breed",
+            urlHost: "https://dog.ceo/api",
+            method: "GET",
           },
-        ],
-        null,
-        2,
-      ),
+          executionMode: "LOOP",
+          loopSelector: "getAllBreeds",
+          loopMaxIters: 5,
+          inputMapping: "$",
+          responseMapping: "$",
+        },
+      ]
     );
     setFinalTransform(`$.getBreedImage.(
-  {"breed": currentItem, "image": data}
+  {"breed": currentItem, "image": message.data}
 )`);
 
     toast({
@@ -141,12 +141,10 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
       if (!workflowId.trim()) {
         updateWorkflowId(`wf-${Date.now()}`);
       }
-
       setSaving(true);
-
       const input = {
         id: workflowId,
-        steps: JSON.parse(stepsText).map((step: ExecutionStep) => ({
+        steps: steps.map((step: ExecutionStep) => ({
           ...step,
           apiConfig: {
             id: step.apiConfig.id || step.id,
@@ -154,6 +152,7 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
             pagination: step.apiConfig.pagination || null
           }
         })),
+        responseSchema: JSON.parse(responseSchema),
         finalTransform
       };
 
@@ -189,7 +188,6 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
   const executeWorkflow = async () => {
     try {
       setLoading(true);
-      const steps = JSON.parse(stepsText);
       if (!workflowId) {
         updateWorkflowId(`wf-${Date.now()}`);
       }
@@ -202,6 +200,7 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
             ...step.apiConfig
           }
         })),
+        responseSchema,
         finalTransform
       };
       const parsedCredentials = parseCredentialsHelper(credentials);
@@ -218,7 +217,10 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
       if(!workflowResult.success) {
         throw new Error(workflowResult.error);
       }
+      console.log(workflowResult);
       setResult(workflowResult);
+      setFinalTransform(workflowResult.config.finalTransform);
+      setSteps(workflowResult.config.steps);
       setLoading(false);
     } catch (error) {
       console.error("Error executing workflow:", error);
@@ -229,6 +231,16 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
       });
       setLoading(false);
     }
+  };
+
+  const handleStepsChange = (newSteps: any[]) => {
+    setSteps(newSteps);
+  };
+
+  const handleStepEdit = (stepId: string, updatedStep: any) => {
+    setSteps(prevSteps => 
+      prevSteps.map(step => (step.id === stepId ? updatedStep : step))
+    );
   };
 
   return (
@@ -305,27 +317,19 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
             <div className="space-y-3 flex flex-col flex-grow">
               <div className="flex-1 flex flex-col min-h-0">
                 <Label htmlFor="steps" className="mb-1 block">
-                  Steps (JSON)
+                  Steps
                 </Label>
-                <Textarea
-                  id="steps"
-                  value={stepsText}
-                  onChange={(e) => setStepsText(e.target.value)}
-                  placeholder="Enter workflow steps as JSON array"
-                  className="font-mono resize-none flex-1 min-h-[250px] overflow-auto w-full text-xs"
+                <WorkflowStepsView
+                  steps={steps}
+                  onStepsChange={handleStepsChange}
+                  onStepEdit={handleStepEdit}
                 />
               </div>
 
               <div className="flex-1 flex flex-col min-h-0">
-                <Label htmlFor="finalTransform" className="mb-1 block">
-                  Final Transformation (JSONata)
-                </Label>
-                <Textarea
-                  id="finalTransform"
-                  value={finalTransform}
-                  onChange={(e) => setFinalTransform(e.target.value)}
-                  placeholder="Enter final transform expression"
-                  className="font-mono resize-none flex-1 min-h-[180px] overflow-auto w-full text-xs"
+                <JsonSchemaEditor
+                  value={responseSchema}
+                  onChange={setResponseSchema}
                 />
               </div>
             </div>
@@ -348,97 +352,16 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
 
         {/* Right Column - Results */}
         <Card className="flex flex-col">
-          <CardHeader className="py-3 px-4 flex-shrink-0">
-            <CardTitle>Results</CardTitle>
-          </CardHeader>
-
-          <CardContent className="p-0 flex-grow flex flex-col overflow-hidden">
-            {result ? (
-              <>
-                {/* Status Bar */}
-                <div className="p-3 bg-muted border-b flex-shrink-0">
-                  <div className="flex flex-col gap-1">
-                    <div className="flex items-center">
-                      <span className="font-semibold mr-2">Status:</span>
-                      <span className={result.success ? "text-green-600" : "text-red-600"}>
-                        {result.success ? "Success" : "Failed"}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center">
-                      <span className="font-semibold mr-2">Time:</span>
-                      <span className="text-sm">
-                        Started: {new Date(result.startedAt).toLocaleString()}
-                        {result.completedAt &&
-                          ` • Duration: ${((new Date(result.completedAt).getTime() - new Date(result.startedAt).getTime()) / 1000).toFixed(2)}s`}
-                      </span>
-                    </div>
-
-                    {result.error && (
-                      <div className="text-red-600">
-                        <span className="font-semibold mr-2">Error:</span>
-                        <span>{result.error}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Custom Tab Implementation */}
-                <div className="flex-grow flex flex-col overflow-hidden">
-                  <div className="flex border-b px-4 pt-2 pb-0 bg-background flex-shrink-0">
-                    <button
-                      type="button"
-                      className={`px-4 py-2 mr-2 ${
-                        activeResultTab === "finalData"
-                          ? "border-b-2 border-primary font-medium"
-                          : "text-muted-foreground"
-                      }`}
-                      onClick={() => setActiveResultTab("finalData")}
-                    >
-                      Final Data
-                    </button>
-                    <button
-                      type="button"
-                      className={`px-4 py-2 ${
-                        activeResultTab === "stepResults"
-                          ? "border-b-2 border-primary font-medium"
-                          : "text-muted-foreground"
-                      }`}
-                      onClick={() => setActiveResultTab("stepResults")}
-                    >
-                      Step Results
-                    </button>
-                  </div>
-
-                  <div className="flex-grow overflow-auto relative">
-                    <div
-                      className={`absolute inset-0 overflow-auto transition-opacity duration-200 ${
-                        activeResultTab === "finalData" ? "opacity-100 z-10" : "opacity-0 z-0"
-                      }`}
-                    >
-                      <pre className="bg-muted/50 p-4 font-mono text-xs min-h-full">
-                        {JSON.stringify(result.data, null, 2)}
-                      </pre>
-                    </div>
-
-                    <div
-                      className={`absolute inset-0 overflow-auto transition-opacity duration-200 ${
-                        activeResultTab === "stepResults" ? "opacity-100 z-10" : "opacity-0 z-0"
-                      }`}
-                    >
-                      <pre className="bg-muted/50 p-4 font-mono text-xs min-h-full">
-                        {JSON.stringify(result.stepResults, null, 2)}
-                      </pre>
-                    </div>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="h-full flex items-center justify-center p-4">
-                <p className="text-gray-500 italic">No results yet. Execute a workflow to see results here.</p>
-              </div>
-            )}
-          </CardContent>
+          <WorkflowResultsView
+            activeTab={activeResultTab}
+            setActiveTab={setActiveResultTab}
+            executionResult={result}
+            finalTransform={finalTransform}
+            setFinalTransform={setFinalTransform}
+            finalResult={result?.data}
+            isExecuting={loading}
+            executionError={result?.error || null}
+          />
         </Card>
       </div>
     </div>

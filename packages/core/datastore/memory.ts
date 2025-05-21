@@ -1,6 +1,7 @@
-import type { ApiConfig, DataStore, ExtractConfig, RunResult, Workflow, TransformConfig } from "@superglue/shared";
+import type { DataStore } from "./types.js";
 import { createHash } from 'node:crypto';
 import { getSchemaFromData } from "../utils/tools.js";
+import { ApiConfig, ExtractConfig, TransformConfig, RunResult, Workflow } from "@superglue/client";
 
 export class MemoryStore implements DataStore {
   private storage: {
