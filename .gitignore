@@ -9,6 +9,4 @@ build.sh
 diff.txt
 diff.sh
 **/superglue_data.json
-packages/web/public/ALS2M3.DAT
-packages/web/public/M3.JSON
-packages/web/public/Steyr_Haus.ONLV
+packages/web/public/test/*
