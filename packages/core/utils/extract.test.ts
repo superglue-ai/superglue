@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { callExtract, generateExtractConfig, processFile } from './extract.js';
 import { callAxios } from './tools.js';
 import { decompressData, parseFile } from './file.js';
-import { DecompressionMethod, FileType, AuthType, HttpMethod } from '@superglue/shared';
+import { DecompressionMethod, FileType, AuthType, HttpMethod } from '@superglue/client';
 import { Documentation } from './documentation.js';
 // Mock dependencies
 vi.mock('./documentation.js');

@@ -178,25 +178,6 @@ export interface WorkflowStepResult {
   error?: string;
 }
 
-export interface WorkflowResult {
-  success: boolean;
-  data: Record<string, unknown>;
-  finalTransform?: string;
-  stepResults: WorkflowStepResult[];
-  error?: string;
-  startedAt: Date;
-  completedAt: Date;
-}
-
-export interface Workflow extends BaseConfig {
-  id: string; 
-  steps: ExecutionStep[];
-  finalTransform?: string;
-  responseSchema?: JSONSchema;
-  instruction?: string;
-  inputSchema?: JSONSchema;
-}
-
 export interface Metadata {
   runId?: string;
   orgId?: string;

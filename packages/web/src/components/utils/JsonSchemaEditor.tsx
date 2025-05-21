@@ -471,16 +471,16 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
   };
 
   return (
-    <div className="space-y-1 flex flex-col h-full mb-4">
+    <div className="space-y-1 flex flex-col h-full mb-4 gap-2">
       <div className="flex justify-between items-center shrink-0">
         <Label htmlFor="responseSchema" className="text-xs sm:text-sm">Set your desired response schema</Label>
         <div className="flex items-center gap-2">
-          <Label htmlFor="editorMode" className="text-xs sm:text-sm">Code Mode</Label>
+          <Label htmlFor="editorMode" className="text-xs">Code Mode</Label>
           <Switch id="editorMode" checked={isCodeMode} onCheckedChange={setIsCodeMode} />
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 border rounded-md overflow-hidden">
+      <div className="flex-1 min-h-0 border rounded-md overflow-hidden min-h-32">
         {isCodeMode ? (
           <div className="h-full font-mono relative bg-transparent overflow-auto">
             <Editor

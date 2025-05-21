@@ -100,11 +100,18 @@ ${JSON.stringify(sample(payload, 2), null, 2).slice(0,30000)}`
     if(!transformation.success) {
       throw new Error(`Validation failed: ${transformation.error}`);
     }
+
+    if(retry > 0) {
+      const evaluation = await evaluateMapping(transformation.data, payload, schema, instruction, metadata);
+      if(!evaluation.success) {
+        throw new Error(`Mapping evaluation failed: ${evaluation.reason}`);
+      }
+    }
     return response;
   } catch (error) {
       if(retry < 8) {
         const errorMessage = String(error.message);
-        logMessage('warn', "Error generating mapping: " + errorMessage.slice(0, 200), metadata);
+        logMessage('warn', "Error generating mapping: " + errorMessage.slice(0, 250), metadata);
         messages.push({role: "user", content: errorMessage});
         return generateMapping(schema, payload, instruction, metadata, retry + 1, messages);
       }
@@ -112,6 +119,61 @@ ${JSON.stringify(sample(payload, 2), null, 2).slice(0,30000)}`
   return null;
 }
 
+export async function evaluateMapping(
+  transformedData: any,
+  sourcePayload: any,
+  targetSchema: any,
+  instruction: string,
+  metadata: Metadata
+): Promise<{ success: boolean; reason: string }> {
+  try {
+    logMessage('info', "Evaluating mapping", metadata);
+
+    const systemPrompt = `You are a data transformation evaluator. Your task is to assess if the 'transformedData' is a correct and high-quality transformation of the 'sourcePayload' according to the 'targetSchema'.
+${instruction ? `The user's original instruction for the transformation was: "${instruction}"` : 'No specific transformation instruction was provided by the user; focus on accurately mapping source data to the target schema.'}
+Return { success: true, reason: "Transformation is correct, complete, and aligns with the objectives." } if the transformed data accurately reflects the source data, matches the target schema, and (if provided) adheres to the user's instruction.
+If the transformation is incorrect, incomplete, introduces errors, misses crucial data from the source payload that could map to the target schema, or (if an instruction was provided) fails to follow it, return { success: false, reason: "Describe the issue with the transformation, specifically referencing how it deviates from the schema or instruction." }.
+Consider if all relevant parts of the sourcePayload have been used to populate the targetSchema where applicable.
+If the transformedData is empty or missing key fields, but the sourcePayload is not, this is likely an issue unless the targetSchema itself implies an empty object/missing fields are valid under certain source conditions.
+Focus on data accuracy and completeness of the mapping, and adherence to the instruction if provided.`;
+
+    const userPrompt = `Target Schema:
+${JSON.stringify(targetSchema, null, 2)}
+
+Source Payload Sample (first 2 elements/entries, max 10KB):
+${JSON.stringify(sample(sourcePayload, 2), null, 2).slice(0, 10000)}
+
+Transformed Data:
+${JSON.stringify(transformedData, null, 2)}
+
+Please evaluate the transformation based on the criteria mentioned in the system prompt.`;
+
+    const messages: ChatCompletionMessageParam[] = [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt }
+    ];
+
+    const llmResponseSchema = {
+      type: "object",
+      properties: {
+        success: { type: "boolean", description: "True if the mapping is good, false otherwise." },
+        reason: { type: "string", description: "Reasoning for the success status. If success is false, explain what is wrong with the mapping. If success is true, confirm correct transformation." }
+      },
+      required: ["success", "reason"],
+      additionalProperties: false
+    };
+
+    // Using temperature 0 for more deterministic evaluation
+    const { response } = await LanguageModel.generateObject(messages, llmResponseSchema, 0); 
+
+    return response;
+
+  } catch (error) {
+    const errorMessage = String(error instanceof Error ? error.message : error);
+    logMessage('error', `Error evaluating mapping: ${errorMessage.slice(0,250)}`, metadata);
+    return { success: false, reason: `Error during evaluation: ${errorMessage}` };
+  }
+}
 
 const jsonataSchema = {
   "$schema": "http://json-schema.org/draft-07/schema#",

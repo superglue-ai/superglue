@@ -23,8 +23,8 @@ export class GeminiModel implements LLM {
               topP: 0.95,
               topK: 64,
               maxOutputTokens: 65536,
-              responseMimeType: "text/plain",
-            },
+              responseMimeType: "text/plain"
+            } as any,
             history: geminiHistory
           });
           const result = await chatSession.sendMessage(userPrompt);

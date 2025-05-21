@@ -1,6 +1,8 @@
 import type { GraphQLResolveInfo } from "graphql";
 import { WorkflowExecutor } from "../../workflow/workflow-executor.js";
-import { Context, Metadata, RequestOptions, Workflow, WorkflowResult } from "@superglue/shared";
+import { Context, Metadata, RequestOptions } from "@superglue/shared";
+import { Workflow, WorkflowResult } from "@superglue/client";
+
 import { WorkflowBuilder } from "../../workflow/workflow-builder.js";
 import type { SystemDefinition } from "../../workflow/workflow-builder.js";
 import { logMessage } from "../../utils/logs.js";
@@ -33,23 +35,30 @@ export const executeWorkflowResolver = async (
   context: Context,
   info: GraphQLResolveInfo,
 ): Promise<WorkflowResult> => {
-  let runId: string | undefined;
-  let metadata: Metadata | undefined;
+  let runId = crypto.randomUUID();
+  let metadata: Metadata = { orgId: context.orgId, runId };
+  let workflow: Workflow | undefined;
   try {
-    const workflow: Workflow = args.input.workflow ||
+    workflow = args.input.workflow ||
       await context.datastore.getWorkflow(args.input.id, context.orgId);
     if(!workflow) {
       throw new Error("Workflow not found");
     }
-    runId = crypto.randomUUID();
-    metadata = { orgId: context.orgId, runId: runId };
+    if(workflow.inputSchema && typeof workflow.inputSchema == 'string') {
+      workflow.inputSchema = JSON.parse(workflow.inputSchema);
+    }
+    if(workflow.responseSchema && typeof workflow.responseSchema == 'string') {
+      workflow.responseSchema = JSON.parse(workflow.responseSchema);
+    }
     const executor = new WorkflowExecutor(workflow, metadata);
     const result = await executor.execute(args.payload, args.credentials, args.options);
     return result;
   } catch (error) {
     logMessage('error', "Workflow execution error: " + String(error), metadata || { orgId: context.orgId, runId });
     return {
+      id: runId,
       success: false,
+      config: workflow || { id: args.input.id, steps: [] },
       error: String(error),
       data: {},
       stepResults: [],
@@ -72,6 +81,8 @@ export const upsertWorkflowResolver = async (_: unknown, { id, input }: { id: st
       id,
       steps: resolveField(input.steps, oldWorkflow?.steps, []),
       finalTransform: resolveField(input.finalTransform, oldWorkflow?.finalTransform, "$"),
+      responseSchema: resolveField(input.responseSchema, oldWorkflow?.responseSchema),
+      instruction: resolveField(input.instruction, oldWorkflow?.instruction),
       createdAt: oldWorkflow?.createdAt || now,
       updatedAt: now
     };

@@ -95,7 +95,7 @@ describe('Call Resolver', () => {
         config: { ...testInput.endpoint },
         messages: []
       });
-      mockedApi.evaluateResponse.mockResolvedValueOnce({ success: true, shortReason: '' });
+      mockedApi.evaluateResponse.mockResolvedValueOnce({ success: true, shortReason: '', refactorNeeded: false   });
 
       const result = await executeApiCall(
         testInput.endpoint, 
@@ -131,7 +131,7 @@ describe('Call Resolver', () => {
         messages: []
       });
       // Mock evaluateResponse to consistently fail
-      mockedApi.evaluateResponse.mockResolvedValue({ success: false, shortReason: 'Eval failed' });
+      mockedApi.evaluateResponse.mockResolvedValue({ success: false, shortReason: 'Eval failed', refactorNeeded: false });
 
       await expect(executeApiCall(
         testInput.endpoint, 
@@ -144,7 +144,7 @@ describe('Call Resolver', () => {
       // callEndpoint is called once for the initial attempt, then 7 more times for retries where evaluateResponse fails.
       expect(mockedApi.callEndpoint).toHaveBeenCalledTimes(8); 
       // evaluateResponse is called for each of the 7 retries after the first callEndpoint failure.
-      expect(mockedApi.evaluateResponse).toHaveBeenCalledTimes(7);
+      expect(mockedApi.evaluateResponse).toHaveBeenCalledTimes(7);  
       expect(mockedTelemetry.telemetryClient?.captureException).toHaveBeenCalled();
     });
 
@@ -162,8 +162,8 @@ describe('Call Resolver', () => {
 
       // Mock evaluateResponse to fail once, then succeed
       mockedApi.evaluateResponse
-        .mockResolvedValueOnce({ success: false, shortReason: 'Eval failed first time' })
-        .mockResolvedValueOnce({ success: true, shortReason: '' });
+        .mockResolvedValueOnce({ success: false, shortReason: 'Eval failed first time', refactorNeeded: false })
+        .mockResolvedValueOnce({ success: true, shortReason: '', refactorNeeded: false });
 
       const result = await executeApiCall(
         testInput.endpoint,

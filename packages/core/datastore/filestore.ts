@@ -1,4 +1,5 @@
-import type { ApiConfig, DataStore, ExtractConfig, RunResult, Workflow, TransformConfig } from "@superglue/shared";
+import type { ApiConfig, ExtractConfig, RunResult, Workflow, TransformConfig } from "@superglue/client";
+import type { DataStore } from "./types.js";
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
