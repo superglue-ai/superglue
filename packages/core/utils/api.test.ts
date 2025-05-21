@@ -1,4 +1,4 @@
-import { ApiConfig, AuthType, HttpMethod, PaginationType } from '@superglue/shared';
+import { ApiConfig, AuthType, HttpMethod, PaginationType } from '@superglue/client';
 import OpenAI from 'openai';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mocked } from 'vitest';
 import { callEndpoint, generateApiConfig } from './api.js';

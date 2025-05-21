@@ -13,7 +13,7 @@ import dotenv from 'dotenv';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyJsonataWithValidation } from './tools.js';
 import { generateMapping, prepareTransform } from './transform.js';
-import { TransformConfig } from '@superglue/shared';
+import { TransformConfig } from '@superglue/client';
 
 // Get reference to the mock after imports
 const mockLLM = (await import('../llm/llm.js')).LanguageModel as any;

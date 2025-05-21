@@ -1,4 +1,4 @@
-import { ApiConfig, RequestOptions } from "@superglue/shared";
+import { ApiConfig, RequestOptions } from "@superglue/client";
 import axios, { AxiosRequestConfig } from "axios";
 import { GraphQLResolveInfo } from "graphql";
 import jsonata from "jsonata";

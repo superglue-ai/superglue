@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { callPostgres } from './postgres.js';
 import { Pool } from 'pg';
-import { ApiConfig, RequestOptions } from '@superglue/shared';
+import { ApiConfig, RequestOptions } from '@superglue/client';
 
 // Create mock functions that we can reference
 const mockQuery = vi.fn();

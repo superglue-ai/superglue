@@ -1,4 +1,5 @@
-import { CacheMode, Context, RequestOptions, TransformConfig, TransformInputRequest } from "@superglue/shared";
+import { CacheMode, RequestOptions, TransformConfig, TransformInputRequest } from "@superglue/client";
+import { Context } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { telemetryClient } from "../../utils/telemetry.js";
 import { applyJsonataWithValidation } from "../../utils/tools.js";
