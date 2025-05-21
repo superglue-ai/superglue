@@ -1,4 +1,5 @@
-import { ApiConfig, ApiInputRequest, CacheMode, Context, Metadata, RequestOptions } from "@superglue/shared";
+import { ApiInputRequest, CacheMode, RequestOptions } from "@superglue/client";
+import { Context, Metadata } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mocked } from 'vitest';
 import * as api from "../../utils/api.js";

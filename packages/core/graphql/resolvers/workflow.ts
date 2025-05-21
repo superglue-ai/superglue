@@ -1,7 +1,7 @@
 import type { GraphQLResolveInfo } from "graphql";
 import { WorkflowExecutor } from "../../workflow/workflow-executor.js";
-import { Context, Metadata, RequestOptions } from "@superglue/shared";
-import { Workflow, WorkflowResult } from "@superglue/client";
+import { Context, Metadata } from "@superglue/shared";
+import { RequestOptions, Workflow, WorkflowResult } from "@superglue/client";
 
 import { WorkflowBuilder } from "../../workflow/workflow-builder.js";
 import type { SystemDefinition } from "../../workflow/workflow-builder.js";

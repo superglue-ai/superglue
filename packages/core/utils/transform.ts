@@ -1,10 +1,11 @@
-import type { DataStore, Metadata, TransformConfig } from "@superglue/shared";
+import type { DataStore, Metadata } from "@superglue/shared";
 import { createHash } from "node:crypto";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { PROMPT_MAPPING } from "../llm/prompts.js";
 import { applyJsonataWithValidation, getSchemaFromData, sample } from "./tools.js";
 import { logMessage } from "./logs.js";
 import { LanguageModel } from "../llm/llm.js";
+import { TransformConfig } from "@superglue/client";
 
 export async function prepareTransform(
     datastore: DataStore,
@@ -59,8 +60,7 @@ export async function prepareTransform(
         updatedAt: new Date(),
         ...input, 
         responseSchema: input.responseSchema,
-        responseMapping: mapping.jsonata,
-        confidence: mapping.confidence
+        responseMapping: mapping.jsonata
       };
     }
     return null;

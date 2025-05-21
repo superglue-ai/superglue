@@ -1,4 +1,4 @@
-import { type ApiConfig, AuthType, FileType, HttpMethod, Metadata, PaginationType, type RequestOptions } from "@superglue/shared";
+import { type ApiConfig, AuthType, FileType, HttpMethod, PaginationType, type RequestOptions } from "@superglue/client";
 import type { AxiosRequestConfig } from "axios";
 import OpenAI from "openai";
 import { z } from "zod";

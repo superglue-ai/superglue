@@ -4,7 +4,7 @@ import { promisify } from 'util';
 import sax, { parser } from 'sax';
 import * as unzipper from 'unzipper';
 import { Readable } from 'stream';
-import { DecompressionMethod, FileType } from "@superglue/shared";
+import { DecompressionMethod, FileType } from "@superglue/client";
 import * as XLSX from 'xlsx';
 
 
