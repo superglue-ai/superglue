@@ -1,15 +1,17 @@
-import { ApiConfig, ApiInputRequest, CacheMode, Context, Metadata, RequestOptions, TransformConfig } from "@superglue/shared";
+import { ApiConfig, ApiInputRequest, CacheMode, RequestOptions, TransformConfig } from "@superglue/client";
+import type { Context, Metadata } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import OpenAI from "openai";
 import { callEndpoint, evaluateResponse, generateApiConfig } from "../../utils/api.js";
 import { telemetryClient } from "../../utils/telemetry.js";
-import { applyJsonataWithValidation, maskCredentials, TransformResult } from "../../utils/tools.js";
-import { prepareTransform } from "../../utils/transform.js";
+import { applyJsonata, applyJsonataWithValidation, maskCredentials, TransformResult } from "../../utils/tools.js";
+import { generateMapping, prepareTransform } from "../../utils/transform.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 import { callPostgres } from "../../utils/postgres.js";
 import { logMessage } from "../../utils/logs.js";
 import { Documentation } from "../../utils/documentation.js";
 import { PROMPT_MAPPING } from "../../llm/prompts.js";
+import { generateSchema } from "../../utils/schema.js";
 
 export async function executeApiCall(
   endpoint: ApiConfig,
@@ -50,6 +52,13 @@ export async function executeApiCall(
         const result = await evaluateResponse(response.data, endpoint.responseSchema, endpoint.instruction);
         success = result.success;
         if(!result.success) throw new Error(result.shortReason + " " + JSON.stringify(response.data).slice(0, 1000));
+        if(result.refactorNeeded) {
+          logMessage('info', `Refactoring the API response.`, metadata);
+          const responseSchema = await generateSchema(endpoint.instruction, JSON.stringify(response.data).slice(0, 1000), metadata);
+          const transformation = await generateMapping(responseSchema, endpoint.instruction, "$", metadata);
+          endpoint.responseMapping = transformation.jsonata;
+          response.data = await applyJsonata(response.data, transformation.jsonata);
+        }
       }
       else {
         success = true;

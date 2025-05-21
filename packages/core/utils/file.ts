@@ -4,7 +4,7 @@ import { promisify } from 'util';
 import sax, { parser } from 'sax';
 import * as unzipper from 'unzipper';
 import { Readable } from 'stream';
-import { DecompressionMethod, FileType } from "@superglue/shared";
+import { DecompressionMethod, FileType } from "@superglue/client";
 import * as XLSX from 'xlsx';
 
 
@@ -179,7 +179,7 @@ export async function parseXML(buffer: Buffer): Promise<any> {
     const results: any = {};
     let currentElement: any = null;
     const elementStack: any[] = [];
-    
+    const error: any = null;
     return new Promise((resolve, reject) => {
     const parser = sax.createStream(true); // true for strict mode
 
@@ -187,8 +187,14 @@ export async function parseXML(buffer: Buffer): Promise<any> {
         // Create a new object for the current element
         const newElement: any = node.attributes || {};
         // If there's a current element, add this new one as its child
-        if (currentElement) {
+        if (currentElement && typeof currentElement === 'object') {
             elementStack.push(currentElement); // Push current to stack
+        }
+        else if(currentElement && typeof currentElement === 'string') {
+            elementStack.push({_TEXT: currentElement});
+        }
+        else {
+            elementStack.push({});
         }
 
         // Update current element
@@ -199,9 +205,12 @@ export async function parseXML(buffer: Buffer): Promise<any> {
         if (!currentElement || text?.trim()?.length == 0) {
             return;
         }
-        
+        if (typeof currentElement !== 'object' || currentElement === null || Array.isArray(currentElement)) {
+            return;
+        }
+
         if(Object.keys(currentElement)?.length > 0) {
-            currentElement["__text"] = text.trim();
+            currentElement["_TEXT"] = text.trim();
         }
         else if(Array.isArray(currentElement)) {
             currentElement.push(text.trim());
@@ -236,13 +245,14 @@ export async function parseXML(buffer: Buffer): Promise<any> {
 
     parser.on('error', (error) => {
         console.error('Failed converting XML to JSON:', error);
-        reject(error);
+        error = error;
     });
 
     parser.on('end', async () => {
-        try {
-            resolve(results);
-        } catch (error) {
+        if(!error) {
+            resolve(currentElement);
+        }
+        else {
             reject(error);
         }
     });

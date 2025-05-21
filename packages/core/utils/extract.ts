@@ -1,6 +1,7 @@
-import axios, { AxiosRequestConfig } from "axios";
-import {  AuthType, RequestOptions, DecompressionMethod, ExtractConfig, FileType, HttpMethod, Metadata } from "@superglue/shared";
-import { callAxios, composeUrl, generateId, replaceVariables } from "./tools.js";
+import { AxiosRequestConfig } from "axios";
+import { AuthType, RequestOptions, DecompressionMethod, ExtractConfig, FileType, HttpMethod } from "@superglue/client";
+import { Metadata } from "@superglue/shared";
+import { callAxios, composeUrl, replaceVariables } from "./tools.js";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { API_PROMPT } from "../llm/prompts.js";

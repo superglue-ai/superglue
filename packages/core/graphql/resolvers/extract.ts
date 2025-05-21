@@ -1,11 +1,11 @@
-import { CacheMode, Context, DecompressionMethod, ExtractConfig, ExtractInputRequest, FileType, RequestOptions } from "@superglue/shared";
+import { CacheMode, DecompressionMethod, ExtractConfig, ExtractInputRequest, FileType, RequestOptions } from "@superglue/client";
+import type { Context, Metadata } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { callExtract, processFile, generateExtractConfig } from "../../utils/extract.js";
 import { telemetryClient } from "../../utils/telemetry.js";
 import { maskCredentials } from "../../utils/tools.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 import { logMessage } from "../../utils/logs.js";
-import { Metadata } from "openai/resources/index.mjs";
 import { Documentation } from "../../utils/documentation.js";
 
 export const extractResolver = async (
@@ -35,7 +35,7 @@ export const extractResolver = async (
     };
     do {
       if(input.file) {
-        const { createReadStream, filename } = await input.file;
+        const { createReadStream, filename } = await input.file as any;
         const stream = createReadStream();
         const chunks: Buffer[] = [];
         for await (const chunk of stream) {

@@ -1,4 +1,4 @@
-import { ApiConfig } from "@superglue/shared";
+import { ApiConfig } from "@superglue/client";
 import { callPostgres } from "./postgres.js";
 import { describe, it, expect } from 'vitest';
 

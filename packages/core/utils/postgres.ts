@@ -1,7 +1,7 @@
 import { composeUrl } from "./tools.js";
-import { ApiConfig } from "@superglue/shared";
+import { ApiConfig } from "@superglue/client";
 import { replaceVariables } from "./tools.js";
-import { RequestOptions } from "@superglue/shared";
+import { RequestOptions } from "@superglue/client";
 import { Pool, PoolConfig } from 'pg';
 
 const DEFAULT_TIMEOUT = 30000; // 30 seconds

@@ -1,8 +1,9 @@
-import type { ExecutionStep, Metadata, RequestOptions, WorkflowStepResult } from "@superglue/shared";
+import type { ExecutionStep, RequestOptions, WorkflowStepResult } from "@superglue/client";
 import { applyJsonata } from "../utils/tools.js";
 import { logMessage } from "../utils/logs.js";
 import { executeApiCall } from "../graphql/resolvers/call.js";
 import { generateMapping } from "../utils/transform.js";
+import { Metadata } from "@superglue/shared";
 
 export interface ExecutionStrategy {
   execute(
@@ -31,7 +32,8 @@ const directStrategy: ExecutionStrategy = {
   ): Promise<WorkflowStepResult> {
     const result: WorkflowStepResult = {
       stepId: step.id,
-      success: false
+      success: false,
+      config: step.apiConfig
     }
     try {
       const apiResponse = await executeApiCall(step.apiConfig, payload, credentials, options, metadata);
@@ -40,7 +42,7 @@ const directStrategy: ExecutionStrategy = {
       result.rawData = apiResponse.data;
       result.transformedData = transformedData;
       result.success = true;
-      result.apiConfig = apiResponse.endpoint;
+      result.config = apiResponse.endpoint;
 
       logMessage("info", `Direct Execution '${step.id}' - Complete`, metadata);
     } catch (error) {
@@ -64,7 +66,8 @@ const loopStrategy: ExecutionStrategy = {
   ): Promise<WorkflowStepResult> {
     const result: WorkflowStepResult = {
       stepId: step.id,
-      success: false
+      success: false,
+      config: step.apiConfig
     }
 
     try {
@@ -108,7 +111,7 @@ const loopStrategy: ExecutionStrategy = {
             success: true, 
             rawData: rawData, 
             transformedData: transformedData,
-            apiConfig: apiResponse.endpoint
+            config: apiResponse.endpoint
           });
 
           // update the apiConfig with the new endpoint
@@ -120,13 +123,13 @@ const loopStrategy: ExecutionStrategy = {
           throw errorMessage;
         }
       }
-      result.apiConfig = step.apiConfig;
+      result.config = step.apiConfig;
       result.rawData = stepResults.map(r => r.rawData);
       result.transformedData = stepResults.map(r => r.transformedData);
       result.success = stepResults.every(r => r.success);
       result.error = stepResults.filter(s => s.error).join("\n");
     } catch (error) {
-      result.apiConfig = step.apiConfig;
+      result.config = step.apiConfig;
       result.success = false;
       result.error = error.message || error;
     }

@@ -1,4 +1,4 @@
-import { ApiConfig, ExtractConfig, HttpMethod, RunResult, TransformConfig } from '@superglue/shared';
+import { ApiConfig, ExtractConfig, HttpMethod, RunResult, TransformConfig } from '@superglue/client';
 import { beforeEach, describe, expect, it, afterEach } from 'vitest';
 import { FileStore } from './filestore.js';
 import fs from 'fs';
@@ -105,9 +105,7 @@ describe('FileStore', () => {
       updatedAt: new Date(),
       instruction: 'Test transformation',
       responseSchema: {},
-      responseMapping: '',
-      confidence: 1,
-      confidence_reasoning: 'test',
+      responseMapping: ''
     };
 
     it('should store and retrieve transform configs', async () => {
@@ -241,9 +239,7 @@ describe('FileStore', () => {
         updatedAt: new Date(),
         instruction: 'Test transformation',
         responseSchema: {},
-        responseMapping: '',
-        confidence: 1,
-        confidence_reasoning: 'test',
+        responseMapping: ''
       };
 
       const testRun: RunResult = {

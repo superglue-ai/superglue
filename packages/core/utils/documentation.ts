@@ -4,7 +4,8 @@ import { NodeHtmlMarkdown } from "node-html-markdown";
 import playwright from '@playwright/test';
 import { composeUrl } from "./tools.js";
 import { LanguageModel } from "../llm/llm.js";
-import { ApiConfig, Metadata } from "@superglue/shared";
+import { Metadata } from "@superglue/shared";
+import { ApiConfig } from "@superglue/client";
 import { logMessage } from "./logs.js";
 
 // Strategy Interface
