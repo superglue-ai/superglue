@@ -129,6 +129,7 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
     setFinalTransform(`$.getBreedImage.(
   {"breed": currentItem, "image": message.data}
 )`);
+    setResponseSchema(`{"type": "object", "properties": {"result": {"type": "array", "items": {"type": "object", "properties": {"breed": {"type": "string"}, "image": {"type": "string"}}}}}}`);
 
     toast({
       title: "Example loaded",
