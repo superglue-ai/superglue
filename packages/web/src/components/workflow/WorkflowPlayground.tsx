@@ -16,7 +16,6 @@ import { parseCredentialsHelper, removeNullUndefined } from "@/src/lib/client-ut
 import { WorkflowStepsView } from "./WorkflowStepsView";
 import { WorkflowResultsView } from "./WorkflowResultsView";
 import JsonSchemaEditor from "@/src/components/utils/JsonSchemaEditor";
-import { Switch } from "@/src/components/ui/switch";
 
 export default function WorkflowPlayground({ id }: { id?: string }) {
   const router = useRouter();
@@ -28,7 +27,6 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
   "result": $
 }`);
   const [responseSchema, setResponseSchema] = useState<string | null>(`{"type": "object", "properties": {"result": {"type": "object"}}}`);
-  const [isResponseSchemaEnabled, setIsResponseSchemaEnabled] = useState<boolean>(true);
   const [credentials, setCredentials] = useState("");
   const [payload, setPayload] = useState("{}");
   const [loading, setLoading] = useState(false);
@@ -65,10 +63,8 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
       
       if (cleanedWorkflow.responseSchema === null || cleanedWorkflow.responseSchema === undefined) {
         setResponseSchema(null);
-        setIsResponseSchemaEnabled(false);
       } else {
         setResponseSchema(JSON.stringify(cleanedWorkflow.responseSchema));
-        setIsResponseSchemaEnabled(true);
       }
 
       toast({
@@ -85,8 +81,7 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
       // Reset state, keeping the attempted ID in the input field for convenience
       setSteps([]);
       setFinalTransform(`{\n  "result": $\n}`);
-      setResponseSchema('{"type": "object", "properties": {"result": {"type": "object"}}}');
-      setIsResponseSchemaEnabled(true);
+      setResponseSchema('{"type": "object", "properties": {"result": {"type": "object"}}}'); // Default back to an enabled schema
       setResult(null);
     } finally {
       setLoading(false);
@@ -95,7 +90,6 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
 
   useEffect(() => {
     if (id) {
-      // updateWorkflowId(id); // Set the input field value while loading
       loadWorkflow(id);
     } else {
       // Reset to a clean slate if id is removed or not provided
@@ -103,7 +97,6 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
       setSteps([]);
       setFinalTransform(`{\n  "result": $\n}`);
       setResponseSchema('{"type": "object", "properties": {"result": {"type": "object"}}}');
-      setIsResponseSchemaEnabled(true);
       setCredentials("");
       setPayload("{}");
       setResult(null);
@@ -146,7 +139,6 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
   {"breed": currentItem, "image": message.data}
 )`);
     setResponseSchema(`{"type": "object", "properties": {"result": {"type": "array", "items": {"type": "object", "properties": {"breed": {"type": "string"}, "image": {"type": "string"}}}}}}`);
-    setIsResponseSchemaEnabled(true);
 
     toast({
       title: "Example loaded",
@@ -170,7 +162,7 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
             pagination: step.apiConfig.pagination || null
           }
         })),
-        responseSchema: isResponseSchemaEnabled && responseSchema ? JSON.parse(responseSchema) : null,
+        responseSchema: responseSchema ? JSON.parse(responseSchema) : null,
         finalTransform
       };
 
@@ -218,7 +210,7 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
             ...step.apiConfig
           }
         })),
-        responseSchema: isResponseSchemaEnabled && responseSchema ? JSON.parse(responseSchema) : null,
+        responseSchema: responseSchema ? JSON.parse(responseSchema) : null,
         finalTransform
       };
       const parsedCredentials = parseCredentialsHelper(credentials);
@@ -240,10 +232,8 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
       
       if (workflowResult.config.responseSchema === null || workflowResult.config.responseSchema === undefined) {
         setResponseSchema(null);
-        setIsResponseSchemaEnabled(false);
       } else {
         setResponseSchema(JSON.stringify(workflowResult.config.responseSchema));
-        setIsResponseSchemaEnabled(true);
       }
       setFinalTransform(workflowResult.config.finalTransform);
       setSteps(workflowResult.config.steps);
@@ -353,45 +343,11 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
               </div>
 
               <div className="flex-1 flex flex-col min-h-0">
-                <div className="flex items-center justify-between mb-2">
-                  <Label htmlFor="enableResponseSchemaToggle" className="font-medium">Response Schema</Label>
-                  <div className="flex items-center space-x-2">
-                    <Label htmlFor="enableResponseSchemaToggle" className="text-xs font-medium cursor-pointer">
-                      {isResponseSchemaEnabled ? "Enabled" : "Disabled"}
-                    </Label>
-                    <Switch
-                      id="enableResponseSchemaToggle"
-                      checked={isResponseSchemaEnabled}
-                      onCheckedChange={(checkedState) => {
-                        const isEnabled = !!checkedState;
-                        setIsResponseSchemaEnabled(isEnabled);
-                        if (!isEnabled) {
-                          setResponseSchema(null);
-                        } else {
-                          // If re-enabling and current schema is null, provide a default
-                          setResponseSchema(responseSchema || '{"type": "object", "properties": {"result": {"type": "object"}}}');
-                        }
-                      }}
-                    />
-                  </div>
-                </div>
-                {isResponseSchemaEnabled ? (
-                  <div className="flex-grow min-h-0"> {/* Ensure JsonSchemaEditor can grow */}
-                    <JsonSchemaEditor
-                      showLabel={false}
-                      value={responseSchema || '{"type": "object"}'} // Provide a default valid JSON if null
-                      onChange={(newSchema) => {
-                        if (isResponseSchemaEnabled) { // Only update if still enabled
-                           setResponseSchema(newSchema);
-                        }
-                      }}
-                    />
-                  </div>
-                ) : (
-                  <div className="flex-grow min-h-0 p-3 border rounded-md text-sm text-muted-foreground bg-muted/50 flex items-center justify-center">
-                    Response schema validation is disabled.
-                  </div>
-                )}
+                <JsonSchemaEditor
+                  isOptional={true}
+                  value={responseSchema}
+                  onChange={setResponseSchema}
+                />
               </div>
             </div>
           </CardContent>
