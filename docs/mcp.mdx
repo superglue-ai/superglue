@@ -7,7 +7,7 @@ This is a developer-focused guide to interacting with superglue's capabilities t
 
 ## introduction
 
-Superglue utilizes MCP to expose its core functionalities as a set of "tools." This allows external clients or agents to discover and execute these functionalities in a structured manner. You can think of it as an RPC-like mechanism where Superglue acts as the server, offering services like pipeline management, data transformation, and more.
+Superglue utilizes MCP to expose its core functionalities as a set of "tools." This allows external clients or agents to discover and execute these functionalities in a structured manner. You can think of it as an RPC-like mechanism where Superglue acts as the server, offering services like capability management, data transformation, and more.
 
 ## connecting to the MCP Server
 
@@ -82,9 +82,9 @@ The following tools are exposed by Superglue's MCP server. The input schemas are
   }
   ```
 
-### 2. `listPipelines`
+### 2. `listCapabilities`
 
-- **Description**: List Superglue pipelines (workflows) with pagination.
+- **Description**: List Superglue capabilities (workflows) with pagination.
 - **Input Schema**: `ListWorkflowsInputSchema`
   - `limit`: (Optional) Number of items to return (default: 10).
   - `offset`: (Optional) Offset for pagination (default: 0).
@@ -93,7 +93,7 @@ The following tools are exposed by Superglue's MCP server. The input schemas are
   ```json
   // MCP callTool params
   {
-    "toolName": "listPipelines",
+    "toolName": "listCapabilities",
     "inputs": {
       "limit": 5,
       "offset": 0
@@ -101,51 +101,51 @@ The following tools are exposed by Superglue's MCP server. The input schemas are
   }
   ```
 
-### 3. `getPipeline`
+### 3. `getCapability`
 
-- **Description**: Get a specific Superglue pipeline (workflow) by its ID.
+- **Description**: Get a specific Superglue capability (workflow) by its ID.
 - **Input Schema**: `GetWorkflowInputSchema`
-  - `id`: The ID of the pipeline.
+  - `id`: The ID of the capability.
 - **Example Usage (Conceptual MCP Call)**:
 
   ```json
   // MCP callTool params
   {
-    "toolName": "getPipeline",
+    "toolName": "getCapability",
     "inputs": {
-      "id": "pipeline-id-123"
+      "id": "capability-id-123"
     }
   }
   ```
 
-### 4. `runPipeline`
+### 4. `runCapability`
 
-- **Description**: Execute a Superglue pipeline (workflow) by its ID.
+- **Description**: Execute a Superglue capability (workflow) by its ID.
 - **Input Schema**: `ExecuteWorkflowInputSchema`
-  - `id`: The ID of the pipeline to execute.
-  - `payload`: (Optional) JSON payload to pass to the pipeline.
-  - `credentials`: (Optional) JSON credentials for the pipeline execution.
+  - `id`: The ID of the capability to execute.
+  - `payload`: (Optional) JSON payload to pass to the capability.
+  - `credentials`: (Optional) JSON credentials for the capability execution.
   - `options`: (Optional) `RequestOptionsSchema`.
 - **Example Usage (Conceptual MCP Call)**:
 
   ```json
   // MCP callTool params
   {
-    "toolName": "runPipeline",
+    "toolName": "runCapability",
     "inputs": {
-      "id": "pipeline-id-123",
+      "id": "capability-id-123",
       "payload": { "inputData": "example" }
     }
   }
   ```
 
-### 5. `buildPipeline`
+### 5. `buildCapability`
 
-- **Description**: Build a new Superglue pipeline (workflow) from an instruction.
+- **Description**: Build a new Superglue capability (workflow) from an instruction.
 - **Input Schema**: `BuildWorkflowInputSchema`
-  - `instruction`: Natural language instruction for the pipeline.
+  - `instruction`: Natural language instruction for the capability.
   - `payload`: (Optional) Example JSON payload.
-  - `systems`: Array of `SystemInputSchema` defining the systems the pipeline can interact with.
+  - `systems`: Array of `SystemInputSchema` defining the systems the capability can interact with.
     - `id`: System ID.
     - `urlHost`: Host URL of the system.
     - `urlPath`: (Optional) Base path for API calls.
@@ -158,7 +158,7 @@ The following tools are exposed by Superglue's MCP server. The input schemas are
   ```json
   // MCP callTool params
   {
-    "toolName": "buildPipeline",
+    "toolName": "buildCapability",
     "inputs": {
       "instruction": "Fetch user data from system A and send it to system B.",
       "systems": [
@@ -169,38 +169,38 @@ The following tools are exposed by Superglue's MCP server. The input schemas are
   }
   ```
 
-### 6. `upsertPipeline`
+### 6. `upsertCapability`
 
-- **Description**: Create a new pipeline (workflow) or update an existing one.
+- **Description**: Create a new capability (workflow) or update an existing one.
 - **Input Schema**: `UpsertWorkflowInputSchema`
-  - `id`: The ID for the pipeline (used for creation or to identify the one to update).
-  - `input`: The pipeline definition (JSON, conforming to Superglue's workflow structure).
+  - `id`: The ID for the capability (used for creation or to identify the one to update).
+  - `input`: The capability definition (JSON, conforming to Superglue's workflow structure).
 - **Example Usage (Conceptual MCP Call)**:
 
   ```json
   // MCP callTool params
   {
-    "toolName": "upsertPipeline",
+    "toolName": "upsertCapability",
     "inputs": {
-      "id": "new-or-existing-pipeline-id",
-      "input": { /* ... full pipeline definition ... */ }
+      "id": "new-or-existing-capability-id",
+      "input": { /* ... full capability definition ... */ }
     }
   }
   ```
 
-### 7. `deletePipeline`
+### 7. `deleteCapability`
 
-- **Description**: Delete a Superglue pipeline (workflow) by its ID.
+- **Description**: Delete a Superglue capability (workflow) by its ID.
 - **Input Schema**: `DeleteWorkflowInputSchema`
-  - `id`: The ID of the pipeline to delete.
+  - `id`: The ID of the capability to delete.
 - **Example Usage (Conceptual MCP Call)**:
 
   ```json
   // MCP callTool params
   {
-    "toolName": "deletePipeline",
+    "toolName": "deleteCapability",
     "inputs": {
-      "id": "pipeline-to-delete-id"
+      "id": "capability-to-delete-id"
     }
   }
   ```
