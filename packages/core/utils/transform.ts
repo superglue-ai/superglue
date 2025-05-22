@@ -1,5 +1,5 @@
 import type { DataStore, Metadata } from "@superglue/shared";
-import { createHash } from "node:crypto";
+import { createHash, hash } from "node:crypto";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { PROMPT_MAPPING } from "../llm/prompts.js";
 import { applyJsonataWithValidation, getSchemaFromData, sample } from "./tools.js";
@@ -34,17 +34,11 @@ export async function prepareTransform(
       if (cached) return { ...cached, ...input };
     }
 
-    const hash = createHash('md5')
-      .update(JSON.stringify({request: input, payloadKeys: getSchemaFromData(data)}))
-      .digest('hex');
-
     if(input.responseMapping && !lastError) {
       return { 
-        id: hash,
+        id: crypto.randomUUID(),
         createdAt: new Date(),
         updatedAt: new Date(),
-        responseMapping: input.responseMapping,
-        responseSchema: input.responseSchema,
         ...input
       };
     }
@@ -55,11 +49,10 @@ export async function prepareTransform(
     // Check if the mapping is generated successfully
     if(mapping) {
       return { 
-        id: hash,
+        id: crypto.randomUUID(),
         createdAt: new Date(),
         updatedAt: new Date(),
         ...input, 
-        responseSchema: input.responseSchema,
         responseMapping: mapping.jsonata
       };
     }
@@ -72,7 +65,7 @@ export async function generateMapping(schema: any, payload: any, instruction: st
     const userPrompt = 
 `Given a source data and structure, create a jsonata expression in JSON FORMAT.
 
-Important: The output should be a jsonata expression creating an object that matches the following schema:
+Important: The output should be a jsonata expression creating an object that exactly matches the following schema:
 ${JSON.stringify(schema, null, 2)}
 
 ${instruction ? `The instruction from the user is: ${instruction}` : ''}
@@ -83,7 +76,7 @@ Source Data Structure:
 ${getSchemaFromData(payload)}
 
 Source data Sample:
-${JSON.stringify(sample(payload, 2), null, 2).slice(0,30000)}`
+${JSON.stringify(sample(payload, 2), null, 2).slice(0,50000)}`
 
     if(!messages) {
       messages = [
@@ -100,12 +93,9 @@ ${JSON.stringify(sample(payload, 2), null, 2).slice(0,30000)}`
     if(!transformation.success) {
       throw new Error(`Validation failed: ${transformation.error}`);
     }
-
-    if(retry > 0) {
-      const evaluation = await evaluateMapping(transformation.data, payload, schema, instruction, metadata);
-      if(!evaluation.success) {
+    const evaluation = await evaluateMapping(transformation.data, payload, schema, instruction, metadata);
+    if(!evaluation.success) {
         throw new Error(`Mapping evaluation failed: ${evaluation.reason}`);
-      }
     }
     return response;
   } catch (error) {
@@ -143,8 +133,8 @@ ${JSON.stringify(targetSchema, null, 2)}
 Source Payload Sample (first 2 elements/entries, max 10KB):
 ${JSON.stringify(sample(sourcePayload, 2), null, 2).slice(0, 10000)}
 
-Transformed Data:
-${JSON.stringify(transformedData, null, 2)}
+Transformed Data Sample (first 2 elements/entries, max 10KB):
+${JSON.stringify(sample(transformedData, 2), null, 2).slice(0, 10000)}
 
 Please evaluate the transformation based on the criteria mentioned in the system prompt.`;
 
