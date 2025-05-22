@@ -83,7 +83,7 @@ export const transformResolver = async (
       id: callId,
       success: false,
       error: error.message,
-      config: preparedTransform || input,
+      config: preparedTransform || {id: callId, instruction: "", ...input},
       startedAt,
       completedAt,
     };

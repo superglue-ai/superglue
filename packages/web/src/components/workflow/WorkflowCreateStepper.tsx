@@ -938,6 +938,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                   <div className="flex flex-col gap-2">
                     <div className="flex-1 min-h-0 bg-background h-[200px] mt-2 mb-4">
                       <JsonSchemaEditor
+                        isOptional={true}
                         value={schema}
                         onChange={setSchema}
                       />
