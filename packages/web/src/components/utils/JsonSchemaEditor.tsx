@@ -25,6 +25,7 @@ import Editor from 'react-simple-code-editor';
 interface JsonSchemaEditorProps {
   value: string;
   onChange: (value: string) => void;
+  showLabel?: boolean;
 }
 
 const SCHEMA_TYPES = ['object', 'array', 'string', 'number', 'boolean', 'integer'];
@@ -37,7 +38,7 @@ const SCHEMA_TYPE_DISPLAY = {
   'integer': 'integer',
 };
 
-const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) => {
+const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange, showLabel = true }) => {
   const [isCodeMode, setIsCodeMode] = React.useState(false);
   const [jsonError, setJsonError] = React.useState<string | null>(null);
   
@@ -473,7 +474,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
   return (
     <div className="space-y-1 flex flex-col h-full mb-4 gap-2">
       <div className="flex justify-between items-center shrink-0">
-        <Label htmlFor="responseSchema" className="text-xs sm:text-sm">Set your desired response schema</Label>
+        <Label htmlFor="responseSchema" className="text-xs sm:text-sm">{showLabel ? 'Set your desired response schema' : ''}</Label>
         <div className="flex items-center gap-2">
           <Label htmlFor="editorMode" className="text-xs">Code Mode</Label>
           <Switch id="editorMode" checked={isCodeMode} onCheckedChange={setIsCodeMode} />

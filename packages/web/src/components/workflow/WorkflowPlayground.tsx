@@ -16,6 +16,7 @@ import { parseCredentialsHelper, removeNullUndefined } from "@/src/lib/client-ut
 import { WorkflowStepsView } from "./WorkflowStepsView";
 import { WorkflowResultsView } from "./WorkflowResultsView";
 import JsonSchemaEditor from "@/src/components/utils/JsonSchemaEditor";
+import { Switch } from "@/src/components/ui/switch";
 
 export default function WorkflowPlayground({ id }: { id?: string }) {
   const router = useRouter();
@@ -26,7 +27,8 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
   const [finalTransform, setFinalTransform] = useState(`{
   "result": $
 }`);
-  const [responseSchema, setResponseSchema] = useState(`{"type": "object", "properties": {"result": {"type": "object"}}}`);
+  const [responseSchema, setResponseSchema] = useState<string | null>(`{"type": "object", "properties": {"result": {"type": "object"}}}`);
+  const [isResponseSchemaEnabled, setIsResponseSchemaEnabled] = useState<boolean>(true);
   const [credentials, setCredentials] = useState("");
   const [payload, setPayload] = useState("{}");
   const [loading, setLoading] = useState(false);
@@ -53,21 +55,21 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
       });
       const workflow = await superglueClient.getWorkflow(idToLoad);
       if (!workflow) {
-        updateWorkflowId('');
-        setSteps([]);
-        setFinalTransform('');
-        setResponseSchema(`{"type": "object", "properties": {"result": {"type": "string"}}}`);
         throw new Error(`Workflow with ID "${idToLoad}" not found.`);
       }
       console.log(workflow);
       const cleanedWorkflow = removeNullUndefined(workflow);
-      const cleanedSteps = cleanedWorkflow.steps || [];
-      const cleanedFinalTransform = cleanedWorkflow.finalTransform || `{\n  "result": $\n}`;
-      const cleanedResponseSchema = JSON.stringify(cleanedWorkflow.responseSchema || {"type": "object", "properties": {"result": {"type": "string"}}});
       updateWorkflowId(cleanedWorkflow.id || '');
-      setSteps(cleanedSteps);
-      setFinalTransform(cleanedFinalTransform);
-      setResponseSchema(cleanedResponseSchema);
+      setSteps(cleanedWorkflow.steps || []);
+      setFinalTransform(cleanedWorkflow.finalTransform || `{\n  "result": $\n}`);
+      
+      if (cleanedWorkflow.responseSchema === null || cleanedWorkflow.responseSchema === undefined) {
+        setResponseSchema(null);
+        setIsResponseSchemaEnabled(false);
+      } else {
+        setResponseSchema(JSON.stringify(cleanedWorkflow.responseSchema));
+        setIsResponseSchemaEnabled(true);
+      }
 
       toast({
         title: "Workflow loaded",
@@ -80,9 +82,12 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
         description: error.message,
         variant: "destructive",
       });
-      updateWorkflowId('');
+      // Reset state, keeping the attempted ID in the input field for convenience
       setSteps([]);
-      setFinalTransform('');
+      setFinalTransform(`{\n  "result": $\n}`);
+      setResponseSchema('{"type": "object", "properties": {"result": {"type": "object"}}}');
+      setIsResponseSchemaEnabled(true);
+      setResult(null);
     } finally {
       setLoading(false);
     }
@@ -90,7 +95,18 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
 
   useEffect(() => {
     if (id) {
+      // updateWorkflowId(id); // Set the input field value while loading
       loadWorkflow(id);
+    } else {
+      // Reset to a clean slate if id is removed or not provided
+      updateWorkflowId("");
+      setSteps([]);
+      setFinalTransform(`{\n  "result": $\n}`);
+      setResponseSchema('{"type": "object", "properties": {"result": {"type": "object"}}}');
+      setIsResponseSchemaEnabled(true);
+      setCredentials("");
+      setPayload("{}");
+      setResult(null);
     }
   }, [id]);
 
@@ -130,6 +146,7 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
   {"breed": currentItem, "image": message.data}
 )`);
     setResponseSchema(`{"type": "object", "properties": {"result": {"type": "array", "items": {"type": "object", "properties": {"breed": {"type": "string"}, "image": {"type": "string"}}}}}}`);
+    setIsResponseSchemaEnabled(true);
 
     toast({
       title: "Example loaded",
@@ -153,7 +170,7 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
             pagination: step.apiConfig.pagination || null
           }
         })),
-        responseSchema: JSON.parse(responseSchema),
+        responseSchema: isResponseSchemaEnabled && responseSchema ? JSON.parse(responseSchema) : null,
         finalTransform
       };
 
@@ -192,7 +209,7 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
       if (!workflowId) {
         updateWorkflowId(`wf-${Date.now()}`);
       }
-      const workflowInput = {
+      const workflowData = {
         id: workflowId,
         steps: steps.map((step: ExecutionStep) => ({
           ...step,
@@ -201,7 +218,7 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
             ...step.apiConfig
           }
         })),
-        responseSchema,
+        responseSchema: isResponseSchemaEnabled && responseSchema ? JSON.parse(responseSchema) : null,
         finalTransform
       };
       const parsedCredentials = parseCredentialsHelper(credentials);
@@ -211,16 +228,23 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
         apiKey: config.superglueApiKey,
       });
       const workflowResult = await superglueClient.executeWorkflow({
-        workflow: workflowInput, 
+        workflow: workflowData, 
         credentials: parsedCredentials, 
         payload: parsedPayload
       });
       if(!workflowResult.success) {
-        throw new Error(workflowResult.error);
+        throw new Error(workflowResult.error || "Workflow execution failed without a specific error message.");
       }
       console.log(workflowResult);
       setResult(workflowResult);
-      setResponseSchema(JSON.stringify(workflowResult.config.responseSchema));
+      
+      if (workflowResult.config.responseSchema === null || workflowResult.config.responseSchema === undefined) {
+        setResponseSchema(null);
+        setIsResponseSchemaEnabled(false);
+      } else {
+        setResponseSchema(JSON.stringify(workflowResult.config.responseSchema));
+        setIsResponseSchemaEnabled(true);
+      }
       setFinalTransform(workflowResult.config.finalTransform);
       setSteps(workflowResult.config.steps);
       setLoading(false);
@@ -329,10 +353,45 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
               </div>
 
               <div className="flex-1 flex flex-col min-h-0">
-                <JsonSchemaEditor
-                  value={responseSchema}
-                  onChange={setResponseSchema}
-                />
+                <div className="flex items-center justify-between mb-2">
+                  <Label htmlFor="enableResponseSchemaToggle" className="font-medium">Response Schema</Label>
+                  <div className="flex items-center space-x-2">
+                    <Label htmlFor="enableResponseSchemaToggle" className="text-xs font-medium cursor-pointer">
+                      {isResponseSchemaEnabled ? "Enabled" : "Disabled"}
+                    </Label>
+                    <Switch
+                      id="enableResponseSchemaToggle"
+                      checked={isResponseSchemaEnabled}
+                      onCheckedChange={(checkedState) => {
+                        const isEnabled = !!checkedState;
+                        setIsResponseSchemaEnabled(isEnabled);
+                        if (!isEnabled) {
+                          setResponseSchema(null);
+                        } else {
+                          // If re-enabling and current schema is null, provide a default
+                          setResponseSchema(responseSchema || '{"type": "object", "properties": {"result": {"type": "object"}}}');
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+                {isResponseSchemaEnabled ? (
+                  <div className="flex-grow min-h-0"> {/* Ensure JsonSchemaEditor can grow */}
+                    <JsonSchemaEditor
+                      showLabel={false}
+                      value={responseSchema || '{"type": "object"}'} // Provide a default valid JSON if null
+                      onChange={(newSchema) => {
+                        if (isResponseSchemaEnabled) { // Only update if still enabled
+                           setResponseSchema(newSchema);
+                        }
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <div className="flex-grow min-h-0 p-3 border rounded-md text-sm text-muted-foreground bg-muted/50 flex items-center justify-center">
+                    Response schema validation is disabled.
+                  </div>
+                )}
               </div>
             </div>
           </CardContent>
