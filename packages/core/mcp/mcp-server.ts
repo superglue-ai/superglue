@@ -54,8 +54,7 @@ export const TransformInputRequestSchema = z.object({
 export const TransformOperationInputSchema = {
   input: TransformInputRequestSchema,
   data: z.any(), // JSON
-  options: RequestOptionsSchema.optional(),
-  superglueApiKey: z.string(),
+  options: RequestOptionsSchema.optional()
 };
 
 // Workflow-related Schemas
@@ -166,7 +165,7 @@ export const toolDefinitions: Record<string, {
     description: "Transform JSON data to a different JSONSchema format.",
     inputSchema: TransformOperationInputSchema,
     execute: async (args, request) => {
-      const { client }: { client: SuperglueClient } = args;
+      const client: SuperglueClient = args.client;
       return client.transform({
         id: args.id,
         data: args.data,
@@ -178,7 +177,7 @@ export const toolDefinitions: Record<string, {
   listCapabilities: {
     description: "List capabilities with pagination.",
     inputSchema: ListWorkflowsInputSchema,
-    execute: async (args: any & { client: SuperglueClient }, request) => {
+    execute: async (args, request) => {
       const { limit, offset, client }: { limit: number, offset: number, client: SuperglueClient } = args;
       const workflows = await client.listWorkflows(limit, offset);
       return workflows;
@@ -187,7 +186,7 @@ export const toolDefinitions: Record<string, {
   getCapability: {
     description: "Get a specific capability by ID.",
     inputSchema: GetWorkflowInputSchema,
-    execute: async (args: any & { client: SuperglueClient }, request) => {
+    execute: async (args, request) => {
       const { id, client }: { id: string, client: SuperglueClient } = args;
       return client.getWorkflow(id);
     },
@@ -195,7 +194,7 @@ export const toolDefinitions: Record<string, {
   runCapability: {
     description: "Execute a capability by ID.",
     inputSchema: ExecuteWorkflowInputSchema,
-    execute: async (args: any & { client: SuperglueClient }, request) => {
+    execute: async (args, request) => {
       const { client }: { client: SuperglueClient } = args;
       return client.executeWorkflow(args);
     },
