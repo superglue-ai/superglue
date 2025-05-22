@@ -518,7 +518,7 @@ if (transformResult?.success) {
                 <Button
                   variant="outline"
                   className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-200/50 hover:border-blue-300/50 text-blue-600 hover:text-blue-700 text-sm px-4 py-1 h-8 rounded-full animate-pulse shrink-0"
-                  onClick={() => window.open('https://cal.com/teamindex/onboarding', '_blank')}
+                  onClick={() => window.open('https://cal.com/superglue/onboarding', '_blank')}
                 >
                   ✨ Get help from our team
                 </Button>
