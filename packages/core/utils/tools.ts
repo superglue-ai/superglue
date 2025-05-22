@@ -127,7 +127,8 @@ export async function applyJsonataWithValidation(data: any, expr: string, schema
     const validation = validator.validate(result, optionalSchema);
     if (!validation.valid) {
       return {
-        success: false, 
+        success: false,
+        data: result,
         error: validation.errors.map(e => `${e.stack}. Computed result: ${e.instance ? JSON.stringify(e.instance) : "undefined"}.`).join('\n').slice(0, 1000) + `\n\nExpected schema: ${JSON.stringify(optionalSchema)}`
       };
     }
@@ -321,6 +322,9 @@ function oldReplaceVariables(template: string, variables: Record<string, any>): 
 
 
 export function sample(value: any, sampleSize = 10): any {
+  if(value === null || value === undefined) {
+    return {};
+  }
   if (Array.isArray(value)) {
     const arrLength = value.length;
     if (arrLength <= sampleSize) {

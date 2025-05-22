@@ -26,7 +26,7 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
   const [finalTransform, setFinalTransform] = useState(`{
   "result": $
 }`);
-  const [responseSchema, setResponseSchema] = useState(`{"type": "object", "properties": {"result": {"type": "object"}}}`);
+  const [responseSchema, setResponseSchema] = useState<string | null>(`{"type": "object", "properties": {"result": {"type": "object"}}}`);
   const [credentials, setCredentials] = useState("");
   const [payload, setPayload] = useState("{}");
   const [loading, setLoading] = useState(false);
@@ -53,21 +53,19 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
       });
       const workflow = await superglueClient.getWorkflow(idToLoad);
       if (!workflow) {
-        updateWorkflowId('');
-        setSteps([]);
-        setFinalTransform('');
-        setResponseSchema(`{"type": "object", "properties": {"result": {"type": "string"}}}`);
         throw new Error(`Workflow with ID "${idToLoad}" not found.`);
       }
       console.log(workflow);
       const cleanedWorkflow = removeNullUndefined(workflow);
-      const cleanedSteps = cleanedWorkflow.steps || [];
-      const cleanedFinalTransform = cleanedWorkflow.finalTransform || `{\n  "result": $\n}`;
-      const cleanedResponseSchema = JSON.stringify(cleanedWorkflow.responseSchema || {"type": "object", "properties": {"result": {"type": "string"}}});
       updateWorkflowId(cleanedWorkflow.id || '');
-      setSteps(cleanedSteps);
-      setFinalTransform(cleanedFinalTransform);
-      setResponseSchema(cleanedResponseSchema);
+      setSteps(cleanedWorkflow.steps || []);
+      setFinalTransform(cleanedWorkflow.finalTransform || `{\n  "result": $\n}`);
+      
+      if (cleanedWorkflow.responseSchema === null || cleanedWorkflow.responseSchema === undefined) {
+        setResponseSchema(null);
+      } else {
+        setResponseSchema(JSON.stringify(cleanedWorkflow.responseSchema));
+      }
 
       toast({
         title: "Workflow loaded",
@@ -80,9 +78,11 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
         description: error.message,
         variant: "destructive",
       });
-      updateWorkflowId('');
+      // Reset state, keeping the attempted ID in the input field for convenience
       setSteps([]);
-      setFinalTransform('');
+      setFinalTransform(`{\n  "result": $\n}`);
+      setResponseSchema('{"type": "object", "properties": {"result": {"type": "object"}}}'); // Default back to an enabled schema
+      setResult(null);
     } finally {
       setLoading(false);
     }
@@ -91,6 +91,15 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
   useEffect(() => {
     if (id) {
       loadWorkflow(id);
+    } else {
+      // Reset to a clean slate if id is removed or not provided
+      updateWorkflowId("");
+      setSteps([]);
+      setFinalTransform(`{\n  "result": $\n}`);
+      setResponseSchema('{"type": "object", "properties": {"result": {"type": "object"}}}');
+      setCredentials("");
+      setPayload("{}");
+      setResult(null);
     }
   }, [id]);
 
@@ -153,7 +162,7 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
             pagination: step.apiConfig.pagination || null
           }
         })),
-        responseSchema: JSON.parse(responseSchema),
+        responseSchema: responseSchema ? JSON.parse(responseSchema) : null,
         finalTransform
       };
 
@@ -192,7 +201,7 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
       if (!workflowId) {
         updateWorkflowId(`wf-${Date.now()}`);
       }
-      const workflowInput = {
+      const workflowData = {
         id: workflowId,
         steps: steps.map((step: ExecutionStep) => ({
           ...step,
@@ -201,7 +210,7 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
             ...step.apiConfig
           }
         })),
-        responseSchema,
+        responseSchema: responseSchema ? JSON.parse(responseSchema) : null,
         finalTransform
       };
       const parsedCredentials = parseCredentialsHelper(credentials);
@@ -211,16 +220,21 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
         apiKey: config.superglueApiKey,
       });
       const workflowResult = await superglueClient.executeWorkflow({
-        workflow: workflowInput, 
+        workflow: workflowData, 
         credentials: parsedCredentials, 
         payload: parsedPayload
       });
       if(!workflowResult.success) {
-        throw new Error(workflowResult.error);
+        throw new Error(workflowResult.error || "Workflow execution failed without a specific error message.");
       }
       console.log(workflowResult);
       setResult(workflowResult);
-      setResponseSchema(JSON.stringify(workflowResult.config.responseSchema));
+      
+      if (workflowResult.config.responseSchema === null || workflowResult.config.responseSchema === undefined) {
+        setResponseSchema(null);
+      } else {
+        setResponseSchema(JSON.stringify(workflowResult.config.responseSchema));
+      }
       setFinalTransform(workflowResult.config.finalTransform);
       setSteps(workflowResult.config.steps);
       setLoading(false);
@@ -330,6 +344,7 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
 
               <div className="flex-1 flex flex-col min-h-0">
                 <JsonSchemaEditor
+                  isOptional={true}
                   value={responseSchema}
                   onChange={setResponseSchema}
                 />
