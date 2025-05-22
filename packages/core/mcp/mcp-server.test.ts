@@ -203,54 +203,56 @@ describe('MCP Server Module', () => {
         client: mockClient,
         input: { id: 'transform-1' },
         data: { key: 'value' },
-        superglueApiKey: 'test-api-key'
+        endpoint: undefined,
+        id: undefined,
+        options: undefined,
       };
       
       const result = await mcpServer.toolDefinitions.transformData.execute(args, mockRequest);
       
-      expect(mockClient.transform).toHaveBeenCalledWith(args);
+      expect(mockClient.transform).toHaveBeenCalledWith({id: args.id, data: args.data, endpoint: args.endpoint, options: args.options});
       expect(result).toEqual({ result: 'transformed' });
     });
     
-    it('should execute listPipelines tool correctly', async () => {
+    it('should execute listCapabilities tool correctly', async () => {
       const args = {
         client: mockClient,
         limit: 5,
         offset: 10
       };
       
-      const result = await mcpServer.toolDefinitions.listPipelines.execute(args, mockRequest);
+      const result = await mcpServer.toolDefinitions.listCapabilities.execute(args, mockRequest);
       
       expect(mockClient.listWorkflows).toHaveBeenCalledWith(5, 10);
       expect(result).toEqual([{ id: 'workflow1' }]);
     });
     
-    it('should execute getPipeline tool correctly', async () => {
+    it('should execute getCapability tool correctly', async () => {
       const args = {
         client: mockClient,
         id: 'workflow1'
       };
       
-      const result = await mcpServer.toolDefinitions.getPipeline.execute(args, mockRequest);
+      const result = await mcpServer.toolDefinitions.getCapability.execute(args, mockRequest);
       
       expect(mockClient.getWorkflow).toHaveBeenCalledWith('workflow1');
       expect(result).toEqual({ id: 'workflow1', steps: [] });
     });
     
-    it('should execute runPipeline tool correctly', async () => {
+    it('should execute runCapability tool correctly', async () => {
       const args = {
         client: mockClient,
         id: 'workflow1',
         payload: { data: 'test' }
       };
       
-      const result = await mcpServer.toolDefinitions.runPipeline.execute(args, mockRequest);
+      const result = await mcpServer.toolDefinitions.runCapability.execute(args, mockRequest);
       
       expect(mockClient.executeWorkflow).toHaveBeenCalledWith(args);
       expect(result).toEqual({ result: 'executed' });
     });
     
-    it('should execute buildPipeline tool correctly', async () => {
+    it('should execute buildCapability tool correctly', async () => {
       const args = {
         client: mockClient,
         instruction: 'Build a workflow',
@@ -258,7 +260,7 @@ describe('MCP Server Module', () => {
         systems: [{ id: 'system1', urlHost: 'https://api.example.com' }]
       };
       
-      const result = await mcpServer.toolDefinitions.buildPipeline.execute(args, mockRequest);
+      const result = await mcpServer.toolDefinitions.buildCapability.execute(args, mockRequest);
       
       expect(mockClient.buildWorkflow).toHaveBeenCalledWith(
         'Build a workflow',
@@ -268,26 +270,26 @@ describe('MCP Server Module', () => {
       expect(result).toEqual({ id: 'new-workflow', steps: [] });
     });
     
-    it('should execute upsertPipeline tool correctly', async () => {
+    it('should execute upsertCapability tool correctly', async () => {
       const args = {
         client: mockClient,
         id: 'workflow1',
         input: { steps: [] }
       };
       
-      const result = await mcpServer.toolDefinitions.upsertPipeline.execute(args, mockRequest);
+      const result = await mcpServer.toolDefinitions.upsertCapability.execute(args, mockRequest);
       
       expect(mockClient.upsertWorkflow).toHaveBeenCalledWith('workflow1', { steps: [] });
       expect(result).toEqual({ id: 'workflow1', updated: true });
     });
     
-    it('should execute deletePipeline tool correctly', async () => {
+    it('should execute deleteCapability tool correctly', async () => {
       const args = {
         client: mockClient,
         id: 'workflow1'
       };
       
-      const result = await mcpServer.toolDefinitions.deletePipeline.execute(args, mockRequest);
+      const result = await mcpServer.toolDefinitions.deleteCapability.execute(args, mockRequest);
       
       expect(mockClient.deleteWorkflow).toHaveBeenCalledWith('workflow1');
       expect(result).toEqual({ success: true });

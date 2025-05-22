@@ -9,20 +9,26 @@ vi.mock('../llm/llm.js', async () => {
   };
 });
 
-import dotenv from 'dotenv';
+vi.mock('./transform.js', async (importOriginal) => {
+  const actual = (await importOriginal()) as any;
+  return {
+    ...actual,
+    evaluateMapping: vi.fn().mockResolvedValue({ success: true, reason: "mocked" }),
+  };
+});
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import dotenv from 'dotenv';
 import { applyJsonataWithValidation } from './tools.js';
-import { generateMapping, prepareTransform } from './transform.js';
 import { TransformConfig } from '@superglue/client';
+import { generateMapping, prepareTransform } from './transform.js';
+import { LanguageModel as mockLLM } from '../llm/llm.js';
 
-// Get reference to the mock after imports
-const mockLLM = (await import('../llm/llm.js')).LanguageModel as any;
-
-describe('transform utils', () => {  
+describe('transform utils', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     dotenv.config();
-    mockLLM.generateObject.mockReset();
+    (mockLLM as any).generateObject.mockReset();
   });
 
   describe('prepareTransform', () => {
@@ -75,25 +81,36 @@ describe('transform utils', () => {
 
     
     it('should generate new mapping if no responseMapping is provided', async () => {
-        let mockDataStore = {
-          getTransformConfig: vi.fn(),
-        } as any;      
-        mockLLM.generateObject.mockResolvedValueOnce({
-            response: {
-                jsonata: '{"name": user.firstName & " " & user.lastName}',
-                confidence: 95,
-                confidence_reasoning: 'Direct field mapping available'
-            },
-            messages: []
-        });    
-        const transform = await prepareTransform(mockDataStore, false, sampleInput, samplePayload, null,{ orgId: testOrgId });
-        const result = await applyJsonataWithValidation(samplePayload, transform.responseMapping, sampleInput.responseSchema);
-        expect(result).toMatchObject({
-          success: true,
-          data: {
-            name: 'John Doe'
+      let mockDataStore = {
+        getTransformConfig: vi.fn(),
+      } as any;
+
+      // First call: generateObject for mapping
+      (mockLLM as any).generateObject
+        .mockResolvedValueOnce({
+          response: {
+            jsonata: '{"name": user.firstName & " " & user.lastName}',
+            confidence: 95,
+            confidence_reasoning: 'Direct field mapping available'
+          },
+          messages: []
+        })
+        // Second call: generateObject for evaluateMapping
+        .mockResolvedValueOnce({
+          response: {
+            success: true,
+            reason: "Transformation is correct, complete, and aligns with the objectives."
           }
         });
+
+      const transform = await prepareTransform(mockDataStore, false, sampleInput, samplePayload, null, { orgId: testOrgId });
+      const result = await applyJsonataWithValidation(samplePayload, transform.responseMapping, sampleInput.responseSchema);
+      expect(result).toMatchObject({
+        success: true,
+        data: {
+          name: 'John Doe'
+        }
+      });
     });
   });
 
@@ -104,7 +121,7 @@ describe('transform utils', () => {
       // Reset modules to ensure clean mocks
       vi.resetModules();
 
-      mockLLM.generateObject.mockReset();
+      (mockLLM as any).generateObject.mockReset();
     });
 
     const sampleSchema = {
@@ -122,18 +139,25 @@ describe('transform utils', () => {
     };
 
     it('should generate mapping successfully', async () => {
-      mockLLM.generateObject.mockResolvedValueOnce({
-        response: {
+      (mockLLM as any).generateObject
+        .mockResolvedValueOnce({
+          response: {
             jsonata: '{"name": user.firstName & " " & user.lastName}',
             confidence: 95,
             confidence_reasoning: 'Direct field mapping available'
-        },
-        messages: []
-      });
+          },
+          messages: []
+        })
+        .mockResolvedValueOnce({
+          response: {
+            success: true,
+            reason: "Transformation is correct, complete, and aligns with the objectives."
+          }
+        });
 
       const mapping = await generateMapping(sampleSchema, samplePayload, 'test-instruction', {});
       expect(mapping).toBeDefined();
-      
+
       const result = await applyJsonataWithValidation(samplePayload, mapping.jsonata, sampleSchema);
       expect(result).toEqual({
         success: true,
@@ -141,12 +165,12 @@ describe('transform utils', () => {
           name: 'John Doe'
         }
       });
-    }, 30000); // Increased timeout for real API call
+    }, 30000);
 
     it('should retry on failure', async () => {
       let attempts = 0;
-      mockLLM.generateObject.mockRejectedValueOnce(attempts++ === 0 ? new Error('API Error') : null);
-      mockLLM.generateObject.mockResolvedValueOnce({
+      (mockLLM as any).generateObject.mockRejectedValueOnce(attempts++ === 0 ? new Error('API Error') : null);
+      (mockLLM as any).generateObject.mockResolvedValueOnce({
         response: {
             jsonata: '{"name": user.firstName & " " & user.lastName}',
             confidence: 95,
@@ -160,7 +184,7 @@ describe('transform utils', () => {
     });
 
     it('should return null after max retries', async () => {
-      mockLLM.generateObject.mockRejectedValue(new Error('API Error'));
+      (mockLLM as any).generateObject.mockRejectedValue(new Error('API Error'));
 
       const result = await generateMapping(sampleSchema, samplePayload, 'test-instruction', {});
       expect(result).toBeNull();

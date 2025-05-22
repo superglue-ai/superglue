@@ -322,7 +322,7 @@ function oldReplaceVariables(template: string, variables: Record<string, any>): 
 
 
 export function sample(value: any, sampleSize = 10): any {
-  if(!value) {
+  if(value === null || value === undefined) {
     return {};
   }
   if (Array.isArray(value)) {
