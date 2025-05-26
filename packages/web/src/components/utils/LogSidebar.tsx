@@ -8,6 +8,7 @@ import { ApolloClient, gql, InMemoryCache, useSubscription } from "@apollo/clien
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions'
 import { createClient } from 'graphql-ws'
 import { useConfig } from "../../app/config-context"
+import { Switch } from "../ui/switch"
 
 export interface LogEntry {
   id: string;
@@ -34,6 +35,7 @@ export function LogSidebar() {
   const [isExpanded, setIsExpanded] = useState(false)
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [hasNewLogs, setHasNewLogs] = useState(false)
+  const [showDebug, setShowDebug] = useState(true)
   const config = useConfig();
   
   const client = useMemo(() => {
@@ -105,6 +107,12 @@ export function LogSidebar() {
     }
   }, [isExpanded]);
 
+  // Filter logs based on showDebug
+  const filteredLogs = useMemo(
+    () => showDebug ? logs : logs.filter(log => log.level !== "DEBUG"),
+    [logs, showDebug]
+  )
+
   return (
     <motion.div
       animate={{ width: isExpanded ? 400 : 50 }}
@@ -134,28 +142,34 @@ export function LogSidebar() {
       </div>
 
       {isExpanded && (
-        <ScrollArea className="max-w-full block">
-          <div className="p-4 max-w-[100%-5rem]">
-            {logs.map((log) => (
-              <div
-                key={log.id}
-                className={`mb-2 p-2 rounded text-sm max-w-full  overflow-hidden ${
-                  log.level === "ERROR"
-                    ? "bg-red-500/10"
-                    : log.level === "WARN"
-                    ? "bg-yellow-500/10"
-                    : "bg-muted"
-                }`}
-              >
-                <div className="flex justify-between">
-                  <span className="font-mono">{new Date(log.timestamp).toLocaleTimeString()}</span>
-                  <span className="font-semibold">{log.level}</span>
+        <>
+          <ScrollArea className="max-w-full block flex-1">
+            <div className="p-4 max-w-[100%-5rem]">
+              {filteredLogs.map((log) => (
+                <div
+                  key={log.id}
+                  className={`mb-2 p-2 rounded text-sm max-w-full  overflow-hidden ${
+                    log.level === "ERROR"
+                      ? "bg-red-500/10"
+                      : log.level === "WARN"
+                      ? "bg-yellow-500/10"
+                      : "bg-muted"
+                  }`}
+                >
+                  <div className="flex justify-between">
+                    <span className="font-mono">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                    <span className="font-semibold">{log.level}</span>
+                  </div>
+                  <p className="max-w-full text-wrap">{log.message}</p>
                 </div>
-                <p className="max-w-full text-wrap">{log.message}</p>
-              </div>
-            ))}
+              ))}
+            </div>
+          </ScrollArea>
+          <div className="absolute bottom-4 right-4 flex items-center gap-2 z-10">
+            <span className="text-xs text-muted-foreground">Show Debug</span>
+            <Switch checked={showDebug} onCheckedChange={setShowDebug} />
           </div>
-        </ScrollArea>
+        </>
       )}
     </motion.div>
   )
