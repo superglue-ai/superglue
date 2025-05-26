@@ -1,8 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
 import { Textarea } from '@/src/components/ui/textarea';
-import { WorkflowResult } from '@superglue/client';
+import { Workflow, WorkflowResult } from '@superglue/client';
 import { AutoSizer, List } from 'react-virtualized';
+import { WorkflowCreateSuccess } from './WorkflowCreateSuccess'
 
 // Helper function (can be moved or passed as prop if used elsewhere)
 const getResponseLines = (response: any): string[] => {
@@ -10,14 +11,18 @@ const getResponseLines = (response: any): string[] => {
 };
 
 interface WorkflowResultsViewProps {
-  activeTab: 'results' | 'transform' | 'final';
-  setActiveTab: (tab: 'results' | 'transform' | 'final') => void;
+  activeTab: 'results' | 'transform' | 'final' | 'instructions';
+  setActiveTab: (tab: 'results' | 'transform' | 'final' | 'instructions') => void;
   executionResult: WorkflowResult | null;
   finalTransform: string;
   setFinalTransform: (transform: string) => void;
   finalResult: any;
   isExecuting: boolean;
   executionError: string | null;
+  showInstructionsTab?: boolean;
+  currentWorkflow?: Workflow;
+  credentials?: Record<string, string>;
+  payload?: Record<string, any>;
 }
 
 export function WorkflowResultsView({
@@ -29,6 +34,10 @@ export function WorkflowResultsView({
   finalResult,
   isExecuting,
   executionError,
+  showInstructionsTab = false,
+  currentWorkflow,
+  credentials,
+  payload
 }: WorkflowResultsViewProps) {
   return (
     <Card className="flex flex-col h-full">
@@ -57,6 +66,15 @@ export function WorkflowResultsView({
             >
               Transformation
             </Button>
+            {showInstructionsTab && (
+              <Button
+                variant={activeTab === 'instructions' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setActiveTab('instructions')}
+              >
+                Instructions
+              </Button>
+            )}
           </div>
         </div>
       </CardHeader>
@@ -143,6 +161,16 @@ export function WorkflowResultsView({
               spellCheck={false}
             />
           </div>
+        ) : activeTab === 'instructions' ? (
+          showInstructionsTab && (
+            <div className="p-4">
+              <WorkflowCreateSuccess
+                currentWorkflow={currentWorkflow}
+                credentials={credentials}
+                payload={payload}
+                />
+            </div>
+          )
         ) : ( // activeTab === 'final'
           finalResult ? (
             <div className="flex-grow overflow-hidden p-1">
