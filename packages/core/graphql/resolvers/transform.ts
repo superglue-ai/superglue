@@ -2,7 +2,7 @@ import { CacheMode, RequestOptions, TransformConfig, TransformInputRequest } fro
 import { Context } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { telemetryClient } from "../../utils/telemetry.js";
-import { applyJsonataWithValidation } from "../../utils/tools.js";
+import { applyTransformationWithValidation } from "../../utils/tools.js";
 import { prepareTransform } from "../../utils/transform.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 
@@ -40,7 +40,7 @@ export const transformResolver = async (
       });
       throw new Error("Did not find a valid transformation configuration. Usually this is due to missing information in the request. If you are sending an ID, you need to enable cache read access.");
     }
-    const transformation = await applyJsonataWithValidation(data, preparedTransform.responseMapping, preparedTransform.responseSchema);
+    const transformation = await applyTransformationWithValidation(data, preparedTransform.responseMapping, preparedTransform.responseSchema);
 
     if (!transformation.success) {
       telemetryClient?.captureException(new Error(transformation.error), context.orgId, {
