@@ -41,6 +41,7 @@ import type { URLFieldHandle } from '../utils/URLField'
 import { WorkflowStepCard } from './WorkflowStepCard';
 import { WorkflowStepsView } from './WorkflowStepsView';
 import { WorkflowResultsView } from './WorkflowResultsView';
+import { WorkflowCreateSuccess } from './WorkflowCreateSuccess'
 
 // Define step types specific to workflow creation
 type WorkflowCreateStep = 'integrations' | 'prompt' | 'review' | 'success'; // Added success step
@@ -92,22 +93,22 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   });
   const [instruction, setInstruction] = useState('');
   const [payload, setPayload] = useState('{}');
-  const [generatedWorkflow, setGeneratedWorkflow] = useState<Workflow | null>(null); // To store result from buildWorkflow
-  const [finalTransform, setFinalTransform] = useState<string>("$"); // For editing in review step
+  const [currentWorkflow, setCurrentWorkflow] = useState<Workflow | null>(null); // To store result from buildWorkflow
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
   const [systemFormVisible, setSystemFormVisible] = useState(false);
 
-  // Add new state to track if ID was manually edited
   const [idManuallyEdited, setIdManuallyEdited] = useState(false);
   const [selectedIntegration, setSelectedIntegration] = useState<string>("custom");
   const [integrationDropdownOpen, setIntegrationDropdownOpen] = useState(false);
+
+  const [schema, setSchema] = useState<string>('{}');
+  const [activeTab, setActiveTab] = useState<'results' | 'transform' | 'final' | 'instructions'>('results');
 
   const [isExecuting, setIsExecuting] = useState(false);
   const [executionResult, setExecutionResult] = useState<WorkflowResult | null>(null);
   const [finalResult, setFinalResult] = useState<any>(null);
   const [executionError, setExecutionError] = useState<string | null>(null);
 
-  // Add new state for loading suggestions
   const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]); // Store multiple suggestions
 
@@ -313,8 +314,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         if (!response) {
           throw new Error('Failed to build workflow');
         }
-        setGeneratedWorkflow(response);
-        setFinalTransform(response.finalTransform || `{\n  "result": $\n}`);
+        setCurrentWorkflow(response);
         toast({
           title: 'Workflow Built',
           description: `Workflow "${response.id}" generated successfully.`,
@@ -332,12 +332,12 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       }
     } else if (step === 'review') {
         // Save the potentially modified workflow
-        if (!generatedWorkflow) return;
+        if (!currentWorkflow) return;
         setIsSaving(true);
         try {
             const workflowInput = {
-              id: generatedWorkflow.id,
-              steps: generatedWorkflow.steps.map((step: any) => ({ // Map steps to input format if needed
+              id: currentWorkflow.id,
+              steps: currentWorkflow.steps.map((step: any) => ({ // Map steps to input format if needed
                 ...step,
                 // Ensure apiConfig has an ID - use step ID if apiConfig ID is missing
                 apiConfig: {
@@ -345,7 +345,8 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                   id: step.apiConfig?.id || step.id,
                 }
               })),
-              finalTransform: finalTransform,
+              inputSchema: currentWorkflow.inputSchema,
+              finalTransform: currentWorkflow.finalTransform,
               responseSchema: JSON.parse(schema),
               instruction: instruction
             };
@@ -353,14 +354,14 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
               endpoint: superglueConfig.superglueEndpoint,
               apiKey: superglueConfig.superglueApiKey,
             });
-            const response = await superglueClient.upsertWorkflow(generatedWorkflow.id, workflowInput);
+            const response = await superglueClient.upsertWorkflow(currentWorkflow.id, workflowInput);
             if(!response) {
                 throw new Error('Failed to save workflow');
             }
 
             toast({
                 title: 'Workflow Saved',
-                description: `Workflow "${generatedWorkflow.id}" saved successfully.`
+                description: `Workflow "${currentWorkflow.id}" saved successfully.`
             });
             setStep(steps[currentIndex + 1]); // Move to success step
 
@@ -438,31 +439,26 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   };
 
   const handleStepEdit = (stepId: string, updatedStep: any) => {
-    if (!generatedWorkflow) return;
+    if (!currentWorkflow) return;
     
-    const newSteps = generatedWorkflow.steps.map((step: any) => 
+    const newSteps = currentWorkflow.steps.map((step: any) => 
       step.id === stepId ? updatedStep : step
     );
-    setGeneratedWorkflow({
-      ...generatedWorkflow,
+    setCurrentWorkflow({
+      ...currentWorkflow,
       steps: newSteps
     });
   };
 
   const handleStepsChange = (newSteps: any[]) => {
-    if (!generatedWorkflow) return;
-    setGeneratedWorkflow({
-      ...generatedWorkflow,
+    if (!currentWorkflow) return;
+    setCurrentWorkflow({
+      ...currentWorkflow,
       steps: newSteps
     });
   };
 
-  const [schema, setSchema] = useState<string>('{}');
 
-  // First, add a new state for the tabs
-  const [activeTab, setActiveTab] = useState<'results' | 'transform' | 'final'>('results');
-
-  // Modify the workflow execution to include transform
   const handleExecuteWorkflow = async () => {
     setIsExecuting(true);
     setExecutionError(null);
@@ -474,21 +470,23 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       const credentials = Object.values(systems).reduce((acc, sys) => {
         return { ...acc, ...Object.entries(sys.credentials || {}).reduce((obj, [name, value]) => ({ ...obj, [`${sys.id}_${name}`]: value }), {}) };
       }, {});
-      
+      console.log(credentials);
+      console.log(payload);
+      console.log(currentWorkflow);
       const result = await superglueClient.executeWorkflow({
         workflow: {
-          id: generatedWorkflow.id,
-          steps: generatedWorkflow.steps,
+          id: currentWorkflow.id,
+          steps: currentWorkflow.steps,
           responseSchema: JSON.parse(schema),
-          finalTransform: generatedWorkflow.finalTransform,
-          instruction: generatedWorkflow.instruction
+          finalTransform: currentWorkflow.finalTransform,
+          inputSchema: currentWorkflow.inputSchema,
+          instruction: currentWorkflow.instruction
         },
         payload: JSON.parse(payload || '{}'),
         credentials: credentials
       });
       setExecutionResult(result);
-      console.log(result.config.finalTransform);
-      setFinalTransform(result.config.finalTransform);
+      setCurrentWorkflow(result.config);
       setFinalResult(result.data);
       setActiveTab('final');
 
@@ -911,10 +909,10 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
           {/* Step 3: Review */}
           {step === 'review' && (
             <div className="space-y-4">
-              {generatedWorkflow ? (
+              {currentWorkflow ? (
                 <>
                   <div className="flex items-center justify-between">
-                    <p className="text-lg font-medium"><span className="font-mono text-base bg-muted px-2 py-0.5 rounded">{generatedWorkflow.id}</span></p>
+                    <p className="text-lg font-medium"><span className="font-mono text-base bg-muted px-2 py-0.5 rounded">{currentWorkflow.id}</span></p>
                     <Button 
                       onClick={handleExecuteWorkflow}
                       disabled={isExecuting}
@@ -928,9 +926,9 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                     </Button>
                   </div>
                   <div>
-                    <Label>Steps ({generatedWorkflow.steps.length})</Label>
+                    <Label>Steps ({currentWorkflow.steps.length})</Label>
                     <WorkflowStepsView
-                      steps={generatedWorkflow.steps}
+                      steps={currentWorkflow.steps}
                       onStepsChange={handleStepsChange}
                       onStepEdit={handleStepEdit}
                     />
@@ -952,126 +950,61 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
           )}
 
           {/* Step 4: Success */}
-          {step === 'success' && generatedWorkflow && (() => {
-            // Define code strings once
-            const credentials = Object.values(systems).reduce((acc, sys) => {
-              return { ...acc, ...Object.entries(sys.credentials || {}).reduce((obj, [name, value]) => ({ ...obj, [`${sys.id}_${name}`]: value }), {}) };
-            }, {});
-            const sdkCode = `const client = new SuperglueClient({
-  apiKey: "${superglueConfig.superglueApiKey}"
-});
-
-const result = await client.executeWorkflow({
-  id: "${generatedWorkflow.id}",
-  payload: ${payload || '{}'},
-  credentials: ${JSON.stringify(credentials, null, 2)}
-});`;
-
-            // Correct the curl command based on the GraphQL schema
-            const curlCommand = `curl -X POST "${superglueConfig.superglueEndpoint}/graphql" \\
-  -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer ${superglueConfig.superglueApiKey}" \\
-  -d '${JSON.stringify({
-              query: `mutation ExecuteWorkflow($input: WorkflowInputRequest!, $payload: JSON, $credentials: JSON) { 
-  executeWorkflow(input: $input, payload: $payload, credentials: $credentials) { 
-    data 
-    error 
-    success 
-  } 
-}`, // Updated query signature
-              variables: {
-                input: { // Nest id under input
-                  id: generatedWorkflow.id 
-                },
-                payload: JSON.parse(payload || '{}'),
-                credentials: credentials
+          {step === 'success' && currentWorkflow && (
+          <div className="space-y-4">
+            <p className="text-lg font-medium">
+              Workflow{' '}
+              <span className="font-mono text-base bg-muted px-2 py-0.5 rounded">
+                {currentWorkflow.id}
+              </span>{' '}
+              created successfully!
+            </p>
+            <p>
+              You can now use this workflow ID in the "Workflows" page or call it via the API/SDK.
+            </p>
+            <WorkflowCreateSuccess
+              currentWorkflow={currentWorkflow}
+              credentials={ 
+                Object.values(systems).reduce((acc, sys: any) => {
+                  return {
+                    ...acc,
+                    ...Object.entries(sys.credentials || {}).reduce(
+                      (obj, [name, value]) => ({ ...obj, [`${sys.id}_${name}`]: value }),
+                      {}
+                    ),
+                  }
+                  }, {})
               }
-            })}'`;
-
-            return (
-              <div className="space-y-4">
-                <p className="text-lg font-medium">Workflow <span className="font-mono text-base bg-muted px-2 py-0.5 rounded">{generatedWorkflow.id}</span> created successfully!</p>
-                <p>You can now use this workflow ID in the "Workflows" page or call it via the API/SDK.</p>
-
-                <div className="space-y-4 mt-6">
-                  <div className="rounded-md bg-muted p-4">
-                    <div className="flex items-start space-x-2">
-                      <div className="space-y-1 w-full">
-                        <div className="flex items-center justify-between mb-2">
-                          <h3 className="font-medium">Using the SDK</h3>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 flex-none"
-                            onClick={() => {
-                              navigator.clipboard.writeText(sdkCode);
-                              toast({ title: 'SDK code copied!' });
-                            }}
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        <div className="bg-secondary rounded-md overflow-hidden">
-                          <pre className="font-mono text-sm p-4 overflow-x-auto">
-                            <code>
-                              {sdkCode}
-                            </code>
-                          </pre>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="rounded-md bg-muted p-4">
-                    <div className="flex items-start space-x-2">
-                      <div className="space-y-1 w-full">
-                        <div className="flex items-center justify-between mb-2">
-                          <h3 className="font-medium">Using cURL</h3>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 flex-none"
-                            onClick={() => {
-                              navigator.clipboard.writeText(curlCommand); // Use updated command
-                              toast({ title: 'cURL command copied!' });
-                            }}
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        <div className="bg-secondary rounded-md overflow-hidden">
-                          <pre className="font-mono text-sm p-4 overflow-x-auto">
-                            <code>
-                              {curlCommand} {/* Display updated command */}
-                            </code>
-                          </pre>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex gap-2 mt-6">
-                  <Button variant="outline" onClick={() => router.push(`/workflows/${generatedWorkflow.id}`)}>
-                    Go to Workflow
-                  </Button>
-                  <Button variant="outline" onClick={() => router.push('/')}>
-                    View All Workflows
-                  </Button>
-                </div>
-              </div>
-            );
-          })()}
+              payload={(() => {
+                try {
+                  return JSON.parse(payload || '{}');
+                } catch {
+                  return {};
+                }
+              })()}
+            />
+          <div className="flex gap-2 mt-6">
+            <Button variant="outline" onClick={() => router.push(`/workflows/${currentWorkflow.id}`)}>
+              Go to Workflow
+            </Button>
+            <Button variant="outline" onClick={() => router.push('/')}>
+              View All Workflows
+            </Button>
+          </div>
+        </div>
+    
+          )}
         </div>
 
         {/* Right Column - Test Results (only shown during review) */}
         {step === 'review' && (
           <WorkflowResultsView
             activeTab={activeTab}
+            showInstructionsTab={false}
             setActiveTab={setActiveTab}
             executionResult={executionResult}
-            finalTransform={finalTransform}
-            setFinalTransform={setFinalTransform}
+            finalTransform={currentWorkflow?.finalTransform || '$'}
+            setFinalTransform={(transform) => setCurrentWorkflow({...currentWorkflow, finalTransform: transform || '$'} as Workflow)}
             finalResult={finalResult}
             isExecuting={isExecuting}
             executionError={executionError}
