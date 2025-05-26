@@ -2,7 +2,7 @@ import type { ExecutionStep, RequestOptions, WorkflowStepResult } from "@supergl
 import { applyJsonata } from "../utils/tools.js";
 import { logMessage } from "../utils/logs.js";
 import { executeApiCall } from "../graphql/resolvers/call.js";
-import { generateMapping } from "../utils/transform.js";
+import { generateTransformJsonata } from "../utils/transform.js";
 import { Metadata } from "@superglue/shared";
 
 export interface ExecutionStrategy {
@@ -44,7 +44,7 @@ const directStrategy: ExecutionStrategy = {
       result.success = true;
       result.config = apiResponse.endpoint;
 
-      logMessage("info", `Direct Execution '${step.id}' - Complete`, metadata);
+      logMessage("info", `'${step.id}' ${result.success ? "Complete" : "Failed"}`, metadata);
     } catch (error) {
       const errorMessage = `Error in direct execution for step ${step.id}: ${error}`;
 
@@ -84,7 +84,7 @@ const loopStrategy: ExecutionStrategy = {
 
       if (!Array.isArray(loopItems) || loopItems.length === 0) {
         if(step.loopSelector !== "$") logMessage("error", `No input data found for '${step.id}' - regenerating data selector`, metadata);
-        const newLoopSelector = await generateMapping({ type: "array" }, payload, "Find the array of selector values for the following loop: " + step.id, metadata);
+        const newLoopSelector = await generateTransformJsonata({ type: "array" }, payload, "Find the array of selector values for the following loop: " + step.id, metadata);
         step.loopSelector = newLoopSelector.jsonata;
         loopItems = await applyJsonata(payload, step.loopSelector);
       }
@@ -94,8 +94,8 @@ const loopStrategy: ExecutionStrategy = {
       }
       const stepResults: WorkflowStepResult[] = [];
       for (let i = 0; i < loopItems.length; i++) {
-        const currentItem = loopItems[i];
-        logMessage("debug", `[LOOP] Executing for ${currentItem} (${i + 1}/${loopItems.length})`, metadata);
+        const currentItem = loopItems[i] || "";
+        logMessage("debug", `Executing for ${JSON.stringify(currentItem).slice(0, 100)} (${i + 1}/${loopItems.length})`, metadata);
 
         const loopPayload = {
           ...payload,
@@ -118,7 +118,7 @@ const loopStrategy: ExecutionStrategy = {
           step.apiConfig = apiResponse.endpoint;
 
         } catch (callError) {
-          const errorMessage = `[LOOP] Error processing '${currentItem}': ${String(callError)}`;
+          const errorMessage = `Error processing '${currentItem}': ${String(callError)}`;
           logMessage("error", errorMessage, metadata);
           throw errorMessage;
         }
@@ -133,7 +133,7 @@ const loopStrategy: ExecutionStrategy = {
       result.success = false;
       result.error = error.message || error;
     }
-    logMessage("info", `[LOOP] Execution '${step.id}' - Complete`, metadata);
+    logMessage("info", `'${step.id}' ${result.success ? "Complete" : "Failed"}`, metadata);
     return result;
   }
 };

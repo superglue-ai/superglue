@@ -4,6 +4,11 @@ import { GraphQLResolveInfo } from "graphql";
 import jsonata from "jsonata";
 import { Validator } from "jsonschema";
 import { toJsonSchema } from "../external/json-schema.js";
+import lodash from "lodash";
+import * as dateFns from "date-fns";
+import validator from "validator";
+import objectPath from "object-path";
+import ivm from 'isolated-vm';
 
 export function isRequested(field: string, info: GraphQLResolveInfo) {
     return info.fieldNodes.some(
@@ -112,6 +117,28 @@ export function superglueJsonata(expr: string) {
   return expression;
 }
 
+export async function applyTransformationWithValidation(data: any, expr: string, schema: any): Promise<TransformResult> {
+  try{
+    let result: any;
+    if(!expr) {
+      result = data;
+    }
+    if(!schema || Object.keys(schema).length === 0) {
+      return { success: true, data: result }
+    }
+
+    if(expr.startsWith("(sourceData) =>") || 
+      expr.startsWith("(sourceData)=>")){
+      result = await executeAndValidateMappingCode(data, expr, schema);
+    } else {
+      result = await applyJsonataWithValidation(data, expr, schema);
+    }
+    return result;
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
 export async function applyJsonataWithValidation(data: any, expr: string, schema: any): Promise<TransformResult> {
   try {
     const result = await applyJsonata(data, expr);
@@ -137,24 +164,41 @@ export async function applyJsonataWithValidation(data: any, expr: string, schema
     return { success: false, error: error.message };
   }
 }
-function makeRequired(schema: any): any {
-  if (!schema || typeof schema !== 'object') return schema;
 
-  const newSchema = { ...schema };
+export async function executeAndValidateMappingCode(input: any, mappingCode: string, schema: any): Promise<TransformResult> {
+  const isolate = new ivm.Isolate({ memoryLimit: 1024 }); // 32 MB
+  const context = await isolate.createContext();
+  await context.global.set('input', JSON.stringify(input));
 
-  if (schema.type === 'object' && schema.properties) {
-    newSchema.required = Object.keys(schema.properties);
-    newSchema.properties = Object.entries(schema.properties).reduce((acc, [key, value]) => ({
-      ...acc,
-      [key]: makeRequired(value)
-    }), {});
+  let result: any;
+  try {
+    const scriptSource =  `const fn = ${mappingCode}; return JSON.stringify(fn(JSON.parse(input)));`;
+    result = JSON.parse(await context.evalClosure(scriptSource, null, { timeout: 10000 }));
+    if (result === null || result === undefined) {
+      return { success: false, error: "Result is empty" };
+    }
+    // if no schema is given, skip validation
+    if (!schema) {
+      return { success: true, data: result };
+    }
+    const validatorInstance = new Validator();
+    const optionalSchema = addNullableToOptional(schema);
+    const validation = validatorInstance.validate(result, optionalSchema);
+    if (!validation.valid) {
+      return {
+        success: false,
+        data: result,
+        error: validation.errors.map(e => 
+          `${e.stack}. Computed result: ${e.instance ? JSON.stringify(e.instance) : "undefined"}. Expected schema: ${JSON.stringify(e.schema || {})}`)
+          .join('\n').slice(0, 2000)
+      };
+    }
+    return { success: true, data: result };
+  } catch (error) {
+    return { success: false, error: error.message };
+  } finally {
+    isolate.dispose();
   }
-
-  if (schema.type === 'array' && schema.items) {
-    newSchema.items = makeRequired(schema.items);
-  }
-
-  return newSchema;
 }
 
 export async function callAxios(config: AxiosRequestConfig, options: RequestOptions) {
@@ -322,16 +366,14 @@ function oldReplaceVariables(template: string, variables: Record<string, any>): 
 
 
 export function sample(value: any, sampleSize = 10): any {
-  if(value === null || value === undefined) {
-    return {};
-  }
   if (Array.isArray(value)) {
     const arrLength = value.length;
     if (arrLength <= sampleSize) {
       return value.map(item => sample(item, sampleSize));
     }
-    const step = Math.floor(arrLength / sampleSize);
-    return Array.from({ length: sampleSize }, (_, i) => sample(value[i * step], sampleSize));
+    const newArray = value.slice(0, sampleSize).map(item => sample(item, sampleSize));
+    newArray.push("sampled from " + (arrLength) + " items");
+    return newArray;
   }
 
   if (value && typeof value === 'object') {
@@ -370,7 +412,22 @@ export function addNullableToOptional(schema: any, required: boolean = true): an
     }
   } else if (!required && schema.type) {
     newSchema.type = [schema.type, 'null'];
-  }  
+  }
+  if(schema?.$defs) {
+    newSchema.$defs = Object.entries(schema.$defs).reduce((acc, [key, value]) => ({
+      ...acc,
+      [key]: addNullableToOptional(value, required)
+    }), {});
+  }
+  if(schema.oneOf) {
+    newSchema.oneOf = schema.oneOf.map(item => addNullableToOptional(item, required));
+  }
+  if(schema.anyOf) {
+    newSchema.anyOf = schema.anyOf.map(item => addNullableToOptional(item, required));
+  }
+  if(schema.allOf) {
+    newSchema.allOf = schema.allOf.map(item => addNullableToOptional(item, required));
+  }
 
   if ((schema.type === 'object' || schema.type?.includes('object')) && schema.properties) {
     newSchema.additionalProperties = false;

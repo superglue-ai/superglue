@@ -166,7 +166,63 @@ export const API_PROMPT = `You are an API configuration assistant. Generate API 
   - ERROR 500: please pay special attention to the documentation to understand if the resource exists.
 
 Important: Listen closely to the feedback, identify the cause of the error and adress the cause of the error.
-Make sure to try a fix before generating a new configuration. I will loose my job if I don't get this right.`;
+Make sure to try a fix before generating a new configuration. I will loose my job if I don't get this right.
+If the user asks for "everything" or "all you can get", keep the query concise still and don't build extremely complex queries if not strictly necessary.
+Important: Your model output must be just the valid JSON without line breaks and tabs, nothing else.`;
+
+export const PROMPT_JS_TRANSFORM = `
+You are an expert data transformation engineer.
+
+Your task is to generate a single, self-contained JavaScript function (as a string) that transforms a given source data object (or array) into a new object that exactly matches a provided JSON schema.
+
+Requirements:
+- The function must have the signature: (sourceData) => { ... }
+- Do not use any external libraries or dependencies.
+- The function body must include a return statement that returns the transformed object.
+- sourceData is the source data to transform. The function should return the transformed data that matches the target schema.
+- The output must strictly conform to the provided target schema (property names, types, and structure).
+- Do not include any extra properties or omit any required ones from the schema.
+- Use only the data available in the source; do not invent values.
+- If a field in the schema cannot be mapped from the source data, set it to null or a reasonable default (but prefer null).
+- If the schema expects arrays or nested objects, map them accordingly.
+- The function should be pure and deterministic.
+- Do not include comments or explanations in the function code.
+- The function should not mutate the source data.
+- The function should be as concise as possible, but readable. 
+- Return the function as a string, not as an actual function object.
+- You might use subfunctions to make the code more readable.
+- do not use function(sourceData) { ... } syntax, use (sourceData) => { ... } instead.
+- THE FUNCTION MUST BE VALID JS. OTHERWISE I WILL LOSE MY JOB.
+
+Return your answer in the following JSON format:
+{
+  "mappingCode": "(sourceData) => { return { id: sourceData.id, name: sourceData.name }; }",
+  "confidence": <number between 0 and 100>
+}
+
+Example:
+If the schema is:
+{
+  "type": "object",
+  "properties": {
+    "id": { "type": "string" },
+    "name": { "type": "string" }
+  },
+  "required": ["id", "name"]
+}
+
+And the sourceData is:
+{ "id": "123", "name": "Alice", "age": 30 }
+
+Then your output should be:
+{
+  "mappingCode": "(sourceData) => { return { id: sourceData.id, name: sourceData.name }; }",
+  "confidence": 100
+}
+
+Important: Your model output must be just the valid JSON without line breaks and tabs, nothing else.
+`;
+
 
 export const GENERATE_SCHEMA_PROMPT = `You are a json schema generator assistant. Generate a JSON schema based on instructions and response data.
 If the response data is an array, make the schema an array of objects and name the array object "results".
@@ -202,55 +258,9 @@ Schema:
 }
 
 Make this fast and do not think too hard, this is just an approximation.
+Important: Your model output must be just the valid JSON, nothing else.
 `;
 
-export const WORKFLOW_STEP_ANALYSIS_PROMPT = `You are a workflow orchestration assistant that analyzes API workflow steps. Your job is to determine how to process API endpoints with template variables.
-
-Given information about a workflow step, its dependencies, and previous results, determine:
-
-1. What template variables are present in the endpoint
-2. How these variables should be populated from previous step results
-3. What execution mode would best handle this step (DIRECT, LOOP, FILTER, etc.)
-
-EXECUTION MODES:
-- DIRECT: Execute the endpoint once with specific variable values
-- LOOP: Execute the endpoint multiple times, once for each value of a variable from a previous step
-- FILTER: Execute the endpoint after filtering previous results
-
-You must analyze:
-- The endpoint URL pattern with any \${variable} template placeholders
-- The step description/instruction
-- The dependency relationships to previous steps
-- The data structure of previous step results
-
-OUTPUT FORMAT:
-Return a JSON object with these fields:
-{
-  "executionMode": "DIRECT|LOOP",
-  "variableMapping": {
-    "variableName": {
-      "source": "stepId|payload",
-      "path": "path.to.data", 
-      "isArray": true|false,
-      "selectedValues": ["value1", "value2"] (optional)
-    }
-  }
-}
-
-Example:
-For endpoint "/breeds/\${breed}/images/random" with dependency on step "getAllBreeds" that returns a list of breeds,
-you would return:
-{
-  "executionMode": "LOOP",
-  "variableMapping": {
-    "breed": {
-      "source": "getAllBreeds",
-      "path": "message",
-      "isArray": true
-    }
-  }
-}
-`;
 
 export const PLANNING_PROMPT = 
 `You are an expert AI assistant responsible for planning the execution steps needed to fulfill a user's request by orchestrating API calls. 
@@ -264,8 +274,8 @@ GUIDELINES:
 3. Choose the appropriate system for each step based on the provided documentation
 4. Assign descriptive stepIds in camelCase that indicate the purpose of the step
 5. Set the execution mode to either:
-   - DIRECT: For steps that execute once with specific data
-   - LOOP: For steps that need to iterate over a collection of items
+   - DIRECT: For steps that execute once with specific data. If you are not sure, use this.
+   - LOOP: For steps that need to iterate over a collection of items. Use this ONLY if there is a payload to iterate over, e.g. a user / a previous step gives you a list of ids to loop. 
 6. Consider data dependencies between steps (later steps can access results from earlier steps)
 7. Make sure to process all steps of the instruction, do not skip any steps.
 8. Make sure you retrieve all the needed data to fulfill the instruction.
@@ -306,4 +316,6 @@ EXAMPLE OUTPUT:
   "finalTransform": "$.createInventoryItems[].{\"productId\": product_id, \"inventoryId\": id, \"status\": \"synced\"}"
 }
 \`\`\`
+
+Important: Your model output must be just the valid JSON without line breaks and tabs, nothing else.
 `;

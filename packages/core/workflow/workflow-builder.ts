@@ -64,7 +64,12 @@ export class WorkflowBuilder {
     this.metadata = metadata;
     this.responseSchema = responseSchema;
     try{
-      this.inputSchema = toJsonSchema(initialPayload, {arrays: {mode: 'all'}}) as unknown as JSONSchema;
+      const credentials = Object.values(systems).reduce((acc, sys) => {
+        return { ...acc, ...Object.entries(sys.credentials || {}).reduce((obj, [name, value]) => ({ ...obj, [`${sys.id}_${name}`]: value }), {}) };
+      }, {});
+      this.inputSchema = toJsonSchema(
+        { payload: initialPayload,credentials: credentials },
+        {arrays: {mode: 'all'}}) as unknown as JSONSchema;
     } catch(error) {
       logMessage('error', `Error during payload parsing: ${error}`, this.metadata);
       throw new Error(`Error during payload parsing: ${error}`);
@@ -75,6 +80,7 @@ export class WorkflowBuilder {
     currentMessages: ChatMessage[],
     lastErrorFromPreviousAttempt: string | null
   ): Promise<{ plan: WorkflowPlan; messages: ChatMessage[] }> {
+
     const planSchema = zodToJsonSchema(z.object({
       steps: z.array(z.object({
         stepId: z.string().describe("Unique camelCase identifier for the step (e.g., 'fetchCustomerDetails', 'updateOrderStatus')."),
@@ -89,7 +95,7 @@ export class WorkflowBuilder {
     const systemDescriptions = Object.values(this.systems).map(sys =>`
 --- System ID: ${sys.id} ---
 Base URL: ${composeUrl(sys.urlHost, sys.urlPath)}
-Credentials available: ${Object.keys(sys.credentials).join(', ') || 'None'}
+Credentials available: ${JSON.stringify(Object.entries(sys.credentials || {}).reduce((obj, [name, value]) => ({ ...obj, [`${sys.id}_${name}`]: value }), {}) || 'None')}
 Documentation:
 \`\`\`
 ${sys.documentation || 'No documentation content available.'}
@@ -126,8 +132,6 @@ Output a JSON object conforming to the WorkflowPlan schema. Define the necessary
       newMessages,
       planSchema
     );
-
-    logMessage('info', `Received workflow plan object from LLM`, this.metadata);
     
     if (!rawPlanObject || typeof rawPlanObject !== 'object' || !('steps' in rawPlanObject) || !Array.isArray(rawPlanObject.steps) || rawPlanObject.steps.length === 0) {
       const errorMsg = "Workflow planning failed: LLM did not produce a valid plan with steps.";
@@ -168,7 +172,7 @@ Output a JSON object conforming to the WorkflowPlan schema. Define the necessary
     let conversationMessages: ChatMessage[] = [];
     do {
       attempts++;
-      logMessage('info', `Workflow build attempt ${attempts}/${MAX_ATTEMPTS}.`, this.metadata);
+      logMessage('info', `Building workflow${attempts > 1 ? ` (attempt ${attempts} of ${MAX_ATTEMPTS})` : ''}`, this.metadata);
       try {
         const { plan: currentPlan, messages: updatedConvMessages } = await this.planWorkflow(
           conversationMessages,

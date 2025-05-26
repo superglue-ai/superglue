@@ -1,9 +1,9 @@
-import { addNullableToOptional, applyJsonata, applyJsonataWithValidation } from "../utils/tools.js";
+import { addNullableToOptional, applyJsonata, applyTransformationWithValidation } from "../utils/tools.js";
 import { selectStrategy } from "./workflow-strategies.js";
 import { logMessage } from "../utils/logs.js";
 import { Metadata } from "@playwright/test";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
-import { generateMapping, prepareTransform } from "../utils/transform.js";
+import { generateTransformCode, generateTransformJsonata, prepareTransform } from "../utils/transform.js";
 import { Validator } from "jsonschema";
 import { WorkflowResult, Workflow, ExecutionStep, RequestOptions, WorkflowStepResult } from "@superglue/client";
 
@@ -51,7 +51,7 @@ export class WorkflowExecutor implements Workflow {
       completedAt: undefined,
     } as WorkflowResult;
     try {
-      this.validate(payload);
+      this.validate({payload, credentials});
       logMessage("info", `Executing workflow ${this.id}`);
 
       // Execute each step in order
@@ -76,6 +76,7 @@ export class WorkflowExecutor implements Workflow {
         if(!stepResult.success){
           this.result.completedAt = new Date();
           this.result.success = false;
+          this.result.error = stepResult.error;
           return this.result;
         }
       }
@@ -94,7 +95,7 @@ export class WorkflowExecutor implements Workflow {
           try {
             // Apply the final transform using the original data
             let currentFinalTransform = this.finalTransform || "$";
-            const finalResult = await applyJsonataWithValidation(rawStepData, currentFinalTransform, this.responseSchema);
+            const finalResult = await applyTransformationWithValidation(rawStepData, currentFinalTransform, this.responseSchema);
             if(!finalResult.success) {
               throw new Error(finalResult.error);
             }
@@ -111,15 +112,15 @@ export class WorkflowExecutor implements Workflow {
             this.result.success = true; // Ensure success is true if transform succeeds
           } catch (transformError) {
             logMessage("info", `Preparing new final transform`, this.metadata);
-            const instruction = "Generate the final transformation expression in JSONata format" + 
+            const instruction = "Generate the final transformation code." + 
               (this.instruction ? " with the following instruction: " + this.instruction : "") +
               (this.finalTransform ? "\nOriginally, we used the following transformation, fix it without messing up future transformations with the original data: " + this.finalTransform : "");
             
-            const newTransformConfig = await generateMapping(this.responseSchema, rawStepData, instruction, this.metadata);
+            const newTransformConfig = await generateTransformCode(this.responseSchema, rawStepData, instruction, this.metadata);
             if(!newTransformConfig) {
               throw new Error("Failed to generate new final transform");
             }
-            const finalResult = await applyJsonataWithValidation(rawStepData, newTransformConfig.jsonata, this.responseSchema);
+            const finalResult = await applyTransformationWithValidation(rawStepData, newTransformConfig.mappingCode, this.responseSchema);
             if(!finalResult.success) {
               throw new Error(finalResult.error);
             }
@@ -127,7 +128,7 @@ export class WorkflowExecutor implements Workflow {
             this.result.config = {
               id: this.id,
               steps: this.steps,
-              finalTransform: newTransformConfig.jsonata,
+              finalTransform: newTransformConfig.mappingCode,
               inputSchema: this.inputSchema,
               responseSchema: this.responseSchema,
               instruction: this.instruction

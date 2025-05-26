@@ -4,8 +4,8 @@ import { GraphQLResolveInfo } from "graphql";
 import OpenAI from "openai";
 import { callEndpoint, evaluateResponse, generateApiConfig } from "../../utils/api.js";
 import { telemetryClient } from "../../utils/telemetry.js";
-import { applyJsonata, applyJsonataWithValidation, maskCredentials, TransformResult } from "../../utils/tools.js";
-import { generateMapping, prepareTransform } from "../../utils/transform.js";
+import { applyJsonata, applyTransformationWithValidation, maskCredentials, TransformResult } from "../../utils/tools.js";
+import { generateTransformJsonata, prepareTransform } from "../../utils/transform.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 import { callPostgres } from "../../utils/postgres.js";
 import { logMessage } from "../../utils/logs.js";
@@ -55,7 +55,7 @@ export async function executeApiCall(
         if(result.refactorNeeded) {
           logMessage('info', `Refactoring the API response.`, metadata);
           const responseSchema = await generateSchema(endpoint.instruction, JSON.stringify(response.data).slice(0, 1000), metadata);
-          const transformation = await generateMapping(responseSchema, endpoint.instruction, "$", metadata);
+          const transformation = await generateTransformJsonata(responseSchema, endpoint.instruction, "$", metadata);
           endpoint.responseMapping = transformation.jsonata;
           response.data = await applyJsonata(response.data, transformation.jsonata);
         }
@@ -150,7 +150,7 @@ export const callResolver = async (
         );
         responseMapping = preparedTransform?.responseMapping;
         transformedResponse = responseMapping ? 
-          await applyJsonataWithValidation(data, responseMapping, endpoint?.responseSchema) : 
+          await applyTransformationWithValidation(data, responseMapping, endpoint?.responseSchema) : 
           { success: true, data };
 
         if (!transformedResponse.success) {
