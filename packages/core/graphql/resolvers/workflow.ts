@@ -36,6 +36,7 @@ export const executeWorkflowResolver = async (
   info: GraphQLResolveInfo,
 ): Promise<WorkflowResult> => {
   let runId = crypto.randomUUID();
+  let startedAt = new Date();
   let metadata: Metadata = { orgId: context.orgId, runId };
   let workflow: Workflow | undefined;
   try {
@@ -52,19 +53,34 @@ export const executeWorkflowResolver = async (
     }
     const executor = new WorkflowExecutor(workflow, metadata);
     const result = await executor.execute(args.payload, args.credentials, args.options);
+
+    // Save run to datastore
+    context.datastore.createRun({
+      id: runId,
+      success: result.success,
+      error: result.error || undefined,
+      config: workflow || { id: args.input.id, steps: [] },
+      startedAt,
+      completedAt: new Date(),
+    }, context.orgId);
+
     return result;
+
   } catch (error) {
     logMessage('error', "Workflow execution error: " + String(error), metadata || { orgId: context.orgId, runId });
-    return {
+    const result = {
       id: runId,
       success: false,
       config: workflow || { id: args.input.id, steps: [] },
       error: String(error),
-      data: {},
       stepResults: [],
-      startedAt: new Date(),
+      startedAt,
       completedAt: new Date(),
     };
+    // Save run to datastore
+    context.datastore.createRun(result, context.orgId);
+
+    return {...result, data: {}, stepResults: []} as WorkflowResult;
   }
 };
 
@@ -80,6 +96,7 @@ export const upsertWorkflowResolver = async (_: unknown, { id, input }: { id: st
     const workflow = {
       id,
       steps: resolveField(input.steps, oldWorkflow?.steps, []),
+      inputSchema: resolveField(input.inputSchema, oldWorkflow?.inputSchema),
       finalTransform: resolveField(input.finalTransform, oldWorkflow?.finalTransform, "$"),
       responseSchema: resolveField(input.responseSchema, oldWorkflow?.responseSchema),
       instruction: resolveField(input.instruction, oldWorkflow?.instruction),
