@@ -40,6 +40,7 @@ export const findArraysOfObjects = (obj: any): Record<string, any[]> => {
 };
 
 export const parseCredentialsHelper = (simpleCreds: string) : Record<string, string> => {
+  try {
   const creds = simpleCreds?.trim() || ""
   if(!creds) {
     return {}
@@ -57,9 +58,11 @@ export const parseCredentialsHelper = (simpleCreds: string) : Record<string, str
     return { token: creds.replace('Basic ', '') }
   }
 
-  return { token: creds }
+    return { token: creds }
+  } catch (error) {
+    return {}
+  }
 }
-
 
 export const removeNullUndefined = (obj: any): any => {
   if (Array.isArray(obj)) {
