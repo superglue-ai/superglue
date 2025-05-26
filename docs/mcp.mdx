@@ -3,15 +3,25 @@ title: "MCPglue"
 description: "It's an agent using an agent disguised as another agent!"
 ---
 
-This is a developer-focused guide to interacting with superglue's capabilities through the Model Context Protocol (MCP). MCP allows for a standardized way to list and call tools exposed by a server.
+## **Turn any endpoint or API into bespoke agent capabilities.**
 
-## introduction
+We’ve talked to dozens of teams wrestling with the same dilemma: give your agents enough freedom to fetch all the data they need, yet still guarantee that every call remains secure, performant, and predictable in production. **MCPglue fixes this**: It gives you the reliability you’re looking for when deploying in prod, and agents the bespoke tools they need to do their job well.
 
-Superglue utilizes MCP to expose its core functionalities as a set of "tools." This allows external clients or agents to discover and execute these functionalities in a structured manner. You can think of it as an RPC-like mechanism where Superglue acts as the server, offering services like capability management, data transformation, and more.
+## What Is MCPglue?  
+
+MCPglue is a lightweight “glue” layer for the Model Context Protocol. It lets you:
+
+- **Merge multiple endpoints & APIs** into coherent, reusable **capabilities**  
+
+- **Expose them via one stable MCP server**, even as upstream APIs change  
+
+- **Abstract away authentication, pagination, retries,** and mapping logic  
+
+- **Keeps your agent’s toolset lean, so they don't get overwhelmed or go rogue**
 
 ## connecting to the MCP Server
 
-The superglue MCP server is typically available at the `/mcp` endpoint of your superglue instance.
+The superglue MCP server is available at the `/mcp` endpoint of your superglue instance.
 
 - **Hosted Endpoint**: `https://mcp.superglue.ai/`
 - **Self-Hosted Endpoint**: `http://<your-superglue-host>:<port>/mcp` (e.g., `http://localhost:3000/mcp`)
