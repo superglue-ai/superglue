@@ -21,6 +21,7 @@ export class FileStore implements DataStore {
   };
 
   private filePath: string;
+  private logsFilePath: string;
 
   constructor(storageDir = '/data') {
     this.storage = {
@@ -43,6 +44,7 @@ export class FileStore implements DataStore {
     }
 
     this.filePath = path.join(storageDir, 'superglue_data.json');
+    this.logsFilePath = path.join(storageDir, 'superglue_logs.json');
     logMessage('info', `File Datastore: Using storage path: ${this.filePath}`);
     
     this.initializeStorage();
@@ -56,30 +58,52 @@ export class FileStore implements DataStore {
       
       const data = fs.readFileSync(this.filePath, 'utf-8');
       const parsed = JSON.parse(data, (key, value) => {
-        // Convert ISO date strings back to Date objects
         if (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
           return new Date(value);
         }
         return value;
-      });
-      logMessage('info', 'File Datastore: Successfully loaded existing data');
-      
-      // Convert plain objects back to Maps
+      });      
       this.storage = {
+        ...this.storage,
         apis: new Map(Object.entries(parsed.apis || {})),
         extracts: new Map(Object.entries(parsed.extracts || {})),
         transforms: new Map(Object.entries(parsed.transforms || {})),
+        workflows: new Map(Object.entries(parsed.workflows || {})),
         runs: new Map(Object.entries(parsed.runs || {})),
         runsIndex: new Map(Object.entries(parsed.runsIndex || {})),
-        workflows: new Map(Object.entries(parsed.workflows || {})),
         tenant: {
           email: parsed.tenant?.email || null,
           emailEntrySkipped: parsed.tenant?.emailEntrySkipped || false
         }
       };
+      logMessage('info', 'File Datastore: Successfully loaded existing data');
     } catch (error) {
-      logMessage('info', 'File Datastore: No existing data found, starting with empty storage');
-      await this.persist();
+      logMessage('error', 'File Datastore: Error loading data: ' + error);
+      if(!fs.existsSync(this.filePath)) {
+        logMessage('info', 'File Datastore: No existing data found, starting with empty storage');
+        await this.persist();
+      }
+    }
+    try {
+      const logs = fs.readFileSync(this.logsFilePath, 'utf-8');
+      const parsedLogs = JSON.parse(logs, (key, value) => {
+        if (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
+          return new Date(value);
+        }
+        return value;
+      });
+      // Merge logs with existing storage
+      this.storage = {
+        ...this.storage,
+        runs: new Map([...this.storage.runs, ...Object.entries(parsedLogs.runs as RunResult[] || {})]),
+        runsIndex: new Map([...this.storage.runsIndex, ...Object.entries(parsedLogs.runsIndex as object || {})]),
+      };
+    } catch (error) {
+      logMessage('error', 'Logs Datastore: Error loading data: ' + error);
+      if(!fs.existsSync(this.logsFilePath)) {
+        logMessage('info', 'Logs Datastore: No existing logs found, starting with empty storage');
+        await this.persistLogs();
+      }
     }
   }
 
@@ -89,18 +113,34 @@ export class FileStore implements DataStore {
         apis: Object.fromEntries(this.storage.apis),
         extracts: Object.fromEntries(this.storage.extracts),
         transforms: Object.fromEntries(this.storage.transforms),
-        runs: Object.fromEntries(this.storage.runs),
-        runsIndex: Object.fromEntries(this.storage.runsIndex),
         workflows: Object.fromEntries(this.storage.workflows),
         tenant: this.storage.tenant
       };
-      // Use temporary file to ensure atomic writes
       const tempPath = `${this.filePath}.tmp`;
       fs.writeFileSync(tempPath, JSON.stringify(serialized, null, 2), { mode: 0o644 });
       fs.renameSync(tempPath, this.filePath);
     } catch (error) {
       logMessage('error', 'Failed to persist data: ' + error);
       throw error;
+    }
+  }
+
+  private isWritingLogs = false;
+  
+  private async persistLogs() {
+    if(this.isWritingLogs) return;
+    this.isWritingLogs = true;
+    try{
+    const serializedLogs = {
+      runs: Object.fromEntries(this.storage.runs),
+      runsIndex: Object.fromEntries(this.storage.runsIndex),
+    };
+    fs.writeFileSync(this.logsFilePath, JSON.stringify(serializedLogs, null, 2), { mode: 0o644 });
+    } catch (error) {
+      logMessage('error', 'Failed to persist logs: ' + error);
+      throw error;
+    } finally {
+      this.isWritingLogs = false;
     }
   }
 
@@ -238,7 +278,7 @@ export class FileStore implements DataStore {
     });
     index.sort((a, b) => b.timestamp - a.timestamp);
     
-    await this.persist();
+    await this.persistLogs();
     return run;
   }
 
@@ -254,8 +294,6 @@ export class FileStore implements DataStore {
       const run = this.storage.runs.get(key);
       return run ? { ...run, id } : null;
     }).filter((run): run is RunResult => run !== null);
-    
-    await this.persist();
     return { items, total: index.length };
   }
 
@@ -271,7 +309,7 @@ export class FileStore implements DataStore {
         index.splice(entryIndex, 1);
       }
     }
-    await this.persist();
+    await this.persistLogs();
     return deleted;
   }
 
@@ -284,7 +322,7 @@ export class FileStore implements DataStore {
     }
     
     this.storage.runsIndex.delete(orgId);
-    await this.persist();
+    await this.persistLogs();
     return true;
   }
 
@@ -296,10 +334,12 @@ export class FileStore implements DataStore {
     this.storage.runsIndex.clear();
     this.storage.workflows.clear();
     await this.persist();
+    await this.persistLogs();
   }
 
   async disconnect(): Promise<void> {
     await this.persist();
+    await this.persistLogs();
   }
 
   async ping(): Promise<boolean> {

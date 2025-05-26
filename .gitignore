@@ -10,3 +10,4 @@ diff.txt
 diff.sh
 **/superglue_data.json
 packages/web/public/test/*
+packages/core/.superglue/superglue_logs.json
