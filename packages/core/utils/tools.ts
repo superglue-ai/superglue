@@ -4,10 +4,6 @@ import { GraphQLResolveInfo } from "graphql";
 import jsonata from "jsonata";
 import { Validator } from "jsonschema";
 import { toJsonSchema } from "../external/json-schema.js";
-import lodash from "lodash";
-import * as dateFns from "date-fns";
-import validator from "validator";
-import objectPath from "object-path";
 import ivm from 'isolated-vm';
 
 export function isRequested(field: string, info: GraphQLResolveInfo) {
@@ -403,11 +399,11 @@ export function addNullableToOptional(schema: any, required: boolean = true): an
   if (!schema || typeof schema !== 'object') return schema;
 
   const newSchema = { ...schema };
-  if (!required && Array.isArray(schema.type)) {
+  if (!required && schema.required !== true && Array.isArray(schema.type)) {
     if (!schema.type.includes('null')) {
       newSchema.type = [...schema.type, 'null'];
     }
-  } else if (!required && schema.type) {
+  } else if (!required && schema.required !== true && schema.type) {
     newSchema.type = [schema.type, 'null'];
   }
   if(schema?.$defs) {
@@ -428,7 +424,7 @@ export function addNullableToOptional(schema: any, required: boolean = true): an
 
   if ((schema.type === 'object' || schema.type?.includes('object')) && schema.properties) {
     newSchema.additionalProperties = false;
-    const allRequired = new Set(schema.required || []);
+    const allRequired = new Set(Array.isArray(schema.required) ? schema.required : []);
     newSchema.required = Object.keys(schema.properties);
     newSchema.properties = Object.entries(schema.properties).reduce((acc, [key, value]) => ({
       ...acc,

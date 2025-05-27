@@ -84,6 +84,7 @@ export class WorkflowExecutor implements Workflow {
       // Apply final transformation if specified
       if (this.finalTransform || this.responseSchema) {
         const rawStepData = {
+          ...payload,
           ...Object.entries(this.result.stepResults).reduce(
             (acc, [stepIndex, stepResult]) => {
               acc[this.result.stepResults[stepIndex].stepId] = stepResult.transformedData;
@@ -92,7 +93,7 @@ export class WorkflowExecutor implements Workflow {
             {} as Record<string, unknown>,
           ),
         };
-          try {
+        try {
             // Apply the final transform using the original data
             let currentFinalTransform = this.finalTransform || "$";
             const finalResult = await applyTransformationWithValidation(rawStepData, currentFinalTransform, this.responseSchema);
@@ -148,8 +149,8 @@ export class WorkflowExecutor implements Workflow {
   }
 
   private validate(payload: Record<string, unknown>): void {
-    if (!this.steps || !Array.isArray(this.steps) || this.steps.length === 0) {
-      throw new Error("Execution plan must have at least one step");
+    if (!this.steps || !Array.isArray(this.steps)) {
+      throw new Error("Execution steps must be an array");
     }
 
     for (const step of this.steps) {
