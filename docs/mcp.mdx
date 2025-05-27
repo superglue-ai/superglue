@@ -1,21 +1,22 @@
 ---
 title: "MCPglue"
-description: "Give your agent bespoke capabilities."
+description: "Turn any API into a personalized MCP."
 ---
 
-We’ve talked to dozens of teams wrestling with the same dilemma: give your agents enough freedom to fetch all the data they need, yet still guarantee that every call remains secure, performant, and predictable in production. **MCPglue fixes this**: It gives you the reliability you’re looking for when deploying in prod, and agents the bespoke tools they need to do their job well.
+We’ve talked to dozens of teams deploying agents and they were all facing the same dilemma: giving their agents enough freedom to fetch all the data they need, yet making sure that every call remains secure, performant, and predictable in production. **MCPglue fixes this**: It gives you the reliability you’re looking for when deploying in prod, and agents the tools they actually need to do their job well.
 
-## What Is MCPglue?  
+## What Is MCPglue?
 
-MCPglue is a lightweight layer for the Model Context Protocol. It lets you:
+MCPglue is a lightweight API-wrapper. It lets you:
 
-- **Merge multiple endpoints & APIs** into coherent, reusable **capabilities**  
-
-- **Expose them via one stable MCP server**, even as upstream APIs change  
-
-- **Abstract away authentication, pagination, retries,** and mapping logic  
-
+- **Merge multiple endpoints & APIs** into coherent, reusable **capabilities**
+- **Expose them via one stable MCP server**, even as upstream APIs change
+- **Abstract away authentication, pagination, retries,** and mapping logic
 - **Keeps your agent’s toolset lean, so they don't get overwhelmed or go rogue**
+
+Use MCPglue to let your agent run cross-API workflows reliably, like fetching transactions in Stripe and updating them in Hubspot, to build ambient agents that react to app triggers or to wrap your own API into capabilities agents can use.
+
+Curious what else you can do with superglue? Read more about it [here](https://docs.superglue.cloud/introduction).
 
 ## connecting to the MCP Server
 
@@ -61,93 +62,11 @@ MCP interactions are session-based. A session allows the server to maintain cont
   - `POST /mcp`: Used for most MCP requests like `listTools` and `callTool`.
   - `GET /mcp` & `DELETE /mcp`: The `handleMcpSessionRequest` in `mcp-server.ts` suggests these might be used for session-specific operations, requiring the `mcp-session-id` header. For example, to check session status or explicitly close a session if implemented.
 
-## available superglue tools via MCP
+## superglue tools available via MCP
 
 The following tools are exposed by superglue's MCP server. The input schemas are defined using Zod in `mcp-server.ts`.
 
-### 1. `transformData`
-
-- **Description**: Execute a data transformation using a defined superglue transform or an ad-hoc instruction.
-- **Input Schema**: `TransformOperationInputSchema`
-  - `input`:
-    - `endpoint`: (Optional) Object defining the transformation (id, instruction, responseSchema, responseMapping, version).
-    - `id`: (Optional) ID of a pre-existing transform. (Either `endpoint` or `id` must be provided).
-  - `data`: The JSON data to transform.
-  - `options`: Optional `RequestOptionsSchema` (cacheMode, timeout, retries, retryDelay, webhookUrl).
-  - `superglueApiKey`: Your superglue API Key. (Handled server-side by `createMcpServer`).
-- **Example Usage (Conceptual MCP Call)**:
-
-  ```json
-  // MCP callTool params
-  {
-    "toolName": "transformData",
-    "inputs": {
-      "input": {
-        "id": "my-transform-id"
-      },
-      "data": { "key": "value" }
-    }
-  }
-  ```
-
-### 2. `listCapabilities`
-
-- **Description**: List superglue capabilities (workflows) with pagination.
-- **Input Schema**: `ListWorkflowsInputSchema`
-  - `limit`: (Optional) Number of items to return (default: 10).
-  - `offset`: (Optional) Offset for pagination (default: 0).
-- **Example Usage (Conceptual MCP Call)**:
-
-  ```json
-  // MCP callTool params
-  {
-    "toolName": "listCapabilities",
-    "inputs": {
-      "limit": 5,
-      "offset": 0
-    }
-  }
-  ```
-
-### 3. `getCapability`
-
-- **Description**: Get a specific superglue capability (workflow) by its ID.
-- **Input Schema**: `GetWorkflowInputSchema`
-  - `id`: The ID of the capability.
-- **Example Usage (Conceptual MCP Call)**:
-
-  ```json
-  // MCP callTool params
-  {
-    "toolName": "getCapability",
-    "inputs": {
-      "id": "capability-id-123"
-    }
-  }
-  ```
-
-### 4. `runCapability`
-
-- **Description**: Execute a superglue capability (workflow) by its ID.
-- **Input Schema**: `ExecuteWorkflowInputSchema`
-  - `id`: The ID of the capability to execute.
-  - `payload`: (Optional) JSON payload to pass to the capability.
-  - `credentials`: (Optional) JSON credentials for the capability execution.
-  - `options`: (Optional) `RequestOptionsSchema`.
-- **Example Usage (Conceptual MCP Call)**:
-
-  ```json
-  // MCP callTool params
-  {
-    "toolName": "runCapability",
-    "inputs": {
-      "id": "capability-id-123",
-      "payload": { "inputData": "example" }
-    }
-  }
-  ```
-
-### 5. `buildCapability`
+### 1. `buildCapability`
 
 - **Description**: Build a new superglue capability (workflow) from an instruction.
 - **Input Schema**: `BuildWorkflowInputSchema`
@@ -177,7 +96,7 @@ The following tools are exposed by superglue's MCP server. The input schemas are
   }
   ```
 
-### 6. `upsertCapability`
+### 2. `upsertCapability`
 
 - **Description**: Create a new capability (workflow) or update an existing one.
 - **Input Schema**: `UpsertWorkflowInputSchema`
@@ -196,7 +115,64 @@ The following tools are exposed by superglue's MCP server. The input schemas are
   }
   ```
 
-### 7. `deleteCapability`
+### 3. `listCapabilities`
+
+- **Description**: List superglue capabilities (workflows) with pagination.
+- **Input Schema**: `ListWorkflowsInputSchema`
+  - `limit`: (Optional) Number of items to return (default: 10).
+  - `offset`: (Optional) Offset for pagination (default: 0).
+- **Example Usage (Conceptual MCP Call)**:
+
+  ```json
+  // MCP callTool params
+  {
+    "toolName": "listCapabilities",
+    "inputs": {
+      "limit": 5,
+      "offset": 0
+    }
+  }
+  ```
+
+### 4. `getCapability`
+
+- **Description**: Get a specific superglue capability (workflow) by its ID.
+- **Input Schema**: `GetWorkflowInputSchema`
+  - `id`: The ID of the capability.
+- **Example Usage (Conceptual MCP Call)**:
+
+  ```json
+  // MCP callTool params
+  {
+    "toolName": "getCapability",
+    "inputs": {
+      "id": "capability-id-123"
+    }
+  }
+  ```
+
+### 5. `runCapability`
+
+- **Description**: Execute a superglue capability (workflow) by its ID.
+- **Input Schema**: `ExecuteWorkflowInputSchema`
+  - `id`: The ID of the capability to execute.
+  - `payload`: (Optional) JSON payload to pass to the capability.
+  - `credentials`: (Optional) JSON credentials for the capability execution.
+  - `options`: (Optional) `RequestOptionsSchema`.
+- **Example Usage (Conceptual MCP Call)**:
+
+  ```json
+  // MCP callTool params
+  {
+    "toolName": "runCapability",
+    "inputs": {
+      "id": "capability-id-123",
+      "payload": { "inputData": "example" }
+    }
+  }
+  ```
+
+### 6. `deleteCapability`
 
 - **Description**: Delete a superglue capability (workflow) by its ID.
 - **Input Schema**: `DeleteWorkflowInputSchema`
@@ -209,6 +185,31 @@ The following tools are exposed by superglue's MCP server. The input schemas are
     "toolName": "deleteCapability",
     "inputs": {
       "id": "capability-to-delete-id"
+    }
+  }
+  ```
+
+### 7. `transformData`
+
+- **Description**: Execute a data transformation using a defined superglue transform or an ad-hoc instruction.
+- **Input Schema**: `TransformOperationInputSchema`
+  - `input`:
+    - `endpoint`: (Optional) Object defining the transformation (id, instruction, responseSchema, responseMapping, version).
+    - `id`: (Optional) ID of a pre-existing transform. (Either `endpoint` or `id` must be provided).
+  - `data`: The JSON data to transform.
+  - `options`: Optional `RequestOptionsSchema` (cacheMode, timeout, retries, retryDelay, webhookUrl).
+  - `superglueApiKey`: Your superglue API Key. (Handled server-side by `createMcpServer`).
+- **Example Usage (Conceptual MCP Call)**:
+
+  ```json
+  // MCP callTool params
+  {
+    "toolName": "transformData",
+    "inputs": {
+      "input": {
+        "id": "my-transform-id"
+      },
+      "data": { "key": "value" }
     }
   }
   ```
