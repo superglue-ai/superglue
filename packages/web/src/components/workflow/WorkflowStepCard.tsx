@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Label } from '../ui/label';
@@ -18,6 +18,11 @@ interface WorkflowStepCardProps {
 export function WorkflowStepCard({ step, isLast, onEdit, onRemove }: WorkflowStepCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedStep, setEditedStep] = useState(step);
+
+  // Sync editedStep with step prop changes
+  useEffect(() => {
+    setEditedStep(step);
+  }, [step]);
 
   const handleSave = () => {
     onEdit(step.id, editedStep);

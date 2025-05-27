@@ -127,9 +127,10 @@ describe('tools utility functions', () => {
     it('should return sampled array if length is greater than sample size', () => {
       const arr = Array.from({ length: 100 }, (_, i) => i);
       const result = sample(arr);
-      expect(result).toHaveLength(10);
+      expect(result).toHaveLength(11);
       expect(result[0]).toBe(0);
-      expect(result[9]).toBe(90);
+      expect(result[9]).toBe(9);
+      expect(result[10]).toBe("sampled from " + (arr.length) + " items");
     });
 
     it('should handle non-array input', () => {
@@ -141,7 +142,9 @@ describe('tools utility functions', () => {
     it('should respect custom sample size', () => {
       const arr = Array.from({ length: 100 }, (_, i) => i);
       const result = sample(arr, 5);
-      expect(result).toHaveLength(5);
+      expect(result).toHaveLength(6);
+      expect(result[0]).toBe(0);
+      expect(result[5]).toBe("sampled from " + (arr.length) + " items");
     });
   });
 
