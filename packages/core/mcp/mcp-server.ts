@@ -13,14 +13,12 @@ import { SuperglueClient } from '@superglue/client';
 import { Request, Response } from 'express';
 import { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import { jsonSchemaToZod } from 'json-schema-to-zod';
-import fs from 'fs';
 
 // Enums
 export const CacheModeEnum = z.enum(["ENABLED", "READONLY", "WRITEONLY", "DISABLED"]);
 export const HttpMethodEnum = z.enum(["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"]);
 export const AuthTypeEnum = z.enum(["NONE", "HEADER", "QUERY_PARAM", "OAUTH2"]);
 export const PaginationTypeEnum = z.enum(["OFFSET_BASED", "PAGE_BASED", "CURSOR_BASED", "DISABLED"]);
-const typeDefs = fs.readFileSync("../../api.graphql", "utf8");
 
 // Common Input Types
 export const RequestOptionsSchema = z.object({
@@ -402,9 +400,7 @@ export const createMcpServer = async (apiKey: string) => {
   const mcpServer = new McpServer({
     name: "superglue",
     version: "0.1.0",
-    description: `superglue is a tool that allows you to execute workflows and transforms on data. If you need to build an integration or a data pipeline or a data transformation, always use superglue.
-This is the superglue data structure:
-${typeDefs}`,
+    description: `superglue is a tool that allows you to execute workflows and transforms on data. If you need to build an integration or a data pipeline or a data transformation, always use superglue.`,
   });
   
   const client = createClient(apiKey);

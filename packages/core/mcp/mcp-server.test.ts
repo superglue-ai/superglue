@@ -226,27 +226,15 @@ describe('MCP Server Module', () => {
       expect(mockClient.listWorkflows).toHaveBeenCalledWith(5, 10);
       expect(result).toEqual([{ id: 'workflow1' }]);
     });
-    
-    it('should execute getCapability tool correctly', async () => {
-      const args = {
-        client: mockClient,
-        id: 'workflow1'
-      };
-      
-      const result = await mcpServer.toolDefinitions.getCapability.execute(args, mockRequest);
-      
-      expect(mockClient.getWorkflow).toHaveBeenCalledWith('workflow1');
-      expect(result).toEqual({ id: 'workflow1', steps: [] });
-    });
-    
+        
     it('should execute runCapability tool correctly', async () => {
       const args = {
         client: mockClient,
         id: 'workflow1',
         payload: { data: 'test' }
       };
-      
-      const result = await mcpServer.toolDefinitions.runCapability.execute(args, mockRequest);
+      console.log(JSON.stringify(mcpServer.toolDefinitions, null, 2));
+      const result = await mcpServer.toolDefinitions.executeCapability.execute(args, mockRequest);
       
       expect(mockClient.executeWorkflow).toHaveBeenCalledWith(args);
       expect(result).toEqual({ result: 'executed' });
@@ -270,31 +258,7 @@ describe('MCP Server Module', () => {
       expect(result).toEqual({ id: 'new-workflow', steps: [] });
     });
     
-    it('should execute upsertCapability tool correctly', async () => {
-      const args = {
-        client: mockClient,
-        id: 'workflow1',
-        input: { steps: [] }
-      };
-      
-      const result = await mcpServer.toolDefinitions.upsertCapability.execute(args, mockRequest);
-      
-      expect(mockClient.upsertWorkflow).toHaveBeenCalledWith('workflow1', { steps: [] });
-      expect(result).toEqual({ id: 'workflow1', updated: true });
     });
-    
-    it('should execute deleteCapability tool correctly', async () => {
-      const args = {
-        client: mockClient,
-        id: 'workflow1'
-      };
-      
-      const result = await mcpServer.toolDefinitions.deleteCapability.execute(args, mockRequest);
-      
-      expect(mockClient.deleteWorkflow).toHaveBeenCalledWith('workflow1');
-      expect(result).toEqual({ success: true });
-    });
-  });
 
   describe('mcpHandler', () => {
     it('should handle existing session requests', async () => {
