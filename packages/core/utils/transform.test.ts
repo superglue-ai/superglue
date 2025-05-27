@@ -19,10 +19,11 @@ vi.mock('./transform.js', async (importOriginal) => {
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import dotenv from 'dotenv';
-import { applyJsonataWithValidation } from './tools.js';
+import { applyJsonataWithValidation, applyTransformationWithValidation } from './tools.js';
 import { TransformConfig } from '@superglue/client';
-import { generateMapping, prepareTransform } from './transform.js';
+import { generateTransformJsonata, prepareTransform } from './transform.js';
 import { LanguageModel as mockLLM } from '../llm/llm.js';
+import { skip } from 'node:test';
 
 describe('transform utils', () => {
   beforeEach(() => {
@@ -79,7 +80,6 @@ describe('transform utils', () => {
       expect(result?.updatedAt).toBeInstanceOf(Date);
     });
 
-    
     it('should generate new mapping if no responseMapping is provided', async () => {
       let mockDataStore = {
         getTransformConfig: vi.fn(),
@@ -89,9 +89,8 @@ describe('transform utils', () => {
       (mockLLM as any).generateObject
         .mockResolvedValueOnce({
           response: {
-            jsonata: '{"name": user.firstName & " " & user.lastName}',
-            confidence: 95,
-            confidence_reasoning: 'Direct field mapping available'
+            mappingCode: '(sourceData) => {return {name: sourceData.user.firstName + " " + sourceData.user.lastName}}',
+            confidence: 95
           },
           messages: []
         })
@@ -104,7 +103,7 @@ describe('transform utils', () => {
         });
 
       const transform = await prepareTransform(mockDataStore, false, sampleInput, samplePayload, null, { orgId: testOrgId });
-      const result = await applyJsonataWithValidation(samplePayload, transform.responseMapping, sampleInput.responseSchema);
+      const result = await applyTransformationWithValidation(samplePayload, transform.responseMapping, sampleInput.responseSchema);
       expect(result).toMatchObject({
         success: true,
         data: {
@@ -114,7 +113,7 @@ describe('transform utils', () => {
     });
   });
 
-  describe('generateMapping', () => {
+  describe('generateTransformJsonata', () => {
     beforeEach(() => {
       // Clear all mocks before each test
       vi.clearAllMocks();
@@ -155,10 +154,10 @@ describe('transform utils', () => {
           }
         });
 
-      const mapping = await generateMapping(sampleSchema, samplePayload, 'test-instruction', {});
+      const mapping = await generateTransformJsonata(sampleSchema, samplePayload, 'test-instruction', {});
       expect(mapping).toBeDefined();
 
-      const result = await applyJsonataWithValidation(samplePayload, mapping.jsonata, sampleSchema);
+      const result = await applyTransformationWithValidation(samplePayload, mapping.jsonata, sampleSchema);
       expect(result).toEqual({
         success: true,
         data: {
@@ -178,7 +177,7 @@ describe('transform utils', () => {
         },
         messages: []
       });
-      const result = await generateMapping(sampleSchema, samplePayload, 'test-instruction', {});
+      const result = await generateTransformJsonata(sampleSchema, samplePayload, 'test-instruction', {});
       expect(result).toBeDefined();
       expect(attempts).toBe(1);
     });
@@ -186,7 +185,7 @@ describe('transform utils', () => {
     it('should return null after max retries', async () => {
       (mockLLM as any).generateObject.mockRejectedValue(new Error('API Error'));
 
-      const result = await generateMapping(sampleSchema, samplePayload, 'test-instruction', {});
+      const result = await generateTransformJsonata(sampleSchema, samplePayload, 'test-instruction', {});
       expect(result).toBeNull();
     });
   });

@@ -297,7 +297,7 @@ describe('Call Resolver', () => {
         instruction: 'test-instruction',
         id: 'test-endpoint-id'
       });
-      mockedTools.applyJsonataWithValidation.mockResolvedValue({
+      mockedTools.applyTransformationWithValidation.mockResolvedValue({
         success: true,
         data: { transformed: 'data' }
       });
@@ -333,7 +333,7 @@ describe('Call Resolver', () => {
         .mockResolvedValueOnce({ responseMapping: 'invalid', responseSchema: {}, instruction: 'test-instruction', id: 'test-endpoint-id' })
         .mockResolvedValueOnce({ responseMapping: 'valid', responseSchema: {}, instruction: 'test-instruction', id: 'test-endpoint-id' });
       
-      mockedTools.applyJsonataWithValidation
+      mockedTools.applyTransformationWithValidation
         .mockResolvedValueOnce({ success: false, error: 'Transform error' })
         .mockResolvedValueOnce({ success: true, data: { transformed: 'success' } });
 
@@ -355,7 +355,7 @@ describe('Call Resolver', () => {
         data: { transformed: 'success' }
       });
       expect(mockedTransform.prepareTransform).toHaveBeenCalledTimes(2);
-      expect(mockedTools.applyJsonataWithValidation).toHaveBeenCalledTimes(2);
+      expect(mockedTools.applyTransformationWithValidation).toHaveBeenCalledTimes(2);
       expect(mockedLogs.logMessage).toHaveBeenCalledWith(
         'warn',
         expect.stringContaining('Transformation failed'),
@@ -371,7 +371,7 @@ describe('Call Resolver', () => {
       
       // Mock transform to always fail
       mockedTransform.prepareTransform.mockResolvedValue({ responseMapping: 'invalid', responseSchema: {}, instruction: 'test-instruction', id: 'test-endpoint-id' });
-      mockedTools.applyJsonataWithValidation.mockResolvedValue({ 
+      mockedTools.applyTransformationWithValidation.mockResolvedValue({ 
         success: false, 
         error: 'Transform error' 
       });
@@ -394,7 +394,7 @@ describe('Call Resolver', () => {
         error: expect.stringContaining('Transformation failed')
       });
       expect(mockedTransform.prepareTransform).toHaveBeenCalledTimes(3);
-      expect(mockedTools.applyJsonataWithValidation).toHaveBeenCalledTimes(3);
+      expect(mockedTools.applyTransformationWithValidation).toHaveBeenCalledTimes(3);
     });
     
     it('should notify webhook on success when configured', async () => {

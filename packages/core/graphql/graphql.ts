@@ -75,7 +75,7 @@ export const resolvers = {
         case "transform":
           return "TransformConfig";
         default:
-          return "ApiConfig";
+          return "Workflow";
       }
     },
   },
