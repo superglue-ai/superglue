@@ -119,12 +119,9 @@ export function superglueJsonata(expr: string) {
 
 export async function applyTransformationWithValidation(data: any, expr: string, schema: any): Promise<TransformResult> {
   try{
-    let result: any;
+    let result: TransformResult;
     if(!expr) {
-      result = data;
-    }
-    if(!schema || Object.keys(schema).length === 0) {
-      return { success: true, data: result }
+      result = { success: true, data: data };
     }
 
     if(expr.startsWith("(sourceData) =>") || 
