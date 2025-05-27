@@ -36,6 +36,7 @@ interface WorkflowPlanStep {
 }
 
 interface WorkflowPlan {
+  id: string;
   steps: WorkflowPlanStep[];
   finalTransform?: string;
 }
@@ -69,7 +70,8 @@ export class WorkflowBuilder {
       }, {});
       this.inputSchema = toJsonSchema(
         { payload: initialPayload,credentials: credentials },
-        {arrays: {mode: 'all'}}) as unknown as JSONSchema;
+        {arrays: {mode: 'all'}, }
+      ) as unknown as JSONSchema;
     } catch(error) {
       logMessage('error', `Error during payload parsing: ${error}`, this.metadata);
       throw new Error(`Error during payload parsing: ${error}`);
@@ -82,6 +84,7 @@ export class WorkflowBuilder {
   ): Promise<{ plan: WorkflowPlan; messages: ChatMessage[] }> {
 
     const planSchema = zodToJsonSchema(z.object({
+      id: z.string().describe("Come up with an ID for the workflow e.g. 'stripe-create-order'"),
       steps: z.array(z.object({
         stepId: z.string().describe("Unique camelCase identifier for the step (e.g., 'fetchCustomerDetails', 'updateOrderStatus')."),
         systemId: z.string().describe("The ID of the system (from the provided list) to use for this step."),
@@ -141,6 +144,7 @@ Output a JSON object conforming to the WorkflowPlan schema. Define the necessary
 
     const plan: WorkflowPlan = {
       steps: rawPlanObject.steps as WorkflowPlanStep[],
+      id: rawPlanObject.id,
       finalTransform: "$",
     };
 
@@ -208,7 +212,7 @@ Output a JSON object conforming to the WorkflowPlan schema. Define the necessary
         }
 
         builtWorkflow = {
-          id: `wf-${Math.random().toString(36).substring(2, 8)}`,
+          id: currentPlan.id,
           steps: executionSteps,
           finalTransform: currentPlan.finalTransform || "$",
           responseSchema: this.responseSchema,

@@ -50,6 +50,7 @@
     "http": "^0.0.1-security",
     "ioredis": "^5.5.0",
     "isolated-vm": "^6.0.0",
+    "json-schema-to-zod": "^2.6.1",
     "jsonata": "^2.0.6",
     "jsonpath": "^1.1.1",
     "jsonpath-plus": "^10.3.0",
