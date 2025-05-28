@@ -3,29 +3,31 @@
   <img src="https://github.com/user-attachments/assets/be0e65d4-dcd8-4133-9841-b08799e087e7" width="350" alt="superglue_logo_white">
 </p>
 
-<h2 align="center">one SDK for all your data pipelines.
- 🍯</h2>
-
-superglue bundles your pipelines into one stable, self-healing endpoint. Comes with automated schema-drift detection, retries and remappings so your data keeps moving no matter what - no connector maintenance, no rewrites. You can deploy it as a proxy between you and any SaaS app, API and data source and always get the data that you want in the format you expect.
-
-- Drop‑in proxy: point it at any REST / GraphQL / SQL / file endpoint.
-- LLM‑assisted mapping at setup; cached JSONata transforms at runtime (no LLM latency).
-- Self‑healing drift detector: when the upstream schema changes, superglue regenerates the transform, bumps a version, and keeps the pipeline running.
-- Security‑first: zero data stored; run fully on‑prem or use our hosted version.
-- Agent‑ready: every pipeline is exposed as a single, deterministic endpoint that LangChain, Retool or internal no‑code tools can call without knowing the ugly stuff underneath.
-
+<h2 align="center">one SDK for all your data.</h2>
 <div align="center">
-
-[![GitHub](https://img.shields.io/github/license/superglue-ai/superglue?style=flat-square)](https://github.com/superglue-ai/superglue/blob/main/LICENSE)
+  
+ [![GitHub](https://img.shields.io/github/license/superglue-ai/superglue?style=flat-square)](https://github.com/superglue-ai/superglue/blob/main/LICENSE)
 [![Y Combinator](https://img.shields.io/badge/Y%20Combinator-W25-orange?style=flat-square)](https://www.ycombinator.com/companies/superglue)
 [![Client SDK](https://img.shields.io/npm/v/@superglue/client?style=flat-square&logo=npm)](https://www.npmjs.com/package/@superglue/client)
 [![Docker](https://img.shields.io/docker/pulls/superglueai/superglue?style=flat-square&logo=Docker)](https://hub.docker.com/r/superglueai/superglue)
-[![Twitter Adina](https://img.shields.io/twitter/follow/adinagoerres?style=flat-square&logo=X)](https://twitter.com/adinagoerres)
-[![Twitter Stefan](https://img.shields.io/twitter/follow/sfaistenauer?style=flat-square&logo=X)](https://twitter.com/sfaistenauer)
 [![Weave Badge](https://img.shields.io/endpoint?url=https%3A%2F%2Fapp.workweave.ai%2Fapi%2Frepository%2Fbadge%2Forg_0S2o9PLamHvNsTjHbszc38vC%2F914997268&cacheSeconds=3600&labelColor=#EC6341)](https://app.workweave.ai/reports/repository/org_0S2o9PLamHvNsTjHbszc38vC/914997268)
 
-
 </div>
+
+![Add a heading (13)](https://github.com/user-attachments/assets/594a78f6-56b6-4477-9f01-f1c8007cef9c)
+<h3 align="center"> Our latest launch lets your agents build their own custom tools, wrapping any API into a personalized MCP.<br>
+Let's glue.<br>
+
+[Read the docs](https://docs.superglue.cloud/mcp) 🍯🍯🍯</h3>
+
+
+## what is superglue?
+superglue automates ETL/ELT jobs via one stable, self-healing endpoint. Comes with automated schema-drift detection, retries and remappings so your data keeps moving no matter what - no connector maintenance, no rewrites. You can deploy it as a proxy between you and any SaaS app, API and data source and always get the data that you want in the format you expect.
+
+- Lightweight proxy: point it at any REST / GraphQL / SQL / file endpoint.
+- LLM‑assisted mapping during config; cached Javascript transforms at runtime (no LLM latency).
+- Self‑heals schema drift: when the upstream API or schema changes, superglue regenerates the transform automatically, and keeps the pipeline running.
+- Security‑first: zero data stored; run fully on‑prem or use [our hosted version](https://app.superglue.cloud/).
 
 ## quick start
 ### hosted version
@@ -123,10 +125,14 @@ We love contributions! Feel free to open issues for bugs or feature requests.
 
 superglue is GPL licensed. The superglue client SDKs are MIT licensed. See [LICENSE](LICENSE) for details.
 
-## 🙋‍♂️ support
+## Next Steps
 
-- 💬 Discord: [Join our community](https://discord.gg/vUKnuhHtfW)
-- 🐛 Issues: [GitHub Issues](https://github.com/superglue-ai/superglue/issues)
+- [Join our Discord](https://discord.gg/vUKnuhHtfW)
+- [Read our docs](https://docs.superglue.cloud/introduction)
+- [Book a sales call](https://cal.com/superglue/superglue-demo)
 
+Text us! <br>
+[![Twitter Adina](https://img.shields.io/twitter/follow/adinagoerres?style=flat-square&logo=X)](https://twitter.com/adinagoerres)
+[![Twitter Stefan](https://img.shields.io/twitter/follow/sfaistenauer?style=flat-square&logo=X)](https://twitter.com/sfaistenauer)
 [![Twitter](https://img.shields.io/twitter/follow/superglue_d?style=social)](https://twitter.com/superglue_d)
 
