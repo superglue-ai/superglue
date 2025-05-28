@@ -1,16 +1,17 @@
-import { ApiConfig, RequestOptions } from "@superglue/client";
+import { RequestOptions } from "@superglue/client";
 import axios, { AxiosRequestConfig } from "axios";
 import { GraphQLResolveInfo } from "graphql";
+import ivm from 'isolated-vm';
 import jsonata from "jsonata";
 import { Validator } from "jsonschema";
 import { toJsonSchema } from "../external/json-schema.js";
-import ivm from 'isolated-vm';
+import { PROMPT_MAPPING } from "../llm/prompts.js";
 
 export function isRequested(field: string, info: GraphQLResolveInfo) {
-    return info.fieldNodes.some(
-      (node) => node.selectionSet && node.selectionSet.selections.some((selection) => selection.kind === 'Field' && selection.name.value === field)
-    );
-  }
+  return info.fieldNodes.some(
+    (node) => node.selectionSet && node.selectionSet.selections.some((selection) => selection.kind === 'Field' && selection.name.value === field)
+  );
+}
 
 export interface TransformResult {
   success: boolean;
@@ -19,7 +20,7 @@ export interface TransformResult {
 }
 
 export async function applyJsonata(data: any, expr: string): Promise<any> {
-  if(!expr) {
+  if (!expr) {
     return data;
   }
   try {
@@ -28,7 +29,7 @@ export async function applyJsonata(data: any, expr: string): Promise<any> {
     return result;
   } catch (error) {
     const errorPositions = (error as any).position ? expr.substring(error.position - 10, error.position + 10) : "";
-    throw new Error(`JSONata transformation failed: ${error.message} at ${errorPositions}`);
+    throw new Error(`JSONata transformation failed: ${error.message} at ${errorPositions}. Consider ${PROMPT_MAPPING}`);
   }
 }
 
@@ -37,33 +38,34 @@ export function superglueJsonata(expr: string) {
     recover: false
   });
   expression.registerFunction("max", (arr: any[]) => {
-    if(Array.isArray(arr)) {
+    if (Array.isArray(arr)) {
       return Math.max(...arr);
     }
     return arr;
   });
   expression.registerFunction("min", (arr: any[]) => {
-    if(Array.isArray(arr)) {
+    if (Array.isArray(arr)) {
       return Math.min(...arr);
     }
     return arr;
   });
   expression.registerFunction("number", (value: string) => parseFloat(String(value).trim()));
-  expression.registerFunction("map", async (arr: any[], func: (item: any) => any[]) => 
+  expression.registerFunction("map", async (arr: any[], func: (item: any) => any[]) =>
     (Array.isArray(arr) ? await Promise.all(arr.map(func)) : await Promise.all([arr].map(func))) || []
   );
+  expression.registerFunction("slice", (arr: any[], start: number, end?: number) => Array.isArray(arr) ? arr.slice(start, end) : arr);
   expression.registerFunction("isArray", async (arr: any) => Array.isArray(arr));
   expression.registerFunction("isString", async (str: any) => typeof str === "string");
   expression.registerFunction("isNull", async (arg: any) => arg === null || arg === undefined);
-  expression.registerFunction("join", async (arr: any[], separator: string = ",") => 
+  expression.registerFunction("join", async (arr: any[], separator: string = ",") =>
     Array.isArray(arr) ? arr.join(separator) : arr
   );
   expression.registerFunction("substring", (str: string, start: number, end?: number) => String(str).substring(start, end));
   expression.registerFunction("replace", (obj: any, pattern: string, replacement: string) => {
-    if(Array.isArray(obj)) {
+    if (Array.isArray(obj)) {
       return obj.map(item => String(item).replace(pattern, replacement));
     }
-    if(typeof obj === "object") {
+    if (typeof obj === "object") {
       return Object.fromEntries(Object.entries(obj).map(([key, value]) => [key, String(value).replace(pattern, replacement)]));
     }
     return String(obj).replace(pattern, replacement);
@@ -77,32 +79,32 @@ export function superglueJsonata(expr: string) {
         const millisTimestamp = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
         return new Date(millisTimestamp).toISOString();
       }
-      
+
       // Handle date strings in MM/DD/YYYY format
       const match = String(date).match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}):(\d{2}))?$/);
       if (match) {
-        const [_, month, day, year, hours="00", minutes="00", seconds="00"] = match;
+        const [_, month, day, year, hours = "00", minutes = "00", seconds = "00"] = match;
         const isoDate = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.000Z`;
         return new Date(isoDate).toISOString();
       }
-      
+
       // Default case: try standard Date parsing
       return new Date(date).toISOString();
     } catch (e) {
       throw new Error(`Invalid date: ${e.message}`);
     }
   });
-  expression.registerFunction("dateMax", (dates: string[]) => 
+  expression.registerFunction("dateMax", (dates: string[]) =>
     dates.reduce((max, curr) => new Date(max) > new Date(curr) ? max : curr));
-  
-  expression.registerFunction("dateMin", (dates: string[]) => 
+
+  expression.registerFunction("dateMin", (dates: string[]) =>
     dates.reduce((min, curr) => new Date(min) < new Date(curr) ? min : curr));
-  
+
   expression.registerFunction("dateDiff", (date1: string, date2: string, unit: string = 'days') => {
     const d1 = new Date(date1);
     const d2 = new Date(date2);
     const diff = Math.abs(d1.getTime() - d2.getTime());
-    switch(unit.toLowerCase()) {
+    switch (unit.toLowerCase()) {
       case 'seconds': return Math.floor(diff / 1000);
       case 'minutes': return Math.floor(diff / (1000 * 60));
       case 'hours': return Math.floor(diff / (1000 * 60 * 60));
@@ -114,14 +116,14 @@ export function superglueJsonata(expr: string) {
 }
 
 export async function applyTransformationWithValidation(data: any, expr: string, schema: any): Promise<TransformResult> {
-  try{
+  try {
     let result: TransformResult;
-    if(!expr) {
+    if (!expr) {
       result = { success: true, data: data };
     }
 
-    if(expr.startsWith("(sourceData) =>") || 
-      expr.startsWith("(sourceData)=>")){
+    if (expr.startsWith("(sourceData) =>") ||
+      expr.startsWith("(sourceData)=>")) {
       result = await executeAndValidateMappingCode(data, expr, schema);
     } else {
       result = await applyJsonataWithValidation(data, expr, schema);
@@ -135,11 +137,11 @@ export async function applyTransformationWithValidation(data: any, expr: string,
 export async function applyJsonataWithValidation(data: any, expr: string, schema: any): Promise<TransformResult> {
   try {
     const result = await applyJsonata(data, expr);
-    if(result === null || result === undefined) {
+    if (result === null || result === undefined) {
       return { success: false, error: "Result is empty" };
     }
     // if no schema is given, skip validation
-    if(!schema) {
+    if (!schema) {
       return { success: true, data: result }
     }
     const validator = new Validator();
@@ -165,7 +167,7 @@ export async function executeAndValidateMappingCode(input: any, mappingCode: str
 
   let result: any;
   try {
-    const scriptSource =  `const fn = ${mappingCode}; return JSON.stringify(fn(JSON.parse(input)));`;
+    const scriptSource = `const fn = ${mappingCode}; return JSON.stringify(fn(JSON.parse(input)));`;
     result = JSON.parse(await context.evalClosure(scriptSource, null, { timeout: 10000 }));
     if (result === null || result === undefined) {
       return { success: false, error: "Result is empty" };
@@ -181,7 +183,7 @@ export async function executeAndValidateMappingCode(input: any, mappingCode: str
       return {
         success: false,
         data: result,
-        error: validation.errors.map(e => 
+        error: validation.errors.map(e =>
           `${e.stack}. Computed result: ${e.instance ? JSON.stringify(e.instance) : "undefined"}. Expected schema: ${JSON.stringify(e.schema || {})}`)
           .join('\n').slice(0, 2000)
       };
@@ -208,23 +210,23 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
   }
 
   // Don't send body for GET, HEAD, DELETE, OPTIONS
-  if(["GET", "HEAD", "DELETE", "OPTIONS"].includes(config.method!)) {
+  if (["GET", "HEAD", "DELETE", "OPTIONS"].includes(config.method!)) {
     config.data = undefined;
   }
-  else if(config.data && config.data.trim().startsWith("{")) {
+  else if (config.data && config.data.trim().startsWith("{")) {
     config.data = JSON.parse(config.data);
   }
-  else if(!config.data) {
+  else if (!config.data) {
     config.data = undefined;
   }
-  
+
   do {
     try {
       const response = await axios({
         ...config,
         validateStatus: null, // Don't throw on any status
       });
-      
+
       if (response.status === 429) {
 
         let waitTime = 0;
@@ -241,19 +243,19 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
           // Exponential backoff with jitter
           waitTime = Math.min(Math.pow(2, rateLimitRetryCount) * 1000 + Math.random() * 1000, 10000);
         }
-        
+
         // Check if we've exceeded the maximum wait time
         if (totalRateLimitWaitTime + waitTime > maxRateLimitWaitMs) {
           return response; // Return the 429 response, caller will handle the error
         }
-        
+
         await new Promise(resolve => setTimeout(resolve, waitTime));
-        
+
         totalRateLimitWaitTime += waitTime;
         rateLimitRetryCount++;
         continue; // Skip the regular retry logic and try again immediately
       }
-      
+
       return response;
     } catch (error) {
       if (retryCount >= maxRetries) throw error;
@@ -284,12 +286,12 @@ export function composeUrl(host: string, path: string) {
   // Handle empty/undefined inputs
   if (!host) host = '';
   if (!path) path = '';
-  
+
   // Add https:// if protocol is missing
   if (!/^(https?|postgres(ql)?):\/\//i.test(host)) {
     host = `https://${host}`;
   }
-  
+
   // Trim slashes in one pass
   const cleanHost = host.endsWith('/') ? host.slice(0, -1) : host;
   const cleanPath = path.startsWith('/') ? path.slice(1) : path;
@@ -299,42 +301,42 @@ export function composeUrl(host: string, path: string) {
 
 export async function replaceVariables(template: string, payload: Record<string, any>): Promise<string> {
   if (!template) return "";
-  
+
   const pattern = /<<([\s\S]*?)>>/g;
-  
+
   let result = template;
   const matches = [...template.matchAll(pattern)];
-  
+
   for (const match of matches) {
     const path = match[1];
     let value: any;
-    if(payload[path]) {
+    if (payload[path]) {
       value = payload[path];
     }
     else {
       value = await applyJsonata(payload, path);
     }
 
-    if(Array.isArray(value) || typeof value === 'object') {
+    if (Array.isArray(value) || typeof value === 'object') {
       value = JSON.stringify(value);
     }
-    
+
     result = result.replace(match[0], String(value));
   }
-  
+
   return oldReplaceVariables(result, payload);
 }
 
 function oldReplaceVariables(template: string, variables: Record<string, any>): string {
   if (!template) return "";
-  
+
   const variableNames = Object.keys(variables);
   const pattern = new RegExp(`\\{(${variableNames.join('|')})(?:\\.(\\w+))*\\}`, 'g');
-  
+
   return String(template).replace(pattern, (match, path) => {
     const parts = path.split('.');
     let value = variables;
-    
+
     for (const part of parts) {
       if (value === undefined || value === null) {
         return match; // Keep original if path is invalid
@@ -343,16 +345,16 @@ function oldReplaceVariables(template: string, variables: Record<string, any>): 
     }
 
     if (value === undefined || value === null) {
-      if(path == 'cursor') {
+      if (path == 'cursor') {
         return "";
       }
       return match; // Keep original if final value is invalid
     }
 
-    if(Array.isArray(value) || typeof value === 'object') {
+    if (Array.isArray(value) || typeof value === 'object') {
       return JSON.stringify(value);
     }
-    
+
     return String(value);
   });
 }
@@ -406,19 +408,19 @@ export function addNullableToOptional(schema: any, required: boolean = true): an
   } else if (!required && schema.required !== true && schema.type) {
     newSchema.type = [schema.type, 'null'];
   }
-  if(schema?.$defs) {
+  if (schema?.$defs) {
     newSchema.$defs = Object.entries(schema.$defs).reduce((acc, [key, value]) => ({
       ...acc,
       [key]: addNullableToOptional(value, required)
     }), {});
   }
-  if(schema.oneOf) {
+  if (schema.oneOf) {
     newSchema.oneOf = schema.oneOf.map(item => addNullableToOptional(item, required));
   }
-  if(schema.anyOf) {
+  if (schema.anyOf) {
     newSchema.anyOf = schema.anyOf.map(item => addNullableToOptional(item, required));
   }
-  if(schema.allOf) {
+  if (schema.allOf) {
     newSchema.allOf = schema.allOf.map(item => addNullableToOptional(item, required));
   }
 
@@ -440,6 +442,6 @@ export function addNullableToOptional(schema: any, required: boolean = true): an
 }
 
 export function getSchemaFromData(data: any): string {
-  if(!data) return null;
-  return JSON.stringify(toJsonSchema(data, {arrays: {mode: 'first'}}), null, 2).slice(0, 50000);
+  if (!data) return null;
+  return JSON.stringify(toJsonSchema(data, { arrays: { mode: 'first' } }), null, 2).slice(0, 50000);
 }

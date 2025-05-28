@@ -111,6 +111,7 @@ Use \n where appropriate for readability.
       $isNull(arg) - Returns true if the argument is null, false otherwise.
       $count(array) - Returns array length
       $sort(array[, function]) - Sorts array
+      $slice(array, start[, end]) - Returns a slice of the array
       $distinct(array) - Removes duplicates
       $map(array, function) - Applies function to each element
       $merge([$obj1, $obj2, ...]) - merge an array of objects into a single object
@@ -151,6 +152,7 @@ export const API_PROMPT = `You are an API configuration assistant. Generate API 
   you could use <<$.items[0].name>> to get the first item's name.
   e.g. body: "{\"name\": \"<<$.name>>\"}". Always wrap the JSONata in <<>>, do not just plainly use it without the <<>>.
 - The JSONata should be simple and concise. Avoid ~> to execute functions, use $map(arr, $function) instead.
+- JSONATA MUST BE WRAPPED IN <<>>. IF THE ENTIRE BODY IS JSONATA, WRAP IT IN <<>> STILL (e.g. body: "<<$.items[0].name>>")
 - Think hard before producing a response, and be aware that the response is not checked for validity if the response is not an error, so only suggest endpoints that you are sure are valid.
 - If this is a store / e-commerce site, try products.json, collections.json, categories.json, etc.
 - You can use the following format to access a postgres database: urlHost: "postgres://<<user>>:<<password>>@<<hostname>>:<<port>>", urlPath: "<<database>>", body: {query: "<<query>>"}
@@ -274,7 +276,7 @@ GUIDELINES:
 3. Choose the appropriate system for each step based on the provided documentation
 4. Assign descriptive stepIds in camelCase that indicate the purpose of the step
 5. Set the execution mode to either:
-   - DIRECT: For steps that execute once with specific data. If you are not sure, use this. Important: Except if the user explicitly provides an array of ids to loop over, the first step should be direct.
+   - DIRECT: For steps that execute once with specific data. Important: Except if the user explicitly provides an array of items to loop over or a previous step gives you a list of items to loop, direct should be used, particularly for the FIRST STEP. If you use loop on the first step without a source array, it will fail.
    - LOOP: For steps that need to iterate over a collection of items. Use this ONLY if there is a payload to iterate over, e.g. a user / a previous step gives you a list of ids to loop. 
 6. Consider data dependencies between steps (later steps can access results from earlier steps)
 7. Make sure to process all steps of the instruction, do not skip any steps.
@@ -283,7 +285,8 @@ GUIDELINES:
 10. Your job is to translate the user's instruction into a set of steps that can be achieved with the available systems. 
    Consider different ways entities can be named between systems and that the user instruction might not always match the entity name in the documentation.
    Consider that the user might be unspecific about instructions, e.g. they say "update the users" but they actually mean "update and create if not present".
-11. Keep in mind that transformations happen within each step, so there is no need to add specific transformation steps.
+11. Keep in mind that transformations happen within each step, so there is no need to add specific transformation steps. 
+12. Keep in mind that logging and the final transformation happen after the workflow, no need to make this a step.
 
 EXAMPLE INPUT:
 \`\`\`

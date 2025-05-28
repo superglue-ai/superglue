@@ -104,7 +104,6 @@ export const SystemInputSchema = {
   urlHost: z.string().describe("Base URL/hostname for the system"),
   urlPath: z.string().optional().describe("Base path for API calls"),
   documentationUrl: z.string().optional().describe("URL to API documentation"),
-  documentation: z.string().optional().describe("Inline API documentation"),
   credentials: z.any().optional().describe("Credentials for accessing the system. MAKE SURE YOU INCLUDE ALL OF THEM BEFORE BUILDING THE CAPABILITY, OTHERWISE IT WILL FAIL."),
 };
 
@@ -126,7 +125,7 @@ export const ExecuteToolInputSchema = {
 
 export const BuildToolInputSchema = {
   instruction: z.string().describe("Natural language instruction for building the tool"),
-  payload: z.any().optional().describe("Example JSON payload for the tool"),
+  payload: z.any().optional().describe("Example JSON payload for the tool. This should be data needed to fulfill the request (e.g. a list of ids to loop over), not settings or filters. If not strictly needed, leave this empty."),
   systems: z.array(z.object(SystemInputSchema)).describe("Array of systems the tool can interact with"),
   responseSchema: z.any().optional().describe("JSONSchema for the expected response structure"),
   save: z.boolean().describe("Whether to save the tool after building"),
