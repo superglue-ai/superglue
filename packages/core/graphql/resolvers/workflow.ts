@@ -1,10 +1,12 @@
 import type { GraphQLResolveInfo } from "graphql";
 import { WorkflowExecutor } from "../../workflow/workflow-executor.js";
-import { Context, Metadata, RequestOptions, Workflow, WorkflowResult } from "@superglue/shared";
-import { createHash } from "crypto";
+import { Context, Metadata } from "@superglue/shared";
+import { RequestOptions, Workflow, WorkflowResult } from "@superglue/client";
+
 import { WorkflowBuilder } from "../../workflow/workflow-builder.js";
 import type { SystemDefinition } from "../../workflow/workflow-builder.js";
 import { logMessage } from "../../utils/logs.js";
+import { JSONSchema } from "openai/lib/jsonschema.mjs";
 
 function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined, defaultValue?: T): T | undefined {
   if (newValue === null) return undefined;
@@ -24,6 +26,7 @@ interface BuildWorkflowArgs {
   instruction: string;
   payload?: Record<string, unknown>;
   systems: SystemDefinition[];
+  responseSchema?: JSONSchema;
 }
 
 export const executeWorkflowResolver = async (
@@ -32,29 +35,52 @@ export const executeWorkflowResolver = async (
   context: Context,
   info: GraphQLResolveInfo,
 ): Promise<WorkflowResult> => {
-  let runId: string | undefined;
-  let metadata: Metadata | undefined;
+  let runId = crypto.randomUUID();
+  let startedAt = new Date();
+  let metadata: Metadata = { orgId: context.orgId, runId };
+  let workflow: Workflow | undefined;
   try {
-    const workflow: Workflow = args.input.workflow ||
-      await context.datastore.getWorkflow(args.input.id, context.orgId);
+    const workflowFromStore = await context.datastore.getWorkflow(args.input.id || args.input.workflow.id, context.orgId);
+    workflow = { ...workflowFromStore, ...args.input.workflow };
     if(!workflow) {
       throw new Error("Workflow not found");
     }
-    runId = crypto.randomUUID();
-    metadata = { orgId: context.orgId, runId: runId };
+    if(workflow.inputSchema && typeof workflow.inputSchema == 'string') {
+      workflow.inputSchema = JSON.parse(workflow.inputSchema);
+    }
+    if(workflow.responseSchema && typeof workflow.responseSchema == 'string') {
+      workflow.responseSchema = JSON.parse(workflow.responseSchema);
+    }
     const executor = new WorkflowExecutor(workflow, metadata);
     const result = await executor.execute(args.payload, args.credentials, args.options);
+
+    // Save run to datastore
+    context.datastore.createRun({
+      id: runId,
+      success: result.success,
+      error: result.error || undefined,
+      config: workflow || { id: args.input.id, steps: [] },
+      startedAt,
+      completedAt: new Date(),
+    }, context.orgId);
+
     return result;
+
   } catch (error) {
     logMessage('error', "Workflow execution error: " + String(error), metadata || { orgId: context.orgId, runId });
-    return {
+    const result = {
+      id: runId,
       success: false,
+      config: workflow || { id: args.input.id, steps: [] },
       error: String(error),
-      data: {},
       stepResults: [],
-      startedAt: new Date(),
+      startedAt,
       completedAt: new Date(),
     };
+    // Save run to datastore
+    context.datastore.createRun(result, context.orgId);
+
+    return {...result, data: {}, stepResults: []} as WorkflowResult;
   }
 };
 
@@ -70,7 +96,10 @@ export const upsertWorkflowResolver = async (_: unknown, { id, input }: { id: st
     const workflow = {
       id,
       steps: resolveField(input.steps, oldWorkflow?.steps, []),
+      inputSchema: resolveField(input.inputSchema, oldWorkflow?.inputSchema),
       finalTransform: resolveField(input.finalTransform, oldWorkflow?.finalTransform, "$"),
+      responseSchema: resolveField(input.responseSchema, oldWorkflow?.responseSchema),
+      instruction: resolveField(input.instruction, oldWorkflow?.instruction),
       createdAt: oldWorkflow?.createdAt || now,
       updatedAt: now
     };
@@ -132,7 +161,10 @@ export const listWorkflowsResolver = async (
 ) => {
   try {
     const result = await context.datastore.listWorkflows(limit, offset, context.orgId);
-    return result.items;
+    return {
+      items: result.items,
+      total: result.total,
+    };
   } catch (error) {
     logMessage('error', "Error listing workflows: " + String(error), { orgId: context.orgId });
     throw error;
@@ -147,7 +179,7 @@ export const buildWorkflowResolver = async (
 ): Promise<Workflow> => {
   try {
     const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
-    const { instruction, payload = {}, systems } = args;
+    const { instruction, payload = {}, systems, responseSchema } = args;
 
     if (!instruction || instruction.trim() === "") {
       throw new Error("Instruction is required to build a workflow.");
@@ -163,10 +195,12 @@ export const buildWorkflowResolver = async (
       }
     });
 
-    const builder = new WorkflowBuilder(systems, instruction, payload, metadata);
+    const builder = new WorkflowBuilder(systems, instruction, payload, responseSchema, metadata);
     const workflow = await builder.build();
-
-    await context.datastore.upsertWorkflow(workflow.id, workflow, context.orgId);
+    // prevent collisions with existing workflows
+    while(await context.datastore.getWorkflow(workflow.id, context.orgId)) {
+      workflow.id = workflow.id + "-1";
+    }
 
     return workflow;
   } catch (error) {

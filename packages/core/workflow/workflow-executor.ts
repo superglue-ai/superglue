@@ -1,15 +1,21 @@
-import type { ExecutionStep, RequestOptions, Workflow, WorkflowResult, WorkflowStepResult } from "@superglue/shared";
-import { applyJsonata } from "../utils/tools.js";
+import { addNullableToOptional, applyJsonata, applyTransformationWithValidation } from "../utils/tools.js";
 import { selectStrategy } from "./workflow-strategies.js";
 import { logMessage } from "../utils/logs.js";
 import { Metadata } from "@playwright/test";
+import { JSONSchema } from "openai/lib/jsonschema.mjs";
+import { generateTransformCode, generateTransformJsonata, prepareTransform } from "../utils/transform.js";
+import { Validator } from "jsonschema";
+import { WorkflowResult, Workflow, ExecutionStep, RequestOptions, WorkflowStepResult } from "@superglue/client";
 
 export class WorkflowExecutor implements Workflow {
   public id: string;
   public steps: ExecutionStep[];
   public finalTransform?: string;
   public result: WorkflowResult;
+  public responseSchema?: JSONSchema;
   public metadata: Metadata;
+  public instruction?: string;
+  public inputSchema?: JSONSchema;
 
   constructor(
     workflow: Workflow,
@@ -18,14 +24,19 @@ export class WorkflowExecutor implements Workflow {
     this.id = workflow.id;
     this.steps = workflow.steps;
     this.finalTransform = workflow.finalTransform || "$";
+    this.responseSchema = workflow.responseSchema;
+    this.instruction = workflow.instruction;
     this.metadata = metadata;
+    this.inputSchema = workflow.inputSchema;
     this.result = {
+      id: crypto.randomUUID(),
       success: true,
       data: {},
       stepResults: [],
       startedAt: new Date(),
       completedAt: undefined,
-    };
+      config: workflow,
+    } as WorkflowResult;
   }
   public async execute(
     payload: Record<string, any>,
@@ -38,9 +49,9 @@ export class WorkflowExecutor implements Workflow {
       stepResults: [],
       startedAt: new Date(),
       completedAt: undefined,
-    };
+    } as WorkflowResult;
     try {
-      this.validateSteps();
+      this.validate({payload, credentials});
       logMessage("info", `Executing workflow ${this.id}`);
 
       // Execute each step in order
@@ -50,11 +61,13 @@ export class WorkflowExecutor implements Workflow {
           const strategy = selectStrategy(step);
           const stepInputPayload = await this.prepareStepInput(step, payload);
           stepResult = await strategy.execute(step, stepInputPayload, credentials, options, this.metadata);
+          step.apiConfig = stepResult.config;
         } catch (stepError) {
           stepResult = {
             stepId: step.id,
             success: false,
-            error: stepError
+            error: stepError,
+            config: step.apiConfig
           };
         }
         this.result.stepResults.push(stepResult);
@@ -63,31 +76,67 @@ export class WorkflowExecutor implements Workflow {
         if(!stepResult.success){
           this.result.completedAt = new Date();
           this.result.success = false;
+          this.result.error = stepResult.error;
           return this.result;
         }
       }
 
       // Apply final transformation if specified
-      if (this.finalTransform) {
+      if (this.finalTransform || this.responseSchema) {
+        const rawStepData = {
+          ...payload,
+          ...Object.entries(this.result.stepResults).reduce(
+            (acc, [stepIndex, stepResult]) => {
+              acc[this.result.stepResults[stepIndex].stepId] = stepResult.transformedData;
+              return acc;
+            },
+            {} as Record<string, unknown>,
+          ),
+        };
         try {
-          // Object to easily access just the step raw data for transform
-          const rawStepData = {
-            ...Object.entries(this.result.stepResults).reduce(
-              (acc, [stepIndex, stepResult]) => {
-                acc[this.result.stepResults[stepIndex].stepId] = stepResult.transformedData;
-                return acc;
-              },
-              {} as Record<string, unknown>,
-            ),
-          };
-
-          // Apply the final transform using the original data
-          const finalResult = await applyJsonata(rawStepData, this.finalTransform);
-          this.result.data = finalResult as Record<string, unknown>;
-        } catch (transformError) {
-          this.result.error = `Final transformation error: ${String(transformError)}`;
-          this.result.success = false;
-        }
+            // Apply the final transform using the original data
+            let currentFinalTransform = this.finalTransform || "$";
+            const finalResult = await applyTransformationWithValidation(rawStepData, currentFinalTransform, this.responseSchema);
+            if(!finalResult.success) {
+              throw new Error(finalResult.error);
+            }
+            this.result.data = finalResult.data as Record<string, unknown> || {};
+            this.result.config = {
+              id: this.id,
+              steps: this.steps,
+              finalTransform: currentFinalTransform,
+              inputSchema: this.inputSchema,
+              responseSchema: this.responseSchema,
+              instruction: this.instruction
+            } as Workflow; // Store the successful transform
+            this.result.error = undefined; // Clear any previous transform error
+            this.result.success = true; // Ensure success is true if transform succeeds
+          } catch (transformError) {
+            logMessage("info", `Preparing new final transform`, this.metadata);
+            const instruction = "Generate the final transformation code." + 
+              (this.instruction ? " with the following instruction: " + this.instruction : "") +
+              (this.finalTransform ? "\nOriginally, we used the following transformation, fix it without messing up future transformations with the original data: " + this.finalTransform : "");
+            
+            const newTransformConfig = await generateTransformCode(this.responseSchema, rawStepData, instruction, this.metadata);
+            if(!newTransformConfig) {
+              throw new Error("Failed to generate new final transform");
+            }
+            const finalResult = await applyTransformationWithValidation(rawStepData, newTransformConfig.mappingCode, this.responseSchema);
+            if(!finalResult.success) {
+              throw new Error(finalResult.error);
+            }
+            this.result.data = finalResult.data as Record<string, unknown> || {};
+            this.result.config = {
+              id: this.id,
+              steps: this.steps,
+              finalTransform: newTransformConfig.mappingCode,
+              inputSchema: this.inputSchema,
+              responseSchema: this.responseSchema,
+              instruction: this.instruction
+            } as Workflow; // Store the successful transform
+            this.result.error = undefined; // Clear any previous transform error
+            this.result.success = true; // Ensure success is true if transform succeeds
+          }
       }
       this.result.completedAt = new Date();
       return this.result;
@@ -99,9 +148,9 @@ export class WorkflowExecutor implements Workflow {
     }
   }
 
-  private validateSteps(): void {
-    if (!this.steps || !Array.isArray(this.steps) || this.steps.length === 0) {
-      throw new Error("Execution plan must have at least one step");
+  private validate(payload: Record<string, unknown>): void {
+    if (!this.steps || !Array.isArray(this.steps)) {
+      throw new Error("Execution steps must be an array");
     }
 
     for (const step of this.steps) {
@@ -112,9 +161,14 @@ export class WorkflowExecutor implements Workflow {
       if (!step.apiConfig) {
         throw new Error("Each step must have an API config");
       }
-      // TODO: should also work without one in the end (e.g. root path for API call)
-      if (!step.apiConfig.urlPath) {
-        throw new Error("Each step's API config must have a URL path");
+    }
+
+    if(this.inputSchema) {
+      const validator = new Validator();
+      const optionalSchema = addNullableToOptional(this.inputSchema);
+      const validation = validator.validate(payload, optionalSchema);
+      if(!validation.valid) {
+        throw new Error("Invalid payload: " + validation.errors.map(e => e.message).join(", "));
       }
     }
   }
@@ -125,22 +179,22 @@ export class WorkflowExecutor implements Workflow {
   ): Promise<Record<string, unknown>> {
     try {
       // if explicit mapping exists, use it first
+      const mappingContext = {
+        ...originalPayload,
+        // Include step results at root level for easier access
+        ...Object.entries(this.result?.stepResults).reduce(
+          (acc, [stepIndex, stepResult]) => {
+            if (stepResult?.transformedData) {
+              acc[this.result.stepResults[stepIndex].stepId] = stepResult.transformedData;
+            }
+            return acc;
+          },
+          {} as Record<string, unknown>,
+        ),
+      };
+
       if (step.inputMapping) {
         // Prepare context for JSONata expression
-        const mappingContext = {
-          ...originalPayload,
-          // Include step results at root level for easier access
-          ...Object.entries(this.result?.stepResults).reduce(
-            (acc, [stepIndex, stepResult]) => {
-              if (stepResult?.transformedData) {
-                acc[this.result.stepResults[stepIndex].stepId] = stepResult.transformedData;
-              }
-              return acc;
-            },
-            {} as Record<string, unknown>,
-          ),
-        };
-
         try {
           const result = await applyJsonata(mappingContext, step.inputMapping || "$");
           return result as Record<string, unknown>;
@@ -149,7 +203,7 @@ export class WorkflowExecutor implements Workflow {
         }
       }
       // Default to simple merging of payload with previous step data
-      return { ...originalPayload };
+      return { ...mappingContext };
     } catch (error) {
       console.error(`[Step ${step.id}] Error preparing input:`, error);
       return { ...originalPayload };

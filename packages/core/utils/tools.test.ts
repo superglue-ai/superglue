@@ -17,28 +17,28 @@ describe('tools utility functions', () => {
   })
 
   describe('replaceVariables', () => {
-    it('should replace variables in template strings', () => {
+    it('should replace variables in template strings', async () => {
       const template = 'Hello {name}, your age is {age}'
       const variables = { name: 'John', age: 30 }
-      expect(replaceVariables(template, variables)).toBe('Hello John, your age is 30')
+      expect(await replaceVariables(template, variables)).toBe('Hello John, your age is 30')
     })
 
-    it('should keep original placeholder if variable not found', () => {
+    it('should keep original placeholder if variable not found', async () => {
       const template = 'Hello {name}, {missing}'
       const variables = { name: 'John' }
-      expect(replaceVariables(template, variables)).toBe('Hello John, {missing}')
+      expect(await replaceVariables(template, variables)).toBe('Hello John, {missing}')
     })
 
-    it('should handle the same placeholder multiple times', () => {
+    it('should handle the same placeholder multiple times', async () => {
       const template = 'Hello {name}, {name}'
       const variables = { name: 'John' }
-      expect(replaceVariables(template, variables)).toBe('Hello John, John')
+      expect(await replaceVariables(template, variables)).toBe('Hello John, John')
     })
 
-    it('should handle JSON template strings', () => {
+    it('should handle JSON template strings', async () => {
       const template = '{"user": "{name}", "details": {"age": {age}}}'
       const variables = { name: 'John', age: 30 }
-      expect(replaceVariables(template, variables)).toBe('{"user": "John", "details": {"age": 30}}')
+      expect(await replaceVariables(template, variables)).toBe('{"user": "John", "details": {"age": 30}}')
     })
   })
 
@@ -127,9 +127,10 @@ describe('tools utility functions', () => {
     it('should return sampled array if length is greater than sample size', () => {
       const arr = Array.from({ length: 100 }, (_, i) => i);
       const result = sample(arr);
-      expect(result).toHaveLength(10);
+      expect(result).toHaveLength(11);
       expect(result[0]).toBe(0);
-      expect(result[9]).toBe(90);
+      expect(result[9]).toBe(9);
+      expect(result[10]).toBe("sampled from " + (arr.length) + " items");
     });
 
     it('should handle non-array input', () => {
@@ -141,7 +142,9 @@ describe('tools utility functions', () => {
     it('should respect custom sample size', () => {
       const arr = Array.from({ length: 100 }, (_, i) => i);
       const result = sample(arr, 5);
-      expect(result).toHaveLength(5);
+      expect(result).toHaveLength(6);
+      expect(result[0]).toBe(0);
+      expect(result[5]).toBe("sampled from " + (arr.length) + " items");
     });
   });
 

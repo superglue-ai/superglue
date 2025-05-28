@@ -1,4 +1,5 @@
-import { ApiConfig, Context, ExtractConfig, TransformConfig } from "@superglue/shared";
+import { ApiConfig, ExtractConfig, TransformConfig } from "@superglue/client";
+import { Context } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 
 function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined, defaultValue?: T): T | undefined {

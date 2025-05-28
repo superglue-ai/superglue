@@ -1,10 +1,10 @@
 import { useConfig } from '@/src/app/config-context';
 import { useToast } from '@/src/hooks/use-toast';
 import { cn, composeUrl } from '@/src/lib/utils';
-import { SuperglueClient, SystemInput, TransformConfig } from '@superglue/client';
+import { SuperglueClient, SystemInput, TransformConfig, Workflow, WorkflowResult } from '@superglue/client';
 import { Loader2, Plus, Trash2, X, Upload, Link, Check, ChevronsUpDown, Globe, ArrowRight, ArrowDown, RotateCw, Play, Pencil, Copy } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '../ui/button';
 import { API_CREATE_STEPS, StepIndicator, WORKFLOW_CREATE_STEPS } from '../utils/StepIndicator';
 import { Label } from '../ui/label';
@@ -35,267 +35,19 @@ import { findMatchingIntegration } from '@/src/lib/integrations';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
 import Editor from 'react-simple-code-editor';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/src/components/ui/select";
 import JsonSchemaEditor from '../utils/JsonSchemaEditor'
 import { AutoSizer, List } from 'react-virtualized';
+import type { URLFieldHandle } from '../utils/URLField'
+import { WorkflowStepCard } from './WorkflowStepCard';
+import { WorkflowStepsView } from './WorkflowStepsView';
+import { WorkflowResultsView } from './WorkflowResultsView';
+import { WorkflowCreateSuccess } from './WorkflowCreateSuccess'
 
 // Define step types specific to workflow creation
 type WorkflowCreateStep = 'integrations' | 'prompt' | 'review' | 'success'; // Added success step
 
 interface WorkflowCreateStepperProps {
   onComplete?: () => void;
-}
-
-interface WorkflowStepCardProps {
-  step: any;
-  isLast: boolean;
-  onEdit: (stepId: string, updatedStep: any) => void;
-}
-
-function WorkflowStepCard({ step, isLast, onEdit }: WorkflowStepCardProps) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedStep, setEditedStep] = useState(step);
-
-  const handleSave = () => {
-    onEdit(step.id, editedStep);
-    setIsEditing(false);
-  };
-
-  const handleCancel = () => {
-    setEditedStep(step);
-    setIsEditing(false);
-  };
-
-  return (
-    <div className="flex flex-col items-center">
-      <Card className={cn("w-full", isEditing ? "border-primary" : "bg-muted/50")}>
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              {editedStep.executionMode === 'LOOP' && (
-                <RotateCw className="h-4 w-4 text-muted-foreground" />
-              )}
-              <span className="font-mono">{step.id}</span>
-            </CardTitle>
-            <div className="flex items-center gap-2">
-              {isEditing && (
-                <Select
-                  value={editedStep.executionMode}
-                  onValueChange={(value) => setEditedStep(prev => ({ ...prev, executionMode: value }))}
-                >
-                  <SelectTrigger className="h-7 w-24">
-                    <SelectValue placeholder="Mode" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="DIRECT">DIRECT</SelectItem>
-                    <SelectItem value="LOOP">LOOP</SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
-              <div className="flex gap-1">
-                {isEditing ? (
-                  <>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleCancel}>
-                      <X className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleSave}>
-                      <Check className="h-4 w-4" />
-                    </Button>
-                  </>
-                ) : (
-                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsEditing(true)}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm">
-          {isEditing ? (
-            <>
-              <div className="space-y-2">
-                <div>
-                  <Label className="text-xs">API Config</Label>
-                  <div className="space-y-2 mt-1">
-                    <div className="flex gap-2">
-                    <Select
-                        value={editedStep.apiConfig.method}
-                        onValueChange={(value) => setEditedStep(prev => ({
-                          ...prev,
-                          apiConfig: { ...prev.apiConfig, method: value }
-                        }))}
-                      >
-                        <SelectTrigger className="h-7 flex-1">
-                          <SelectValue placeholder="Method" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {['GET', 'POST', 'PUT', 'DELETE', 'PATCH'].map(method => (
-                            <SelectItem key={method} value={method}>{method}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Input
-                        value={editedStep.apiConfig.urlHost}
-                        onChange={(e) => setEditedStep(prev => ({
-                          ...prev,
-                          apiConfig: { ...prev.apiConfig, urlHost: e.target.value }
-                        }))}
-                        className="text-xs flex-1"
-                        placeholder="Host"
-                      />
-                      <Input
-                        value={editedStep.apiConfig.urlPath}
-                        onChange={(e) => setEditedStep(prev => ({
-                          ...prev,
-                          apiConfig: { ...prev.apiConfig, urlPath: e.target.value }
-                        }))}
-                        className="text-xs flex-1"
-                        placeholder="Path"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <Label className="text-xs">Headers (JSON)</Label>
-                  <Textarea
-                    value={JSON.stringify(editedStep.apiConfig.headers || {}, null, 2)}
-                    onChange={(e) => {
-                      try {
-                        const headers = JSON.parse(e.target.value);
-                        setEditedStep(prev => ({
-                          ...prev,
-                          apiConfig: { ...prev.apiConfig, headers }
-                        }));
-                      } catch (error) {
-                        // Handle invalid JSON
-                      }
-                    }}
-                    className="font-mono text-xs h-20 mt-1"
-                  />
-                </div>
-
-                <div>
-                  <Label className="text-xs">Query Parameters (JSON)</Label>
-                  <Textarea
-                    value={JSON.stringify(editedStep.apiConfig.queryParams || {}, null, 2)}
-                    onChange={(e) => {
-                      try {
-                        const queryParams = JSON.parse(e.target.value);
-                        setEditedStep(prev => ({
-                          ...prev,
-                          apiConfig: { ...prev.apiConfig, queryParams }
-                        }));
-                      } catch (error) {
-                        // Handle invalid JSON
-                      }
-                    }}
-                    className="font-mono text-xs h-20 mt-1"
-                  />
-                </div>
-
-                <div>
-                  <Label className="text-xs">Body</Label>
-                  <Textarea
-                    value={editedStep.apiConfig.body || ''}
-                    onChange={(e) => setEditedStep(prev => ({
-                      ...prev,
-                      apiConfig: { ...prev.apiConfig, body: e.target.value }
-                    }))}
-                    className="font-mono text-xs h-20 mt-1"
-                  />
-                </div>
-
-                {editedStep.executionMode === 'LOOP' && (
-                  <>
-                    <div>
-                      <Label className="text-xs">Loop Selector (JSONata)</Label>
-                      <Input
-                        value={editedStep.loopSelector || ''}
-                        onChange={(e) => setEditedStep(prev => ({
-                          ...prev,
-                          loopSelector: e.target.value
-                        }))}
-                        className="text-xs mt-1"
-                        placeholder="e.g., $.items"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs">Max Iterations</Label>
-                      <Input
-                        type="number"
-                        value={editedStep.loopMaxIters || ''}
-                        onChange={(e) => setEditedStep(prev => ({
-                          ...prev,
-                          loopMaxIters: parseInt(e.target.value) || undefined
-                        }))}
-                        className="text-xs mt-1 w-32"
-                      />
-                    </div>
-                  </>
-                )}
-
-                <div>
-                  <Label className="text-xs">Input Mapping (JSONata)</Label>
-                  <Textarea
-                    value={editedStep.inputMapping || ''}
-                    onChange={(e) => setEditedStep(prev => ({
-                      ...prev,
-                      inputMapping: e.target.value
-                    }))}
-                    className="font-mono text-xs h-20 mt-1"
-                    placeholder="Transform input before sending to API"
-                  />
-                </div>
-
-                <div>
-                  <Label className="text-xs">Response Mapping (JSONata)</Label>
-                  <Textarea
-                    value={editedStep.responseMapping || ''}
-                    onChange={(e) => setEditedStep(prev => ({
-                      ...prev,
-                      responseMapping: e.target.value
-                    }))}
-                    className="font-mono text-xs h-20 mt-1"
-                    placeholder="Transform API response"
-                  />
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              <div>
-                <div className="font-mono text-xs bg-background/50 p-2 rounded mt-1">
-                  <div>{editedStep.apiConfig.method || 'GET'} {editedStep.apiConfig.urlHost}{editedStep.apiConfig.urlPath}</div>
-                </div>
-              </div>
-              {editedStep.executionMode === 'LOOP' && editedStep.loopSelector && (
-                <div>
-                  <Label className="text-xs text-muted-foreground">Loop Over</Label>
-                  <div className="font-mono text-xs bg-background/50 p-2 rounded mt-1">
-                    {editedStep.loopSelector}
-                    {editedStep.loopMaxIters && ` (max ${editedStep.loopMaxIters} iterations)`}
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </CardContent>
-      </Card>
-      {!isLast && (
-        <div className="my-2 text-muted-foreground">
-          <ArrowDown className="h-4 w-4" />
-        </div>
-      )}
-    </div>
-  );
 }
 
 // Create an extended client class
@@ -341,22 +93,22 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   });
   const [instruction, setInstruction] = useState('');
   const [payload, setPayload] = useState('{}');
-  const [generatedWorkflow, setGeneratedWorkflow] = useState<any>(null); // To store result from buildWorkflow
-  const [finalTransform, setFinalTransform] = useState<string | null>(null); // For editing in review step
+  const [currentWorkflow, setCurrentWorkflow] = useState<Workflow | null>(null); // To store result from buildWorkflow
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
   const [systemFormVisible, setSystemFormVisible] = useState(false);
 
-  // Add new state to track if ID was manually edited
   const [idManuallyEdited, setIdManuallyEdited] = useState(false);
   const [selectedIntegration, setSelectedIntegration] = useState<string>("custom");
   const [integrationDropdownOpen, setIntegrationDropdownOpen] = useState(false);
 
+  const [schema, setSchema] = useState<string>('{}');
+  const [activeTab, setActiveTab] = useState<'results' | 'transform' | 'final' | 'instructions'>('results');
+
   const [isExecuting, setIsExecuting] = useState(false);
-  const [executionResult, setExecutionResult] = useState<any>(null);
+  const [executionResult, setExecutionResult] = useState<WorkflowResult | null>(null);
   const [finalResult, setFinalResult] = useState<any>(null);
   const [executionError, setExecutionError] = useState<string | null>(null);
 
-  // Add new state for loading suggestions
   const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]); // Store multiple suggestions
 
@@ -556,14 +308,13 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         // Generate schema first
         const schema = await superglueClient.generateSchema(instruction, "");
         setSchema(JSON.stringify(schema, null, 2));
-
+        const parsedPayload = JSON.parse(payload || '{}');
         // Then build workflow
-        const response = await superglueClient.buildWorkflow(instruction, payload, systems);
+        const response = await superglueClient.buildWorkflow(instruction, parsedPayload, systems, schema);
         if (!response) {
           throw new Error('Failed to build workflow');
         }
-        setGeneratedWorkflow(response);
-        setFinalTransform(response.finalTransform || `{\n  "result": $\n}`);
+        setCurrentWorkflow(response);
         toast({
           title: 'Workflow Built',
           description: `Workflow "${response.id}" generated successfully.`,
@@ -581,37 +332,36 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       }
     } else if (step === 'review') {
         // Save the potentially modified workflow
-        if (!generatedWorkflow) return;
+        if (!currentWorkflow) return;
         setIsSaving(true);
         try {
             const workflowInput = {
-              id: generatedWorkflow.id,
-              steps: generatedWorkflow.steps.map((step: any) => ({ // Map steps to input format if needed
+              id: currentWorkflow.id,
+              steps: currentWorkflow.steps.map((step: any) => ({ // Map steps to input format if needed
                 ...step,
                 // Ensure apiConfig has an ID - use step ID if apiConfig ID is missing
                 apiConfig: {
                   ...(step.apiConfig || {}),
                   id: step.apiConfig?.id || step.id,
-                  // Ensure nested objects like pagination are handled or nulled if not present
-                  // createdAt: undefined,
-                  // updatedAt: undefined,
-                  // version: undefined,
                 }
               })),
-              finalTransform: finalTransform
+              inputSchema: currentWorkflow.inputSchema,
+              finalTransform: currentWorkflow.finalTransform,
+              responseSchema: JSON.parse(schema),
+              instruction: instruction
             };
             const superglueClient = new ExtendedSuperglueClient({
               endpoint: superglueConfig.superglueEndpoint,
               apiKey: superglueConfig.superglueApiKey,
             });
-            const response = await superglueClient.upsertWorkflow(generatedWorkflow.id, workflowInput);
+            const response = await superglueClient.upsertWorkflow(currentWorkflow.id, workflowInput);
             if(!response) {
                 throw new Error('Failed to save workflow');
             }
 
             toast({
                 title: 'Workflow Saved',
-                description: `Workflow "${generatedWorkflow.id}" saved successfully.`
+                description: `Workflow "${currentWorkflow.id}" saved successfully.`
             });
             setStep(steps[currentIndex + 1]); // Move to success step
 
@@ -647,7 +397,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     if (onComplete) {
         onComplete();
     } else {
-        router.push('/workflows'); // Default redirect
+        router.push('/'); // Default redirect
     }
   };
 
@@ -689,22 +439,26 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   };
 
   const handleStepEdit = (stepId: string, updatedStep: any) => {
-    if (!generatedWorkflow) return;
+    if (!currentWorkflow) return;
     
-    setGeneratedWorkflow({
-      ...generatedWorkflow,
-      steps: generatedWorkflow.steps.map((step: any) => 
-        step.id === stepId ? updatedStep : step
-      )
+    const newSteps = currentWorkflow.steps.map((step: any) => 
+      step.id === stepId ? updatedStep : step
+    );
+    setCurrentWorkflow({
+      ...currentWorkflow,
+      steps: newSteps
     });
   };
 
-  const [schema, setSchema] = useState<string>('{}');
+  const handleStepsChange = (newSteps: any[]) => {
+    if (!currentWorkflow) return;
+    setCurrentWorkflow({
+      ...currentWorkflow,
+      steps: newSteps
+    });
+  };
 
-  // First, add a new state for the tabs
-  const [activeTab, setActiveTab] = useState<'results' | 'transform' | 'final'>('results');
 
-  // Modify the workflow execution to include transform
   const handleExecuteWorkflow = async () => {
     setIsExecuting(true);
     setExecutionError(null);
@@ -713,28 +467,29 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         endpoint: superglueConfig.superglueEndpoint,
         apiKey: superglueConfig.superglueApiKey,
       });
+      const credentials = Object.values(systems).reduce((acc, sys) => {
+        return { ...acc, ...Object.entries(sys.credentials || {}).reduce((obj, [name, value]) => ({ ...obj, [`${sys.id}_${name}`]: value }), {}) };
+      }, {});
+      console.log(credentials);
+      console.log(payload);
+      console.log(currentWorkflow);
       const result = await superglueClient.executeWorkflow({
-        id: generatedWorkflow.id,
+        workflow: {
+          id: currentWorkflow.id,
+          steps: currentWorkflow.steps,
+          responseSchema: JSON.parse(schema),
+          finalTransform: currentWorkflow.finalTransform,
+          inputSchema: currentWorkflow.inputSchema,
+          instruction: currentWorkflow.instruction
+        },
         payload: JSON.parse(payload || '{}'),
-        credentials: systems.reduce((acc, system) => ({...acc, ...system.credentials}), {}),
+        credentials: credentials
       });
       setExecutionResult(result);
+      setCurrentWorkflow(result.config);
+      setFinalResult(result.data);
+      setActiveTab('final');
 
-      // Generate transform after successful execution
-      const transformResult = await superglueClient.transform({
-        endpoint: {
-          id: generatedWorkflow.id,
-          instruction: instruction,
-          responseSchema: JSON.parse(schema),
-        },
-        data: result?.data || {}
-      });
-      
-      if (transformResult.success) {
-        setFinalTransform((transformResult.config as TransformConfig).responseMapping);
-        setFinalResult(transformResult.data);
-        setActiveTab('final');
-      }
     } catch (error: any) {
       setExecutionError(error.message);
       toast({
@@ -785,6 +540,8 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     }
   };
 
+  const urlFieldRef = useRef<URLFieldHandle>(null)
+
   return (
     <div className="flex-1 flex flex-col h-full p-6">
       {/* Header */}
@@ -796,6 +553,13 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
           <div className="flex items-center gap-2">
             {/* Optional Help Button */}
             {/* <Button variant="outline" ...>Get Help</Button> */}
+            <Button
+              variant="outline"
+              className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-200/50 hover:border-blue-300/50 text-blue-600 hover:text-blue-700 text-sm px-4 py-1 h-8 rounded-full animate-pulse shrink-0"
+              onClick={() => window.open('https://cal.com/superglue/onboarding', '_blank')}
+            >
+              ✨ Get help from our team
+            </Button>
             <Button variant="ghost" size="icon" className="shrink-0" onClick={handleClose}>
               <X className="h-4 w-4" />
             </Button>
@@ -987,6 +751,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                         <Label htmlFor="systemFullUrl">API Endpoint*</Label>
                         <HelpTooltip text="The base URL of the API (e.g., https://api.example.com/v1)." />
                         <URLField
+                          ref={urlFieldRef}
                           url={composeUrl(currentSystem.urlHost, currentSystem.urlPath) || ''}
                           onUrlChange={handleUrlChange}
                         />
@@ -1072,7 +837,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                       value={instruction}
                       onChange={(e) => { setInstruction(e.target.value); setValidationErrors(prev => ({...prev, instruction: false})); }}
                       placeholder="e.g., 'Fetch customer details from CRM using the input email, then get their recent orders from productApi.'"
-                      className={cn("h-40", validationErrors.instruction && inputErrorStyles)}
+                      className={cn("min-h-80", validationErrors.instruction && inputErrorStyles)}
                     />
                     {suggestions.length > 0 && !instruction && (
                       <div className="absolute bottom-0  p-3 pointer-events-none">
@@ -1144,10 +909,10 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
           {/* Step 3: Review */}
           {step === 'review' && (
             <div className="space-y-4">
-              {generatedWorkflow ? (
+              {currentWorkflow ? (
                 <>
                   <div className="flex items-center justify-between">
-                    <p className="text-lg font-medium"><span className="font-mono text-base bg-muted px-2 py-0.5 rounded">{generatedWorkflow.id}</span></p>
+                    <p className="text-lg font-medium"><span className="font-mono text-base bg-muted px-2 py-0.5 rounded">{currentWorkflow.id}</span></p>
                     <Button 
                       onClick={handleExecuteWorkflow}
                       disabled={isExecuting}
@@ -1161,21 +926,17 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                     </Button>
                   </div>
                   <div>
-                    <Label>Steps ({generatedWorkflow.steps.length})</Label>
-                    <div className="space-y-2 mt-2">
-                      {generatedWorkflow.steps.map((step: any, index: number) => (
-                        <WorkflowStepCard 
-                          key={step.id} 
-                          step={step} 
-                          isLast={index === generatedWorkflow.steps.length - 1} 
-                          onEdit={handleStepEdit}
-                        />
-                      ))}
-                    </div>
+                    <Label>Steps ({currentWorkflow.steps.length})</Label>
+                    <WorkflowStepsView
+                      steps={currentWorkflow.steps}
+                      onStepsChange={handleStepsChange}
+                      onStepEdit={handleStepEdit}
+                    />
                   </div>
                   <div className="flex flex-col gap-2">
                     <div className="flex-1 min-h-0 bg-background h-[200px] mt-2 mb-4">
                       <JsonSchemaEditor
+                        isOptional={true}
                         value={schema}
                         onChange={setSchema}
                       />
@@ -1189,269 +950,65 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
           )}
 
           {/* Step 4: Success */}
-          {step === 'success' && generatedWorkflow && (() => {
-            // Define code strings once
-            const sdkCode = `const client = new SuperglueClient({
-  apiKey: "${superglueConfig.superglueApiKey}"
-});
-
-const result = await client.executeWorkflow({
-  id: "${generatedWorkflow.id}",
-  payload: ${payload || '{}'},
-  credentials: ${JSON.stringify(systems.reduce((acc, system) => ({ ...acc, ...system.credentials }), {}), null, 2)}
-});`;
-
-            // Correct the curl command based on the GraphQL schema
-            const curlCommand = `curl -X POST "${superglueConfig.superglueEndpoint}/graphql" \\
-  -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer ${superglueConfig.superglueApiKey}" \\
-  -d '${JSON.stringify({
-              query: `mutation ExecuteWorkflow($input: WorkflowInputRequest!, $payload: JSON, $credentials: JSON) { 
-  executeWorkflow(input: $input, payload: $payload, credentials: $credentials) { 
-    data 
-    error 
-    success 
-  } 
-}`, // Updated query signature
-              variables: {
-                input: { // Nest id under input
-                  id: generatedWorkflow.id 
-                },
-                payload: JSON.parse(payload || '{}'),
-                credentials: systems.reduce((acc, system) => ({ ...acc, ...system.credentials }), {})
+          {step === 'success' && currentWorkflow && (
+          <div className="space-y-4">
+            <p className="text-lg font-medium">
+              Workflow{' '}
+              <span className="font-mono text-base bg-muted px-2 py-0.5 rounded">
+                {currentWorkflow.id}
+              </span>{' '}
+              created successfully!
+            </p>
+            <p>
+              You can now use this workflow ID in the "Workflows" page or call it via the API/SDK.
+            </p>
+            <WorkflowCreateSuccess
+              currentWorkflow={currentWorkflow}
+              credentials={ 
+                Object.values(systems).reduce((acc, sys: any) => {
+                  return {
+                    ...acc,
+                    ...Object.entries(sys.credentials || {}).reduce(
+                      (obj, [name, value]) => ({ ...obj, [`${sys.id}_${name}`]: value }),
+                      {}
+                    ),
+                  }
+                  }, {})
               }
-            })}'`;
-
-            return (
-              <div className="space-y-4">
-                <p className="text-lg font-medium">Workflow <span className="font-mono text-base bg-muted px-2 py-0.5 rounded">{generatedWorkflow.id}</span> created successfully!</p>
-                <p>You can now use this workflow ID in the "Workflows" page or call it via the API/SDK.</p>
-
-                <div className="space-y-4 mt-6">
-                  <div className="rounded-md bg-muted p-4">
-                    <div className="flex items-start space-x-2">
-                      <div className="space-y-1 w-full">
-                        <div className="flex items-center justify-between mb-2">
-                          <h3 className="font-medium">Using the SDK</h3>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 flex-none"
-                            onClick={() => {
-                              navigator.clipboard.writeText(sdkCode);
-                              toast({ title: 'SDK code copied!' });
-                            }}
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        <div className="bg-secondary rounded-md overflow-hidden">
-                          <pre className="font-mono text-sm p-4 overflow-x-auto">
-                            <code>
-                              {sdkCode}
-                            </code>
-                          </pre>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="rounded-md bg-muted p-4">
-                    <div className="flex items-start space-x-2">
-                      <div className="space-y-1 w-full">
-                        <div className="flex items-center justify-between mb-2">
-                          <h3 className="font-medium">Using cURL</h3>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 flex-none"
-                            onClick={() => {
-                              navigator.clipboard.writeText(curlCommand); // Use updated command
-                              toast({ title: 'cURL command copied!' });
-                            }}
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        <div className="bg-secondary rounded-md overflow-hidden">
-                          <pre className="font-mono text-sm p-4 overflow-x-auto">
-                            <code>
-                              {curlCommand} {/* Display updated command */}
-                            </code>
-                          </pre>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex gap-2 mt-6">
-                  <Button variant="outline" onClick={() => router.push(`/workflows/${generatedWorkflow.id}`)}>
-                    Go to Workflow
-                  </Button>
-                  <Button variant="outline" onClick={() => router.push('/workflows')}>
-                    View All Workflows
-                  </Button>
-                </div>
-              </div>
-            );
-          })()}
+              payload={(() => {
+                try {
+                  return JSON.parse(payload || '{}');
+                } catch {
+                  return {};
+                }
+              })()}
+            />
+          <div className="flex gap-2 mt-6">
+            <Button variant="outline" onClick={() => router.push(`/workflows/${currentWorkflow.id}`)}>
+              Go to Workflow
+            </Button>
+            <Button variant="outline" onClick={() => router.push('/')}>
+              View All Workflows
+            </Button>
+          </div>
+        </div>
+    
+          )}
         </div>
 
         {/* Right Column - Test Results (only shown during review) */}
         {step === 'review' && (
-          <Card className="flex flex-col">
-            <CardHeader className="py-3 px-4 flex-shrink-0">
-              <div className="flex justify-between items-center">
-                <CardTitle>Results</CardTitle>
-                <div className="flex gap-2">
-                  <Button
-                    variant={activeTab === 'results' ? 'default' : 'ghost'}
-                    size="sm"
-                    onClick={() => setActiveTab('results')}
-                  >
-                    Raw Results
-                  </Button>
-                  <Button
-                    variant={activeTab === 'final' ? 'default' : 'ghost'}
-                    size="sm"
-                    onClick={() => setActiveTab('final')}
-                  >
-                    Final Results
-                  </Button>
-                  <Button
-                    variant={activeTab === 'transform' ? 'default' : 'ghost'}
-                    size="sm"
-                    onClick={() => setActiveTab('transform')}
-                  >
-                    Transformation
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-
-            <CardContent className="p-0 flex-grow flex flex-col overflow-hidden">
-              { executionResult && (
-                <div className="p-3 bg-muted border-b flex-shrink-0">
-                  <div className="flex flex-col gap-1">
-                    <div className="flex items-center">
-                      <span className="font-semibold mr-2">Status:</span>
-                      <span className={executionResult.success ? "text-green-600" : "text-red-600"}>
-                        {executionResult.success ? "Success" : "Failed"}
-                      </span>
-                    </div>
-
-                    {executionResult.startedAt && (
-                      <div className="flex items-center">
-                        <span className="font-semibold mr-2">Time:</span>
-                        <span className="text-sm">
-                          {new Date(executionResult.startedAt).toLocaleString()}
-                          {executionResult.completedAt &&
-                            ` • Duration: ${((new Date(executionResult.completedAt).getTime() - new Date(executionResult.startedAt).getTime()) / 1000).toFixed(2)}s`}
-                        </span>
-                      </div>
-                    )}
-
-                    {executionError && (
-                      <div className="text-red-600">
-                        <span className="font-semibold mr-2">Error:</span>
-                        <span>{executionError}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>)
-              }
-              {activeTab === 'results' ? (
-                executionResult ? (
-                  <>
-                    {/* Results - Replace with virtualized list */}
-                    <div className="flex-grow overflow-hidden p-1">
-                      <AutoSizer>
-                        {({ height, width }) => (
-                          <List
-                            width={width}
-                            height={height}
-                            rowCount={getResponseLines(executionResult?.data).length}
-                            rowHeight={18}
-                            rowRenderer={({ index, key, style }) => {
-                              const line = getResponseLines(executionResult?.data)[index];
-                              const indentMatch = line?.match(/^(\s*)/);
-                              const indentLevel = indentMatch ? indentMatch[0].length : 0;
-                              
-                              return (
-                                <div 
-                                  key={key} 
-                                  style={{
-                                    ...style,
-                                    whiteSpace: 'pre',
-                                    paddingLeft: `${indentLevel * 8}px`,
-                                  }} 
-                                  className="font-mono text-xs overflow-hidden text-ellipsis px-4"
-                                >
-                                  {line?.trimLeft()}
-                                </div>
-                              );
-                            }}
-                            overscanRowCount={100}
-                            className="overflow-auto"
-                          />
-                        )}
-                      </AutoSizer>
-                    </div>
-                  </>
-                ) : (
-                  <div className="h-full flex items-center justify-center p-4">
-                    <p className="text-gray-500 italic">
-                      {isExecuting ? 'Executing workflow...' : 'No results yet. Test the workflow to see results here.'}
-                    </p>
-                  </div>
-                )
-              ) : activeTab === 'transform' ? (
-                <div className="flex-grow overflow-auto p-4">
-                  <Textarea
-                    value={finalTransform || ''}
-                    onChange={(e) => setFinalTransform(e.target.value)}
-                    className="font-mono text-xs w-full h-full min-h-[300px]"
-                    spellCheck={false}
-                  />
-                </div>
-              ) : (
-                <div className="flex-grow overflow-hidden p-1">
-                  <AutoSizer>
-                    {({ height, width }) => (
-                      <List
-                        width={width}
-                        height={height}
-                        rowCount={getResponseLines(finalResult).length}
-                        rowHeight={18}
-                        rowRenderer={({ index, key, style }) => {
-                          const line = getResponseLines(finalResult)[index];
-                          const indentMatch = line?.match(/^(\s*)/);
-                          const indentLevel = indentMatch ? indentMatch[0].length : 0;
-                          
-                          return (
-                            <div 
-                              key={key} 
-                              style={{
-                                ...style,
-                                whiteSpace: 'pre',
-                                paddingLeft: `${indentLevel * 8}px`,
-                              }} 
-                              className="font-mono text-xs overflow-hidden text-ellipsis px-4"
-                            >
-                              {line?.trimLeft()}
-                            </div>
-                          );
-                        }}
-                        overscanRowCount={100}
-                        className="overflow-auto"
-                      />
-                    )}
-                  </AutoSizer>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <WorkflowResultsView
+            activeTab={activeTab}
+            showInstructionsTab={false}
+            setActiveTab={setActiveTab}
+            executionResult={executionResult}
+            finalTransform={currentWorkflow?.finalTransform || '$'}
+            setFinalTransform={(transform) => setCurrentWorkflow({...currentWorkflow, finalTransform: transform || '$'} as Workflow)}
+            finalResult={finalResult}
+            isExecuting={isExecuting}
+            executionError={executionError}
+          />
         )}
       </div>
 
@@ -1465,7 +1022,10 @@ const result = await client.executeWorkflow({
           Back
         </Button>
         <Button
-          onClick={handleNext}
+          onClick={() => {
+            urlFieldRef.current?.commit()
+            handleNext()
+          }}
           disabled={isBuilding || isSaving || isGeneratingSuggestions || (step === 'integrations' && systems.length === 0)}
         >
           {isBuilding ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Building...</> :

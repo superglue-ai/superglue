@@ -8,6 +8,7 @@ import { ApolloClient, gql, InMemoryCache, useSubscription } from "@apollo/clien
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions'
 import { createClient } from 'graphql-ws'
 import { useConfig } from "../../app/config-context"
+import { Switch } from "../ui/switch"
 
 export interface LogEntry {
   id: string;
@@ -38,13 +39,13 @@ export function LogSidebar() {
   const [isExpanded, setIsExpanded] = useState(false)
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [hasNewLogs, setHasNewLogs] = useState(false)
-  const config = useConfig()
-
   const [transitionDuration, setTransitionDuration] = useState(0.3)
   const [logViewWidth, setLogViewWidth] = useState(LOG_MIN_WIDTH)
   const resizingWidthRef = useRef(logViewWidth)
   const logViewRef = useRef<HTMLDivElement | null>(null)
-
+  const [showDebug, setShowDebug] = useState(true)
+  const config = useConfig();
+  
   const client = useMemo(() => {
     const wsLink = new GraphQLWsLink(createClient({
       url: config.superglueEndpoint?.replace('https', 'wss')?.replace('http', 'ws') || 'ws://localhost:3000/graphql',
@@ -70,7 +71,12 @@ export function LogSidebar() {
       },
     })
   }, [config.superglueEndpoint, config.superglueApiKey])
-
+          
+  const filteredLogs = useMemo(
+    () => showDebug ? logs : logs.filter(log => log.level !== "DEBUG"),
+    [logs, showDebug]
+  )
+          
   useEffect(() => {
     return () => {
       client.stop()
@@ -140,7 +146,6 @@ export function LogSidebar() {
     document.addEventListener('mousemove', handleMouseMove)
     document.addEventListener('mouseup', handleMouseUp)
   }
-
   return (
     <motion.div
       ref={logViewRef}
@@ -175,12 +180,13 @@ export function LogSidebar() {
 
       {isExpanded && (
         <>
-          <ScrollArea className="max-w-full block">
+
+          <ScrollArea className="max-w-full block flex-1">
             <div className="p-4 max-w-[100%-5rem]">
-              {logs.map((log) => (
+              {filteredLogs.map((log) => (
                 <div
                   key={log.id}
-                  className={`mb-2 p-2 rounded text-sm max-w-full overflow-hidden ${
+                  className={`mb-2 p-2 rounded text-sm max-w-full  overflow-hidden ${
                     log.level === "ERROR"
                       ? "bg-red-500/10"
                       : log.level === "WARN"
@@ -201,6 +207,10 @@ export function LogSidebar() {
             onMouseDown={handleMouseDown}
             className="absolute left-0 top-0 h-full w-2 cursor-col-resize bg-transparent border-none outline-none"
           />
+          <div className="absolute bottom-4 right-4 flex items-center gap-2 z-10">
+            <span className="text-xs text-muted-foreground">Show Debug</span>
+            <Switch checked={showDebug} onCheckedChange={setShowDebug} />
+          </div>
         </>
       )}
     </motion.div>

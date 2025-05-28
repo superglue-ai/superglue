@@ -1,164 +1,161 @@
 ---
 title: "Architecture"
-description: "Technical architecture and data flow"
+description: "Technical architecture of the Superglue integration agent and its data flow"
 ---
 
-Superglue is built with a modular architecture that connects data sources to your software stack via a dedicated transformation layer and caching system. The following diagram illustrates the core components and data flow:
+superglue operates as a self-healing integration agent, designed to connect disparate systems and data sources through automated, multi-step workflows. It intelligently orchestrates data extraction, transformation, and validation, ensuring data arrives in your target systems in the correct format, even when source APIs change.
 
-```mermaid
-flowchart TB
-    subgraph DataSources[External Data Sources]
-        A1[REST & GraphQL APIs]
-        A2[XML/JSON/CSV Files]
-        A3[Legacy System Interfaces]
-    end
+The following diagram illustrates the core components and a typical workflow data flow:
 
-    subgraph SuperglueLayer[superglue]
-        P1[Extract Pipeline]
-        E1[LLM Transform Engine]
-        C1[Schema Validator]
-    end
+<Frame>
+  ```mermaid
+  flowchart TB
+      subgraph UserClient[User / Client System]
+          direction LR
+          AppTrigger["Application / Trigger"]
+      end
+  
+      subgraph ExternalSystems[External Data Sources]
+          direction LR
+          ExternalSource[Generic API / File Source]
+      end
+  
+      subgraph SuperglueAgent[Superglue Integration Agent]
+          direction TB
+          Orchestrator[Workflow Orchestrator]
+          
+          subgraph CoreProcessing[Data Processing Pipeline]
+              direction LR
+              Extractor[Extract]
+              Transformer[Transform]
+              Validator[Validate]
+          end
+          
+          Orchestrator --> Extractor
+          Orchestrator --> Transformer
+          Orchestrator --> Validator
+          Validator -- Healing Feedback --> Transformer
+      end
+  
+      subgraph PersistentStore[Configuration & Cache]
+          direction TB
+          Store[Workflow Defs, Step Configs, Cache, Logs]
+      end
+  
+      AppTrigger -- Initiates Workflow --> Orchestrator
+      
+      Orchestrator -- Instructs Data Retrieval --> ExternalSource
+      ExternalSource -- Raw Data --> Extractor
+      Extractor -- Extracted Data --> Transformer
+      Transformer -- Transformed Data --> Validator
+      Validator -- Validated Step Output --> Orchestrator
+      
+      Orchestrator -- Final Workflow Output to --> AppTrigger
+  
+      SuperglueAgent <--> PersistentStore
+  
+      classDef userStyle fill:#e6e6fa,stroke:#333,stroke-width:2px
+      classDef externalStyle fill:#ffe4e1,stroke:#333,stroke-width:2px
+      classDef superglueStyle fill:#d1e0f0,stroke:#333,stroke-width:2px
+      classDef storageStyle fill:#e0f0d1,stroke:#333,stroke-width:2px
+  
+      class UserClient userStyle
+      class ExternalSystems externalStyle
+      class SuperglueAgent superglueStyle
+      class PersistentStore storageStyle
+  ```
+</Frame>
 
-    subgraph Redis[Redis Mapping Cache]
-        R1[(Cache DB)]
-    end
+## core components
 
-    subgraph YourSoftware[Your System]
-        CallScheduler[Call Scheduler]
-        DB[(Storage)]
-    end
+### External Systems / Data Sources
 
-    %% Main data flow
-    A1 & A2 & A3 <--> SuperglueLayer
-    P1 --> E1
-    E1 --> C1
-    SuperglueLayer <--> YourSoftware
-    SuperglueLayer <--> Redis
+Superglue can connect to a wide array of external systems as steps within a workflow:
 
-    %% Styling
-    classDef sourceStyle fill:#f9f,stroke:#333,stroke-width:2px
-    classDef superglueStyle fill:#bbf,stroke:#333,stroke-width:2px
-    classDef storageStyle fill:#bfb,stroke:#333,stroke-width:2px
-    classDef supportStyle fill:#ffd,stroke:#333,stroke-width:2px
-    classDef redisStyle fill:#fff,stroke:#333,stroke-width:2px
+- **REST & GraphQL APIs**: Connects to any modern API, handling authentication, rate limiting, and pagination per step. Supports common authentication methods (OAuth, API keys, JWT tokens).
+- **XML/JSON/CSV Files**: Processes structured data files from sources like local filesystems, S3 buckets, or remote URLs as part of a workflow step.
+- **Legacy System Interfaces**: Interfaces with older systems (SOAP APIs, FTP) as defined in a workflow step.
 
-    class DataSources sourceStyle
-    class SuperglueLayer superglueStyle
-    class Redis redisStyle
-    class YourSoftware supportStyle
-```
+### superglue integration agent
 
-## Core Components
+This is the core of Superglue, responsible for executing integration workflows.
 
-### External Data Sources
+- **Workflow Engine / Orchestrator**:
+  - Manages the execution of multi-step workflows defined by the user.
+  - Sequences operations (API calls, data extractions, transformations) across different systems.
+  - Passes data between workflow steps.
+  - Handles overall workflow state, error handling, and retries for the workflow itself.
+- **Core Capabilities (utilized by the Workflow Engine for each step)**:
+  - **Extract Pipeline**:
+    - Manages data extraction from the source specified in a workflow step (e.g., an API endpoint, a file URL).
+    - Handles connection pooling, step-specific retry logic (default: 3 retries), and exponential backoff.
+    - Supports rate limiting for API calls as configured for that step.
+  - **LLM Transform Engine**:
+    - Converts data from a source schema to a target schema for each relevant workflow step.
+    - Uses LLMs (e.g., OpenAI, Gemini) to generate and refine JSONata transformation rules.
+    - Caches successful transformation rules in Redis to ensure deterministic and efficient re-execution.
+    - If schema validation fails (see below), this engine can be re-triggered to attempt a "self-heal" of the transformation rules.
+  - **Schema Validator**:
+    - Ensures data consistency and integrity for the output of each transformation step against a defined JSON Schema.
+    - Provides field-level validation error messages.
+    - If validation fails, it can trigger the LLM Transform Engine's self-healing process.
 
-- **REST & GraphQL APIs**: Superglue can connect to any modern API endpoint, handling authentication, rate limiting, and pagination automatically. It supports common authentication methods like OAuth, API keys, and JWT tokens.
+### Configuration & Cache (Persistent Store - e.g., Redis, File)
 
-- **XML/JSON/CSV Files**: Process structured data files from various sources, including local filesystems, S3 buckets, or remote URLs. Superglue automatically handles parsing and data validation.
+Superglue relies on persistent storage for its operational data:
 
-- **Legacy System Interfaces**: Connect to older systems through their available interfaces, including SOAP APIs, FTP servers, or custom protocols.
+- **Workflow Definitions**: Stores the structure of user-defined workflows, including the sequence of steps and their configurations.
+- **API/Step Configurations**: Contains the specific configurations for each step within a workflow (e.g., `ApiConfig`, `ExtractConfig`, `TransformConfig` for individual API calls or file processing operations).
+- **Transformation Cache (Mappings)**: Caches the generated JSONata transformation rules for quick and deterministic reuse.
+- **Run Logs**: Stores execution logs for workflows and individual steps for monitoring and debugging.
+  Two main storage modes are supported:
+- **Redis Mode**: Recommended for production. Persistent, supports clustering, and handles concurrent access.
+- **File/In-Memory Mode**: Simpler options suitable for development/testing, with file mode offering basic persistence.
 
-### Superglue Layer
+### User / Your Client System
 
-- **Extract Pipeline**:
-  - Manages the data extraction process from various sources
-  - Handles connection pooling with configurable retry logic (default: 3 retries)
-  - Implements exponential backoff starting at 1s with 2x multiplier
-  - Supports rate limiting via Redis-based token bucket
-  - Logs all extraction attempts with request/response details
+- **Your Application**: The system that ultimately consumes the data processed by Superglue workflows or triggers these workflows.
+- **Workflow Trigger**: Workflows can be initiated via an API call to Superglue or potentially through a scheduled mechanism.
 
-- **LLM Transform Engine**:
-  - Converts data between different schemas and formats
-  - Uses OpenAI API to generate JSONata transformations
-  - Caches successful transformations in Redis with 30-day TTL
-  - Validates output against JSON Schema before returning
-  - Handles nested object/array transformations up to 10 levels deep
+## data flow (workflow example)
 
-- **Schema Validator**:
-  - Ensures data consistency and integrity
-  - Enforces JSON Schema validation on all transformed data
-  - Provides field-level validation error messages
-  - Supports custom validation rules via JSONata expressions
-  - Validates required fields and data types
+1. A workflow is triggered (e.g., by an API call from 'Your Application' to Superglue).
+2. The **Workflow Engine** in Superglue loads the workflow definition.
+3. **For each step in the workflow** (e.g., calling API A, then API B using data from A):
+   a.  The Orchestrator initiates the step, using the specific configuration for that step (e.g., an `ApiConfig` for calling API A).
+   b.  The **Extract Pipeline** retrieves raw data from the external system (e.g., API A).
+   c.  The **LLM Transform Engine** processes the raw data, applying cached or newly generated transformation rules to map it to the desired schema for that step.
+   d.  The **Schema Validator** validates the transformed data. If it fails, it may trigger a feedback loop to the Transform Engine to attempt self-healing of the transformation rules.
+   e.  The validated, transformed data from the current step becomes available as input for the next step in the workflow or as part of the final output.
+4. This process repeats for all steps in the workflow.
+5. The final output of the workflow is delivered to the designated target, such as 'Your Application' or another system specified in the workflow's concluding step.
+6. Status, metrics, and logs for the workflow and each step are recorded.
 
-### Redis Cache
-Two supported storage modes:
+## performance characteristics
 
-**Redis Mode**
-- Persistent storage with 30-day TTL
-- Supports cluster configuration
-- Stores mappings, configurations and execution logs
-- Implements key-based locking for concurrent access
+- Average transformation latency for an individual step with \<100KB data: 10-50ms (when transformation rules are cached).
+- Supports a high number of concurrent workflow executions, limited by underlying resources.
+- Maximum payload size per step: 100MB (configurable).
 
-**In-Memory Mode**
-- Non-persistent storage using Map/Set data structures
-- Suitable for development/testing
-- Lower latency but no persistence
-- Limited by available system memory
+## security implementation
 
-### Your System Integration
+- All external connections made by Superglue during workflow steps can be encrypted (e.g., TLS 1.3 for API calls).
+- Credentials for accessing external systems within workflow steps are securely managed (e.g., stored encrypted if using Redis).
+- Transformation logic for each step runs in isolated contexts.
+- Rate limiting can be configured per API step.
 
-- **Call Scheduler**:
-  - Manages the timing and frequency of data synchronization
-  - Configurable webhook notifications for job status
-  - Retry mechanism: 3 attempts with exponential backoff
-  - Supports batch processing up to 1000 records
-  - Implements circuit breaker pattern for failing endpoints
+## monitoring capabilities
 
-- **Storage**:
-  - Your system's database where transformed data is stored
-  - Supports any database with a JSON-compatible interface
-  - Maintains atomic transactions for data consistency
-  - Implements optimistic locking for concurrent updates
-  - Buffers writes to reduce database load
+- Prometheus metrics for core operations and workflow execution.
+- Detailed logging with correlation IDs for workflows and individual steps.
+- Error tracking with stack traces.
+- Performance metrics for cache hit/miss ratios of transformation rules.
 
-## Data Flow
+The implementation details for core capabilities like extraction and transformation can be found in the relevant utility modules within the codebase.
 
-1. External data sources are accessed through their respective interfaces
-2. The Extract Pipeline retrieves and normalizes the raw data
-3. The LLM Transform Engine processes and maps the data to your required format
-4. The Schema Validator ensures data quality and consistency
-5. Processed data is cached in Redis if validation passes
-6. Results are sent to target system via configured interface
-7. Status and metrics are logged for monitoring
+## monitoring and maintenance
 
-## Performance Characteristics
-
-- Average transformation latency: 200-500ms
-- Cache hit ratio: ~80% for repeated transformations
-- Supports up to 100 concurrent transformations
-- Maximum payload size: 100MB
-
-## Security Implementation
-
-- All external connections are encrypted using industry-standard protocols
-- TLS 1.3 required for all external connections
-- Credentials stored in Redis with AES-256 encryption
-- Transformation runs in isolated Node.js worker threads
-- Rate limiting per API key and IP address
-
-## Monitoring Capabilities
-
-- Prometheus metrics for all core operations
-- Detailed logging with correlation IDs
-- Error tracking with stack traces
-- Performance metrics for cache hit/miss ratios
-
-The implementation details can be found in the core utilities:
-
-```typescript:packages/core/utils/extract.ts
-startLine: 1
-endLine: 40
-```
-
-```typescript:packages/core/utils/transform.ts
-startLine: 1
-endLine: 35
-```
-
-## Monitoring and Maintenance
-
-- Built-in logging and monitoring capabilities
-- Performance metrics collection
-- Error tracking and alerting
-- Easy configuration management and updates 
+- Built-in logging and monitoring capabilities for workflows and individual steps.
+- Performance metrics collection.
+- Error tracking and alerting.
+- Easy configuration management for workflows and their constituent steps.

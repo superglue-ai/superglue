@@ -1,5 +1,18 @@
 # Types Reference
 
+## Base Types
+
+```graphql
+interface BaseConfig {
+  id: ID!
+  version: String
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+union ConfigType = ApiConfig | ExtractConfig | TransformConfig
+```
+
 ## ApiConfig
 Configuration for API endpoints. Inherits from [BaseConfig](overview.md#base-types).
 
@@ -22,6 +35,7 @@ type ApiConfig implements BaseConfig {
   responseMapping: JSONata         # JSONata transformation expression
   pagination: Pagination           # Pagination configuration
   dataPath: String                 # Path to data in response
+  documentationUrl: String
 }
 ```
 
@@ -46,6 +60,7 @@ type ExtractConfig implements BaseConfig {
   fileType: FileType                # Format of the source file
   decompressionMethod: DecompressionMethod  # Decompression algorithm
   dataPath: String                  # Path to data in file/response
+  documentationUrl: String
 }
 ```
 
@@ -64,6 +79,77 @@ type TransformConfig implements BaseConfig {
   responseMapping: JSONata!        # Transformation expression
   confidence: Float                # Confidence score of the mapping
   confidence_reasoning: String     # Explanation of confidence score
+}
+```
+
+## Workflow
+```graphql
+type Workflow implements BaseConfig {
+  id: ID!
+  version: String
+  createdAt: DateTime
+  updatedAt: DateTime
+  steps: [ExecutionStep!]!
+  finalTransform: JSONata
+  responseSchema: JSONSchema
+}
+```
+
+## ExecutionStep
+```graphql
+type ExecutionStep {
+  id: String!
+  apiConfig: ApiConfig!
+  executionMode: String # DIRECT | LOOP
+  loopSelector: JSONata
+  loopMaxIters: Int
+  inputMapping: JSONata
+  responseMapping: JSONata
+}
+```
+
+## WorkflowResult
+```graphql
+type WorkflowResult {
+  success: Boolean!
+  data: JSON!
+  finalTransform: JSONata
+  stepResults: [WorkflowStepResult!]!
+  error: String
+  startedAt: DateTime!
+  completedAt: DateTime!
+}
+```
+
+## WorkflowStepResult
+```graphql
+type WorkflowStepResult {
+  stepId: String!
+  success: Boolean!
+  rawData: JSON
+  transformedData: JSON
+  error: String
+}
+```
+
+## SystemInput
+```graphql
+input SystemInput {
+  id: String!
+  urlHost: String!
+  urlPath: String
+  documentationUrl: String
+  documentation: String
+  credentials: JSON
+}
+```
+
+## Pagination
+```graphql
+type Pagination {
+  type: PaginationType!
+  pageSize: String
+  cursorPath: String
 }
 ```
 
@@ -107,6 +193,43 @@ Cache behavior options:
 - `DISABLED` - No caching
 - `READONLY` - Read-only cache
 - `WRITEONLY` - Write-only cache
+
+### PaginationType
+Pagination type options:
+- `OFFSET_BASED` - Offset-based pagination
+- `PAGE_BASED` - Page-based pagination
+- `CURSOR_BASED` - Cursor-based pagination
+- `DISABLED` - Disabled pagination
+
+### LogLevel
+Log level options:
+- `DEBUG` - Debug level
+- `INFO` - Info level
+- `WARN` - Warn level
+- `ERROR` - Error level
+
+## Subscriptions
+
+### logs
+Stream log messages in real time.
+
+```graphql
+subscription {
+  logs {
+    id
+    message
+    level
+    timestamp
+    runId
+  }
+}
+```
+
+- `id`: ID of the log message
+- `message`: Log message string
+- `level`: LogLevel (DEBUG, INFO, WARN, ERROR)
+- `timestamp`: DateTime
+- `runId`: ID of the related run (optional)
 
 See also:
 - [Overview](overview.md) for common parameters

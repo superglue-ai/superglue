@@ -4,7 +4,7 @@ import { promisify } from 'util';
 import sax, { parser } from 'sax';
 import * as unzipper from 'unzipper';
 import { Readable } from 'stream';
-import { DecompressionMethod, FileType } from "@superglue/shared";
+import { DecompressionMethod, FileType } from "@superglue/client";
 import * as XLSX from 'xlsx';
 
 
@@ -72,8 +72,7 @@ export async function parseFile(buffer: Buffer, fileType: FileType): Promise<any
     }
 }
 
-async function detectCSVHeaders(sample: Buffer): Promise<{ headerValues: string[], headerRowIndex: number, delimiter: string }> {
-    const delimiter = detectDelimiter(sample);
+async function detectCSVHeaders(sample: Buffer, delimiter: string): Promise<{ headerValues: string[], headerRowIndex: number, delimiter: string }> {
     
     return new Promise<{ headerValues: string[], headerRowIndex: number, delimiter: string }>((resolve, reject) => {
         Papa.parse(Readable.from(sample), {
@@ -107,8 +106,9 @@ async function parseCSV(buffer: Buffer): Promise<any> {
     // First pass: parse first chunk to detect headers
     const sampleSize = Math.min(buffer.length, 32768);
     const sample = buffer.slice(0, sampleSize);
-    const { headerValues, headerRowIndex, delimiter } = await detectCSVHeaders(sample);
-
+    const delimiter = detectDelimiter(sample);
+    const { headerValues, headerRowIndex } = await detectCSVHeaders(sample, delimiter);
+    let rawHeader = [];
     // Second pass: parse entire file with detected headers
     let currentLine = -1;
     return new Promise((resolve, reject) => {
@@ -120,8 +120,15 @@ async function parseCSV(buffer: Buffer): Promise<any> {
                 try {
                     currentLine++;
                     // Store metadata rows
-                    if(currentLine <= headerRowIndex) {
-                        if(result.data == null || result.data?.filter(Boolean).length == 0 || currentLine == headerRowIndex) return;
+                    if(currentLine == headerRowIndex) {
+                        rawHeader = result.data.filter(Boolean).reduce((acc, value, index) => {
+                            acc[`${index}`] = value;
+                            return acc;
+                        }, {});
+                        return;
+                    }
+                    else if(currentLine < headerRowIndex) {
+                        if(result.data == null || result.data?.filter(Boolean).length == 0) return;
                         metadata.push(result?.data);
                         return;
                     }
@@ -143,7 +150,12 @@ async function parseCSV(buffer: Buffer): Promise<any> {
                     });
                 }
                 else {
-                    resolve(results);
+                    if(results.length > 0) {
+                        resolve(results);
+                    }
+                    else {
+                        resolve(rawHeader);
+                    }
                 }
             },
             error: (error) => {
@@ -167,7 +179,7 @@ export async function parseXML(buffer: Buffer): Promise<any> {
     const results: any = {};
     let currentElement: any = null;
     const elementStack: any[] = [];
-    
+    const error: any = null;
     return new Promise((resolve, reject) => {
     const parser = sax.createStream(true); // true for strict mode
 
@@ -175,8 +187,14 @@ export async function parseXML(buffer: Buffer): Promise<any> {
         // Create a new object for the current element
         const newElement: any = node.attributes || {};
         // If there's a current element, add this new one as its child
-        if (currentElement) {
+        if (currentElement && typeof currentElement === 'object') {
             elementStack.push(currentElement); // Push current to stack
+        }
+        else if(currentElement && typeof currentElement === 'string') {
+            elementStack.push({_TEXT: currentElement});
+        }
+        else {
+            elementStack.push({});
         }
 
         // Update current element
@@ -187,9 +205,12 @@ export async function parseXML(buffer: Buffer): Promise<any> {
         if (!currentElement || text?.trim()?.length == 0) {
             return;
         }
-        
+        if (typeof currentElement !== 'object' || currentElement === null || Array.isArray(currentElement)) {
+            return;
+        }
+
         if(Object.keys(currentElement)?.length > 0) {
-            currentElement["__text"] = text.trim();
+            currentElement["_TEXT"] = text.trim();
         }
         else if(Array.isArray(currentElement)) {
             currentElement.push(text.trim());
@@ -224,13 +245,14 @@ export async function parseXML(buffer: Buffer): Promise<any> {
 
     parser.on('error', (error) => {
         console.error('Failed converting XML to JSON:', error);
-        reject(error);
+        error = error;
     });
 
     parser.on('end', async () => {
-        try {
-            resolve(results);
-        } catch (error) {
+        if(!error) {
+            resolve(currentElement);
+        }
+        else {
             reject(error);
         }
     });
@@ -334,7 +356,6 @@ async function detectFileType(buffer: Buffer): Promise<FileType> {
 function detectDelimiter(buffer: Buffer): string {
     const sampleSize = Math.min(buffer.length, 32768);
     const sample = buffer.slice(0, sampleSize).toString('utf8');
-
     const delimiters = [',', '|', '\t', ';', ':'];
     const counts = delimiters.map(delimiter => ({
         delimiter,
@@ -345,6 +366,10 @@ function detectDelimiter(buffer: Buffer): string {
         return curr.count > prev.count ? curr : prev;
     });
 
+    if (detectedDelimiter.count === 0) {
+        return ' ';
+    }
+
     return detectedDelimiter.delimiter;
 }
 
@@ -352,16 +377,16 @@ function countUnescapedDelimiter(text: string, delimiter: string): number {
     let count = 0;
     let inQuotes = false;
     let prevChar = '';
-
+    let delimiterLength = delimiter.length;
     for (let i = 0; i < text.length; i++) {
         const currentChar = text[i];
-        
+        const searchChar = text.substring(i, i + delimiterLength);
         // Toggle quote state, but only if the quote isn't escaped
         if (currentChar === '"' && prevChar !== '\\') {
             inQuotes = !inQuotes;
         }
         // Count delimiter only if we're not inside quotes
-        else if (currentChar === delimiter && !inQuotes) {
+        else if (searchChar === delimiter && !inQuotes) {
             count++;
         }
         

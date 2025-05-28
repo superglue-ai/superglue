@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Button } from '@/src/components/ui/button'
 import { Input } from '@/src/components/ui/input'
 import { Upload, Link, FileText, FileQuestion } from 'lucide-react'
@@ -34,12 +34,36 @@ export function DocumentationField({
     if (!file) return
     
     try {
-      const text = await file.text()
+      let text = ''
+      if (file.type === 'application/pdf') {
+        // For PDFs, use pdf.js
+        const pdfjsLib = await import('pdfjs-dist');
+        // Update worker path to use .mjs extension
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
+        
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        
+        let fullText = '';
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const textContent = await page.getTextContent();
+          const pageText = textContent.items.map((item: any) => item.str).join(' ');
+          fullText += pageText + '\n';
+        }
+        text = fullText;
+      } else {
+        // For text files (.txt, .md, etc)
+        text = await file.text();
+      }
       setDocFile(file)
       onContentChange(text)
       onUrlChange('')
     } catch (error) {
       console.error('Error reading file:', error)
+      // You might want to add user-facing error handling here
+      // e.g., setDocFile(null); onContentChange(''); // Clear state
+      // alert('Failed to read PDF. Please try another file.');
     }
   }
 

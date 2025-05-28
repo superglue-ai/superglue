@@ -1,9 +1,10 @@
-import { ApiConfig, RequestOptions } from "@superglue/shared";
+import { ApiConfig, RequestOptions } from "@superglue/client";
 import axios, { AxiosRequestConfig } from "axios";
 import { GraphQLResolveInfo } from "graphql";
 import jsonata from "jsonata";
 import { Validator } from "jsonschema";
 import { toJsonSchema } from "../external/json-schema.js";
+import ivm from 'isolated-vm';
 
 export function isRequested(field: string, info: GraphQLResolveInfo) {
     return info.fieldNodes.some(
@@ -26,12 +27,15 @@ export async function applyJsonata(data: any, expr: string): Promise<any> {
     const result = await expression.evaluate(data);
     return result;
   } catch (error) {
-    throw new Error(`Mapping transformation failed: ${error.message}`);
+    const errorPositions = (error as any).position ? expr.substring(error.position - 10, error.position + 10) : "";
+    throw new Error(`JSONata transformation failed: ${error.message} at ${errorPositions}`);
   }
 }
 
 export function superglueJsonata(expr: string) {
-  const expression = jsonata(expr);
+  const expression = jsonata(expr, {
+    recover: false
+  });
   expression.registerFunction("max", (arr: any[]) => {
     if(Array.isArray(arr)) {
       return Math.max(...arr);
@@ -44,9 +48,15 @@ export function superglueJsonata(expr: string) {
     }
     return arr;
   });
-  expression.registerFunction("number", (value: string) => parseFloat(value));
+  expression.registerFunction("number", (value: string) => parseFloat(String(value).trim()));
   expression.registerFunction("map", async (arr: any[], func: (item: any) => any[]) => 
-    Array.isArray(arr) ? await Promise.all(arr.map(func)) : await Promise.all([arr].map(func))
+    (Array.isArray(arr) ? await Promise.all(arr.map(func)) : await Promise.all([arr].map(func))) || []
+  );
+  expression.registerFunction("isArray", async (arr: any) => Array.isArray(arr));
+  expression.registerFunction("isString", async (str: any) => typeof str === "string");
+  expression.registerFunction("isNull", async (arg: any) => arg === null || arg === undefined);
+  expression.registerFunction("join", async (arr: any[], separator: string = ",") => 
+    Array.isArray(arr) ? arr.join(separator) : arr
   );
   expression.registerFunction("substring", (str: string, start: number, end?: number) => String(str).substring(start, end));
   expression.registerFunction("replace", (obj: any, pattern: string, replacement: string) => {
@@ -103,10 +113,29 @@ export function superglueJsonata(expr: string) {
   return expression;
 }
 
+export async function applyTransformationWithValidation(data: any, expr: string, schema: any): Promise<TransformResult> {
+  try{
+    let result: TransformResult;
+    if(!expr) {
+      result = { success: true, data: data };
+    }
+
+    if(expr.startsWith("(sourceData) =>") || 
+      expr.startsWith("(sourceData)=>")){
+      result = await executeAndValidateMappingCode(data, expr, schema);
+    } else {
+      result = await applyJsonataWithValidation(data, expr, schema);
+    }
+    return result;
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
 export async function applyJsonataWithValidation(data: any, expr: string, schema: any): Promise<TransformResult> {
   try {
     const result = await applyJsonata(data, expr);
-    if(result === null || result === undefined || result?.length === 0 || Object.keys(result).length === 0) {
+    if(result === null || result === undefined) {
       return { success: false, error: "Result is empty" };
     }
     // if no schema is given, skip validation
@@ -118,7 +147,8 @@ export async function applyJsonataWithValidation(data: any, expr: string, schema
     const validation = validator.validate(result, optionalSchema);
     if (!validation.valid) {
       return {
-        success: false, 
+        success: false,
+        data: result,
         error: validation.errors.map(e => `${e.stack}. Computed result: ${e.instance ? JSON.stringify(e.instance) : "undefined"}.`).join('\n').slice(0, 1000) + `\n\nExpected schema: ${JSON.stringify(optionalSchema)}`
       };
     }
@@ -127,24 +157,41 @@ export async function applyJsonataWithValidation(data: any, expr: string, schema
     return { success: false, error: error.message };
   }
 }
-function makeRequired(schema: any): any {
-  if (!schema || typeof schema !== 'object') return schema;
 
-  const newSchema = { ...schema };
+export async function executeAndValidateMappingCode(input: any, mappingCode: string, schema: any): Promise<TransformResult> {
+  const isolate = new ivm.Isolate({ memoryLimit: 1024 }); // 32 MB
+  const context = await isolate.createContext();
+  await context.global.set('input', JSON.stringify(input));
 
-  if (schema.type === 'object' && schema.properties) {
-    newSchema.required = Object.keys(schema.properties);
-    newSchema.properties = Object.entries(schema.properties).reduce((acc, [key, value]) => ({
-      ...acc,
-      [key]: makeRequired(value)
-    }), {});
+  let result: any;
+  try {
+    const scriptSource =  `const fn = ${mappingCode}; return JSON.stringify(fn(JSON.parse(input)));`;
+    result = JSON.parse(await context.evalClosure(scriptSource, null, { timeout: 10000 }));
+    if (result === null || result === undefined) {
+      return { success: false, error: "Result is empty" };
+    }
+    // if no schema is given, skip validation
+    if (!schema) {
+      return { success: true, data: result };
+    }
+    const validatorInstance = new Validator();
+    const optionalSchema = addNullableToOptional(schema);
+    const validation = validatorInstance.validate(result, optionalSchema);
+    if (!validation.valid) {
+      return {
+        success: false,
+        data: result,
+        error: validation.errors.map(e => 
+          `${e.stack}. Computed result: ${e.instance ? JSON.stringify(e.instance) : "undefined"}. Expected schema: ${JSON.stringify(e.schema || {})}`)
+          .join('\n').slice(0, 2000)
+      };
+    }
+    return { success: true, data: result };
+  } catch (error) {
+    return { success: false, error: error.message };
+  } finally {
+    isolate.dispose();
   }
-
-  if (schema.type === 'array' && schema.items) {
-    newSchema.items = makeRequired(schema.items);
-  }
-
-  return newSchema;
 }
 
 export async function callAxios(config: AxiosRequestConfig, options: RequestOptions) {
@@ -154,6 +201,11 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
   const maxRateLimitWaitMs = 60 * 1000; // 60s is the max wait time for rate limit retries, hardcoded
   let rateLimitRetryCount = 0;
   let totalRateLimitWaitTime = 0;
+
+  config.headers = {
+    "Accept": "*/*",
+    ...config.headers,
+  }
 
   // Don't send body for GET, HEAD, DELETE, OPTIONS
   if(["GET", "HEAD", "DELETE", "OPTIONS"].includes(config.method!)) {
@@ -245,7 +297,35 @@ export function composeUrl(host: string, path: string) {
   return `${cleanHost}/${cleanPath}`;
 }
 
-export function replaceVariables(template: string, variables: Record<string, any>): string {
+export async function replaceVariables(template: string, payload: Record<string, any>): Promise<string> {
+  if (!template) return "";
+  
+  const pattern = /<<([\s\S]*?)>>/g;
+  
+  let result = template;
+  const matches = [...template.matchAll(pattern)];
+  
+  for (const match of matches) {
+    const path = match[1];
+    let value: any;
+    if(payload[path]) {
+      value = payload[path];
+    }
+    else {
+      value = await applyJsonata(payload, path);
+    }
+
+    if(Array.isArray(value) || typeof value === 'object') {
+      value = JSON.stringify(value);
+    }
+    
+    result = result.replace(match[0], String(value));
+  }
+  
+  return oldReplaceVariables(result, payload);
+}
+
+function oldReplaceVariables(template: string, variables: Record<string, any>): string {
   if (!template) return "";
   
   const variableNames = Object.keys(variables);
@@ -277,14 +357,16 @@ export function replaceVariables(template: string, variables: Record<string, any
   });
 }
 
+
 export function sample(value: any, sampleSize = 10): any {
   if (Array.isArray(value)) {
     const arrLength = value.length;
     if (arrLength <= sampleSize) {
       return value.map(item => sample(item, sampleSize));
     }
-    const step = Math.floor(arrLength / sampleSize);
-    return Array.from({ length: sampleSize }, (_, i) => sample(value[i * step], sampleSize));
+    const newArray = value.slice(0, sampleSize).map(item => sample(item, sampleSize));
+    newArray.push("sampled from " + (arrLength) + " items");
+    return newArray;
   }
 
   if (value && typeof value === 'object') {
@@ -317,17 +399,32 @@ export function addNullableToOptional(schema: any, required: boolean = true): an
   if (!schema || typeof schema !== 'object') return schema;
 
   const newSchema = { ...schema };
-  if (!required && Array.isArray(schema.type)) {
+  if (!required && schema.required !== true && Array.isArray(schema.type)) {
     if (!schema.type.includes('null')) {
       newSchema.type = [...schema.type, 'null'];
     }
-  } else if (!required && schema.type) {
+  } else if (!required && schema.required !== true && schema.type) {
     newSchema.type = [schema.type, 'null'];
-  }  
+  }
+  if(schema?.$defs) {
+    newSchema.$defs = Object.entries(schema.$defs).reduce((acc, [key, value]) => ({
+      ...acc,
+      [key]: addNullableToOptional(value, required)
+    }), {});
+  }
+  if(schema.oneOf) {
+    newSchema.oneOf = schema.oneOf.map(item => addNullableToOptional(item, required));
+  }
+  if(schema.anyOf) {
+    newSchema.anyOf = schema.anyOf.map(item => addNullableToOptional(item, required));
+  }
+  if(schema.allOf) {
+    newSchema.allOf = schema.allOf.map(item => addNullableToOptional(item, required));
+  }
 
   if ((schema.type === 'object' || schema.type?.includes('object')) && schema.properties) {
     newSchema.additionalProperties = false;
-    const allRequired = new Set(schema.required || []);
+    const allRequired = new Set(Array.isArray(schema.required) ? schema.required : []);
     newSchema.required = Object.keys(schema.properties);
     newSchema.properties = Object.entries(schema.properties).reduce((acc, [key, value]) => ({
       ...acc,

@@ -106,7 +106,7 @@ describe('Documentation Class', () => {
       expect(mockPage.goto).toHaveBeenCalledWith(docUrl);
       expect(mockPage.waitForLoadState).toHaveBeenCalledWith('domcontentloaded', { timeout: 15000 });
       expect(mockPage.waitForTimeout).toHaveBeenCalledWith(1000);
-      expect(mockPage.evaluate).toHaveBeenCalledTimes(1); // For removing elements
+      expect(mockPage.evaluate).toHaveBeenCalledTimes(2); // For removing elements and getting links
       expect(mockPage.content).toHaveBeenCalledTimes(1);
       expect(result).toContain('# API Docs');
       expect(result).toContain('Details here.');
@@ -356,7 +356,7 @@ describe('Documentation Class', () => {
           const urlPath = `/${searchTerm}`;
 
           const doc = new Documentation({ documentationUrl: longContent, urlHost: 'https://api.example.com', urlPath }, metadata);
-          const result = await doc.fetch();
+          const result = await doc.fetch(urlPath);
 
         expect(result.length).toBeLessThanOrEqual(DOCUMENTATION_MAX_LENGTH);
           expect(result).toContain(searchTerm);

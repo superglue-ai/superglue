@@ -1,49 +1,49 @@
 {
-    "$schema": "https://turbo.build/schema.json",
-    "tasks": {
-      "build": {
-        "dependsOn": ["^build"],
-        "outputs": ["dist/**", ".next/**"],
-        "inputs": ["src/**/*.tsx", "src/**/*.ts", "*.ts", "*.tsx", "package.json"]
-      },
-      "dev": {
-        "dependsOn": ["build"],
-        "cache": false,
-        "persistent": true
-      },
-      "start": {
-        "cache": false,
-        "persistent": true
-      },
-      "test": {
-        "dependsOn": ["@superglue/core#build"],
-        "outputs": []
-      },
-      "test:coverage": {
-        "dependsOn": ["@superglue/core#build"],
-        "outputs": ["coverage/**"]
-      }
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", ".next/**"],
+      "inputs": ["src/**/*.tsx", "src/**/*.ts", "*.ts", "*.tsx", "package.json"]
     },
-    "globalEnv": [
-      "GRAPHQL_ENDPOINT",
-      "GRAPHQL_PORT",
-      "WEB_PORT",
-      "DATASTORE_TYPE",
-      "REDIS_HOST",
-      "REDIS_PORT",
-      "REDIS_USERNAME",
-      "REDIS_PASSWORD",
-      "NODE_ENV",
-      "AUTH_TOKEN",
-      "DEBUG",
-      "MODEL_PROVIDER",
-      "FIREWORKS_API_KEY",
-      "FIREWORKS_MODEL",
-      "FIREWORKS_BASE_URL",
-      "OPENAI_API_KEY",
-      "OPENAI_API_BASE_URL",
-      "OPENAI_MODEL",
-      "NEXT_PUBLIC_SUPERGLUE_ENDPOINT",
-      "NEXT_PUBLIC_SUPERGLUE_API_KEY"
-    ]
+    "dev": {
+      "dependsOn": ["build"],
+      "cache": false,
+      "persistent": true
+    },
+    "start": {
+      "cache": false,
+      "persistent": true
+    },
+    "test": {
+        "dependsOn": ["@superglue/core#build"],
+      "outputs": []
+    },
+    "test:coverage": {
+        "dependsOn": ["@superglue/core#build"],
+      "outputs": ["coverage/**"]
+    }
+  },
+  "globalEnv": [
+    "GRAPHQL_ENDPOINT",
+    "GRAPHQL_PORT",
+    "WEB_PORT",
+    "DATASTORE_TYPE",
+    "REDIS_HOST",
+    "REDIS_PORT",
+    "REDIS_USERNAME",
+    "REDIS_PASSWORD",
+    "NODE_ENV",
+    "AUTH_TOKEN",
+    "OPENAI_API_KEY",
+    "OPENAI_MODEL",
+    "NEXT_PUBLIC_SUPERGLUE_ENDPOINT",
+    "NEXT_PUBLIC_SUPERGLUE_API_KEY",
+    "STORAGE_DIR",
+    "LLM_PROVIDER",
+    "GEMINI_API_KEY",
+    "GEMINI_MODEL",
+    "OPENAI_API_BASE_URL",
+    "NEXT_PUBLIC_DISABLE_WELCOME_SCREEN"
+  ]
 }

@@ -26,7 +26,6 @@
         "@superglue/shared": "file:../shared",
         "@types/prismjs": "^1.26.5",
         "autoprefixer": "^10.4.20",
-        "axios": "^1.8.2",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "cmdk": "^1.1.1",

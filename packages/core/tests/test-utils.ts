@@ -77,17 +77,22 @@ export class MockServerFactory {
 export class DataStoreFactory {
   private testDir: string;
   private testPath: string;
+  private testLogsPath: string;
   private dataStores: { name: string; instance: DataStore }[] = [];
 
   constructor(testDir = "./.test-data") {
     this.testDir = testDir;
     this.testPath = path.join(testDir, "superglue_data.json");
+    this.testLogsPath = path.join(testDir, "superglue_logs.json");
   }
 
   init() {
     // Clean up any existing test data
     if (fs.existsSync(this.testPath)) {
       fs.unlinkSync(this.testPath);
+    }
+    if (fs.existsSync(this.testLogsPath)) {
+      fs.unlinkSync(this.testLogsPath);
     }
     if (fs.existsSync(this.testDir)) {
       fs.rmdirSync(this.testDir);
@@ -126,6 +131,9 @@ export class DataStoreFactory {
     // Clean up test files
     if (fs.existsSync(this.testPath)) {
       fs.unlinkSync(this.testPath);
+    }
+    if (fs.existsSync(this.testLogsPath)) {
+      fs.unlinkSync(this.testLogsPath);
     }
     if (fs.existsSync(this.testDir)) {
       fs.rmdirSync(this.testDir);

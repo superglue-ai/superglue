@@ -11,7 +11,7 @@ interface BaseConfig {
   updatedAt: DateTime
 }
 
-union ConfigType = ApiConfig | ExtractConfig | TransformConfig
+union ConfigType = ApiConfig | ExtractConfig | TransformConfig | Workflow
 
 type ApiConfig implements BaseConfig {
   # BaseConfig
@@ -104,6 +104,11 @@ type TransformList {
 
 type ExtractList {
   items: [ExtractConfig!]!
+  total: Int!
+}
+
+type WorkflowList {
+  items: [Workflow!]!
   total: Int!
 }
 
@@ -260,7 +265,7 @@ type Query {
   listApis(limit: Int = 10, offset: Int = 0): ApiList!
   listTransforms(limit: Int = 10, offset: Int = 0): TransformList!
   listExtracts(limit: Int = 10, offset: Int = 0): ExtractList!
-  listWorkflows(limit: Int = 10, offset: Int = 0): [Workflow!]!
+  listWorkflows(limit: Int = 10, offset: Int = 0): WorkflowList!
 
   getRun(id: ID!): RunResult
   getApi(id: ID!): ApiConfig
@@ -300,12 +305,6 @@ input ExecutionStepInput {
   responseMapping: JSONata
 }
 
-type ExecutionPlan {
-  id: String!
-  steps: [ExecutionStep!]!
-  finalTransform: JSONata
-}
-
 type Workflow implements BaseConfig {
   # BaseConfig
   id: ID!
@@ -315,7 +314,10 @@ type Workflow implements BaseConfig {
 
   # Specific implementation
   steps: [ExecutionStep!]!
+  instruction: String
   finalTransform: JSONata
+  responseSchema: JSONSchema
+  inputSchema: JSONSchema
 }
 
 type WorkflowStepResult {
@@ -327,18 +329,25 @@ type WorkflowStepResult {
 }
 
 type WorkflowResult {
+  id: ID!
   success: Boolean!
-  data: JSON!
-  stepResults: [WorkflowStepResult!]!
+  data: JSON
   error: String
   startedAt: DateTime!
   completedAt: DateTime!
+  config: Workflow
+
+  stepResults: [WorkflowStepResult!]!
 }
 
 input WorkflowInput {
   id: String!
   steps: [ExecutionStepInput!]!
   finalTransform: JSONata
+  inputSchema: JSONSchema
+  responseSchema: JSONSchema
+  version: String
+  instruction: String
 }
 
 type Mutation {
@@ -375,6 +384,7 @@ type Mutation {
     instruction: String!
     payload: JSON
     systems: [SystemInput!]!
+    responseSchema: JSONSchema
   ): Workflow!
 
   upsertWorkflow(id: ID!, input: JSON!): Workflow!

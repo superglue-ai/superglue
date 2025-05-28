@@ -11,7 +11,7 @@ Before you begin, ensure you have:
 
 - Docker (version 20.10.0 or higher)
 - Redis (version 6.0 or higher) for persistent storage
-- OpenAI API key with access to the recommended model
+- OpenAI or Gemini API key
 - At least 2GB of RAM and 1 CPU core
 - Git (optional, for building from source)
 
@@ -55,39 +55,48 @@ volumes:
 
 2. **Configure Environment Variables**
 
-Create a `.env` file:
+Copy `.env.example` to `.env` and fill in your values. Here are all available variables:
 
 ```env
-# Server Configuration
-
-# Port to run the superglue server
+# Port for the Superglue server
 GRAPHQL_PORT=3000
 
-# Port to run the web dashboard 
-WEB_PORT=3001
-
-# Endpoint the web interface will connect to
+# Endpoint for the graphql api (used so the web dashboard knows where to find the server)
 GRAPHQL_ENDPOINT=http://localhost:3000
 
+# Port for the web dashboard 
+WEB_PORT=3001
 # Authentication token for API access
-AUTH_TOKEN=your-auth-token
+AUTH_TOKEN=your-secret-token
 
-# Datastore Configuration. File is a simple persistent option. Memory is fast but not persistent. Redis is distributed and can be configured to be persistent.
-DATASTORE_TYPE=file or memory or redis
+# Datastore type (redis or memory or file)
+DATASTORE_TYPE=file
 
-# if file
+# if file, the path to the datastore directory
+# if not given or existing, the datastore will be created in the current directory
 STORAGE_DIR=/data
 
-# if redis
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_USERNAME=default
-REDIS_PASSWORD=secret
+# AI Provider - OPENAI or GEMINI
+# best performance / price ratio right now is GEMINI with gemini-2.5-flash-preview-04-17
+LLM_PROVIDER=GEMINI
 
-# OpenAI Configuration
-OPENAI_API_KEY=sk-...
-# OpenAI model to use. We recommend gpt-4o-2024-11-20
-OPENAI_MODEL=gpt-4o-2024-11-20
+# If GEMINI: Your Google API key
+# You can get one here : https://aistudio.google.com/app/apikey
+GEMINI_API_KEY=XXXXXXX
+# Gemini model to use. We recommend gemini-2.5-flash-preview-04-17
+GEMINI_MODEL=gemini-2.5-flash-preview-04-17
+
+# If OPENAI: Your OpenAI API key
+# You can get one here : https://platform.openai.com/api-keys
+OPENAI_API_KEY=sk-proj-XXXXXXXX
+# OpenAI model to use. Use gpt-4.5-preview-2025-02-27 for best results or gpt-4o for speed / cost.
+OPENAI_MODEL=gpt-4o
+# Optional: Set a custom OpenAI API URL (for self-hosted models or providers like fireworks.ai)
+# for fireworks, use https://api.fireworks.ai/inference/v1
+OPENAI_API_BASE_URL=https://api.openai.com/v1
+
+# Disable the welcome/onboarding screen for development
+NEXT_PUBLIC_DISABLE_WELCOME_SCREEN=false
 ```
 
 3. **Start the Services**

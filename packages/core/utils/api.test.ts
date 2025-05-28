@@ -1,4 +1,4 @@
-import { ApiConfig, AuthType, HttpMethod, PaginationType } from '@superglue/shared';
+import { ApiConfig, AuthType, HttpMethod, PaginationType } from '@superglue/client';
 import OpenAI from 'openai';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mocked } from 'vitest';
 import { callEndpoint, generateApiConfig } from './api.js';
@@ -132,7 +132,7 @@ describe('API Utilities', () => {
         ...testConfig,
         pagination: {
           type: PaginationType.PAGE_BASED,
-          pageSize: 2
+          pageSize: "2"
         }
       } as ApiConfig;
 
@@ -161,7 +161,7 @@ describe('API Utilities', () => {
         },
         pagination: {
           type: PaginationType.OFFSET_BASED,
-          pageSize: 2
+          pageSize: "2"
         }
       } as ApiConfig;
 
@@ -199,7 +199,7 @@ describe('API Utilities', () => {
         dataPath: 'data',
         pagination: {
           type: PaginationType.CURSOR_BASED,
-          pageSize: 2,
+          pageSize: "2",
           cursorPath: 'meta.next_cursor'
         }
       } as ApiConfig;
@@ -242,7 +242,7 @@ describe('API Utilities', () => {
         ...testConfig,
         pagination: {
           type: PaginationType.PAGE_BASED,
-          pageSize: 2
+          pageSize: "2"
         }
       } as ApiConfig;
 
@@ -269,7 +269,7 @@ describe('API Utilities', () => {
         ...testConfig,
         pagination: {
           type: PaginationType.OFFSET_BASED,
-          pageSize: 1
+          pageSize: "1"
         }
       } as ApiConfig;
 
@@ -293,7 +293,7 @@ describe('API Utilities', () => {
         ...testConfig,
         pagination: {
           type: PaginationType.OFFSET_BASED,
-          pageSize: 1
+          pageSize: "1"
         }
       } as ApiConfig;
 

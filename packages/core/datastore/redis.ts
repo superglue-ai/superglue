@@ -1,9 +1,9 @@
-import type { ApiConfig, DataStore, ExtractConfig, RunResult, Workflow, TransformConfig } from "@superglue/shared";
+import type { ApiConfig, ExtractConfig, RunResult, Workflow, TransformConfig } from "@superglue/client";
 import { createHash } from 'node:crypto';
 import { type RedisClientType, createClient } from 'redis';
 import { getSchemaFromData } from "../utils/tools.js";
 import { logMessage } from "../utils/logs.js";
-
+import type { DataStore } from "./types.js";
 export class RedisService implements DataStore {
   private redis: RedisClientType;
   private readonly RUN_PREFIX = 'run:';

@@ -1,11 +1,11 @@
-import { CacheMode, Context, DecompressionMethod, ExtractConfig, ExtractInputRequest, FileType, RequestOptions } from "@superglue/shared";
+import { CacheMode, DecompressionMethod, ExtractConfig, ExtractInputRequest, FileType, RequestOptions } from "@superglue/client";
+import type { Context, Metadata } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { callExtract, processFile, generateExtractConfig } from "../../utils/extract.js";
 import { telemetryClient } from "../../utils/telemetry.js";
 import { maskCredentials } from "../../utils/tools.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 import { logMessage } from "../../utils/logs.js";
-import { Metadata } from "openai/resources/index.mjs";
 import { Documentation } from "../../utils/documentation.js";
 
 export const extractResolver = async (
@@ -35,7 +35,7 @@ export const extractResolver = async (
     };
     do {
       if(input.file) {
-        const { createReadStream, filename } = await input.file;
+        const { createReadStream, filename } = await input.file as any;
         const stream = createReadStream();
         const chunks: Buffer[] = [];
         for await (const chunk of stream) {
@@ -56,11 +56,14 @@ export const extractResolver = async (
           await context.datastore.getExtractConfig(input.id, context.orgId)
           : null;
         if(!preparedExtract) {
-          const documentation = new Documentation(preparedExtract, metadata);
-          const documentationString = await documentation.fetch();
-          preparedExtract = await generateExtractConfig(preparedExtract, documentationString, payload, credentials, lastError);
-      
+          if(!input.endpoint.instruction) {
+            throw new Error("Id could not be found and no endpoint provided.");
+          }
+          const documentation = new Documentation(input.endpoint, metadata);
+          const documentationString = await documentation.fetch(input.endpoint.instruction || "");
+          preparedExtract = await generateExtractConfig(input.endpoint, documentationString, payload, credentials, lastError);
         }
+        
         try {
           const buffer = await callExtract(preparedExtract, payload, credentials, options);
           response = await processFile(buffer, preparedExtract);
