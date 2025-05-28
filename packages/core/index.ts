@@ -14,7 +14,7 @@ import { resolvers, typeDefs } from './graphql/graphql.js';
 import { createTelemetryPlugin, telemetryMiddleware } from './utils/telemetry.js';
 import { logMessage } from "./utils/logs.js";
 import { authMiddleware, validateToken, extractToken } from './auth/auth.js';
-
+import { handleMcpSessionRequest, mcpHandler } from './mcp/mcp-server.js';
 // Constants
 const PORT = process.env.GRAPHQL_PORT || 3000;
 
@@ -139,10 +139,11 @@ async function startServer() {
   app.use(telemetryMiddleware);
   app.use(graphqlUploadExpress({ maxFileSize: 10000000, maxFiles: 1 })); // Consider if needed before auth
 
-  // Apply Apollo middleware *after* other middlewares
-  // Ensure the path matches your desired GraphQL endpoint for HTTP
-  app.use('/', expressMiddleware(server, { context: getHttpContext }));
+  app.post('/mcp', mcpHandler);
+  app.get('/mcp', handleMcpSessionRequest);
+  app.delete('/mcp', handleMcpSessionRequest);
 
+  app.use('/', expressMiddleware(server, { context: getHttpContext }));
   // Modified server startup
   await new Promise<void>((resolve) => httpServer.listen({ port: PORT }, resolve));
 

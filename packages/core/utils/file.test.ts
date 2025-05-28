@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { decompressZip, parseFile } from './file.js';
-import { FileType } from '@superglue/shared';
+import { FileType } from '@superglue/client';
 import axios from 'axios';
 
 describe('File Utilities', () => {

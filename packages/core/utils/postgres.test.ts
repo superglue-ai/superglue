@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { callPostgres } from './postgres.js';
-import pkg from 'pg';
-const { Pool } = pkg;
-import { ApiConfig, RequestOptions } from '@superglue/shared';
+import { Pool } from 'pg';
+import { ApiConfig, RequestOptions } from '@superglue/client';
 
 // Create mock functions that we can reference
 const mockQuery = vi.fn();
@@ -10,12 +9,10 @@ const mockEnd = vi.fn();
 
 // Mock pg Pool
 vi.mock('pg', () => ({
-  default: {
-    Pool: vi.fn().mockImplementation(() => ({
-      query: mockQuery,
-      end: mockEnd
-    }))
-  }
+  Pool: vi.fn().mockImplementation(() => ({
+    query: mockQuery,
+    end: mockEnd
+  }))
 }));
 
 describe('PostgreSQL Utilities', () => {

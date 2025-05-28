@@ -1,4 +1,4 @@
-import { type ApiConfig, AuthType, HttpMethod, Metadata, PaginationType, type RequestOptions } from "@superglue/shared";
+import { type ApiConfig, AuthType, FileType, HttpMethod, PaginationType, type RequestOptions } from "@superglue/client";
 import type { AxiosRequestConfig } from "axios";
 import OpenAI from "openai";
 import { z } from "zod";
@@ -6,9 +6,11 @@ import { zodToJsonSchema } from "zod-to-json-schema";
 import { callAxios, composeUrl, generateId, replaceVariables } from "./tools.js";
 import { API_PROMPT } from "../llm/prompts.js";
 import { logMessage } from "./logs.js";
-import { parseXML } from "./file.js";
+import { parseFile, parseXML } from "./file.js";
 import { LanguageModel } from "../llm/llm.js";
 import { callPostgres } from "./postgres.js";
+import { error } from "console";
+import { JSONSchema } from "openai/lib/jsonschema.mjs";
 
 export function convertBasicAuthToBase64(headerValue: string){
     if(!headerValue) return headerValue;
@@ -38,21 +40,22 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
   let cursor = null;
   let hasMore = true;
   let loopCounter = 0;
+  let seenResponseHashes = new Set<string>();
 
   while (hasMore && loopCounter < 500) {
     // Generate pagination variables if enabled
     let paginationVars = {};
     switch (endpoint.pagination?.type) {
       case PaginationType.PAGE_BASED:
-        const pageSize = endpoint.pagination?.pageSize || 50;
+        const pageSize = endpoint.pagination?.pageSize || "50";
         paginationVars = { page, limit: pageSize, pageSize: pageSize };
         break;
       case PaginationType.OFFSET_BASED:
-        const offsetPageSize = endpoint.pagination?.pageSize || 50;
+        const offsetPageSize = endpoint.pagination?.pageSize || "50";
         paginationVars = { offset, limit: offsetPageSize, pageSize: offsetPageSize };
         break;
       case PaginationType.CURSOR_BASED:
-        const cursorPageSize = endpoint.pagination?.pageSize || 50;
+        const cursorPageSize = endpoint.pagination?.pageSize || "50";
         paginationVars = { cursor: cursor, limit: cursorPageSize, pageSize: cursorPageSize };
         break;
       default:
@@ -62,16 +65,20 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
 
     // Combine all variables
     const requestVars = { ...paginationVars, ...allVariables };
+
     // Check for any {var} in the generated config that isn't in available variables
-    const invalidVars = validateVariables(endpoint, Object.keys(requestVars));
+    //const invalidVars = validateVariables(endpoint, Object.keys(requestVars));
     
-    if (invalidVars.length > 0) {
-      throw new Error(`The following variables are not defined: ${invalidVars.join(', ')}`);  
-    }
+    //if (invalidVars.length > 0) {
+    //  throw new Error(`The following variables are not defined: ${invalidVars.join(', ')}`);  
+    //}
+
     // Generate request parameters with variables replaced
     const headers = Object.fromEntries(
-      Object.entries(endpoint.headers || {})
-        .map(([key, value]) => [key, replaceVariables(value, requestVars)])
+      (await Promise.all(
+        Object.entries(endpoint.headers || {})
+          .map(async ([key, value]) => [key, await replaceVariables(value, requestVars)])
+      )).filter(([_, value]) => value && value !== "undefined" && value !== "null")
     );
 
     // Process headers for Basic Auth
@@ -85,15 +92,17 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
     }
 
     const queryParams = Object.fromEntries(
-      Object.entries(endpoint.queryParams || {})
-        .map(([key, value]) => [key, replaceVariables(value, requestVars)])
+      (await Promise.all(
+        Object.entries(endpoint.queryParams || {})
+          .map(async ([key, value]) => [key, await replaceVariables(value, requestVars)])
+      )).filter(([_, value]) => value && value !== "undefined" && value !== "null")
     );
 
     const body = endpoint.body ? 
-      replaceVariables(endpoint.body, requestVars) : 
+      await replaceVariables(endpoint.body, requestVars) : 
       "";
 
-    const url = replaceVariables(composeUrl(endpoint.urlHost, endpoint.urlPath), requestVars);
+    const url = await replaceVariables(composeUrl(endpoint.urlHost, endpoint.urlPath), requestVars);
 
     const axiosConfig: AxiosRequestConfig = {
       method: endpoint.method,
@@ -110,12 +119,10 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
         response.data?.error || 
         (Array.isArray(response?.data?.errors) && response?.data?.errors.length > 0)
       ) {
-      const error = JSON.stringify(response?.data?.error || response.data?.errors || response?.data);
-      let message = `${endpoint.method} ${url} failed with status ${response.status}. Response: ${String(error).slice(0, 1000)}
-      Headers: ${JSON.stringify(headers)}
-      Body: ${JSON.stringify(body)}
-      Params: ${JSON.stringify(queryParams)}
-      `;
+      const error = JSON.stringify(response?.data?.error || response.data?.errors || response?.data || response?.statusText || "undefined");
+      let message = `${endpoint.method} ${url} failed with status ${response.status}.
+Response: ${String(error).slice(0, 1000)}
+config: ${JSON.stringify(axiosConfig)}`;
       
       // Add specific context for rate limit errors
       if (response.status === 429) {
@@ -143,8 +150,8 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
 
     let responseData = response.data;
 
-    if(responseData && typeof responseData === 'string' && responseData.startsWith('<')) {
-      responseData = await parseXML(Buffer.from(responseData));
+    if(responseData && typeof responseData === 'string') {
+      responseData = await parseFile(Buffer.from(responseData), FileType.AUTO);
     }
 
     if (endpoint.dataPath) {
@@ -163,11 +170,13 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
     }
     
     if (Array.isArray(responseData)) {
-      if(responseData.length < endpoint.pagination?.pageSize) {
+      const pageSize = parseInt(endpoint.pagination?.pageSize || "50");
+      if(!pageSize || responseData.length < pageSize) {
         hasMore = false;
       }
-
-      if(JSON.stringify(responseData) !== JSON.stringify(allResults)) {
+      const currentResponseHash = JSON.stringify(responseData);
+      if(!seenResponseHashes.has(currentResponseHash)) {
+        seenResponseHashes.add(currentResponseHash);
         allResults = allResults.concat(responseData);
       }
       else {
@@ -187,7 +196,7 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
       page++;
     }
     else if(endpoint.pagination?.type === PaginationType.OFFSET_BASED) {
-      offset += endpoint.pagination?.pageSize || 50;
+      offset += parseInt(endpoint.pagination?.pageSize || "50");
     }
     else if (endpoint.pagination?.type === PaginationType.CURSOR_BASED) {
         const cursorParts = (endpoint.pagination?.cursorPath || 'next_cursor').split('.');
@@ -206,8 +215,8 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
   if(endpoint.pagination?.type === PaginationType.CURSOR_BASED) {
     return {
       data: {
-        results: allResults,
-        next_cursor: cursor
+        next_cursor: cursor,
+        ...(Array.isArray(allResults) ? { results: allResults } : allResults)
       }
     };
   }
@@ -237,7 +246,7 @@ export async function generateApiConfig(
       key: z.string(),
       value: z.string()
     })).optional(),
-    body: z.string().optional().describe("Format as JSON if not instructed otherwise."),
+    body: z.string().optional().describe("Format as JSON if not instructed otherwise. Use <<>> to access variables."),
     authentication: z.enum(Object.values(AuthType) as [string, ...string[]]),
     dataPath: z.string().optional().describe("The path to the data you want to extract from the response. E.g. products.variants.size"),
     pagination: z.object({
@@ -307,30 +316,29 @@ Documentation: ${String(documentation)}`;
   };
 }
 
-function validateVariables(generatedConfig: any, vars: string[]) {
-  vars = [
-    ...vars,
-    "page",
-    "limit",
-    "offset",
-    "cursor"
-  ]
-  
-  // Helper function to find only template variables in a string
-  const findTemplateVars = (str: string) => {
-    if (!str) return [];
-    // Only match {varName} patterns that aren't within JSON quotes
-    const matches = str.match(/\{(\w+)\}/g) || [];
-    return matches.map((match: string) => match.slice(1, -1));
-  };
+export async function evaluateResponse(data: any, responseSchema: JSONSchema, instruction: string): Promise<{success: boolean, refactorNeeded: boolean, shortReason: string}> {
+  const request = [
+    {
+      role: "system",
+      content: `You are an API response validator. 
+Validate the following api response and return { success: true, shortReason: "", refactorNeeded: false } if the response aligns with the instruction. 
+If the response does not align with the instruction, return { success: false, shortReason: "reason why it does not align", refactorNeeded: false }.
 
-  const varMatches = [
-    generatedConfig.urlPath,
-    ...Object.values(generatedConfig.queryParams || {}),
-    ...Object.values(generatedConfig.headers || {}),
-    generatedConfig.body
-  ].flatMap(value => findTemplateVars(String(value)));
+Do not make the mistake of thinking that the { success: true, shortReason: "", refactorNeeded: false } is the expected API response format. It is YOUR expected response format.
+Keep in mind that the response can come in any shape or form, just validate that the response aligns with the instruction.
+If the instruction contains a filter and the response contains data not matching the filter, return { success: true, refactorNeeded: true, shortReason: "Only results matching the filter XXX" }.
+If the reponse is valid but hard to comprehend, return { success: true, refactorNeeded: true, shortReason: "The response is valid but hard to comprehend. Please refactor the instruction to make it easier to understand." }.
+E.g. if the response is something like { "data": { "products": [{"id": 1, "name": "Product 1"}, {"id": 2, "name": "Product 2"}] } }, no refactoring is needed.
+If the response reads something like [ "12/2", "22.2", "frejgeiorjgrdelo"] that makes it very hard to parse the required information of the instruction, refactoring is needed. 
+Instruction: ${instruction}`
+    },
+    {role: "user", content: JSON.stringify(data)}
+  ] as OpenAI.Chat.ChatCompletionMessageParam[];
 
-  const invalidVars = varMatches.filter(v => !vars.includes(v));
-  return invalidVars;
+  const response = await LanguageModel.generateObject(
+    request,
+    {type: "object", properties: {success: {type: "boolean"}, refactorNeeded: {type: "boolean"}, shortReason: {type: "string"}}},
+    0
+  );
+  return response.response;
 }

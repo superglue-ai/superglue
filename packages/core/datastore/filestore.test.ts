@@ -1,4 +1,4 @@
-import { ApiConfig, ExtractConfig, HttpMethod, RunResult, TransformConfig } from '@superglue/shared';
+import { ApiConfig, ExtractConfig, HttpMethod, RunResult, TransformConfig } from '@superglue/client';
 import { beforeEach, describe, expect, it, afterEach } from 'vitest';
 import { FileStore } from './filestore.js';
 import fs from 'fs';
@@ -8,12 +8,16 @@ describe('FileStore', () => {
   let store: FileStore;
   const testOrgId = 'test-org';
   const testDir = './.test-data';
+  const testLogsPath = path.join(testDir, 'superglue_logs.json');
   const testPath = path.join(testDir, 'superglue_data.json');
 
   beforeEach(() => {
     // Clean up any existing test data
     if (fs.existsSync(testPath)) {
       fs.unlinkSync(testPath);
+    }
+    if (fs.existsSync(testLogsPath)) {
+      fs.unlinkSync(testLogsPath);
     }
     if (fs.existsSync(testDir)) {
       fs.rmdirSync(testDir);
@@ -27,6 +31,9 @@ describe('FileStore', () => {
     // Clean up test files
     if (fs.existsSync(testPath)) {
       fs.unlinkSync(testPath);
+    }
+    if(fs.existsSync(testLogsPath)) {
+      fs.unlinkSync(testLogsPath);
     }
     if (fs.existsSync(testDir)) {
       fs.rmdirSync(testDir);
@@ -105,9 +112,7 @@ describe('FileStore', () => {
       updatedAt: new Date(),
       instruction: 'Test transformation',
       responseSchema: {},
-      responseMapping: '',
-      confidence: 1,
-      confidence_reasoning: 'test',
+      responseMapping: ''
     };
 
     it('should store and retrieve transform configs', async () => {
@@ -241,9 +246,7 @@ describe('FileStore', () => {
         updatedAt: new Date(),
         instruction: 'Test transformation',
         responseSchema: {},
-        responseMapping: '',
-        confidence: 1,
-        confidence_reasoning: 'test',
+        responseMapping: ''
       };
 
       const testRun: RunResult = {

@@ -1,4 +1,4 @@
-import { ApiConfig, ExtractConfig, HttpMethod, RunResult, TransformConfig } from '@superglue/shared';
+import { ApiConfig, ExtractConfig, HttpMethod, RunResult, TransformConfig } from '@superglue/client';
 import { beforeEach, describe, expect, it, afterEach, vi } from 'vitest';
 import { RedisService } from './redis.js';
 
@@ -110,9 +110,7 @@ if (!testConfig.host || !testConfig.port || !testConfig.username || !testConfig.
         updatedAt: new Date(),
         instruction: 'Test transformation',
         responseSchema: {},
-        responseMapping: '',
-        confidence: 1,
-        confidence_reasoning: 'test',
+        responseMapping: ''
       };
 
       it('should store and retrieve transform configs', async () => {

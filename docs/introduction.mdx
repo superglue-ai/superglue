@@ -1,103 +1,54 @@
 ---
-title: "Welcome to superglue 🍯"
-description: "Connect to any API without writing complex integration code."
+title: "welcome to superglue 🍯"
+description: "one SDK to manage all your data pipelines."
 ---
 
-[superglue](https://superglue.cloud/) is an API connector that writes its own code. It lets you connect to any API/data source and get the data you want in the format you need. It’s an open source proxy server which sits between you and your target APIs. Thus, you can easily deploy it into your own infra.
+superglue bundles your pipelines into one stable, self-healing endpoint. Comes with automated schema-drift detection, retries and remappings so your data keeps moving no matter what - no connector maintenance, no rewrites. You can deploy it as a proxy between you and any SaaS app, API and data source and always get the data that you want in the format you expect.
 
-## Core Functionality
+- Drop‑in proxy: point it at any REST / GraphQL / SQL / file endpoint.
+- LLM‑assisted mapping at setup; cached JSONata transforms at runtime (no LLM latency).
+- Self‑healing drift detector: when the upstream schema changes, superglue regenerates the transform, bumps a version, and keeps the pipeline running.
+- Security‑first: zero data stored; run fully on‑prem or use our hosted version.
+- Agent‑ready: every pipeline is exposed as a single, deterministic endpoint that LangChain, Retool or internal no‑code tools can call without knowing the ugly stuff underneath.
 
-* Understands schema and format of data source
+It's open source and easy to run in your own infra.
 
-* Transforms data sources into your target schema
+<iframe width="560" height="315" src="https://www.youtube.com/embed/bWO-yp6yLXo" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen />
 
-* Handles extraction, validation, and transformation automatically
+## core functionality
 
-* Creates deterministic transformation instructions using LLMs
+- Understands schema and format of data source
+- Transforms data sources into your target schema
+- Handles extraction, validation, and transformation automatically
+- Creates deterministic transformation instructions using LLMs
+- Validates output against JSON schemas
+- Supports monitoring, error handling, self-healing out of the box
+- Real-time log streaming via GraphQL subscriptions
+- Use as a drop-in replacement for any API integration or as lightweight ETL
 
-* Validates output against JSON schemas
+## what people build with superglue
 
-* Supports monitoring, error handling, self-healing out of the box
+- Ship connectors 10x faster, without the maintenance overhead
+- Simple interface for legacy API pipelines
+- CMS or cloud migration
+- Transforming SQL queries into Rest API calls
+- Data lake consolidation
+- Track data lineage
+- And many more...
 
-* Use as a drop-in replacement for any API integration or as lightweight ETL
+## next steps
 
-## Quick Start
+- Read our [Quick Start Guide](/docs/quickstart) to set up superglue for your usecase
+- Check out our guides, e.g. on [Hubspot](/guides/hubspot), to learn common patterns
+- Learn about [advanced configuration](/api-reference/overview)
 
-1. **Get Access**
+## support & resources
 
-Get your API key at [https://app.superglue.cloud](https://superglue.cloud) and sign up for early access to the hosted version. Alternatively, you can [self-host](/guides/self-hosting) superglue.
+- [API Reference](/api-reference/overview)
+- [GitHub Repository](https://github.com/superglue-ai/superglue)
+- [Discord Community](https://discord.gg/vUKnuhHtfW)
+- Email: [stefan@superglue.cloud](mailto:stefan@superglue.cloud)
 
-1. **Install the SDK**
-
-```bash
-# Install the SDK
-npm install @superglue/client
-```
-
-1. **Make Your First Call**
-
-```typescript
-import { SuperglueClient } from "@superglue/client";
-
-const superglue = new SuperglueClient({
-  apiKey: "YOUR_API_KEY"
-});
-
-// Transform any API response with a single call
-const result = await superglue.call({
-  endpoint: {
-    urlHost: "https://futuramaapi.com",
-    instruction: "get all characters from the show from the graphql api",
-    documentation: "https://futuramaapi.com/graphql",
-    responseSchema: {
-      type: "object",
-      properties: {
-        characters: {
-          type: "array",  
-          items: {
-            type: "object",
-            properties: {
-              name: { type: "string" },
-              species: { type: "string", description: "lowercased" }
-            }
-          }
-        }
-      }
-    }
-  }
-});
-```
-
-## Next Steps
-
-* See [example use cases](/examples) for common integration patterns
-
-* Learn about [advanced configuration](/api-reference/overview)
-
-* Check out our [self-hosting guide](/self-hosting) for deploying your own instance
-
-## Requirements
-
-* Node.js 16+ for the client SDK
-
-* For self-hosting:
-
-  * Docker 20.10.0+
-
-  * Redis 6.0+
-
-  * OpenAI API key
-
-## Support & Resources
-
-* [API Reference](/api-reference/overview)
-
-* [GitHub Repository](https://github.com/superglue-ai/superglue)
-
-* [Discord Community](https://discord.gg/vUKnuhHtfW)
-
-* Email: [stefan@superglue.cloud](mailto:stefan@superglue.cloud)
-
-***
+---
 
 Ready to simplify your API integrations? [Get started now](https://superglue.cloud)

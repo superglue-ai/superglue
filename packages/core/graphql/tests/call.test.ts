@@ -1,4 +1,5 @@
-import { ApiConfig, ApiInputRequest, CacheMode, Context, Metadata, RequestOptions } from "@superglue/shared";
+import { ApiInputRequest, CacheMode, RequestOptions } from "@superglue/client";
+import { Context, Metadata } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mocked } from 'vitest';
 import * as api from "../../utils/api.js";
@@ -95,6 +96,7 @@ describe('Call Resolver', () => {
         config: { ...testInput.endpoint },
         messages: []
       });
+      mockedApi.evaluateResponse.mockResolvedValueOnce({ success: true, shortReason: '', refactorNeeded: false   });
 
       const result = await executeApiCall(
         testInput.endpoint, 
@@ -112,19 +114,25 @@ describe('Call Resolver', () => {
       expect(mockedApi.generateApiConfig).toHaveBeenCalledTimes(1);
       expect(mockedLogs.logMessage).toHaveBeenCalledWith(
         'info',
-        expect.stringContaining('retry 1'),
+        expect.stringContaining('(1)'),
         testMetadata
       );
     });
 
-    it('should throw after max retries', async () => {
-      // Mock consistent failures
-      mockedApi.callEndpoint.mockRejectedValue(new Error('API call failed'));
+    it('should throw after max retries due to evaluateResponse failures', async () => {
+      // Mock callEndpoint to succeed (after the first attempt, which will use the unmocked path)
+      // The first attempt will fail, triggering retries. Subsequent callEndpoint calls within retries will succeed.
+      mockedApi.callEndpoint
+        .mockRejectedValueOnce(new Error('Initial API call failed to trigger retry logic')) // Fails first time
+        .mockResolvedValue({ data: { result: 'success' } }); // Succeeds on retries
+
       vi.mocked(Documentation.prototype.fetch).mockResolvedValue('test docs');
       mockedApi.generateApiConfig.mockResolvedValue({
         config: { ...testInput.endpoint },
         messages: []
       });
+      // Mock evaluateResponse to consistently fail
+      mockedApi.evaluateResponse.mockResolvedValue({ success: false, shortReason: 'Eval failed', refactorNeeded: false });
 
       await expect(executeApiCall(
         testInput.endpoint, 
@@ -132,10 +140,56 @@ describe('Call Resolver', () => {
         testCredentials, 
         testOptions,
         testMetadata
-      )).rejects.toThrow(/API call failed after \d+ retries/);
+      )).rejects.toThrow(/API call failed after \d+ retries.*Last error: Eval failed/);
       
-      expect(mockedApi.callEndpoint).toHaveBeenCalledTimes(5);
+      // callEndpoint is called once for the initial attempt, then 7 more times for retries where evaluateResponse fails.
+      expect(mockedApi.callEndpoint).toHaveBeenCalledTimes(8); 
+      // evaluateResponse is called for each of the 7 retries after the first callEndpoint failure.
+      expect(mockedApi.evaluateResponse).toHaveBeenCalledTimes(7);  
       expect(mockedTelemetry.telemetryClient?.captureException).toHaveBeenCalled();
+    });
+
+    it('should retry on evaluateResponse failure and eventually succeed', async () => {
+      // Mock callEndpoint to fail once, then succeed
+      mockedApi.callEndpoint
+        .mockRejectedValueOnce(new Error('Initial API call failed to trigger retry logic')) // Fails first time to enter retry
+        .mockResolvedValue({ data: { result: 'successful data' } }); // Succeeds on subsequent calls
+
+      vi.mocked(Documentation.prototype.fetch).mockResolvedValue('test docs');
+      mockedApi.generateApiConfig.mockResolvedValue({
+        config: { ...testInput.endpoint, responseSchema: {} }, // ensure responseSchema is present
+        messages: []
+      });
+
+      // Mock evaluateResponse to fail once, then succeed
+      mockedApi.evaluateResponse
+        .mockResolvedValueOnce({ success: false, shortReason: 'Eval failed first time', refactorNeeded: false })
+        .mockResolvedValueOnce({ success: true, shortReason: '', refactorNeeded: false });
+
+      const result = await executeApiCall(
+        testInput.endpoint,
+        testPayload,
+        testCredentials,
+        testOptions,
+        testMetadata
+      );
+
+      expect(result.data).toEqual({ result: 'successful data' });
+      // Initial call + 1st retry (evaluateResponse fails) + 2nd retry (evaluateResponse succeeds)
+      expect(mockedApi.callEndpoint).toHaveBeenCalledTimes(3);
+      // evaluateResponse called on 1st retry (fails) and 2nd retry (succeeds)
+      expect(mockedApi.evaluateResponse).toHaveBeenCalledTimes(2);
+      expect(mockedApi.generateApiConfig).toHaveBeenCalledTimes(2); // Called for each retry attempt
+      expect(mockedLogs.logMessage).toHaveBeenCalledWith(
+        'info',
+        expect.stringContaining('(1)'), // For the first retry
+        testMetadata
+      );
+      expect(mockedLogs.logMessage).toHaveBeenCalledWith(
+        'info',
+        expect.stringContaining('(2)'), // For the second retry
+        testMetadata
+      );
     });
 
     it('should handle null response data', async () => {
@@ -157,7 +211,7 @@ describe('Call Resolver', () => {
         testMetadata
       )).rejects.toThrow(/API call failed after \d+ retries/);
       
-      expect(mockedApi.callEndpoint).toHaveBeenCalledTimes(5);
+      expect(mockedApi.callEndpoint).toHaveBeenCalledTimes(8);
     });
   });
 
@@ -243,7 +297,7 @@ describe('Call Resolver', () => {
         instruction: 'test-instruction',
         id: 'test-endpoint-id'
       });
-      mockedTools.applyJsonataWithValidation.mockResolvedValue({
+      mockedTools.applyTransformationWithValidation.mockResolvedValue({
         success: true,
         data: { transformed: 'data' }
       });
@@ -279,7 +333,7 @@ describe('Call Resolver', () => {
         .mockResolvedValueOnce({ responseMapping: 'invalid', responseSchema: {}, instruction: 'test-instruction', id: 'test-endpoint-id' })
         .mockResolvedValueOnce({ responseMapping: 'valid', responseSchema: {}, instruction: 'test-instruction', id: 'test-endpoint-id' });
       
-      mockedTools.applyJsonataWithValidation
+      mockedTools.applyTransformationWithValidation
         .mockResolvedValueOnce({ success: false, error: 'Transform error' })
         .mockResolvedValueOnce({ success: true, data: { transformed: 'success' } });
 
@@ -301,7 +355,7 @@ describe('Call Resolver', () => {
         data: { transformed: 'success' }
       });
       expect(mockedTransform.prepareTransform).toHaveBeenCalledTimes(2);
-      expect(mockedTools.applyJsonataWithValidation).toHaveBeenCalledTimes(2);
+      expect(mockedTools.applyTransformationWithValidation).toHaveBeenCalledTimes(2);
       expect(mockedLogs.logMessage).toHaveBeenCalledWith(
         'warn',
         expect.stringContaining('Transformation failed'),
@@ -317,7 +371,7 @@ describe('Call Resolver', () => {
       
       // Mock transform to always fail
       mockedTransform.prepareTransform.mockResolvedValue({ responseMapping: 'invalid', responseSchema: {}, instruction: 'test-instruction', id: 'test-endpoint-id' });
-      mockedTools.applyJsonataWithValidation.mockResolvedValue({ 
+      mockedTools.applyTransformationWithValidation.mockResolvedValue({ 
         success: false, 
         error: 'Transform error' 
       });
@@ -340,7 +394,7 @@ describe('Call Resolver', () => {
         error: expect.stringContaining('Transformation failed')
       });
       expect(mockedTransform.prepareTransform).toHaveBeenCalledTimes(3);
-      expect(mockedTools.applyJsonataWithValidation).toHaveBeenCalledTimes(3);
+      expect(mockedTools.applyTransformationWithValidation).toHaveBeenCalledTimes(3);
     });
     
     it('should notify webhook on success when configured', async () => {

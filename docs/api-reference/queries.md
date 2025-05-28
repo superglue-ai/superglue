@@ -1,18 +1,19 @@
 ---
-title: 'Queries'
-description: 'Queries are used to retrieve configs and logs.'
+title: "Queries"
+description: "Queries are used to retrieve configs, logs, and workflow info."
 ---
 
 ## List Operations
 
 ### listRuns
+
 Returns a paginated list of execution runs.
 
 <Tabs>
   <Tab title="GraphQL">
     ```graphql
-    query ListRuns($limit: Int = 10, $offset: Int = 0) {
-      listRuns(limit: $limit, offset: $offset) {
+    query ListRuns($limit: Int = 10, $offset: Int = 0, $configId: ID) {
+      listRuns(limit: $limit, offset: $offset, configId: $configId) {
         items {
           id
           success
@@ -24,15 +25,31 @@ Returns a paginated list of execution runs.
             ... on ApiConfig {
               id
               urlHost
+              urlPath
               method
+              instruction
+              authentication
+              createdAt
+              updatedAt
             }
             ... on ExtractConfig {
               id
+              urlHost
+              urlPath
               fileType
+              decompressionMethod
+              instruction
+              authentication
+              createdAt
+              updatedAt
             }
             ... on TransformConfig {
               id
+              instruction
               responseSchema
+              responseMapping
+              createdAt
+              updatedAt
             }
           }
         }
@@ -43,20 +60,13 @@ Returns a paginated list of execution runs.
   </Tab>
   <Tab title="Client">
     ```typescript
-    const client = new SuperglueClient({
-      apiKey: 'YOUR_API_KEY'
-    });
-
     const { items, total } = await client.listRuns(100, 0);
-    console.log(`Found ${total} runs`);
-    items.forEach(run => {
-      console.log(`Run ${run.id}: ${run.success ? 'Success' : 'Failed'}`);
-    });
     ```
   </Tab>
 </Tabs>
 
 ### listApis
+
 Returns a paginated list of API configurations.
 
 <Tabs>
@@ -69,6 +79,7 @@ Returns a paginated list of API configurations.
           urlHost
           urlPath
           method
+          instruction
           authentication
           createdAt
           updatedAt
@@ -80,20 +91,13 @@ Returns a paginated list of API configurations.
   </Tab>
   <Tab title="Client">
     ```typescript
-    const client = new SuperglueClient({
-      apiKey: 'YOUR_API_KEY'
-    });
-
     const { items, total } = await client.listApis(10, 0);
-    console.log(`Found ${total} API configs`);
-    items.forEach(config => {
-      console.log(`API ${config.id}: ${config.urlHost}${config.urlPath}`);
-    });
     ```
   </Tab>
 </Tabs>
 
 ### listTransforms
+
 Returns a paginated list of transform configurations.
 
 <Tabs>
@@ -103,6 +107,7 @@ Returns a paginated list of transform configurations.
       listTransforms(limit: $limit, offset: $offset) {
         items {
           id
+          instruction
           responseSchema
           responseMapping
           createdAt
@@ -115,20 +120,13 @@ Returns a paginated list of transform configurations.
   </Tab>
   <Tab title="Client">
     ```typescript
-    const client = new SuperglueClient({
-      apiKey: 'YOUR_API_KEY'
-    });
-
     const { items, total } = await client.listTransforms(10, 0);
-    console.log(`Found ${total} transform configs`);
-    items.forEach(config => {
-      console.log(`Transform ${config.id}`);
-    });
     ```
   </Tab>
 </Tabs>
 
 ### listExtracts
+
 Returns a paginated list of extract configurations.
 
 <Tabs>
@@ -139,8 +137,11 @@ Returns a paginated list of extract configurations.
         items {
           id
           urlHost
+          urlPath
           fileType
           decompressionMethod
+          instruction
+          authentication
           createdAt
           updatedAt
         }
@@ -151,15 +152,49 @@ Returns a paginated list of extract configurations.
   </Tab>
   <Tab title="Client">
     ```typescript
-    const client = new SuperglueClient({
-      apiKey: 'YOUR_API_KEY'
-    });
-
     const { items, total } = await client.listExtracts(10, 0);
-    console.log(`Found ${total} extract configs`);
-    items.forEach(config => {
-      console.log(`Extract ${config.id}: ${config.fileType}`);
-    });
+    ```
+  </Tab>
+</Tabs>
+
+### listWorkflows
+
+Returns a paginated list of workflow configurations.
+
+<Tabs>
+  <Tab title="GraphQL">
+    ```graphql
+    query ListWorkflows($limit: Int = 10, $offset: Int = 0) {
+      listWorkflows(limit: $limit, offset: $offset) {
+        id
+        version
+        createdAt
+        updatedAt
+        steps {
+          id
+          apiConfig {
+            id
+            urlHost
+            urlPath
+            method
+            instruction
+            authentication
+          }
+          executionMode
+          loopSelector
+          loopMaxIters
+          inputMapping
+          responseMapping
+        }
+        finalTransform
+        responseSchema
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Client">
+    ```typescript
+    const workflows = await client.listWorkflows(10, 0);
     ```
   </Tab>
 </Tabs>
@@ -167,6 +202,7 @@ Returns a paginated list of extract configurations.
 ## Get Operations
 
 ### getRun
+
 Retrieves a specific execution run by ID.
 
 <Tabs>
@@ -181,8 +217,35 @@ Retrieves a specific execution run by ID.
         completedAt
         data
         config {
-          id
-          # Config fields vary by type
+          ... on ApiConfig {
+            id
+            urlHost
+            urlPath
+            method
+            instruction
+            authentication
+            createdAt
+            updatedAt
+          }
+          ... on ExtractConfig {
+            id
+            urlHost
+            urlPath
+            fileType
+            decompressionMethod
+            instruction
+            authentication
+            createdAt
+            updatedAt
+          }
+          ... on TransformConfig {
+            id
+            instruction
+            responseSchema
+            responseMapping
+            createdAt
+            updatedAt
+          }
         }
       }
     }
@@ -190,21 +253,14 @@ Retrieves a specific execution run by ID.
   </Tab>
   <Tab title="Client">
     ```typescript
-    const client = new SuperglueClient({
-      apiKey: 'YOUR_API_KEY'
-    });
-
     const run = await client.getRun("run-id");
-    console.log(`Run status: ${run.success ? 'Success' : 'Failed'}`);
-    if (run.error) {
-      console.error(`Error: ${run.error}`);
-    }
     ```
   </Tab>
 </Tabs>
 
 ### getApi
-Retrieves a specific API configuration by ID. Returns [ApiConfig](types.md#apiconfig).
+
+Retrieves a specific API configuration by ID.
 
 <Tabs>
   <Tab title="GraphQL">
@@ -215,9 +271,18 @@ Retrieves a specific API configuration by ID. Returns [ApiConfig](types.md#apico
         urlHost
         urlPath
         method
+        instruction
         headers
         queryParams
         authentication
+        responseSchema
+        responseMapping
+        pagination {
+          type
+          pageSize
+          cursorPath
+        }
+        dataPath
         createdAt
         updatedAt
       }
@@ -226,18 +291,14 @@ Retrieves a specific API configuration by ID. Returns [ApiConfig](types.md#apico
   </Tab>
   <Tab title="Client">
     ```typescript
-    const client = new SuperglueClient({
-      apiKey: 'YOUR_API_KEY'
-    });
-
     const config = await client.getApi("api-config-id");
-    console.log(`API Config: ${config.urlHost}${config.urlPath}`);
     ```
   </Tab>
 </Tabs>
 
 ### getTransform
-Retrieves a specific transform configuration by ID. Returns [TransformConfig](types.md#transformconfig).
+
+Retrieves a specific transform configuration by ID.
 
 <Tabs>
   <Tab title="GraphQL">
@@ -245,6 +306,7 @@ Retrieves a specific transform configuration by ID. Returns [TransformConfig](ty
     query GetTransform($id: ID!) {
       getTransform(id: $id) {
         id
+        instruction
         responseSchema
         responseMapping
         createdAt
@@ -255,18 +317,14 @@ Retrieves a specific transform configuration by ID. Returns [TransformConfig](ty
   </Tab>
   <Tab title="Client">
     ```typescript
-    const client = new SuperglueClient({
-      apiKey: 'YOUR_API_KEY'
-    });
-
     const config = await client.getTransform("transform-config-id");
-    console.log(`Transform mapping: ${config.responseMapping}`);
     ```
   </Tab>
 </Tabs>
 
 ### getExtract
-Retrieves a specific extract configuration by ID. Returns [ExtractConfig](types.md#extractconfig).
+
+Retrieves a specific extract configuration by ID.
 
 <Tabs>
   <Tab title="GraphQL">
@@ -275,8 +333,11 @@ Retrieves a specific extract configuration by ID. Returns [ExtractConfig](types.
       getExtract(id: $id) {
         id
         urlHost
+        urlPath
         fileType
         decompressionMethod
+        instruction
+        authentication
         createdAt
         updatedAt
       }
@@ -285,18 +346,56 @@ Retrieves a specific extract configuration by ID. Returns [ExtractConfig](types.
   </Tab>
   <Tab title="Client">
     ```typescript
-    const client = new SuperglueClient({
-      apiKey: 'YOUR_API_KEY'
-    });
-
     const config = await client.getExtract("extract-config-id");
-    console.log(`Extract type: ${config.fileType}`);
+    ```
+  </Tab>
+</Tabs>
+
+### getWorkflow
+
+Retrieves a specific workflow configuration by ID.
+
+<Tabs>
+  <Tab title="GraphQL">
+    ```graphql
+    query GetWorkflow($id: ID!) {
+      getWorkflow(id: $id) {
+        id
+        version
+        createdAt
+        updatedAt
+        steps {
+          id
+          apiConfig {
+            id
+            urlHost
+            urlPath
+            method
+            instruction
+            authentication
+          }
+          executionMode
+          loopSelector
+          loopMaxIters
+          inputMapping
+          responseMapping
+        }
+        finalTransform
+        responseSchema
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Client">
+    ```typescript
+    const workflow = await client.getWorkflow("workflow-id");
     ```
   </Tab>
 </Tabs>
 
 ### generateSchema
-Generates a JSON schema based on instructions and optional response data. Used to automatically create sensible response JSON schemas to return API data in.
+
+Generates a JSON schema based on instructions and optional response data.
 
 <Tabs>
   <Tab title="GraphQL">
@@ -308,20 +407,10 @@ Generates a JSON schema based on instructions and optional response data. Used t
   </Tab>
   <Tab title="Client">
     ```typescript
-    const client = new SuperglueClient({
-      apiKey: 'YOUR_API_KEY'
-    });
-
     const schema = await client.generateSchema(
       "Get me all characters with only their name",
       '[{"name": "Rick", "species": "Human"}, {"name": "Morty", "species": "Human"}]'
     );
-    console.log(`Generated schema: ${schema}`);
     ```
   </Tab>
 </Tabs>
-
-
-See also:
-- [Types Reference](types.md) for detailed type definitions
-- [Overview](overview.md) for common parameters 

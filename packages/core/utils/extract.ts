@@ -1,6 +1,7 @@
-import axios, { AxiosRequestConfig } from "axios";
-import {  AuthType, RequestOptions, DecompressionMethod, ExtractConfig, FileType, HttpMethod, Metadata } from "@superglue/shared";
-import { callAxios, composeUrl, generateId, replaceVariables } from "./tools.js";
+import { AxiosRequestConfig } from "axios";
+import { AuthType, RequestOptions, DecompressionMethod, ExtractConfig, FileType, HttpMethod } from "@superglue/client";
+import { Metadata } from "@superglue/shared";
+import { callAxios, composeUrl, replaceVariables } from "./tools.js";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { API_PROMPT } from "../llm/prompts.js";
@@ -13,12 +14,16 @@ import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
 export async function callExtract(extract: ExtractConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions, metadata?: Metadata): Promise<any> {
   const allVariables = { ...payload, ...credentials };
   const headers = Object.fromEntries(
-    Object.entries(extract.headers || {}).map(([key, value]) => [key, replaceVariables(value, allVariables)])
+    (await Promise.all(
+      Object.entries(extract.headers || {}).map(async ([key, value]) => [key, await replaceVariables(value, allVariables)])
+    )).filter(([_, value]) => value)
   ) as Record<string, string>;
   const queryParams = Object.fromEntries(
-    Object.entries(extract.queryParams || {}).map(([key, value]) => [key, replaceVariables(value, allVariables)])
+    (await Promise.all(
+      Object.entries(extract.queryParams || {}).map(async ([key, value]) => [key, await replaceVariables(value, allVariables)])
+    )).filter(([_, value]) => value)
   ) as Record<string, string>;
-  const body = extract.body ? replaceVariables(extract.body, allVariables) : undefined;
+  const body = extract.body ? await replaceVariables(extract.body, allVariables) : undefined;
   const url = composeUrl(extract.urlHost, extract.urlPath);
   const axiosConfig: AxiosRequestConfig = {
     method: extract.method,
@@ -99,9 +104,9 @@ Base URL: ${composeUrl(extractConfig.urlHost, extractConfig.urlPath)}
 
 Documentation: ${documentation}
 
-Available credential variables: ${Object.keys(credentials).join(", ")}
-Available payload variables: ${Object.keys(payload).join(", ")}
-Example payload: ${JSON.stringify(payload)}
+Available credential variables: ${Object.keys(credentials || {}).join(", ")}
+Available payload variables: ${Object.keys(payload || {}).join(", ")}
+Example payload: ${JSON.stringify(payload || {})}
 
 ${lastError ? `We tried to call the API but it failed with the following error:
 ${lastError}` : ''}`

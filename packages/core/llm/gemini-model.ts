@@ -13,8 +13,8 @@ export class GeminiModel implements LLM {
     async generateText(messages: ChatCompletionMessageParam[], temperature: number = 0): Promise<LLMResponse> {
         const { geminiHistory, systemInstruction, userPrompt } = this.convertToGeminiHistory(messages);
         const model = this.genAI.getGenerativeModel({
-            model: process.env.GEMINI_MODEL || "gemini-2.5-pro-preview-03-25",
-            systemInstruction: systemInstruction
+            model: process.env.GEMINI_MODEL || "gemini-2.5-flash-preview-04-17",
+            systemInstruction: systemInstruction,
         });
 
         const chatSession = model.startChat({
@@ -23,8 +23,8 @@ export class GeminiModel implements LLM {
               topP: 0.95,
               topK: 64,
               maxOutputTokens: 65536,
-              responseMimeType: "text/plain",
-            },
+              responseMimeType: "text/plain"
+            } as any,
             history: geminiHistory
           });
           const result = await chatSession.sendMessage(userPrompt);
@@ -46,7 +46,7 @@ export class GeminiModel implements LLM {
         
         const { geminiHistory, systemInstruction, userPrompt } = this.convertToGeminiHistory(messages);
         const model = this.genAI.getGenerativeModel({
-            model: process.env.GEMINI_MODEL || "gemini-2.5-pro-preview-03-25",
+            model: process.env.GEMINI_MODEL || "gemini-2.5-flash-preview-04-17",
             systemInstruction: systemInstruction
         });
         const chatSession = model.startChat({

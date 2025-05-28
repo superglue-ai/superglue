@@ -23,8 +23,10 @@ import React from 'react';
 import Editor from 'react-simple-code-editor';
 
 interface JsonSchemaEditorProps {
-  value: string;
-  onChange: (value: string) => void;
+  value: string | null;
+  onChange: (value: string | null) => void;
+  isOptional?: boolean;
+  title?: string;
 }
 
 const SCHEMA_TYPES = ['object', 'array', 'string', 'number', 'boolean', 'integer'];
@@ -37,9 +39,17 @@ const SCHEMA_TYPE_DISPLAY = {
   'integer': 'integer',
 };
 
-const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) => {
+const DEFAULT_EMPTY_SCHEMA = `{"type":"object","properties":{}}`;
+
+const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ 
+  value, 
+  onChange, 
+  isOptional = false, 
+  title = "Set Response Schema"
+}) => {
   const [isCodeMode, setIsCodeMode] = React.useState(false);
   const [jsonError, setJsonError] = React.useState<string | null>(null);
+  const [localIsEnabled, setLocalIsEnabled] = React.useState<boolean>(!isOptional || value !== null);
   
   // Initialize from localStorage on mount
   React.useEffect(() => {
@@ -55,6 +65,15 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
       localStorage.setItem('jsonSchemaEditorCodeMode', isCodeMode.toString());
     }
   }, [isCodeMode]);
+  
+  React.useEffect(() => {
+    // Sync localIsEnabled with value prop if isOptional is true
+    if (isOptional) {
+      setLocalIsEnabled(value !== null);
+    } else {
+      setLocalIsEnabled(true); // Always enabled if not optional
+    }
+  }, [value, isOptional]);
   
   const [visualSchema, setVisualSchema] = React.useState<any>({});
   const [editingField, setEditingField] = React.useState<string | null>(null);
@@ -77,6 +96,11 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
   }, []);
   
   React.useEffect(() => {
+    if (value === null) {
+      setVisualSchema({}); // Clear visual schema if value is null
+      setJsonError(null);
+      return;
+    }
     try {
       // Only update visual schema if the JSON is valid
       const parsed = JSON.parse(value);
@@ -86,6 +110,8 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
       // Just set the error but don't update visual schema if JSON is invalid
       if (value !== '') {
         setJsonError((e as Error).message);
+      } else {
+        setJsonError(null); // Clear error for empty string if it's not null
       }
     }
   }, [value]);
@@ -470,76 +496,109 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ value, onChange }) 
     }
   };
 
+  const handleEnabledChange = (enabled: boolean) => {
+    if (isOptional) {
+      setLocalIsEnabled(enabled);
+      if (!enabled) {
+        onChange(null);
+      } else {
+        // If enabling and current parent value is null, provide a default
+        // This ensures a fresh start if re-enabled
+        onChange(JSON.stringify(ensureObjectStructure({ type: 'object', properties: {} }), null, 2));
+      }
+    }
+  };
+
   return (
-    <div className="space-y-1 flex flex-col h-full mb-4">
+    <div className="space-y-1 flex flex-col h-full mb-4 gap-2">
       <div className="flex justify-between items-center shrink-0">
-        <Label htmlFor="responseSchema" className="text-xs sm:text-sm">Set your desired response schema</Label>
-        <div className="flex items-center gap-2">
-          <Label htmlFor="editorMode" className="text-xs sm:text-sm">Code Mode</Label>
-          <Switch id="editorMode" checked={isCodeMode} onCheckedChange={setIsCodeMode} />
+        {title && <Label className="text-xs sm:text-sm">{title}</Label>}
+        <div className="flex items-center gap-4"> {/* Increased gap for clarity */}
+          {(localIsEnabled || !isOptional) && (
+            <div className="flex items-center gap-2">
+              <Label htmlFor="editorMode" className="text-xs">Code Mode</Label>
+              <Switch id="editorMode" checked={isCodeMode} onCheckedChange={setIsCodeMode} />
+            </div>
+          )}
+          {isOptional && (
+            <div className="flex items-center gap-2">
+              <Label htmlFor="schemaOptionalToggle" className="text-xs">Enabled</Label>
+              <Switch 
+                id="schemaOptionalToggle" 
+                checked={localIsEnabled} 
+                onCheckedChange={handleEnabledChange} 
+              />
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 border rounded-md overflow-hidden">
-        {isCodeMode ? (
-          <div className="h-full font-mono relative bg-transparent overflow-auto">
-            <Editor
-              value={value}
-              onValueChange={(code) => {
-                onChange(code);
-                try {
-                  JSON.parse(code);
-                  setJsonError(null);
-                } catch (e) {
-                  setJsonError((e as Error).message);
-                }
-              }}
-              highlight={highlightJson}
-              padding={10}
-              tabSize={2}
-              insertSpaces={true}
-              className={cn(
-                "min-h-full text-xs [&_textarea]:outline-none [&_textarea]:w-full [&_textarea]:h-full [&_textarea]:resize-none [&_textarea]:p-0 [&_textarea]:border-0 [&_textarea]:bg-transparent dark:[&_textarea]:text-white",
-                jsonError && "border-red-500"
-              )}
-              style={{
-                fontFamily: 'var(--font-mono)',
-                minHeight: '100%',
-              }}
-            />
-            {jsonError && (
-              <div className="absolute bottom-0 left-0 right-0 bg-red-500/10 text-red-500 p-2 text-xs">
-                {jsonError}
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="h-full flex flex-col min-h-0">
-            {Object.keys(visualSchema).length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                <p className="mb-4 text-xs sm:text-sm">No schema defined yet</p>
-                <Button
-                  variant="outline"
-                  className="text-xs sm:text-sm"
-                  onClick={() => {
-                    const initialSchema = ensureObjectStructure({ type: 'object', properties: {} });
-                    setVisualSchema(initialSchema);
-                    onChange(JSON.stringify(initialSchema, null, 2));
-                  }}
-                >
-                  <span className="text-xs sm:text-sm">Add Root Property</span>
-                </Button>
-              </div>
-            ) : (
-              <div className="flex-1 overflow-y-auto min-h-0">
-                <div className="p-4">
-                  {renderSchemaField('root', visualSchema, [])}
+      {localIsEnabled ? (
+        <div className="flex-1 min-h-0 border rounded-md overflow-hidden min-h-32">
+          {isCodeMode ? (
+            <div className="h-full font-mono relative bg-transparent overflow-auto">
+              <Editor
+                value={value || ""} // Editor expects string, use "" if value is null but enabled (e.g. just re-enabled)
+                onValueChange={(code) => {
+                  onChange(code); // Pass code directly
+                  try {
+                    JSON.parse(code);
+                    setJsonError(null);
+                  } catch (e) {
+                    setJsonError((e as Error).message);
+                  }
+                }}
+                highlight={highlightJson}
+                padding={10}
+                tabSize={2}
+                insertSpaces={true}
+                className={cn(
+                  "min-h-full text-xs [&_textarea]:outline-none [&_textarea]:w-full [&_textarea]:h-full [&_textarea]:resize-none [&_textarea]:p-0 [&_textarea]:border-0 [&_textarea]:bg-transparent dark:[&_textarea]:text-white",
+                  jsonError && "border-red-500"
+                )}
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  minHeight: '100%',
+                }}
+              />
+              {jsonError && (
+                <div className="absolute bottom-0 left-0 right-0 bg-red-500/10 text-red-500 p-2 text-xs">
+                  {jsonError}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
+          ) : (
+            <div className="h-full flex flex-col min-h-0">
+              {Object.keys(visualSchema).length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                  <p className="mb-4 text-xs sm:text-sm">No schema defined yet</p>
+                  <Button
+                    variant="outline"
+                    className="text-xs sm:text-sm"
+                    onClick={() => {
+                      const initialSchema = ensureObjectStructure({ type: 'object', properties: {} });
+                      setVisualSchema(initialSchema);
+                      onChange(JSON.stringify(initialSchema, null, 2));
+                    }}
+                  >
+                    <span className="text-xs sm:text-sm">Add Root Property</span>
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex-1 overflow-y-auto min-h-0">
+                  <div className="p-4">
+                    {renderSchemaField('root', visualSchema, [])}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      ) : (
+         <div className="flex-grow min-h-[4rem] p-3 border rounded-md text-sm text-muted-foreground bg-muted/50 flex items-center justify-center">
+            Schema definition is disabled.
           </div>
-        )}
-      </div>
+      )}
     </div>
   );
 };

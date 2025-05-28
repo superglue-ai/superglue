@@ -23,7 +23,7 @@
   ],
   "topbarCtaButton": {
     "name": "Talk to us",
-    "url": "https://cal.com/teamindex/superglue-demo"
+    "url": "https://cal.com/superglue/superglue-demo"
   },
   "anchors": [
     {
@@ -41,7 +41,9 @@
     {
       "group": "Getting Started",
       "pages": [
-        "introduction"
+        "introduction",
+        "quickstart",
+        "mcp"
       ]
     },
     {
@@ -50,7 +52,8 @@
         "guides/self-hosting",
         "guides/architecture",
         "guides/shopify",
-        "guides/jira"
+        "guides/jira",
+        "guides/hubspot"
       ]
     },
     {
@@ -59,7 +62,8 @@
         "api-reference/overview",
         "api-reference/types",
         "api-reference/queries",
-        "api-reference/mutations"
+        "api-reference/mutations",
+        "api-reference/subscriptions"
       ]
     }
   ],

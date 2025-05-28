@@ -1,4 +1,4 @@
-import { DataStore } from '@superglue/shared';
+import { DataStore } from './types.js';
 import { RedisService } from './redis.js';
 import { MemoryStore } from './memory.js';
 import { FileStore } from './filestore.js';

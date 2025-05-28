@@ -1,10 +1,8 @@
 import { composeUrl } from "./tools.js";
-import { ApiConfig } from "@superglue/shared";
+import { ApiConfig } from "@superglue/client";
 import { replaceVariables } from "./tools.js";
-import { RequestOptions } from "@superglue/shared";
-import pkg from 'pg';
-const { Pool } = pkg;
-type PoolConfig = pkg.PoolConfig;
+import { RequestOptions } from "@superglue/client";
+import { Pool, PoolConfig } from 'pg';
 
 const DEFAULT_TIMEOUT = 30000; // 30 seconds
 const DEFAULT_RETRIES = 0;
@@ -12,8 +10,8 @@ const DEFAULT_RETRY_DELAY = 1000; // 1 second
 
 export async function callPostgres(endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions): Promise<any> {
   const requestVars = { ...payload, ...credentials };
-  const connectionString = replaceVariables(composeUrl(endpoint.urlHost, endpoint.urlPath), requestVars);
-  const query = replaceVariables(JSON.parse(endpoint.body).query, requestVars);
+  const connectionString = await replaceVariables(composeUrl(endpoint.urlHost, endpoint.urlPath), requestVars);
+  const query = await replaceVariables(JSON.parse(endpoint.body).query, requestVars);
 
   const poolConfig: PoolConfig = {
     connectionString,
