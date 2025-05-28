@@ -1,18 +1,20 @@
 ---
 title: "MCPglue"
-description: "Turn any API into a personalized MCP."
+description: "Let your agent build its own tools."
 ---
 
-We've talked to dozens of teams deploying agents and they were all facing the same dilemma: giving their agents enough freedom to fetch all the data they need, yet making sure that every call remains secure, performant, and predictable in production. **MCPglue fixes this**: It gives you the reliability you're looking for when deploying in prod, and agents the tools they actually need to do their job well.
+## why glue?
 
-## What Is MCPglue?
+We’ve talked to dozens of teams deploying agents and they were all facing the same dilemma: giving their agents enough freedom to fetch all the data they need, yet making sure that every call remains secure, performant, and predictable in production. **MCPglue fixes this**: It gives you the reliability you’re looking for when deploying in prod, and agents the tools they actually need to do their job well.
 
-MCPglue is a lightweight API-wrapper. It lets you:
+## how does MCPglue help?
 
-- **Merge multiple endpoints & APIs** into coherent, reusable **tools**
+MCPglue is a lightweight API-wrapper. Agents can use it to:
+
+- **Merge multiple endpoints & APIs** into coherent, reusable, **custom tools**
 - **Expose them via one stable MCP server**, even as upstream APIs change
 - **Abstract away authentication, pagination, retries,** and mapping logic
-- **Keeps your agent's toolset lean, so they don't get overwhelmed or go rogue**
+- **Keep their toolset lean, so they don't get overwhelmed or go rogue**
 
 Use MCPglue to let your agent run cross-API workflows reliably, like fetching transactions in Stripe and updating them in Hubspot, to build ambient agents that react to app triggers or to wrap your own API into capabilities agents can use.
 
