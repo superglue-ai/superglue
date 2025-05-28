@@ -262,8 +262,8 @@ Important: Your model output must be just the valid JSON, nothing else.
 `;
 
 
-export const PLANNING_PROMPT = 
-`You are an expert AI assistant responsible for planning the execution steps needed to fulfill a user's request by orchestrating API calls. 
+export const PLANNING_PROMPT =
+  `You are an expert AI assistant responsible for planning the execution steps needed to fulfill a user's request by orchestrating API calls. 
 Your goal is to create a clear, step-by-step plan based on the provided system documentation and the user's overall instruction. 
 Each step should be a single API call. Adhere to the documentation to understand how to call the API.
 Output the plan as a JSON object adhering to the specified schema.
@@ -274,7 +274,7 @@ GUIDELINES:
 3. Choose the appropriate system for each step based on the provided documentation
 4. Assign descriptive stepIds in camelCase that indicate the purpose of the step
 5. Set the execution mode to either:
-   - DIRECT: For steps that execute once with specific data. If you are not sure, use this.
+   - DIRECT: For steps that execute once with specific data. If you are not sure, use this. Important: Except if the user explicitly provides an array of ids to loop over, the first step should be direct.
    - LOOP: For steps that need to iterate over a collection of items. Use this ONLY if there is a payload to iterate over, e.g. a user / a previous step gives you a list of ids to loop. 
 6. Consider data dependencies between steps (later steps can access results from earlier steps)
 7. Make sure to process all steps of the instruction, do not skip any steps.
