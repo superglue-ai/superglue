@@ -283,6 +283,7 @@ GUIDELINES:
 10. Your job is to translate the user's instruction into a set of steps that can be achieved with the available systems. 
    Consider different ways entities can be named between systems and that the user instruction might not always match the entity name in the documentation.
    Consider that the user might be unspecific about instructions, e.g. they say "update the users" but they actually mean "update and create if not present".
+11. Keep in mind that transformations happen within each step, so there is no need to add specific transformation steps.
 
 EXAMPLE INPUT:
 \`\`\`
