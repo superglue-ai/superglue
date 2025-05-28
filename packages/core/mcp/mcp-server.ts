@@ -202,12 +202,12 @@ const generateSDKCode = async (client: SuperglueClient, toolId: string) => {
     return {
       typescript: `// if not installed, run: npm install @superglue/client
 // ALWAYS use the endpoint: "${endpoint}"
-// ALWAYS USE THE SDK IF AVAILABLE
+// ALWAYS USE THE SDK, do not use the graphql endpoint directly
 import { SuperglueClient } from '@superglue/client';
 
 const client = new SuperglueClient({
   apiKey: "YOUR_API_KEY",
-  endpoint: "${endpoint}" // or default to https://graphql.superglue.ai
+  endpoint: "${endpoint}" // or default to https://graphql.superglue.ai NOT https://api.superglue.ai
 });
 
 const result = await client.executeWorkflow({
