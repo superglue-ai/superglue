@@ -128,7 +128,6 @@ export const BuildToolInputSchema = {
   payload: z.any().optional().describe("Example JSON payload for the tool. This should be data needed to fulfill the request (e.g. a list of ids to loop over), not settings or filters. If not strictly needed, leave this empty."),
   systems: z.array(z.object(SystemInputSchema)).describe("Array of systems the tool can interact with"),
   responseSchema: z.any().optional().describe("JSONSchema for the expected response structure"),
-  save: z.boolean().describe("Whether to save the tool after building"),
 };
 
 export const UpsertToolInputSchema = {
@@ -337,7 +336,9 @@ export const toolDefinitions: Record<string, any> = {
       const { client }: { client: SuperglueClient } = args;
       try {
         const result: WorkflowResult = await client.executeWorkflow(args);
-
+        if (result.success) {
+          await client.upsertWorkflow(args.id, result.config);
+        }
         return {
           ...result,
           usage_tip: "Use the superglue_get_integration_code tool to integrate this tool into your applications"
@@ -362,7 +363,6 @@ export const toolDefinitions: Record<string, any> = {
       - Gather ALL system credentials BEFORE building (API keys, tokens, documentation url if the system is less known)
       - Provide detailed, specific instructions
       - superglue handles pagination for you, so you don't need to worry about it
-      - Set save=true to persist for reuse, save=false for one-time use
       - Tool building may take 30-60 seconds
     </important_notes>
     `,
@@ -376,16 +376,14 @@ export const toolDefinitions: Record<string, any> = {
       const { client }: { client: SuperglueClient } = args;
       try {
         let tool = await client.buildWorkflow(args.instruction, args.payload, args.systems);
-        if (args.save) {
+        if (tool) {
           tool = await client.upsertWorkflow(tool.id, tool);
         }
 
         return {
           success: true,
           ...tool,
-          next_steps: args.save ?
-            `Tool saved successfully. Use with execute_${tool.id} to run it or generate code with superglue_get_integration_code.` :
-            "Tool built for one-time use. Set save=true if you want to reuse it."
+          next_steps: `Tool saved successfully. Use with execute_${tool.id} to run it or generate code with superglue_get_integration_code.`
         };
       } catch (error: any) {
         return {
