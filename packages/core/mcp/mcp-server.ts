@@ -375,7 +375,7 @@ export const toolDefinitions: Record<string, any> = {
 
       const { client }: { client: SuperglueClient } = args;
       try {
-        let tool = await client.buildWorkflow(args.instruction, args.payload, args.systems);
+        let tool = await client.buildWorkflow(args.instruction, args.payload || {}, args.systems, args.responseSchema || {});
         if (tool) {
           tool = await client.upsertWorkflow(tool.id, tool);
         }
