@@ -56,11 +56,24 @@ The superglue MCP server is available at the `/mcp` endpoint of your superglue i
 
 The reason this request is structured in an odd way (AUTH_HEADER instead of AUTH_TOKEN) is because Cursor does not allow spaces within the args array, but does so for env vars. This might become obsolete in future versions.
 
-## authentication
+## Using superglue MCP
+Switch to the agent mode of your LLM interface and prompt to build or execute a superglue tool. All superglue tools are exposed through MCP.
+<video
+  autoPlay
+  muted
+  loop
+  playsInline
+  className="w-full aspect-video"
+  src="https://superglue.cloud/files/mcp-short.mp4"
+></video>
 
-All requests to the MCP server must be authenticated. superglue's MCP integration uses a key-based authentication system just like the GQL endpoint.
+## API reference
 
-## session management
+### authentication
+
+All requests to the MCP server must be authenticated. superglue's MCP integration uses a key-based authentication system just like the GQL endpoint, see [quickstart](/quickstart).
+
+### session management
 
 MCP interactions are session-based. A session allows the server to maintain context across multiple requests from the same client.
 
@@ -72,11 +85,11 @@ MCP interactions are session-based. A session allows the server to maintain cont
   - `POST /mcp`: Used for most MCP requests like `listTools` and `callTool`.
   - `GET /mcp` & `DELETE /mcp`: The `handleMcpSessionRequest` in `mcp-server.ts` suggests these might be used for session-specific operations, requiring the `mcp-session-id` header. For example, to check session status or explicitly close a session if implemented.
 
-## superglue tools available via MCP
+### superglue tools available via MCP
 
 The following tools are exposed by superglue's MCP server. The input schemas are defined using Zod in `mcp-server.ts`.
 
-### 1. `superglue_execute_tool`
+#### 1. `superglue_execute_tool`
 
 - **Description**: Execute a specific Superglue tool by ID. Use this when you know the exact tool needed for a task.
 - **Input Schema**: `ExecuteToolInputSchema`
@@ -103,7 +116,7 @@ The following tools are exposed by superglue's MCP server. The input schemas are
   }
   ```
 
-### 2. `superglue_build_new_tool`
+#### 2. `superglue_build_new_tool`
 
 - **Description**: Build a new integration tool from natural language instructions. Use when existing tools don't meet requirements.
 - **Input Schema**: `BuildToolInputSchema`
@@ -145,7 +158,7 @@ The following tools are exposed by superglue's MCP server. The input schemas are
   }
   ```
 
-### 3. `superglue_get_integration_code`
+#### 3. `superglue_get_integration_code`
 
 - **Description**: Generate integration code for a specific tool. Use this to show users how to implement a tool in their applications.
 - **Input Schema**: `GenerateCodeInputSchema`
@@ -168,7 +181,7 @@ The following tools are exposed by superglue's MCP server. The input schemas are
   }
   ```
 
-## Dynamic Tool Execution
+### Dynamic Tool Execution
 
 In addition to the static tools above, the MCP server dynamically creates execution tools for each of your existing Superglue tools. These are named `execute_{tool_id}` and provide direct access to run specific tools.
 
@@ -197,7 +210,7 @@ The exact schema is derived from the tool's `inputSchema` if available, otherwis
 }
 ```
 
-## Agent Workflow
+### Agent Workflow
 
 The recommended workflow for agents using the Superglue MCP server:
 
@@ -205,7 +218,7 @@ The recommended workflow for agents using the Superglue MCP server:
 2. **EXECUTE**: Use `superglue_execute_tool` for existing tools OR `superglue_build_new_tool` for new integrations  
 3. **INTEGRATE**: Use `superglue_get_integration_code` to show users how to implement tools in their applications
 
-## Best Practices
+### Best Practices
 
 - Always gather all credentials before building or executing tools
 - Use descriptive instructions when building new tools
