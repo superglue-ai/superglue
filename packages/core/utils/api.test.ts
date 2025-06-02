@@ -7,11 +7,11 @@ import * as tools from './tools.js';
 vi.mock('axios');
 vi.mock('openai');
 vi.mock('./tools.js', async () => {
-    const actual = await vi.importActual('./tools.js');
-    return {
-        ...(actual as Object),
-        callAxios: vi.fn()
-    };
+  const actual = await vi.importActual('./tools.js');
+  return {
+    ...(actual as Object),
+    callAxios: vi.fn()
+  };
 });
 const mockedTools = tools as Mocked<typeof tools>;
 
@@ -113,8 +113,8 @@ describe('API Utilities', () => {
     };
 
     it('should make successful API call', async () => {
-      const mockResponse = { 
-        status: 200, 
+      const mockResponse = {
+        status: 200,
         data: { result: 'success' },
         statusText: 'OK',
         headers: {},
@@ -156,8 +156,8 @@ describe('API Utilities', () => {
       const config = {
         ...testConfig,
         queryParams: {
-            offset: "{offset}",
-            limit: "{limit}"
+          offset: "{offset}",
+          limit: "{limit}"
         },
         pagination: {
           type: PaginationType.OFFSET_BASED,
@@ -205,25 +205,25 @@ describe('API Utilities', () => {
       } as ApiConfig;
 
       const mockResponses = [
-        { 
-          status: 200, 
-          data: { 
+        {
+          status: 200,
+          data: {
             data: [{ id: 1 }, { id: 2 }],
             meta: { next_cursor: 'cursor123' }
           },
           statusText: 'OK',
           headers: {},
-          config: {} as any 
+          config: {} as any
         },
-        { 
-          status: 200, 
-          data: { 
+        {
+          status: 200,
+          data: {
             data: [{ id: 3 }],
             meta: { next_cursor: null }
           },
           statusText: 'OK',
           headers: {},
-          config: {} as any 
+          config: {} as any
         }
       ];
 
@@ -246,12 +246,12 @@ describe('API Utilities', () => {
         }
       } as ApiConfig;
 
-      const sameResponse = { 
-        status: 200, 
+      const sameResponse = {
+        status: 200,
         data: [{ id: 1 }, { id: 2 }],
         statusText: 'OK',
         headers: {},
-        config: {} as any 
+        config: {} as any
       };
 
       mockedTools.callAxios
@@ -274,14 +274,14 @@ describe('API Utilities', () => {
       } as ApiConfig;
 
       // Mock 501 responses to test the loop limit
-      const mockResponse = { 
-        status: 200, 
+      const mockResponse = {
+        status: 200,
         statusText: 'OK',
         headers: {},
-        config: {} as any 
+        config: {} as any
       };
-      for(let i = 0; i < 505; i++) {
-        mockedTools.callAxios.mockResolvedValueOnce({...mockResponse, data: [{ id: i }]});
+      for (let i = 0; i < 505; i++) {
+        mockedTools.callAxios.mockResolvedValueOnce({ ...mockResponse, data: [{ id: i }] });
       }
       const result = await callEndpoint(config, {}, {}, {});
       // Should stop at 500 iterations (as defined in the code)
@@ -298,12 +298,12 @@ describe('API Utilities', () => {
       } as ApiConfig;
 
       // Mock 501 responses to test the loop limit
-      const mockResponse = { 
-        status: 200, 
+      const mockResponse = {
+        status: 200,
         data: [{ id: 1 }],
         statusText: 'OK',
         headers: {},
-        config: {} as any 
+        config: {} as any
       };
 
       mockedTools.callAxios.mockResolvedValue(mockResponse);
@@ -315,8 +315,8 @@ describe('API Utilities', () => {
     });
 
     it('should handle error responses', async () => {
-      const errorResponse = { 
-        status: 400, 
+      const errorResponse = {
+        status: 400,
         data: null,
         error: 'Bad Request',
         statusText: 'Bad Request',
@@ -330,8 +330,8 @@ describe('API Utilities', () => {
     });
 
     it('should handle HTML error responses', async () => {
-      const htmlResponse = { 
-        status: 200, 
+      const htmlResponse = {
+        status: 200,
         data: '<!DOCTYPE html><html><body>Error page</body></html>',
         statusText: 'OK',
         headers: {},
@@ -349,12 +349,12 @@ describe('API Utilities', () => {
         dataPath: 'response.items'
       };
 
-      const mockResponse = { 
-        status: 200, 
-        data: { 
-          response: { 
-            items: [{ id: 1 }, { id: 2 }] 
-          } 
+      const mockResponse = {
+        status: 200,
+        data: {
+          response: {
+            items: [{ id: 1 }, { id: 2 }]
+          }
         },
         statusText: 'OK',
         headers: {},

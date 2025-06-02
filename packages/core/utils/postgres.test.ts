@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { callPostgres } from './postgres.js';
-import { Pool } from 'pg';
 import { ApiConfig, RequestOptions } from '@superglue/client';
+import { Pool } from 'pg';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { callPostgres } from './postgres.js';
 
 // Create mock functions that we can reference
 const mockQuery = vi.fn();
@@ -65,7 +65,7 @@ describe('PostgreSQL Utilities', () => {
       const options: RequestOptions = {};
       await expect(callPostgres(mockEndpoint, mockPayload, mockCredentials, options))
         .rejects.toThrow(`PostgreSQL error after 1 attempts: ${errorMessage}`);
-      
+
       expect(mockEnd).toHaveBeenCalled();
     });
 
@@ -86,7 +86,7 @@ describe('PostgreSQL Utilities', () => {
     it('should retry on failure when retries configured', async () => {
       // Reset mock state
       mockQuery.mockReset();
-      
+
       const options: RequestOptions = {
         retries: 2,
         retryDelay: 100
@@ -106,7 +106,7 @@ describe('PostgreSQL Utilities', () => {
     it('should fail after max retries', async () => {
       // Reset mock state
       mockQuery.mockReset();
-      
+
       const options: RequestOptions = {
         retries: 1,
         retryDelay: 100
@@ -121,14 +121,14 @@ describe('PostgreSQL Utilities', () => {
 
       await expect(callPostgres(mockEndpoint, mockPayload, mockCredentials, options))
         .rejects.toThrow('PostgreSQL error after 2 attempts: Second failure');
-      
+
       expect(mockQuery).toHaveBeenCalledTimes(2);
     });
 
     it('should handle variable replacement in query', async () => {
       // Reset mock state
       mockQuery.mockReset();
-      
+
       const customEndpoint: ApiConfig = {
         id: '1',
         instruction: 'test',

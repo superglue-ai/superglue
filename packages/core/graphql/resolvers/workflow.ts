@@ -1,12 +1,12 @@
+import { RequestOptions, Workflow, WorkflowResult } from "@superglue/client";
+import { Context, Metadata } from "@superglue/shared";
 import type { GraphQLResolveInfo } from "graphql";
 import { WorkflowExecutor } from "../../workflow/workflow-executor.js";
-import { Context, Metadata } from "@superglue/shared";
-import { RequestOptions, Workflow, WorkflowResult } from "@superglue/client";
 
-import { WorkflowBuilder } from "../../workflow/workflow-builder.js";
-import type { SystemDefinition } from "../../workflow/workflow-builder.js";
-import { logMessage } from "../../utils/logs.js";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
+import { logMessage } from "../../utils/logs.js";
+import type { SystemDefinition } from "../../workflow/workflow-builder.js";
+import { WorkflowBuilder } from "../../workflow/workflow-builder.js";
 
 function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined, defaultValue?: T): T | undefined {
   if (newValue === null) return undefined;
@@ -16,7 +16,7 @@ function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined
 }
 
 interface ExecuteWorkflowArgs {
-  input:  { workflow: Workflow; id?: never } | { workflow?: never; id: string };
+  input: { workflow: Workflow; id?: never } | { workflow?: never; id: string };
   payload?: any;
   credentials?: any;
   options?: RequestOptions;
@@ -42,24 +42,23 @@ export const executeWorkflowResolver = async (
   try {
     const workflowFromStore = await context.datastore.getWorkflow(args.input.id || args.input.workflow.id, context.orgId);
     workflow = { ...workflowFromStore, ...args.input.workflow };
-    if(!workflow) {
+    if (!workflow) {
       throw new Error("Workflow not found");
     }
-    if(workflow.inputSchema && typeof workflow.inputSchema == 'string') {
+    if (workflow.inputSchema && typeof workflow.inputSchema == 'string') {
       workflow.inputSchema = JSON.parse(workflow.inputSchema);
     }
-    if(workflow.responseSchema && typeof workflow.responseSchema == 'string') {
+    if (workflow.responseSchema && typeof workflow.responseSchema == 'string') {
       workflow.responseSchema = JSON.parse(workflow.responseSchema);
     }
     const executor = new WorkflowExecutor(workflow, metadata);
     const result = await executor.execute(args.payload, args.credentials, args.options);
-
     // Save run to datastore
     context.datastore.createRun({
       id: runId,
       success: result.success,
       error: result.error || undefined,
-      config: workflow || { id: args.input.id, steps: [] },
+      config: result.config || workflow || { id: args.input.id, steps: [] },
       startedAt,
       completedAt: new Date(),
     }, context.orgId);
@@ -80,7 +79,7 @@ export const executeWorkflowResolver = async (
     // Save run to datastore
     context.datastore.createRun(result, context.orgId);
 
-    return {...result, data: {}, stepResults: []} as WorkflowResult;
+    return { ...result, data: {}, stepResults: [] } as WorkflowResult;
   }
 };
 
@@ -92,7 +91,7 @@ export const upsertWorkflowResolver = async (_: unknown, { id, input }: { id: st
   try {
     const now = new Date();
     const oldWorkflow = await context.datastore.getWorkflow(id, context.orgId);
-    
+
     const workflow = {
       id,
       steps: resolveField(input.steps, oldWorkflow?.steps, []),
@@ -138,7 +137,7 @@ export const getWorkflowResolver = async (_: unknown, { id }: { id: string }, co
 
   try {
     const workflow = await context.datastore.getWorkflow(id, context.orgId);
-    if(!workflow) {
+    if (!workflow) {
       throw new Error("Workflow not found");
     }
     // for each step, make sure that the apiConfig has an id. if not, set it to the step id
@@ -198,7 +197,7 @@ export const buildWorkflowResolver = async (
     const builder = new WorkflowBuilder(systems, instruction, payload, responseSchema, metadata);
     const workflow = await builder.build();
     // prevent collisions with existing workflows
-    while(await context.datastore.getWorkflow(workflow.id, context.orgId)) {
+    while (await context.datastore.getWorkflow(workflow.id, context.orgId)) {
       workflow.id = workflow.id + "-1";
     }
 

@@ -1,39 +1,37 @@
 import { type ApiConfig, AuthType, FileType, HttpMethod, PaginationType, type RequestOptions } from "@superglue/client";
 import type { AxiosRequestConfig } from "axios";
 import OpenAI from "openai";
+import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { callAxios, composeUrl, generateId, replaceVariables } from "./tools.js";
-import { API_PROMPT } from "../llm/prompts.js";
-import { logMessage } from "./logs.js";
-import { parseFile, parseXML } from "./file.js";
 import { LanguageModel } from "../llm/llm.js";
+import { API_PROMPT } from "../llm/prompts.js";
+import { parseFile } from "./file.js";
 import { callPostgres } from "./postgres.js";
-import { error } from "console";
-import { JSONSchema } from "openai/lib/jsonschema.mjs";
+import { callAxios, composeUrl, generateId, replaceVariables } from "./tools.js";
 
-export function convertBasicAuthToBase64(headerValue: string){
-    if(!headerValue) return headerValue;
-    // Get the part of the 'Basic '
-    const credentials = headerValue.substring('Basic '.length).trim();
-    // checking if it is already Base64 decoded
-    const seemsEncoded = /^[A-Za-z0-9+/=]+$/.test(credentials);
+export function convertBasicAuthToBase64(headerValue: string) {
+  if (!headerValue) return headerValue;
+  // Get the part of the 'Basic '
+  const credentials = headerValue.substring('Basic '.length).trim();
+  // checking if it is already Base64 decoded
+  const seemsEncoded = /^[A-Za-z0-9+/=]+$/.test(credentials);
 
-    if (!seemsEncoded) {
-      // if not encoded, convert to username:password to Base64
-      const base64Credentials = Buffer.from(credentials).toString('base64');
-      return `Basic ${base64Credentials}`; 
-    }
-      return headerValue; 
+  if (!seemsEncoded) {
+    // if not encoded, convert to username:password to Base64
+    const base64Credentials = Buffer.from(credentials).toString('base64');
+    return `Basic ${base64Credentials}`;
+  }
+  return headerValue;
 }
 
-export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions): Promise<{ data: any }> {  
-  if(endpoint.urlHost.startsWith("postgres")) {
+export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions): Promise<{ data: any }> {
+  if (endpoint.urlHost.startsWith("postgres")) {
     return await callPostgres(endpoint, payload, credentials, options);
   }
-  
+
   const allVariables = { ...payload, ...credentials };
-  
+
   let allResults = [];
   let page = 1;
   let offset = 0;
@@ -68,7 +66,7 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
 
     // Check for any {var} in the generated config that isn't in available variables
     //const invalidVars = validateVariables(endpoint, Object.keys(requestVars));
-    
+
     //if (invalidVars.length > 0) {
     //  throw new Error(`The following variables are not defined: ${invalidVars.join(', ')}`);  
     //}
@@ -98,8 +96,8 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
       )).filter(([_, value]) => value && value !== "undefined" && value !== "null")
     );
 
-    const body = endpoint.body ? 
-      await replaceVariables(endpoint.body, requestVars) : 
+    const body = endpoint.body ?
+      await replaceVariables(endpoint.body, requestVars) :
       "";
 
     const url = await replaceVariables(composeUrl(endpoint.urlHost, endpoint.urlPath), requestVars);
@@ -115,31 +113,31 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
 
     const response = await callAxios(axiosConfig, options);
 
-    if(![200, 201, 204].includes(response?.status) || 
-        response.data?.error || 
-        (Array.isArray(response?.data?.errors) && response?.data?.errors.length > 0)
-      ) {
+    if (![200, 201, 204].includes(response?.status) ||
+      response.data?.error ||
+      (Array.isArray(response?.data?.errors) && response?.data?.errors.length > 0)
+    ) {
       const error = JSON.stringify(response?.data?.error || response.data?.errors || response?.data || response?.statusText || "undefined");
       let message = `${endpoint.method} ${url} failed with status ${response.status}.
 Response: ${String(error).slice(0, 1000)}
 config: ${JSON.stringify(axiosConfig)}`;
-      
+
       // Add specific context for rate limit errors
       if (response.status === 429) {
-        const retryAfter = response.headers['retry-after'] 
-          ? `Retry-After: ${response.headers['retry-after']}` 
+        const retryAfter = response.headers['retry-after']
+          ? `Retry-After: ${response.headers['retry-after']}`
           : 'No Retry-After header provided';
-        
+
         message = `Rate limit exceeded. ${retryAfter}. Maximum wait time of 60s exceeded. 
         
         ${message}`;
       }
-      
+
       throw new Error(`API call failed with status ${response.status}. Response: ${message}`);
     }
-    if (typeof response.data === 'string' && 
-      (response.data.slice(0, 100).trim().toLowerCase().startsWith('<!doctype html') || 
-       response.data.slice(0, 100).trim().toLowerCase().startsWith('<html'))) {
+    if (typeof response.data === 'string' &&
+      (response.data.slice(0, 100).trim().toLowerCase().startsWith('<!doctype html') ||
+        response.data.slice(0, 100).trim().toLowerCase().startsWith('<html'))) {
       throw new Error(`Received HTML response instead of expected JSON data from ${url}. 
         This usually indicates an error page or invalid endpoint.\nResponse: ${response.data.slice(0, 2000)}`);
     }
@@ -150,7 +148,7 @@ config: ${JSON.stringify(axiosConfig)}`;
 
     let responseData = response.data;
 
-    if(responseData && typeof responseData === 'string') {
+    if (responseData && typeof responseData === 'string') {
       responseData = await parseFile(Buffer.from(responseData), FileType.AUTO);
     }
 
@@ -161,29 +159,29 @@ config: ${JSON.stringify(axiosConfig)}`;
       for (const part of pathParts) {
         // sometimes a jsonata expression is used to get the data, so ignore the $
         // TODO: fix this later
-        if(!responseData[part] && part !== '$') {
+        if (!responseData[part] && part !== '$') {
           dataPathSuccess = false;
           break;
         }
-        responseData = responseData[part] || responseData;  
+        responseData = responseData[part] || responseData;
       }
     }
-    
+
     if (Array.isArray(responseData)) {
       const pageSize = parseInt(endpoint.pagination?.pageSize || "50");
-      if(!pageSize || responseData.length < pageSize) {
+      if (!pageSize || responseData.length < pageSize) {
         hasMore = false;
       }
       const currentResponseHash = JSON.stringify(responseData);
-      if(!seenResponseHashes.has(currentResponseHash)) {
+      if (!seenResponseHashes.has(currentResponseHash)) {
         seenResponseHashes.add(currentResponseHash);
         allResults = allResults.concat(responseData);
       }
       else {
         hasMore = false;
       }
-    } 
-    else if(responseData && allResults.length === 0) {
+    }
+    else if (responseData && allResults.length === 0) {
       allResults.push(responseData);
       hasMore = false;
     }
@@ -192,27 +190,27 @@ config: ${JSON.stringify(axiosConfig)}`;
     }
 
     // update pagination
-    if(endpoint.pagination?.type === PaginationType.PAGE_BASED) {
+    if (endpoint.pagination?.type === PaginationType.PAGE_BASED) {
       page++;
     }
-    else if(endpoint.pagination?.type === PaginationType.OFFSET_BASED) {
+    else if (endpoint.pagination?.type === PaginationType.OFFSET_BASED) {
       offset += parseInt(endpoint.pagination?.pageSize || "50");
     }
     else if (endpoint.pagination?.type === PaginationType.CURSOR_BASED) {
-        const cursorParts = (endpoint.pagination?.cursorPath || 'next_cursor').split('.');
-        let nextCursor = response.data;
-        for (const part of cursorParts) {
-          nextCursor = nextCursor?.[part];
-        }
-        cursor = nextCursor;
-        if(!cursor) {
-          hasMore = false;
-        }
+      const cursorParts = (endpoint.pagination?.cursorPath || 'next_cursor').split('.');
+      let nextCursor = response.data;
+      for (const part of cursorParts) {
+        nextCursor = nextCursor?.[part];
+      }
+      cursor = nextCursor;
+      if (!cursor) {
+        hasMore = false;
+      }
     }
     loopCounter++;
   }
 
-  if(endpoint.pagination?.type === PaginationType.CURSOR_BASED) {
+  if (endpoint.pagination?.type === PaginationType.CURSOR_BASED) {
     return {
       data: {
         next_cursor: cursor,
@@ -227,10 +225,10 @@ config: ${JSON.stringify(axiosConfig)}`;
 }
 
 export async function generateApiConfig(
-  apiConfig: Partial<ApiConfig>, 
-  documentation: string, 
-  payload: Record<string, any>, 
-  credentials: Record<string, any>, 
+  apiConfig: Partial<ApiConfig>,
+  documentation: string,
+  payload: Record<string, any>,
+  credentials: Record<string, any>,
   retryCount = 0,
   messages: OpenAI.Chat.ChatCompletionMessageParam[] = []
 ): Promise<{ config: ApiConfig; messages: OpenAI.Chat.ChatCompletionMessageParam[] }> {
@@ -280,7 +278,7 @@ Example payload: ${JSON.stringify(payload || {})}
 
 Documentation: ${String(documentation)}`;
 
-  if(messages.length === 0) {
+  if (messages.length === 0) {
     messages.push({
       role: "system",
       content: API_PROMPT
@@ -291,8 +289,8 @@ Documentation: ${String(documentation)}`;
     });
   }
   const temperature = Math.min(retryCount * 0.2, 1);
-  const {response: generatedConfig, messages: updatedMessages} = await LanguageModel.generateObject(messages, schema, temperature);
-  
+  const { response: generatedConfig, messages: updatedMessages } = await LanguageModel.generateObject(messages, schema, temperature);
+
   return {
     config: {
       instruction: apiConfig.instruction,
@@ -316,7 +314,7 @@ Documentation: ${String(documentation)}`;
   };
 }
 
-export async function evaluateResponse(data: any, responseSchema: JSONSchema, instruction: string): Promise<{success: boolean, refactorNeeded: boolean, shortReason: string}> {
+export async function evaluateResponse(data: any, responseSchema: JSONSchema, instruction: string): Promise<{ success: boolean, refactorNeeded: boolean, shortReason: string }> {
   const request = [
     {
       role: "system",
@@ -332,12 +330,12 @@ E.g. if the response is something like { "data": { "products": [{"id": 1, "name"
 If the response reads something like [ "12/2", "22.2", "frejgeiorjgrdelo"] that makes it very hard to parse the required information of the instruction, refactoring is needed. 
 Instruction: ${instruction}`
     },
-    {role: "user", content: JSON.stringify(data)}
+    { role: "user", content: JSON.stringify(data) }
   ] as OpenAI.Chat.ChatCompletionMessageParam[];
 
   const response = await LanguageModel.generateObject(
     request,
-    {type: "object", properties: {success: {type: "boolean"}, refactorNeeded: {type: "boolean"}, shortReason: {type: "string"}}},
+    { type: "object", properties: { success: { type: "boolean" }, refactorNeeded: { type: "boolean" }, shortReason: { type: "string" } } },
     0
   );
   return response.response;

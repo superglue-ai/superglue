@@ -14,7 +14,7 @@ export const updateApiConfigIdResolver = async (
   if (!newId) {
     throw new Error("newId is required");
   }
-  
+
   // Check if the newId already exists
   const existingConfig = await context.datastore.getApiConfig(newId, context.orgId);
   if (existingConfig) {

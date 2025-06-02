@@ -1,13 +1,12 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { LanguageModel } from './llm.js';
 
 // Mock the entire modules
 vi.mock('./openai-model.js');
 vi.mock('./gemini-model.js');
 
 // Import after mocking
-import { OpenAIModel } from './openai-model.js';
 import { GeminiModel } from './gemini-model.js';
+import { OpenAIModel } from './openai-model.js';
 
 describe('LLM', () => {
   const originalEnv = process.env;

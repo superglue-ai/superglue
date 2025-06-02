@@ -1,20 +1,20 @@
 import { CacheMode, DecompressionMethod, ExtractConfig, ExtractInputRequest, FileType, RequestOptions } from "@superglue/client";
 import type { Context, Metadata } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
-import { callExtract, processFile, generateExtractConfig } from "../../utils/extract.js";
+import { Documentation } from "../../utils/documentation.js";
+import { callExtract, generateExtractConfig, processFile } from "../../utils/extract.js";
+import { logMessage } from "../../utils/logs.js";
 import { telemetryClient } from "../../utils/telemetry.js";
 import { maskCredentials } from "../../utils/tools.js";
 import { notifyWebhook } from "../../utils/webhook.js";
-import { logMessage } from "../../utils/logs.js";
-import { Documentation } from "../../utils/documentation.js";
 
 export const extractResolver = async (
   _: any,
-  { input, payload, credentials, options }: { 
-    input: ExtractInputRequest; 
-    payload: any; 
+  { input, payload, credentials, options }: {
+    input: ExtractInputRequest;
+    payload: any;
     credentials: Record<string, string>;
-    options: RequestOptions; 
+    options: RequestOptions;
   },
   context: Context,
   info: GraphQLResolveInfo
@@ -34,7 +34,7 @@ export const extractResolver = async (
       orgId: context.orgId
     };
     do {
-      if(input.file) {
+      if (input.file) {
         const { createReadStream, filename } = await input.file as any;
         const stream = createReadStream();
         const chunks: Buffer[] = [];
@@ -52,18 +52,18 @@ export const extractResolver = async (
         response = await processFile(buffer, preparedExtract);
       }
       else {
-        preparedExtract = readCache ? 
+        preparedExtract = readCache ?
           await context.datastore.getExtractConfig(input.id, context.orgId)
           : null;
-        if(!preparedExtract) {
-          if(!input.endpoint.instruction) {
+        if (!preparedExtract) {
+          if (!input.endpoint.instruction) {
             throw new Error("Id could not be found and no endpoint provided.");
           }
           const documentation = new Documentation(input.endpoint, metadata);
           const documentationString = await documentation.fetch(input.endpoint.instruction || "");
           preparedExtract = await generateExtractConfig(input.endpoint, documentationString, payload, credentials, lastError);
         }
-        
+
         try {
           const buffer = await callExtract(preparedExtract, payload, credentials, options);
           response = await processFile(buffer, preparedExtract);
@@ -74,8 +74,8 @@ export const extractResolver = async (
       }
       retryCount++;
     } while (!response && retryCount < 5);
-    
-    if(!response) {
+
+    if (!response) {
       logMessage('error', `Extract call failed after ${retryCount} retries. Last error: ${lastError}`, metadata);
       telemetryClient?.captureException(new Error(`Extract call failed after ${retryCount} retries. Last error: ${maskCredentials(lastError, credentials)}`), context.orgId, {
         preparedEndpoint: preparedExtract || input.endpoint,
@@ -85,7 +85,7 @@ export const extractResolver = async (
     }
 
     // Save configuration if requested
-    if(writeCache) {
+    if (writeCache) {
       context.datastore.upsertExtractConfig(input.id || preparedExtract.id, preparedExtract, context.orgId);
     }
     const completedAt = new Date();
@@ -93,7 +93,7 @@ export const extractResolver = async (
     // Notify webhook if configured
     // call async
     if (options?.webhookUrl) {
-      notifyWebhook(options.webhookUrl, callId, true, response); 
+      notifyWebhook(options.webhookUrl, callId, true, response);
     }
 
     return {
@@ -112,7 +112,7 @@ export const extractResolver = async (
     });
 
     const completedAt = new Date();
-    
+
     if (options?.webhookUrl) {
       await notifyWebhook(options.webhookUrl, callId, false, undefined, maskedError);
     }

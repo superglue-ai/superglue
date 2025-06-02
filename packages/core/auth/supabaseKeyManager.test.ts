@@ -1,4 +1,4 @@
-import { expect, it, describe, beforeEach, afterEach, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SupabaseKeyManager } from './supabaseKeyManager.js';
 
 describe('SupabaseKeyManager', () => {
@@ -58,7 +58,7 @@ describe('SupabaseKeyManager', () => {
 
   it('should return empty array and log error when environment variables are missing', async () => {
     process.env = {};
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
     const mockData = [
       { org_id: '1', key: 'key1', is_active: true }
     ];
@@ -67,7 +67,7 @@ describe('SupabaseKeyManager', () => {
     const keys = await keyManagerTest.getApiKeys();
     expect(keys).toEqual([]);
     expect(consoleSpy).toHaveBeenCalledWith('Missing required Supabase environment variables');
-    
+
     consoleSpy.mockRestore();
   });
 
@@ -102,4 +102,3 @@ describe('SupabaseKeyManager', () => {
   });
 });
 
- 
