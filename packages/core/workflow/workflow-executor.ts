@@ -1,11 +1,11 @@
-import { addNullableToOptional, applyJsonata, applyTransformationWithValidation } from "../utils/tools.js";
-import { selectStrategy } from "./workflow-strategies.js";
-import { logMessage } from "../utils/logs.js";
 import { Metadata } from "@playwright/test";
-import { JSONSchema } from "openai/lib/jsonschema.mjs";
-import { generateTransformCode, generateTransformJsonata, prepareTransform } from "../utils/transform.js";
+import { ExecutionStep, RequestOptions, Workflow, WorkflowResult, WorkflowStepResult } from "@superglue/client";
 import { Validator } from "jsonschema";
-import { WorkflowResult, Workflow, ExecutionStep, RequestOptions, WorkflowStepResult } from "@superglue/client";
+import { JSONSchema } from "openai/lib/jsonschema.mjs";
+import { logMessage } from "../utils/logs.js";
+import { addNullableToOptional, applyJsonata, applyTransformationWithValidation } from "../utils/tools.js";
+import { generateTransformCode } from "../utils/transform.js";
+import { selectStrategy } from "./workflow-strategies.js";
 
 export class WorkflowExecutor implements Workflow {
   public id: string;
@@ -51,7 +51,7 @@ export class WorkflowExecutor implements Workflow {
       completedAt: undefined,
     } as WorkflowResult;
     try {
-      this.validate({payload, credentials});
+      this.validate({ payload, credentials });
       logMessage("info", `Executing workflow ${this.id}`);
 
       // Execute each step in order
@@ -73,7 +73,7 @@ export class WorkflowExecutor implements Workflow {
         this.result.stepResults.push(stepResult);
 
         // abort if failure occurs
-        if(!stepResult.success){
+        if (!stepResult.success) {
           this.result.completedAt = new Date();
           this.result.success = false;
           this.result.error = stepResult.error;
@@ -94,49 +94,49 @@ export class WorkflowExecutor implements Workflow {
           ),
         };
         try {
-            // Apply the final transform using the original data
-            let currentFinalTransform = this.finalTransform || "$";
-            const finalResult = await applyTransformationWithValidation(rawStepData, currentFinalTransform, this.responseSchema);
-            if(!finalResult.success) {
-              throw new Error(finalResult.error);
-            }
-            this.result.data = finalResult.data as Record<string, unknown> || {};
-            this.result.config = {
-              id: this.id,
-              steps: this.steps,
-              finalTransform: currentFinalTransform,
-              inputSchema: this.inputSchema,
-              responseSchema: this.responseSchema,
-              instruction: this.instruction
-            } as Workflow; // Store the successful transform
-            this.result.error = undefined; // Clear any previous transform error
-            this.result.success = true; // Ensure success is true if transform succeeds
-          } catch (transformError) {
-            logMessage("info", `Preparing new final transform`, this.metadata);
-            const instruction = "Generate the final transformation code." + 
-              (this.instruction ? " with the following instruction: " + this.instruction : "") +
-              (this.finalTransform ? "\nOriginally, we used the following transformation, fix it without messing up future transformations with the original data: " + this.finalTransform : "");
-            
-            const newTransformConfig = await generateTransformCode(this.responseSchema, rawStepData, instruction, this.metadata);
-            if(!newTransformConfig) {
-              throw new Error("Failed to generate new final transform");
-            }
-            const finalResult = await applyTransformationWithValidation(rawStepData, newTransformConfig.mappingCode, this.responseSchema);
-            if(!finalResult.success) {
-              throw new Error(finalResult.error);
-            }
-            this.result.data = finalResult.data as Record<string, unknown> || {};
-            this.result.config = {
-              id: this.id,
-              steps: this.steps,
-              finalTransform: newTransformConfig.mappingCode,
-              inputSchema: this.inputSchema,
-              responseSchema: this.responseSchema,
-              instruction: this.instruction
-            } as Workflow; // Store the successful transform
-            this.result.error = undefined; // Clear any previous transform error
-            this.result.success = true; // Ensure success is true if transform succeeds
+          // Apply the final transform using the original data
+          let currentFinalTransform = this.finalTransform || "$";
+          const finalResult = await applyTransformationWithValidation(rawStepData, currentFinalTransform, this.responseSchema);
+          if (!finalResult.success) {
+            throw new Error(finalResult.error);
           }
+          this.result.data = finalResult.data as Record<string, unknown> || {};
+          this.result.config = {
+            id: this.id,
+            steps: this.steps,
+            finalTransform: currentFinalTransform,
+            inputSchema: this.inputSchema,
+            responseSchema: this.responseSchema,
+            instruction: this.instruction
+          } as Workflow; // Store the successful transform
+          this.result.error = undefined; // Clear any previous transform error
+          this.result.success = true; // Ensure success is true if transform succeeds
+        } catch (transformError) {
+          logMessage("info", `Preparing new final transform`, this.metadata);
+          const instruction = "Generate the final transformation code." +
+            (this.instruction ? " with the following instruction: " + this.instruction : "") +
+            (this.finalTransform ? "\nOriginally, we used the following transformation, fix it without messing up future transformations with the original data: " + this.finalTransform : "");
+
+          const newTransformConfig = await generateTransformCode(this.responseSchema, rawStepData, instruction, this.metadata);
+          if (!newTransformConfig) {
+            throw new Error("Failed to generate new final transform");
+          }
+          const finalResult = await applyTransformationWithValidation(rawStepData, newTransformConfig.mappingCode, this.responseSchema);
+          if (!finalResult.success) {
+            throw new Error(finalResult.error);
+          }
+          this.result.data = finalResult.data as Record<string, unknown> || {};
+          this.result.config = {
+            id: this.id,
+            steps: this.steps,
+            finalTransform: newTransformConfig.mappingCode,
+            inputSchema: this.inputSchema,
+            responseSchema: this.responseSchema,
+            instruction: this.instruction
+          } as Workflow; // Store the successful transform
+          this.result.error = undefined; // Clear any previous transform error
+          this.result.success = true; // Ensure success is true if transform succeeds
+        }
       }
       this.result.completedAt = new Date();
       return this.result;
@@ -163,11 +163,11 @@ export class WorkflowExecutor implements Workflow {
       }
     }
 
-    if(this.inputSchema) {
+    if (this.inputSchema) {
       const validator = new Validator();
       const optionalSchema = addNullableToOptional(this.inputSchema);
       const validation = validator.validate(payload, optionalSchema);
-      if(!validation.valid) {
+      if (!validation.valid) {
         throw new Error("Invalid payload: " + validation.errors.map(e => e.message).join(", "));
       }
     }

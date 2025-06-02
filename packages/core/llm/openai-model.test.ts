@@ -1,13 +1,13 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { OpenAIModel } from './openai-model.js';
 import OpenAI from 'openai';
 import { ChatCompletionMessageParam } from 'openai/resources/chat/completions.mjs';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { OpenAIModel } from './openai-model.js';
 
 vi.mock('openai');
 
 describe('OpenAIModel', () => {
   const mockCreate = vi.fn();
-  
+
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.OPENAI_API_KEY = 'test-key';
@@ -62,7 +62,7 @@ describe('OpenAIModel', () => {
 
   describe('generateObject', () => {
     it('should generate object response', async () => {
-        process.env.OPENAI_MODEL = 'gpt-4o';
+      process.env.OPENAI_MODEL = 'gpt-4o';
       const model = new OpenAIModel();
       const responseJson = '{"key": "value"}';
       mockCreate.mockResolvedValue({

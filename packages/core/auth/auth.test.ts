@@ -1,7 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { authMiddleware, validateToken, extractToken, _resetAuthManager } from './auth.js'
-import { LocalKeyManager } from './localKeyManager.js'
-import { SupabaseKeyManager } from './supabaseKeyManager.js'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { _resetAuthManager, authMiddleware, extractToken, validateToken } from './auth.js'
 
 vi.mock('./localKeyManager.js')
 vi.mock('./supabaseKeyManager.js')
@@ -25,7 +23,7 @@ describe('Auth Module', () => {
     })
 
     it('extracts token from WebSocket URL', () => {
-      const conn = { 
+      const conn = {
         connectionParams: {},
         extra: { request: { url: 'ws://localhost?token=test123&other=param' } }
       }
@@ -42,17 +40,17 @@ describe('Auth Module', () => {
       mockAuthManager = {
         authenticate: vi.fn()
       };
-      
+
       // Reset the mock function calls before each test
       mockAuthManager.authenticate.mockReset();
-      
+
       // Directly set the internal auth manager to our mock instance
-      _resetAuthManager(mockAuthManager); 
+      _resetAuthManager(mockAuthManager);
     })
 
     it('returns failure when no token provided', async () => {
       // Reset manager to null for this specific test case where getAuthManager shouldn't be called with a token
-      _resetAuthManager(null); 
+      _resetAuthManager(null);
       const result = await validateToken(undefined)
       expect(result).toEqual({
         success: false,
@@ -93,7 +91,7 @@ describe('Auth Module', () => {
         authenticate: vi.fn()
       };
       // Directly set the internal auth manager to our mock instance
-       _resetAuthManager(mockAuthManager);
+      _resetAuthManager(mockAuthManager);
     })
 
     it('skips auth for health check', async () => {
@@ -105,9 +103,9 @@ describe('Auth Module', () => {
 
     it('returns 401 for invalid token', async () => {
       mockReq.headers.authorization = 'Bearer invalid'
-      mockAuthManager.authenticate.mockResolvedValue({ 
-        success: false, 
-        orgId: undefined 
+      mockAuthManager.authenticate.mockResolvedValue({
+        success: false,
+        orgId: undefined
       })
 
       await authMiddleware(mockReq, mockRes, mockNext)
@@ -117,9 +115,9 @@ describe('Auth Module', () => {
 
     it('adds orgId to request and proceeds for valid token', async () => {
       mockReq.headers.authorization = 'Bearer valid'
-      mockAuthManager.authenticate.mockResolvedValue({ 
-        success: true, 
-        orgId: 'org123' 
+      mockAuthManager.authenticate.mockResolvedValue({
+        success: true,
+        orgId: 'org123'
       })
 
       await authMiddleware(mockReq, mockRes, mockNext)

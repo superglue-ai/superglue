@@ -9,16 +9,16 @@ export const isDebug = process.env.DEBUG === "true";
 export const isSelfHosted = process.env.RUNS_ON_SUPERGLUE_CLOUD !== "true";
 export const isTelemetryDisabled = process.env.DISABLE_TELEMETRY === "true";
 
-export const telemetryClient = !isTelemetryDisabled && !isDebug ? 
+export const telemetryClient = !isTelemetryDisabled && !isDebug ?
   new PostHog(
     config.posthog.apiKey,
     {
       host: config.posthog.host,
-      enableExceptionAutocapture: true 
-     }
+      enableExceptionAutocapture: true
+    }
   ) : null;
 
-if(telemetryClient) {
+if (telemetryClient) {
   logMessage('info', "superglue uses telemetry to understand how many users are using the platform. See self-hosting guide for more info.");
 }
 
@@ -33,7 +33,7 @@ export const extractOperationName = (query: string): string => {
 };
 
 export const telemetryMiddleware = (req: any, res: any, next: any) => {
-  if(!req?.body?.query || req.body.query.includes("IntrospectionQuery") || req.body.query.includes("__schema")) {
+  if (!req?.body?.query || req.body.query.includes("IntrospectionQuery") || req.body.query.includes("__schema")) {
     return next();
   }
   const operation = extractOperationName(req.body.query);
@@ -41,13 +41,13 @@ export const telemetryMiddleware = (req: any, res: any, next: any) => {
   logMessage('debug', `Executing ${operation}`, { orgId: req.orgId });
 
   telemetryClient?.capture({
-      distinctId: req.orgId || sessionId,
-      event: operation,
-      properties: {
-        query: req.body.query,
-        orgId: req.orgId,
-      }
-    });
+    distinctId: req.orgId || sessionId,
+    event: operation,
+    properties: {
+      query: req.body.query,
+      orgId: req.orgId,
+    }
+  });
   next();
 };
 
@@ -58,10 +58,10 @@ const createCallProperties = (query: string, responseBody: any, isSelfHosted: bo
   properties.operation = operation;
   properties.query = query;
 
-  switch(operation) {
+  switch (operation) {
     case 'call':
       const call = responseBody?.singleResult?.data?.call;
-      if(!call) break;
+      if (!call) break;
       properties.endpointHost = call?.config?.urlHost;
       properties.endpointPath = call?.config?.urlPath;
       properties.apiConfigId = call?.config?.id;
@@ -106,7 +106,7 @@ export const handleQueryError = (errors: any[], query: string, orgId: string, re
 };
 
 const handleQuerySuccess = (query: string, orgId: string, requestContext: any) => {
-  if(!query || query.includes("IntrospectionQuery") || query.includes("__schema")) {
+  if (!query || query.includes("IntrospectionQuery") || query.includes("__schema")) {
     return;
   }
   const distinctId = isSelfHosted ? `sh-inst-${requestContext.contextValue.datastore.storage?.tenant?.email}` : orgId;
@@ -123,14 +123,14 @@ const handleQuerySuccess = (query: string, orgId: string, requestContext: any) =
     groups: {
       orgId: orgId
     }
-  }); 
+  });
 };
 
 export const createTelemetryPlugin = () => {
   return {
     requestDidStart: async () => ({
       willSendResponse: async (requestContext: any) => {
-        const errors = requestContext.errors || 
+        const errors = requestContext.errors ||
           requestContext?.response?.body?.singleResult?.errors ||
           Object.values(requestContext?.response?.body?.singleResult?.data || {}).map((d: any) => d.error).filter(Boolean);
 

@@ -71,7 +71,7 @@ export class SupabaseKeyManager implements ApiKeyManager {
       }
     }
 
-    return allData.filter(item => item.is_active === true).map(item => ({orgId: item.org_id, key: item.key}));
+    return allData.filter(item => item.is_active === true).map(item => ({ orgId: item.org_id, key: item.key }));
   }
 
   private async refreshApiKeys(): Promise<void> {

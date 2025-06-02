@@ -1,7 +1,7 @@
-import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
-import { LLM, LLMResponse, LLMObjectResponse } from "./llm.js";
-import { GenerativeModel, GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import OpenAI from "openai";
+import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
+import { LLM, LLMObjectResponse, LLMResponse } from "./llm.js";
 
 
 export class GeminiModel implements LLM {
@@ -9,7 +9,7 @@ export class GeminiModel implements LLM {
     private genAI: GoogleGenerativeAI;
     constructor() {
         this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    }    
+    }
     async generateText(messages: ChatCompletionMessageParam[], temperature: number = 0): Promise<LLMResponse> {
         const { geminiHistory, systemInstruction, userPrompt } = this.convertToGeminiHistory(messages);
         const model = this.genAI.getGenerativeModel({
@@ -19,31 +19,31 @@ export class GeminiModel implements LLM {
 
         const chatSession = model.startChat({
             generationConfig: {
-              temperature: temperature,
-              topP: 0.95,
-              topK: 64,
-              maxOutputTokens: 65536,
-              responseMimeType: "text/plain"
+                temperature: temperature,
+                topP: 0.95,
+                topK: 64,
+                maxOutputTokens: 65536,
+                responseMimeType: "text/plain"
             } as any,
             history: geminiHistory
-          });
-          const result = await chatSession.sendMessage(userPrompt);
-          let responseText = result.response.text();
+        });
+        const result = await chatSession.sendMessage(userPrompt);
+        let responseText = result.response.text();
 
-          // Add response to messages history
-          messages.push({
+        // Add response to messages history
+        messages.push({
             role: "assistant",
             content: responseText
-          });
-          return {
+        });
+        return {
             response: responseText,
             messages: messages
-          };
+        };
     }
     async generateObject(messages: ChatCompletionMessageParam[], schema: any, temperature: number = 0): Promise<LLMObjectResponse> {
         // Remove additionalProperties and make all properties required
         const cleanSchema = schema ? this.cleanSchemaForGemini(schema) : undefined;
-        
+
         const { geminiHistory, systemInstruction, userPrompt } = this.convertToGeminiHistory(messages);
         const model = this.genAI.getGenerativeModel({
             model: process.env.GEMINI_MODEL || "gemini-2.5-flash-preview-04-17",
@@ -51,31 +51,31 @@ export class GeminiModel implements LLM {
         });
         const chatSession = model.startChat({
             generationConfig: {
-              temperature: temperature,
-              topP: 0.95,
-              topK: 64,
-              maxOutputTokens: 65536,
-              responseMimeType: "application/json",
-              responseSchema: cleanSchema,
+                temperature: temperature,
+                topP: 0.95,
+                topK: 64,
+                maxOutputTokens: 65536,
+                responseMimeType: "application/json",
+                responseSchema: cleanSchema,
             },
             history: geminiHistory
-          });
-          const result = await chatSession.sendMessage(userPrompt);
-          let responseText = result.response.text();
+        });
+        const result = await chatSession.sendMessage(userPrompt);
+        let responseText = result.response.text();
 
-          // Clean up any potential prefixes/suffixes while preserving arrays
-          responseText = responseText.replace(/^[^[{]*/, '').replace(/[^}\]]*$/, '');
-          const generatedObject = JSON.parse(responseText);
-          
-          // Add response to messages history
-          messages.push({
+        // Clean up any potential prefixes/suffixes while preserving arrays
+        responseText = responseText.replace(/^[^[{]*/, '').replace(/[^}\]]*$/, '');
+        const generatedObject = JSON.parse(responseText);
+
+        // Add response to messages history
+        messages.push({
             role: "assistant",
             content: responseText
-          });
-          return {
+        });
+        return {
             response: generatedObject,
             messages: messages
-          };
+        };
     }
 
     private cleanSchemaForGemini(schema: any): any {
@@ -105,8 +105,8 @@ export class GeminiModel implements LLM {
         }
 
         // Handle arrays
-        if(schema.items) {
-            if(typeof schema.items === 'object') {
+        if (schema.items) {
+            if (typeof schema.items === 'object') {
                 this.cleanSchemaForGemini(schema.items); // Recurse for items in arrays
             }
         }
@@ -117,22 +117,22 @@ export class GeminiModel implements LLM {
         const geminiHistory: any[] = [];
         let userPrompt: any;
         let systemInstruction: any;
-        for(var i = 0; i < messages.length; i++) {
-            if(messages[i].role == "system") {
+        for (var i = 0; i < messages.length; i++) {
+            if (messages[i].role == "system") {
                 systemInstruction = messages[i].content;
                 continue;
             }
-            if(i == messages.length - 1) {
+            if (i == messages.length - 1) {
                 userPrompt = messages[i].content;
                 continue;
             }
-            
+
             geminiHistory.push({
-                    role: messages[i].role == "assistant" ? "model" : messages[i].role,
-                    parts: [{ text: messages[i].content }]
+                role: messages[i].role == "assistant" ? "model" : messages[i].role,
+                parts: [{ text: messages[i].content }]
             });
         }
         return { geminiHistory, systemInstruction, userPrompt };
-    }    
+    }
 }
 

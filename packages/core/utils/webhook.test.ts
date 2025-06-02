@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { notifyWebhook } from './webhook.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { callAxios } from './tools.js';
+import { notifyWebhook } from './webhook.js';
 
 // Mock the callAxios function
 vi.mock('./tools.js', () => ({
@@ -62,16 +62,16 @@ describe('notifyWebhook', () => {
   it('should not throw if callAxios fails', async () => {
     const webhookUrl = 'https://example.com/webhook';
     const callId = '123';
-    
+
     // Mock console.error to avoid cluttering test output
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+
     // Make callAxios throw an error
     (callAxios as any).mockRejectedValueOnce(new Error('Network error'));
 
     // Should not throw
     await expect(notifyWebhook(webhookUrl, callId, true)).resolves.not.toThrow();
-    
+
     expect(consoleSpy).toHaveBeenCalled();
     consoleSpy.mockRestore();
   });

@@ -1,12 +1,12 @@
+import playwright from '@playwright/test';
+import { ApiConfig } from "@superglue/client";
+import { Metadata } from "@superglue/shared";
 import axios from "axios";
 import { getIntrospectionQuery } from "graphql";
 import { NodeHtmlMarkdown } from "node-html-markdown";
-import playwright from '@playwright/test';
-import { composeUrl } from "./tools.js";
 import { LanguageModel } from "../llm/llm.js";
-import { Metadata } from "@superglue/shared";
-import { ApiConfig } from "@superglue/client";
 import { logMessage } from "./logs.js";
+import { composeUrl } from "./tools.js";
 
 // Strategy Interface
 interface FetchingStrategy {
@@ -56,7 +56,7 @@ export class Documentation {
       .map(term => term.trim())
       .filter(term => term.length >= MIN_SEARCH_TERM_LENGTH);
 
-    for(const searchTerm of searchTerms) {
+    for (const searchTerm of searchTerms) {
       let pos = docLower.indexOf(searchTerm);
       while (pos !== -1) {
         positions.push(pos);
@@ -160,7 +160,7 @@ export class Documentation {
       break;
     }
 
-    if(!rawResult) {
+    if (!rawResult) {
       return "";
     }
 
@@ -184,7 +184,7 @@ class RawContentStrategy implements FetchingStrategy {
   async tryFetch(config: ApiConfig, metadata: Metadata): Promise<string | null> {
     if (!config.documentationUrl?.startsWith("http")) {
       // It's raw content passed directly in the URL field
-      if(config.documentationUrl && config.documentationUrl.length > 0) {
+      if (config.documentationUrl && config.documentationUrl.length > 0) {
         logMessage('info', "Using raw content provided directly as documentation.", metadata);
         return config.documentationUrl;
       }
@@ -218,10 +218,10 @@ class GraphQLStrategy implements FetchingStrategy {
     }
   }
   private isLikelyGraphQL(url: string, config: ApiConfig): boolean {
-    if(!url) return false;
+    if (!url) return false;
     return url?.includes('graphql') ||
-           Object.values({...config.queryParams, ...config.headers})
-           .some(val => typeof val === 'string' && val.includes('IntrospectionQuery'));
+      Object.values({ ...config.queryParams, ...config.headers })
+        .some(val => typeof val === 'string' && val.includes('IntrospectionQuery'));
   }
   async tryFetch(config: ApiConfig, metadata: Metadata): Promise<string | null> {
     if (!config.urlHost.startsWith("http")) return null; // Needs a valid HTTP URL
@@ -236,13 +236,13 @@ class GraphQLStrategy implements FetchingStrategy {
     // Use the endpoint URL if it looks like GraphQL, otherwise use the documentation URL
     const url = urlIsLikelyGraphQL ? endpointUrl : config.documentationUrl;
     if (!url) {
-        return null;
+      return null;
     }
 
     const schema = await this.fetchGraphQLSchema(url, config, metadata);
     if (schema) {
-        logMessage('info', `Successfully fetched GraphQL schema from ${url}.`, metadata);
-        return JSON.stringify(schema);
+      logMessage('info', `Successfully fetched GraphQL schema from ${url}.`, metadata);
+      return JSON.stringify(schema);
     }
     return null;
   }
@@ -259,7 +259,7 @@ export class AxiosFetchingStrategy implements FetchingStrategy {
           url.searchParams.append(key, value);
         });
       }
-      
+
       const response = await axios.get(url.toString(), { headers: config.headers });
       logMessage('info', `Successfully fetched content with axios for ${config.documentationUrl}`, metadata);
       return response.data;
@@ -271,25 +271,25 @@ export class AxiosFetchingStrategy implements FetchingStrategy {
 }
 // Special strategy solely responsible for fetching page content if needed
 export class PlaywrightFetchingStrategy implements FetchingStrategy {
-    // --- Static Helpers (accessible by strategies) ---
-    private static browserInstance: playwright.Browser | null = null;
+  // --- Static Helpers (accessible by strategies) ---
+  private static browserInstance: playwright.Browser | null = null;
 
-    private static async getBrowser(): Promise<playwright.Browser> {
-      if (!PlaywrightFetchingStrategy.browserInstance) {
-        // Consider adding metadata if logging launch errors becomes necessary
-        PlaywrightFetchingStrategy.browserInstance = await playwright.chromium.launch();
-      }
-      return PlaywrightFetchingStrategy.browserInstance;
+  private static async getBrowser(): Promise<playwright.Browser> {
+    if (!PlaywrightFetchingStrategy.browserInstance) {
+      // Consider adding metadata if logging launch errors becomes necessary
+      PlaywrightFetchingStrategy.browserInstance = await playwright.chromium.launch();
     }
-  
-    static async closeBrowser(): Promise<void> {
-      if (PlaywrightFetchingStrategy.browserInstance) {
-        const closedInstance = PlaywrightFetchingStrategy.browserInstance;
-        PlaywrightFetchingStrategy.browserInstance = null;
-        // Consider adding metadata if logging close errors becomes necessary
-        await closedInstance.close();
-      }
+    return PlaywrightFetchingStrategy.browserInstance;
+  }
+
+  static async closeBrowser(): Promise<void> {
+    if (PlaywrightFetchingStrategy.browserInstance) {
+      const closedInstance = PlaywrightFetchingStrategy.browserInstance;
+      PlaywrightFetchingStrategy.browserInstance = null;
+      // Consider adding metadata if logging close errors becomes necessary
+      await closedInstance.close();
     }
+  }
   private async fetchPageContentWithPlaywright(urlString: string, config: ApiConfig, metadata: Metadata): Promise<{ content: string; links: Record<string, string> } | null> {
 
     if (!urlString?.startsWith("http")) {
@@ -339,11 +339,11 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
         ];
         selectorsToRemove.forEach(selector => {
           document.querySelectorAll(selector).forEach(element => {
-             try { element.remove(); }
-             catch(e) {
-               // Cannot use logMessage directly here as it's inside page.evaluate
-               console.warn("Failed to remove element:", e?.message);
-             }
+            try { element.remove(); }
+            catch (e) {
+              // Cannot use logMessage directly here as it's inside page.evaluate
+              console.warn("Failed to remove element:", e?.message);
+            }
           });
         });
       });
@@ -358,8 +358,8 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       logMessage('warn', `Playwright fetch failed for ${urlString}: ${error?.message}`, metadata);
       return null;
     } finally {
-       if (page) await page.close();
-       if (browserContext) await browserContext.close();
+      if (page) await page.close();
+      if (browserContext) await browserContext.close();
     }
   }
 
@@ -368,18 +368,18 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     // Pass metadata
     const docResult = await this.fetchPageContentWithPlaywright(config?.documentationUrl, config, metadata);
     let fetchedLinks = new Set<string>();
-    if(!config.instruction && docResult?.content) {
+    if (!config.instruction && docResult?.content) {
       return docResult?.content;
     }
     fetchedLinks.add(config.documentationUrl);
     const instructions = ["auth", "authentication", "introduction", "authorization", "started"];
     instructions.push(...(config.instruction?.toLowerCase().split(/[^a-z0-9]/g).filter(i => i.length > 3) || []));
 
-    if(!docResult || !docResult.links) return null;
+    if (!docResult || !docResult.links) return null;
 
     const rankedLinks: { linkText: string, href: string, matchCount: number }[] = [];
 
-    for(const [linkText, href] of Object.entries(docResult.links)) {
+    for (const [linkText, href] of Object.entries(docResult.links)) {
       const keywords = linkText.split(" ").filter(i => i.length > 3);
       const matchCount = keywords.filter(k => instructions.some(instr => k.includes(instr) || instr.includes(k))).length;
       rankedLinks.push({ linkText, href, matchCount });
@@ -388,11 +388,11 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     // Sort links by match count in descending order
     rankedLinks.sort((a, b) => b.matchCount - a.matchCount);
 
-    for(const rankedLink of rankedLinks) {
-      if(fetchedLinks.size > 3) break;
-      if(fetchedLinks.has(rankedLink.href)) continue;
+    for (const rankedLink of rankedLinks) {
+      if (fetchedLinks.size > 3) break;
+      if (fetchedLinks.has(rankedLink.href)) continue;
       const linkResult = await this.fetchPageContentWithPlaywright(rankedLink.href, config, metadata);
-      if(linkResult && linkResult.content) { // Ensure content exists
+      if (linkResult && linkResult.content) { // Ensure content exists
         docResult.content += `\n\n${linkResult.content}`;
         fetchedLinks.add(rankedLink.href);
       }
@@ -424,9 +424,9 @@ class OpenApiStrategy implements ProcessingStrategy {
       }
       // Fallback: look for a slightly different JSON structure often used
       const jsonMatch2 = html.match(/url:\s*"([^"]*(?:openapi|swagger|spec)\.(?:json|yaml|yml))"/i);
-       if (jsonMatch2 && jsonMatch2[1]) {
-           return jsonMatch2[1];
-       }
+      if (jsonMatch2 && jsonMatch2[1]) {
+        return jsonMatch2[1];
+      }
 
       // find direct references to common spec file names within quotes
       const directUrlMatch = html.match(/["']((?:https?:\/\/|\/)[^"']*(?:openapi|swagger)\.(?:json|yaml|yml))["']/i);
@@ -434,11 +434,11 @@ class OpenApiStrategy implements ProcessingStrategy {
         return directUrlMatch[1];
       }
 
-       // find references in script blocks that might assign the URL to a variable
-       const scriptVarMatch = html.match(/url\s*=\s*["']([^"']*(?:openapi|swagger)\.(?:json|yaml|yml))["']/i);
-       if (scriptVarMatch && scriptVarMatch[1]) {
-           return scriptVarMatch[1];
-       }
+      // find references in script blocks that might assign the URL to a variable
+      const scriptVarMatch = html.match(/url\s*=\s*["']([^"']*(?:openapi|swagger)\.(?:json|yaml|yml))["']/i);
+      if (scriptVarMatch && scriptVarMatch[1]) {
+        return scriptVarMatch[1];
+      }
 
 
       return null;
@@ -449,7 +449,7 @@ class OpenApiStrategy implements ProcessingStrategy {
   private async fetchOpenApiFromUrl(openApiUrl: string, config: ApiConfig, metadata: Metadata): Promise<string | null> {
     try {
       let absoluteOpenApiUrl = openApiUrl;
-      if(openApiUrl.startsWith("/")) {
+      if (openApiUrl.startsWith("/")) {
         const baseUrl = config.documentationUrl ? new URL(config.documentationUrl).origin : config.urlHost;
         absoluteOpenApiUrl = composeUrl(baseUrl, openApiUrl);
       }
@@ -465,19 +465,19 @@ class OpenApiStrategy implements ProcessingStrategy {
           return JSON.stringify(openApiData);
         }
       } else if (typeof openApiData === 'string') {
-         try {
-           const parsed = JSON.parse(openApiData);
-           if (parsed && (parsed.openapi || parsed.swagger)) {
-             logMessage('info', `Successfully fetched valid OpenAPI/Swagger JSON string from ${absoluteOpenApiUrl}`, metadata);
-             return openApiData; // Valid JSON spec
-           }
-         } catch (e) { /* ignore */ }
-         const trimmedData = openApiData.trim();
-         if (trimmedData.startsWith('openapi:') || trimmedData.startsWith('swagger:')) {
-            logMessage('info', `Successfully fetched likely OpenAPI/Swagger YAML string from ${absoluteOpenApiUrl}`, metadata);
-            return openApiData; // Likely YAML spec
-         }
-         return openApiData; // Return raw string as fallback
+        try {
+          const parsed = JSON.parse(openApiData);
+          if (parsed && (parsed.openapi || parsed.swagger)) {
+            logMessage('info', `Successfully fetched valid OpenAPI/Swagger JSON string from ${absoluteOpenApiUrl}`, metadata);
+            return openApiData; // Valid JSON spec
+          }
+        } catch (e) { /* ignore */ }
+        const trimmedData = openApiData.trim();
+        if (trimmedData.startsWith('openapi:') || trimmedData.startsWith('swagger:')) {
+          logMessage('info', `Successfully fetched likely OpenAPI/Swagger YAML string from ${absoluteOpenApiUrl}`, metadata);
+          return openApiData; // Likely YAML spec
+        }
+        return openApiData; // Return raw string as fallback
       }
 
       logMessage('warn', `Unexpected data type received from ${absoluteOpenApiUrl}: ${typeof openApiData}`, metadata);
@@ -499,39 +499,39 @@ class OpenApiStrategy implements ProcessingStrategy {
     const isYaml = trimmedContent.startsWith('openapi:') || trimmedContent.startsWith('swagger:');
     const isHtml = trimmedContent.slice(0, 500).toLowerCase().includes("<html");
     if (isJson) {
-       try {
-          const parsed = JSON.parse(trimmedContent);
-          if (parsed && (parsed.openapi || parsed.swagger)) {
-             logMessage('info', "Provided content is already a valid OpenAPI/Swagger JSON spec.", metadata);
-             return trimmedContent; // Content is a valid JSON spec
-          }
-       } catch(e) { /* ignore parse error */ }
-    } 
-    if (isYaml) {
-       logMessage('info', "Provided content appears to be an OpenAPI/Swagger YAML spec.", metadata);
-       // Basic check is enough for YAML start
-       return trimmedContent; // Content is likely a YAML spec
+      try {
+        const parsed = JSON.parse(trimmedContent);
+        if (parsed && (parsed.openapi || parsed.swagger)) {
+          logMessage('info', "Provided content is already a valid OpenAPI/Swagger JSON spec.", metadata);
+          return trimmedContent; // Content is a valid JSON spec
+        }
+      } catch (e) { /* ignore parse error */ }
     }
-    if(isHtml) {
+    if (isYaml) {
+      logMessage('info', "Provided content appears to be an OpenAPI/Swagger YAML spec.", metadata);
+      // Basic check is enough for YAML start
+      return trimmedContent; // Content is likely a YAML spec
+    }
+    if (isHtml) {
       const openApiUrl = this.extractOpenApiUrl(content, metadata);
-      if(!openApiUrl) {
+      if (!openApiUrl) {
         return null;
       }
 
       const openApiSpec = await this.fetchOpenApiFromUrl(openApiUrl, config, metadata);
-      if(!openApiSpec) {
+      if (!openApiSpec) {
         return null; // Only return null if fetching the SPEC failed. If HTML->MD fails, we still return the spec.
       }
 
       // Try to convert HTML to Markdown as supplementary info
       const markdownContent = await new HtmlMarkdownStrategy().tryProcess(content, config, metadata);
       if (markdownContent) {
-          logMessage('info', "Successfully extracted OpenAPI spec and converted HTML to Markdown.", metadata);
-          return `${openApiSpec}\n\n${markdownContent}`;
+        logMessage('info', "Successfully extracted OpenAPI spec and converted HTML to Markdown.", metadata);
+        return `${openApiSpec}\n\n${markdownContent}`;
       } else {
-          logMessage('warn', "Successfully extracted OpenAPI spec, but failed to convert HTML to Markdown. Returning spec only.", metadata);
-          // We still have the spec, return it. Don't include the original raw HTML.
-          return openApiSpec;
+        logMessage('warn', "Successfully extracted OpenAPI spec, but failed to convert HTML to Markdown. Returning spec only.", metadata);
+        // We still have the spec, return it. Don't include the original raw HTML.
+        return openApiSpec;
       }
     }
     // Content is not JSON, YAML, or HTML that contained an OpenAPI spec
@@ -541,22 +541,22 @@ class OpenApiStrategy implements ProcessingStrategy {
 
 class HtmlMarkdownStrategy implements ProcessingStrategy {
   async tryProcess(content: string, config: ApiConfig, metadata: Metadata): Promise<string | null> {
-     // Needs page content fetched by PlaywrightFetchingStrategy
-     if (content === undefined || content === null) {
-       return null;
-     }
-     // Only apply if content looks like HTML
-     if (!content.slice(0, 500).toLowerCase().includes("<html")) {
-        return null;
-     }
+    // Needs page content fetched by PlaywrightFetchingStrategy
+    if (content === undefined || content === null) {
+      return null;
+    }
+    // Only apply if content looks like HTML
+    if (!content.slice(0, 500).toLowerCase().includes("<html")) {
+      return null;
+    }
 
-     try {
-       const markdown = NodeHtmlMarkdown.translate(content);
-       logMessage('info', "Successfully converted HTML to Markdown.", metadata);
-       return markdown;
-     } catch (translateError) {
-       return null; // Failed translation, let RawPageContentStrategy handle it
-     }
+    try {
+      const markdown = NodeHtmlMarkdown.translate(content);
+      logMessage('info', "Successfully converted HTML to Markdown.", metadata);
+      return markdown;
+    } catch (translateError) {
+      return null; // Failed translation, let RawPageContentStrategy handle it
+    }
   }
 }
 

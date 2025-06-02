@@ -1,9 +1,8 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { AuthType, DecompressionMethod, FileType, HttpMethod } from '@superglue/client';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { callExtract, generateExtractConfig, processFile } from './extract.js';
-import { callAxios } from './tools.js';
 import { decompressData, parseFile } from './file.js';
-import { DecompressionMethod, FileType, AuthType, HttpMethod } from '@superglue/client';
-import { Documentation } from './documentation.js';
+import { callAxios } from './tools.js';
 // Mock dependencies
 vi.mock('./documentation.js');
 vi.mock('./file.js');
@@ -42,7 +41,7 @@ describe('Extract Utils', () => {
   describe('prepareExtract', () => {
     it('should prepare extract config', async () => {
       const mockDocumentation = 'API documentation';
-      
+
       const extractInput = {
         documentationUrl: 'https://docs.example.com',
         instruction: 'Fetch user data',
@@ -70,20 +69,20 @@ describe('Extract Utils', () => {
         urlHost: 'https://api.example.com',
         urlPath: '/data',
         method: HttpMethod.GET,
-        headers: { 
+        headers: {
           'Authorization': 'Bearer {token}'
         },
         authentication: AuthType.HEADER,
         fileType: FileType.JSON
       };
 
-      const credentials = { 
+      const credentials = {
         token: '12345'
       };
 
       console.log('Headers before:', extract.headers);
       console.log('Variables:', credentials);
-      
+
       const result = await callExtract(extract, {}, credentials, {});
       const resultObj = await processFile(result, extract);
       expect(callAxios).toHaveBeenCalledWith(
@@ -99,7 +98,7 @@ describe('Extract Utils', () => {
     it('should handle compressed response', async () => {
       const mockCompressedData = Buffer.from('compressed');
       const mockDecompressedData = Buffer.from(JSON.stringify({ data: [1, 2, 3] }));
-      
+
       (callAxios as any).mockResolvedValue({
         status: 200,
         data: mockCompressedData
@@ -158,7 +157,7 @@ describe('Extract Utils', () => {
     it('should handle Excel file response', async () => {
       const mockExcelData = Buffer.from('mock excel data');
       const mockParsedData = { sheet1: [{ name: 'John', age: 30 }] };
-      
+
       (callAxios as any).mockResolvedValue({
         status: 200,
         data: mockExcelData
@@ -194,7 +193,7 @@ describe('Extract Utils', () => {
         sheet1: [{ name: 'John', age: 30 }],
         sheet2: [{ city: 'New York', country: 'USA' }]
       };
-      
+
       (callAxios as any).mockResolvedValue({
         status: 200,
         data: mockExcelData
@@ -227,7 +226,7 @@ describe('Extract Utils', () => {
       const mockCompressedData = Buffer.from('compressed excel data');
       const mockDecompressedData = Buffer.from('decompressed excel data');
       const mockParsedData = { sheet1: [{ name: 'John', age: 30 }] };
-      
+
       (callAxios as any).mockResolvedValue({
         status: 200,
         data: mockCompressedData

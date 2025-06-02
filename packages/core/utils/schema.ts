@@ -1,11 +1,11 @@
-import { Validator } from "jsonschema";
-import type { ChatCompletionCreateParams, ChatCompletionMessageParam } from "openai/resources/chat/completions";
-import { GENERATE_SCHEMA_PROMPT } from "../llm/prompts.js";
 import { Metadata } from "@playwright/test";
-import { logMessage } from "./logs.js";
+import { Validator } from "jsonschema";
+import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { LanguageModel } from "../llm/llm.js";
+import { GENERATE_SCHEMA_PROMPT } from "../llm/prompts.js";
+import { logMessage } from "./logs.js";
 
-export async function generateSchema(instruction: string, responseData: string, metadata: Metadata) : Promise<string> {
+export async function generateSchema(instruction: string, responseData: string, metadata: Metadata): Promise<string> {
   const messages: ChatCompletionMessageParam[] = [
     {
       role: "system",
@@ -43,10 +43,10 @@ export async function generateSchema(instruction: string, responseData: string, 
 async function attemptSchemaGeneration(
   messages: ChatCompletionMessageParam[],
   retry: number
-): Promise<string> {  
+): Promise<string> {
   let temperature = Math.min(0.3 * retry, 1.0);
   const { response: generatedSchema } = await LanguageModel.generateObject(messages, null, temperature);
-  if(!generatedSchema || Object.keys(generatedSchema).length === 0) {
+  if (!generatedSchema || Object.keys(generatedSchema).length === 0) {
     throw new Error("No schema generated");
   }
   const validator = new Validator();

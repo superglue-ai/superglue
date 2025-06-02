@@ -1,5 +1,5 @@
 import { ApiConfig, ExtractConfig, HttpMethod, RunResult, TransformConfig } from '@superglue/client';
-import { beforeEach, describe, expect, it, afterEach, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { RedisService } from './redis.js';
 
 // Mock Redis client configuration

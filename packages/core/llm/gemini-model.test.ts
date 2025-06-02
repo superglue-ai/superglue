@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { GeminiModel } from './gemini-model.js';
-import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { ChatCompletionMessageParam } from 'openai/resources/chat/completions.mjs';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { GeminiModel } from './gemini-model.js';
 
 vi.mock('@google/generative-ai');
 
@@ -9,7 +9,7 @@ describe('GeminiModel', () => {
   const mockSendMessage = vi.fn();
   const mockStartChat = vi.fn(() => ({ sendMessage: mockSendMessage }));
   const mockGetGenerativeModel = vi.fn(() => ({ startChat: mockStartChat }));
-  
+
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.GEMINI_API_KEY = 'test-key';
@@ -41,7 +41,7 @@ describe('GeminiModel', () => {
   describe('generateObject', () => {
     it('should generate object response', async () => {
       const model = new GeminiModel();
-      mockSendMessage.mockResolvedValue({ 
+      mockSendMessage.mockResolvedValue({
         response: { text: () => '{"key": "value"}' }
       });
 
@@ -61,7 +61,7 @@ describe('GeminiModel', () => {
 
     it('should clean schema for Gemini', async () => {
       const model = new GeminiModel();
-      mockSendMessage.mockResolvedValue({ 
+      mockSendMessage.mockResolvedValue({
         response: { text: () => '{}' }
       });
 
@@ -116,23 +116,23 @@ describe('GeminiModel', () => {
     it('should handle JSON cleaning in responses', async () => {
       const model = new GeminiModel();
       const testCases = [
-        { 
-          input: '```json\n{"key": "value"}\n```', 
+        {
+          input: '```json\n{"key": "value"}\n```',
           expected: { key: 'value' },
           schema: { type: 'object' }
         },
-        { 
-          input: 'Here is your JSON: {"key": "value"}', 
+        {
+          input: 'Here is your JSON: {"key": "value"}',
           expected: { key: 'value' },
           schema: { type: 'object' }
         },
-        { 
-          input: '[{"key": "value"}]', 
+        {
+          input: '[{"key": "value"}]',
           expected: [{ key: 'value' }],
           schema: { type: 'array' }
         },
-        { 
-          input: '{"key": "value"}', 
+        {
+          input: '{"key": "value"}',
           expected: { key: 'value' },
           schema: { type: 'object' }
         }
@@ -153,7 +153,7 @@ describe('GeminiModel', () => {
 
     it('should clean schema with arrays', async () => {
       const model = new GeminiModel();
-      mockSendMessage.mockResolvedValue({ 
+      mockSendMessage.mockResolvedValue({
         response: { text: () => '[{"test": "value"}]' }
       });
 
