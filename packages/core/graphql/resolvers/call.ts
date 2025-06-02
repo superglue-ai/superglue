@@ -2,16 +2,15 @@ import { ApiConfig, ApiInputRequest, CacheMode, RequestOptions, TransformConfig 
 import type { Context, Metadata } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import OpenAI from "openai";
+import { PROMPT_MAPPING } from "../../llm/prompts.js";
 import { callEndpoint, evaluateResponse, generateApiConfig } from "../../utils/api.js";
+import { Documentation } from "../../utils/documentation.js";
+import { logMessage } from "../../utils/logs.js";
+import { generateSchema } from "../../utils/schema.js";
 import { telemetryClient } from "../../utils/telemetry.js";
 import { applyJsonata, applyTransformationWithValidation, maskCredentials, TransformResult } from "../../utils/tools.js";
 import { generateTransformJsonata, prepareTransform } from "../../utils/transform.js";
 import { notifyWebhook } from "../../utils/webhook.js";
-import { callPostgres } from "../../utils/postgres.js";
-import { logMessage } from "../../utils/logs.js";
-import { Documentation } from "../../utils/documentation.js";
-import { PROMPT_MAPPING } from "../../llm/prompts.js";
-import { generateSchema } from "../../utils/schema.js";
 
 export async function executeApiCall(
   endpoint: ApiConfig,
@@ -31,13 +30,13 @@ export async function executeApiCall(
   let success = false;
   do {
     try {
-      if(retryCount > 0) {
-        logMessage('info', `Generating API config for ${endpoint?.urlHost}${retryCount > 0 ? ` (${retryCount})` : ""}`, metadata);      
-        if(!documentation) {
+      if (retryCount > 0) {
+        logMessage('info', `Generating API config for ${endpoint?.urlHost}${retryCount > 0 ? ` (${retryCount})` : ""}`, metadata);
+        if (!documentation) {
           documentation = new Documentation(endpoint, metadata);
         }
         const documentationString = await documentation.fetch(endpoint.instruction);
-        const computedApiCallConfig = await generateApiConfig(endpoint, documentationString, payload, credentials, retryCount, messages);      
+        const computedApiCallConfig = await generateApiConfig(endpoint, documentationString, payload, credentials, retryCount, messages);
         endpoint = computedApiCallConfig.config;
         messages = computedApiCallConfig.messages;
       }
@@ -48,11 +47,11 @@ export async function executeApiCall(
         throw new Error("No data returned from API. This could be due to a configuration error.");
       }
       // Check if response is valid
-      if(retryCount > 0) {
+      if (retryCount > 0) {
         const result = await evaluateResponse(response.data, endpoint.responseSchema, endpoint.instruction);
         success = result.success;
-        if(!result.success) throw new Error(result.shortReason + " " + JSON.stringify(response.data).slice(0, 1000));
-        if(result.refactorNeeded) {
+        if (!result.success) throw new Error(result.shortReason + " " + JSON.stringify(response.data).slice(0, 1000));
+        if (result.refactorNeeded) {
           logMessage('info', `Refactoring the API response.`, metadata);
           const responseSchema = await generateSchema(endpoint.instruction, JSON.stringify(response.data).slice(0, 1000), metadata);
           const transformation = await generateTransformJsonata(responseSchema, endpoint.instruction, "$", metadata);
@@ -65,16 +64,16 @@ export async function executeApiCall(
       }
       break;
     }
-    catch(error) {
-      if(retryCount === 0) {
+    catch (error) {
+      if (retryCount === 0) {
         logMessage('info', `The initial configuration is not valid. Generating a new configuration. If you are creating a new configuration, this is expected.`, metadata);
       }
-      else if(retryCount > 0) {
+      else if (retryCount > 0) {
         const rawErrorString = error?.message || JSON.stringify(error || {});
         lastError = maskCredentials(rawErrorString, credentials).slice(0, 200);
-        messages.push({role: "user", content: `There was an error with the configuration, please fix: ${rawErrorString.slice(0, 2000)}`});
-        if(rawErrorString.startsWith("JSONata") && !messages.some(m => String(m.content).startsWith("Please find the JSONata guide here:"))) {
-          messages.push({role: "user", content: "Please find the JSONata guide here: "+ PROMPT_MAPPING});
+        messages.push({ role: "user", content: `There was an error with the configuration, please fix: ${rawErrorString.slice(0, 2000)}` });
+        if (rawErrorString.startsWith("JSONata") && !messages.some(m => String(m.content).startsWith("Please find the JSONata guide here:"))) {
+          messages.push({ role: "user", content: "Please find the JSONata guide here: " + PROMPT_MAPPING });
         }
         logMessage('warn', `API call failed. ${lastError}`, metadata);
       }
@@ -95,11 +94,11 @@ export async function executeApiCall(
 
 export const callResolver = async (
   _: any,
-  { input, payload, credentials, options }: { 
-    input: ApiInputRequest; 
-    payload: any; 
+  { input, payload, credentials, options }: {
+    input: ApiInputRequest;
+    payload: any;
     credentials?: Record<string, string>;
-    options: RequestOptions; 
+    options: RequestOptions;
   },
   context: Context,
   info: GraphQLResolveInfo
@@ -117,14 +116,14 @@ export const callResolver = async (
   try {
 
     // Get endpoint from datastore or use the one provided in the input
-    if(input.id) {
+    if (input.id) {
       endpoint = await context.datastore.getApiConfig(input.id, context.orgId);
     } else {
       endpoint = input.endpoint;
     }
 
     // Check if response schema is zod and throw an error if it is
-    if((endpoint?.responseSchema as any)?._def?.typeName === "ZodObject") {
+    if ((endpoint?.responseSchema as any)?._def?.typeName === "ZodObject") {
       throw new Error("zod is not supported for response schema. Please use json schema instead. you can use the zod-to-json-schema package to convert zod to json schema.");
     }
 
@@ -141,16 +140,16 @@ export const callResolver = async (
       try {
         // Transform response
         const preparedTransform = await prepareTransform(
-          context.datastore, 
-          readCache, 
-          endpoint as TransformConfig, 
-          data, 
+          context.datastore,
+          readCache,
+          endpoint as TransformConfig,
+          data,
           transformError,
           { runId: callId, orgId: context.orgId }
         );
         responseMapping = preparedTransform?.responseMapping;
-        transformedResponse = responseMapping ? 
-          await applyTransformationWithValidation(data, responseMapping, endpoint?.responseSchema) : 
+        transformedResponse = responseMapping ?
+          await applyTransformationWithValidation(data, responseMapping, endpoint?.responseSchema) :
           { success: true, data };
 
         if (!transformedResponse.success) {
@@ -169,15 +168,15 @@ export const callResolver = async (
     }
 
     // Save configuration if requested
-    const config = { ...endpoint, responseMapping: responseMapping};
-    if(writeCache) {
+    const config = { ...endpoint, responseMapping: responseMapping };
+    if (writeCache) {
       context.datastore.upsertApiConfig(input.id || endpoint.id, config, context.orgId);
     }
 
     // Notify webhook if configured
     // call async
     if (options?.webhookUrl) {
-      notifyWebhook(options.webhookUrl, callId, true, transformedResponse.data); 
+      notifyWebhook(options.webhookUrl, callId, true, transformedResponse.data);
     }
     const result = {
       id: callId,
@@ -187,10 +186,10 @@ export const callResolver = async (
       completedAt: new Date(),
     };
     context.datastore.createRun(result, context.orgId);
-    return {...result, data: transformedResponse.data};
+    return { ...result, data: transformedResponse.data };
   } catch (error) {
     const maskedError = maskCredentials(error.message, credentials);
-    
+
     if (options?.webhookUrl) {
       await notifyWebhook(options.webhookUrl, callId, false, undefined, error.message);
     }

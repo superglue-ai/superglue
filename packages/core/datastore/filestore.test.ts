@@ -1,8 +1,8 @@
 import { ApiConfig, ExtractConfig, HttpMethod, RunResult, TransformConfig } from '@superglue/client';
-import { beforeEach, describe, expect, it, afterEach } from 'vitest';
-import { FileStore } from './filestore.js';
 import fs from 'fs';
 import path from 'path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { FileStore } from './filestore.js';
 
 describe('FileStore', () => {
   let store: FileStore;
@@ -32,7 +32,7 @@ describe('FileStore', () => {
     if (fs.existsSync(testPath)) {
       fs.unlinkSync(testPath);
     }
-    if(fs.existsSync(testLogsPath)) {
+    if (fs.existsSync(testLogsPath)) {
       fs.unlinkSync(testLogsPath);
     }
     if (fs.existsSync(testDir)) {
@@ -197,11 +197,11 @@ describe('FileStore', () => {
       const run1 = { ...testRun, id: 'run1', config: { ...testRun.config, id: 'config1' } };
       const run2 = { ...testRun, id: 'run2', config: { ...testRun.config, id: 'config2' } };
       const run3 = { ...testRun, id: 'run3', config: { ...testRun.config, id: 'config1' } };
-      
+
       await store.createRun(run1, testOrgId);
       await store.createRun(run2, testOrgId);
       await store.createRun(run3, testOrgId);
-      
+
       const { items, total } = await store.listRuns(10, 0, 'config1', testOrgId);
       expect(items.length).toBe(2);
       expect(total).toBe(3); // Total is still all runs

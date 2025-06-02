@@ -2,19 +2,19 @@ import { ApolloServer } from '@apollo/server';
 import { expressMiddleware } from '@apollo/server/express4';
 import { ApolloServerPluginDrainHttpServer } from '@apollo/server/plugin/drainHttpServer';
 import { ApolloServerPluginLandingPageLocalDefault } from '@apollo/server/plugin/landingPage/default';
+import { makeExecutableSchema } from '@graphql-tools/schema';
 import cors from 'cors';
 import express from 'express';
 import { graphqlUploadExpress } from 'graphql-upload-minimal';
+import { useServer } from 'graphql-ws/use/ws';
 import http from 'http';
 import { WebSocketServer } from 'ws';
-import { useServer } from 'graphql-ws/use/ws';
-import { makeExecutableSchema } from '@graphql-tools/schema';
+import { authMiddleware, extractToken, validateToken } from './auth/auth.js';
 import { createDataStore } from './datastore/datastore.js';
 import { resolvers, typeDefs } from './graphql/graphql.js';
-import { createTelemetryPlugin, telemetryMiddleware } from './utils/telemetry.js';
-import { logMessage } from "./utils/logs.js";
-import { authMiddleware, validateToken, extractToken } from './auth/auth.js';
 import { handleMcpSessionRequest, mcpHandler } from './mcp/mcp-server.js';
+import { logMessage } from "./utils/logs.js";
+import { createTelemetryPlugin, telemetryMiddleware } from './utils/telemetry.js';
 // Constants
 const PORT = process.env.GRAPHQL_PORT || 3000;
 
@@ -44,19 +44,19 @@ const getHttpContext = async ({ req }) => {
 };
 
 function validateEnvironment() {
-  if(!process.env.GRAPHQL_PORT) {
+  if (!process.env.GRAPHQL_PORT) {
     throw new Error('GRAPHQL_PORT is not set.');
   }
 
-  if((process.env.LLM_PROVIDER !== 'GEMINI') && !process.env.OPENAI_API_KEY) {
+  if ((process.env.LLM_PROVIDER !== 'GEMINI') && !process.env.OPENAI_API_KEY) {
     throw new Error('OPENAI_API_KEY is not set.');
   }
 
-  if((process.env.LLM_PROVIDER === 'GEMINI') && !process.env.GEMINI_API_KEY) {
+  if ((process.env.LLM_PROVIDER === 'GEMINI') && !process.env.GEMINI_API_KEY) {
     throw new Error('GEMINI_API_KEY is not set.');
   }
 
-  if(process.env.DATASTORE_TYPE === 'redis' && !process.env.REDIS_HOST) {
+  if (process.env.DATASTORE_TYPE === 'redis' && !process.env.REDIS_HOST) {
     throw new Error('REDIS_HOST is not set.');
   }
 

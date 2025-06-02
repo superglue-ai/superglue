@@ -1,14 +1,14 @@
-import { describe, it, expect } from 'vitest';
-import { decompressZip, parseFile } from './file.js';
 import { FileType } from '@superglue/client';
 import axios from 'axios';
+import { describe, expect, it } from 'vitest';
+import { decompressZip, parseFile } from './file.js';
 
 describe('File Utilities', () => {
   describe('parseFile', () => {
     it('should parse JSON data', async () => {
       const jsonData = JSON.stringify([{ name: 'test', value: 123 }]);
       const buffer = Buffer.from(jsonData);
-      
+
       const result = await parseFile(buffer, FileType.JSON);
       expect(result).toEqual([{ name: 'test', value: 123 }]);
     });
@@ -16,7 +16,7 @@ describe('File Utilities', () => {
     it('should parse CSV data', async () => {
       const csvData = 'name,value\ntest,123';
       const buffer = Buffer.from(csvData);
-      
+
       const result = await parseFile(buffer, FileType.CSV);
       expect(result).toEqual([{ name: 'test', value: '123' }]);
     });
@@ -24,7 +24,7 @@ describe('File Utilities', () => {
     it('should parse CSV data as array if multiple rows are given', async () => {
       const csvData = 'name,value\ntest,123\ntest2,456';
       const buffer = Buffer.from(csvData);
-      
+
       const result = await parseFile(buffer, FileType.CSV);
       expect(result).toEqual([
         { name: 'test', value: '123' },
@@ -42,10 +42,10 @@ describe('File Utilities', () => {
         </root>
       `;
       const buffer = Buffer.from(xmlData);
-      
+
       const result = await parseFile(buffer, FileType.XML);
       expect(result?.root?.item).toEqual({ name: 'test', value: '123' });
-    }); 
+    });
     it('should parse XML data as array if multiple rows are given', async () => {
       const xmlData = `
         <?xml version="1.0" encoding="UTF-8"?>
@@ -61,7 +61,7 @@ describe('File Utilities', () => {
         </root>
       `;
       const buffer = Buffer.from(xmlData);
-      
+
       const result = await parseFile(buffer, FileType.XML);
       expect(result?.root?.item).toHaveLength(2);
       expect(result?.root?.item).toEqual([
@@ -81,7 +81,7 @@ describe('File Utilities', () => {
     it('should extract first file from zip archive', async () => {
       // This is a minimal valid ZIP file structure containing one file named "test.txt" with content "Hello World!"
       const file = await axios.get('https://sample-files.com/downloads/compressed/zip/basic-text.zip', { responseType: 'arraybuffer' });
-      
+
       const result = await decompressZip(file.data);
       expect(result.toString()).toBe('This is a sample file.');
     });
@@ -97,7 +97,7 @@ describe('File Utilities', () => {
         0x50, 0x4B, 0x05, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00
       ]);
-      
+
       await expect(decompressZip(invalidZip))
         .rejects.toThrow('Error decompressing zip');
     });

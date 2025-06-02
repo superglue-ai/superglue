@@ -1,6 +1,6 @@
-import { SystemDefinition } from "../workflow/workflow-builder.js";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { LanguageModel } from "../llm/llm.js";
+import { SystemDefinition } from "../workflow/workflow-builder.js";
 import { logMessage } from "./logs.js";
 
 export async function generateInstructions(systems: SystemDefinition[], metadata: { orgId: string }): Promise<string[]> {
@@ -67,7 +67,7 @@ async function attemptInstructionGeneration(
     }
   }
   const { response: generatedInstructions } = await LanguageModel.generateObject(messages, schema, temperature);
-  
+
   if (!Array.isArray(generatedInstructions) || generatedInstructions.length === 0) {
     throw new Error("No valid instructions generated");
   }

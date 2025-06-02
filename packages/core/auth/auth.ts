@@ -1,6 +1,6 @@
+import { logMessage } from "../utils/logs.js";
 import { LocalKeyManager } from "./localKeyManager.js";
 import { SupabaseKeyManager } from "./supabaseKeyManager.js";
-import { logMessage } from "../utils/logs.js";
 
 // Instead, create a getter to ensure manager is initialized after mocks
 let _authManager: LocalKeyManager | SupabaseKeyManager | null = null;
@@ -12,26 +12,26 @@ function getAuthManager() {
 }
 
 // HTTP Middleware
-export const authMiddleware = async (req:any, res:any, next:any) => {
-    // Skip authentication for health check
-    if (req.path === '/health') return res.status(200).send('OK');
-    
-    const token = extractToken(req);
-    const authResult = await validateToken(token);
-  
-    // If authentication fails, return 401 error
-    if (!authResult.success) {
-      logMessage('warn', `Authentication failed for token: ${token}`);
-      return res.status(401).send(getAuthErrorHTML(token));
-    }
+export const authMiddleware = async (req: any, res: any, next: any) => {
+  // Skip authentication for health check
+  if (req.path === '/health') return res.status(200).send('OK');
 
-    // Add orgId to request object
-    req.orgId = authResult.orgId;
-    req.headers["orgId"] = authResult.orgId;
-    req.authInfo = { token: token, clientId: authResult.orgId };
-    return next();
+  const token = extractToken(req);
+  const authResult = await validateToken(token);
+
+  // If authentication fails, return 401 error
+  if (!authResult.success) {
+    logMessage('warn', `Authentication failed for token: ${token}`);
+    return res.status(401).send(getAuthErrorHTML(token));
+  }
+
+  // Add orgId to request object
+  req.orgId = authResult.orgId;
+  req.headers["orgId"] = authResult.orgId;
+  req.authInfo = { token: token, clientId: authResult.orgId };
+  return next();
 };
-  
+
 // Shared auth function
 export async function validateToken(token: string | undefined) {
   if (!token) {
@@ -49,23 +49,23 @@ export async function validateToken(token: string | undefined) {
     message: authResult.success ? '' : 'Invalid token'
   }
 }
-  
-  // Extract token from various sources
+
+// Extract token from various sources
 export const extractToken = (source: { headers?: any, query?: any } | { connectionParams?: any, extra?: any }): string | undefined => {
-    if ('headers' in source) {
-      // HTTP request
-      return source.headers?.authorization?.split(" ")?.[1]?.trim() || source.query?.token;
-    } else if ('connectionParams' in source) {
-      // WebSocket connection
-      return source.connectionParams?.Authorization?.split(" ")?.[1]?.trim() || 
-        source.extra?.request?.url?.split("token=")?.[1]?.split("&")?.[0] ||
-        source.extra?.request?.url?.split("superglueApiKey=")?.[1]?.split("&")?.[0];
-    }
-    return undefined;
+  if ('headers' in source) {
+    // HTTP request
+    return source.headers?.authorization?.split(" ")?.[1]?.trim() || source.query?.token;
+  } else if ('connectionParams' in source) {
+    // WebSocket connection
+    return source.connectionParams?.Authorization?.split(" ")?.[1]?.trim() ||
+      source.extra?.request?.url?.split("token=")?.[1]?.split("&")?.[0] ||
+      source.extra?.request?.url?.split("superglueApiKey=")?.[1]?.split("&")?.[0];
+  }
+  return undefined;
 };
-  // Helper Functions
- function getAuthErrorHTML(token: string | undefined) {
-    return `
+// Helper Functions
+function getAuthErrorHTML(token: string | undefined) {
+  return `
       <html>
         <body style="display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif;">
           <div style="text-align: center;">
@@ -80,8 +80,8 @@ export const extractToken = (source: { headers?: any, query?: any } | { connecti
         </body>
       </html>
     `;
-  }
+}
 
-  export const _resetAuthManager = (manager: LocalKeyManager | SupabaseKeyManager | null = null) => {
-    _authManager = manager;
-  }; 
+export const _resetAuthManager = (manager: LocalKeyManager | SupabaseKeyManager | null = null) => {
+  _authManager = manager;
+}; 

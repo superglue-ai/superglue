@@ -8,10 +8,10 @@ import { notifyWebhook } from "../../utils/webhook.js";
 
 export const transformResolver = async (
   _: any,
-  { input, data, options }: { 
-    input: TransformInputRequest; 
-    data: any; 
-    options: RequestOptions; 
+  { input, data, options }: {
+    input: TransformInputRequest;
+    data: any;
+    options: RequestOptions;
   },
   context: Context,
   info: GraphQLResolveInfo
@@ -22,18 +22,18 @@ export const transformResolver = async (
   const writeCache = options?.cacheMode ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.WRITEONLY : true;
   let preparedTransform: TransformConfig | null = null;
 
-  if((input.endpoint?.responseSchema as any)?._def?.typeName === "ZodObject") {
+  if ((input.endpoint?.responseSchema as any)?._def?.typeName === "ZodObject") {
     throw new Error("zod is not supported for response schema. Please use json schema instead. you can use the zod-to-json-schema package to convert zod to json schema.");
   }
 
   try {
     // Transform response
-    preparedTransform = readCache ? 
+    preparedTransform = readCache ?
       await context.datastore.getTransformConfig(input.id, context.orgId)
-    : null;
-    preparedTransform = preparedTransform?.responseMapping ? preparedTransform : 
+      : null;
+    preparedTransform = preparedTransform?.responseMapping ? preparedTransform :
       await prepareTransform(context.datastore, readCache, preparedTransform || input.endpoint, data, null, { runId: callId, orgId: context.orgId });
-    if(!preparedTransform || !preparedTransform.responseMapping) {
+    if (!preparedTransform || !preparedTransform.responseMapping) {
       telemetryClient?.captureException(new Error("Didn't find a valid transformation configuration."), context.orgId, {
         input: input,
         data: data,
@@ -52,7 +52,7 @@ export const transformResolver = async (
     }
 
     // Save configuration if requested
-    if(writeCache) {
+    if (writeCache) {
       context.datastore.upsertTransformConfig(input.id || preparedTransform.id, preparedTransform, context.orgId);
     }
     const completedAt = new Date();
@@ -60,7 +60,7 @@ export const transformResolver = async (
     // Notify webhook if configured
     // call async
     if (options?.webhookUrl) {
-      notifyWebhook(options.webhookUrl, callId, true, transformation.data); 
+      notifyWebhook(options.webhookUrl, callId, true, transformation.data);
     }
 
     return {
@@ -74,7 +74,7 @@ export const transformResolver = async (
 
   } catch (error) {
     const completedAt = new Date();
-    
+
     if (options?.webhookUrl) {
       await notifyWebhook(options.webhookUrl, callId, false, undefined, error.message);
     }
@@ -83,7 +83,7 @@ export const transformResolver = async (
       id: callId,
       success: false,
       error: error.message,
-      config: preparedTransform || {id: callId, instruction: "", ...input},
+      config: preparedTransform || { id: callId, instruction: "", ...input },
       startedAt,
       completedAt,
     };

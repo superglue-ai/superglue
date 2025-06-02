@@ -6,20 +6,20 @@ import { extractResolver } from "./resolvers/extract.js";
 import { generateInstructionsResolver, generateSchemaResolver } from "./resolvers/generate.js";
 import { getApiResolver, getExtractResolver, getRunResolver, getTransformResolver } from "./resolvers/get.js";
 import { listApisResolver, listExtractsResolver, listRunsResolver, listTransformsResolver } from "./resolvers/list.js";
+import { logsResolver } from "./resolvers/logs.js";
 import { JSONResolver, JSONSchemaResolver, JSONataResolver } from "./resolvers/scalars.js";
 import { getTenantInfoResolver, setTenantInfoResolver } from "./resolvers/tenant.js";
 import { transformResolver } from "./resolvers/transform.js";
 import { updateApiConfigIdResolver } from "./resolvers/update-id.js";
 import { upsertApiResolver, upsertExtractResolver, upsertTransformResolver } from "./resolvers/upsert.js";
 import {
+  buildWorkflowResolver,
   deleteWorkflowResolver,
+  executeWorkflowResolver,
   getWorkflowResolver,
   listWorkflowsResolver,
-  upsertWorkflowResolver,
-  executeWorkflowResolver,
-  buildWorkflowResolver
+  upsertWorkflowResolver
 } from "./resolvers/workflow.js";
-import { logsResolver } from "./resolvers/logs.js";
 
 export const resolvers = {
   Query: {

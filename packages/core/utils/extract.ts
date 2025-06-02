@@ -1,14 +1,14 @@
-import { AxiosRequestConfig } from "axios";
-import { AuthType, RequestOptions, DecompressionMethod, ExtractConfig, FileType, HttpMethod } from "@superglue/client";
+import { AuthType, DecompressionMethod, ExtractConfig, FileType, HttpMethod, RequestOptions } from "@superglue/client";
 import { Metadata } from "@superglue/shared";
-import { callAxios, composeUrl, replaceVariables } from "./tools.js";
+import { AxiosRequestConfig } from "axios";
+import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
+import { LanguageModel } from "../llm/llm.js";
 import { API_PROMPT } from "../llm/prompts.js";
 import { decompressData, parseFile } from "./file.js";
 import { logMessage } from "./logs.js";
-import { LanguageModel } from "../llm/llm.js";
-import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
+import { callAxios, composeUrl, replaceVariables } from "./tools.js";
 
 
 export async function callExtract(extract: ExtractConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions, metadata?: Metadata): Promise<any> {
@@ -37,7 +37,7 @@ export async function callExtract(extract: ExtractConfig, payload: Record<string
   logMessage('info', `${extract.method} ${url}`, metadata);
   const response = await callAxios(axiosConfig, options);
 
-  if(![200, 201, 204].includes(response?.status) || response.data?.error) {
+  if (![200, 201, 204].includes(response?.status) || response.data?.error) {
     const error = JSON.stringify(String(response?.data?.error || response?.data));
     const message = `${extract.method} ${url} failed with status ${response.status}. Response: ${error}
     Headers: ${JSON.stringify(headers)}
@@ -62,7 +62,7 @@ export async function processFile(data: Buffer, extractConfig: ExtractConfig) {
     // Navigate to the specified data path
     const pathParts = extractConfig.dataPath.split('.');
     for (const part of pathParts) {
-      responseJSON = responseJSON[part] || responseJSON;  
+      responseJSON = responseJSON[part] || responseJSON;
     }
   }
 
@@ -94,9 +94,9 @@ export async function generateExtractConfig(extractConfig: Partial<ExtractConfig
       content: API_PROMPT
     },
     {
-      role: "user", 
-      content: 
-`Generate API configuration for the following:
+      role: "user",
+      content:
+        `Generate API configuration for the following:
 
 Instructions: ${extractConfig.instruction}
 
@@ -129,6 +129,6 @@ ${lastError}` : ''}`
     fileType: generatedConfig.fileType,
     documentationUrl: extractConfig.documentationUrl,
     createdAt: extractConfig.createdAt || new Date(),
-    updatedAt: new Date(),    
+    updatedAt: new Date(),
   } as ExtractConfig;
 }

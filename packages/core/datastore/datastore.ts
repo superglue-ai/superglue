@@ -1,7 +1,7 @@
-import { DataStore } from './types.js';
-import { RedisService } from './redis.js';
-import { MemoryStore } from './memory.js';
 import { FileStore } from './filestore.js';
+import { MemoryStore } from './memory.js';
+import { RedisService } from './redis.js';
+import { DataStore } from './types.js';
 
 export function createDataStore(config: {
   type: 'redis' | 'memory' | 'file';
@@ -15,7 +15,7 @@ export function createDataStore(config: {
     return new FileStore(fileStoreConfig.storageDir);
   }
   return new MemoryStore();
-} 
+}
 
 export function getFileStoreConfig() {
   return {

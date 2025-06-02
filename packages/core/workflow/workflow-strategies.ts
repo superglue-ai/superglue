@@ -1,9 +1,9 @@
 import type { ExecutionStep, RequestOptions, WorkflowStepResult } from "@superglue/client";
-import { applyJsonata } from "../utils/tools.js";
-import { logMessage } from "../utils/logs.js";
-import { executeApiCall } from "../graphql/resolvers/call.js";
-import { generateTransformJsonata } from "../utils/transform.js";
 import { Metadata } from "@superglue/shared";
+import { executeApiCall } from "../graphql/resolvers/call.js";
+import { logMessage } from "../utils/logs.js";
+import { applyJsonata } from "../utils/tools.js";
+import { generateTransformJsonata } from "../utils/transform.js";
 
 export interface ExecutionStrategy {
   execute(
@@ -72,18 +72,18 @@ const loopStrategy: ExecutionStrategy = {
 
     try {
       if (!step.loopSelector) {
-        if(Array.isArray(payload)) {
+        if (Array.isArray(payload)) {
           step.loopSelector = "$";
         }
         else {
           throw new Error("loopSelector is required for LOOP execution mode");
         }
       }
-      
+
       let loopItems: any[] = await applyJsonata(payload, step.loopSelector);
 
       if (!Array.isArray(loopItems) || loopItems.length === 0) {
-        if(step.loopSelector !== "$") logMessage("error", `No input data found for '${step.id}' - regenerating data selector`, metadata);
+        if (step.loopSelector !== "$") logMessage("error", `No input data found for '${step.id}' - regenerating data selector`, metadata);
         const newLoopSelector = await generateTransformJsonata({ type: "array" }, payload, "Find the array of selector values for the following loop: " + step.id, metadata);
         step.loopSelector = newLoopSelector.jsonata;
         loopItems = await applyJsonata(payload, step.loopSelector);
@@ -104,12 +104,12 @@ const loopStrategy: ExecutionStrategy = {
 
         try {
           const apiResponse = await executeApiCall(step.apiConfig, loopPayload, credentials, options, metadata);
-          const rawData = {currentItem: currentItem, ...(typeof apiResponse.data === 'object' ? apiResponse.data : {data: apiResponse.data})};
+          const rawData = { currentItem: currentItem, ...(typeof apiResponse.data === 'object' ? apiResponse.data : { data: apiResponse.data }) };
           const transformedData = await applyJsonata(rawData, step.responseMapping);
-          stepResults.push({ 
-            stepId: step.id, 
-            success: true, 
-            rawData: rawData, 
+          stepResults.push({
+            stepId: step.id,
+            success: true,
+            rawData: rawData,
             transformedData: transformedData,
             config: apiResponse.endpoint
           });
