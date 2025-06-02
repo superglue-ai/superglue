@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { generateSchema } from './schema.js'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LanguageModel } from '../llm/llm.js';
+import { generateSchema } from './schema.js';
 
 // Update the mock to be more flexible
 vi.mock('../llm/llm.js', () => {
@@ -30,7 +30,7 @@ vi.mock('../llm/llm.js', () => {
 
 describe('generateSchema', () => {
   const originalEnv = { ...process.env }
-  
+
   // Test data
   const instruction = "get me all characters with only their name"
   const responseData = '{"results": [{"name": "Homer", "species": "Human"}, {"name": "Bart", "species": "Human"}]}'
@@ -40,7 +40,7 @@ describe('generateSchema', () => {
       results: {
         type: "array",
         items: {
-          type: "object", 
+          type: "object",
           properties: {
             name: {
               type: "string"
@@ -59,7 +59,7 @@ describe('generateSchema', () => {
     process.env.OPENAI_API_KEY = 'test-key'
     // Set default model for tests
     process.env.OPENAI_MODEL = 'gpt-4o'
-    
+
     // Reset the mocks before each test
     vi.resetAllMocks()
   })
@@ -80,7 +80,7 @@ describe('generateSchema', () => {
   it('should retry on failure and succeed on second attempt', async () => {
     const errorMessage = 'Test error message'
     const generateObject = vi.mocked(LanguageModel.generateObject)
-    
+
     // First call fails
     generateObject.mockRejectedValueOnce(new Error(errorMessage))
     // Second call succeeds
@@ -112,11 +112,11 @@ describe('generateSchema', () => {
     vi.resetAllMocks()
     delete process.env.SCHEMA_GENERATION_MODEL
     process.env.OPENAI_MODEL = 'gpt-4o'
-    
+
     generateObject.mockResolvedValueOnce({ response: expectedSchema, messages: [] })
-    
+
     await generateSchema(instruction, responseData, {})
-    
+
     expect(generateObject).toHaveBeenCalledWith(
       expect.any(Array),
       null,
@@ -125,7 +125,7 @@ describe('generateSchema', () => {
   })
 
   // Skip live API tests when API key isn't available
-  if(!process.env.VITE_OPENAI_API_KEY) {
-    it('skips live tests when VITE_OPENAI_API_KEY is not set', () => {})
+  if (!process.env.VITE_OPENAI_API_KEY) {
+    it('skips live tests when VITE_OPENAI_API_KEY is not set', () => { })
   }
 })

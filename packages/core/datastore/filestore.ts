@@ -1,9 +1,9 @@
-import type { ApiConfig, ExtractConfig, RunResult, Workflow, TransformConfig } from "@superglue/client";
-import type { DataStore } from "./types.js";
+import type { ApiConfig, ExtractConfig, RunResult, TransformConfig, Workflow } from "@superglue/client";
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { logMessage } from "../utils/logs.js";
+import type { DataStore } from "./types.js";
 
 export class FileStore implements DataStore {
 
@@ -46,7 +46,7 @@ export class FileStore implements DataStore {
     this.filePath = path.join(storageDir, 'superglue_data.json');
     this.logsFilePath = path.join(storageDir, 'superglue_logs.json');
     logMessage('info', `File Datastore: Using storage path: ${this.filePath}`);
-    
+
     this.initializeStorage();
   }
 
@@ -55,14 +55,14 @@ export class FileStore implements DataStore {
       // Ensure the directory exists with proper permissions
       fs.mkdirSync(path.dirname(this.filePath), { recursive: true, mode: 0o755 });
       logMessage('info', `File Datastore: Created/verified directory: ${path.dirname(this.filePath)}`);
-      
+
       const data = fs.readFileSync(this.filePath, 'utf-8');
       const parsed = JSON.parse(data, (key, value) => {
         if (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
           return new Date(value);
         }
         return value;
-      });      
+      });
       this.storage = {
         ...this.storage,
         apis: new Map(Object.entries(parsed.apis || {})),
@@ -79,7 +79,7 @@ export class FileStore implements DataStore {
       logMessage('info', 'File Datastore: Successfully loaded existing data');
     } catch (error) {
       logMessage('error', 'File Datastore: Error loading data: ' + error);
-      if(!fs.existsSync(this.filePath)) {
+      if (!fs.existsSync(this.filePath)) {
         logMessage('info', 'File Datastore: No existing data found, starting with empty storage');
         await this.persist();
       }
@@ -100,7 +100,7 @@ export class FileStore implements DataStore {
       };
     } catch (error) {
       logMessage('error', 'Logs Datastore: Error loading data: ' + error);
-      if(!fs.existsSync(this.logsFilePath)) {
+      if (!fs.existsSync(this.logsFilePath)) {
         logMessage('info', 'Logs Datastore: No existing logs found, starting with empty storage');
         await this.persistLogs();
       }
@@ -126,16 +126,16 @@ export class FileStore implements DataStore {
   }
 
   private isWritingLogs = false;
-  
+
   private async persistLogs() {
-    if(this.isWritingLogs) return;
+    if (this.isWritingLogs) return;
     this.isWritingLogs = true;
-    try{
-    const serializedLogs = {
-      runs: Object.fromEntries(this.storage.runs),
-      runsIndex: Object.fromEntries(this.storage.runsIndex),
-    };
-    fs.writeFileSync(this.logsFilePath, JSON.stringify(serializedLogs, null, 2), { mode: 0o644 });
+    try {
+      const serializedLogs = {
+        runs: Object.fromEntries(this.storage.runs),
+        runsIndex: Object.fromEntries(this.storage.runsIndex),
+      };
+      fs.writeFileSync(this.logsFilePath, JSON.stringify(serializedLogs, null, 2), { mode: 0o644 });
     } catch (error) {
       logMessage('error', 'Failed to persist logs: ' + error);
       throw error;
@@ -161,7 +161,7 @@ export class FileStore implements DataStore {
 
   // API Config Methods
   async getApiConfig(id: string, orgId: string): Promise<ApiConfig | null> {
-    if(!id) return null;
+    if (!id) return null;
     const key = this.getKey('api', id, orgId);
     const config = this.storage.apis.get(key);
     return config ? { ...config, id } : null;
@@ -176,7 +176,7 @@ export class FileStore implements DataStore {
   }
 
   async upsertApiConfig(id: string, config: ApiConfig, orgId?: string): Promise<ApiConfig> {
-    if(!id || !config) return null;
+    if (!id || !config) return null;
     const key = this.getKey('api', id, orgId);
     this.storage.apis.set(key, config);
     await this.persist();
@@ -184,7 +184,7 @@ export class FileStore implements DataStore {
   }
 
   async deleteApiConfig(id: string, orgId: string): Promise<boolean> {
-    if(!id) return false;
+    if (!id) return false;
     const key = this.getKey('api', id, orgId);
     const deleted = this.storage.apis.delete(key);
     await this.persist();
@@ -193,7 +193,7 @@ export class FileStore implements DataStore {
 
   // Extract Config Methods
   async getExtractConfig(id: string, orgId: string): Promise<ExtractConfig | null> {
-    if(!id) return null;
+    if (!id) return null;
     const key = this.getKey('extract', id, orgId);
     const config = this.storage.extracts.get(key);
     return config ? { ...config, id } : null;
@@ -207,7 +207,7 @@ export class FileStore implements DataStore {
   }
 
   async upsertExtractConfig(id: string, config: ExtractConfig, orgId: string): Promise<ExtractConfig> {
-    if(!id || !config) return null;
+    if (!id || !config) return null;
     const key = this.getKey('extract', id, orgId);
     this.storage.extracts.set(key, config);
     await this.persist();
@@ -215,7 +215,7 @@ export class FileStore implements DataStore {
   }
 
   async deleteExtractConfig(id: string, orgId: string): Promise<boolean> {
-    if(!id) return false;
+    if (!id) return false;
     const key = this.getKey('extract', id, orgId);
     const deleted = this.storage.extracts.delete(key);
     await this.persist();
@@ -224,7 +224,7 @@ export class FileStore implements DataStore {
 
   // Transform Config Methods
   async getTransformConfig(id: string, orgId: string): Promise<TransformConfig | null> {
-    if(!id) return null;
+    if (!id) return null;
     const key = this.getKey('transform', id, orgId);
     const config = this.storage.transforms.get(key);
     return config ? { ...config, id } : null;
@@ -238,7 +238,7 @@ export class FileStore implements DataStore {
   }
 
   async upsertTransformConfig(id: string, config: TransformConfig, orgId: string): Promise<TransformConfig> {
-    if(!id || !config) return null;
+    if (!id || !config) return null;
     const key = this.getKey('transform', id, orgId);
     this.storage.transforms.set(key, config);
     await this.persist();
@@ -246,7 +246,7 @@ export class FileStore implements DataStore {
   }
 
   async deleteTransformConfig(id: string, orgId: string): Promise<boolean> {
-    if(!id) return false;
+    if (!id) return false;
     const key = this.getKey('transform', id, orgId);
     const deleted = this.storage.transforms.delete(key);
     await this.persist();
@@ -255,21 +255,21 @@ export class FileStore implements DataStore {
 
   // Run Result Methods
   async getRun(id: string, orgId: string): Promise<RunResult | null> {
-    if(!id) return null;
+    if (!id) return null;
     const key = this.getKey('run', id, orgId);
     const run = this.storage.runs.get(key);
     return run ? { ...run, id } : null;
   }
 
   async createRun(run: RunResult, orgId: string): Promise<RunResult> {
-    if(!run) return null;
+    if (!run) return null;
     const key = this.getKey('run', run.id, orgId);
     this.storage.runs.set(key, run);
-    
+
     if (!this.storage.runsIndex.has(orgId)) {
       this.storage.runsIndex.set(orgId, []);
     }
-    
+
     const index = this.storage.runsIndex.get(orgId)!;
     index.push({
       id: run.id,
@@ -277,7 +277,7 @@ export class FileStore implements DataStore {
       configId: run.config?.id
     });
     index.sort((a, b) => b.timestamp - a.timestamp);
-    
+
     await this.persistLogs();
     return run;
   }
@@ -288,7 +288,7 @@ export class FileStore implements DataStore {
       .filter(entry => !configId || entry.configId === configId)
       .slice(offset, offset + limit)
       .map(entry => entry.id);
-    
+
     const items = runIds.map(id => {
       const key = this.getKey('run', id, orgId);
       const run = this.storage.runs.get(key);
@@ -298,10 +298,10 @@ export class FileStore implements DataStore {
   }
 
   async deleteRun(id: string, orgId: string): Promise<boolean> {
-    if(!id) return false;
+    if (!id) return false;
     const key = this.getKey('run', id, orgId);
     const deleted = this.storage.runs.delete(key);
-    
+
     if (deleted && this.storage.runsIndex.has(orgId)) {
       const index = this.storage.runsIndex.get(orgId)!;
       const entryIndex = index.findIndex(entry => entry.id === id);
@@ -316,11 +316,11 @@ export class FileStore implements DataStore {
   async deleteAllRuns(orgId: string): Promise<boolean> {
     const keys = Array.from(this.storage.runs.keys())
       .filter(key => key.startsWith(`${orgId ? `${orgId}:` : ''}run:`));
-    
+
     for (const key of keys) {
       this.storage.runs.delete(key);
     }
-    
+
     this.storage.runsIndex.delete(orgId);
     await this.persistLogs();
     return true;

@@ -1,16 +1,15 @@
-import { Metadata, ExecutionMode } from "@superglue/shared";
-import { object, z } from "zod";
+import { ApiConfig, ExecutionStep, Workflow } from "@superglue/client";
+import { ExecutionMode, Metadata } from "@superglue/shared";
+import { type OpenAI } from "openai";
+import { JSONSchema } from "openai/lib/jsonschema.mjs";
+import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { composeUrl } from "../utils/tools.js"; // Assuming path
+import { toJsonSchema } from "../external/json-schema.js";
 import { LanguageModel } from "../llm/llm.js";
 import { PLANNING_PROMPT } from "../llm/prompts.js";
-import { logMessage } from "../utils/logs.js"; // Added import
 import { Documentation } from "../utils/documentation.js";
-import { JSONSchema } from "openai/lib/jsonschema.mjs";
-import { WorkflowExecutor } from "./workflow-executor.js";
-import { type OpenAI } from "openai";
-import { toJsonSchema } from "../external/json-schema.js";
-import { Workflow, ExecutionStep, ApiConfig } from "@superglue/client";
+import { logMessage } from "../utils/logs.js"; // Added import
+import { composeUrl } from "../utils/tools.js"; // Assuming path
 
 type ChatMessage = OpenAI.Chat.ChatCompletionMessageParam;
 
@@ -64,15 +63,15 @@ export class WorkflowBuilder {
     this.initialPayload = initialPayload;
     this.metadata = metadata;
     this.responseSchema = responseSchema;
-    try{
+    try {
       const credentials = Object.values(systems).reduce((acc, sys) => {
         return { ...acc, ...Object.entries(sys.credentials || {}).reduce((obj, [name, value]) => ({ ...obj, [`${sys.id}_${name}`]: value }), {}) };
       }, {});
       this.inputSchema = toJsonSchema(
-        { payload: initialPayload,credentials: credentials },
-        {arrays: {mode: 'all'}, }
+        { payload: initialPayload, credentials: credentials },
+        { arrays: { mode: 'all' }, }
       ) as unknown as JSONSchema;
-    } catch(error) {
+    } catch (error) {
       logMessage('error', `Error during payload parsing: ${error}`, this.metadata);
       throw new Error(`Error during payload parsing: ${error}`);
     }
@@ -95,7 +94,7 @@ export class WorkflowBuilder {
       })).describe("The sequence of steps required to fulfill the overall instruction.")
     }));
 
-    const systemDescriptions = Object.values(this.systems).map(sys =>`
+    const systemDescriptions = Object.values(this.systems).map(sys => `
 --- System ID: ${sys.id} ---
 Base URL: ${composeUrl(sys.urlHost, sys.urlPath)}
 Credentials available: ${JSON.stringify(Object.entries(sys.credentials || {}).reduce((obj, [name, value]) => ({ ...obj, [`${sys.id}_${name}`]: value }), {}) || 'None')}
@@ -130,12 +129,12 @@ Output a JSON object conforming to the WorkflowPlan schema. Define the necessary
     if (lastErrorFromPreviousAttempt) {
       newMessages.push({ role: "user", content: `The previous attempt resulted in an error: "${lastErrorFromPreviousAttempt}". Please analyze this error and provide a revised plan to address it. Ensure the new plan is valid and complete according to the schema.` });
     }
-    
+
     const { response: rawPlanObject, messages: updatedMessagesFromLLM } = await LanguageModel.generateObject(
       newMessages,
       planSchema
     );
-    
+
     if (!rawPlanObject || typeof rawPlanObject !== 'object' || !('steps' in rawPlanObject) || !Array.isArray(rawPlanObject.steps) || rawPlanObject.steps.length === 0) {
       const errorMsg = "Workflow planning failed: LLM did not produce a valid plan with steps.";
       logMessage('error', errorMsg + `\nPlan attempt: ${JSON.stringify(rawPlanObject)}`, this.metadata);
@@ -152,8 +151,8 @@ Output a JSON object conforming to the WorkflowPlan schema. Define the necessary
   }
 
   private async fetchDocumentation(): Promise<void> {
-    for(const system of Object.values(this.systems)) {
-      if(system.documentation) {
+    for (const system of Object.values(this.systems)) {
+      if (system.documentation) {
         continue;
       }
       const documentation = new Documentation({

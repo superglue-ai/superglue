@@ -1,69 +1,69 @@
+import { TransformConfig } from "@superglue/client";
 import type { DataStore, Metadata } from "@superglue/shared";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
-import { PROMPT_MAPPING, PROMPT_JS_TRANSFORM } from "../llm/prompts.js";
-import { applyTransformationWithValidation, getSchemaFromData, sample, executeAndValidateMappingCode } from "./tools.js";
-import { logMessage } from "./logs.js";
-import { LanguageModel } from "../llm/llm.js";
-import { TransformConfig } from "@superglue/client";
 import prettier from "prettier";
+import { LanguageModel } from "../llm/llm.js";
+import { PROMPT_JS_TRANSFORM, PROMPT_MAPPING } from "../llm/prompts.js";
+import { logMessage } from "./logs.js";
+import { applyTransformationWithValidation, getSchemaFromData, sample } from "./tools.js";
 
 export async function prepareTransform(
-    datastore: DataStore,
-    fromCache: boolean,
-    input: TransformConfig,
-    data: any,
-    lastError: string | null,
-    metadata: Metadata
-  ): Promise<TransformConfig | null> {
-    // Check if the response schema is empty
-    if(!input?.responseSchema || 
-      Object.keys(input.responseSchema).length === 0) {
-      return null;
-    }
-
-    // Check if the data is empty
-    if(!data || 
-      (Array.isArray(data) && data.length === 0) || 
-      (typeof data === 'object' && Object.keys(data).length === 0)) {
-      return null;
-    }
-
-    // Check if the transform config is cached
-    if(fromCache && datastore) {
-      const cached = await datastore.getTransformConfig(input.id, metadata.orgId);
-      if (cached) return { ...cached, ...input };
-    }
-
-    if(input.responseMapping && !lastError) {
-      return { 
-        id: crypto.randomUUID(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        ...input
-      };
-    }
-
-    // Generate the response mapping
-    const mapping = await generateTransformCode(input.responseSchema, data, input.instruction, metadata);
-
-    // Check if the mapping is generated successfully
-    if(mapping) {
-      return {
-        id: crypto.randomUUID(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        ...input, 
-        responseMapping: mapping.mappingCode
-      };
-    }
+  datastore: DataStore,
+  fromCache: boolean,
+  input: TransformConfig,
+  data: any,
+  lastError: string | null,
+  metadata: Metadata
+): Promise<TransformConfig | null> {
+  // Check if the response schema is empty
+  if (!input?.responseSchema ||
+    Object.keys(input.responseSchema).length === 0) {
     return null;
-  } 
+  }
 
-  export async function generateTransformJsonata(schema: any, payload: any, instruction: string, metadata: Metadata, retry = 0, messages?: ChatCompletionMessageParam[]): Promise<{jsonata: string, confidence: number} | null> {
-    try {
-      logMessage('info', "Generating mapping" + (retry > 0 ? ` (retry ${retry})` : ''), metadata);
-      const userPrompt = 
-  `Given a source data and structure, create a jsonata expression in JSON FORMAT.
+  // Check if the data is empty
+  if (!data ||
+    (Array.isArray(data) && data.length === 0) ||
+    (typeof data === 'object' && Object.keys(data).length === 0)) {
+    return null;
+  }
+
+  // Check if the transform config is cached
+  if (fromCache && datastore) {
+    const cached = await datastore.getTransformConfig(input.id, metadata.orgId);
+    if (cached) return { ...cached, ...input };
+  }
+
+  if (input.responseMapping && !lastError) {
+    return {
+      id: crypto.randomUUID(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      ...input
+    };
+  }
+
+  // Generate the response mapping
+  const mapping = await generateTransformCode(input.responseSchema, data, input.instruction, metadata);
+
+  // Check if the mapping is generated successfully
+  if (mapping) {
+    return {
+      id: crypto.randomUUID(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      ...input,
+      responseMapping: mapping.mappingCode
+    };
+  }
+  return null;
+}
+
+export async function generateTransformJsonata(schema: any, payload: any, instruction: string, metadata: Metadata, retry = 0, messages?: ChatCompletionMessageParam[]): Promise<{ jsonata: string, confidence: number } | null> {
+  try {
+    logMessage('info', "Generating mapping" + (retry > 0 ? ` (retry ${retry})` : ''), metadata);
+    const userPrompt =
+      `Given a source data and structure, create a jsonata expression in JSON FORMAT.
   
   Important: The output should be a jsonata expression creating an object that exactly matches the following schema:
   ${JSON.stringify(schema, null, 2)}
@@ -76,53 +76,53 @@ export async function prepareTransform(
   ${getSchemaFromData(payload)}
   
   Source data Sample:
-  ${JSON.stringify(sample(payload, 2), null, 2).slice(0,50000)}`
-  
-      if(!messages) {
-        messages = [
-          {role: "system", content: PROMPT_MAPPING},
-          {role: "user", content: userPrompt}
-        ]
-      }
-      const temperature = Math.min(retry * 0.1, 1);
-      
-      const { response, messages: updatedMessages } = await LanguageModel.generateObject(messages, jsonataSchema, temperature);
-      messages = updatedMessages;
-      const transformation = await applyTransformationWithValidation(payload, response.jsonata, schema);
-  
-      if(!transformation.success) {
-        throw new Error(`Validation failed: ${transformation.error}`);
-      }
-      const evaluation = await evaluateMapping(transformation.data, response.jsonata, payload, schema, instruction, metadata);
-      if(!evaluation.success) {
-          throw new Error(`Mapping evaluation failed: ${evaluation.reason}`);
-      }
-      return response;
-    } catch (error) {
-        if(retry < 8) {
-          const errorMessage = String(error.message);
-          logMessage('warn', "Error generating mapping: " + errorMessage.slice(0, 250), metadata);
-          messages.push({role: "user", content: errorMessage});
-          return generateTransformJsonata(schema, payload, instruction, metadata, retry + 1, messages);
-        }
+  ${JSON.stringify(sample(payload, 2), null, 2).slice(0, 50000)}`
+
+    if (!messages) {
+      messages = [
+        { role: "system", content: PROMPT_MAPPING },
+        { role: "user", content: userPrompt }
+      ]
     }
-    return null;
+    const temperature = Math.min(retry * 0.1, 1);
+
+    const { response, messages: updatedMessages } = await LanguageModel.generateObject(messages, jsonataSchema, temperature);
+    messages = updatedMessages;
+    const transformation = await applyTransformationWithValidation(payload, response.jsonata, schema);
+
+    if (!transformation.success) {
+      throw new Error(`Validation failed: ${transformation.error}`);
+    }
+    const evaluation = await evaluateMapping(transformation.data, response.jsonata, payload, schema, instruction, metadata);
+    if (!evaluation.success) {
+      throw new Error(`Mapping evaluation failed: ${evaluation.reason}`);
+    }
+    return response;
+  } catch (error) {
+    if (retry < 8) {
+      const errorMessage = String(error.message);
+      logMessage('warn', "Error generating mapping: " + errorMessage.slice(0, 250), metadata);
+      messages.push({ role: "user", content: errorMessage });
+      return generateTransformJsonata(schema, payload, instruction, metadata, retry + 1, messages);
+    }
   }
+  return null;
+}
 
-  export async function generateTransformCode(
-    schema: any,
-    payload: any,
-    instruction: string,
-    metadata: Metadata,
-    retry = 0,
-    messages?: ChatCompletionMessageParam[]
-  ): Promise<{ mappingCode: string, confidence: number } | null> {
-    try {
-      logMessage('info', "Generating mapping" + (retry > 0 ? ` (retry ${retry})` : ''), metadata);
+export async function generateTransformCode(
+  schema: any,
+  payload: any,
+  instruction: string,
+  metadata: Metadata,
+  retry = 0,
+  messages?: ChatCompletionMessageParam[]
+): Promise<{ mappingCode: string, confidence: number } | null> {
+  try {
+    logMessage('info', "Generating mapping" + (retry > 0 ? ` (retry ${retry})` : ''), metadata);
 
-      if (!messages || messages?.length === 0) {
-        const userPrompt = 
-`Given a source data and structure, create a JavaScript function (as a string) that transforms the input data to exactly match the following schema:
+    if (!messages || messages?.length === 0) {
+      const userPrompt =
+        `Given a source data and structure, create a JavaScript function (as a string) that transforms the input data to exactly match the following schema:
 ${JSON.stringify(schema, null, 2)}
 
 ${instruction ? `The instruction from the user is: ${instruction}` : ''}
@@ -132,61 +132,61 @@ Source Data Structure:
 ${getSchemaFromData(payload)}
 
 Source data Sample:
-${JSON.stringify(sample(payload, 2), null, 2).slice(0,50000)}
+${JSON.stringify(sample(payload, 2), null, 2).slice(0, 50000)}
 `;
-        messages = [
-          { role: "system", content: PROMPT_JS_TRANSFORM },
-          { role: "user", content: userPrompt }
-        ];
-      }
-      const temperature = Math.min(retry * 0.1, 1);
-
-      // Schema for the expected LLM response
-      const mappingSchema = {
-        type: "object",
-        properties: {
-          mappingCode: { type: "string", description: "JS function as string" },
-          confidence: { type: "number", description: "Confidence score 0-100" }
-        },
-        required: ["mappingCode", "confidence"],
-        additionalProperties: false
-      };
-
-      const { response, messages: updatedMessages } = await LanguageModel.generateObject(messages, mappingSchema, temperature);
-      messages = updatedMessages;
-
-      // Validate and execute the generated code
-      let result: any;
-      try {
-        // Autoformat the generated code
-        response.mappingCode = await prettier.format(response.mappingCode, { parser: "babel" });
-        const validation = await applyTransformationWithValidation(payload, response.mappingCode, schema);
-        if (!validation.success) {
-          throw new Error(`Validation failed: ${validation.error}`);
-        }
-        result = validation.data;
-      } catch (err) {
-        throw new Error(`Generated code is invalid JS: ${err.message}`);
-      }
-
-      // Optionally, evaluate mapping quality as before
-      const evaluation = await evaluateMapping(result, response.mappingCode, payload, schema, instruction, metadata);
-      if (!evaluation.success) {
-        throw new Error(`Mapping evaluation failed: ${evaluation.reason}`);
-      }
-      logMessage('info', `Mapping generated successfully with ${response.confidence}% confidence`, metadata);
-      return response;
-    } catch (error) {
-      if (retry < 10) {
-        const errorMessage = String(error.message);
-        logMessage('warn', "Error generating JS mapping: " + errorMessage.slice(0, 250), metadata);
-        messages?.push({ role: "user", content: errorMessage });
-        return generateTransformCode(schema, payload, instruction, metadata, retry + 1, messages);
-      }
+      messages = [
+        { role: "system", content: PROMPT_JS_TRANSFORM },
+        { role: "user", content: userPrompt }
+      ];
     }
-    return null;
+    const temperature = Math.min(retry * 0.1, 1);
+
+    // Schema for the expected LLM response
+    const mappingSchema = {
+      type: "object",
+      properties: {
+        mappingCode: { type: "string", description: "JS function as string" },
+        confidence: { type: "number", description: "Confidence score 0-100" }
+      },
+      required: ["mappingCode", "confidence"],
+      additionalProperties: false
+    };
+
+    const { response, messages: updatedMessages } = await LanguageModel.generateObject(messages, mappingSchema, temperature);
+    messages = updatedMessages;
+
+    // Validate and execute the generated code
+    let result: any;
+    try {
+      // Autoformat the generated code
+      response.mappingCode = await prettier.format(response.mappingCode, { parser: "babel" });
+      const validation = await applyTransformationWithValidation(payload, response.mappingCode, schema);
+      if (!validation.success) {
+        throw new Error(`Validation failed: ${validation.error}`);
+      }
+      result = validation.data;
+    } catch (err) {
+      throw new Error(`Generated code is invalid JS: ${err.message}`);
+    }
+
+    // Optionally, evaluate mapping quality as before
+    const evaluation = await evaluateMapping(result, response.mappingCode, payload, schema, instruction, metadata);
+    if (!evaluation.success) {
+      throw new Error(`Mapping evaluation failed: ${evaluation.reason}`);
+    }
+    logMessage('info', `Mapping generated successfully with ${response.confidence}% confidence`, metadata);
+    return response;
+  } catch (error) {
+    if (retry < 10) {
+      const errorMessage = String(error.message);
+      logMessage('warn', "Error generating JS mapping: " + errorMessage.slice(0, 250), metadata);
+      messages?.push({ role: "user", content: errorMessage });
+      return generateTransformCode(schema, payload, instruction, metadata, retry + 1, messages);
+    }
   }
-  
+  return null;
+}
+
 export async function evaluateMapping(
   transformedData: any,
   mappingCode: string,
@@ -240,13 +240,13 @@ ${mappingCode}
     };
 
     // Using temperature 0 for more deterministic evaluation
-    const { response } = await LanguageModel.generateObject(messages, llmResponseSchema, 0); 
+    const { response } = await LanguageModel.generateObject(messages, llmResponseSchema, 0);
 
     return response;
 
   } catch (error) {
     const errorMessage = String(error instanceof Error ? error.message : error);
-    logMessage('error', `Error evaluating mapping: ${errorMessage.slice(0,250)}`, metadata);
+    logMessage('error', `Error evaluating mapping: ${errorMessage.slice(0, 250)}`, metadata);
     return { success: false, reason: `Error during evaluation: ${errorMessage}` };
   }
 }

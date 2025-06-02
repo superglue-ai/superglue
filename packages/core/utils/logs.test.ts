@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { logger, logMessage, logEmitter } from './logs.js'
 import { LogEntry } from '@superglue/shared'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { logEmitter, logger, logMessage } from './logs.js'
 
 describe('Logging Module', () => {
   beforeEach(() => {

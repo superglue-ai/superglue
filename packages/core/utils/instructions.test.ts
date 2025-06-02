@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { generateInstructions } from './instructions.js'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LanguageModel } from '../llm/llm.js';
+import { generateInstructions } from './instructions.js';
 
 vi.mock('../llm/llm.js', () => {
   return {
@@ -21,7 +21,7 @@ vi.mock('../llm/llm.js', () => {
 
 describe('generateInstructions', () => {
   const originalEnv = { ...process.env }
-  
+
   // Test data
   const systems = [
     {
@@ -66,7 +66,7 @@ describe('generateInstructions', () => {
   it('should retry on failure and succeed on second attempt', async () => {
     const errorMessage = 'Test error message'
     const generateObject = vi.mocked(LanguageModel.generateObject)
-    
+
     // First call fails
     generateObject.mockRejectedValueOnce(new Error(errorMessage))
     // Second call succeeds
@@ -84,7 +84,7 @@ describe('generateInstructions', () => {
 
   it('should increase temperature on retries', async () => {
     const generateObject = vi.mocked(LanguageModel.generateObject)
-    
+
     // Make it fail twice
     generateObject.mockRejectedValueOnce(new Error('First failure'))
     generateObject.mockRejectedValueOnce(new Error('Second failure'))
@@ -101,7 +101,7 @@ describe('generateInstructions', () => {
   it('should fail after max retries', async () => {
     const generateObject = vi.mocked(LanguageModel.generateObject)
     const error = new Error('Persistent error')
-    
+
     // Make it fail consistently
     generateObject.mockRejectedValue(error)
 

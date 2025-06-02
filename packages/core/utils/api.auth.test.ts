@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { convertBasicAuthToBase64 } from './api.js'; 
+import { convertBasicAuthToBase64 } from './api.js';
 
 describe('Basic Auth Utilities', () => {
   beforeEach(() => {
@@ -22,7 +22,7 @@ describe('Basic Auth Utilities', () => {
     it('should leave non-Basic Auth headers unchanged', () => {
       expect(convertBasicAuthToBase64('Bearer token123')).toBe('Bearer token123');
     });
-    
+
     it('should handle undefined or null values', () => {
       expect(convertBasicAuthToBase64(undefined)).toBeUndefined();
       expect(convertBasicAuthToBase64(null)).toBeNull();

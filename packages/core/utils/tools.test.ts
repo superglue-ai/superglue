@@ -219,10 +219,10 @@ describe('tools utility functions', () => {
       const data = { numbers: [5, 2, 8.2, 1, 0.1, 9] };
       const minExpr = '$min(numbers)';
       const maxExpr = '$max(numbers)';
-      
+
       const minResult = await applyJsonata(data, minExpr);
       const maxResult = await applyJsonata(data, maxExpr);
-      
+
       expect(minResult).toBe(0.1);
       expect(maxResult).toBe(9);
     });
@@ -231,10 +231,10 @@ describe('tools utility functions', () => {
       const data = { numbers: [] };
       const minExpr = '$min(numbers)';
       const maxExpr = '$max(numbers)';
-      
+
       const minResult = await applyJsonata(data, minExpr);
       const maxResult = await applyJsonata(data, maxExpr);
-      
+
       expect(minResult).toBe(Infinity);
       expect(maxResult).toBe(-Infinity);
     });
@@ -244,10 +244,10 @@ describe('tools utility functions', () => {
         isoDate: '2024-03-15T10:30:00Z',
         usDate: '03/15/2024 03:30:00'
       };
-      
+
       const isoResult = await applyJsonata(data, '$toDate(isoDate)');
       const usResult = await applyJsonata(data, '$toDate(usDate)');
-      
+
       expect(isoResult).toBe('2024-03-15T10:30:00.000Z');
       expect(usResult).toBe('2024-03-15T03:30:00.000Z');
     });
@@ -267,14 +267,14 @@ describe('tools utility functions', () => {
           withTz: '2024-03-15T10:30:00+01:00'
         }
       };
-      
+
       const results = await Promise.all([
         applyJsonata(data, '$toDate(dates.iso)'),
         applyJsonata(data, '$toDate(dates.simple)'),
         applyJsonata(data, '$toDate(dates.withTime)'),
         applyJsonata(data, '$toDate(dates.withTz)')
       ]);
-      
+
       results.forEach(result => {
         expect(result).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z$/);
       });
@@ -288,13 +288,13 @@ describe('tools utility functions', () => {
           '2024-03-15T20:00:00Z'        // 8 PM UTC
         ]
       };
-      
+
       const minExpr = '$dateMin(dates)';
       const maxExpr = '$dateMax(dates)';
-      
+
       const earliestDate = await applyJsonata(data, minExpr);
       const latestDate = await applyJsonata(data, maxExpr);
-      
+
       // All represent same day, but different times
       expect(new Date(earliestDate).getUTCHours()).toBe(15); // 10:00 EST = 15:00 UTC
       expect(new Date(latestDate).getUTCHours()).toBe(20);   // 20:00 UTC

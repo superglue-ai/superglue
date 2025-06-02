@@ -17,13 +17,12 @@ vi.mock('./transform.js', async (importOriginal) => {
   };
 });
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import dotenv from 'dotenv';
-import { applyJsonataWithValidation, applyTransformationWithValidation } from './tools.js';
 import { TransformConfig } from '@superglue/client';
-import { generateTransformJsonata, prepareTransform } from './transform.js';
+import dotenv from 'dotenv';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LanguageModel as mockLLM } from '../llm/llm.js';
-import { skip } from 'node:test';
+import { applyTransformationWithValidation } from './tools.js';
+import { generateTransformJsonata, prepareTransform } from './transform.js';
 
 describe('transform utils', () => {
   beforeEach(() => {
@@ -45,16 +44,16 @@ describe('transform utils', () => {
       }
     };
     const samplePayload = {
-        user: {
-          firstName: 'John',
-          lastName: 'Doe'
-        }
-      };  
+      user: {
+        firstName: 'John',
+        lastName: 'Doe'
+      }
+    };
 
     it('should return null if responseSchema is empty', async () => {
       let mockDataStore = {
         getTransformConfig: vi.fn(),
-      } as any;      
+      } as any;
       const input = { ...sampleInput, responseSchema: {} };
       const result = await prepareTransform(mockDataStore, false, input, {}, null, { orgId: testOrgId });
       expect(result).toBeNull();
@@ -63,14 +62,14 @@ describe('transform utils', () => {
     it('should create new config if responseMapping is provided', async () => {
       let mockDataStore = {
         getTransformConfig: vi.fn(),
-      } as any;          
+      } as any;
       const input = {
         ...sampleInput,
         responseMapping: 'test-mapping'
       };
-      
+
       const result = await prepareTransform(mockDataStore, false, input, { product: { name: 'test' } }, null, { orgId: testOrgId });
-      
+
       expect(result).toMatchObject({
         responseMapping: 'test-mapping',
         responseSchema: input.responseSchema
@@ -171,9 +170,9 @@ describe('transform utils', () => {
       (mockLLM as any).generateObject.mockRejectedValueOnce(attempts++ === 0 ? new Error('API Error') : null);
       (mockLLM as any).generateObject.mockResolvedValueOnce({
         response: {
-            jsonata: '{"name": user.firstName & " " & user.lastName}',
-            confidence: 95,
-            confidence_reasoning: 'Direct field mapping available'
+          jsonata: '{"name": user.firstName & " " & user.lastName}',
+          confidence: 95,
+          confidence_reasoning: 'Direct field mapping available'
         },
         messages: []
       });

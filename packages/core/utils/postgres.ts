@@ -1,8 +1,6 @@
-import { composeUrl } from "./tools.js";
-import { ApiConfig } from "@superglue/client";
-import { replaceVariables } from "./tools.js";
-import { RequestOptions } from "@superglue/client";
+import { ApiConfig, RequestOptions } from "@superglue/client";
 import { Pool, PoolConfig } from 'pg';
+import { composeUrl, replaceVariables } from "./tools.js";
 
 const DEFAULT_TIMEOUT = 30000; // 30 seconds
 const DEFAULT_RETRIES = 0;
@@ -29,7 +27,7 @@ export async function callPostgres(endpoint: ApiConfig, payload: Record<string, 
       return result.rows;
     } catch (error) {
       attempts++;
-      
+
       if (attempts > maxRetries) {
         await pool.end();
         if (error instanceof Error) {

@@ -1,7 +1,6 @@
-import type { DataStore } from "./types.js";
+import { ApiConfig, ExtractConfig, RunResult, TransformConfig, Workflow } from "@superglue/client";
 import { createHash } from 'node:crypto';
-import { getSchemaFromData } from "../utils/tools.js";
-import { ApiConfig, ExtractConfig, TransformConfig, RunResult, Workflow } from "@superglue/client";
+import type { DataStore } from "./types.js";
 
 export class MemoryStore implements DataStore {
   private storage: {
@@ -45,7 +44,7 @@ export class MemoryStore implements DataStore {
 
   // API Config Methods
   async getApiConfig(id: string, orgId: string): Promise<ApiConfig | null> {
-    if(!id) return null;
+    if (!id) return null;
     const key = this.getKey('api', id, orgId);
     const config = this.storage.apis.get(key);
     return config ? { ...config, id } : null;
@@ -60,14 +59,14 @@ export class MemoryStore implements DataStore {
   }
 
   async upsertApiConfig(id: string, config: ApiConfig, orgId?: string): Promise<ApiConfig> {
-    if(!id || !config) return null;
+    if (!id || !config) return null;
     const key = this.getKey('api', id, orgId);
     this.storage.apis.set(key, config);
     return { ...config, id };
   }
 
   async deleteApiConfig(id: string, orgId: string): Promise<boolean> {
-    if(!id) return false;
+    if (!id) return false;
     const key = this.getKey('api', id, orgId);
     const deleted = this.storage.apis.delete(key);
     return deleted;
@@ -75,7 +74,7 @@ export class MemoryStore implements DataStore {
 
   // Extract Config Methods
   async getExtractConfig(id: string, orgId: string): Promise<ExtractConfig | null> {
-    if(!id) return null;
+    if (!id) return null;
     const key = this.getKey('extract', id, orgId);
     const config = this.storage.extracts.get(key);
     return config ? { ...config, id } : null;
@@ -89,14 +88,14 @@ export class MemoryStore implements DataStore {
   }
 
   async upsertExtractConfig(id: string, config: ExtractConfig, orgId: string): Promise<ExtractConfig> {
-    if(!id || !config) return null;
+    if (!id || !config) return null;
     const key = this.getKey('extract', id, orgId);
     this.storage.extracts.set(key, config);
     return { ...config, id };
   }
 
   async deleteExtractConfig(id: string, orgId: string): Promise<boolean> {
-    if(!id) return false;
+    if (!id) return false;
     const key = this.getKey('extract', id, orgId);
     const deleted = this.storage.extracts.delete(key);
     return deleted;
@@ -104,7 +103,7 @@ export class MemoryStore implements DataStore {
 
   // Transform Config Methods
   async getTransformConfig(id: string, orgId: string): Promise<TransformConfig | null> {
-    if(!id) return null;
+    if (!id) return null;
     const key = this.getKey('transform', id, orgId);
     const config = this.storage.transforms.get(key);
     return config ? { ...config, id } : null;
@@ -118,14 +117,14 @@ export class MemoryStore implements DataStore {
   }
 
   async upsertTransformConfig(id: string, config: TransformConfig, orgId: string): Promise<TransformConfig> {
-    if(!id || !config) return null;
+    if (!id || !config) return null;
     const key = this.getKey('transform', id, orgId);
     this.storage.transforms.set(key, config);
     return { ...config, id };
   }
 
   async deleteTransformConfig(id: string, orgId: string): Promise<boolean> {
-    if(!id) return false;
+    if (!id) return false;
     const key = this.getKey('transform', id, orgId);
     const deleted = this.storage.transforms.delete(key);
     return deleted;
@@ -133,21 +132,21 @@ export class MemoryStore implements DataStore {
 
   // Run Result Methods
   async getRun(id: string, orgId: string): Promise<RunResult | null> {
-    if(!id) return null;
+    if (!id) return null;
     const key = this.getKey('run', id, orgId);
     const run = this.storage.runs.get(key);
     return run ? { ...run, id } : null;
   }
 
   async createRun(run: RunResult, orgId: string): Promise<RunResult> {
-    if(!run) return null;
+    if (!run) return null;
     const key = this.getKey('run', run.id, orgId);
     this.storage.runs.set(key, run);
-    
+
     if (!this.storage.runsIndex.has(orgId)) {
       this.storage.runsIndex.set(orgId, []);
     }
-    
+
     const index = this.storage.runsIndex.get(orgId)!;
     index.push({
       id: run.id,
@@ -155,7 +154,7 @@ export class MemoryStore implements DataStore {
       configId: run.config?.id
     });
     index.sort((a, b) => b.timestamp - a.timestamp);
-    
+
     return run;
   }
 
@@ -165,21 +164,21 @@ export class MemoryStore implements DataStore {
       .filter(entry => !configId || entry.configId === configId)
       .slice(offset, offset + limit)
       .map(entry => entry.id);
-    
+
     const items = runIds.map(id => {
       const key = this.getKey('run', id, orgId);
       const run = this.storage.runs.get(key);
       return run ? { ...run, id } : null;
     }).filter((run): run is RunResult => run !== null);
-    
+
     return { items, total: index.length };
   }
 
   async deleteRun(id: string, orgId: string): Promise<boolean> {
-    if(!id) return false;
+    if (!id) return false;
     const key = this.getKey('run', id, orgId);
     const deleted = this.storage.runs.delete(key);
-    
+
     if (deleted && this.storage.runsIndex.has(orgId)) {
       const index = this.storage.runsIndex.get(orgId)!;
       const entryIndex = index.findIndex(entry => entry.id === id);
@@ -193,11 +192,11 @@ export class MemoryStore implements DataStore {
   async deleteAllRuns(orgId: string): Promise<boolean> {
     const keys = Array.from(this.storage.runs.keys())
       .filter(key => key.startsWith(`${orgId ? `${orgId}:` : ''}run:`));
-    
+
     for (const key of keys) {
       this.storage.runs.delete(key);
     }
-    
+
     this.storage.runsIndex.delete(orgId);
     return true;
   }
