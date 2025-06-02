@@ -1,34 +1,28 @@
 ---
-title: "MCPglue"
+title: "supertools"
 description: "Let your agent build its own tools."
 ---
 
-## why glue?
+## why supertools?
 
-We’ve talked to dozens of teams deploying agents and they were all facing the same dilemma: giving their agents enough freedom to fetch all the data they need, yet making sure that every call remains secure, performant, and predictable in production. **MCPglue fixes this**: It gives you the reliability you’re looking for when deploying in prod, and agents the tools they actually need to do their job well.
+We’ve talked to dozens of teams deploying agents and they were all facing the same dilemma: giving their agents enough freedom to fetch all the data they need, yet making sure that every call remains secure, performant, and predictable in production. **supertools fix this**: It gives you the reliability you’re looking for when deploying in prod, and agents the tools they actually need to do their job well.
 
-## how does MCPglue help?
+## how do supertools help?
 
-MCPglue is a lightweight API-wrapper. Agents can use it to:
+supertools is a lightweight API-wrapper available via MCP. Agents can use it to:
 
 - **Merge multiple endpoints & APIs** into coherent, reusable, **custom tools**
 - **Expose them via one stable MCP server**, even as upstream APIs change
 - **Abstract away authentication, pagination, retries,** and mapping logic
 - **Keep their toolset lean, so they don't get overwhelmed or go rogue**
 
-Use MCPglue to let your agent run cross-API workflows reliably, like fetching transactions in Stripe and updating them in Hubspot, to build ambient agents that react to app triggers or to wrap your own API into capabilities agents can use.
+Use supertools to let your agent run cross-API workflows reliably, like fetching transactions in Stripe and updating them in Hubspot, to build ambient agents that react to app triggers or to wrap your own API into capabilities agents can use.
 
 Curious what else you can do with superglue? Read more about it [here](https://docs.superglue.cloud/introduction).
 
 ## connecting to the MCP Server
-<video
-  autoPlay
-  muted
-  loop
-  playsInline
-  className="w-full aspect-video"
-  src="https://superglue.cloud/files/mcp.mp4"
-></video>
+
+<video autoPlay muted loop playsInline className="w-full aspect-video" src="https://superglue.cloud/files/mcp.mp4" />
 
 The superglue MCP server is available at the `/mcp` endpoint of your superglue instance.
 
@@ -57,15 +51,10 @@ The superglue MCP server is available at the `/mcp` endpoint of your superglue i
 The reason this request is structured in an odd way (AUTH_HEADER instead of AUTH_TOKEN) is because Cursor does not allow spaces within the args array, but does so for env vars. This might become obsolete in future versions.
 
 ## Using superglue MCP
+
 Switch to the agent mode of your LLM interface and prompt to build or execute a superglue tool. All superglue tools are exposed through MCP. For the video example to work, you need to share your HubSpot API key when running the tool.
-<video
-  autoPlay
-  muted
-  loop
-  playsInline
-  className="w-full aspect-video"
-  src="https://superglue.cloud/files/mcp-short.mp4"
-></video>
+
+<video autoPlay muted loop playsInline className="w-full aspect-video" src="https://superglue.cloud/files/mcp-short.mp4" />
 
 ## MCP reference
 
@@ -101,7 +90,7 @@ The following tools are exposed by superglue's MCP server. The input schemas are
   - Tool ID must exist (use dynamic `execute_{tool_id}` tools to find valid IDs)
   - CRITICAL: Include ALL required credentials in the credentials object
   - Payload structure must match the tool's expected input schema
-  - Returns execution results + SDK code for integration
+  - Returns execution results \+ SDK code for integration
 - **Example Usage (Conceptual MCP Call)**:
 
   ```json
@@ -188,6 +177,7 @@ In addition to the static tools above, the MCP server dynamically creates execut
 ### Dynamic Tool Schema
 
 Each dynamic tool has the following input schema:
+
 - `payload`: (Optional) JSON payload data for the tool
 - `credentials`: (Optional) Authentication credentials for the tool
 - `options`: (Optional) Request configuration (caching, timeouts, retries, etc.)
@@ -215,7 +205,7 @@ The exact schema is derived from the tool's `inputSchema` if available, otherwis
 The recommended workflow for agents using the Superglue MCP server:
 
 1. **DISCOVER**: List available tools using the dynamic `execute_{tool_id}` tools or by calling `superglue_execute_tool` with known IDs
-2. **EXECUTE**: Use `superglue_execute_tool` for existing tools OR `superglue_build_new_tool` for new integrations  
+2. **EXECUTE**: Use `superglue_execute_tool` for existing tools OR `superglue_build_new_tool` for new integrations
 3. **INTEGRATE**: Use `superglue_get_integration_code` to show users how to implement tools in their applications
 
 ### Best Practices
