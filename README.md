@@ -22,7 +22,7 @@ Let's glue.<br>
 
 
 ## what is superglue?
-superglue automates ETL/ELT jobs via one stable, self-healing endpoint. Comes with automated schema-drift detection, retries and remappings so your data keeps moving no matter what - no connector maintenance, no rewrites. You can deploy it as a proxy between you and any SaaS app, API and data source and always get the data that you want in the format you expect.
+superglue automates data intergation via one stable, self-healing endpoint. Comes with automated schema-drift detection, retries and remappings so your data keeps moving no matter what - no connector maintenance, no rewrites. You can deploy it as a proxy between you and any SaaS app, API and data source and always get the data that you want in the format you expect.
 
 - Lightweight proxy: point it at any REST / GraphQL / SQL / file endpoint.
 - LLM‑assisted mapping during config; cached Javascript transforms at runtime (no LLM latency).
