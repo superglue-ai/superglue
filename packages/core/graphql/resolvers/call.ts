@@ -1,4 +1,4 @@
-import { ApiConfig, ApiInputRequest, CacheMode, RequestOptions, TransformConfig } from "@superglue/client";
+import { ApiConfig, ApiInputRequest, CacheMode, RequestOptions, SelfHealingMode, TransformConfig } from "@superglue/client";
 import type { Context, Metadata } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import OpenAI from "openai";
@@ -28,6 +28,7 @@ export async function executeApiCall(
   let messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
   let documentation: Documentation;
   let success = false;
+  let isSelfHealing = options?.selfHealing ? options.selfHealing === SelfHealingMode.ENABLED || options.selfHealing === SelfHealingMode.REQUEST_ONLY : true;
   do {
     try {
       if (retryCount > 0) {
@@ -79,7 +80,7 @@ export async function executeApiCall(
       }
     }
     retryCount++;
-  } while (retryCount < 8);
+  } while (retryCount < 8 && isSelfHealing);
 
   if (!success) {
     telemetryClient?.captureException(new Error(`API call failed after ${retryCount} retries. Last error: ${lastError}`), metadata.orgId, {
@@ -135,6 +136,7 @@ export const callResolver = async (
     let responseMapping: string | null;
     let transformError = null;
     let transformRetryCount = 0;
+    let isSelfHealing = options?.selfHealing ? options.selfHealing === SelfHealingMode.ENABLED || options.selfHealing === SelfHealingMode.TRANSFORM_ONLY : true;
 
     do {
       try {
@@ -142,6 +144,7 @@ export const callResolver = async (
         const preparedTransform = await prepareTransform(
           context.datastore,
           readCache,
+          isSelfHealing,
           endpoint as TransformConfig,
           data,
           transformError,

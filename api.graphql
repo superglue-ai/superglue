@@ -215,11 +215,19 @@ input TransformInput {
 }
 
 input RequestOptions {
+  selfHealing: SelfHealingMode
   cacheMode: CacheMode
   timeout: Int
   retries: Int
   retryDelay: Int
   webhookUrl: String
+}
+
+enum SelfHealingMode {
+  ENABLED
+  TRANSFORM_ONLY
+  REQUEST_ONLY
+  DISABLED
 }
 
 input ApiInputRequest @oneOf {
