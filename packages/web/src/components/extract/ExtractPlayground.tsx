@@ -1,16 +1,15 @@
 'use client'
 
-import React, { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import { ExtractConfig, CacheMode } from "@superglue/client";
-import { Button } from "@/src/components/ui/button";
-import { Card, CardHeader, CardTitle, CardContent } from "@/src/components/ui/card";
-import { Badge } from "@/src/components/ui/badge";
-import { Play, Clock, AlertCircle, Copy, Upload } from "lucide-react";
-import { SuperglueClient } from "@superglue/client";
-import { useToast } from "@/src/hooks/use-toast";
 import { useConfig } from "@/src/app/config-context";
+import { Badge } from "@/src/components/ui/badge";
+import { Button } from "@/src/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/src/components/ui/card";
+import { useToast } from "@/src/hooks/use-toast";
 import { cn } from "@/src/lib/utils";
+import { CacheMode, ExtractConfig, SuperglueClient } from "@superglue/client";
+import { AlertCircle, Clock, Copy, Play, Upload } from "lucide-react";
+import { useParams } from "next/navigation";
+import React, { useEffect, useState } from "react";
 
 export function ExtractPlayground({ extractId }: { extractId?: string }) {
   const params = useParams();
@@ -72,7 +71,7 @@ export function ExtractPlayground({ extractId }: { extractId?: string }) {
   const handleRunExtract = async (e: React.MouseEvent) => {
     e.preventDefault();
     if (!extract) return;
-    
+
     setLoading(true);
     setError(null);
     setResponse(null);
@@ -83,7 +82,7 @@ export function ExtractPlayground({ extractId }: { extractId?: string }) {
     try {
       let parsedPayload = {};
       let parsedCredentials = {};
-      
+
       try {
         parsedPayload = JSON.parse(payloadInput);
         parsedCredentials = JSON.parse(credentialsInput);
@@ -92,7 +91,7 @@ export function ExtractPlayground({ extractId }: { extractId?: string }) {
           title: "Invalid JSON",
           description: "Please check your payload and credentials JSON format",
           variant: "destructive",
-        }); 
+        });
         throw new Error("Invalid JSON in payload or credentials");
       }
 
@@ -101,29 +100,26 @@ export function ExtractPlayground({ extractId }: { extractId?: string }) {
         endpoint: superglueConfig.superglueEndpoint
       });
 
-      let result = await superglue.extract({
-          file,
-          id,
-          payload: parsedPayload,
-          credentials: parsedCredentials,
-          options: {
-            cacheMode: selectedCacheMode
-          }
-        });
-      if (result.success) {
-        try {
-          result = await superglue.transform({
-            id,
-            data: result.data,
-            options: {
-              cacheMode: selectedCacheMode
-            }  
-          });
-        } catch (err) {
-          console.error(err);
+      let extractResult = await superglue.extract({
+        file,
+        id,
+        payload: parsedPayload,
+        credentials: parsedCredentials,
+        options: {
+          cacheMode: selectedCacheMode
         }
+      });
+      if (!extractResult.success) {
+        throw new Error(extractResult.error);
       }
-      setResponse(result.data);
+      let transformResult = await superglue.transform({
+        id,
+        data: extractResult.data,
+        options: {
+          cacheMode: selectedCacheMode
+        }
+      });
+      setResponse(transformResult.data);
       setResponseTime(Date.now() - startTime);
     } catch (err: any) {
       const errorMessage = err.message || 'Failed to execute API call';
@@ -159,22 +155,22 @@ export function ExtractPlayground({ extractId }: { extractId?: string }) {
             <CardTitle className="flex items-center justify-between">
               <span>Request Configuration</span>
               <div className="flex gap-2 items-center">
-              <Button 
-                onClick={handleRunExtract}
-                disabled={loading}
-                size="lg"
-                className="gap-2"
-              >
-                <Play className="h-4 w-4" />
-                {loading ? 'Running...' : 'Run Extraction'}
-              </Button>
-            </div>
+                <Button
+                  onClick={handleRunExtract}
+                  disabled={loading}
+                  size="lg"
+                  className="gap-2"
+                >
+                  <Play className="h-4 w-4" />
+                  {loading ? 'Running...' : 'Run Extraction'}
+                </Button>
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
               <label className="text-sm font-medium">Source</label>
-              <div 
+              <div
                 className={cn(
                   "mt-1 relative rounded-lg border-2 border-dashed p-6",
                   isDragging ? "border-primary bg-primary/5" : "border-muted-foreground/25",
@@ -232,7 +228,7 @@ export function ExtractPlayground({ extractId }: { extractId?: string }) {
                 )}
               </div>
             </div>
-            
+
             <div>
               <label className="text-sm font-medium">Instruction</label>
               <div className="mt-1 p-2 bg-secondary rounded-md">
@@ -300,7 +296,7 @@ export function ExtractPlayground({ extractId }: { extractId?: string }) {
                   {JSON.stringify(response, null, 2)}
                 </pre>
                 <Button
-                  variant="ghost" 
+                  variant="ghost"
                   size="sm"
                   className="absolute top-2 right-2"
                   onClick={(e) => {

@@ -144,7 +144,7 @@ Output a JSON object conforming to the WorkflowPlan schema. Define the necessary
     const plan: WorkflowPlan = {
       steps: rawPlanObject.steps as WorkflowPlanStep[],
       id: rawPlanObject.id,
-      finalTransform: "$",
+      finalTransform: "(sourceData) => { return sourceData; }",
     };
 
     return { plan, messages: updatedMessagesFromLLM };
@@ -213,7 +213,7 @@ Output a JSON object conforming to the WorkflowPlan schema. Define the necessary
         builtWorkflow = {
           id: currentPlan.id,
           steps: executionSteps,
-          finalTransform: currentPlan.finalTransform || "$",
+          finalTransform: currentPlan.finalTransform || "(sourceData) => { return sourceData; }",
           responseSchema: this.responseSchema,
           instruction: this.instruction,
           createdAt: new Date(),

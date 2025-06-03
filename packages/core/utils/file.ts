@@ -56,6 +56,7 @@ export async function decompressZip(buffer: Buffer): Promise<Buffer> {
 }
 
 export async function parseFile(buffer: Buffer, fileType: FileType): Promise<any> {
+    if (!buffer || buffer.length == 0) return null;
     fileType = fileType == FileType.AUTO ? await detectFileType(buffer) : fileType;
 
     switch (fileType) {

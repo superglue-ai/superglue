@@ -18,8 +18,13 @@ export class OpenAIModel implements LLM {
     if (process.env.OPENAI_MODEL?.startsWith('o')) {
       temperature = undefined;
     }
+    const dateMessage = {
+      role: "system",
+      content: "The current date and time is " + new Date().toISOString()
+    } as ChatCompletionMessageParam;
+
     const result = await this.model.chat.completions.create({
-      messages: messages,
+      messages: [dateMessage, ...messages],
       model: process.env.OPENAI_MODEL || "gpt-4o",
       temperature: temperature,
       max_tokens: 65536,
@@ -27,14 +32,15 @@ export class OpenAIModel implements LLM {
     let responseText = result.choices[0].message.content;
 
     // Add response to messages history
-    messages.push({
+    const updatedMessages = [...messages, {
       role: "assistant",
       content: responseText
-    });
+    }];
+
     return {
       response: responseText,
-      messages: messages
-    };
+      messages: updatedMessages
+    } as LLMResponse;
   }
 
   private enforceStrictSchema(schema: any, isRoot: boolean) {
@@ -79,8 +85,12 @@ export class OpenAIModel implements LLM {
       temperature = undefined;
     }
     const responseFormat = schema ? { type: "json_schema", json_schema: { name: "response", strict: true, schema: schema } } : { type: "json_object" };
+    const dateMessage = {
+      role: "system",
+      content: "The current date and time is " + new Date().toISOString()
+    } as ChatCompletionMessageParam;
     const result = await this.model.chat.completions.create({
-      messages: messages,
+      messages: [dateMessage, ...messages],
       model: process.env.OPENAI_MODEL || "gpt-4o",
       temperature: temperature,
       response_format: responseFormat as any,
@@ -91,15 +101,17 @@ export class OpenAIModel implements LLM {
     if (generatedObject.___results) {
       generatedObject = generatedObject.___results;
     }
+
     // Add response to messages history
-    messages.push({
+    const updatedMessages = [...messages, {
       role: "assistant",
       content: responseText
-    });
+    }];
+
     return {
       response: generatedObject,
-      messages: messages
-    };
+      messages: updatedMessages
+    } as LLMObjectResponse;
   }
 }
 

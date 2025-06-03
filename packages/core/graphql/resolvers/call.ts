@@ -8,8 +8,8 @@ import { Documentation } from "../../utils/documentation.js";
 import { logMessage } from "../../utils/logs.js";
 import { generateSchema } from "../../utils/schema.js";
 import { telemetryClient } from "../../utils/telemetry.js";
-import { applyJsonata, applyTransformationWithValidation, maskCredentials, TransformResult } from "../../utils/tools.js";
-import { generateTransformJsonata, prepareTransform } from "../../utils/transform.js";
+import { applyJsonata, maskCredentials } from "../../utils/tools.js";
+import { executeTransform, generateTransformJsonata } from "../../utils/transform.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 
 export async function executeApiCall(
@@ -111,7 +111,7 @@ export const callResolver = async (
   };
   let endpoint: ApiConfig;
   const readCache = options?.cacheMode ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.READONLY : true;
-  const writeCache = options?.cacheMode ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.WRITEONLY : true;
+  const writeCache = options?.cacheMode ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.WRITEONLY : false;
 
   try {
 
@@ -131,53 +131,29 @@ export const callResolver = async (
     endpoint = callResult.endpoint;
     const data = callResult.data;
 
-    let transformedResponse: TransformResult | null;
-    let responseMapping: string | null;
-    let transformError = null;
-    let transformRetryCount = 0;
-
-    do {
-      try {
-        // Transform response
-        const preparedTransform = await prepareTransform(
-          context.datastore,
-          readCache,
-          endpoint as TransformConfig,
-          data,
-          transformError,
-          { runId: callId, orgId: context.orgId }
-        );
-        responseMapping = preparedTransform?.responseMapping;
-        transformedResponse = responseMapping ?
-          await applyTransformationWithValidation(data, responseMapping, endpoint?.responseSchema) :
-          { success: true, data };
-
-        if (!transformedResponse.success) {
-          throw new Error(transformedResponse.error);
-        }
-      } catch (error) {
-        const rawErrorString = error?.message || JSON.stringify(error || {});
-        transformError = maskCredentials(rawErrorString, credentials).slice(0, 200);
-        logMessage('warn', `Transformation failed. ${transformError}`, { runId: callId, orgId: context.orgId });
+    // Transform response with built-in retry logic
+    const transformResult = await executeTransform(
+      {
+        datastore: context.datastore,
+        fromCache: readCache,
+        input: { endpoint: endpoint as TransformConfig },
+        data: data,
+        metadata: { runId: callId, orgId: context.orgId }
       }
-      transformRetryCount++;
-    } while (!transformedResponse.success && transformRetryCount < 3);
-
-    if (!transformedResponse?.success) {
-      throw new Error("Transformation failed. " + transformedResponse.error);
-    }
+    );
 
     // Save configuration if requested
-    const config = { ...endpoint, responseMapping: responseMapping };
+    const config = { ...endpoint, ...transformResult?.config };
+
     if (writeCache) {
       context.datastore.upsertApiConfig(input.id || endpoint.id, config, context.orgId);
     }
 
     // Notify webhook if configured
-    // call async
     if (options?.webhookUrl) {
-      notifyWebhook(options.webhookUrl, callId, true, transformedResponse.data);
+      notifyWebhook(options.webhookUrl, callId, true, transformResult.data);
     }
+
     const result = {
       id: callId,
       success: true,
@@ -186,7 +162,7 @@ export const callResolver = async (
       completedAt: new Date(),
     };
     context.datastore.createRun(result, context.orgId);
-    return { ...result, data: transformedResponse.data };
+    return { ...result, data: transformResult.data };
   } catch (error) {
     const maskedError = maskCredentials(error.message, credentials);
 
