@@ -5,7 +5,6 @@ import ivm from 'isolated-vm';
 import jsonata from "jsonata";
 import { Validator } from "jsonschema";
 import { toJsonSchema } from "../external/json-schema.js";
-import { PROMPT_MAPPING } from "../llm/prompts.js";
 
 export function isRequested(field: string, info: GraphQLResolveInfo) {
   return info.fieldNodes.some(
@@ -29,7 +28,7 @@ export async function applyJsonata(data: any, expr: string): Promise<any> {
     return result;
   } catch (error) {
     const errorPositions = (error as any).position ? expr.substring(error.position - 10, error.position + 10) : "";
-    throw new Error(`JSONata transformation failed: ${error.message} at ${errorPositions}. Consider ${PROMPT_MAPPING}`);
+    throw new Error(`JSONata transformation failed: ${error.message} at ${errorPositions}.`);
   }
 }
 

@@ -23,7 +23,7 @@ export const extractResolver = async (
   const startedAt = new Date();
   let preparedExtract: ExtractConfig;
   const readCache = options?.cacheMode ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.READONLY : true;
-  const writeCache = options?.cacheMode ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.WRITEONLY : true;
+  const writeCache = options?.cacheMode ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.WRITEONLY : false;
   try {
     // Resolve endpoint configuration from cache or prepare new one
     let response: any;

@@ -14,7 +14,7 @@ export class GeminiModel implements LLM {
         const { geminiHistory, systemInstruction, userPrompt } = this.convertToGeminiHistory(messages);
         const model = this.genAI.getGenerativeModel({
             model: process.env.GEMINI_MODEL || "gemini-2.5-flash-preview-04-17",
-            systemInstruction: systemInstruction,
+            systemInstruction: systemInstruction + "\n\n" + "The current date and time is " + new Date().toISOString(),
         });
 
         const chatSession = model.startChat({
@@ -47,7 +47,7 @@ export class GeminiModel implements LLM {
         const { geminiHistory, systemInstruction, userPrompt } = this.convertToGeminiHistory(messages);
         const model = this.genAI.getGenerativeModel({
             model: process.env.GEMINI_MODEL || "gemini-2.5-flash-preview-04-17",
-            systemInstruction: systemInstruction
+            systemInstruction: systemInstruction + "\n\n" + "The current date and time is " + new Date().toISOString(),
         });
         const chatSession = model.startChat({
             generationConfig: {

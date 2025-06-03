@@ -1,7 +1,6 @@
 "use client"
 
 import { useConfig } from '@/src/app/config-context';
-import ApiConfigDetail from '@/src/app/configs/[id]/page';
 import { ConfigCreateStepper } from '@/src/components/api/ConfigCreateStepper';
 import {
   AlertDialog,
@@ -16,6 +15,12 @@ import {
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/src/components/ui/dropdown-menu";
+import {
   Table,
   TableBody,
   TableCell,
@@ -23,29 +28,23 @@ import {
   TableHeader,
   TableRow,
 } from "@/src/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/src/components/ui/dropdown-menu";
 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/src/components/ui/tooltip";
-import { ApiConfig, ExecutionStep, ExtractConfig, SuperglueClient, Workflow } from '@superglue/client';
-import { Check, Copy, FileText, GitBranch, Globe, History, Loader2, Play, Plus, RotateCw, Settings, ShoppingBag, Trash2 } from "lucide-react";
+import EmptyStateActions from '@/src/components/utils/EmptyStateActions';
+import { ApiConfig, ExecutionStep, ExtractConfig, SuperglueClient, TransformConfig, Workflow } from '@superglue/client';
+import { Check, Copy, GitBranch, History, Loader2, Play, Plus, RotateCw, Settings, Trash2, Zap } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import React from 'react';
-import EmptyStateActions from '@/src/components/utils/EmptyStateActions';
 
 const ConfigTable = () => {
   const router = useRouter();
-  const [configs, setConfigs] = React.useState<(ApiConfig | ExtractConfig | Workflow)[]>([]);
+  const [configs, setConfigs] = React.useState<(ApiConfig | ExtractConfig | Workflow | TransformConfig)[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [total, setTotal] = React.useState(0);
   const [page, setPage] = React.useState(0);
   const [pageSize] = React.useState(20);
   const config = useConfig();
-  const [configToDelete, setConfigToDelete] = React.useState<ApiConfig | ExtractConfig | Workflow | null>(null);
+  const [configToDelete, setConfigToDelete] = React.useState<ApiConfig | ExtractConfig | Workflow | TransformConfig | null>(null);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [showConfigStepper, setShowConfigStepper] = React.useState(false);
   const [configStepperProps, setConfigStepperProps] = React.useState<{ prefillData?: any }>({});
@@ -61,17 +60,19 @@ const ConfigTable = () => {
         apiKey: config.superglueApiKey
       });
 
-      // Fetch APIs, Extracts, and Workflows concurrently
-      const [apiConfigs, extractConfigs, workflowConfigs] = await Promise.all([
+      // Fetch APIs, Extracts, Transforms, and Workflows concurrently
+      const [apiConfigs, extractConfigs, transformConfigs, workflowConfigs] = await Promise.all([
         superglueClient.listApis(1000, 0),
         superglueClient.listExtracts(1000, 0),
+        superglueClient.listTransforms(1000, 0),
         superglueClient.listWorkflows(1000, 0),
       ]);
 
       const combinedConfigs = [
         ...apiConfigs.items.map(item => ({ ...item, type: 'api' as const })),
         ...extractConfigs.items.map(item => ({ ...item, type: 'extract' as const })),
-        ...workflowConfigs.items.map((item: any) => ({ ...item, type: 'workflow' as const })) // Add workflow items
+        ...transformConfigs.items.map(item => ({ ...item, type: 'transform' as const })),
+        ...workflowConfigs.items.map((item: any) => ({ ...item, type: 'workflow' as const }))
       ].sort((a, b) => {
         // Use updatedAt first, fallback to createdAt
         const dateA = new Date(a.updatedAt || a.createdAt).getTime();
@@ -96,9 +97,6 @@ const ConfigTable = () => {
     refreshConfigs();
   }, [refreshConfigs]);
 
-  const handleCreateNew = () => {
-    router.push('/configs/new');
-  };
   const handleWorkflow = () => {
     router.push('/workflows');
   };
@@ -106,31 +104,10 @@ const ConfigTable = () => {
     router.push('/workflows/manual');
   };
 
-  const handleCreateNewExtract = () => {
-    router.push('/extracts/new');
+  const handleTransform = () => {
+    router.push('/transforms');
   };
 
-  const handleCreateExampleShopify = () => {
-    // Create detailed prefill configuration with the Shopify example values
-    const shopifyPrefillData = {
-      fullUrl: 'https://timbuk2.com',
-      instruction: 'get me all products with name and price',
-      documentationUrl: ''
-    };
-    
-    // Set prefill data in configStepperProps
-    setConfigStepperProps({
-      prefillData: shopifyPrefillData
-    });
-    
-    // Reset any existing config states to ensure a clean start
-    setShowConfigStepper(false);
-    
-    // Short timeout to ensure state changes are processed before opening
-    setTimeout(() => {
-      setShowConfigStepper(true);
-    }, 50); // Increased timeout to ensure state updates are processed
-  };
 
   const handleEdit = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
@@ -145,6 +122,11 @@ const ConfigTable = () => {
   const handlePlayExtract = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     router.push(`/extracts/${id}/run`);
+  };
+
+  const handlePlayTransform = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    router.push(`/transforms/${id}`);
   };
 
   const handleViewLogs = (e: React.MouseEvent, id: string) => {
@@ -183,6 +165,9 @@ const ConfigTable = () => {
         case 'extract':
           deletePromise = superglueClient.deleteExtraction(configToDelete.id);
           break;
+        case 'transform':
+          deletePromise = superglueClient.deleteTransformation(configToDelete.id);
+          break;
         case 'workflow':
           // Manual fetch for deleting workflow
           deletePromise = fetch(`${config.superglueEndpoint}`, {
@@ -211,7 +196,7 @@ const ConfigTable = () => {
           console.error('Unknown config type for deletion:', (configToDelete as any)?.type);
           return;
       }
-      
+
       await deletePromise;
 
       setConfigToDelete(null);
@@ -275,11 +260,9 @@ const ConfigTable = () => {
         </div>
 
         <EmptyStateActions
-          handleCreateNew={handleCreateNew}
-          handleCreateNewExtract={handleCreateNewExtract}
           handleWorkflow={handleWorkflow}
-          handleCreateExampleShopify={handleCreateExampleShopify}
           handleWorkflowManual={handleWorkflowManual}
+          handleTransform={handleTransform}
         />
       </div>
     );
@@ -290,7 +273,7 @@ const ConfigTable = () => {
       <div className="flex flex-col lg:flex-row justify-between lg:items-center mb-6 gap-2">
         <h1 className="text-2xl font-bold">Configurations</h1>
         <div className="flex gap-4">
-        <DropdownMenu>
+          <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button>
                 <Plus className="mr-2 h-4 w-4" />
@@ -298,6 +281,10 @@ const ConfigTable = () => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align='end'>
+              <DropdownMenuItem onClick={handleTransform} className='p-4'>
+                <Zap className="mr-2 h-4 w-4" />
+                Transform
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={handleWorkflow} className='p-4'>
                 <GitBranch className="mr-2 h-4 w-4" />
                 Workflow
@@ -346,19 +333,21 @@ const ConfigTable = () => {
               const configType = (config as any).type;
               const isApi = configType === 'api';
               const isExtract = configType === 'extract';
+              const isTransform = configType === 'transform';
               const isWorkflow = configType === 'workflow';
 
               const handleRunClick = (e: React.MouseEvent) => {
                 if (isApi) handlePlay(e, config.id);
                 else if (isExtract) handlePlayExtract(e, config.id);
+                else if (isTransform) handlePlayTransform(e, config.id);
                 else if (isWorkflow) handlePlayWorkflow(e, config.id);
               };
 
               return (
                 <TableRow
-                  key={config.id}
+                  key={`${configType}-${config.id}`}
                   className="hover:bg-secondary"
-                  // Consider adding onClick={() => handleRowClick(config)} if needed
+                // Consider adding onClick={() => handleRowClick(config)} if needed
                 >
                   <TableCell className="w-[100px]">
                     <Button
@@ -398,14 +387,14 @@ const ConfigTable = () => {
                     </div>
                   </TableCell>
                   <TableCell className="w-[100px]">
-                     {/* Use different variants or specific names */}
-                     <Badge variant={isApi ? 'secondary' : isExtract ? 'default' : 'outline'}>
-                      {isApi ? 'API' : isExtract ? 'Extract' : 'Workflow'}
+                    {/* Use different variants or specific names */}
+                    <Badge variant={isApi ? 'secondary' : isExtract ? 'default' : isTransform ? 'outline' : 'outline'}>
+                      {isApi ? 'API' : isExtract ? 'Extract' : isTransform ? 'Transform' : 'Workflow'}
                     </Badge>
                   </TableCell>
                   <TableCell className="max-w-[300px] truncate">
-                    {configType === 'api' || configType === 'extract' ? 
-                      (config as ApiConfig | ExtractConfig).instruction : 
+                    {configType === 'api' || configType === 'extract' || configType === 'transform' ?
+                      (config as ApiConfig | ExtractConfig | TransformConfig).instruction :
                       (config as Workflow).steps.map((step: ExecutionStep) => step.id).join(' => ')
                     }
                   </TableCell>
@@ -449,7 +438,7 @@ const ConfigTable = () => {
                             </TooltipContent>
                           </Tooltip>
                         )}
-                        
+
                         {/* Delete Action (Available for all types) */}
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -465,7 +454,7 @@ const ConfigTable = () => {
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>
-                             <p>Delete {isApi ? 'Configuration' : isExtract ? 'Configuration' : 'Workflow'}</p>
+                            <p>Delete {isApi ? 'Configuration' : isExtract ? 'Configuration' : isTransform ? 'Transform' : 'Workflow'}</p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>

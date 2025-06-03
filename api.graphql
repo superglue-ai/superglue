@@ -209,7 +209,7 @@ input ExtractInput {
 input TransformInput {
   id: ID!
   instruction: String!
-  responseSchema: JSONSchema!
+  responseSchema: JSONSchema
   responseMapping: JSONata
   version: String
 }

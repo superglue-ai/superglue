@@ -1,9 +1,8 @@
-import { CacheMode, RequestOptions, TransformConfig, TransformInputRequest } from "@superglue/client";
-import { Context } from "@superglue/shared";
+import { CacheMode, FileType, RequestOptions, TransformConfig, TransformInputRequest } from "@superglue/client";
+import { Context, Metadata } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
-import { telemetryClient } from "../../utils/telemetry.js";
-import { applyTransformationWithValidation } from "../../utils/tools.js";
-import { prepareTransform } from "../../utils/transform.js";
+import { parseFile } from "../../utils/file.js";
+import { executeTransform } from "../../utils/transform.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 
 export const transformResolver = async (
@@ -18,56 +17,54 @@ export const transformResolver = async (
 ) => {
   const callId = crypto.randomUUID();
   const startedAt = new Date();
+
+  const metadata: Metadata = {
+    runId: callId,
+    orgId: context.orgId
+  };
+
   const readCache = options?.cacheMode ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.READONLY : true;
-  const writeCache = options?.cacheMode ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.WRITEONLY : true;
-  let preparedTransform: TransformConfig | null = null;
+  const writeCache = options?.cacheMode ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.WRITEONLY : false;
+  let transformResult: { data?: any; config?: TransformConfig } | null = null;
 
   if ((input.endpoint?.responseSchema as any)?._def?.typeName === "ZodObject") {
     throw new Error("zod is not supported for response schema. Please use json schema instead. you can use the zod-to-json-schema package to convert zod to json schema.");
   }
 
   try {
-    // Transform response
-    preparedTransform = readCache ?
-      await context.datastore.getTransformConfig(input.id, context.orgId)
-      : null;
-    preparedTransform = preparedTransform?.responseMapping ? preparedTransform :
-      await prepareTransform(context.datastore, readCache, preparedTransform || input.endpoint, data, null, { runId: callId, orgId: context.orgId });
-    if (!preparedTransform || !preparedTransform.responseMapping) {
-      telemetryClient?.captureException(new Error("Didn't find a valid transformation configuration."), context.orgId, {
-        input: input,
-        data: data,
-      });
-      throw new Error("Did not find a valid transformation configuration. Usually this is due to missing information in the request. If you are sending an ID, you need to enable cache read access.");
-    }
-    const transformation = await applyTransformationWithValidation(data, preparedTransform.responseMapping, preparedTransform.responseSchema);
 
-    if (!transformation.success) {
-      telemetryClient?.captureException(new Error(transformation.error), context.orgId, {
-        input: input,
-        data: data,
-        preparedTransform: preparedTransform,
-      });
-      throw new Error(transformation.error);
+    if (typeof data === 'string') {
+      try {
+        data = JSON.parse(data);
+      } catch (error) {
+        data = await parseFile(Buffer.from(data), FileType.AUTO);
+      }
     }
 
+    transformResult = await executeTransform({
+      datastore: context.datastore,
+      fromCache: readCache,
+      input: input,
+      data: data,
+      metadata: metadata
+    });
     // Save configuration if requested
     if (writeCache) {
-      context.datastore.upsertTransformConfig(input.id || preparedTransform.id, preparedTransform, context.orgId);
+      context.datastore.upsertTransformConfig(input.id || input.endpoint.id, transformResult.config, context.orgId);
     }
     const completedAt = new Date();
 
     // Notify webhook if configured
     // call async
     if (options?.webhookUrl) {
-      notifyWebhook(options.webhookUrl, callId, true, transformation.data);
+      notifyWebhook(options.webhookUrl, callId, true, transformResult.data);
     }
 
     return {
       id: callId,
       success: true,
-      data: transformation.data,
-      config: preparedTransform,
+      data: transformResult.data,
+      config: transformResult.config,
       startedAt,
       completedAt,
     };
@@ -83,7 +80,8 @@ export const transformResolver = async (
       id: callId,
       success: false,
       error: error.message,
-      config: preparedTransform || { id: callId, instruction: "", ...input },
+      config: transformResult?.config || { id: callId, instruction: "", ...input },
+      data: transformResult?.data,
       startedAt,
       completedAt,
     };
