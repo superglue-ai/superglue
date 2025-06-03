@@ -1,26 +1,26 @@
 ---
-title: "MCP"
+title: "supertools"
 description: "Let your agent build its own tools."
 ---
 
-## why superglue MCP?
+## why supertools?
 
 We’ve talked to dozens of teams deploying agents and they were all facing the same dilemma: giving their agents all the tools they need, yet making sure that tool calls remains secure, performant, and predictable in production. **supertools fix this**: It gives you the reliability you’re looking for when deploying in prod, and agents only the tools they actually need to do their job well. supertools is a tool that builds tools.
 
-## how do superglue MCP help?
+## how do supertools help?
 
-superglue MCP is a lightweight API-wrapper available via MCP. Agents can use it to:
+supertools is a lightweight API-wrapper available via MCP. Agents can use it to:
 
 - **Merge multiple endpoints & APIs** into coherent, reusable, **custom tools**
 - **Expose them via one stable MCP server**, even as upstream APIs change
 - **Abstract away authentication, pagination, retries,** and mapping logic
 - **Keep their toolset lean, so they don't get overwhelmed or go rogue**
 
-Use superglue MCP to let your agent run cross-API workflows reliably, like fetching transactions in Stripe and updating them in Hubspot, to build ambient agents that react to app triggers or to wrap your own API into capabilities agents can use.
+Use supertools to let your agent run cross-API workflows reliably, like fetching transactions in Stripe and updating them in Hubspot, to build ambient agents that react to app triggers or to wrap your own API into capabilities agents can use.
 
 Curious what else you can do with superglue? Read more about it [here](https://docs.superglue.cloud/introduction).
 
-## connecting to the MCP Server
+## connecting to the MCP Server (how your agent can use supertools)
 
 <video autoPlay muted loop playsInline className="w-full aspect-video" src="https://superglue.cloud/files/mcp.mp4" />
 
@@ -50,7 +50,7 @@ The superglue MCP server is available at the `/mcp` endpoint of your superglue i
 
 The reason this request is structured in an odd way (AUTH_HEADER instead of AUTH_TOKEN) is because Cursor does not allow spaces within the args array, but does so for env vars. This might become obsolete in future versions.
 
-## Using superglue MCP
+## Using supertools
 
 Switch to the agent mode of your LLM interface and prompt to build or execute a superglue tool. All superglue tools are exposed through MCP. For the video example to work, you need to share your HubSpot API key when running the tool.
 
