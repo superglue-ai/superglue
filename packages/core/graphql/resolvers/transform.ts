@@ -1,4 +1,4 @@
-import { CacheMode, RequestOptions, TransformConfig, TransformInputRequest } from "@superglue/client";
+import { CacheMode, RequestOptions, SelfHealingMode, TransformConfig, TransformInputRequest } from "@superglue/client";
 import { Context } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { telemetryClient } from "../../utils/telemetry.js";
@@ -20,6 +20,7 @@ export const transformResolver = async (
   const startedAt = new Date();
   const readCache = options?.cacheMode ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.READONLY : true;
   const writeCache = options?.cacheMode ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.WRITEONLY : true;
+  let isSelfHealing = options?.selfHealing ? options.selfHealing === SelfHealingMode.ENABLED || options.selfHealing === SelfHealingMode.TRANSFORM_ONLY : true;
   let preparedTransform: TransformConfig | null = null;
 
   if ((input.endpoint?.responseSchema as any)?._def?.typeName === "ZodObject") {
@@ -32,7 +33,7 @@ export const transformResolver = async (
       await context.datastore.getTransformConfig(input.id, context.orgId)
       : null;
     preparedTransform = preparedTransform?.responseMapping ? preparedTransform :
-      await prepareTransform(context.datastore, readCache, preparedTransform || input.endpoint, data, null, { runId: callId, orgId: context.orgId });
+      await prepareTransform(context.datastore, readCache, isSelfHealing, preparedTransform || input.endpoint, data, null, { runId: callId, orgId: context.orgId });
     if (!preparedTransform || !preparedTransform.responseMapping) {
       telemetryClient?.captureException(new Error("Didn't find a valid transformation configuration."), context.orgId, {
         input: input,

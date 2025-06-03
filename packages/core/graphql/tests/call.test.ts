@@ -3,13 +3,13 @@ import { Context, Metadata } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mocked } from 'vitest';
 import * as api from "../../utils/api.js";
+import { Documentation } from "../../utils/documentation.js";
+import * as logs from "../../utils/logs.js";
+import * as telemetry from "../../utils/telemetry.js";
 import * as tools from "../../utils/tools.js";
 import * as transform from "../../utils/transform.js";
 import * as webhook from "../../utils/webhook.js";
-import * as telemetry from "../../utils/telemetry.js";
-import * as logs from "../../utils/logs.js";
 import { callResolver, executeApiCall } from "../resolvers/call.js";
-import { Documentation } from "../../utils/documentation.js";
 
 // Mock dependencies
 vi.mock("../../utils/api.js");
@@ -33,7 +33,7 @@ describe('Call Resolver', () => {
     vi.clearAllMocks();
     // Mock crypto.randomUUID globally
     vi.spyOn(crypto, 'randomUUID').mockImplementation(() => 'test-uuid-1234-5678-9012-345678901234');
-    
+
     // Add mock for maskCredentials
     mockedTools.maskCredentials = vi.fn().mockImplementation((error, credentials) => error);
   });
@@ -63,9 +63,9 @@ describe('Call Resolver', () => {
       });
 
       const result = await executeApiCall(
-        testInput.endpoint, 
-        testPayload, 
-        testCredentials, 
+        testInput.endpoint,
+        testPayload,
+        testCredentials,
         testOptions,
         testMetadata
       );
@@ -89,19 +89,19 @@ describe('Call Resolver', () => {
         .mockResolvedValueOnce({
           data: { result: 'success after retry' }
         });
-      
+
       // Mock documentation and generateApiConfig
       vi.mocked(Documentation.prototype.fetch).mockResolvedValue('test docs');
       mockedApi.generateApiConfig.mockResolvedValue({
         config: { ...testInput.endpoint },
         messages: []
       });
-      mockedApi.evaluateResponse.mockResolvedValueOnce({ success: true, shortReason: '', refactorNeeded: false   });
+      mockedApi.evaluateResponse.mockResolvedValueOnce({ success: true, shortReason: '', refactorNeeded: false });
 
       const result = await executeApiCall(
-        testInput.endpoint, 
-        testPayload, 
-        testCredentials, 
+        testInput.endpoint,
+        testPayload,
+        testCredentials,
         testOptions,
         testMetadata
       );
@@ -135,17 +135,17 @@ describe('Call Resolver', () => {
       mockedApi.evaluateResponse.mockResolvedValue({ success: false, shortReason: 'Eval failed', refactorNeeded: false });
 
       await expect(executeApiCall(
-        testInput.endpoint, 
-        testPayload, 
-        testCredentials, 
+        testInput.endpoint,
+        testPayload,
+        testCredentials,
         testOptions,
         testMetadata
       )).rejects.toThrow(/API call failed after \d+ retries.*Last error: Eval failed/);
-      
+
       // callEndpoint is called once for the initial attempt, then 7 more times for retries where evaluateResponse fails.
-      expect(mockedApi.callEndpoint).toHaveBeenCalledTimes(8); 
+      expect(mockedApi.callEndpoint).toHaveBeenCalledTimes(8);
       // evaluateResponse is called for each of the 7 retries after the first callEndpoint failure.
-      expect(mockedApi.evaluateResponse).toHaveBeenCalledTimes(7);  
+      expect(mockedApi.evaluateResponse).toHaveBeenCalledTimes(7);
       expect(mockedTelemetry.telemetryClient?.captureException).toHaveBeenCalled();
     });
 
@@ -195,7 +195,7 @@ describe('Call Resolver', () => {
     it('should handle null response data', async () => {
       // Mock response with no data for all 5 expected calls
       mockedApi.callEndpoint.mockResolvedValue({ data: null });
-      
+
       // Add these missing mocks
       vi.mocked(Documentation.prototype.fetch).mockResolvedValue('test docs');
       mockedApi.generateApiConfig.mockResolvedValue({
@@ -204,13 +204,13 @@ describe('Call Resolver', () => {
       });
 
       await expect(executeApiCall(
-        testInput.endpoint, 
-        testPayload, 
-        testCredentials, 
+        testInput.endpoint,
+        testPayload,
+        testCredentials,
         testOptions,
         testMetadata
       )).rejects.toThrow(/API call failed after \d+ retries/);
-      
+
       expect(mockedApi.callEndpoint).toHaveBeenCalledTimes(8);
     });
   });
@@ -265,7 +265,7 @@ describe('Call Resolver', () => {
 
       const result = await callResolver(
         null,
-        { 
+        {
           input: { id: 'test-endpoint-id' },
           payload: testPayload,
           credentials: testCredentials,
@@ -327,12 +327,12 @@ describe('Call Resolver', () => {
       mockedApi.callEndpoint.mockResolvedValue({
         data: { result: 'success' }
       });
-      
+
       // Mock transform - fail first, succeed second time
       mockedTransform.prepareTransform
         .mockResolvedValueOnce({ responseMapping: 'invalid', responseSchema: {}, instruction: 'test-instruction', id: 'test-endpoint-id' })
         .mockResolvedValueOnce({ responseMapping: 'valid', responseSchema: {}, instruction: 'test-instruction', id: 'test-endpoint-id' });
-      
+
       mockedTools.applyTransformationWithValidation
         .mockResolvedValueOnce({ success: false, error: 'Transform error' })
         .mockResolvedValueOnce({ success: true, data: { transformed: 'success' } });
@@ -368,12 +368,12 @@ describe('Call Resolver', () => {
       mockedApi.callEndpoint.mockResolvedValue({
         data: { result: 'success' }
       });
-      
+
       // Mock transform to always fail
       mockedTransform.prepareTransform.mockResolvedValue({ responseMapping: 'invalid', responseSchema: {}, instruction: 'test-instruction', id: 'test-endpoint-id' });
-      mockedTools.applyTransformationWithValidation.mockResolvedValue({ 
-        success: false, 
-        error: 'Transform error' 
+      mockedTools.applyTransformationWithValidation.mockResolvedValue({
+        success: false,
+        error: 'Transform error'
       });
 
       const result = await callResolver(
@@ -396,7 +396,7 @@ describe('Call Resolver', () => {
       expect(mockedTransform.prepareTransform).toHaveBeenCalledTimes(3);
       expect(mockedTools.applyTransformationWithValidation).toHaveBeenCalledTimes(3);
     });
-    
+
     it('should notify webhook on success when configured', async () => {
       // Mock API call instead of the broken spy
       mockedApi.callEndpoint.mockResolvedValue({
@@ -406,7 +406,7 @@ describe('Call Resolver', () => {
       // Mock transform
       mockedTransform.prepareTransform.mockResolvedValue({ responseMapping: null, responseSchema: {}, instruction: 'test-instruction', id: 'test-endpoint-id' });
       mockedTools.applyJsonataWithValidation.mockResolvedValue({
-        success: true, 
+        success: true,
         data: { result: 'success' }
       });
 
@@ -465,7 +465,7 @@ describe('Call Resolver', () => {
       mockedApi.callEndpoint.mockResolvedValue({
         data: { result: 'success' }
       });
-      
+
       // Mock transform
       mockedTransform.prepareTransform.mockResolvedValue({ responseMapping: null, responseSchema: {}, instruction: 'test-instruction', id: 'test-endpoint-id' });
       mockedTools.applyJsonataWithValidation.mockResolvedValue({
@@ -489,6 +489,7 @@ describe('Call Resolver', () => {
       expect(mockedTransform.prepareTransform).toHaveBeenCalledWith(
         testContext.datastore,
         true, // readCache should be true
+        true,
         expect.any(Object),
         expect.any(Object),
         null,
@@ -523,6 +524,7 @@ describe('Call Resolver', () => {
       expect(mockedTransform.prepareTransform).toHaveBeenCalledWith(
         testContext.datastore,
         false, // readCache should be false
+        true,
         expect.any(Object),
         expect.any(Object),
         null,
@@ -543,7 +545,7 @@ describe('Call Resolver', () => {
 
       const result = await callResolver(
         null,
-        { 
+        {
           input: { id: 'test-endpoint-id' },
           payload: testPayload,
           credentials: testCredentials,
