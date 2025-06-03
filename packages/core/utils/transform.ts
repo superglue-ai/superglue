@@ -10,24 +10,12 @@ import { applyTransformationWithValidation, getSchemaFromData, sample } from "./
 export async function prepareTransform(
   datastore: DataStore,
   fromCache: boolean,
+  isSelfHealing: boolean,
   input: TransformConfig,
   data: any,
   lastError: string | null,
   metadata: Metadata
 ): Promise<TransformConfig | null> {
-  // Check if the response schema is empty
-  if (!input?.responseSchema ||
-    Object.keys(input.responseSchema).length === 0) {
-    return null;
-  }
-
-  // Check if the data is empty
-  if (!data ||
-    (Array.isArray(data) && data.length === 0) ||
-    (typeof data === 'object' && Object.keys(data).length === 0)) {
-    return null;
-  }
-
   // Check if the transform config is cached
   if (fromCache && datastore) {
     const cached = await datastore.getTransformConfig(input.id, metadata.orgId);
@@ -43,6 +31,9 @@ export async function prepareTransform(
     };
   }
 
+  if (lastError && input.responseMapping && !isSelfHealing) {
+    throw new Error(lastError);
+  }
   // Generate the response mapping
   const mapping = await generateTransformCode(input.responseSchema, data, input.instruction, metadata);
 

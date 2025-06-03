@@ -55,7 +55,7 @@ describe('transform utils', () => {
         getTransformConfig: vi.fn(),
       } as any;
       const input = { ...sampleInput, responseSchema: {} };
-      const result = await prepareTransform(mockDataStore, false, input, {}, null, { orgId: testOrgId });
+      const result = await prepareTransform(mockDataStore, false, true, input, {}, null, { orgId: testOrgId });
       expect(result).toBeNull();
     });
 
@@ -68,7 +68,7 @@ describe('transform utils', () => {
         responseMapping: 'test-mapping'
       };
 
-      const result = await prepareTransform(mockDataStore, false, input, { product: { name: 'test' } }, null, { orgId: testOrgId });
+      const result = await prepareTransform(mockDataStore, false, true, input, { product: { name: 'test' } }, null, { orgId: testOrgId });
 
       expect(result).toMatchObject({
         responseMapping: 'test-mapping',
@@ -101,7 +101,7 @@ describe('transform utils', () => {
           }
         });
 
-      const transform = await prepareTransform(mockDataStore, false, sampleInput, samplePayload, null, { orgId: testOrgId });
+      const transform = await prepareTransform(mockDataStore, false, true, sampleInput, samplePayload, null, { orgId: testOrgId });
       const result = await applyTransformationWithValidation(samplePayload, transform.responseMapping, sampleInput.responseSchema);
       expect(result).toMatchObject({
         success: true,
