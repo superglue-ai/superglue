@@ -32,7 +32,6 @@ export const transformResolver = async (
   }
 
   try {
-
     if (typeof data === 'string') {
       try {
         data = JSON.parse(data);
@@ -46,6 +45,7 @@ export const transformResolver = async (
       fromCache: readCache,
       input: input,
       data: data,
+      options: options,
       metadata: metadata
     });
     // Save configuration if requested
