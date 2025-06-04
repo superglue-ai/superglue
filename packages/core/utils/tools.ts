@@ -1,10 +1,11 @@
-import { RequestOptions } from "@superglue/client";
+import { HttpMethod, RequestOptions } from "@superglue/client";
 import axios, { AxiosRequestConfig } from "axios";
 import { GraphQLResolveInfo } from "graphql";
 import ivm from 'isolated-vm';
 import jsonata from "jsonata";
 import { Validator } from "jsonschema";
 import { toJsonSchema } from "../external/json-schema.js";
+import { HttpMethodEnum } from "../mcp/mcp-server.js";
 
 export function isRequested(field: string, info: GraphQLResolveInfo) {
   return info.fieldNodes.some(
@@ -443,4 +444,13 @@ export function addNullableToOptional(schema: any, required: boolean = true): an
 export function getSchemaFromData(data: any): string {
   if (!data) return null;
   return JSON.stringify(toJsonSchema(data, { arrays: { mode: 'first' } }), null, 2).slice(0, 50000);
+}
+
+export function safeHttpMethod(method: any): HttpMethod {
+  const validMethods = HttpMethodEnum.options;
+  if (validMethods.includes(method)) return method as HttpMethod;
+  if (typeof method === "string" && validMethods.includes(method.toUpperCase() as any)) {
+    return method.toUpperCase() as HttpMethod;
+  }
+  return "GET" as HttpMethod;
 }
