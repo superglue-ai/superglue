@@ -869,7 +869,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
 
                <div className="space-y-1">
                   <Label htmlFor="payload">Workflow Variables (Optional, JSON)</Label>
-                  <HelpTooltip text="Provide dynamic variables for the workflow as a JSON object. You can change them when you use the workflow later." />
+                  <HelpTooltip text="Provide dynamic variables for the workflow as a JSON object. Workflow variables are equivalent to your workflow's initial payload and can be referenced in the entire config. You can change them when you use the workflow later." />
                   <div className="flex-1 min-h-0 border rounded-md overflow-hidden">
                     <div className="h-full font-mono relative bg-transparent overflow-auto">
                       <Editor
