@@ -15,6 +15,48 @@ import { Textarea } from "../ui/textarea";
 
 type InputType = 'raw' | 'url' | 'file';
 
+interface SavedInputData {
+    inputType: InputType;
+    rawData: string;
+    inputUrl: string;
+    fileName?: string;
+}
+
+// Cookie utility functions
+const saveInputDataToCookie = (transformId: string, inputData: SavedInputData) => {
+    if (!transformId) return;
+
+    const cookieName = `transform_input_${transformId}`;
+    const cookieValue = JSON.stringify(inputData);
+
+    // Set cookie with 30 days expiration
+    const expirationDate = new Date();
+    expirationDate.setDate(expirationDate.getDate() + 30);
+
+    document.cookie = `${cookieName}=${encodeURIComponent(cookieValue)}; expires=${expirationDate.toUTCString()}; path=/`;
+};
+
+const loadInputDataFromCookie = (transformId: string): SavedInputData | null => {
+    if (!transformId) return null;
+
+    const cookieName = `transform_input_${transformId}`;
+    const cookies = document.cookie.split(';');
+
+    for (const cookie of cookies) {
+        const [name, value] = cookie.trim().split('=');
+        if (name === cookieName) {
+            try {
+                return JSON.parse(decodeURIComponent(value));
+            } catch (error) {
+                console.error('Error parsing cookie data:', error);
+                return null;
+            }
+        }
+    }
+
+    return null;
+};
+
 export default function TransformPlayground({ id }: { id?: string }) {
     const router = useRouter();
     const { toast } = useToast();
@@ -30,8 +72,7 @@ export default function TransformPlayground({ id }: { id?: string }) {
     const [inputFile, setInputFile] = useState<File | null>(null);
 
     // Transform configuration
-    const [transform, setTransform] = useState(`(sourceData) => ({
-})`);
+    const [transform, setTransform] = useState(`(sourceData) => {\n   return sourceData;\n}`);
     const [instruction, setInstruction] = useState('');
     const [responseSchema, setResponseSchema] = useState<string | null>(``);
 
@@ -118,6 +159,24 @@ export default function TransformPlayground({ id }: { id?: string }) {
                 setResponseSchema(JSON.stringify(transformConfig.responseSchema));
             }
 
+            // Load saved input data from cookie
+            const savedInputData = loadInputDataFromCookie(idToLoad);
+            if (savedInputData) {
+                setInputType(savedInputData.inputType);
+                setRawData(savedInputData.rawData);
+                setInputUrl(savedInputData.inputUrl);
+
+                // For file input, we can't restore the actual file, but we can show the filename
+                if (savedInputData.inputType === 'file' && savedInputData.fileName) {
+                    // Clear the file input but show a message about the previous file
+                    setInputFile(null);
+                    toast({
+                        title: "Previous file reference found",
+                        description: `Previously used file: ${savedInputData.fileName}`,
+                    });
+                }
+            }
+
             toast({
                 title: "Transform loaded",
                 description: `Loaded "${transformConfig.id}" successfully`,
@@ -131,7 +190,7 @@ export default function TransformPlayground({ id }: { id?: string }) {
             });
             // Reset state, keeping the attempted ID in the input field for convenience
             setInstruction('');
-            setTransform(`(sourceData) => ({})`);
+            setTransform(`(sourceData) => {\n   return sourceData;\n}`);
             setResponseSchema(null);
             setResult(null);
             setExecutionError(null);
@@ -147,7 +206,7 @@ export default function TransformPlayground({ id }: { id?: string }) {
             // Reset to a clean slate if id is removed or not provided
             setTransformId('');
             setInstruction('');
-            setTransform(`(sourceData) => ({})`);
+            setTransform(`(sourceData) => {\n   return sourceData;\n}`);
             setResponseSchema(null);
             setResult(null);
             setExecutionError(null);
@@ -180,9 +239,18 @@ export default function TransformPlayground({ id }: { id?: string }) {
 
             await superglueClient.upsertTransformation(savingId, transformData);
 
+            // Save input data to cookie
+            const inputDataToSave: SavedInputData = {
+                inputType,
+                rawData,
+                inputUrl,
+                fileName: inputFile?.name
+            };
+            saveInputDataToCookie(savingId, inputDataToSave);
+
             toast({
                 title: "Transform saved",
-                description: `"${transformId}" saved successfully`,
+                description: `"${savingId}" saved successfully`,
             });
             router.push(`/transforms/${savingId}`);
         } catch (error: any) {
@@ -205,36 +273,40 @@ export default function TransformPlayground({ id }: { id?: string }) {
             setResult(null);
             setExecutionError(null);
 
+            // Save input data to cookie before execution
+            if (transformId) {
+                const inputDataToSave: SavedInputData = {
+                    inputType,
+                    rawData,
+                    inputUrl,
+                    fileName: inputFile?.name
+                };
+                saveInputDataToCookie(transformId, inputDataToSave);
+            }
+
             // Prepare input based on type
             switch (inputType) {
                 case 'raw':
-                    try {
-                        inputData = JSON.parse(rawData);
-                    } catch (error) {
-                        throw new Error('Invalid JSON in raw data input');
-                    }
+                    inputData = rawData;
                     break;
                 case 'url':
                     if (!inputUrl.trim()) {
                         throw new Error('URL cannot be empty');
                     }
                     // Fetch data from URL
-                    const response = await fetch(inputUrl);
+                    const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(inputUrl)}`);
                     if (!response.ok) {
                         throw new Error(`Failed to fetch data from URL: ${response.statusText}`);
                     }
-                    inputData = await response.text();
+                    const responseData = await response.json();
+                    inputData = responseData.contents;
                     break;
                 case 'file':
                     if (!inputFile) {
                         throw new Error('No file selected');
                     }
                     const fileContent = await inputFile.text();
-                    try {
-                        inputData = JSON.parse(fileContent);
-                    } catch (error) {
-                        throw new Error('Invalid JSON in uploaded file');
-                    }
+                    inputData = fileContent;
                     break;
                 default:
                     throw new Error('Invalid input type');
@@ -397,7 +469,7 @@ export default function TransformPlayground({ id }: { id?: string }) {
                             onClick={() => setInputType('raw')}
                             className="text-sm font-medium"
                         >
-                            Raw JSON
+                            Raw Data
                         </Button>
                         <Button
                             variant={inputType === 'url' ? 'default' : 'ghost'}
@@ -421,13 +493,13 @@ export default function TransformPlayground({ id }: { id?: string }) {
                 {
                     inputType === 'raw' && (
                         <div>
-                            <Label htmlFor="rawData" className="mb-1 block">Raw JSON Data</Label>
+                            <Label htmlFor="rawData" className="mb-1 block">Raw Data (JSON, XML, CSV)</Label>
                             <Textarea
                                 id="rawData"
                                 value={rawData}
                                 onChange={(e) => setRawData(e.target.value)}
-                                placeholder="Enter JSON data"
-                                className="font-mono text-xs min-h-[120px]"
+                                placeholder="Enter data"
+                                className="font-mono text-xs min-h-[200px]"
                             />
                             {!rawData.trim() && (
                                 <div className="text-xs text-amber-500 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded mt-1">
@@ -436,7 +508,7 @@ export default function TransformPlayground({ id }: { id?: string }) {
                                         <line x1="12" y1="9" x2="12" y2="13" />
                                         <line x1="12" y1="17" x2="12.01" y2="17" />
                                     </svg>
-                                    No JSON data provided
+                                    No data provided
                                 </div>
                             )}
                         </div>
@@ -445,7 +517,7 @@ export default function TransformPlayground({ id }: { id?: string }) {
                 {
                     inputType === 'url' && (
                         <div>
-                            <Label htmlFor="inputUrl" className="mb-1 block">URL</Label>
+                            <Label htmlFor="inputUrl" className="mb-1 block">File URL (JSON, XML, CSV)</Label>
                             <Input
                                 id="inputUrl"
                                 type="url"
@@ -469,7 +541,7 @@ export default function TransformPlayground({ id }: { id?: string }) {
                 {
                     inputType === 'file' && (
                         <div>
-                            <Label htmlFor="inputFile" className="mb-1 block">Upload JSON File</Label>
+                            <Label htmlFor="inputFile" className="mb-1 block">Upload File (JSON, XML, CSV)</Label>
                             <Input
                                 id="inputFile"
                                 type="file"
