@@ -326,5 +326,12 @@ describe('tools utility functions', () => {
       expect(['HEAD', 'OPTIONS']).toContain(safeHttpMethod('head'));
       expect(['HEAD', 'OPTIONS']).toContain(safeHttpMethod('OPTIONS'));
     });
+
+    it('does not throw if method is undefined or null', () => {
+      expect(() => safeHttpMethod(undefined)).not.toThrow();
+      expect(() => safeHttpMethod(null)).not.toThrow();
+      expect(safeHttpMethod(undefined)).toBe('GET');
+      expect(safeHttpMethod(null)).toBe('GET');
+    });
   });
 }) 

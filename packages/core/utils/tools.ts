@@ -449,8 +449,7 @@ export function getSchemaFromData(data: any): string {
 export function safeHttpMethod(method: any): HttpMethod {
   const validMethods = HttpMethodEnum.options;
   if (validMethods.includes(method)) return method as HttpMethod;
-  if (typeof method === "string" && validMethods.includes(method.toUpperCase() as any)) {
-    return method.toUpperCase() as HttpMethod;
-  }
+  const upper = method?.toUpperCase?.();
+  if (upper && validMethods.includes(upper)) return upper as HttpMethod;
   return "GET" as HttpMethod;
 }
