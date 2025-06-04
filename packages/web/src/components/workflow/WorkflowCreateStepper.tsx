@@ -904,8 +904,52 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                       </div>
                     )}
                   </div>
-                </div>
-              </div>
+                   {validationErrors.instruction && <p className="text-sm text-destructive mt-1">Instruction is required.</p>}
+               </div>
+
+               {/* Show loading state */}
+               {isGeneratingSuggestions && (
+                 <div className="flex items-center justify-center py-4">
+                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                 </div>
+               )}
+
+               <div className="space-y-1">
+                  <Label htmlFor="payload">Workflow Variables (Optional, JSON)</Label>
+                  <HelpTooltip text="Provide dynamic variables for the workflow as a JSON object. Workflow variables are equivalent to your workflow's initial payload and can be referenced in the entire config. You can change them when you use the workflow later." />
+                  <div className="flex-1 min-h-0 border rounded-md overflow-hidden">
+                    <div className="h-full font-mono relative bg-transparent overflow-auto">
+                      <Editor
+                        value={payload}
+                        onValueChange={(code) => {
+                          setPayload(code);
+                          try {
+                            JSON.parse(code);
+                            setValidationErrors(prev => ({...prev, payload: false}));
+                          } catch (e) {
+                            setValidationErrors(prev => ({...prev, payload: true}));
+                          }
+                        }}
+                        highlight={highlightJson}
+                        padding={10}
+                        tabSize={2}
+                        insertSpaces={true}
+                        className={cn(
+                          "min-h-[96px] text-xs [&_textarea]:outline-none [&_textarea]:w-full [&_textarea]:resize-none [&_textarea]:p-0 [&_textarea]:border-0 [&_textarea]:bg-transparent dark:[&_textarea]:text-white",
+                          validationErrors.payload && inputErrorStyles
+                        )}
+                        style={{
+                          fontFamily: 'var(--font-mono)',
+                        }}
+                      />
+                      {validationErrors.payload && (
+                        <div className="absolute bottom-0 left-0 right-0 bg-red-500/10 text-red-500 p-2 text-xs">
+                          Invalid JSON format
+                        </div>
+                      )}
+                    </div>
+                  </div>
+               </div>
             </div>
           )}
 
