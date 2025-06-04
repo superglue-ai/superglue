@@ -6,10 +6,13 @@ import {
   isInitializeRequest
 } from "@modelcontextprotocol/sdk/types.js";
 import { SuperglueClient, Workflow, WorkflowResult } from '@superglue/client';
+import { LogEntry } from "@superglue/shared";
 import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import { jsonSchemaToZod } from 'json-schema-to-zod';
 import { z } from 'zod';
+import { validateToken } from '../auth/auth.js';
+import { logEmitter } from '../utils/logs.js';
 
 // Enums
 export const CacheModeEnum = z.enum(["ENABLED", "READONLY", "WRITEONLY", "DISABLED"]);
@@ -375,10 +378,12 @@ export const toolDefinitions: Record<string, any> = {
 
       const { client }: { client: SuperglueClient } = args;
       try {
-        let tool = await client.buildWorkflow(args.instruction, args.payload || {}, args.systems, args.responseSchema || {});
-        if (tool) {
-          tool = await client.upsertWorkflow(tool.id, tool);
-        }
+        let tool = await client.buildWorkflow({
+          instruction: args.instruction,
+          payload: args.payload || {},
+          systems: args.systems,
+          responseSchema: args.responseSchema || {}
+        });
 
         return {
           success: true,
@@ -532,9 +537,42 @@ BEST PRACTICES:
 - Validate tool IDs exist before execution
 - Provide integration code when users ask "how do I use this?"
     `,
-  });
+  },
+    {
+      capabilities: {
+        logging: {},
+        tools: {}
+      }
+    });
 
   const client = createClient(apiKey);
+
+  // Get org ID from the API key
+  const authResult = await validateToken(apiKey);
+  const orgId = authResult.orgId;
+
+  // Subscribe to server logs and forward to MCP client
+  const logHandler = (logEntry: LogEntry) => {
+    // Only send logs that match this user's org ID
+    if (logEntry.orgId === orgId || (!logEntry.orgId && !orgId)) {
+      mcpServer.server.sendLoggingMessage({
+        level: String(logEntry.level).toLowerCase() as any,
+        data: logEntry.message,
+        logger: "superglue-server"
+      });
+    }
+  };
+
+  // Start listening to log events
+  logEmitter.on('log', logHandler);
+
+  // Clean up log subscription when server closes
+  mcpServer.server.onerror = (error) => {
+    logEmitter.removeListener('log', logHandler);
+  };
+  mcpServer.server.onclose = () => {
+    logEmitter.removeListener('log', logHandler);
+  };
 
   // Register static tools
   for (const toolName of Object.keys(toolDefinitions)) {
@@ -545,21 +583,21 @@ BEST PRACTICES:
       tool.inputSchema,
       async (args, extra) => {
         const result = await tool.execute({ ...args, client }, extra);
+
         if (["superglue_build_new_tool"].includes(toolName)) {
           const id = `execute_${result.id}`;
           const tools = await createDynamicTools([result], client);
-          const tool = tools[id];
+          const dynamicTool = tools[id];
           mcpServer.tool(
             id,
-            tool.description,
-            tool.inputSchema,
-            tool.execute
+            dynamicTool.description,
+            dynamicTool.inputSchema,
+            dynamicTool.execute
           );
           mcpServer.sendToolListChanged();
-          mcpServer.sendPromptListChanged();
-          mcpServer.sendResourceListChanged();
-
+          mcpServer.server.sendToolListChanged();
         }
+
         return {
           content: [
             {
