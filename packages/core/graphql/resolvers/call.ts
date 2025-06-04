@@ -1,4 +1,4 @@
-import { ApiConfig, ApiInputRequest, CacheMode, RequestOptions, TransformConfig } from "@superglue/client";
+import { ApiConfig, ApiInputRequest, CacheMode, RequestOptions, SelfHealingMode, TransformConfig } from "@superglue/client";
 import type { Context, Metadata } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import OpenAI from "openai";
@@ -8,8 +8,8 @@ import { Documentation } from "../../utils/documentation.js";
 import { logMessage } from "../../utils/logs.js";
 import { generateSchema } from "../../utils/schema.js";
 import { telemetryClient } from "../../utils/telemetry.js";
-import { applyJsonata, maskCredentials } from "../../utils/tools.js";
-import { executeTransform, generateTransformJsonata } from "../../utils/transform.js";
+import { maskCredentials } from "../../utils/tools.js";
+import { executeTransform, generateTransformCode } from "../../utils/transform.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 
 export async function executeApiCall(
@@ -28,9 +28,10 @@ export async function executeApiCall(
   let messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
   let documentation: Documentation;
   let success = false;
+  let isSelfHealing = isSelfHealingEnabled(options);
   do {
     try {
-      if (retryCount > 0) {
+      if (retryCount > 0 && isSelfHealing) {
         logMessage('info', `Generating API config for ${endpoint?.urlHost}${retryCount > 0 ? ` (${retryCount})` : ""}`, metadata);
         if (!documentation) {
           documentation = new Documentation(endpoint, metadata);
@@ -46,17 +47,18 @@ export async function executeApiCall(
       if (!response.data) {
         throw new Error("No data returned from API. This could be due to a configuration error.");
       }
+
       // Check if response is valid
-      if (retryCount > 0) {
+      if (retryCount > 0 && isSelfHealing) {
         const result = await evaluateResponse(response.data, endpoint.responseSchema, endpoint.instruction);
         success = result.success;
         if (!result.success) throw new Error(result.shortReason + " " + JSON.stringify(response.data).slice(0, 1000));
         if (result.refactorNeeded) {
           logMessage('info', `Refactoring the API response.`, metadata);
           const responseSchema = await generateSchema(endpoint.instruction, JSON.stringify(response.data).slice(0, 1000), metadata);
-          const transformation = await generateTransformJsonata(responseSchema, endpoint.instruction, "$", metadata);
-          endpoint.responseMapping = transformation.jsonata;
-          response.data = await applyJsonata(response.data, transformation.jsonata);
+          const transformation = await generateTransformCode(responseSchema, response.data, endpoint.instruction, metadata);
+          endpoint.responseMapping = transformation.mappingCode;
+          response.data = transformation.data;
         }
       }
       else {
@@ -65,12 +67,12 @@ export async function executeApiCall(
       break;
     }
     catch (error) {
+      const rawErrorString = error?.message || JSON.stringify(error || {});
+      lastError = maskCredentials(rawErrorString, credentials).slice(0, 200);
       if (retryCount === 0) {
-        logMessage('info', `The initial configuration is not valid. Generating a new configuration. If you are creating a new configuration, this is expected.`, metadata);
+        logMessage('info', `The initial configuration is not valid. Generating a new configuration. If you are creating a new configuration, this is expected.\n${lastError}`, metadata);
       }
       else if (retryCount > 0) {
-        const rawErrorString = error?.message || JSON.stringify(error || {});
-        lastError = maskCredentials(rawErrorString, credentials).slice(0, 200);
         messages.push({ role: "user", content: `There was an error with the configuration, please fix: ${rawErrorString.slice(0, 2000)}` });
         if (rawErrorString.startsWith("JSONata") && !messages.some(m => String(m.content).startsWith("Please find the JSONata guide here:"))) {
           messages.push({ role: "user", content: "Please find the JSONata guide here: " + PROMPT_MAPPING });
@@ -79,7 +81,7 @@ export async function executeApiCall(
       }
     }
     retryCount++;
-  } while (retryCount < 8);
+  } while (retryCount < (options?.retries !== undefined ? options.retries : 8));
 
   if (!success) {
     telemetryClient?.captureException(new Error(`API call failed after ${retryCount} retries. Last error: ${lastError}`), metadata.orgId, {
@@ -90,6 +92,9 @@ export async function executeApiCall(
   }
 
   return { data: response?.data, endpoint };
+}
+function isSelfHealingEnabled(options: RequestOptions): boolean {
+  return options?.selfHealing ? options.selfHealing === SelfHealingMode.ENABLED || options.selfHealing === SelfHealingMode.REQUEST_ONLY : true;
 }
 
 export const callResolver = async (
@@ -138,7 +143,8 @@ export const callResolver = async (
         fromCache: readCache,
         input: { endpoint: endpoint as TransformConfig },
         data: data,
-        metadata: { runId: callId, orgId: context.orgId }
+        metadata: { runId: callId, orgId: context.orgId },
+        options: options
       }
     );
 

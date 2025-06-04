@@ -1,4 +1,4 @@
-import { TransformConfig, TransformInputRequest } from "@superglue/client";
+import { RequestOptions, SelfHealingMode, TransformConfig, TransformInputRequest } from "@superglue/client";
 import type { DataStore, Metadata } from "@superglue/shared";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import prettier from "prettier";
@@ -12,9 +12,10 @@ export async function executeTransform(args: {
   fromCache: boolean,
   input: TransformInputRequest,
   data: any,
+  options?: RequestOptions,
   metadata: Metadata
 }): Promise<{ data?: any; config?: TransformConfig }> {
-  const { datastore, fromCache, input, data, metadata } = args;
+  const { datastore, fromCache, input, data, metadata, options } = args;
   let currentConfig = input.endpoint;
 
   if (fromCache && datastore) {
@@ -54,6 +55,12 @@ export async function executeTransform(args: {
       instruction = `${instruction}\n\nThe previous error was: ${transformError} for the following mapping: ${currentConfig.responseMapping}`;
     }
 
+    // if the transform is not self healing and there is an existing mapping, throw an error
+    // if there is no mapping that means that the config is being generated for the first time and should generate regardless
+    if (currentConfig.responseMapping && !isSelfHealing(options)) {
+      throw new Error(transformError);
+    }
+
     const result = await generateTransformCode(
       currentConfig.responseSchema,
       data,
@@ -78,6 +85,10 @@ export async function executeTransform(args: {
       config: currentConfig
     };
   }
+}
+
+function isSelfHealing(options: RequestOptions): boolean {
+  return options?.selfHealing ? options.selfHealing === SelfHealingMode.ENABLED || options.selfHealing === SelfHealingMode.TRANSFORM_ONLY : true;
 }
 
 export async function generateTransformJsonata(schema: any, payload: any, instruction: string, metadata: Metadata, retry = 0, messages?: ChatCompletionMessageParam[]): Promise<{ jsonata: string, confidence: number } | null> {
