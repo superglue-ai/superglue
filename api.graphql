@@ -215,11 +215,19 @@ input TransformInput {
 }
 
 input RequestOptions {
+  selfHealing: SelfHealingMode
   cacheMode: CacheMode
   timeout: Int
   retries: Int
   retryDelay: Int
   webhookUrl: String
+}
+
+enum SelfHealingMode {
+  ENABLED
+  TRANSFORM_ONLY
+  REQUEST_ONLY
+  DISABLED
 }
 
 input ApiInputRequest @oneOf {
@@ -313,7 +321,7 @@ type Workflow implements BaseConfig {
   updatedAt: DateTime
 
   # Specific implementation
-  steps: [ExecutionStep!]!
+  steps: [ExecutionStep!]
   instruction: String
   finalTransform: JSONata
   responseSchema: JSONSchema
@@ -336,13 +344,12 @@ type WorkflowResult {
   startedAt: DateTime!
   completedAt: DateTime!
   config: Workflow
-
-  stepResults: [WorkflowStepResult!]!
+  stepResults: [WorkflowStepResult!]
 }
 
 input WorkflowInput {
   id: String!
-  steps: [ExecutionStepInput!]!
+  steps: [ExecutionStepInput!]
   finalTransform: JSONata
   inputSchema: JSONSchema
   responseSchema: JSONSchema
