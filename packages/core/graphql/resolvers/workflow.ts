@@ -62,6 +62,7 @@ export const executeWorkflowResolver = async (
       stepResults: result.stepResults || [],
       startedAt,
       completedAt: new Date(),
+      stepResults: result.stepResults || [],
     }, context.orgId);
 
     return result;

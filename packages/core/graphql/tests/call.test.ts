@@ -317,7 +317,6 @@ describe('Call Resolver', () => {
 
       // Mock transform to always fail
       mockedTransform.executeTransform.mockRejectedValue(new Error('Transform error'));
-
       const result = await callResolver(
         null,
         {

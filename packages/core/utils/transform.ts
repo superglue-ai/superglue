@@ -17,7 +17,6 @@ export async function executeTransform(args: {
 }): Promise<{ data?: any; config?: TransformConfig }> {
   const { datastore, fromCache, input, data, metadata, options } = args;
   let currentConfig = input.endpoint;
-
   if (fromCache && datastore) {
     const cached = await datastore.getTransformConfig(input.id || input.endpoint.id, metadata.orgId);
     if (cached) {

@@ -1,4 +1,4 @@
-import { ApiConfig, ExecutionStep, Workflow } from "@superglue/client";
+import { ApiConfig, ExecutionStep, HttpMethod, Workflow } from "@superglue/client";
 import { ExecutionMode, Metadata } from "@superglue/shared";
 import { type OpenAI } from "openai";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
@@ -9,7 +9,7 @@ import { LanguageModel } from "../llm/llm.js";
 import { PLANNING_PROMPT } from "../llm/prompts.js";
 import { Documentation } from "../utils/documentation.js";
 import { logMessage } from "../utils/logs.js"; // Added import
-import { composeUrl } from "../utils/tools.js"; // Assuming path
+import { composeUrl, safeHttpMethod } from "../utils/tools.js"; // Assuming path
 
 type ChatMessage = OpenAI.Chat.ChatCompletionMessageParam;
 
@@ -32,6 +32,7 @@ interface WorkflowPlanStep {
   instruction: string;
   mode: ExecutionMode;
   loopSelector?: string;
+  method?: HttpMethod;
 }
 
 interface WorkflowPlan {
@@ -93,7 +94,8 @@ export class WorkflowBuilder {
         instruction: z.string().describe("A specific, concise instruction for what this single API call should achieve (e.g., 'Get user profile by email', 'Create a new order')."),
         mode: z.enum(["DIRECT", "LOOP"]).describe("The mode of execution for this step. Use 'DIRECT' for simple calls executed once or 'LOOP' when the call needs to be executed multiple times over a collection (e.g. payload is a list of customer ids and call is executed for each customer id)."),
         urlHost: z.string().optional().describe("Optional. Override the system's default host. If not provided, the system's urlHost will be used."),
-        urlPath: z.string().optional().describe("Optional. Specific API path for this step. If not provided, the system's urlPath might be used or the LLM needs to determine it from documentation if the system's base URL is just a host.")
+        urlPath: z.string().optional().describe("Optional. Specific API path for this step. If not provided, the system's urlPath might be used or the LLM needs to determine it from documentation if the system's base URL is just a host."),
+        method: z.enum(["GET", "POST", "PUT", "DELETE", "PATCH"]).optional().describe("Tentative HTTP method for this step, e.g. GET, POST, PUT, DELETE, PATCH. If unsure, default to GET.")
       })).describe("The sequence of steps required to fulfill the overall instruction.")
     }));
 
@@ -124,7 +126,7 @@ ${systemDescriptions}
 
 ${initialPayloadDescription}
 
-Output a JSON object conforming to the WorkflowPlan schema. Define the necessary steps, assigning a unique lowercase \`stepId\`, selecting the appropriate \`systemId\`, writing a clear \`instruction\` for that specific API call based on documentation, and setting the execution \`mode\`. Assume data from previous steps is available implicitly for subsequent steps. If a step involves iteration, ensure \`loopSelector\` is appropriately defined. The plan should also include a \`finalTransform\` field, which is a JSONata expression for the final output transformation (default to '$' if no specific transformation is needed).
+Output a JSON object conforming to the WorkflowPlan schema. Define the necessary steps, assigning a unique lowercase \`stepId\`, selecting the appropriate \`systemId\`, writing a clear \`instruction\` for that specific API call based on documentation, and setting the execution \`mode\`.  For each step, also include a tentative HTTP \`method\` (GET, POST, etc.)—if unsure, default to GET. Assume data from previous steps is available implicitly for subsequent steps. If a step involves iteration, ensure \`loopSelector\` is appropriately defined. The plan should also include a \`finalTransform\` field, which is a JSONata expression for the final output transformation (default to '$' if no specific transformation is needed).
 `;
       newMessages.push({ role: "user", content: initialUserPrompt });
     }
@@ -201,6 +203,7 @@ Output a JSON object conforming to the WorkflowPlan schema. Define the necessary
             urlHost: plannedStep.urlHost || system.urlHost,
             urlPath: plannedStep.urlPath || system.urlPath,
             documentationUrl: system.documentationUrl,
+            method: safeHttpMethod(plannedStep.method)
           };
           const executionStep: ExecutionStep = {
             id: plannedStep.stepId,

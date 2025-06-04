@@ -82,7 +82,6 @@ export async function executeApiCall(
     }
     retryCount++;
   } while (retryCount < (options?.retries !== undefined ? options.retries : 8));
-
   if (!success) {
     telemetryClient?.captureException(new Error(`API call failed after ${retryCount} retries. Last error: ${lastError}`), metadata.orgId, {
       endpoint: endpoint,
