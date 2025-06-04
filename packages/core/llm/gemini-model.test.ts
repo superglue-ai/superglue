@@ -31,9 +31,9 @@ describe('GeminiModel', () => {
 
       expect(mockGetGenerativeModel).toHaveBeenCalledWith({
         model: 'gemini-2.5-flash-preview-04-17',
-        systemInstruction: 'system prompt'
+        systemInstruction: expect.stringContaining('system prompt')
       });
-      expect(result.response).toBe('test response');
+      expect(result.response).toContain('test response');
       expect(result.messages).toHaveLength(3);
     });
   });

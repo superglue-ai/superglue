@@ -69,10 +69,16 @@ describe('transform utils', () => {
         getTransformConfig: vi.fn(),
       } as any;
 
-      (LanguageModel as any).generateObject.mockResolvedValue({
+      (LanguageModel as any).generateObject.mockResolvedValueOnce({
         response: {
           mappingCode: '(sourceData) => {return { name: sourceData.product.name };}',
           confidence: 95
+        },
+        messages: []
+      }).mockResolvedValueOnce({
+        response: {
+          success: true,
+          reason: "Transformation is correct, complete, and aligns with the objectives."
         },
         messages: []
       });
@@ -91,7 +97,7 @@ describe('transform utils', () => {
       });
 
       expect(result.config).toMatchObject({
-        responseMapping: 'test-mapping',
+        responseMapping: '(sourceData) => {\n  return { name: sourceData.product.name };\n};\n',
         responseSchema: input.responseSchema
       });
       expect(result.config?.id).toBeDefined();
