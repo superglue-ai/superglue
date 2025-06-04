@@ -208,11 +208,16 @@ const client = new SuperglueClient({
   endpoint: "${endpoint}" // or default to https://graphql.superglue.ai NOT https://api.superglue.ai
 });
 
-const result = await client.executeWorkflow({
-  id: "${toolId}",
-  payload: ${JSON.stringify(payload, null, 2)},
-  credentials: ${JSON.stringify(credentials, null, 2)}
-});`,
+async function main() {
+  const result = await client.executeWorkflow({
+    id: "${toolId}",
+    payload: ${JSON.stringify(payload, null, 2)},
+    credentials: ${JSON.stringify(credentials, null, 2)}
+  });
+  console.log(result);
+}
+
+main();`,
       python: `import requests
 
 response = requests.post("${endpoint}", // or default to https://graphql.superglue.ai
