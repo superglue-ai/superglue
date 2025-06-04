@@ -51,6 +51,8 @@ export class WorkflowExecutor implements Workflow {
       completedAt: undefined,
     } as WorkflowResult;
     try {
+      if (!payload) payload = {};
+      if (!credentials) credentials = {};
       this.validate({ payload, credentials });
       logMessage("info", `Executing workflow ${this.id}`);
 
@@ -149,6 +151,10 @@ export class WorkflowExecutor implements Workflow {
   }
 
   private validate(payload: Record<string, unknown>): void {
+    if (!this.id) {
+      throw new Error("Workflow must have a valid ID");
+    }
+
     if (!this.steps || !Array.isArray(this.steps)) {
       throw new Error("Execution steps must be an array");
     }

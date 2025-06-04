@@ -1,6 +1,6 @@
 "use client";
 
-import { Book, History, Layout, PlayCircle } from "lucide-react";
+import { Book, Bot, History, Layout, PlayCircle } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -8,12 +8,12 @@ const navItems = [
   { icon: Layout, label: "Configurations", href: "/" },
   { icon: History, label: "Runs", href: "/runs" },
   { icon: PlayCircle, label: "Playground", href: "/playground" },
-  // { icon: GitBranch, label: 'Workflows', href: '/workflows' },
+  { icon: Bot, label: "MCP Setup", href: "https://docs.superglue.cloud/mcp", target: "_blank" },
   { icon: Book, label: "Documentation", href: "https://docs.superglue.cloud", target: "_blank" },
   /*  { icon: AlertCircle, label: 'Error Monitoring', href: '/analytics' },
   { icon: Shield, label: 'Access Control', href: '/access-control' },
   { icon: Code, label: 'SDK Generation', href: '/sdk' },
-  { icon: Layout, label: 'Documentation', href: '/docs' }, */
+*/
 ];
 
 export function Sidebar() {
@@ -36,11 +36,10 @@ export function Sidebar() {
               key={item.href}
               href={item.href}
               target={item.target || "_self"}
-              className={`flex items-center px-6 py-3 text-sm ${
-                isActive
-                  ? "bg-gray-100 dark:bg-secondary text-gray-900 dark:text-white border-r-2 border-gray-900 dark:border-white"
-                  : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-secondary"
-              }`}
+              className={`flex items-center px-6 py-3 text-sm ${isActive
+                ? "bg-gray-100 dark:bg-secondary text-gray-900 dark:text-white border-r-2 border-gray-900 dark:border-white"
+                : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-secondary"
+                }`}
             >
               <Icon className="h-4 w-4 mr-3" />
               {item.label}

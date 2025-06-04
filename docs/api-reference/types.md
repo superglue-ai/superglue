@@ -191,7 +191,7 @@ Available decompression methods:
 Cache behavior options:
 - `ENABLED` - Full caching
 - `DISABLED` - No caching
-- `READONLY` - Read-only cache
+- `READONLY` - Read-only cache. This is the default mode.
 - `WRITEONLY` - Write-only cache
 
 ### PaginationType

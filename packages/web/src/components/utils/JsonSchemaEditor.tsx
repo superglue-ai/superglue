@@ -41,16 +41,16 @@ const SCHEMA_TYPE_DISPLAY = {
 
 const DEFAULT_EMPTY_SCHEMA = `{"type":"object","properties":{}}`;
 
-const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({ 
-  value, 
-  onChange, 
-  isOptional = false, 
+const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
+  value,
+  onChange,
+  isOptional = false,
   title = "Set Response Schema"
 }) => {
   const [isCodeMode, setIsCodeMode] = React.useState(false);
   const [jsonError, setJsonError] = React.useState<string | null>(null);
   const [localIsEnabled, setLocalIsEnabled] = React.useState<boolean>(!isOptional || value !== null);
-  
+
   // Initialize from localStorage on mount
   React.useEffect(() => {
     const savedMode = localStorage?.getItem('jsonSchemaEditorCodeMode');
@@ -65,7 +65,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
       localStorage.setItem('jsonSchemaEditorCodeMode', isCodeMode.toString());
     }
   }, [isCodeMode]);
-  
+
   React.useEffect(() => {
     // Sync localIsEnabled with value prop if isOptional is true
     if (isOptional) {
@@ -74,7 +74,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
       setLocalIsEnabled(true); // Always enabled if not optional
     }
   }, [value, isOptional]);
-  
+
   const [visualSchema, setVisualSchema] = React.useState<any>({});
   const [editingField, setEditingField] = React.useState<string | null>(null);
   // Store field name during editing in case of duplicate keys
@@ -85,7 +85,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
   const [hoveredDescField, setHoveredDescField] = React.useState<string | null>(null);
   // Ref to store timeout IDs for hover delay
   const hoverTimeoutRef = React.useRef<{ [key: string]: NodeJS.Timeout }>({});
-  
+
   // Clear all hover timeouts when component unmounts
   React.useEffect(() => {
     return () => {
@@ -94,32 +94,36 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
       }
     };
   }, []);
-  
+
   React.useEffect(() => {
     if (value === null) {
-      setVisualSchema({}); // Clear visual schema if value is null
+      setVisualSchema({});
       setJsonError(null);
       return;
     }
     try {
-      // Only update visual schema if the JSON is valid
       const parsed = JSON.parse(value);
       setVisualSchema(parsed);
       setJsonError(null);
+
+      // Normalize the format to ensure consistency
+      const formattedValue = JSON.stringify(parsed, null, 2);
+      if (formattedValue !== value) {
+        onChange(formattedValue);
+      }
     } catch (e) {
-      // Just set the error but don't update visual schema if JSON is invalid
       if (value !== '') {
         setJsonError((e as Error).message);
       } else {
-        setJsonError(null); // Clear error for empty string if it's not null
+        setJsonError(null);
       }
     }
-  }, [value]);
+  }, [value, onChange]);
 
   const updateVisualSchema = (path: string[], newValue: any) => {
     const newSchema = { ...visualSchema };
     let current = newSchema;
-    
+
     // Navigate to the target location
     for (let i = 0; i < path.length - 1; i++) {
       current = current[path[i]];
@@ -142,20 +146,20 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
     setVisualSchema(newSchema);
     onChange(JSON.stringify(newSchema, null, 2));
   };
-  
+
   // Handle mouse enter with delay
   const handleMouseEnter = (fieldId: string) => {
     // Clear any existing timeout for this field
     if (hoverTimeoutRef.current[fieldId]) {
       clearTimeout(hoverTimeoutRef.current[fieldId]);
     }
-    
+
     // Set a new timeout to show tooltip after 2 seconds
     hoverTimeoutRef.current[fieldId] = setTimeout(() => {
       setHoveredDescField(fieldId);
     }, 1000);
   };
-  
+
   // Handle mouse leave
   const handleMouseLeave = (fieldId: string) => {
     // Clear the timeout if mouse leaves before delay completes
@@ -163,7 +167,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
       clearTimeout(hoverTimeoutRef.current[fieldId]);
       delete hoverTimeoutRef.current[fieldId];
     }
-    
+
     // Hide the tooltip if it's currently shown for this field
     if (hoveredDescField === fieldId) {
       setHoveredDescField(null);
@@ -187,7 +191,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
     const isEditing = editingField === path.join('.');
     // Create a unique ID for this field's description
     const descFieldId = [...path, 'description'].join('.');
-    
+
     // Helper function to check if field is required
     const isFieldRequired = () => {
       if (isRoot || isArrayChild) return false;
@@ -198,7 +202,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
       }
       return parent.required?.includes(fieldName) || false;
     };
-    
+
     const finishEditing = () => {
       // Only update the schema if the field name is not a duplicate and not empty
       if (!isDuplicateField && tempFieldName !== fieldName && tempFieldName.trim() !== '') {
@@ -207,10 +211,10 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
         for (let i = 0; i < path.length - 2; i++) {
           current = current[path[i]];
         }
-        
+
         const properties = current[path[path.length - 2]];
         const newProperties: Record<string, any> = {};
-        
+
         // Apply the name change
         for (const key of Object.keys(properties)) {
           if (key === fieldName) {
@@ -219,19 +223,19 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
             newProperties[key] = properties[key];
           }
         }
-        
+
         // Update required fields if needed
         if (current.required?.includes(fieldName)) {
-          current.required = current.required.map((f: string) => 
+          current.required = current.required.map((f: string) =>
             f === fieldName ? tempFieldName : f
           );
         }
-        
+
         current[path[path.length - 2]] = newProperties;
         setVisualSchema(newSchema);
         onChange(JSON.stringify(newSchema, null, 2));
       }
-      
+
       // Always reset states when done editing
       setTempFieldName('');
       setEditingField(null);
@@ -250,13 +254,13 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
                   // Just update the temporary field name for visual display
                   // WITHOUT modifying the actual schema until editing is complete
                   setTempFieldName(e.target.value);
-                  
+
                   let current = visualSchema;
                   for (let i = 0; i < path.length - 2; i++) {
                     current = current[path[i]];
                   }
                   const properties = current[path[path.length - 2]];
-                  
+
                   // it's a duplicate if a property with that name exists and it's not the current field
                   const isDuplicateKey = properties[e.target.value] && fieldName !== e.target.value;
                   setIsDuplicateField(isDuplicateKey);  // for UI highlighting
@@ -275,8 +279,8 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
                   }
                 }}
               />
-            ) : (!isArrayChild &&(
-              <div 
+            ) : (!isArrayChild && (
+              <div
                 className={cn(
                   "w-36 px-2 py-0.5 min-h-[32px] rounded hover:bg-secondary cursor-pointer flex items-center gap-0.5",
                   "text-[11px] xs:text-[12px] sm:text-[14px]"
@@ -359,7 +363,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
                           for (const segment of parentPath) {
                             parent = parent[segment];
                           }
-                          
+
                           if (checked) {
                             parent.required = [...(parent.required || []), fieldName];
                           } else {
@@ -368,7 +372,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
                               delete parent.required;
                             }
                           }
-                          
+
                           setVisualSchema(newSchema);
                           onChange(JSON.stringify(newSchema, null, 2));
                         }}
@@ -396,14 +400,14 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
                 onClick={() => {
                   const newSchema = { ...visualSchema };
                   let current = newSchema;
-                  
+
                   // Navigate to the parent to handle required fields
                   const parentPath = path.slice(0, -2);
                   let parent = newSchema;
                   for (const segment of parentPath) {
                     parent = parent[segment];
                   }
-                  
+
                   // If this field was required, remove it from the required array
                   if (parent.required?.includes(fieldName)) {
                     parent.required = parent.required.filter((f: string) => f !== fieldName);
@@ -412,11 +416,11 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
                       delete parent.required;
                     }
                   }
-                  
+
                   // Delete the field itself
                   for (let i = 0; i < path.length - 1; i++) current = current[path[i]];
                   delete current[path[path.length - 1] === 'properties' ? fieldName : path[path.length - 1]];
-                  
+
                   setVisualSchema(newSchema);
                   onChange(JSON.stringify(newSchema, null, 2));
                 }}
@@ -439,9 +443,9 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
               className="gap-2 text-xs sm:text-sm"
               onClick={() => updateVisualSchema(
                 [...path, 'properties'],
-                { 
-                  ...(schema.properties || {}), 
-                  [generateUniqueFieldName(schema.properties)]: { type: 'string' } 
+                {
+                  ...(schema.properties || {}),
+                  [generateUniqueFieldName(schema.properties)]: { type: 'string' }
                 }
               )}
             >
@@ -455,22 +459,22 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
           <div className="pl-2 mt-1">
             {schema.items && renderSchemaField('items', schema.items, [...path, 'items'], true)}
             {!schema.items && (
-            <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="gap-2 text-xs sm:text-sm"
-        onClick={() => updateVisualSchema(
-        [...path, 'items'],
-        { 
-            type: 'string',
-            ...(schema.items || {}),
-        }
-        )}
-    >
-            <ListPlus className="h-3 w-3 sm:h-4 sm:w-4" />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-2 text-xs sm:text-sm"
+                onClick={() => updateVisualSchema(
+                  [...path, 'items'],
+                  {
+                    type: 'string',
+                    ...(schema.items || {}),
+                  }
+                )}
+              >
+                <ListPlus className="h-3 w-3 sm:h-4 sm:w-4" />
                 <span className="text-xs sm:text-sm">Set Item</span>
-            </Button>        
+              </Button>
             )}
           </div>
         )}
@@ -523,10 +527,10 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
           {isOptional && (
             <div className="flex items-center gap-2">
               <Label htmlFor="schemaOptionalToggle" className="text-xs">Enabled</Label>
-              <Switch 
-                id="schemaOptionalToggle" 
-                checked={localIsEnabled} 
-                onCheckedChange={handleEnabledChange} 
+              <Switch
+                id="schemaOptionalToggle"
+                checked={localIsEnabled}
+                onCheckedChange={handleEnabledChange}
               />
             </div>
           )}
@@ -571,7 +575,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
             <div className="h-full flex flex-col min-h-0">
               {Object.keys(visualSchema).length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                  <p className="mb-4 text-xs sm:text-sm">No schema defined yet</p>
+                  <p className="mb-4 text-xs sm:text-sm mt-6">No schema defined yet</p>
                   <Button
                     variant="outline"
                     className="text-xs sm:text-sm"
@@ -595,9 +599,9 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
           )}
         </div>
       ) : (
-         <div className="flex-grow min-h-[4rem] p-3 border rounded-md text-sm text-muted-foreground bg-muted/50 flex items-center justify-center">
-            Schema definition is disabled.
-          </div>
+        <div className="flex-grow min-h-[4rem] p-3 border rounded-md text-sm text-muted-foreground bg-muted/50 flex items-center justify-center">
+          Schema definition is disabled.
+        </div>
       )}
     </div>
   );

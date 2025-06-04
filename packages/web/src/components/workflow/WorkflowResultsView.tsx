@@ -2,7 +2,7 @@ import { Button } from '@/src/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Textarea } from '@/src/components/ui/textarea';
 import { Workflow, WorkflowResult } from '@superglue/client';
-import { Check, Copy } from 'lucide-react';
+import { Check, Copy, Loader2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { AutoSizer, List } from 'react-virtualized';
 import { WorkflowCreateSuccess } from './WorkflowCreateSuccess';
@@ -225,8 +225,9 @@ export function WorkflowResultsView({
             </div>
           ) : (
             <div className="h-full flex items-center justify-center p-4">
-              <p className="text-gray-500 italic">
-                {isExecuting ? 'Executing workflow...' : 'No results yet. Test the workflow to see results here.'}
+              <p className="text-gray-500 italic flex items-center gap-2">
+                {isExecuting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {isExecuting ? 'Executing...' : 'No results yet. Test the workflow to see results here.'}
               </p>
             </div>
           )
@@ -304,8 +305,9 @@ export function WorkflowResultsView({
             </div>
           ) : (
             <div className="h-full flex items-center justify-center p-4">
-              <p className="text-gray-500 italic">
-                {isExecuting ? 'Executing workflow...' : 'No final results yet. Test the workflow to see results here.'}
+              <p className="text-gray-500 italic flex items-center gap-2">
+                {isExecuting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {isExecuting ? 'Executing...' : 'No final results yet. Test the workflow to see results here.'}
               </p>
             </div>
           )

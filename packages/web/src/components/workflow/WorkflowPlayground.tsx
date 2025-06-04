@@ -1,21 +1,19 @@
 "use client";
 
+import { useConfig } from "@/src/app/config-context";
+import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
+import JsonSchemaEditor from "@/src/components/utils/JsonSchemaEditor";
+import { parseCredentialsHelper, removeNullUndefined } from "@/src/lib/client-utils";
+import { ExecutionStep, SuperglueClient, WorkflowResult } from "@superglue/client";
+import { useRouter } from 'next/navigation';
 import { useEffect, useState } from "react";
+import { useToast } from "../../hooks/use-toast";
 import { Button } from "../ui/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "../ui/card";
+import { Card, CardContent, CardFooter } from "../ui/card";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
-import { Textarea } from "../ui/textarea";
-import { useToast } from "../../hooks/use-toast";
-import { useConfig } from "@/src/app/config-context";
-import { useSearchParams, useRouter } from 'next/navigation';
-import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
-import { ExecutionStep, WorkflowResult } from "@superglue/client";
-import { SuperglueClient } from "@superglue/client";
-import { parseCredentialsHelper, removeNullUndefined } from "@/src/lib/client-utils";
-import { WorkflowStepsView } from "./WorkflowStepsView";
 import { WorkflowResultsView } from "./WorkflowResultsView";
-import JsonSchemaEditor from "@/src/components/utils/JsonSchemaEditor";
+import { WorkflowStepsView } from "./WorkflowStepsView";
 
 export default function WorkflowPlayground({ id }: { id?: string }) {
   const router = useRouter();
@@ -33,17 +31,17 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<WorkflowResult | null>(null);
   const [activeResultTab, setActiveResultTab] = useState<'results' | 'transform' | 'final' | 'instructions'>("final");
-  
+
   const updateWorkflowId = (id: string) => {
     const sanitizedId = id
       .replace(/ /g, "-") // Replace spaces with hyphens
       .replace(/[^a-zA-Z0-9-]/g, ""); // Remove special characters
     setWorkflowId(sanitizedId);
   };
-  
+
   const generateDefaultFromSchema = (schema: any): any => {
     if (!schema || typeof schema !== 'object') return {};
-    
+
     if (schema.type === 'object' && schema.properties) {
       const result: any = {};
       for (const [key, propSchema] of Object.entries(schema.properties)) {
@@ -51,23 +49,23 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
       }
       return result;
     }
-    
+
     if (schema.type === 'array') {
       return [];
     }
-    
+
     if (schema.type === 'string') {
       return schema.default || '';
     }
-    
+
     if (schema.type === 'number' || schema.type === 'integer') {
       return schema.default || 0;
     }
-    
+
     if (schema.type === 'boolean') {
       return schema.default || false;
     }
-    
+
     return schema.default || null;
   };
 
@@ -90,7 +88,7 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
       updateWorkflowId(cleanedWorkflow.id || '');
       setSteps(cleanedWorkflow.steps || []);
       setFinalTransform(cleanedWorkflow.finalTransform || `{\n  "result": $\n}`);
-      
+
       if (cleanedWorkflow.responseSchema === null || cleanedWorkflow.responseSchema === undefined) {
         setResponseSchema(null);
       } else {
@@ -100,14 +98,14 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
       // Handle inputSchema to populate credentials and payload defaults
       if (cleanedWorkflow.inputSchema) {
         const defaultValues = generateDefaultFromSchema(cleanedWorkflow.inputSchema);
-        
+
         if (defaultValues.credentials !== undefined) {
-          const credentialsValue = typeof defaultValues.credentials === 'string' 
-            ? defaultValues.credentials 
+          const credentialsValue = typeof defaultValues.credentials === 'string'
+            ? defaultValues.credentials
             : JSON.stringify(defaultValues.credentials);
           setCredentials(credentialsValue);
         }
-        
+
         if (defaultValues.payload !== undefined) {
           setPayload(JSON.stringify(defaultValues.payload));
         }
@@ -266,23 +264,19 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
         apiKey: config.superglueApiKey,
       });
       const workflowResult = await superglueClient.executeWorkflow({
-        workflow: workflowData, 
-        credentials: parsedCredentials, 
+        workflow: workflowData,
+        credentials: parsedCredentials,
         payload: parsedPayload
       });
-      if(!workflowResult.success) {
+      if (!workflowResult.success) {
         throw new Error(workflowResult.error || "Workflow execution failed without a specific error message.");
       }
       console.log(workflowResult);
       setResult(workflowResult);
-      
-      if (workflowResult.config.responseSchema === null || workflowResult.config.responseSchema === undefined) {
-        setResponseSchema(null);
-      } else {
-        setResponseSchema(JSON.stringify(workflowResult.config.responseSchema));
+      if (workflowResult.success) {
+        setFinalTransform(workflowResult.config.finalTransform);
+        setSteps(workflowResult.config.steps);
       }
-      setFinalTransform(workflowResult.config.finalTransform);
-      setSteps(workflowResult.config.steps);
       setLoading(false);
     } catch (error) {
       console.error("Error executing workflow:", error);
@@ -300,27 +294,27 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
   };
 
   const handleStepEdit = (stepId: string, updatedStep: any) => {
-    setSteps(prevSteps => 
+    setSteps(prevSteps =>
       prevSteps.map(step => (step.id === stepId ? updatedStep : step))
     );
   };
 
   const isCredentialsEmpty = () => {
     if (!credentials || credentials.trim() === '') return true;
-    
+
     try {
       const parsed = JSON.parse(credentials);
       if (typeof parsed === 'object' && parsed !== null) {
-        return Object.keys(parsed).length === 0 || 
-               Object.values(parsed).every(value => 
-                 value === '' || value === null || value === undefined
-               );
+        return Object.keys(parsed).length === 0 ||
+          Object.values(parsed).every(value =>
+            value === '' || value === null || value === undefined
+          );
       }
     } catch {
       // If it's not valid JSON, treat as string
       return credentials.trim() === '';
     }
-    
+
     return false;
   };
 
@@ -380,9 +374,9 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
               {isCredentialsEmpty() && (
                 <div className="text-xs text-amber-500 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded mt-1">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                    <line x1="12" y1="9" x2="12" y2="13"/>
-                    <line x1="12" y1="17" x2="12.01" y2="17"/>
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                    <line x1="12" y1="9" x2="12" y2="13" />
+                    <line x1="12" y1="17" x2="12.01" y2="17" />
                   </svg>
                   No credentials added
                 </div>
