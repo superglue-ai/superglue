@@ -1,4 +1,4 @@
-import { ApiConfig, RunResult } from "@superglue/client";
+import { ApiConfig, ApiResult } from "@superglue/client";
 import { Context } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 

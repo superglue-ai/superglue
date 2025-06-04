@@ -61,8 +61,7 @@ export const executeWorkflowResolver = async (
       config: result.config || workflow || { id: args.input.id, steps: [] },
       stepResults: result.stepResults || [],
       startedAt,
-      completedAt: new Date(),
-      stepResults: result.stepResults || [],
+      completedAt: new Date()
     }, context.orgId);
 
     return result;
