@@ -60,7 +60,7 @@ export class WorkflowBuilder {
       return acc;
     }, {} as Record<string, SystemDefinition>);
     this.instruction = instruction;
-    this.initialPayload = initialPayload;
+    this.initialPayload = initialPayload || {};
     this.metadata = metadata;
     this.responseSchema = responseSchema;
     try {
@@ -68,7 +68,10 @@ export class WorkflowBuilder {
         return { ...acc, ...Object.entries(sys.credentials || {}).reduce((obj, [name, value]) => ({ ...obj, [`${sys.id}_${name}`]: value }), {}) };
       }, {});
       this.inputSchema = toJsonSchema(
-        { payload: initialPayload, credentials: credentials },
+        {
+          payload: this.initialPayload,
+          credentials: credentials
+        },
         { arrays: { mode: 'all' }, }
       ) as unknown as JSONSchema;
     } catch (error) {
@@ -104,7 +107,7 @@ ${sys.documentation || 'No documentation content available.'}
 \`\`\``
     ).join("\n");
 
-    const initialPayloadDescription = `Initial Input Payload contains keys: ${Object.keys(this.initialPayload).join(", ") || 'None'}\nPayload example: ${JSON.stringify(this.initialPayload)}`;
+    const initialPayloadDescription = this.initialPayload ? `Initial Input Payload contains keys: ${Object.keys(this.initialPayload).join(", ") || 'None'}\nPayload example: ${JSON.stringify(this.initialPayload)}` : '';
 
     let newMessages = [...currentMessages];
 
