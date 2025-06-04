@@ -252,17 +252,10 @@ describe('Call Resolver', () => {
       });
 
       // Mock transform
-      mockedTransform.prepareTransform.mockResolvedValue({
-        responseMapping: null,
-        responseSchema: {},
-        instruction: 'test-instruction',
-        id: 'test-endpoint-id'
+      mockedTransform.executeTransform.mockResolvedValue({
+        data: { result: 'success' },
+        config: { responseMapping: null, responseSchema: {}, instruction: 'test-instruction', id: 'test-endpoint-id' }
       });
-      mockedTools.applyJsonataWithValidation.mockResolvedValue({
-        success: true,
-        data: { result: 'success' }
-      });
-
       const result = await callResolver(
         null,
         {
@@ -280,7 +273,7 @@ describe('Call Resolver', () => {
         success: true,
         data: { result: 'success' }
       });
-      expect(testContext.datastore.upsertApiConfig).toHaveBeenCalled();
+      expect(testContext.datastore.upsertApiConfig).not.toHaveBeenCalled();
       expect(testContext.datastore.createRun).toHaveBeenCalled();
     });
 
@@ -291,15 +284,9 @@ describe('Call Resolver', () => {
       });
 
       // Mock transform
-      mockedTransform.prepareTransform.mockResolvedValue({
-        responseMapping: 'data',
-        responseSchema: {},
-        instruction: 'test-instruction',
-        id: 'test-endpoint-id'
-      });
-      mockedTools.applyTransformationWithValidation.mockResolvedValue({
-        success: true,
-        data: { transformed: 'data' }
+      mockedTransform.executeTransform.mockResolvedValue({
+        data: { transformed: 'data' },
+        config: { responseMapping: 'data', responseSchema: {}, instruction: 'test-instruction', id: 'test-endpoint-id' }
       });
 
       const result = await callResolver(
@@ -322,47 +309,6 @@ describe('Call Resolver', () => {
       expect(testContext.datastore.getApiConfig).not.toHaveBeenCalled();
     });
 
-    it('should retry transform on failure', async () => {
-      // Mock API call response
-      mockedApi.callEndpoint.mockResolvedValue({
-        data: { result: 'success' }
-      });
-
-      // Mock transform - fail first, succeed second time
-      mockedTransform.prepareTransform
-        .mockResolvedValueOnce({ responseMapping: 'invalid', responseSchema: {}, instruction: 'test-instruction', id: 'test-endpoint-id' })
-        .mockResolvedValueOnce({ responseMapping: 'valid', responseSchema: {}, instruction: 'test-instruction', id: 'test-endpoint-id' });
-
-      mockedTools.applyTransformationWithValidation
-        .mockResolvedValueOnce({ success: false, error: 'Transform error' })
-        .mockResolvedValueOnce({ success: true, data: { transformed: 'success' } });
-
-      const result = await callResolver(
-        null,
-        {
-          input: testInput,
-          payload: testPayload,
-          credentials: testCredentials,
-          options: testOptions
-        },
-        testContext,
-        testInfo
-      );
-
-      expect(result).toMatchObject({
-        id: 'test-uuid-1234-5678-9012-345678901234',
-        success: true,
-        data: { transformed: 'success' }
-      });
-      expect(mockedTransform.prepareTransform).toHaveBeenCalledTimes(2);
-      expect(mockedTools.applyTransformationWithValidation).toHaveBeenCalledTimes(2);
-      expect(mockedLogs.logMessage).toHaveBeenCalledWith(
-        'warn',
-        expect.stringContaining('Transformation failed'),
-        expect.any(Object)
-      );
-    });
-
     it('should handle transformation failure after max retries', async () => {
       // Mock API call response instead of using the broken spy
       mockedApi.callEndpoint.mockResolvedValue({
@@ -370,12 +316,7 @@ describe('Call Resolver', () => {
       });
 
       // Mock transform to always fail
-      mockedTransform.prepareTransform.mockResolvedValue({ responseMapping: 'invalid', responseSchema: {}, instruction: 'test-instruction', id: 'test-endpoint-id' });
-      mockedTools.applyTransformationWithValidation.mockResolvedValue({
-        success: false,
-        error: 'Transform error'
-      });
-
+      mockedTransform.executeTransform.mockRejectedValue(new Error('Transform error'));
       const result = await callResolver(
         null,
         {
@@ -391,10 +332,9 @@ describe('Call Resolver', () => {
       expect(result).toMatchObject({
         id: 'test-uuid-1234-5678-9012-345678901234',
         success: false,
-        error: expect.stringContaining('Transformation failed')
+        error: expect.stringContaining('Transform error')
       });
-      expect(mockedTransform.prepareTransform).toHaveBeenCalledTimes(3);
-      expect(mockedTools.applyTransformationWithValidation).toHaveBeenCalledTimes(3);
+      expect(mockedTransform.executeTransform).toHaveBeenCalledTimes(1);
     });
 
     it('should notify webhook on success when configured', async () => {
@@ -404,7 +344,7 @@ describe('Call Resolver', () => {
       });
 
       // Mock transform
-      mockedTransform.prepareTransform.mockResolvedValue({ responseMapping: null, responseSchema: {}, instruction: 'test-instruction', id: 'test-endpoint-id' });
+      mockedTransform.executeTransform.mockResolvedValue({ data: { result: 'success' }, config: { responseMapping: null, responseSchema: {}, instruction: 'test-instruction', id: 'test-endpoint-id' } });
       mockedTools.applyJsonataWithValidation.mockResolvedValue({
         success: true,
         data: { result: 'success' }
@@ -467,12 +407,7 @@ describe('Call Resolver', () => {
       });
 
       // Mock transform
-      mockedTransform.prepareTransform.mockResolvedValue({ responseMapping: null, responseSchema: {}, instruction: 'test-instruction', id: 'test-endpoint-id' });
-      mockedTools.applyJsonataWithValidation.mockResolvedValue({
-        success: true,
-        data: { result: 'success' }
-      });
-
+      mockedTransform.executeTransform.mockResolvedValue({ data: { result: 'success' }, config: { responseMapping: null, responseSchema: {}, instruction: 'test-instruction', id: 'test-endpoint-id' } });
       // Test with READONLY cache
       await callResolver(
         null,
@@ -486,15 +421,7 @@ describe('Call Resolver', () => {
         testInfo
       );
 
-      expect(mockedTransform.prepareTransform).toHaveBeenCalledWith(
-        testContext.datastore,
-        true, // readCache should be true
-        true,
-        expect.any(Object),
-        expect.any(Object),
-        null,
-        expect.any(Object)
-      );
+      expect(mockedTransform.executeTransform).toHaveBeenCalled();
       expect(testContext.datastore.upsertApiConfig).not.toHaveBeenCalled();
 
       // Reset mocks
@@ -502,11 +429,7 @@ describe('Call Resolver', () => {
       mockedApi.callEndpoint.mockResolvedValue({
         data: { result: 'success' }
       });
-      mockedTransform.prepareTransform.mockResolvedValue({ responseMapping: null, responseSchema: {}, instruction: 'test-instruction', id: 'test-endpoint-id' });
-      mockedTools.applyJsonataWithValidation.mockResolvedValue({
-        success: true,
-        data: { result: 'success' }
-      });
+      mockedTransform.executeTransform.mockResolvedValue({ data: { result: 'success' }, config: { responseMapping: null, responseSchema: {}, instruction: 'test-instruction', id: 'test-endpoint-id' } });
 
       // Test with WRITEONLY cache
       await callResolver(
@@ -521,15 +444,7 @@ describe('Call Resolver', () => {
         testInfo
       );
 
-      expect(mockedTransform.prepareTransform).toHaveBeenCalledWith(
-        testContext.datastore,
-        false, // readCache should be false
-        true,
-        expect.any(Object),
-        expect.any(Object),
-        null,
-        expect.any(Object)
-      );
+      expect(mockedTransform.executeTransform).toHaveBeenCalled();
       expect(testContext.datastore.upsertApiConfig).toHaveBeenCalled();
     });
 

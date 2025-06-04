@@ -1,4 +1,4 @@
-import { TransformConfig } from "@superglue/client";
+import { RequestOptions, SelfHealingMode, TransformConfig, TransformInputRequest } from "@superglue/client";
 import type { DataStore, Metadata } from "@superglue/shared";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import prettier from "prettier";
@@ -7,47 +7,87 @@ import { PROMPT_JS_TRANSFORM, PROMPT_MAPPING } from "../llm/prompts.js";
 import { logMessage } from "./logs.js";
 import { applyTransformationWithValidation, getSchemaFromData, sample } from "./tools.js";
 
-export async function prepareTransform(
+export async function executeTransform(args: {
   datastore: DataStore,
   fromCache: boolean,
-  isSelfHealing: boolean,
-  input: TransformConfig,
+  input: TransformInputRequest,
   data: any,
-  lastError: string | null,
+  options?: RequestOptions,
   metadata: Metadata
-): Promise<TransformConfig | null> {
-  // Check if the transform config is cached
+}): Promise<{ data?: any; config?: TransformConfig }> {
+  const { datastore, fromCache, input, data, metadata, options } = args;
+  let currentConfig = input.endpoint;
   if (fromCache && datastore) {
-    const cached = await datastore.getTransformConfig(input.id, metadata.orgId);
-    if (cached) return { ...cached, ...input };
+    const cached = await datastore.getTransformConfig(input.id || input.endpoint.id, metadata.orgId);
+    if (cached) {
+      currentConfig = { ...cached, ...input.endpoint };
+    }
+  }
+  if (!currentConfig) {
+    throw new Error("No transform config found");
   }
 
-  if (input.responseMapping && !lastError) {
+  try {
+    if (!currentConfig?.responseMapping) {
+      throw new Error("No response mapping found");
+    }
+
+    const transformResult = await applyTransformationWithValidation(
+      data,
+      currentConfig.responseMapping,
+      currentConfig.responseSchema
+    );
+
+    if (!transformResult.success) {
+      throw new Error(transformResult.error);
+    }
+
     return {
+      data: transformResult.data,
+      config: currentConfig
+    };
+  } catch (error) {
+    const rawErrorString = error?.message || JSON.stringify(error || {});
+    const transformError = rawErrorString.slice(0, 200);
+    let instruction = currentConfig.instruction;
+    if (transformError && currentConfig.responseMapping) {
+      instruction = `${instruction}\n\nThe previous error was: ${transformError} for the following mapping: ${currentConfig.responseMapping}`;
+    }
+
+    // if the transform is not self healing and there is an existing mapping, throw an error
+    // if there is no mapping that means that the config is being generated for the first time and should generate regardless
+    if (currentConfig.responseMapping && !isSelfHealing(options)) {
+      throw new Error(transformError);
+    }
+
+    const result = await generateTransformCode(
+      currentConfig.responseSchema,
+      data,
+      instruction,
+      metadata
+    );
+
+    if (!result || !result?.mappingCode) {
+      throw new Error("Failed to generate transformation mapping");
+    }
+
+    currentConfig = {
       id: crypto.randomUUID(),
       createdAt: new Date(),
       updatedAt: new Date(),
-      ...input
+      ...currentConfig,
+      responseMapping: result.mappingCode
     };
-  }
 
-  if (lastError && input.responseMapping && !isSelfHealing) {
-    throw new Error(lastError);
-  }
-  // Generate the response mapping
-  const mapping = await generateTransformCode(input.responseSchema, data, input.instruction, metadata);
-
-  // Check if the mapping is generated successfully
-  if (mapping) {
     return {
-      id: crypto.randomUUID(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      ...input,
-      responseMapping: mapping.mappingCode
+      data: result.data,
+      config: currentConfig
     };
   }
-  return null;
+}
+
+function isSelfHealing(options: RequestOptions): boolean {
+  return options?.selfHealing ? options.selfHealing === SelfHealingMode.ENABLED || options.selfHealing === SelfHealingMode.TRANSFORM_ONLY : true;
 }
 
 export async function generateTransformJsonata(schema: any, payload: any, instruction: string, metadata: Metadata, retry = 0, messages?: ChatCompletionMessageParam[]): Promise<{ jsonata: string, confidence: number } | null> {
@@ -107,7 +147,7 @@ export async function generateTransformCode(
   metadata: Metadata,
   retry = 0,
   messages?: ChatCompletionMessageParam[]
-): Promise<{ mappingCode: string, confidence: number } | null> {
+): Promise<{ mappingCode: string, confidence: number, data?: any } | null> {
   try {
     logMessage('info', "Generating mapping" + (retry > 0 ? ` (retry ${retry})` : ''), metadata);
 
@@ -145,9 +185,6 @@ ${JSON.stringify(sample(payload, 2), null, 2).slice(0, 50000)}
 
     const { response, messages: updatedMessages } = await LanguageModel.generateObject(messages, mappingSchema, temperature);
     messages = updatedMessages;
-
-    // Validate and execute the generated code
-    let result: any;
     try {
       // Autoformat the generated code
       response.mappingCode = await prettier.format(response.mappingCode, { parser: "babel" });
@@ -155,13 +192,13 @@ ${JSON.stringify(sample(payload, 2), null, 2).slice(0, 50000)}
       if (!validation.success) {
         throw new Error(`Validation failed: ${validation.error}`);
       }
-      result = validation.data;
+      response.data = validation.data;
     } catch (err) {
       throw new Error(`Generated code is invalid JS: ${err.message}`);
     }
 
     // Optionally, evaluate mapping quality as before
-    const evaluation = await evaluateMapping(result, response.mappingCode, payload, schema, instruction, metadata);
+    const evaluation = await evaluateMapping(response.data, response.mappingCode, payload, schema, instruction, metadata);
     if (!evaluation.success) {
       throw new Error(`Mapping evaluation failed: ${evaluation.reason}`);
     }

@@ -20,15 +20,15 @@ vi.mock('./transform.js', async (importOriginal) => {
 import { TransformConfig } from '@superglue/client';
 import dotenv from 'dotenv';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { LanguageModel as mockLLM } from '../llm/llm.js';
+import { LanguageModel } from '../llm/llm.js';
 import { applyTransformationWithValidation } from './tools.js';
-import { generateTransformJsonata, prepareTransform } from './transform.js';
+import { executeTransform, generateTransformJsonata } from './transform.js';
 
 describe('transform utils', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     dotenv.config();
-    (mockLLM as any).generateObject.mockReset();
+    (LanguageModel as any).generateObject.mockReset();
   });
 
   describe('prepareTransform', () => {
@@ -55,28 +55,54 @@ describe('transform utils', () => {
         getTransformConfig: vi.fn(),
       } as any;
       const input = { ...sampleInput, responseSchema: {} };
-      const result = await prepareTransform(mockDataStore, false, true, input, {}, null, { orgId: testOrgId });
-      expect(result).toBeNull();
+      await expect(executeTransform({
+        datastore: mockDataStore,
+        fromCache: false,
+        input: { endpoint: input },
+        data: {},
+        metadata: { orgId: testOrgId }
+      })).rejects.toThrow('Failed to generate transformation mapping');
     });
 
     it('should create new config if responseMapping is provided', async () => {
       let mockDataStore = {
         getTransformConfig: vi.fn(),
       } as any;
+
+      (LanguageModel as any).generateObject.mockResolvedValueOnce({
+        response: {
+          mappingCode: '(sourceData) => {return { name: sourceData.product.name };}',
+          confidence: 95
+        },
+        messages: []
+      }).mockResolvedValueOnce({
+        response: {
+          success: true,
+          reason: "Transformation is correct, complete, and aligns with the objectives."
+        },
+        messages: []
+      });
+
       const input = {
         ...sampleInput,
         responseMapping: 'test-mapping'
       };
 
-      const result = await prepareTransform(mockDataStore, false, true, input, { product: { name: 'test' } }, null, { orgId: testOrgId });
+      const result = await executeTransform({
+        datastore: mockDataStore,
+        fromCache: false,
+        input: { endpoint: input },
+        data: { product: { name: 'test' } },
+        metadata: { orgId: testOrgId }
+      });
 
-      expect(result).toMatchObject({
-        responseMapping: 'test-mapping',
+      expect(result.config).toMatchObject({
+        responseMapping: '(sourceData) => {\n  return { name: sourceData.product.name };\n};\n',
         responseSchema: input.responseSchema
       });
-      expect(result?.id).toBeDefined();
-      expect(result?.createdAt).toBeInstanceOf(Date);
-      expect(result?.updatedAt).toBeInstanceOf(Date);
+      expect(result.config?.id).toBeDefined();
+      expect(result.config?.createdAt).toBeInstanceOf(Date);
+      expect(result.config?.updatedAt).toBeInstanceOf(Date);
     });
 
     it('should generate new mapping if no responseMapping is provided', async () => {
@@ -84,8 +110,7 @@ describe('transform utils', () => {
         getTransformConfig: vi.fn(),
       } as any;
 
-      // First call: generateObject for mapping
-      (mockLLM as any).generateObject
+      (LanguageModel as any).generateObject
         .mockResolvedValueOnce({
           response: {
             mappingCode: '(sourceData) => {return {name: sourceData.user.firstName + " " + sourceData.user.lastName}}',
@@ -93,16 +118,22 @@ describe('transform utils', () => {
           },
           messages: []
         })
-        // Second call: generateObject for evaluateMapping
         .mockResolvedValueOnce({
           response: {
             success: true,
             reason: "Transformation is correct, complete, and aligns with the objectives."
-          }
+          },
+          messages: []
         });
 
-      const transform = await prepareTransform(mockDataStore, false, true, sampleInput, samplePayload, null, { orgId: testOrgId });
-      const result = await applyTransformationWithValidation(samplePayload, transform.responseMapping, sampleInput.responseSchema);
+      const transform = await executeTransform({
+        datastore: mockDataStore,
+        fromCache: false,
+        input: { endpoint: sampleInput },
+        data: samplePayload,
+        metadata: { orgId: testOrgId }
+      });
+      const result = await applyTransformationWithValidation(samplePayload, transform.config.responseMapping, sampleInput.responseSchema);
       expect(result).toMatchObject({
         success: true,
         data: {
@@ -114,12 +145,9 @@ describe('transform utils', () => {
 
   describe('generateTransformJsonata', () => {
     beforeEach(() => {
-      // Clear all mocks before each test
       vi.clearAllMocks();
-      // Reset modules to ensure clean mocks
       vi.resetModules();
-
-      (mockLLM as any).generateObject.mockReset();
+      (LanguageModel as any).generateObject.mockReset();
     });
 
     const sampleSchema = {
@@ -137,7 +165,7 @@ describe('transform utils', () => {
     };
 
     it('should generate mapping successfully', async () => {
-      (mockLLM as any).generateObject
+      (LanguageModel as any).generateObject
         .mockResolvedValueOnce({
           response: {
             jsonata: '{"name": user.firstName & " " & user.lastName}',
@@ -167,8 +195,8 @@ describe('transform utils', () => {
 
     it('should retry on failure', async () => {
       let attempts = 0;
-      (mockLLM as any).generateObject.mockRejectedValueOnce(attempts++ === 0 ? new Error('API Error') : null);
-      (mockLLM as any).generateObject.mockResolvedValueOnce({
+      (LanguageModel as any).generateObject.mockRejectedValueOnce(attempts++ === 0 ? new Error('API Error') : null);
+      (LanguageModel as any).generateObject.mockResolvedValueOnce({
         response: {
           jsonata: '{"name": user.firstName & " " & user.lastName}',
           confidence: 95,
@@ -182,7 +210,7 @@ describe('transform utils', () => {
     });
 
     it('should return null after max retries', async () => {
-      (mockLLM as any).generateObject.mockRejectedValue(new Error('API Error'));
+      (LanguageModel as any).generateObject.mockRejectedValue(new Error('API Error'));
 
       const result = await generateTransformJsonata(sampleSchema, samplePayload, 'test-instruction', {});
       expect(result).toBeNull();

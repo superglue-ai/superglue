@@ -61,7 +61,7 @@ export class WorkflowBuilder {
       return acc;
     }, {} as Record<string, SystemDefinition>);
     this.instruction = instruction;
-    this.initialPayload = initialPayload;
+    this.initialPayload = initialPayload || {};
     this.metadata = metadata;
     this.responseSchema = responseSchema;
     try {
@@ -69,7 +69,10 @@ export class WorkflowBuilder {
         return { ...acc, ...Object.entries(sys.credentials || {}).reduce((obj, [name, value]) => ({ ...obj, [`${sys.id}_${name}`]: value }), {}) };
       }, {});
       this.inputSchema = toJsonSchema(
-        { payload: initialPayload, credentials: credentials },
+        {
+          payload: this.initialPayload,
+          credentials: credentials
+        },
         { arrays: { mode: 'all' }, }
       ) as unknown as JSONSchema;
     } catch (error) {
@@ -106,7 +109,7 @@ ${sys.documentation || 'No documentation content available.'}
 \`\`\``
     ).join("\n");
 
-    const initialPayloadDescription = `Initial Input Payload contains keys: ${Object.keys(this.initialPayload).join(", ") || 'None'}\nPayload example: ${JSON.stringify(this.initialPayload)}`;
+    const initialPayloadDescription = this.initialPayload ? `Initial Input Payload contains keys: ${Object.keys(this.initialPayload).join(", ") || 'None'}\nPayload example: ${JSON.stringify(this.initialPayload)}` : '';
 
     let newMessages = [...currentMessages];
 
@@ -146,7 +149,7 @@ Output a JSON object conforming to the WorkflowPlan schema. Define the necessary
     const plan: WorkflowPlan = {
       steps: rawPlanObject.steps as WorkflowPlanStep[],
       id: rawPlanObject.id,
-      finalTransform: "$",
+      finalTransform: "(sourceData) => { return sourceData; }",
     };
 
     return { plan, messages: updatedMessagesFromLLM };
@@ -216,7 +219,7 @@ Output a JSON object conforming to the WorkflowPlan schema. Define the necessary
         builtWorkflow = {
           id: currentPlan.id,
           steps: executionSteps,
-          finalTransform: currentPlan.finalTransform || "$",
+          finalTransform: currentPlan.finalTransform || "(sourceData) => { return sourceData; }",
           responseSchema: this.responseSchema,
           instruction: this.instruction,
           createdAt: new Date(),

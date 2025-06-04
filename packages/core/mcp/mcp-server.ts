@@ -5,11 +5,14 @@ import {
   CallToolResult,
   isInitializeRequest
 } from "@modelcontextprotocol/sdk/types.js";
-import { SuperglueClient, WorkflowResult } from '@superglue/client';
+import { SuperglueClient, Workflow, WorkflowResult } from '@superglue/client';
+import { LogEntry } from "@superglue/shared";
 import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import { jsonSchemaToZod } from 'json-schema-to-zod';
 import { z } from 'zod';
+import { validateToken } from '../auth/auth.js';
+import { logEmitter } from '../utils/logs.js';
 
 // Enums
 export const CacheModeEnum = z.enum(["ENABLED", "READONLY", "WRITEONLY", "DISABLED"]);
@@ -375,10 +378,12 @@ export const toolDefinitions: Record<string, any> = {
 
       const { client }: { client: SuperglueClient } = args;
       try {
-        let tool = await client.buildWorkflow(args.instruction, args.payload || {}, args.systems, args.responseSchema || {});
-        if (tool) {
-          tool = await client.upsertWorkflow(tool.id, tool);
-        }
+        let tool = await client.buildWorkflow({
+          instruction: args.instruction,
+          payload: args.payload || {},
+          systems: args.systems,
+          responseSchema: args.responseSchema || {}
+        });
 
         return {
           success: true,
@@ -441,11 +446,10 @@ export const toolDefinitions: Record<string, any> = {
 };
 
 // Add a new function to create dynamic tools from tools
-const createDynamicToolsFromTools = async (client: SuperglueClient) => {
-  const tools = await client.listWorkflows(100, 0); // Get user's tools
+const createDynamicTools = async (tools: Workflow[], client: SuperglueClient) => {
   const dynamicTools: Record<string, any> = {};
 
-  for (const tool of tools.items) {
+  for (const tool of tools) {
     let inputSchema;
 
     if (tool.inputSchema) {
@@ -485,13 +489,22 @@ const createDynamicToolsFromTools = async (client: SuperglueClient) => {
     dynamicTools[`execute_${tool.id}`] = {
       description: tool.instruction || `Execute tool: ${tool.id}`,
       inputSchema,
-      execute: async (args: any, request: any): Promise<WorkflowResult> => {
-        return client.executeWorkflow({
+      execute: async (args: any, request: any): Promise<CallToolResult> => {
+        const result = await client.executeWorkflow({
           id: tool.id,
           payload: args.payload,
           credentials: args.credentials,
           options: args.options,
         });
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(result),
+              mimeType: "text/plain",
+            },
+          ],
+        } as CallToolResult;
       },
     };
   }
@@ -524,9 +537,42 @@ BEST PRACTICES:
 - Validate tool IDs exist before execution
 - Provide integration code when users ask "how do I use this?"
     `,
-  });
+  },
+    {
+      capabilities: {
+        logging: {},
+        tools: {}
+      }
+    });
 
   const client = createClient(apiKey);
+
+  // Get org ID from the API key
+  const authResult = await validateToken(apiKey);
+  const orgId = authResult.orgId;
+
+  // Subscribe to server logs and forward to MCP client
+  const logHandler = (logEntry: LogEntry) => {
+    // Only send logs that match this user's org ID
+    if (logEntry.orgId === orgId || (!logEntry.orgId && !orgId)) {
+      mcpServer.server.sendLoggingMessage({
+        level: String(logEntry.level).toLowerCase() as any,
+        data: logEntry.message,
+        logger: "superglue-server"
+      });
+    }
+  };
+
+  // Start listening to log events
+  logEmitter.on('log', logHandler);
+
+  // Clean up log subscription when server closes
+  mcpServer.server.onerror = (error) => {
+    logEmitter.removeListener('log', logHandler);
+  };
+  mcpServer.server.onclose = () => {
+    logEmitter.removeListener('log', logHandler);
+  };
 
   // Register static tools
   for (const toolName of Object.keys(toolDefinitions)) {
@@ -537,9 +583,21 @@ BEST PRACTICES:
       tool.inputSchema,
       async (args, extra) => {
         const result = await tool.execute({ ...args, client }, extra);
+
         if (["superglue_build_new_tool"].includes(toolName)) {
+          const id = `execute_${result.id}`;
+          const tools = await createDynamicTools([result], client);
+          const dynamicTool = tools[id];
+          mcpServer.tool(
+            id,
+            dynamicTool.description,
+            dynamicTool.inputSchema,
+            dynamicTool.execute
+          );
           mcpServer.sendToolListChanged();
+          mcpServer.server.sendToolListChanged();
         }
+
         return {
           content: [
             {
@@ -555,24 +613,14 @@ BEST PRACTICES:
 
   // Register dynamic tools
   try {
-    const dynamicTools = await createDynamicToolsFromTools(client);
+    const workflows = await client.listWorkflows(100, 0);
+    const dynamicTools = await createDynamicTools(workflows.items, client);
     for (const [toolName, tool] of Object.entries(dynamicTools)) {
       mcpServer.tool(
         toolName,
         tool.description,
         tool.inputSchema,
-        async (args, extra) => {
-          const result = await tool.execute(args, extra);
-          return {
-            content: [
-              {
-                type: "text",
-                text: JSON.stringify(result),
-                mimeType: "text/plain",
-              },
-            ],
-          } as CallToolResult;
-        }
+        tool.execute
       );
     }
   } catch (error) {

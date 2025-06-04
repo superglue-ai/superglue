@@ -100,7 +100,7 @@ export function ExtractPlayground({ extractId }: { extractId?: string }) {
         endpoint: superglueConfig.superglueEndpoint
       });
 
-      let result = await superglue.extract({
+      let extractResult = await superglue.extract({
         file,
         id,
         payload: parsedPayload,
@@ -109,20 +109,17 @@ export function ExtractPlayground({ extractId }: { extractId?: string }) {
           cacheMode: selectedCacheMode
         }
       });
-      if (result.success) {
-        try {
-          result = await superglue.transform({
-            id,
-            data: result.data,
-            options: {
-              cacheMode: selectedCacheMode
-            }
-          }) as any;
-        } catch (err) {
-          console.error(err);
-        }
+      if (!extractResult.success) {
+        throw new Error(extractResult.error);
       }
-      setResponse(result.data);
+      let transformResult = await superglue.transform({
+        id,
+        data: extractResult.data,
+        options: {
+          cacheMode: selectedCacheMode
+        }
+      });
+      setResponse(transformResult.data);
       setResponseTime(Date.now() - startTime);
     } catch (err: any) {
       const errorMessage = err.message || 'Failed to execute API call';

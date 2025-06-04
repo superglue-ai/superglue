@@ -1,4 +1,4 @@
-import { ApiConfig, RunResult } from "@superglue/client";
+import { ApiConfig, ApiResult } from "@superglue/client";
 import { Context } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 
@@ -46,7 +46,7 @@ export const updateApiConfigIdResolver = async (
         ...run.config,
         id: newId
       }
-    } as RunResult;
+    } as ApiResult;
     await context.datastore.deleteRun(run.id, context.orgId);
     await context.datastore.createRun(updatedRun, context.orgId);
   }

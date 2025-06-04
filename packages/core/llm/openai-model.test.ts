@@ -7,9 +7,12 @@ vi.mock('openai');
 
 describe('OpenAIModel', () => {
   const mockCreate = vi.fn();
+  const MOCK_DATE = '2024-01-01T00:00:00.000Z';
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(MOCK_DATE));
     process.env.OPENAI_API_KEY = 'test-key';
     (OpenAI as any).mockImplementation(() => ({
       chat: {
@@ -35,7 +38,10 @@ describe('OpenAIModel', () => {
       const result = await model.generateText(messages);
 
       expect(mockCreate).toHaveBeenCalledWith({
-        messages,
+        messages: [
+          { role: 'system', content: 'The current date and time is ' + MOCK_DATE },
+          ...messages
+        ],
         model: 'gpt-4o',
         temperature: 0,
         max_tokens: 65536
@@ -84,7 +90,10 @@ describe('OpenAIModel', () => {
       const result = await model.generateObject(messages, schema);
 
       expect(mockCreate).toHaveBeenCalledWith({
-        messages,
+        messages: [
+          { role: 'system', content: 'The current date and time is ' + MOCK_DATE },
+          ...messages
+        ],
         model: 'gpt-4o',
         temperature: 0,
         response_format: {
