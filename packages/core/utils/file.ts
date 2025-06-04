@@ -180,9 +180,9 @@ export async function parseXML(buffer: Buffer): Promise<any> {
     const results: any = {};
     let currentElement: any = null;
     const elementStack: any[] = [];
-    const error: any = null;
+    let error: any = null;
     return new Promise((resolve, reject) => {
-        const parser = sax.createStream(true); // true for strict mode
+        const parser = sax.createStream(false);
 
         parser.on('opentag', (node) => {
             // Create a new object for the current element
@@ -244,18 +244,13 @@ export async function parseXML(buffer: Buffer): Promise<any> {
             currentElement = parentElement;
         });
 
-        parser.on('error', (error) => {
-            console.error('Failed converting XML to JSON:', error);
-            error = error;
+        parser.on('error', (err) => {
+            console.warn('XML parsing warning (continuing):', err.message);
+            // Don't reject on errors in non-strict mode, just continue
         });
 
         parser.on('end', async () => {
-            if (!error) {
-                resolve(currentElement);
-            }
-            else {
-                reject(error);
-            }
+            resolve(currentElement);
         });
 
         const readStream = Readable.from(buffer);
