@@ -13,6 +13,7 @@ import { jsonSchemaToZod } from 'json-schema-to-zod';
 import { z } from 'zod';
 import { validateToken } from '../auth/auth.js';
 import { logEmitter } from '../utils/logs.js';
+import { getSDKCode } from '@superglue/shared/templates';
 import { SystemDefinition } from "../workflow/workflow-builder.js";
 
 // Enums
@@ -209,82 +210,14 @@ const generateSDKCode = async (client: SuperglueClient, toolId: string) => {
 
     const { payload, credentials } = generatePlaceholders(inputSchema);
 
-    return {
-      typescript: `// if not installed, run: npm install @superglue/client
-// ALWAYS use the endpoint: "${endpoint}"
-// ALWAYS USE THE SDK, do not use the graphql endpoint directly
-import { SuperglueClient } from '@superglue/client';
+    return getSDKCode({
+      apiKey: process.env.SUPERGLUE_API_KEY || 'YOUR_API_KEY',
+      endpoint: endpoint,
+      workflowId: toolId,
+      payload,
+      credentials,
+    });
 
-const client = new SuperglueClient({
-  apiKey: "YOUR_API_KEY",
-  endpoint: "${endpoint}" // or default to https://graphql.superglue.ai NOT https://api.superglue.ai
-});
-
-async function main() {
-  const result = await client.executeWorkflow({
-    id: "${toolId}",
-    payload: ${JSON.stringify(payload, null, 2)},
-    credentials: ${JSON.stringify(credentials, null, 2)}
-  });
-  console.log(result);
-}
-
-main();
-`,
-      python: `import requests
-
-response = requests.post("${endpoint}", // or default to https://graphql.superglue.ai
-  headers={"Authorization": "Bearer YOUR_API_KEY"},
-  json={
-    "query": """
-      mutation ExecuteWorkflow($input: WorkflowInputRequest!, $payload: JSON, $credentials: JSON) {
-        executeWorkflow(input: $input, payload: $payload, credentials: $credentials) {
-          data error success
-        }
-      }
-    """,
-    "variables": {
-      "input": {"id": "${toolId}"},
-      "payload": ${JSON.stringify(payload, null, 6)},
-      "credentials": ${JSON.stringify(credentials, null, 6)}
-    }
-  }
-)
-
-result = response.json()`,
-      go: `package main
-
-import (
-	"bytes"
-	"encoding/json"
-	"net/http"
-)
-
-func main() {
-	payload := ${JSON.stringify(payload, null, 2)}
-	credentials := ${JSON.stringify(credentials, null, 2)}
-	
-	reqBody, _ := json.Marshal(map[string]interface{}{
-		"query": \`mutation ExecuteWorkflow($input: WorkflowInputRequest!, $payload: JSON, $credentials: JSON) {
-			executeWorkflow(input: $input, payload: $payload, credentials: $credentials) {
-				data error success
-			}
-		}\`,
-		"variables": map[string]interface{}{
-			"input":       map[string]string{"id": "${toolId}"},
-			"payload":     payload,
-			"credentials": credentials,
-		},
-	})
-	
-	req, _ := http.NewRequest("POST", "${endpoint}", bytes.NewBuffer(reqBody)) // or default to https://graphql.superglue.ai
-	req.Header.Set("Authorization", "Bearer YOUR_API_KEY")
-	req.Header.Set("Content-Type", "application/json")
-	
-	resp, _ := http.DefaultClient.Do(req)
-	defer resp.Body.Close()
-}`
-    };
   } catch (error) {
     console.warn(`Failed to generate SDK code for tool ${toolId}:`, error);
     return null;
