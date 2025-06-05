@@ -16,7 +16,7 @@ import { inputErrorStyles, splitUrl } from '@/src/lib/client-utils';
 import { findMatchingIntegration, integrations } from '@/src/lib/integrations';
 import { cn, composeUrl } from '@/src/lib/utils';
 import { SuperglueClient, SystemInput, Workflow, WorkflowResult } from '@superglue/client';
-import { ArrowRight, Check, ChevronsUpDown, Globe, Loader2, Play, Plus, Trash2, X } from 'lucide-react';
+import { ArrowRight, Check, ChevronsUpDown, Globe, Loader2, Pencil, Play, Plus, Trash2, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
@@ -93,7 +93,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const [currentWorkflow, setCurrentWorkflow] = useState<Workflow | null>(null); // To store result from buildWorkflow
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
   const [systemFormVisible, setSystemFormVisible] = useState(false);
-
+  const [editingSystemIndex, setEditingSystemIndex] = useState<number | null>(null);
   const [idManuallyEdited, setIdManuallyEdited] = useState(false);
   const [selectedIntegration, setSelectedIntegration] = useState<string>("custom");
   const [integrationDropdownOpen, setIntegrationDropdownOpen] = useState(false);
@@ -234,7 +234,12 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       return;
     }
 
-    setSystems(prev => [...prev, currentSystem as SystemInput]);
+    if (editingSystemIndex !== null) {
+      setSystems(prev => prev.map((sys, i) => i === editingSystemIndex ? currentSystem : sys));
+      setEditingSystemIndex(null);
+    } else {
+      setSystems(prev => [...prev, currentSystem]);
+    }
     setCurrentSystem({ // Reset form
       id: '',
       urlHost: '',
@@ -247,6 +252,12 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     setValidationErrors({});
     setSystemFormVisible(false); // Hide form after adding
     setIdManuallyEdited(false); // Reset when adding system
+  };
+
+  const handleEditSystem = (index: number) => {
+    setCurrentSystem(systems[index]);
+    setSystemFormVisible(true);
+    setEditingSystemIndex(index);
   };
 
   const removeSystem = (index: number) => {
@@ -391,6 +402,17 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const handleBack = () => {
     const steps: WorkflowCreateStep[] = ['integrations', 'prompt', 'review', 'success'];
     const currentIndex = steps.indexOf(step);
+    if (step === 'integrations') {
+      router.push('/configs');
+      return;
+    }
+
+    if (step === 'review') {
+      setExecutionResult(null);
+      setFinalResult(null);
+      setExecutionError(null);
+    }
+
     if (currentIndex > 0) {
       setStep(steps[currentIndex - 1]);
     }
@@ -545,6 +567,40 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
 
   const urlFieldRef = useRef<URLFieldHandle>(null)
 
+  const handleSaveSystemEdit = () => {
+    if (editingSystemIndex !== null) {
+      setSystems(prev => prev.map((sys, i) => i === editingSystemIndex ? currentSystem : sys));
+      setEditingSystemIndex(null);
+    }
+    setSystemFormVisible(false);
+    setValidationErrors({});
+    setIdManuallyEdited(false);
+    setSelectedIntegration("custom");
+    setCurrentSystem({
+      id: '',
+      urlHost: '',
+      urlPath: '',
+      documentationUrl: '',
+      documentation: '',
+      credentials: {},
+    });
+  };
+
+  const handleCancelEditOrAdd = () => {
+    setSystemFormVisible(false);
+    setValidationErrors({});
+    setIdManuallyEdited(false);
+    setSelectedIntegration("custom");
+    setCurrentSystem({
+      id: '',
+      urlHost: '',
+      urlPath: '',
+      documentationUrl: '',
+      documentation: '',
+      credentials: {},
+    });
+  };
+
   return (
     <div className="flex-1 flex flex-col h-full p-6">
       {/* Header */}
@@ -618,14 +674,24 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                               </span>
                             </div>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                            onClick={() => removeSystem(index)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <div className="flex flex-row gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-blue-500 hover:bg-blue-100 transition-colors"
+                              onClick={() => handleEditSystem(index)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                              onClick={() => removeSystem(index)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                         {(!sys.credentials || Object.keys(sys.credentials).length === 0) && (
                           <div className="text-xs text-amber-500 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded">
@@ -806,21 +872,12 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                       {validationErrors.credentials && <p className="text-sm text-destructive mt-1">Credentials must be valid JSON.</p>}
                     </div>
                     <div className="flex justify-end gap-2 pt-2">
-                      <Button variant="outline" onClick={() => {
-                        setSystemFormVisible(false);
-                        setValidationErrors({});
-                        setIdManuallyEdited(false); // Reset when canceling
-                        setSelectedIntegration("custom"); // Reset integration selection
-                        setCurrentSystem({
-                          id: '',
-                          urlHost: '',
-                          urlPath: '',
-                          documentationUrl: '',
-                          documentation: '',
-                          credentials: {},
-                        });
-                      }}>Cancel</Button>
-                      <Button onClick={addSystem}>Add System</Button>
+                      <Button variant="outline" onClick={handleCancelEditOrAdd}>Cancel</Button>
+                      {editingSystemIndex !== null ? (
+                        <Button onClick={handleSaveSystemEdit}>Save Changes</Button>
+                      ) : (
+                        <Button onClick={addSystem}>Add System</Button>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -1019,7 +1076,10 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         <Button
           variant="outline"
           onClick={handleBack}
-          disabled={step === 'integrations' || isBuilding || isSaving}
+          disabled={
+            (step === 'integrations' && (systemFormVisible || isBuilding || isSaving)) ||
+            isBuilding || isSaving
+          }
         >
           Back
         </Button>
@@ -1028,7 +1088,12 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
             urlFieldRef.current?.commit()
             handleNext()
           }}
-          disabled={isBuilding || isSaving || isGeneratingSuggestions || (step === 'integrations' && systems.length === 0)}
+          disabled={
+            isBuilding ||
+            isSaving ||
+            isGeneratingSuggestions ||
+            (step === 'integrations' && (systemFormVisible || systems.length === 0))
+          }
         >
           {isBuilding ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Building...</> :
             isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</> :
