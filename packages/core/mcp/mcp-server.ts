@@ -211,11 +211,17 @@ const client = new SuperglueClient({
   endpoint: "${endpoint}" // or default to https://graphql.superglue.ai NOT https://api.superglue.ai
 });
 
-const result = await client.executeWorkflow({
-  id: "${toolId}",
-  payload: ${JSON.stringify(payload, null, 2)},
-  credentials: ${JSON.stringify(credentials, null, 2)}
-});`,
+async function main() {
+  const result = await client.executeWorkflow({
+    id: "${toolId}",
+    payload: ${JSON.stringify(payload, null, 2)},
+    credentials: ${JSON.stringify(credentials, null, 2)}
+  });
+  console.log(result);
+}
+
+main();
+`,
       python: `import requests
 
 response = requests.post("${endpoint}", // or default to https://graphql.superglue.ai
@@ -339,8 +345,12 @@ export const toolDefinitions: Record<string, any> = {
       const { client }: { client: SuperglueClient } = args;
       try {
         const result: WorkflowResult = await client.executeWorkflow(args);
-        if (result.success) {
-          await client.upsertWorkflow(args.id, result.config);
+        if (!result.success) {
+          return {
+            success: false,
+            error: result.error || "Unknown error",
+            suggestion: "Check that the tool ID exists and all required credentials are provided"
+          };
         }
         return {
           ...result,
@@ -424,6 +434,14 @@ export const toolDefinitions: Record<string, any> = {
             success: false,
             error: `Failed to generate code for tool ${toolId}`,
             suggestion: "Verify the tool ID exists and is accessible"
+          };
+        }
+
+        if (!['typescript', 'python', 'go'].includes(language)) {
+          return {
+            success: false,
+            error: `Language '${language}' is not supported. Supported languages are: typescript, python, go.`,
+            suggestion: "Choose a supported language."
           };
         }
 

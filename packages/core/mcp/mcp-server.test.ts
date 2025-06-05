@@ -2,6 +2,8 @@ import { toolDefinitions } from './mcp-server.js'
 import { describe, it, expect, vi } from 'vitest'
 
 const buildNewTool = toolDefinitions.superglue_build_new_tool.execute
+const executeTool = toolDefinitions.superglue_execute_tool.execute
+const getIntegrationCode = toolDefinitions.superglue_get_integration_code.execute
 
 function getValidArgs(overrides = {}) {
   return {
@@ -12,7 +14,6 @@ function getValidArgs(overrides = {}) {
     ],
     client: {
       buildWorkflow: vi.fn().mockResolvedValue({ id: 'tool-1', foo: 'bar' }),
-      upsertWorkflow: vi.fn().mockResolvedValue({ id: 'tool-1', foo: 'bar' }),
     },
     ...overrides
   }
@@ -51,149 +52,182 @@ describe('superglue_build_new_tool', () => {
     }), {})).rejects.toThrow(/credentials object is required/)
   })
 
-  it('returns success and calls client methods on valid input', async () => {
+  it('returns success and calls client method on valid input', async () => {
     const client = {
       buildWorkflow: vi.fn().mockResolvedValue({ id: 'tool-1', foo: 'bar' }),
-      upsertWorkflow: vi.fn().mockResolvedValue({ id: 'tool-1', foo: 'bar' }),
     }
     const args = getValidArgs({ client })
     const result = await buildNewTool(args, {})
     expect(result.success).toBe(true)
     expect(client.buildWorkflow).toHaveBeenCalled()
-    expect(client.upsertWorkflow).toHaveBeenCalled()
   })
 
   it('returns failure if buildWorkflow throws', async () => {
     const client = {
       buildWorkflow: vi.fn().mockRejectedValue(new Error('fail build')),
-      upsertWorkflow: vi.fn(),
     }
     const args = getValidArgs({ client })
     const result = await buildNewTool(args, {})
     expect(result.success).toBe(false)
     expect(result.error).toMatch(/fail build/)
   })
+})
 
-  it('returns failure if upsertWorkflow throws', async () => {
+describe('superglue_execute_tool', () => {
+  it('calls executeWorkflow with minimal valid input (id only)', async () => {
     const client = {
-      buildWorkflow: vi.fn().mockResolvedValue({ id: 'tool-1', foo: 'bar' }),
-      upsertWorkflow: vi.fn().mockRejectedValue(new Error('fail upsert')),
+      executeWorkflow: vi.fn().mockResolvedValue({ success: true, data: { ok: true }, config: { id: 'tool-minimal' }, stepResults: [] }),
     }
-    const args = getValidArgs({ client })
-    const result = await buildNewTool(args, {})
-    expect(result.success).toBe(false)
-    expect(result.error).toMatch(/fail upsert/)
+    const args = { id: 'tool-minimal', client }
+    const result = await executeTool(args, {})
+    expect(client.executeWorkflow).toHaveBeenCalledWith(expect.objectContaining({ id: 'tool-minimal' }))
+    expect(result.success).toBe(true)
+    expect(result.data).toEqual({ ok: true })
+  })
+
+  it('calls executeWorkflow with payload', async () => {
+    const client = {
+      executeWorkflow: vi.fn().mockResolvedValue({ success: true, data: { foo: 'bar' }, config: {}, stepResults: [] }),
+    }
+    const args = { id: 'tool-payload', payload: { foo: 'bar' }, client }
+    const result = await executeTool(args, {})
+    expect(client.executeWorkflow).toHaveBeenCalledWith(expect.objectContaining({ id: 'tool-payload', payload: { foo: 'bar' }, client }))
+    expect(result.success).toBe(true)
+    expect(result.data).toEqual({ foo: 'bar' })
+  })
+
+  it('calls executeWorkflow with all fields', async () => {
+    const client = {
+      executeWorkflow: vi.fn().mockResolvedValue({ success: true, data: { ok: true }, config: {}, stepResults: [] }),
+    }
+    const args = {
+      id: 'tool-all',
+      payload: { foo: 1 },
+      credentials: { apiKey: 'test' },
+      options: { retries: 2 },
+      client
+    }
+    const result = await executeTool(args, {})
+    expect(client.executeWorkflow).toHaveBeenCalledWith(expect.objectContaining({
+      id: 'tool-all',
+      payload: { foo: 1 },
+      credentials: { apiKey: 'test' },
+      options: { retries: 2 }
+    }))
+    expect(result.success).toBe(true)
+  })
+
+  it('calls executeWorkflow with null/undefined/empty payload', async () => {
+    const client = {
+      executeWorkflow: vi.fn().mockResolvedValue({ success: true, data: {}, config: {}, stepResults: [] }),
+    }
+    // null payload
+    const argsNull = { id: 'tool-null', payload: null, client }
+    let result = await executeTool(argsNull, {})
+    expect(client.executeWorkflow).toHaveBeenCalledWith(expect.objectContaining({ id: 'tool-null', payload: null }))
+    expect(result.success).toBe(true)
+    // undefined payload
+    const argsUndefined = { id: 'tool-undefined', client }
+    result = await executeTool(argsUndefined, {})
+    expect(client.executeWorkflow).toHaveBeenCalledWith(expect.objectContaining({ id: 'tool-undefined' }))
+    expect(result.success).toBe(true)
+    // empty object payload
+    const argsEmpty = { id: 'tool-empty', payload: {}, client }
+    result = await executeTool(argsEmpty, {})
+    expect(client.executeWorkflow).toHaveBeenCalledWith(expect.objectContaining({ id: 'tool-empty', payload: {} }))
+    expect(result.success).toBe(true)
+  })
+
+  it('throws if id is missing', async () => {
+    const client = {
+      executeWorkflow: vi.fn(),
+    }
+    const args = { client }
+    await expect(executeTool(args, {})).rejects.toThrow(/Tool ID is required/)
   })
 })
 
-// ... existing code ...
-
-describe('superglue_execute_tool', () => {
-  const executeTool = toolDefinitions.superglue_execute_tool.execute
-
-  it('throws if workflow/tool does not exist', async () => {
+describe('superglue_get_integration_code', () => {
+  it('returns code for valid toolId and language', async () => {
     const client = {
-      executeWorkflow: vi.fn().mockRejectedValue(new Error('Workflow not found')),
-      upsertWorkflow: vi.fn()
+      getWorkflow: vi.fn().mockResolvedValue({ id: 'tool-1', inputSchema: { properties: {} } })
     }
-    const args = { id: 'nonexistent', client }
-    const result = await executeTool(args, {})
-    expect(result.success).toBe(false)
-    expect(result.error).toMatch(/not found/i)
-  })
-
-  it('throws if workflow built with non-empty payload but executed with missing payload', async () => {
-    // Simulate workflow expects payload { foo: string }
-    const client = {
-      executeWorkflow: vi.fn().mockRejectedValue(new Error('Missing required payload: foo')),
-      upsertWorkflow: vi.fn()
-    }
-    const args = { id: 'tool-with-payload', client }
-    const result = await executeTool(args, {})
-    expect(result.success).toBe(false)
-    expect(result.error).toMatch(/missing.*payload/i)
-  })
-
-  it('throws if workflow built with a specific input schema but executed with a different payload shape', async () => {
-    // Simulate workflow expects { foo: string }, got { bar: 123 }
-    const client = {
-      executeWorkflow: vi.fn().mockRejectedValue(new Error('Payload does not match input schema')),
-      upsertWorkflow: vi.fn()
-    }
-    const args = { id: 'tool-with-schema', payload: { bar: 123 }, client }
-    const result = await executeTool(args, {})
-    expect(result.success).toBe(false)
-    expect(result.error).toMatch(/input schema/i)
-  })
-
-  it('throws if workflow built without a payload but executed with a payload', async () => {
-    // Simulate workflow expects no payload, but got one
-    const client = {
-      executeWorkflow: vi.fn().mockRejectedValue(new Error('Payload not allowed for this workflow')),
-      upsertWorkflow: vi.fn()
-    }
-    const args = { id: 'tool-no-payload', payload: { foo: 'bar' }, client }
-    const result = await executeTool(args, {})
-    expect(result.success).toBe(false)
-    expect(result.error).toMatch(/not allowed/i)
-  })
-
-  it('handles null payload (should throw if not allowed)', async () => {
-    const client = {
-      executeWorkflow: vi.fn().mockRejectedValue(new Error('Payload cannot be null')),
-      upsertWorkflow: vi.fn()
-    }
-    const args = { id: 'tool-null-payload', payload: null, client }
-    const result = await executeTool(args, {})
-    expect(result.success).toBe(false)
-    expect(result.error).toMatch(/null/i)
-  })
-
-  it('handles empty string payload (should throw if not allowed)', async () => {
-    const client = {
-      executeWorkflow: vi.fn().mockRejectedValue(new Error('Payload must be an object')),
-      upsertWorkflow: vi.fn()
-    }
-    const args = { id: 'tool-empty-string', payload: '', client }
-    const result = await executeTool(args, {})
-    expect(result.success).toBe(false)
-    expect(result.error).toMatch(/object/i)
-  })
-
-  it('handles payload with extra fields (should throw if strict schema)', async () => {
-    const client = {
-      executeWorkflow: vi.fn().mockRejectedValue(new Error('Unexpected field: extra')),
-      upsertWorkflow: vi.fn()
-    }
-    const args = { id: 'tool-strict', payload: { foo: 'bar', extra: 1 }, client }
-    const result = await executeTool(args, {})
-    expect(result.success).toBe(false)
-    expect(result.error).toMatch(/unexpected field/i)
-  })
-
-  it('returns success if everything matches', async () => {
-    const client = {
-      executeWorkflow: vi.fn().mockResolvedValue({ success: true, data: { ok: true }, config: {}, stepResults: [] }),
-      upsertWorkflow: vi.fn()
-    }
-    const args = { id: 'tool-ok', payload: { foo: 'bar' }, client }
-    const result = await executeTool(args, {})
+    const args = { client, toolId: 'tool-1', language: 'typescript' }
+    const result = await getIntegrationCode(args, {})
     expect(result.success).toBe(true)
-    expect(result.data).toEqual({ ok: true })
-    expect(client.executeWorkflow).toHaveBeenCalled()
+    expect(result.toolId).toBe('tool-1')
+    expect(result.language).toBe('typescript')
+    expect(result.code).toMatch(/SuperglueClient/)
   })
 
-  it('calls upsertWorkflow when executeWorkflow is successful', async () => {
+  it('fails if toolId does not exist', async () => {
     const client = {
-      executeWorkflow: vi.fn().mockResolvedValue({ success: true, data: { ok: true }, config: { id: 'tool-ok' }, stepResults: [] }),
-      upsertWorkflow: vi.fn()
+      getWorkflow: vi.fn().mockRejectedValue(new Error('not found'))
     }
-    const args = { id: 'tool-ok', payload: { foo: 'bar' }, client }
-    const result = await executeTool(args, {})
-    expect(result.success).toBe(true)
-    expect(client.upsertWorkflow).toHaveBeenCalledWith('tool-ok', { id: 'tool-ok' })
+    const args = { client, toolId: 'bad-id', language: 'typescript' }
+    const result = await getIntegrationCode(args, {})
+    expect(result.success).toBe(false)
+    expect(result.error).toMatch(/bad-id|not found/i)
   })
 
+  it('returns code for all supported languages', async () => {
+    const client = {
+      getWorkflow: vi.fn().mockResolvedValue({ id: 'tool-1', inputSchema: { properties: {} } })
+    }
+    for (const language of ['typescript', 'python', 'go']) {
+      const args = { client, toolId: 'tool-1', language }
+      const result = await getIntegrationCode(args, {})
+      expect(result.success).toBe(true)
+      expect(result.language).toBe(language)
+      expect(result.code).toBeTruthy()
+    }
+  })
 
+  it('handles workflow with missing/empty inputSchema', async () => {
+    const client = {
+      getWorkflow: vi.fn().mockResolvedValue({ id: 'tool-3' })
+    }
+    const args = { client, toolId: 'tool-3', language: 'typescript' }
+    const result = await getIntegrationCode(args, {})
+    expect(result.success).toBe(true)
+    expect(result.code).toMatch(/payload/)
+  })
+
+  it('handles workflow with complex inputSchema', async () => {
+    const complexSchema = {
+      properties: {
+        payload: {
+          properties: {
+            foo: { type: 'string' },
+            bar: { type: 'number' },
+            baz: { type: 'array', items: { type: 'string' } },
+            nested: { type: 'object', properties: { a: { type: 'boolean' } } }
+          }
+        },
+        credentials: { properties: {} }
+      }
+    }
+    const client = {
+      getWorkflow: vi.fn().mockResolvedValue({ id: 'tool-4', inputSchema: complexSchema })
+    }
+    const args = { client, toolId: 'tool-4', language: 'typescript' }
+    const result = await getIntegrationCode(args, {})
+    expect(result.success).toBe(true)
+    console.log(result.code)
+    expect(result.code).toMatch(/foo/)
+    expect(result.code).toMatch(/bar/)
+    expect(result.code).toMatch(/baz/)
+    expect(result.code).toMatch(/nested/)
+  })
+
+  it('handles missing/invalid language', async () => {
+    const client = {
+      getWorkflow: vi.fn().mockResolvedValue({ id: 'tool-1', inputSchema: { properties: {} } })
+    }
+    const args = { client, toolId: 'tool-1', language: 'some-language' }
+    const result = await getIntegrationCode(args, {})
+    expect(result.success).toBe(false)
+    expect(result.error).toMatch(/some-language/i)
+  })
 })
 
