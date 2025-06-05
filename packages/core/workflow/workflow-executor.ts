@@ -30,7 +30,7 @@ export class WorkflowExecutor implements Workflow {
     this.inputSchema = workflow.inputSchema;
     this.result = {
       id: crypto.randomUUID(),
-      success: true,
+      success: false,
       data: {},
       stepResults: [],
       startedAt: new Date(),
@@ -44,17 +44,19 @@ export class WorkflowExecutor implements Workflow {
     options?: RequestOptions,
   ): Promise<WorkflowResult> {
     this.result = {
-      success: true,
-      data: {},
-      stepResults: [],
+      ...this.result,
+      id: crypto.randomUUID(),
+      success: false,
+      data: {} as Record<string, unknown>,
+      stepResults: [] as WorkflowStepResult[],
       startedAt: new Date(),
-      completedAt: undefined,
+      completedAt: undefined
     } as WorkflowResult;
     try {
       if (!payload) payload = {};
       if (!credentials) credentials = {};
       this.validate({ payload, credentials });
-      logMessage("info", `Executing workflow ${this.id}`);
+      logMessage("info", `Executing workflow ${this.id}`, this.metadata);
 
       // Execute each step in order
       for (const step of this.steps) {
