@@ -85,3 +85,115 @@ describe('superglue_build_new_tool', () => {
     expect(result.error).toMatch(/fail upsert/)
   })
 })
+
+// ... existing code ...
+
+describe('superglue_execute_tool', () => {
+  const executeTool = toolDefinitions.superglue_execute_tool.execute
+
+  it('throws if workflow/tool does not exist', async () => {
+    const client = {
+      executeWorkflow: vi.fn().mockRejectedValue(new Error('Workflow not found')),
+      upsertWorkflow: vi.fn()
+    }
+    const args = { id: 'nonexistent', client }
+    const result = await executeTool(args, {})
+    expect(result.success).toBe(false)
+    expect(result.error).toMatch(/not found/i)
+  })
+
+  it('throws if workflow built with non-empty payload but executed with missing payload', async () => {
+    // Simulate workflow expects payload { foo: string }
+    const client = {
+      executeWorkflow: vi.fn().mockRejectedValue(new Error('Missing required payload: foo')),
+      upsertWorkflow: vi.fn()
+    }
+    const args = { id: 'tool-with-payload', client }
+    const result = await executeTool(args, {})
+    expect(result.success).toBe(false)
+    expect(result.error).toMatch(/missing.*payload/i)
+  })
+
+  it('throws if workflow built with a specific input schema but executed with a different payload shape', async () => {
+    // Simulate workflow expects { foo: string }, got { bar: 123 }
+    const client = {
+      executeWorkflow: vi.fn().mockRejectedValue(new Error('Payload does not match input schema')),
+      upsertWorkflow: vi.fn()
+    }
+    const args = { id: 'tool-with-schema', payload: { bar: 123 }, client }
+    const result = await executeTool(args, {})
+    expect(result.success).toBe(false)
+    expect(result.error).toMatch(/input schema/i)
+  })
+
+  it('throws if workflow built without a payload but executed with a payload', async () => {
+    // Simulate workflow expects no payload, but got one
+    const client = {
+      executeWorkflow: vi.fn().mockRejectedValue(new Error('Payload not allowed for this workflow')),
+      upsertWorkflow: vi.fn()
+    }
+    const args = { id: 'tool-no-payload', payload: { foo: 'bar' }, client }
+    const result = await executeTool(args, {})
+    expect(result.success).toBe(false)
+    expect(result.error).toMatch(/not allowed/i)
+  })
+
+  it('handles null payload (should throw if not allowed)', async () => {
+    const client = {
+      executeWorkflow: vi.fn().mockRejectedValue(new Error('Payload cannot be null')),
+      upsertWorkflow: vi.fn()
+    }
+    const args = { id: 'tool-null-payload', payload: null, client }
+    const result = await executeTool(args, {})
+    expect(result.success).toBe(false)
+    expect(result.error).toMatch(/null/i)
+  })
+
+  it('handles empty string payload (should throw if not allowed)', async () => {
+    const client = {
+      executeWorkflow: vi.fn().mockRejectedValue(new Error('Payload must be an object')),
+      upsertWorkflow: vi.fn()
+    }
+    const args = { id: 'tool-empty-string', payload: '', client }
+    const result = await executeTool(args, {})
+    expect(result.success).toBe(false)
+    expect(result.error).toMatch(/object/i)
+  })
+
+  it('handles payload with extra fields (should throw if strict schema)', async () => {
+    const client = {
+      executeWorkflow: vi.fn().mockRejectedValue(new Error('Unexpected field: extra')),
+      upsertWorkflow: vi.fn()
+    }
+    const args = { id: 'tool-strict', payload: { foo: 'bar', extra: 1 }, client }
+    const result = await executeTool(args, {})
+    expect(result.success).toBe(false)
+    expect(result.error).toMatch(/unexpected field/i)
+  })
+
+  it('returns success if everything matches', async () => {
+    const client = {
+      executeWorkflow: vi.fn().mockResolvedValue({ success: true, data: { ok: true }, config: {}, stepResults: [] }),
+      upsertWorkflow: vi.fn()
+    }
+    const args = { id: 'tool-ok', payload: { foo: 'bar' }, client }
+    const result = await executeTool(args, {})
+    expect(result.success).toBe(true)
+    expect(result.data).toEqual({ ok: true })
+    expect(client.executeWorkflow).toHaveBeenCalled()
+  })
+
+  it('calls upsertWorkflow when executeWorkflow is successful', async () => {
+    const client = {
+      executeWorkflow: vi.fn().mockResolvedValue({ success: true, data: { ok: true }, config: { id: 'tool-ok' }, stepResults: [] }),
+      upsertWorkflow: vi.fn()
+    }
+    const args = { id: 'tool-ok', payload: { foo: 'bar' }, client }
+    const result = await executeTool(args, {})
+    expect(result.success).toBe(true)
+    expect(client.upsertWorkflow).toHaveBeenCalledWith('tool-ok', { id: 'tool-ok' })
+  })
+
+
+})
+
