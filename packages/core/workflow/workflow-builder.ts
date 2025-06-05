@@ -164,7 +164,7 @@ Output a JSON object conforming to the WorkflowPlan schema. Define the necessary
         urlHost: system.urlHost,
         urlPath: system.urlPath,
         documentationUrl: system.documentationUrl
-      }, this.metadata);
+      }, system.credentials, this.metadata);
       system.documentation = await documentation.fetch(this.instruction);
     }
   }

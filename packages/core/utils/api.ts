@@ -27,7 +27,7 @@ export function convertBasicAuthToBase64(headerValue: string) {
 
 export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions): Promise<{ data: any }> {
   if (endpoint.urlHost.startsWith("postgres")) {
-    return await callPostgres(endpoint, payload, credentials, options);
+    return { data: await callPostgres(endpoint, payload, credentials, options) };
   }
 
   const allVariables = { ...payload, ...credentials };
