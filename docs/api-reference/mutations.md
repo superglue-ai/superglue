@@ -1,11 +1,12 @@
 ---
-title: 'Mutations'
-description: 'Mutations are used to execute operations and manage configs.'
+title: "Mutations"
+description: "Mutations are used to execute operations and manage configs."
 ---
 
 ## Execute Operations
 
 ### call
+
 Executes an API call with the given configuration. Supports both one-time configurations and saved endpoints.
 
 <Tabs>
@@ -80,6 +81,7 @@ Executes an API call with the given configuration. Supports both one-time config
 </Tabs>
 
 ### extract
+
 Extracts data from a file or API response. Handles decompression and parsing of various file formats.
 
 <Tabs>
@@ -130,6 +132,7 @@ Extracts data from a file or API response. Handles decompression and parsing of 
 </Tabs>
 
 ### transform
+
 Transforms data using JSONata expressions and validates against a schema.
 
 <Tabs>
@@ -184,6 +187,7 @@ Transforms data using JSONata expressions and validates against a schema.
 </Tabs>
 
 ### executeWorkflow
+
 Executes a workflow (multiple APIs or Endpoints) in a single call.
 
 <Tabs>
@@ -227,6 +231,7 @@ Executes a workflow (multiple APIs or Endpoints) in a single call.
 ## Configuration Management
 
 ### upsertApi
+
 Creates or updates an API configuration.
 
 <Tabs>
@@ -271,6 +276,7 @@ Creates or updates an API configuration.
 </Tabs>
 
 ### deleteApi
+
 Deletes an API configuration. Returns `true` if successful.
 
 <Tabs>
@@ -289,6 +295,7 @@ Deletes an API configuration. Returns `true` if successful.
 </Tabs>
 
 ### upsertExtraction
+
 Creates or updates an extraction configuration.
 
 <Tabs>
@@ -318,6 +325,7 @@ Creates or updates an extraction configuration.
 </Tabs>
 
 ### deleteExtraction
+
 Deletes an extraction configuration. Returns `true` if successful.
 
 <Tabs>
@@ -336,6 +344,7 @@ Deletes an extraction configuration. Returns `true` if successful.
 </Tabs>
 
 ### upsertTransformation
+
 Creates or updates a transformation configuration.
 
 <Tabs>
@@ -363,6 +372,7 @@ Creates or updates a transformation configuration.
 </Tabs>
 
 ### deleteTransformation
+
 Deletes a transformation configuration. Returns `true` if successful.
 
 <Tabs>
@@ -381,6 +391,7 @@ Deletes a transformation configuration. Returns `true` if successful.
 </Tabs>
 
 ### upsertWorkflow
+
 Creates or updates a workflow configuration.
 
 <Tabs>
@@ -408,6 +419,7 @@ Creates or updates a workflow configuration.
 </Tabs>
 
 ### deleteWorkflow
+
 Deletes a workflow configuration. Returns `true` if successful.
 
 <Tabs>
@@ -426,5 +438,6 @@ Deletes a workflow configuration. Returns `true` if successful.
 </Tabs>
 
 See also:
+
 - [Types Reference](types.md)
-- [Overview](overview.md) 
+- [Overview](overview.md)

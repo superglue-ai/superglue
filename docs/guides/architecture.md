@@ -66,7 +66,7 @@ The following diagram illustrates the core components and a typical workflow dat
   ```
 </Frame>
 
-## core components
+## Core Components
 
 ### External Systems / Data Sources
 
@@ -76,7 +76,7 @@ Superglue can connect to a wide array of external systems as steps within a work
 - **XML/JSON/CSV Files**: Processes structured data files from sources like local filesystems, S3 buckets, or remote URLs as part of a workflow step.
 - **Legacy System Interfaces**: Interfaces with older systems (SOAP APIs, FTP) as defined in a workflow step.
 
-### superglue integration agent
+### Superglue Integration Agent
 
 This is the core of Superglue, responsible for executing integration workflows.
 
@@ -117,7 +117,7 @@ Superglue relies on persistent storage for its operational data:
 - **Your Application**: The system that ultimately consumes the data processed by Superglue workflows or triggers these workflows.
 - **Workflow Trigger**: Workflows can be initiated via an API call to Superglue or potentially through a scheduled mechanism.
 
-## data flow (workflow example)
+## Data Flow (Workflow Example)
 
 1. A workflow is triggered (e.g., by an API call from 'Your Application' to Superglue).
 2. The **Workflow Engine** in Superglue loads the workflow definition.
@@ -131,20 +131,20 @@ Superglue relies on persistent storage for its operational data:
 5. The final output of the workflow is delivered to the designated target, such as 'Your Application' or another system specified in the workflow's concluding step.
 6. Status, metrics, and logs for the workflow and each step are recorded.
 
-## performance characteristics
+## Performance Characteristics
 
 - Average transformation latency for an individual step with \<100KB data: 10-50ms (when transformation rules are cached).
 - Supports a high number of concurrent workflow executions, limited by underlying resources.
 - Maximum payload size per step: 100MB (configurable).
 
-## security implementation
+## Security Implementation
 
 - All external connections made by Superglue during workflow steps can be encrypted (e.g., TLS 1.3 for API calls).
 - Credentials for accessing external systems within workflow steps are securely managed (e.g., stored encrypted if using Redis).
 - Transformation logic for each step runs in isolated contexts.
 - Rate limiting can be configured per API step.
 
-## monitoring capabilities
+## Monitoring Capabilities
 
 - Prometheus metrics for core operations and workflow execution.
 - Detailed logging with correlation IDs for workflows and individual steps.
@@ -153,7 +153,7 @@ Superglue relies on persistent storage for its operational data:
 
 The implementation details for core capabilities like extraction and transformation can be found in the relevant utility modules within the codebase.
 
-## monitoring and maintenance
+## Monitoring and Maintenance
 
 - Built-in logging and monitoring capabilities for workflows and individual steps.
 - Performance metrics collection.

@@ -1,13 +1,14 @@
 ---
-title: 'Subscriptions'
-description: 'GraphQL subscriptions for real-time updates.'
+title: "Subscriptions"
+description: "GraphQL subscriptions for real-time updates."
 ---
 
-## logs
+## Logs
 
 Stream log messages in real time.
 
 ### Subscription
+
 ```graphql
 subscription {
   logs {
@@ -21,13 +22,15 @@ subscription {
 ```
 
 ### Fields
-- `id`: ID!
-- `message`: String!
+
+- `id`: ID\!
+- `message`: String\!
 - `level`: LogLevel (DEBUG, INFO, WARN, ERROR)
-- `timestamp`: DateTime!
+- `timestamp`: DateTime\!
 - `runId`: ID (optional)
 
 ### Example
+
 ```graphql
 subscription {
   logs {
@@ -41,7 +44,8 @@ subscription {
 ```
 
 ### LogLevel enum
+
 - DEBUG
 - INFO
 - WARN
-- ERROR 
+- ERROR
