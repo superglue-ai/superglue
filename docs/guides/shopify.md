@@ -1,9 +1,10 @@
 ---
-title: 'Shopify'
-description: 'How to extract a product catalog from Shopify'
+title: "Shopify"
+description: "How to extract a product catalog from Shopify"
 ---
 
 When you're building an application that needs Shopify product data, you typically face a few challenges:
+
 - The Shopify API returns a complex data structure that might not match your needs
 - You need to handle pagination, variants, and images
 - You want to transform the data into your own format
@@ -99,7 +100,6 @@ main();
    - Price information (lowest variant price)
    - Variants with their prices
    - Product images
-
 2. **Configuration**: The \`config\` object tells Superglue:
    - Where to get the data (\`urlHost\` and \`urlPath\`)
    - What to do with it (\`instruction\`)
@@ -148,7 +148,7 @@ The transformed data will look like this:
 }
 ```
 
-The response will also include the used configuration, the applied mapping, and some metadata. 
+The response will also include the used configuration, the applied mapping, and some metadata.
 The generated JSONata mapping instruction will include the from_price which is derived from the lowest variant price. The url will be derived from the handle and the shopdomain. The complete JSONata mapping instruction will look something like this:
 
 ```jsonata
@@ -258,4 +258,4 @@ const result = await superglue.call({
 ## Next Steps
 
 - Check the [API Reference](../api-reference/types.md) for detailed type information and all config fields
-- Join our [Discord](https://discord.gg/SKRYYQEp) for support 
+- Join our [Discord](https://discord.gg/SKRYYQEp) for support

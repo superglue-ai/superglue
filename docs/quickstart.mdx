@@ -1,9 +1,9 @@
 ---
-title: "get started"
+title: "Get Started"
 description: "Get set up in 5 minutes."
 ---
 
-## core concepts
+## Core Concepts
 
 superglue simplifies API integrations by understanding how to interact with data sources, transform their data into your target schema, and handle the complexities of extraction, validation, and transformation.
 
@@ -13,7 +13,7 @@ Key components include:
 - **`Workflows (Workflow):`** Workflows allow you to chain multiple API calls and transformations together. A workflow consists of a series of `ExecutionStep`s. Each step typically uses an `ApiConfig` to fetch or send data, and you can map and transform data between steps. This is powerful for orchestrating complex data flows.
 - **`Transformations (JSONata):`** Data transformations and mappings within API Configs and Workflows are often defined using JSONata, a flexible query and transformation language for JSON.
 
-## getting Started
+## Getting Started
 
 1. **Get Access**
    - Grab an API key from [app.superglue.cloud](https://app.superglue.cloud) to use the hosted version.
@@ -24,7 +24,7 @@ Key components include:
    npm install @superglue/client
    ```
 
-## example 1: Executing a Simple Workflow
+## Example 1: Executing a Simple Workflow
 
 Let's create a workflow that:
 
@@ -98,7 +98,7 @@ async function runMyWorkflow() {
 runMyWorkflow();
 ```
 
-## next steps
+## Next Steps
 
 - Check out our guides, e.g. on [Hubspot](/guides/hubspot), to learn common patterns
 - Dive deeper into [API Configuration](/api-reference/overview) (link to be updated if structure changes).
@@ -106,14 +106,14 @@ runMyWorkflow();
 - Check out our [self-hosting guide](/guides/self-hosting) for deploying your own instance.
 - Learn about [real-time log subscriptions via GraphQL](/api-reference/subscriptions) for monitoring.
 
-## requirements
+## Requirements
 
 - Node.js 16\+ for the client SDK.
 - For self-hosting:
   - Docker 20.10.0\+
   - A Gemini or OpenAI API key (or compatible LLM provider).
 
-## support & resources
+## Support & Resources
 
 - [API Reference](/api-reference/overview) (ensure this points to the main API ref page)
 - [GitHub Repository](https://github.com/superglue-ai/superglue)
