@@ -12,6 +12,7 @@ import { Card, CardContent } from "../ui/card";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Textarea } from "../ui/textarea";
+import { X } from 'lucide-react';
 
 type InputType = 'raw' | 'url' | 'file';
 
@@ -569,55 +570,67 @@ export default function TransformPlayground({ id }: { id?: string }) {
         );
     };
     return (
-        <div className="p-6 max-w-none w-full">
-            <h1 className="text-2xl font-bold mb-3 flex-shrink-0">Create a Transformation</h1>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Left Column - Transform Configuration */}
-                <Card className="flex flex-col">
-                    <CardContent className="p-4 overflow-auto flex-grow space-y-4">
-                        {/* Input Section */}
-                        {renderInputSection()}
+        <div className="flex flex-col h-full">
+            <div className="flex items-center justify-between mb-4">
+                <h1 className="text-2xl font-semibold">Create New Transform</h1>
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="shrink-0"
+                    onClick={() => router.push('/configs')}
+                >
+                    <X className="h-4 w-4" />
+                </Button>
+            </div>
+            <div className="p-6 max-w-none w-full">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Left Column - Transform Configuration */}
+                    <Card className="flex flex-col">
+                        <CardContent className="p-4 overflow-auto flex-grow space-y-4">
+                            {/* Input Section */}
+                            {renderInputSection()}
 
-                        {/* Response Schema */}
-                        <div className="flex-1 flex flex-col min-h-0">
-                            <JsonSchemaEditor
-                                isOptional={true}
-                                value={responseSchema}
-                                onChange={setResponseSchema}
-                            />
-                        </div>
-                        {/* Save and Execute Buttons */}
-                        <div className="flex gap-2 -mt-4 mb-4">
-                            <Button
-                                variant="outline"
-                                onClick={saveTransform}
-                                disabled={saving || loading}
-                                className="w-full"
-                            >
-                                {saving ? "Saving..." : "Save Transform"}
-                            </Button>
-                            <Button
-                                onClick={executeTransform}
-                                disabled={loading || saving || isInputEmpty()}
-                                className="w-full"
-                            >
-                                {loading ? "Transforming..." : "Execute Transform"}
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
+                            {/* Response Schema */}
+                            <div className="flex-1 flex flex-col min-h-0">
+                                <JsonSchemaEditor
+                                    isOptional={true}
+                                    value={responseSchema}
+                                    onChange={setResponseSchema}
+                                />
+                            </div>
+                            {/* Save and Execute Buttons */}
+                            <div className="flex gap-2 -mt-4 mb-4">
+                                <Button
+                                    variant="outline"
+                                    onClick={saveTransform}
+                                    disabled={saving || loading}
+                                    className="w-full"
+                                >
+                                    {saving ? "Saving..." : "Save Transform"}
+                                </Button>
+                                <Button
+                                    onClick={executeTransform}
+                                    disabled={loading || saving || isInputEmpty()}
+                                    className="w-full"
+                                >
+                                    {loading ? "Transforming..." : "Execute Transform"}
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
 
-                {/* Right Column - Results */}
-                <WorkflowResultsView
-                    activeTab={activeResultTab}
-                    setActiveTab={setActiveResultTab}
-                    executionResult={result}
-                    finalTransform={transform}
-                    setFinalTransform={setTransform}
-                    finalResult={result?.data}
-                    isExecuting={loading}
-                    executionError={executionError}
-                />
+                    {/* Right Column - Results */}
+                    <WorkflowResultsView
+                        activeTab={activeResultTab}
+                        setActiveTab={setActiveResultTab}
+                        executionResult={result}
+                        finalTransform={transform}
+                        setFinalTransform={setTransform}
+                        finalResult={result?.data}
+                        isExecuting={loading}
+                        executionError={executionError}
+                    />
+                </div>
             </div>
         </div>
     );

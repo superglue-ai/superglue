@@ -402,7 +402,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const handleBack = () => {
     const steps: WorkflowCreateStep[] = ['integrations', 'prompt', 'review', 'success'];
     const currentIndex = steps.indexOf(step);
-    if (step === 'integrations' && systems.length === 0) {
+    if (step === 'integrations') {
       router.push('/configs');
       return;
     }
