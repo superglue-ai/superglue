@@ -3,6 +3,7 @@ import { Button } from '../ui/button'
 import { Copy, Check } from 'lucide-react'
 import { useConfig } from '@/src/app/config-context'
 import { useState } from 'react'
+import { getSDKCode } from '@superglue/shared/templates'
 
 type Workflow = any // Replace with your actual Workflow type
 type SystemInput = any // Replace with your actual SystemInput type
@@ -22,15 +23,13 @@ export function WorkflowCreateSuccess({
   const [sdkCopied, setSdkCopied] = useState(false)
   const [curlCopied, setCurlCopied] = useState(false)
   
-  const sdkCode = `const client = new SuperglueClient({
-  apiKey: "${superglueConfig.superglueApiKey}"
-});
-
-const result = await client.executeWorkflow({
-  id: "${currentWorkflow.id}",
-  payload: ${JSON.stringify(payload, null, 2)},
-  credentials: ${JSON.stringify(credentials, null, 2)}
-});`
+  const sdkCode = getSDKCode({
+    apiKey: superglueConfig.superglueApiKey,
+    endpoint: superglueConfig.superglueEndpoint,
+    workflowId: currentWorkflow.id,
+    payload,
+    credentials,
+  })
 
   const curlCommand = `curl -X POST "${superglueConfig.superglueEndpoint}/graphql" \\
   -H "Content-Type: application/json" \\
@@ -64,7 +63,7 @@ const result = await client.executeWorkflow({
                   size="icon"
                   className="h-8 w-8 flex-none"
                   onClick={() => {
-                    navigator.clipboard.writeText(sdkCode)
+                    navigator.clipboard.writeText(sdkCode.typescript)
                     setSdkCopied(true)
                     setTimeout(() => setSdkCopied(false), 1000)
                   }}
@@ -74,7 +73,7 @@ const result = await client.executeWorkflow({
               </div>
               <div className="bg-secondary rounded-md overflow-hidden">
                 <pre className="font-mono text-sm p-4 overflow-x-auto">
-                  <code>{sdkCode}</code>
+                  <code>{sdkCode.typescript}</code>
                 </pre>
               </div>
             </div>
