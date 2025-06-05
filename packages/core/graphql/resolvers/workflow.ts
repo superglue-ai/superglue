@@ -40,7 +40,7 @@ export const executeWorkflowResolver = async (
   let metadata: Metadata = { orgId: context.orgId, runId };
   let workflow: Workflow | undefined;
   try {
-    const workflowFromStore = await context.datastore.getWorkflow(args.input.id || args.input.workflow.id, context.orgId);
+    const workflowFromStore = await context.datastore.getWorkflow(args.input.id || args.input.workflow?.id, context.orgId);
     workflow = { ...workflowFromStore, ...args.input.workflow };
     if (!workflow) {
       throw new Error("Workflow not found");
