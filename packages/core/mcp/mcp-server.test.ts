@@ -52,16 +52,6 @@ describe('superglue_build_new_tool', () => {
     }), {})).rejects.toThrow(/credentials object is required/)
   })
 
-  it('returns success and calls client method on valid input', async () => {
-    const client = {
-      buildWorkflow: vi.fn().mockResolvedValue({ id: 'tool-1', foo: 'bar' }),
-    }
-    const args = getValidArgs({ client })
-    const result = await buildNewTool(args, {})
-    expect(result.success).toBe(true)
-    expect(client.buildWorkflow).toHaveBeenCalled()
-  })
-
   it('returns failure if buildWorkflow throws', async () => {
     const client = {
       buildWorkflow: vi.fn().mockRejectedValue(new Error('fail build')),
@@ -70,6 +60,16 @@ describe('superglue_build_new_tool', () => {
     const result = await buildNewTool(args, {})
     expect(result.success).toBe(false)
     expect(result.error).toMatch(/fail build/)
+  })
+
+  it('returns success and calls client method on valid input', async () => {
+    const client = {
+      buildWorkflow: vi.fn().mockResolvedValue({ id: 'tool-1', foo: 'bar' }),
+    }
+    const args = getValidArgs({ client })
+    const result = await buildNewTool(args, {})
+    expect(result.success).toBe(true)
+    expect(client.buildWorkflow).toHaveBeenCalled()
   })
 })
 
@@ -157,7 +157,7 @@ describe('superglue_get_integration_code', () => {
     expect(result.success).toBe(true)
     expect(result.toolId).toBe('tool-1')
     expect(result.language).toBe('typescript')
-    expect(result.code).toMatch(/SuperglueClient/)
+    expect(result.code).toMatch(/const client = new SuperglueClient/)
   })
 
   it('fails if toolId does not exist', async () => {
@@ -220,14 +220,14 @@ describe('superglue_get_integration_code', () => {
     expect(result.code).toMatch(/nested/)
   })
 
-  it('handles missing/invalid language', async () => {
+  it('handles invalid language', async () => {
     const client = {
       getWorkflow: vi.fn().mockResolvedValue({ id: 'tool-1', inputSchema: { properties: {} } })
     }
-    const args = { client, toolId: 'tool-1', language: 'some-language' }
+    const args = { client, toolId: 'tool-1', language: 'invalid-language' }
     const result = await getIntegrationCode(args, {})
     expect(result.success).toBe(false)
-    expect(result.error).toMatch(/some-language/i)
+    expect(result.error).toMatch(/invalid-language/i)
   })
 })
 
