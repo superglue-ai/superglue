@@ -51,8 +51,11 @@ describe('PostgreSQL Utilities', () => {
 
       expect(result).toEqual(mockRows);
       expect(Pool).toHaveBeenCalledWith({
-        connectionString: 'postgres://testuser:testpass@localhost:5432/testdb/',
-        statement_timeout: 30000
+        connectionString: 'postgres://testuser:testpass@localhost:5432/testdb',
+        statement_timeout: 30000,
+        ssl: {
+          rejectUnauthorized: false,
+        }
       });
       expect(mockQuery).toHaveBeenCalledWith('SELECT * FROM users');
       expect(mockEnd).toHaveBeenCalled();
@@ -79,7 +82,10 @@ describe('PostgreSQL Utilities', () => {
 
       expect(Pool).toHaveBeenCalledWith({
         connectionString: expect.any(String),
-        statement_timeout: 5000
+        statement_timeout: 5000,
+        ssl: {
+          rejectUnauthorized: false,
+        }
       });
     });
 
