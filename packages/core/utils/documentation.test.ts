@@ -75,7 +75,7 @@ describe('Documentation Class', () => {
   describe('getDocumentation', () => {
     it('should return raw content for non-HTTP URL', async () => {
       const rawContent = "This is raw documentation content.";
-      const doc = new Documentation({ documentationUrl: rawContent, urlHost: 'https://api.example.com' }, metadata);
+      const doc = new Documentation({ documentationUrl: rawContent, urlHost: 'https://api.example.com' }, {}, metadata);
       const result = await doc.fetch();
       expect(result).toBe(rawContent);
       // Verify no network calls were made
@@ -86,7 +86,7 @@ describe('Documentation Class', () => {
 
     it('should return empty string for empty documentation URL if treated as non-http', async () => {
       // Assuming empty string is handled like raw content
-      const doc = new Documentation({ documentationUrl: "", urlHost: 'https://api.example.com' }, metadata);
+      const doc = new Documentation({ documentationUrl: "", urlHost: 'https://api.example.com' }, {}, metadata);
       const result = await doc.fetch();
       expect(result).toBe('');
     });
@@ -97,7 +97,7 @@ describe('Documentation Class', () => {
       `;
       mockPage.content.mockResolvedValueOnce(htmlDoc);
       const docUrl = 'https://api.example.com/docs';
-      const doc = new Documentation({ documentationUrl: docUrl, urlHost: 'https://api.example.com' }, metadata);
+      const doc = new Documentation({ documentationUrl: docUrl, urlHost: 'https://api.example.com' }, {}, metadata);
       const result = await doc.fetch();
 
       expect(playwright.chromium.launch).toHaveBeenCalledTimes(1);
@@ -117,7 +117,7 @@ describe('Documentation Class', () => {
     it('should return raw page content if not HTML, GraphQL, or OpenAPI', async () => {
       const plainDoc = 'Plain text documentation content.';
       mockPage.content.mockResolvedValueOnce(plainDoc);
-      const doc = new Documentation({ documentationUrl: 'https://api.example.com/raw', urlHost: 'https://api.example.com' }, metadata);
+      const doc = new Documentation({ documentationUrl: 'https://api.example.com/raw', urlHost: 'https://api.example.com' }, {}, metadata);
       const result = await doc.fetch();
 
       expect(playwright.chromium.launch).toHaveBeenCalledTimes(1);
@@ -139,7 +139,7 @@ describe('Documentation Class', () => {
         urlPath: '/graphql',
         headers,
         queryParams: params
-      }, metadata);
+      }, {}, metadata);
       const result = await doc.fetch();
 
       expect(mockedAxios.post).toHaveBeenCalledWith(
@@ -158,7 +158,7 @@ describe('Documentation Class', () => {
       mockPage.content.mockResolvedValueOnce(htmlDoc); // Playwright fetch should succeed
 
       const docUrl = 'https://api.example.com/graphql'; // Looks like GraphQL
-      const doc = new Documentation({ documentationUrl: docUrl, urlHost: 'https://api.example.com' }, metadata);
+      const doc = new Documentation({ documentationUrl: docUrl, urlHost: 'https://api.example.com' }, {}, metadata);
       const result = await doc.fetch();
 
       // Check GraphQL was attempted
@@ -176,7 +176,7 @@ describe('Documentation Class', () => {
       mockPage.content.mockResolvedValueOnce(htmlDoc); // Playwright fetch should succeed
 
       const docUrl = 'https://api.example.com/graphql'; // Looks like GraphQL
-      const doc = new Documentation({ documentationUrl: docUrl, urlHost: 'https://api.example.com' }, metadata);
+      const doc = new Documentation({ documentationUrl: docUrl, urlHost: 'https://api.example.com' }, {}, metadata);
       const result = await doc.fetch();
 
       // Check GraphQL was attempted
@@ -197,7 +197,7 @@ describe('Documentation Class', () => {
       mockPage.content.mockResolvedValueOnce(swaggerHtml); // Playwright returns HTML
       mockedAxios.get.mockResolvedValueOnce({ data: openApiJson }); // Axios fetches OpenAPI spec
 
-      const doc = new Documentation({ documentationUrl: baseUrl, urlHost: 'https://api.example.com' }, metadata);
+      const doc = new Documentation({ documentationUrl: baseUrl, urlHost: 'https://api.example.com' }, {}, metadata);
       const result = await doc.fetch();
 
       // Verify Playwright fetch
@@ -217,7 +217,7 @@ describe('Documentation Class', () => {
       mockPage.content.mockResolvedValueOnce(swaggerHtml);
       mockedAxios.get.mockResolvedValueOnce({ data: openApiYaml });
 
-      const doc = new Documentation({ documentationUrl: docUrl, urlHost: 'https://api.example.com' }, metadata);
+      const doc = new Documentation({ documentationUrl: docUrl, urlHost: 'https://api.example.com' }, {}, metadata);
       const result = await doc.fetch();
 
       expect(playwright.chromium.launch).toHaveBeenCalledTimes(1);
@@ -230,7 +230,7 @@ describe('Documentation Class', () => {
       const openApiJsonString = JSON.stringify({ swagger: "2.0", info: { title: "Direct JSON" } });
       mockPage.content.mockResolvedValueOnce(openApiJsonString); // Playwright returns JSON string
       const docUrl = 'https://api.example.com/openapi.json';
-      const doc = new Documentation({ documentationUrl: docUrl, urlHost: 'https://api.example.com' }, metadata);
+      const doc = new Documentation({ documentationUrl: docUrl, urlHost: 'https://api.example.com' }, {}, metadata);
       const result = await doc.fetch();
 
       expect(playwright.chromium.launch).toHaveBeenCalledTimes(1);
@@ -244,7 +244,7 @@ describe('Documentation Class', () => {
       const openApiYaml = `openapi: 3.1.0\ninfo:\n  title: Direct YAML`;
       mockPage.content.mockResolvedValueOnce(openApiYaml); // Playwright returns YAML string
       const docUrl = 'https://api.example.com/openapi.yaml';
-      const doc = new Documentation({ documentationUrl: docUrl, urlHost: 'https://api.example.com' }, metadata);
+      const doc = new Documentation({ documentationUrl: docUrl, urlHost: 'https://api.example.com' }, {}, metadata);
       const result = await doc.fetch();
 
       expect(playwright.chromium.launch).toHaveBeenCalledTimes(1);
@@ -259,7 +259,7 @@ describe('Documentation Class', () => {
       mockedAxios.get.mockRejectedValueOnce(new Error('404 Not Found')); // Axios fails for OpenAPI
       const headers = { 'Auth': 'key' };
       const docUrl = 'https://api.example.com/docs';
-      const doc = new Documentation({ documentationUrl: docUrl, urlHost: 'https://api.example.com', headers }, metadata);
+      const doc = new Documentation({ documentationUrl: docUrl, urlHost: 'https://api.example.com', headers }, {}, metadata);
       const result = await doc.fetch();
 
       expect(playwright.chromium.launch).toHaveBeenCalledTimes(1);
@@ -271,7 +271,7 @@ describe('Documentation Class', () => {
 
     it('should handle Playwright fetch errors gracefully', async () => {
       vi.mocked(playwright.chromium.launch).mockRejectedValueOnce(new Error('Browser launch failed'));
-      const doc = new Documentation({ documentationUrl: 'https://api.example.com/docs', urlHost: 'https://api.example.com' }, metadata);
+      const doc = new Documentation({ documentationUrl: 'https://api.example.com/docs', urlHost: 'https://api.example.com' }, {}, metadata);
       const result = await doc.fetch();
 
       expect(result).toBe(''); // Should return empty string on complete failure
@@ -280,7 +280,7 @@ describe('Documentation Class', () => {
 
     it('should cache the result and return processed result on subsequent calls', async () => {
       const rawContent = "Raw content";
-      const doc = new Documentation({ documentationUrl: rawContent, urlHost: 'https://api.example.com' }, metadata);
+      const doc = new Documentation({ documentationUrl: rawContent, urlHost: 'https://api.example.com' }, {}, metadata);
 
       const result1 = await doc.fetch();
       expect(result1).toBe(rawContent);
@@ -293,7 +293,7 @@ describe('Documentation Class', () => {
       // Test with a strategy that involves mocks
       const htmlDoc = `<html><body>Data</body></html>`;
       mockPage.content.mockResolvedValueOnce(htmlDoc);
-      const httpDoc = new Documentation({ documentationUrl: 'http://example.com', urlHost: 'https://api.example.com' }, metadata);
+      const httpDoc = new Documentation({ documentationUrl: 'http://example.com', urlHost: 'https://api.example.com' }, {}, metadata);
 
       const resHttp1 = await httpDoc.fetch();
       expect(resHttp1).toBe("Data");
@@ -312,7 +312,7 @@ describe('Documentation Class', () => {
 
     it('should truncate very long raw content if no urlPath is provided', async () => {
       const longRawContent = createLongString('A', 1.5);
-      const doc = new Documentation({ documentationUrl: longRawContent, urlHost: 'https://api.example.com' }, metadata); // No urlPath
+      const doc = new Documentation({ documentationUrl: longRawContent, urlHost: 'https://api.example.com' }, {}, metadata); // No urlPath
       const result = await doc.fetch();
       expect(result.length).toBe(DOCUMENTATION_MAX_LENGTH);
       expect(result).toBe(longRawContent.slice(0, DOCUMENTATION_MAX_LENGTH));
@@ -321,7 +321,7 @@ describe('Documentation Class', () => {
     it('should truncate very long fetched content if no urlPath is provided', async () => {
       const longHtml = createLongString('B', 2);
       mockPage.content.mockResolvedValueOnce(longHtml); // Simulate fetch returning long content
-      const doc = new Documentation({ documentationUrl: 'http://example.com', urlHost: 'https://api.example.com' }, metadata); // No urlPath
+      const doc = new Documentation({ documentationUrl: 'http://example.com', urlHost: 'https://api.example.com' }, {}, metadata); // No urlPath
       const result = await doc.fetch();
       expect(result.length).toBe(DOCUMENTATION_MAX_LENGTH);
       expect(result).toBe(longHtml.slice(0, DOCUMENTATION_MAX_LENGTH));
@@ -337,7 +337,7 @@ describe('Documentation Class', () => {
       const urlPath = `/${searchTerm}/details`;
 
       // Test with RawContentStrategy
-      const docRaw = new Documentation({ documentationUrl: longContent, urlHost: 'https://api.example.com', urlPath }, metadata);
+      const docRaw = new Documentation({ documentationUrl: longContent, urlHost: 'https://api.example.com', urlPath }, {}, metadata);
       const resultRaw = await docRaw.fetch();
 
       expect(resultRaw.length).toBeLessThanOrEqual(DOCUMENTATION_MAX_LENGTH);
@@ -355,7 +355,7 @@ describe('Documentation Class', () => {
       const longContent = `${prefix} some data about ${searchTerm} ${suffix} ${authSection}`;
       const urlPath = `/${searchTerm}`;
 
-      const doc = new Documentation({ documentationUrl: longContent, urlHost: 'https://api.example.com', urlPath }, metadata);
+      const doc = new Documentation({ documentationUrl: longContent, urlHost: 'https://api.example.com', urlPath }, {}, metadata);
       const result = await doc.fetch(urlPath);
 
       expect(result.length).toBeLessThanOrEqual(DOCUMENTATION_MAX_LENGTH);
@@ -368,7 +368,7 @@ describe('Documentation Class', () => {
       const longContent = createLongString('Z', 1.5); // Content doesn't contain searchTerm
       const urlPath = `/${searchTerm}`;
 
-      const doc = new Documentation({ documentationUrl: longContent, urlHost: 'https://api.example.com', urlPath }, metadata);
+      const doc = new Documentation({ documentationUrl: longContent, urlHost: 'https://api.example.com', urlPath }, {}, metadata);
       const result = await doc.fetch();
 
       // Should just truncate from the beginning as term isn't found
