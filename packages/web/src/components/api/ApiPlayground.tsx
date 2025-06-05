@@ -1,19 +1,18 @@
-'use client' 
+'use client'
 
-import React, { useEffect, useState, useCallback } from "react";
-import { useParams } from "next/navigation";
-import { ApiConfig, CacheMode } from "@superglue/client";
-import { composeUrl } from "@/src/lib/utils";
-import { Button } from "@/src/components/ui/button";
-import { Card, CardHeader, CardTitle, CardContent } from "@/src/components/ui/card";
-import { Badge } from "@/src/components/ui/badge";
-import { Play, Clock, AlertCircle, Copy } from "lucide-react";
-import { SuperglueClient } from "@superglue/client";
-import { useToast } from "@/src/hooks/use-toast";
 import { useConfig } from "@/src/app/config-context";
+import { Badge } from "@/src/components/ui/badge";
+import { Button } from "@/src/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/src/components/ui/card";
+import { useToast } from "@/src/hooks/use-toast";
+import { composeUrl } from "@/src/lib/utils";
+import { ApiConfig, CacheMode, SuperglueClient } from "@superglue/client";
+import { AlertCircle, Clock, Copy, Play, Plus, X } from "lucide-react";
+import { useParams } from "next/navigation";
+import React, { useCallback, useEffect, useState } from "react";
 
 // Add this new type and state
-type Credential = { key: string; value: string };
+type Credential = { id: string; key: string; value: string; isManual?: boolean };
 
 // Define the props for the component including the new callback
 type ApiPlaygroundProps = {
@@ -49,31 +48,55 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
   // Find template variables in a string
   const findTemplateVars = (str: string): string[] => {
     if (!str) return [];
-    // Only match {varName} patterns
-    const matches = str.match(/\{(\w+)\}/g) || [];
-    return matches.map(match => match.slice(1, -1));
+    // Match both {varName} and <<varName>> patterns
+    const matches = str.match(/\{(\w+)\}|<<(\w+)>>/g) || [];
+    return matches.map(match => {
+      if (match.startsWith('{')) {
+        return match.slice(1, -1);
+      } else {
+        return match.slice(2, -2);
+      }
+    });
   };
 
   // Save user inputs to sessionStorage instead of localStorage
   const saveUserInputs = useCallback(() => {
     if (!id) return;
     const credentialsObj = Object.fromEntries(credentials.map(c => [c.key, c.value]));
+    const manualVars = credentials.filter(c => c.isManual).map(c => c.key);
     sessionStorage.setItem(`sg-playground-credentials-${id}`, JSON.stringify(credentialsObj));
+    sessionStorage.setItem(`sg-playground-manual-vars-${id}`, JSON.stringify(manualVars));
   }, [id, credentials]);
 
   // Load user inputs from sessionStorage
   const loadUserInputs = useCallback(() => {
     if (!id) return;
     const savedCredentials = sessionStorage.getItem(`sg-playground-credentials-${id}`);
+    const savedManualVars = sessionStorage.getItem(`sg-playground-manual-vars-${id}`);
+
     if (savedCredentials) {
       try {
         const parsed = JSON.parse(savedCredentials);
+        const manualVars = savedManualVars ? JSON.parse(savedManualVars) : [];
+
         setCredentials(prev => {
-          // Merge saved values with existing credential keys
-          return prev.map(cred => ({
-            key: cred.key,
+          const existing = prev.map(cred => ({
+            ...cred,
             value: parsed[cred.key] || cred.value
           }));
+
+          // Add manual variables that were saved but not in auto-detected ones
+          const existingKeys = new Set(existing.map(c => c.key));
+          const additionalManual = manualVars
+            .filter((key: string) => !existingKeys.has(key) && parsed[key] !== undefined)
+            .map((key: string) => ({
+              id: crypto.randomUUID(),
+              key,
+              value: parsed[key],
+              isManual: true
+            }));
+
+          return [...existing, ...additionalManual];
         });
       } catch (e) {
         console.error('Failed to parse saved credentials:', e);
@@ -81,14 +104,7 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
     }
   }, [id]);
 
-  // Call loadUserInputs when credentials are initialized
-  useEffect(() => {
-    if (credentials.length > 0) {
-      loadUserInputs();
-    }
-  }, [credentials.length, loadUserInputs]);
-
-  // Save on visibility change and beforeunload
+  // Keep only this useEffect that loads config and calls loadUserInputs once
   useEffect(() => {
     const loadConfig = async () => {
       try {
@@ -98,7 +114,7 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
         })
         const data = await superglueClient.getApi(id);
         setConfig(data);
-        
+
         const varMatches = [
           data.urlPath,
           ...Object.values(data.queryParams || {}),
@@ -106,10 +122,15 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
           data.body
         ].flatMap(value => findTemplateVars(String(value)));
         const allVars = [...new Set(varMatches)].filter(v => !['limit', 'offset', 'page'].includes(v));
-        
-        // Set credentials without merging
-        setCredentials(allVars.map(key => ({ key, value: '' })));
-        
+
+        // Set credentials with unique IDs
+        setCredentials(allVars.map(key => ({
+          id: crypto.randomUUID(),
+          key,
+          value: '',
+          isManual: false
+        })));
+
         // Load saved values after setting initial credentials
         loadUserInputs();
       } catch (err) {
@@ -118,28 +139,28 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
       }
     };
     loadConfig();
-  }, [id]);
+  }, [id, loadUserInputs]);
 
   const handleRunApi = async (e: React.MouseEvent) => {
     e.preventDefault();  // Prevent any form submission
     if (!config) return;
-    
+
     // Check for empty credentials and mark them as invalid
     const emptyCredentials = credentials
       .filter(c => c.value === "")
       .map(c => c.key);
-      
+
     if (emptyCredentials.length > 0) {
       setInvalidFields(new Set(emptyCredentials));
       return;
     }
-    
+
     // Clear invalid fields if all are filled
     setInvalidFields(new Set());
-        
+
     // Save inputs before running
     saveUserInputs();
-    
+
     setLoading(true);
     setError(null);
     setResponse(null);
@@ -164,7 +185,7 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
           return [c.key, value];
         })
       );
-      
+
       const superglue = new SuperglueClient({
         apiKey: superglueConfig.superglueApiKey,
         endpoint: superglueConfig.superglueEndpoint
@@ -200,6 +221,33 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
     }
   };
 
+  const handleAddVariable = () => {
+    const newKey = `var${credentials.filter(c => c.isManual).length + 1}`;
+    setCredentials(prev => [...prev, {
+      id: crypto.randomUUID(),
+      key: newKey,
+      value: '',
+      isManual: true
+    }]);
+  };
+
+  const handleRemoveVariable = (id: string) => {
+    setCredentials(prev => prev.filter(cred => cred.id !== id));
+    saveUserInputs();
+  };
+
+  const handleKeyChange = (id: string, newKey: string) => {
+    setCredentials(prev => {
+      const updated = [...prev];
+      const index = updated.findIndex(cred => cred.id === id);
+      if (index !== -1) {
+        updated[index] = { ...updated[index], key: newKey };
+      }
+      return updated;
+    });
+    saveUserInputs();
+  };
+
   if (!config) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -219,29 +267,29 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
               <CardTitle className="flex items-center justify-between">
                 <span>Request Configuration</span>
                 <div className="flex gap-2 items-center">
-                <Button 
-                  onClick={handleRunApi}
-                  disabled={loading}
-                  size="lg"
-                  className="gap-2"
-                >
-                  <Play className="h-4 w-4" />
-                  {loading ? 'Running...' : 'Run API'}
-                </Button>
-              </div>
+                  <Button
+                    onClick={handleRunApi}
+                    disabled={loading}
+                    size="lg"
+                    className="gap-2"
+                  >
+                    <Play className="h-4 w-4" />
+                    {loading ? 'Running...' : 'Run API'}
+                  </Button>
+                </div>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
                 <label className="text-sm font-medium">URL</label>
                 <div className="mt-1 p-2 bg-secondary rounded-md flex items-center gap-2">
-                <Badge variant={loading ? "secondary" : "default"} className="h-6 justify-center">
-                  {config.method}
+                  <Badge variant={loading ? "secondary" : "default"} className="h-6 justify-center">
+                    {config.method}
                   </Badge>
                   {composeUrl(config.urlHost, config.urlPath)}
                 </div>
               </div>
-              
+
               <div>
                 <label className="text-sm font-medium">Instruction</label>
                 <div className="mt-1 p-2 bg-secondary rounded-md">
@@ -249,24 +297,41 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
                 </div>
               </div>
               <div>
-                <label className="text-sm font-medium">Variables</label>
-                <div className="mt-2 space-y-2">
-                  {credentials.map((cred, index) => (
-                    <div key={cred.key}>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-sm font-medium">Variables</label>
+                  <Button
+                    onClick={handleAddVariable}
+                    size="sm"
+                    variant="outline"
+                    className="gap-1"
+                  >
+                    <Plus className="h-3 w-3" />
+                    Add Variable
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {credentials.map((cred) => (
+                    <div key={cred.id}>
                       <div className="flex gap-2">
                         <input
                           type="text"
                           value={cred.key}
-                          disabled
-                          className="p-2 w-1/3 bg-secondary rounded-md"
+                          onChange={(e) => handleKeyChange(cred.id, e.target.value)}
+                          disabled={!cred.isManual}
+                          className={`p-2 w-1/3 rounded-md ${cred.isManual ? 'bg-background border' : 'bg-secondary'
+                            }`}
+                          placeholder="Variable name"
                         />
                         <input
                           type="text"
                           value={cred.value}
                           onChange={(e) => {
                             const newCreds = [...credentials];
-                            newCreds[index].value = e.target.value;
-                            setCredentials(newCreds);
+                            const index = newCreds.findIndex(c => c.id === cred.id);
+                            if (index !== -1) {
+                              newCreds[index].value = e.target.value;
+                              setCredentials(newCreds);
+                            }
                             if (invalidFields.has(cred.key)) {
                               const newInvalidFields = new Set(invalidFields);
                               newInvalidFields.delete(cred.key);
@@ -276,12 +341,21 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
                           }}
                           required
                           placeholder="Enter value"
-                          className={`p-2 w-2/3 bg-secondary rounded-md ${
-                            invalidFields.has(cred.key) 
-                              ? 'border border-red-500 focus:border-red-500 shake' 
-                              : ''
-                          }`}
+                          className={`p-2 flex-1 bg-secondary rounded-md ${invalidFields.has(cred.key)
+                            ? 'border border-red-500 focus:border-red-500 shake'
+                            : ''
+                            }`}
                         />
+                        {cred.isManual && (
+                          <Button
+                            onClick={() => handleRemoveVariable(cred.id)}
+                            size="sm"
+                            variant="ghost"
+                            className="px-2"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                       {invalidFields.has(cred.key) && (
                         <p className="text-red-500 text-xs mt-1">This field is required</p>
@@ -318,7 +392,7 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
                     {JSON.stringify(response, null, 2)}
                   </pre>
                   <Button
-                    variant="ghost" 
+                    variant="ghost"
                     size="sm"
                     className="absolute top-2 right-2"
                     onClick={(e) => {
