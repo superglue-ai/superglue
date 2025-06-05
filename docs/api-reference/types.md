@@ -1,6 +1,6 @@
-# Types Reference
+## Types Reference
 
-## Base Types
+### Base Types
 
 ```graphql
 interface BaseConfig {
@@ -13,7 +13,8 @@ interface BaseConfig {
 union ConfigType = ApiConfig | ExtractConfig | TransformConfig
 ```
 
-## ApiConfig
+### ApiConfig
+
 Configuration for API endpoints. Inherits from [BaseConfig](overview.md#base-types).
 
 ```graphql
@@ -39,7 +40,8 @@ type ApiConfig implements BaseConfig {
 }
 ```
 
-## ExtractConfig
+### ExtractConfig
+
 Configuration for data extraction. Inherits from [BaseConfig](overview.md#base-types).
 
 ```graphql
@@ -64,7 +66,8 @@ type ExtractConfig implements BaseConfig {
 }
 ```
 
-## TransformConfig
+### TransformConfig
+
 Configuration for data transformation. Inherits from [BaseConfig](overview.md#base-types).
 
 ```graphql
@@ -82,7 +85,8 @@ type TransformConfig implements BaseConfig {
 }
 ```
 
-## Workflow
+### Workflow
+
 ```graphql
 type Workflow implements BaseConfig {
   id: ID!
@@ -95,7 +99,8 @@ type Workflow implements BaseConfig {
 }
 ```
 
-## ExecutionStep
+### ExecutionStep
+
 ```graphql
 type ExecutionStep {
   id: String!
@@ -108,7 +113,8 @@ type ExecutionStep {
 }
 ```
 
-## WorkflowResult
+### WorkflowResult
+
 ```graphql
 type WorkflowResult {
   success: Boolean!
@@ -121,7 +127,8 @@ type WorkflowResult {
 }
 ```
 
-## WorkflowStepResult
+### WorkflowStepResult
+
 ```graphql
 type WorkflowStepResult {
   stepId: String!
@@ -132,7 +139,8 @@ type WorkflowStepResult {
 }
 ```
 
-## SystemInput
+### SystemInput
+
 ```graphql
 input SystemInput {
   id: String!
@@ -144,7 +152,8 @@ input SystemInput {
 }
 ```
 
-## Pagination
+### Pagination
+
 ```graphql
 type Pagination {
   type: PaginationType!
@@ -156,7 +165,9 @@ type Pagination {
 ## Enums
 
 ### HttpMethod
+
 Available HTTP methods:
+
 - `GET`
 - `POST`
 - `PUT`
@@ -166,21 +177,27 @@ Available HTTP methods:
 - `OPTIONS`
 
 ### AuthType
+
 Authentication methods:
+
 - `NONE` - No authentication
 - `HEADER` - Authentication via headers
 - `QUERY_PARAM` - Authentication via query parameters
 - `OAUTH2` - OAuth 2.0 authentication
 
 ### FileType
+
 Supported file formats:
+
 - `AUTO` - Automatic detection
 - `JSON` - JSON files
 - `CSV` - CSV files
 - `XML` - XML files
 
 ### DecompressionMethod
+
 Available decompression methods:
+
 - `NONE` - No decompression
 - `GZIP` - gzip compression
 - `DEFLATE` - deflate compression
@@ -188,21 +205,27 @@ Available decompression methods:
 - `AUTO` - Automatic detection
 
 ### CacheMode
+
 Cache behavior options:
+
 - `ENABLED` - Full caching
 - `DISABLED` - No caching
 - `READONLY` - Read-only cache. This is the default mode.
 - `WRITEONLY` - Write-only cache
 
 ### PaginationType
+
 Pagination type options:
+
 - `OFFSET_BASED` - Offset-based pagination
 - `PAGE_BASED` - Page-based pagination
 - `CURSOR_BASED` - Cursor-based pagination
 - `DISABLED` - Disabled pagination
 
 ### LogLevel
+
 Log level options:
+
 - `DEBUG` - Debug level
 - `INFO` - Info level
 - `WARN` - Warn level
@@ -210,7 +233,8 @@ Log level options:
 
 ## Subscriptions
 
-### logs
+### Logs
+
 Stream log messages in real time.
 
 ```graphql
@@ -232,6 +256,7 @@ subscription {
 - `runId`: ID of the related run (optional)
 
 See also:
+
 - [Overview](overview.md) for common parameters
 - [Mutations](mutations.md) for operations using these types
-- [Queries](queries.md) for retrieving configurations 
+- [Queries](queries.md) for retrieving configurations

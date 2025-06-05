@@ -1,5 +1,5 @@
 ---
-title: 'Superglue Workflow Synchronization with GitHub Actions'
+title: "Superglue Workflow Synchronization with GitHub Actions"
 ---
 
 This document describes how to set up and use the GitHub Actions workflow to automatically synchronize Superglue workflow definitions stored in this repository with the Superglue service.
@@ -8,44 +8,43 @@ The synchronization treats the workflow definitions in the `superglue/workflows/
 
 ## Setup
 
-1.  **Store Workflow Definitions:**
-    *   Create a directory named `superglue/workflows/` in the root of your repository.
-    *   Place your Superglue workflow definitions inside this directory as individual JSON files.
-    *   **Important:** The name of each file (without the `.json` extension) will be used as the `id` for the workflow when calling `upsertWorkflow`. For example, a file named `superglue/workflows/my-cool-workflow.json` will upsert a workflow with the ID `my-cool-workflow`. The `id` field *within* the JSON file itself is not used by the `upsertWorkflow` mutation's logic but should ideally match the filename for clarity.
-
-2.  **Add Superglue API Key as a Secret:**
-    *   Go to your GitHub repository's **Settings** > **Secrets and variables** > **Actions**.
-    *   Click **New repository secret**.
-    *   Create a secret named `SUPERGLUE_API_KEY`.
-    *   Paste your Superglue API key into the **Value** field.
-    *   Click **Add secret**.
-    *   (Optional) If you use a custom Superglue endpoint (not `https://graphql.superglue.cloud`), create another secret named `SUPERGLUE_API_ENDPOINT` with your custom endpoint URL.
-
-3.  **Ensure Script and Workflow Files Exist:**
-    *   Make sure the `scripts/upsert-superglue-workflows.js` file exists and contains the synchronization logic.
-    *   Make sure the `.github/workflows/superglue-sync.yml` file exists and defines the GitHub Actions workflow.
+1. **Store Workflow Definitions:**
+   - Create a directory named `superglue/workflows/` in the root of your repository.
+   - Place your Superglue workflow definitions inside this directory as individual JSON files.
+   - **Important:** The name of each file (without the `.json` extension) will be used as the `id` for the workflow when calling `upsertWorkflow`. For example, a file named `superglue/workflows/my-cool-workflow.json` will upsert a workflow with the ID `my-cool-workflow`. The `id` field _within_ the JSON file itself is not used by the `upsertWorkflow` mutation's logic but should ideally match the filename for clarity.
+2. **Add Superglue API Key as a Secret:**
+   - Go to your GitHub repository's **Settings** \> **Secrets and variables** \> **Actions**.
+   - Click **New repository secret**.
+   - Create a secret named `SUPERGLUE_API_KEY`.
+   - Paste your Superglue API key into the **Value** field.
+   - Click **Add secret**.
+   - (Optional) If you use a custom Superglue endpoint (not `https://graphql.superglue.cloud`), create another secret named `SUPERGLUE_API_ENDPOINT` with your custom endpoint URL.
+3. **Ensure Script and Workflow Files Exist:**
+   - Make sure the `scripts/upsert-superglue-workflows.js` file exists and contains the synchronization logic.
+   - Make sure the `.github/workflows/superglue-sync.yml` file exists and defines the GitHub Actions workflow.
 
 ## How it Works
 
-*   **Trigger:** The workflow runs automatically:
-    *   Every day at 03:00 UTC.
-    *   Whenever changes are pushed to the `main` branch specifically within the `superglue/workflows/` directory.
-*   **Steps:**
-    1.  Checks out the repository code.
-    2.  Sets up Node.js (version 20).
-    3.  Installs the `@superglue/client` package.
-    4.  Executes the `scripts/upsert-superglue-workflows.js` script.
-*   **Script Logic (`upsert-superglue-workflows.js`):**
-    1.  Reads the `SUPERGLUE_API_KEY` (and optionally `SUPERGLUE_API_ENDPOINT`) from environment variables (provided by GitHub Actions secrets).
-    2.  Initializes the `SuperglueClient`.
-    3.  Reads all `.json` files from the `superglue/workflows/` directory.
-    4.  For each file:
-        *   Parses the JSON content.
-        *   Extracts the workflow ID from the filename.
-        *   Calls `client.upsertWorkflow(workflowId, workflowData)` to create or update the workflow in Superglue.
-    5.  Logs progress and any errors to the GitHub Actions console.
+- **Trigger:** The workflow runs automatically:
+  - Every day at 03:00 UTC.
+  - Whenever changes are pushed to the `main` branch specifically within the `superglue/workflows/` directory.
+- **Steps:**
+  1. Checks out the repository code.
+  2. Sets up Node.js (version 20).
+  3. Installs the `@superglue/client` package.
+  4. Executes the `scripts/upsert-superglue-workflows.js` script.
+- **`Script Logic (upsert-superglue-workflows.js):`**
+  1. Reads the `SUPERGLUE_API_KEY` (and optionally `SUPERGLUE_API_ENDPOINT`) from environment variables (provided by GitHub Actions secrets).
+  2. Initializes the `SuperglueClient`.
+  3. Reads all `.json` files from the `superglue/workflows/` directory.
+  4. For each file:
+     - Parses the JSON content.
+     - Extracts the workflow ID from the filename.
+     - Calls `client.upsertWorkflow(workflowId, workflowData)` to create or update the workflow in Superglue.
+  5. Logs progress and any errors to the GitHub Actions console.
 
 ## .github/workflows/superglue-sync.yml
+
 ```yaml
 name: Sync Superglue Workflows
 
@@ -124,6 +123,7 @@ jobs:
 ```
 
 ## scripts/upsert-superglue-workflows.js
+
 ```javascript
 const fs = require('fs');
 const path = require('path');
@@ -192,6 +192,7 @@ syncWorkflows();
 ```
 
 ## scripts/fetch-superglue-workflows.js
+
 ```javascript
 const fs = require('fs');
 const path = require('path');

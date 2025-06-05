@@ -1,0 +1,162 @@
+---
+title: "MCP Tools"
+description: "superglue MCP provides tools for workflow creation, execution and integration code generation."
+---
+
+The following tools are exposed by superglue's MCP server. The input schemas are defined using Zod in `mcp-server.ts`.
+
+#### 1. `superglue_execute_tool`
+
+- **Description**: Execute a specific Superglue tool by ID. Use this when you know the exact tool needed for a task.
+- **Input Schema**: `ExecuteToolInputSchema`
+  - `id`: The ID of the tool to execute.
+  - `payload`: (Optional) JSON payload to pass to the tool.
+  - `credentials`: (Optional) JSON credentials for the tool execution.
+  - `options`: (Optional) Request configuration (caching, timeouts, retries, etc.).
+
+<Note>
+  **Important Notes**
+
+  - Tool ID must exist (use dynamic `execute_{tool_id}` tools to find valid IDs)
+  - **CRITICAL**: Include **ALL** required credentials in the credentials object
+  - Payload structure must match the tool's expected input schema
+  - Returns execution results \+ SDK code for integration
+</Note>
+
+- **Example Usage (Conceptual MCP Call)**:
+
+  ```json
+  // MCP callTool params
+  {
+    "toolName": "superglue_execute_tool",
+    "inputs": {
+      "id": "tool-id-123",
+      "payload": { "inputData": "example" },
+      "credentials": { "apiKey": "your-api-key" }
+    }
+  }
+  ```
+
+#### 2. `superglue_build_new_tool`
+
+- **Description**: Build a new integration tool from natural language instructions. Use when existing tools don't meet requirements. Built tools are immediately saved and dynamically made available as new tools.
+- **Input Schema**: `BuildToolInputSchema`
+  - `instruction`: Natural language instruction for building the tool.
+  - `payload`: (Optional) Example JSON payload for the tool. This should be data needed to fulfill the request (e.g. a list of ids to loop over), not settings or filters.
+  - `systems`: Array of `SystemInputSchema` defining the systems the tool can interact with.
+    - `id`: Unique identifier for the system.
+    - `urlHost`: Base URL/hostname for the system.
+    - `urlPath`: (Optional) Base path for API calls.
+    - `documentationUrl`: (Optional) URL to API documentation.
+    - `credentials`: (Optional) Credentials for accessing the system. MAKE SURE YOU INCLUDE ALL OF THEM BEFORE BUILDING THE CAPABILITY, OTHERWISE IT WILL FAIL.
+  - `responseSchema`: (Optional) JSONSchema for the expected response structure.
+
+<Note>
+  **Important Notes:**
+
+  - Gather **ALL** system credentials **BEFORE** building (API keys, tokens, documentation url if the system is less known)
+  - Built workflows are saved, but not immediately executed
+  - Provide detailed, specific instructions
+  - superglue handles pagination for you, so you don't need to worry about it
+  - Tool building may take 30-60 seconds
+</Note>
+
+- **Example Usage (Conceptual MCP Call)**:
+
+  ```json
+  // MCP callTool params
+  {
+    "toolName": "superglue_build_new_tool",
+    "inputs": {
+      "instruction": "Fetch user data from system A and send it to system B.",
+      "systems": [
+        { 
+          "id": "systemA", 
+          "urlHost": "https://api.systema.com",
+          "credentials": { "apiKey": "system-a-key" }
+        },
+        { 
+          "id": "systemB", 
+          "urlHost": "https://api.systemb.com",
+          "credentials": { "token": "system-b-token" }
+        }
+      ]
+    }
+  }
+  ```
+
+#### 3. `superglue_get_integration_code`
+
+- **Description**: Generate integration code for a specific tool. Use this to show users how to implement a tool in their applications.
+- **Input Schema**: `GenerateCodeInputSchema`
+  - `toolId`: The ID of the tool to generate code for.
+  - `language`: Programming language for the generated code (`typescript`, `python`, or `go`).
+
+<Note>
+  **Important Notes:**
+
+  - Generates code in TypeScript, Python, or Go
+  - Includes example payload and credentials based on the tool's input schema
+  - Returns ready-to-use SDK code for integration
+</Note>
+
+- **Example Usage (Conceptual MCP Call)**:
+
+  ```json
+  // MCP callTool params
+  {
+    "toolName": "superglue_get_integration_code",
+    "inputs": {
+      "toolId": "tool-id-123",
+      "language": "typescript"
+    }
+  }
+  ```
+
+### Dynamic Tool Execution
+
+In addition to the static tools above, the MCP server dynamically creates execution tools for each of your existing Superglue workflows. These are named `execute_{tool_id}` and provide direct access to execute existing workflows.
+
+### Dynamic Tool Schema
+
+Each dynamic tool has the following input schema:
+
+- `payload`: (Optional) JSON payload data for the tool
+- `credentials`: (Optional) Authentication credentials for the tool
+- `options`: (Optional) Request configuration (caching, timeouts, retries, etc.)
+
+The exact schema is derived from the tool's `inputSchema` if available, otherwise it falls back to the flexible schema above.
+
+### Example Dynamic Tool Usage
+
+```json
+// MCP callTool params for a tool with ID "stripe-to-hubspot-sync"
+{
+  "toolName": "execute_stripe-to-hubspot-sync",
+  "inputs": {
+    "payload": { "customerId": "cus_123" },
+    "credentials": { 
+      "stripeKey": "sk_test_...",
+      "hubspotToken": "pat-na1-..."
+    }
+  }
+}
+```
+
+### Agent Workflow
+
+The recommended workflow for agents using the Superglue MCP server:
+
+1. **DISCOVER**: List available tools using the dynamic `execute_{tool_id}` tools or by calling `superglue_execute_tool` with known IDs
+2. **EXECUTE**: Use `superglue_execute_tool` for existing tools OR `superglue_build_new_tool` for new integrations
+3. **INTEGRATE**: Use `superglue_get_integration_code` to show users how to implement tools in their applications
+
+<Info>
+  **Best Practices**
+
+  - Always gather all credentials before building or executing tools
+  - Use descriptive instructions when building new tools
+  - Validate tool IDs exist before execution
+  - Provide integration code when users ask "how do I use this?"
+  - The server handles authentication, pagination, retries, and error handling automatically
+</Info>
