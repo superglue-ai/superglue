@@ -6,14 +6,15 @@ import { getIntrospectionQuery } from "graphql";
 import { NodeHtmlMarkdown } from "node-html-markdown";
 import { LanguageModel } from "../llm/llm.js";
 import { logMessage } from "./logs.js";
+import { callPostgres } from './postgres.js';
 import { composeUrl } from "./tools.js";
 
 // Strategy Interface
 interface FetchingStrategy {
-  tryFetch(config: DocumentationConfig, metadata: Metadata): Promise<string | null>;
+  tryFetch(config: DocumentationConfig, metadata: Metadata, credentials?: Record<string, any>): Promise<string | null>;
 }
 interface ProcessingStrategy {
-  tryProcess(rawResult: string, config: DocumentationConfig, metadata: Metadata): Promise<string | null>;
+  tryProcess(rawResult: string, config: DocumentationConfig, metadata: Metadata, credentials?: Record<string, any>): Promise<string | null>;
 }
 
 export interface DocumentationConfig {
@@ -30,12 +31,14 @@ export class Documentation {
 
   // Configuration stored per instance
   public config: DocumentationConfig;
+  private readonly credentials?: Record<string, any>;
   private readonly metadata: Metadata;
 
   private lastResult: string | null = null;
 
-  constructor(config: DocumentationConfig, metadata: Metadata) {
+  constructor(config: DocumentationConfig, credentials: Record<string, any>, metadata: Metadata) {
     this.config = config;
+    this.credentials = credentials;
     this.metadata = metadata;
   }
 
@@ -145,6 +148,7 @@ export class Documentation {
 
     const processingStrategies: ProcessingStrategy[] = [
       new OpenApiStrategy(),
+      new PostgreSqlStrategy(),
       new HtmlMarkdownStrategy(),
       new RawPageContentStrategy()
     ];
@@ -152,7 +156,7 @@ export class Documentation {
     let rawResult: string | null = null;
 
     for (const strategy of fetchingStrategies) {
-      const result = await strategy.tryFetch(this.config, this.metadata);
+      const result = await strategy.tryFetch(this.config, this.metadata, this.credentials);
       if (result == null || result.length === 0) {
         continue;
       }
@@ -161,11 +165,11 @@ export class Documentation {
     }
 
     if (!rawResult) {
-      return "";
+      rawResult = "";
     }
 
     for (const strategy of processingStrategies) {
-      const result = await strategy.tryProcess(rawResult, this.config, this.metadata);
+      const result = await strategy.tryProcess(rawResult, this.config, this.metadata, this.credentials);
       if (result == null || result.length === 0) {
         continue;
       }
@@ -398,6 +402,32 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       }
     }
     return docResult.content;
+  }
+}
+
+class PostgreSqlStrategy implements ProcessingStrategy {
+  async tryProcess(content: string, config: ApiConfig, metadata: Metadata, credentials?: Record<string, any>): Promise<string | null> {
+    if (config.urlHost.startsWith("postgres://")) {
+      const url = composeUrl(config.urlHost, config.urlPath);
+
+      // First get the schema information
+      const schemaQuery = {
+        query: `SELECT 
+    table_name,
+    column_name,
+    data_type,
+    is_nullable,
+    column_default
+FROM information_schema.columns 
+WHERE table_schema = 'public'
+ORDER BY table_name, ordinal_position;`
+      };
+
+      const schemaResponse = await callPostgres({ ...config, body: JSON.stringify(schemaQuery) }, null, credentials, null);
+      if (!schemaResponse) return null;
+      return `<DOCUMENTATION>${content}</DOCUMENTATION><DB_SCHEMA>\n\n${JSON.stringify(schemaResponse, null, 2)}\n\n</DB_SCHEMA>`;
+    }
+    return null;
   }
 }
 

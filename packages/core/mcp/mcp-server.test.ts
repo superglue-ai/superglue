@@ -1,5 +1,5 @@
+import { describe, expect, it, vi } from 'vitest'
 import { toolDefinitions } from './mcp-server.js'
-import { describe, it, expect, vi } from 'vitest'
 
 const buildNewTool = toolDefinitions.superglue_build_new_tool.execute
 const executeTool = toolDefinitions.superglue_execute_tool.execute
@@ -77,6 +77,7 @@ describe('superglue_execute_tool', () => {
   it('calls executeWorkflow with minimal valid input (id only)', async () => {
     const client = {
       executeWorkflow: vi.fn().mockResolvedValue({ success: true, data: { ok: true }, config: { id: 'tool-minimal' }, stepResults: [] }),
+      upsertWorkflow: vi.fn().mockResolvedValue(undefined),
     }
     const args = { id: 'tool-minimal', client }
     const result = await executeTool(args, {})
@@ -88,6 +89,7 @@ describe('superglue_execute_tool', () => {
   it('calls executeWorkflow with payload', async () => {
     const client = {
       executeWorkflow: vi.fn().mockResolvedValue({ success: true, data: { foo: 'bar' }, config: {}, stepResults: [] }),
+      upsertWorkflow: vi.fn().mockResolvedValue(undefined),
     }
     const args = { id: 'tool-payload', payload: { foo: 'bar' }, client }
     const result = await executeTool(args, {})
@@ -99,6 +101,7 @@ describe('superglue_execute_tool', () => {
   it('calls executeWorkflow with all fields', async () => {
     const client = {
       executeWorkflow: vi.fn().mockResolvedValue({ success: true, data: { ok: true }, config: {}, stepResults: [] }),
+      upsertWorkflow: vi.fn().mockResolvedValue(undefined),
     }
     const args = {
       id: 'tool-all',
@@ -120,6 +123,7 @@ describe('superglue_execute_tool', () => {
   it('calls executeWorkflow with null/undefined/empty payload', async () => {
     const client = {
       executeWorkflow: vi.fn().mockResolvedValue({ success: true, data: {}, config: {}, stepResults: [] }),
+      upsertWorkflow: vi.fn().mockResolvedValue(undefined),
     }
     // null payload
     const argsNull = { id: 'tool-null', payload: null, client }
