@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./templates": "./dist/templates.js"
+  },
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist"
