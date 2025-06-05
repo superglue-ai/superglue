@@ -34,7 +34,7 @@ export async function executeApiCall(
       if (retryCount > 0 && isSelfHealing) {
         logMessage('info', `Generating API config for ${endpoint?.urlHost}${retryCount > 0 ? ` (${retryCount})` : ""}`, metadata);
         if (!documentation) {
-          documentation = new Documentation(endpoint, metadata);
+          documentation = new Documentation(endpoint, credentials, metadata);
         }
         const documentationString = await documentation.fetch(endpoint.instruction);
         const computedApiCallConfig = await generateApiConfig(endpoint, documentationString, payload, credentials, retryCount, messages);
