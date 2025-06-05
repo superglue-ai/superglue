@@ -43,7 +43,6 @@
       "pages": [
         "introduction",
         "quickstart",
-        "mcp"
       ]
     },
     {
@@ -54,6 +53,14 @@
         "guides/shopify",
         "guides/jira",
         "guides/hubspot"
+      ]
+    },
+    {
+      "group": "superglue MCP",
+      "pages": [
+        "mcp/mcp-why",
+        "mcp/mcp-tools",
+        "mcp/mcp-guide",
       ]
     },
     {
