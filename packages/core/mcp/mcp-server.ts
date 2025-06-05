@@ -13,6 +13,7 @@ import { jsonSchemaToZod } from 'json-schema-to-zod';
 import { z } from 'zod';
 import { validateToken } from '../auth/auth.js';
 import { logEmitter } from '../utils/logs.js';
+import { SystemDefinition } from "../workflow/workflow-builder.js";
 
 // Enums
 export const CacheModeEnum = z.enum(["ENABLED", "READONLY", "WRITEONLY", "DISABLED"]);
@@ -60,8 +61,8 @@ export const TransformOperationInputSchema = {
 // Tool-related Schemas (previously Workflow-related)
 export const ApiInputSchemaInternal = {
   id: z.string().describe("Unique identifier for the API endpoint"),
-  urlHost: z.string().describe("Base URL/hostname for the API"),
-  urlPath: z.string().optional().describe("Path component of the URL"),
+  urlHost: z.string().describe("Base URL/hostname for the API including protocol. For https://, use the format: https://<<hostname>>. For postgres, use the format: postgres://<<user>>:<<password>>@<<hostname>>:<<port>>"),
+  urlPath: z.string().optional().describe("Path component of the URL. For postgres, use the db name as the path."),
   instruction: z.string().describe("Natural language description of what this API does"),
   queryParams: z.any().optional().describe("JSON object containing URL query parameters"),
   method: HttpMethodEnum.optional().describe("HTTP method to use"),
@@ -104,8 +105,8 @@ export const ToolInputRequestSchema = z.object({
 
 export const SystemInputSchema = {
   id: z.string().describe("Unique identifier for the system"),
-  urlHost: z.string().describe("Base URL/hostname for the system"),
-  urlPath: z.string().optional().describe("Base path for API calls"),
+  urlHost: z.string().describe("Base URL/hostname for the API including protocol. For https://, use the format: https://<<hostname>>. For postgres, use the format: postgres://<<user>>:<<password>>@<<hostname>>:<<port>>"),
+  urlPath: z.string().optional().describe("Path component of the URL. For postgres, use the db name as the path."),
   documentationUrl: z.string().optional().describe("URL to API documentation"),
   credentials: z.any().optional().describe("Credentials for accessing the system. MAKE SURE YOU INCLUDE ALL OF THEM BEFORE BUILDING THE CAPABILITY, OTHERWISE IT WILL FAIL."),
 };
@@ -145,6 +146,14 @@ export const DeleteToolInputSchema = {
 export const GenerateCodeInputSchema = {
   toolId: z.string().describe("The ID of the tool to generate code for"),
   language: z.enum(["typescript", "python", "go"]).describe("Programming language for the generated code"),
+};
+
+// Add this schema near the other input schemas around line 150
+export const RunInstructionInputSchema = {
+  instruction: z.string().describe("Natural language instruction for the one-time execution"),
+  payload: z.any().optional().describe("Example JSON payload for the execution. This should be data needed to fulfill the request (e.g. a list of ids to loop over), not settings or filters. If not strictly needed, leave this empty."),
+  systems: z.array(z.object(SystemInputSchema)).describe("Array of systems the execution can interact with"),
+  responseSchema: z.any().optional().describe("JSONSchema for the expected response structure"),
 };
 
 // --- Tool Definitions ---
@@ -352,6 +361,7 @@ export const toolDefinitions: Record<string, any> = {
             suggestion: "Check that the tool ID exists and all required credentials are provided"
           };
         }
+        await client.upsertWorkflow(result.config.id, result.config);
         return {
           ...result,
           usage_tip: "Use the superglue_get_integration_code tool to integrate this tool into your applications"
@@ -461,6 +471,66 @@ export const toolDefinitions: Record<string, any> = {
       }
     },
   },
+
+  superglue_run_instruction: {
+    description: `
+    <use_case>
+      Execute an instruction once without saving it as a persistent tool. Use for ad-hoc tasks that don't need to be reused.
+    </use_case>
+
+    <important_notes>
+      - Builds and executes immediately without persistence
+      - Requires ALL system credentials upfront  
+      - Faster than build + execute workflow for one-time tasks
+      - Results are returned but tool definition is discarded
+    </important_notes>
+    `,
+    inputSchema: RunInstructionInputSchema,
+    execute: async (args: any & { client: SuperglueClient }, request) => {
+      const validationErrors = validateToolBuilding(args);
+      if (validationErrors.length > 0) {
+        throw new Error(`Validation failed:\n${validationErrors.join('\n')}`);
+      }
+
+      const { client }: { client: SuperglueClient } = args;
+      try {
+        // Build the tool temporarily
+        const workflow = await client.buildWorkflow({
+          instruction: args.instruction,
+          payload: args.payload || {},
+          systems: args.systems,
+          responseSchema: args.responseSchema || {},
+          save: false
+        });
+        const credentials = Object.values(args.systems as SystemDefinition[]).reduce((acc, sys) => {
+          return { ...acc, ...Object.entries(sys.credentials || {}).reduce((obj, [name, value]) => ({ ...obj, [`${sys.id}_${name}`]: value }), {}) };
+        }, {});
+
+        // Execute it immediately
+        const result = await client.executeWorkflow({
+          workflow: workflow,
+          payload: args.payload,
+          credentials: credentials
+        });
+
+        // Note: We don't call upsertWorkflow here, so it's not persisted
+
+        return {
+          success: result.success,
+          data: result.data,
+          error: result.error,
+          instruction_executed: args.instruction,
+          note: "Tool was executed once and not saved. Use superglue_build_new_tool if you want to save it for reuse."
+        };
+      } catch (error: any) {
+        return {
+          success: false,
+          error: error.message,
+          suggestion: "Ensure all system credentials are provided and instruction is detailed"
+        };
+      }
+    },
+  },
 };
 
 // Add a new function to create dynamic tools from tools
@@ -514,6 +584,9 @@ const createDynamicTools = async (tools: Workflow[], client: SuperglueClient) =>
           credentials: args.credentials,
           options: args.options,
         });
+        if (result.success) {
+          await client.upsertWorkflow(result.config.id, result.config);
+        }
         return {
           content: [
             {
@@ -602,7 +675,7 @@ BEST PRACTICES:
       async (args, extra) => {
         const result = await tool.execute({ ...args, client }, extra);
 
-        if (["superglue_build_new_tool"].includes(toolName)) {
+        if (result && result.success && ["superglue_build_new_tool"].includes(toolName)) {
           const id = `execute_${result.id}`;
           const tools = await createDynamicTools([result], client);
           const dynamicTool = tools[id];
