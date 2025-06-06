@@ -1,6 +1,6 @@
 ---
 description: "A quick guide on using superglue MCP to build database integrations."
-title: "Query your database with MCP"
+title: "Reliable database access"
 ---
 
 In this guide, we will cover how to use superglue MCP to build custom database query tools in Cursor. Working with databases often involves complex multi-table joins, aggregations, and data transformations. Superglue MCP can automate these processes, enabling the creation of sophisticated database queries through natural language prompts.
