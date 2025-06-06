@@ -1,6 +1,6 @@
 ---
 description: "A quick guide on using superglue MCP to build integrations."
-title: "MCP Guide"
+title: "Building an MCP tool"
 ---
 
 In this guide, we will cover how to use superglue MCP to build custom HubSpot integration tools in Cursor. Integrating with HubSpot often involves fetching related data, like companies and their contacts, and transforming it into a specific structure for your application. Superglue MCP can automate these multi-step processes, enabling the creation of complex, multi-step data aggregation workflows through natural language prompts.
@@ -68,5 +68,3 @@ You can find detailed descriptions of all available tools provided by superglue 
 
 - **Reuse Tools**: You can re-run the tool/workflow any time either programmatically by running the integration code generated, or through superglue MCP by asking your agent to use `superglue_execute_tool` with the correct ID
 - **Complex Scenarios**: Extend this pattern to include more HubSpot objects (Deals, Tickets), apply more complex transformations, or integrate HubSpot data with other system data by building more tools with superglue MCP.
-
-This guide illustrates the power of superglue MCP for equipping agents with the tools to create complex integrations with APIs like HubSpot, automating data fetching, transformation, and aggregation with simple, natural language instructions.
