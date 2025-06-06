@@ -6,55 +6,36 @@ export function useTheme(): [Theme, (theme: Theme) => void, "light" | "dark"] {
   const getSystemTheme = () =>
     window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 
-  const [theme, setThemeState] = useState<Theme>(() => {
+  const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window === "undefined") return "dark";
-    const stored = localStorage.getItem("theme");
-    if (stored === "light" || stored === "dark" || stored === "system") return stored as Theme;
-    return "system";
+    return (localStorage.getItem("theme") as Theme) || "system";
   });
 
-  const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">(() => {
+  const [resolved, setResolved] = useState<"light" | "dark">(() => {
     if (typeof window === "undefined") return "dark";
     const stored = localStorage.getItem("theme");
-    if (stored === "light" || stored === "dark") return stored as "light" | "dark";
+    if (stored === "light" || stored === "dark") return stored;
     return getSystemTheme();
   });
 
   useEffect(() => {
-    // Only ever add/remove the "dark" class, never touch any other classes!
     const root = document.documentElement;
-    if (theme === "dark") {
-      root.classList.add("dark");
-      setResolvedTheme("dark");
-    } else if (theme === "light") {
-      root.classList.remove("dark");
-      setResolvedTheme("light");
-    } else {
-      // system
-      const systemTheme = getSystemTheme();
-      setResolvedTheme(systemTheme);
-      if (systemTheme === "dark") {
-        root.classList.add("dark");
-      } else {
-        root.classList.remove("dark");
-      }
-      // Listen for system changes
+    const apply = (t: "light" | "dark") => {
+      root.classList.toggle("dark", t === "dark");
+      setResolved(t);
+    };
+
+    if (theme === "system") {
       const mql = window.matchMedia("(prefers-color-scheme: dark)");
-      const handler = (e: MediaQueryListEvent) => {
-        setResolvedTheme(e.matches ? "dark" : "light");
-        if (e.matches) {
-          root.classList.add("dark");
-        } else {
-          root.classList.remove("dark");
-        }
-      };
+      const handler = () => apply(getSystemTheme());
+      handler();
       mql.addEventListener("change", handler);
       return () => mql.removeEventListener("change", handler);
+    } else {
+      apply(theme);
     }
     localStorage.setItem("theme", theme);
   }, [theme]);
 
-  const setTheme = useCallback((t: Theme) => setThemeState(t), []);
-
-  return [theme, setTheme, resolvedTheme];
+  return [theme, setTheme, resolved];
 }
