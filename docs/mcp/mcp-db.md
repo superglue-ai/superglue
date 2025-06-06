@@ -13,6 +13,10 @@ This guide demonstrates how to build and run a tool that:
 
 You can use the superglue client SDK to do this, but in this tutorial we will cover how to build this tool using superglue MCP.
 
+<Note>
+  If you want to use this setup to query your Supabase DB: You may need to enable [IPv4 support](https://supabase.com/docs/guides/platform/ipv4-address) in your database settings. Other than that, Supabase works just like any other PostgreSQL database with superglue MCP. Get your Supabase connection string by clicking [Connect](https://supabase.com/dashboard/project/_?showConnect=true) on your Supabase dashboard.
+</Note>
+
 ## Prerequisites
 
 - Ensure that you have added superglue MCP to your `mcp.json`
