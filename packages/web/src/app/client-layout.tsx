@@ -7,7 +7,7 @@ import { Toaster } from '../components/ui/toaster'
 import { ConfigProvider } from './config-context'
 import { jetbrainsMono, jetbrainsSans } from './fonts'
 import { LogSidebar } from '../components/utils/LogSidebar'
-import { PostHogProvider } from 'posthog-js/react'
+import { CSPostHogProvider } from './providers'
 
 interface Props {
   children: React.ReactNode
@@ -20,10 +20,7 @@ export function ClientWrapper({ children, config }: Props) {
 
   return (
     <ConfigProvider config={config}>
-      <PostHogProvider
-        apiKey={config.postHogKey}
-        options={{ api_host: config.postHogHost }}
-      >
+      <CSPostHogProvider>
         <div className={`${jetbrainsSans.variable} ${jetbrainsMono.variable} antialiased`}>
           {isAuthPage ? (
             children
@@ -47,7 +44,7 @@ export function ClientWrapper({ children, config }: Props) {
           <Toaster />
           {config.superglueApiKey && <ServerMonitor />}
         </div>
-      </PostHogProvider>
+      </CSPostHogProvider>
     </ConfigProvider>
   )
 }
