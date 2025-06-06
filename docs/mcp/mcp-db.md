@@ -55,10 +55,10 @@ Find the most popular LEGO themes by number of sets
 Get detailed information about parts and colors for specific sets
 Calculate inventory statistics across different themes
 
-Database connection: postgres://superglue:superglue@database-1.c01e6ms2cdvl.us-east-1.rds.amazonaws.com:5432/lego
+Always tell superglue your database connection: postgres://superglue:superglue@database-1.c01e6ms2cdvl.us-east-1.rds.amazonaws.com:5432/lego
 ```
 
-<video autoPlay muted loop playsInline className="w-full aspect-video" src="https://superglue.cloud/files/mcp-doc-demo.mp4" />
+<video autoPlay muted loop playsInline className="w-full aspect-video" src="https://superglue.cloud/files/mcp-db.mp4" />
 
 ### What Happened Under the Hood:
 
@@ -84,21 +84,14 @@ Database connection: postgres://superglue:superglue@database-1.c01e6ms2cdvl.us-e
 Let's say you want to add a new custom LEGO set to the database. Instead of building a persistent tool, you can run a one-time instruction:
 
 ```
-Execute this instruction once: Create a new LEGO set in my database with the following details:
+Execute this instruction once: Create a new LEGO set in my database with the following details and add it to the inventory:
 - Set number: "CUSTOM-001"
 - Name: "My Custom Castle"
 - Year: 2024
-- Theme: Castle (theme_id: 186)
+- Theme: Castle
 - Number of parts: 150
 
-Also add it to the inventories table with version 1.
-
-Database connection: postgres://superglue:superglue@database-1.c01e6ms2cdvl.us-east-1.rds.amazonaws.com:5432/lego
-
-Use these SQL operations:
-1. INSERT into lego_sets table
-2. INSERT into inventories table
-3. Return confirmation with the new set details
+Database connection: postgres://postgres:password@localhost:5432/lego
 ```
 
 This will execute immediately and return the results without creating a saved tool. Perfect for:
