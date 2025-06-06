@@ -46,6 +46,15 @@
       ]
     },
     {
+      "group": "For Agents",
+      "pages": [
+        "mcp/mcp",
+        "mcp/mcp-guide",
+        "mcp/mcp-db",
+        "mcp/mcp-tools"
+      ]
+    },
+    {
       "group": "Guides & Examples",
       "pages": [
         "guides/self-hosting",
@@ -53,14 +62,6 @@
         "guides/shopify",
         "guides/jira",
         "guides/hubspot"
-      ]
-    },
-    {
-      "group": "superglue MCP",
-      "pages": [
-        "mcp/mcp-why",
-        "mcp/mcp-tools",
-        "mcp/mcp-guide"
       ]
     },
     {

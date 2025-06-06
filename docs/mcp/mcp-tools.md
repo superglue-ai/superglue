@@ -1,5 +1,5 @@
 ---
-title: "MCP Tools"
+title: "MCP Tool Reference"
 description: "superglue MCP provides tools for workflow creation, execution and integration code generation."
 ---
 
@@ -113,6 +113,57 @@ The following tools are exposed by superglue's MCP server. The input schemas are
   }
   ```
 
+#### 4. `superglue_run_instruction`
+
+- **Description**: Execute an instruction once without saving it as a persistent tool. Use for ad-hoc tasks that don't need to be reused.
+- **Input Schema**: `RunInstructionInputSchema`
+  - `instruction`: Natural language instruction for the one-time execution.
+  - `payload`: (Optional) Example JSON payload for the execution. This should be data needed to fulfill the request (e.g. a list of ids to loop over), not settings or filters.
+  - `systems`: Array of `SystemInputSchema` defining the systems the execution can interact with.
+    - `id`: Unique identifier for the system.
+    - `urlHost`: Base URL/hostname for the system.
+    - `urlPath`: (Optional) Base path for API calls.
+    - `documentationUrl`: (Optional) URL to API documentation.
+    - `credentials`: (Optional) Credentials for accessing the system.
+  - `responseSchema`: (Optional) JSONSchema for the expected response structure.
+
+<Note>
+  **Important Notes:**
+
+  - Builds and executes immediately without persistence
+  - Requires **ALL** system credentials upfront
+  - Faster than build + execute workflow for one-time tasks
+  - Results are returned but tool definition is discarded
+  - Use this for ad-hoc tasks that don't need to be saved for reuse
+</Note>
+
+- **Example Usage (Conceptual MCP Call)**:
+
+  ```json
+  // MCP callTool params
+  {
+    "toolName": "superglue_run_instruction",
+    "inputs": {
+      "instruction": "Get all active users from system A and create a summary report",
+      "payload": { "includeMetrics": true },
+      "systems": [
+        { 
+          "id": "systemA", 
+          "urlHost": "https://api.systema.com",
+          "credentials": { "apiKey": "system-a-key" }
+        }
+      ],
+      "responseSchema": {
+        "type": "object",
+        "properties": {
+          "totalUsers": { "type": "number" },
+          "summary": { "type": "string" }
+        }
+      }
+    }
+  }
+  ```
+
 ### Dynamic Tool Execution
 
 In addition to the static tools above, the MCP server dynamically creates execution tools for each of your existing Superglue workflows. These are named `execute_{tool_id}` and provide direct access to execute existing workflows.
@@ -148,7 +199,7 @@ The exact schema is derived from the tool's `inputSchema` if available, otherwis
 The recommended workflow for agents using the Superglue MCP server:
 
 1. **DISCOVER**: List available tools using the dynamic `execute_{tool_id}` tools or by calling `superglue_execute_tool` with known IDs
-2. **EXECUTE**: Use `superglue_execute_tool` for existing tools OR `superglue_build_new_tool` for new integrations
+2. **EXECUTE**: Use `superglue_execute_tool` for existing tools, `superglue_build_new_tool` for new integrations, OR `superglue_run_instruction` for one-time ad-hoc tasks
 3. **INTEGRATE**: Use `superglue_get_integration_code` to show users how to implement tools in their applications
 
 <Info>

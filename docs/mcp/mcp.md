@@ -1,22 +1,33 @@
 ---
-title: "Why Use superglue MCP?"
-description: "Let your agent build its own tools."
+title: "Intro to MCP"
+description: "Instant reliable tools for your agents"
 ---
 
-We’ve talked to dozens of teams deploying agents and they were all facing the same dilemma: Giving their agents enough freedom to fetch all the data they need, yet making sure that every call remains secure, performant, and predictable in production. **superglue MCP fixes this**: It gives you the reliability you’re looking for when deploying in prod, and agents the tools they actually need to do their job well.
+Turn any API into tools so your agents can get things done reliably.
 
-## How Does superglue MCP Help?
+Stop drowning your agents in 20+ fragile tools that break when APIs change. **superglue MCP** lets you build reliable, validated capabilities that agents can request and use in natural language - no more tool overload, no more brittle integrations.
 
-superglue MCP is a lightweight API-wrapper available via MCP. Agents can use it to:
+## How superglue MCP Works
 
-- **Merge multiple endpoints & APIs** into coherent, reusable, **custom tools**
-- **Expose them via one stable MCP server**, even as upstream APIs change
-- **Abstract away authentication, pagination, retries,** and mapping logic
-- **Keep their toolset lean, so they don't get overwhelmed or go rogue**
+superglue MCP is a lightweight API-wrapper available via MCP that:
 
-Use supertools to let your agent run cross-API workflows reliably, like fetching transactions in Stripe and updating them in Hubspot, to build ambient agents that react to app triggers or to wrap your own API into capabilities agents can use.
+1. **Merges multiple endpoints and APIs into custom tools** - we call them capabilities
+2. **Exposes them via one server** that abstracts away endpoints and API calls  
+3. **Acts like a repository pattern** that stays stable even as upstream APIs or mappings change
 
-Curious what else you can do with superglue? Read more about it [here](https://docs.superglue.cloud/introduction).
+### Key Benefits
+
+- **Merge Multiple APIs**: Combine endpoints and APIs into custom capabilities. No more juggling dozens of specific tools - create unified capabilities that work across multiple services.
+- **Production Ready**: Secure, fast, and guaranteed to work. Built for production deployments with stability guarantees even as upstream APIs change.
+- **Bespoke Agent Tools**: Custom tools that agents actually need. Stop building generic tools - create purpose-built capabilities that match your specific workflows and business logic.
+
+## Use superglue MCP to:
+
+**Stitch Stripe and HubSpot together**: Build cross-API workflows like fetching transactions in Stripe and updating them in HubSpot reliably.
+
+**Create Ambient Agents**: Build agents that react to app triggers and events. Create agents that monitor your systems and respond automatically to events, triggers and webhooks.
+
+**Wrap your own APIs**: Make your own APIs accessible by any agent. Turn your internal APIs and services into agent-friendly capabilities with built-in validation and error handling.
 
 ## Connecting to the MCP Server
 
