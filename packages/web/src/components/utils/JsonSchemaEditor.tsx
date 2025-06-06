@@ -354,6 +354,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
                   <TooltipTrigger asChild>
                     <div className="relative z-10">
                       <Switch
+                        className="custom-switch"
                         id={`required-${path.join('-')}`}
                         checked={isFieldRequired()}
                         onCheckedChange={(checked) => {
@@ -376,9 +377,8 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
                           setVisualSchema(newSchema);
                           onChange(JSON.stringify(newSchema, null, 2));
                         }}
-                        className="peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
                       />
-                      <span className="pointer-events-none absolute flex h-4 w-4 items-center justify-center rounded-full bg-background shadow-lg ring-0 transition-transform peer-data-[state=checked]:translate-x-4 peer-data-[state=unchecked]:translate-x-0 left-[2px] top-[2px]">
+                      <span className="pointer-events-none absolute flex h-4 w-4 items-center justify-center rounded-full bg-white shadow-lg ring-0 transition-transform peer-data-[state=checked]:translate-x-4 peer-data-[state=unchecked]:translate-x-0 left-[2px] top-[2px]">
                         {isFieldRequired() ? (
                           <span className="text-red-500 text-[12px] sm:text-[16px] font-bold leading-none mt-2">*</span>
                         ) : (
@@ -397,6 +397,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
               <Button
                 variant="ghost"
                 size="icon"
+                className="text-destructive h-8 w-8 min-w-[2rem] min-h-[2rem]"
                 onClick={() => {
                   const newSchema = { ...visualSchema };
                   let current = newSchema;
@@ -433,9 +434,11 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
 
         {schema.type === 'object' && (
           <div className={`pl-2 ${!isRoot && 'mt-1'}`}>
-            {schema.properties && Object.entries(schema.properties).map(([key, value]) =>
-              renderSchemaField(key, value, [...path, 'properties', key])
-            )}
+            <div className="overflow-x-auto">
+              {schema.properties && Object.entries(schema.properties).map(([key, value]) =>
+                renderSchemaField(key, value, [...path, 'properties', key])
+              )}
+            </div>
             <Button
               type="button"
               variant="outline"
@@ -457,7 +460,9 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
 
         {schema.type === 'array' && (
           <div className="pl-2 mt-1">
-            {schema.items && renderSchemaField('items', schema.items, [...path, 'items'], true)}
+            <div className="overflow-x-auto">
+              {schema.items && renderSchemaField('items', schema.items, [...path, 'items'], true)}
+            </div>
             {!schema.items && (
               <Button
                 type="button"
@@ -521,13 +526,14 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
           {(localIsEnabled || !isOptional) && (
             <div className="flex items-center gap-2">
               <Label htmlFor="editorMode" className="text-xs">Code Mode</Label>
-              <Switch id="editorMode" checked={isCodeMode} onCheckedChange={setIsCodeMode} />
+              <Switch className="custom-switch" id="editorMode" checked={isCodeMode} onCheckedChange={setIsCodeMode} />
             </div>
           )}
           {isOptional && (
             <div className="flex items-center gap-2">
               <Label htmlFor="schemaOptionalToggle" className="text-xs">Enabled</Label>
               <Switch
+                className="custom-switch"
                 id="schemaOptionalToggle"
                 checked={localIsEnabled}
                 onCheckedChange={handleEnabledChange}
@@ -538,33 +544,35 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
       </div>
 
       {localIsEnabled ? (
-        <div className="flex-1 min-h-0 border rounded-md overflow-hidden min-h-32">
+        <div className="flex-1 min-h-0 border rounded-md min-h-32">
           {isCodeMode ? (
-            <div className="h-full font-mono relative bg-transparent overflow-auto">
-              <Editor
-                value={value || ""} // Editor expects string, use "" if value is null but enabled (e.g. just re-enabled)
-                onValueChange={(code) => {
-                  onChange(code); // Pass code directly
-                  try {
-                    JSON.parse(code);
-                    setJsonError(null);
-                  } catch (e) {
-                    setJsonError((e as Error).message);
-                  }
-                }}
-                highlight={highlightJson}
-                padding={10}
-                tabSize={2}
-                insertSpaces={true}
-                className={cn(
-                  "min-h-full text-xs [&_textarea]:outline-none [&_textarea]:w-full [&_textarea]:h-full [&_textarea]:resize-none [&_textarea]:p-0 [&_textarea]:border-0 [&_textarea]:bg-transparent dark:[&_textarea]:text-white",
-                  jsonError && "border-red-500"
-                )}
-                style={{
-                  fontFamily: 'var(--font-mono)',
-                  minHeight: '100%',
-                }}
-              />
+            <div className="h-full font-mono relative bg-transparent code-editor">
+              <div className="overflow-auto h-full">
+                <Editor
+                  value={value || ""} // Editor expects string, use "" if value is null but enabled (e.g. just re-enabled)
+                  onValueChange={(code) => {
+                    onChange(code); // Pass code directly
+                    try {
+                      JSON.parse(code);
+                      setJsonError(null);
+                    } catch (e) {
+                      setJsonError((e as Error).message);
+                    }
+                  }}
+                  highlight={highlightJson}
+                  padding={10}
+                  tabSize={2}
+                  insertSpaces={true}
+                  className={cn(
+                    "font-mono text-xs w-full min-h-full",
+                    jsonError && "border-red-500"
+                  )}
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    minHeight: '100%',
+                  }}
+                />
+              </div>
               {jsonError && (
                 <div className="absolute bottom-0 left-0 right-0 bg-red-500/10 text-red-500 p-2 text-xs">
                   {jsonError}
@@ -591,7 +599,9 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
               ) : (
                 <div className="flex-1 overflow-y-auto min-h-0">
                   <div className="p-4">
-                    {renderSchemaField('root', visualSchema, [])}
+                    <div className="overflow-x-auto">
+                      {renderSchemaField('root', visualSchema, [])}
+                    </div>
                   </div>
                 </div>
               )}

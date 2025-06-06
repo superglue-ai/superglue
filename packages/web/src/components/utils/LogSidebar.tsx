@@ -209,7 +209,7 @@ export function LogSidebar() {
           />
           <div className="absolute bottom-4 right-4 flex items-center gap-2 z-10">
             <span className="text-xs text-muted-foreground">Show Debug</span>
-            <Switch checked={showDebug} onCheckedChange={setShowDebug} />
+            <Switch className="custom-switch" checked={showDebug} onCheckedChange={setShowDebug} />
           </div>
         </>
       )}
