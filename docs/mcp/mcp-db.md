@@ -15,7 +15,6 @@ You can use the superglue client SDK to do this, but in this tutorial we will co
 
 ## Prerequisites
 
-- Docker installed on your machine
 - Ensure that you have added superglue MCP to your `mcp.json`
 
 ```json mcp.json
@@ -43,70 +42,20 @@ You can use the superglue client SDK to do this, but in this tutorial we will co
   Make sure to replace the API key placeholder with your own API key after copying.
 </Note>
 
-## Setting Up the LEGO Database
-
-First, let's set up a PostgreSQL database with LEGO data using Docker:
-
-### 1. Start PostgreSQL Container
-
-```bash
-docker run --name lego-postgres -e POSTGRES_PASSWORD=password -e POSTGRES_DB=lego -p 5432:5432 -d postgres:15
-```
-
-### 2. Download and Load the LEGO Dataset
-
-```bash
-# Download the dataset
-wget https://raw.githubusercontent.com/neondatabase/postgres-sample-dbs/main/lego.sql
-
-# Load the data into the database
-psql -d "postgres://postgres:password@localhost:5432/lego" -f lego.sql
-```
-
-### 3. Verify the Setup
-
-Connect to the database and run a test query:
-
-```bash
-psql postgres://postgres:password@localhost:5432/lego
-```
-
-```sql
--- Find the top 5 LEGO themes by the number of sets
-SELECT lt.name AS theme_name, COUNT(ls.set_num) AS number_of_sets
-FROM lego_themes lt
-JOIN lego_sets ls ON lt.id = ls.theme_id
-GROUP BY lt.name
-ORDER BY number_of_sets DESC
-LIMIT 5;
-```
-
 ## Building a Custom Database Query Tool
 
 You can find detailed descriptions of all available tools provided by superglue MCP [here](/docs/mcp/mcp-tools). In this tutorial, we will build a custom database integration tool using natural language through your Cursor chat interface.
 
 Here's how to create a tool that analyzes LEGO data:
 
-### Example Prompt:
+### Example Prompts:
 
 ```
-Build a tool that connects to my PostgreSQL database and analyzes LEGO data. I want to:
+Find the most popular LEGO themes by number of sets
+Get detailed information about parts and colors for specific sets
+Calculate inventory statistics across different themes
 
-1. Find the most popular LEGO themes by number of sets
-2. Get detailed information about parts and colors for specific sets
-3. Calculate inventory statistics across different themes
-
-Database connection: postgres://postgres:password@localhost:5432/lego
-
-The database has these main tables:
-- lego_sets (set_num, name, year, theme_id, num_parts)
-- lego_themes (id, name, parent_id)
-- lego_parts (part_num, name, part_cat_id)
-- lego_colors (id, name, rgb, is_trans)
-- inventories (id, version, set_num)
-- inventory_parts (inventory_id, part_num, color_id, quantity, is_spare)
-
-I want the results to include theme names, set counts, and part statistics.
+Database connection: postgres://superglue:superglue@database-1.c01e6ms2cdvl.us-east-1.rds.amazonaws.com:5432/lego
 ```
 
 <video autoPlay muted loop playsInline className="w-full aspect-video" src="https://superglue.cloud/files/mcp-doc-demo.mp4" />
@@ -118,6 +67,19 @@ I want the results to include theme names, set counts, and part statistics.
 - superglue MCP used `superglue_get_integration_code` to generate code for embedding this database workflow in your application
 
 ## Example: Creating a New Custom LEGO Set
+
+<Note>
+  The database used in this example is readonly. If you want to create your own writable database for testing, you can set up a local PostgreSQL instance:
+
+  ```bash
+  # Start PostgreSQL Container
+  docker run --name lego-postgres -e POSTGRES_PASSWORD=password -e POSTGRES_DB=lego -p 5432:5432 -d postgres:15
+
+  # Download and load the dataset
+  wget https://raw.githubusercontent.com/neondatabase/postgres-sample-dbs/main/lego.sql
+  psql -d "postgres://postgres:password@localhost:5432/lego" -f lego.sql
+  ```
+</Note>
 
 Let's say you want to add a new custom LEGO set to the database. Instead of building a persistent tool, you can run a one-time instruction:
 
@@ -131,7 +93,7 @@ Execute this instruction once: Create a new LEGO set in my database with the fol
 
 Also add it to the inventories table with version 1.
 
-Database connection: postgres://postgres:password@localhost:5432/lego
+Database connection: postgres://superglue:superglue@database-1.c01e6ms2cdvl.us-east-1.rds.amazonaws.com:5432/lego
 
 Use these SQL operations:
 1. INSERT into lego_sets table
