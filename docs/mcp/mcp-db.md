@@ -50,6 +50,8 @@ Here's how to create a tool that analyzes LEGO data:
 
 ### Example Prompts:
 
+<video autoPlay muted loop playsInline className="w-full aspect-video" src="https://superglue.cloud/files/mcp-db.mp4" />
+
 ```
 Find the most popular LEGO themes by number of sets
 Get detailed information about parts and colors for specific sets
@@ -57,8 +59,6 @@ Calculate inventory statistics across different themes
 
 Always tell superglue your database connection: postgres://superglue:superglue@database-1.c01e6ms2cdvl.us-east-1.rds.amazonaws.com:5432/lego
 ```
-
-<video autoPlay muted loop playsInline className="w-full aspect-video" src="https://superglue.cloud/files/mcp-db.mp4" />
 
 ### What Happened Under the Hood:
 
