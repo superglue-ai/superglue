@@ -598,9 +598,6 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
                           tabSize={2}
                           insertSpaces={true}
                           className="min-h-[8rem] text-sm [&_textarea]:outline-none [&_textarea]:w-full [&_textarea]:resize-none [&_textarea]:p-0 [&_textarea]:border-0 [&_textarea]:bg-transparent dark:[&_textarea]:text-white"
-                          style={{
-                            fontFamily: 'var(--font-mono)',
-                          }}
                         />
                       </div>
                     </div>
@@ -619,9 +616,6 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
                           tabSize={2}
                           insertSpaces={true}
                           className="min-h-[8rem] text-sm [&_textarea]:outline-none [&_textarea]:w-full [&_textarea]:resize-none [&_textarea]:p-0 [&_textarea]:border-0 [&_textarea]:bg-transparent dark:[&_textarea]:text-white"
-                          style={{
-                            fontFamily: 'var(--font-mono)',
-                          }}
                         />
                       </div>
                     </div>

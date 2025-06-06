@@ -1,7 +1,8 @@
 import "./globals.css";
 import nextConfig from "@/next.config";
 import { ClientWrapper } from "@/src/app/client-layout";
-import { geistSans, geistMono } from '@/src/app/fonts'
+import { jetbrainsSans, jetbrainsMono } from '@/src/app/fonts'
+import { Providers } from "./providers";
 
 // we need to force dynamic to get the env vars at runtime
 export const dynamic = 'force-dynamic'
@@ -20,12 +21,34 @@ export default function RootLayout({
   if(!config.superglueApiKey) {
     throw new Error('AUTH_TOKEN is not set and no other authentication provider is configured.');
   }
+  // Looks like suppressing hydration warning is standard for Next.js. Otherwise we lose user preference mode button.
   return (
-    <html lang="en" className={`dark ${geistSans.variable} ${geistMono.variable}`}>
-      <body>
-        <ClientWrapper config={config}>
-          {children}
-        </ClientWrapper>
+    <html suppressHydrationWarning lang="en" className={`${jetbrainsSans.variable} ${jetbrainsMono.variable}`}>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+(function() {
+  try {
+    var theme = localStorage.getItem('theme');
+    var systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (theme === 'dark' || (!theme && systemDark)) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  } catch(e){}
+})();
+            `,
+          }}
+        />
+      </head>
+      <body suppressHydrationWarning>
+        <Providers>
+          <ClientWrapper config={config}>
+            {children}
+          </ClientWrapper>
+        </Providers>
       </body>
     </html>
   );

@@ -3,14 +3,15 @@ import posthog, { PostHog } from 'posthog-js'
 import { PostHogProvider } from 'posthog-js/react'
 import SuspendedPostHogPageView from '../components/utils/PHPageView'
 
-export function CSPostHogProvider({ children }: { children: any }) {
+export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <PostHogProvider client={posthog}>
       <SuspendedPostHogPageView />
       {children}
     </PostHogProvider>
-  )
+  );
 }
+
 let postHog: PostHog | undefined = undefined;
 
 // Only in components
