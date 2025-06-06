@@ -27,7 +27,6 @@ export default function RootLayout({
           <ClientWrapper config={config}>
             {children}
           </ClientWrapper>
-
       </body>
     </html>
   );
