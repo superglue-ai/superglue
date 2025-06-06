@@ -14,6 +14,7 @@ import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { WorkflowResultsView } from "./WorkflowResultsView";
 import { WorkflowStepsView } from "./WorkflowStepsView";
+import { X } from "lucide-react";
 
 export default function WorkflowPlayground({ id }: { id?: string }) {
   const router = useRouter();
@@ -320,6 +321,17 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
 
   return (
     <div className="p-6 max-w-none w-full">
+      <div className="flex justify-end items-center mb-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="shrink-0"
+          onClick={() => router.push('/configs')}
+          aria-label="Close"
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
       <h1 className="text-2xl font-bold mb-3 flex-shrink-0">Workflows</h1>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Left Column - Workflow Configuration */}

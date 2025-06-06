@@ -3,129 +3,259 @@
 @tailwind utilities;
 
 body {
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-family: var(--font-jetbrains-sans);
+}
+
+code, pre, tt {
+  font-family: var(--font-jetbrains-mono);
 }
 
 @layer base {
   :root {
-    --background: 220 33% 98%;
-    --foreground: 220 10% 3.9%;
-    --card: 220 33% 98%;
-    --card-foreground: 220 10% 3.9%;
-    --popover: 220 33% 98%;
-    --popover-foreground: 220 10% 3.9%;
-    --primary: 220 85% 45%;
-    --primary-foreground: 220 10% 97%;
-    --secondary: 220 10% 90%;
-    --secondary-foreground: 220 10% 3.9%;
-    --muted: 220 10% 90%;
-    --muted-foreground: 220 10% 40%;
-    --accent: 220 85% 45%;
-    --accent-foreground: 220 10% 97%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 220 10% 85%;
-    --input: 220 10% 85%;
-    --ring: 220 85% 45%;
-    --chart-1: 220 85% 55%;
-    --chart-2: 180 70% 45%;
-    --chart-3: 280 65% 55%;
-    --chart-4: 330 75% 55%;
-    --chart-5: 150 65% 45%;
+    --background: 0 0% 100%;           /* #fff (white) */
+    --foreground: 220 7% 10%;          /* #191c20 (very dark grey) */
+    --card: 220 7% 98%;                /* #f7f8fa (very light grey) */
+    --card-foreground: 220 7% 10%;     /* #191c20 */
+    --popover: 220 7% 98%;             /* #f7f8fa */
+    --popover-foreground: 220 7% 12%;  /* #1e2126 */
+    --primary: 220 7% 90%;             /* #e5e7eb (light grey) */
+    --primary-foreground: 220 7% 20%;  /* #32343a (dark grey) */
+    --primary-hover: 220 7% 20%;       /* #32343a */
+    --primary-hover-foreground: 220 7% 100%; /* #fff */
+    --secondary: 220 7% 96%;           /* #f3f4f6 */
+    --secondary-foreground: 220 7% 90%;/* #e5e7eb */
+    --muted: 220 7% 98%;               /* #f7f8fa */
+    --muted-foreground: 220 7% 10%;    /* #191c20 */
+    --border: 220 7% 90%;              /* #e5e7eb */
+    --input: 220 7% 80%;               /* #cfd2d6 */
+    --hover: 220 7% 82%;               /* #d7dbe0 */
+    --accent: 220 7% 80%;              /* #cfd2d6 */
+    --accent-foreground: 0 0% 100%;    /* #fff */
+    --destructive: 0 72% 51%;          /* #e5484d */
+    --destructive-foreground: 0 0% 100%; /* #fff */
+    --ring: 220 7% 20%;                /* #32343a */
     --radius: 0.5rem;
+    --chart-1: 210 100% 50%;           /* #1473e6 */
+    --chart-2: 180 70% 45%;            /* #2bbecf */
+    --chart-3: 280 65% 55%;            /* #a259e6 */
+    --chart-4: 330 75% 55%;            /* #e14b8c */
+    --chart-5: 150 65% 45%;            /* #3ecf8e */
+    --outline: 220 7% 20%;             /* #32343a */
+    --outline-foreground: 220 7% 0%;   /* #000 */
+    --outline-border: 220 7% 80%;      /* #cfd2d6 */
+    --ghost-foreground: 220 7% 20%;    /* #32343a */
+    --ghost-hover: 220 7% 80%;         /* #cfd2d6 */
+    --link: 210 100% 50%;              /* #1473e6 */
+    --link-foreground: 0 0% 100%;      /* #fff */
   }
   .dark {
-    --background: 220 40% 8%;
-    --foreground: 220 10% 97%;
-    --card: 220 40% 11%;
-    --card-foreground: 220 10% 97%;
-    --popover: 220 40% 11%;
-    --popover-foreground: 220 10% 97%;
-    --primary: 220 85% 55%;
-    --primary-foreground: 220 10% 97%;
-    --secondary: 220 40% 16%;
-    --secondary-foreground: 220 10% 97%;
-    --muted: 220 40% 16%;
-    --muted-foreground: 220 10% 70%;
-    --accent: 220 85% 55%;
-    --accent-foreground: 220 10% 97%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 220 10% 97%;
-    --border: 220 40% 16%;
-    --input: 220 40% 16%;
-    --ring: 220 85% 55%;
-    --chart-1: 220 85% 55%;
-    --chart-2: 180 70% 45%;
-    --chart-3: 280 65% 55%;
-    --chart-4: 330 75% 55%;
-    --chart-5: 150 65% 45%;
+    --background: 0 0% 0%; /* #000 */
+    --foreground: 0 0% 100%; /* #fff */
+    --card: 220 7% 8%; /* #18191b */
+    --card-foreground: 0 0% 100%; /* #fff */
+    --popover: 0 0% 8%; /* #18191b */
+    --popover-foreground: 0 0% 100%; /* #fff */
+    --primary: 220 7% 20%;             /* #23262b */
+    --primary-foreground: 220 7% 100%;  /* #fff */
+    --primary-hover: 220 7% 90%;       /* #e5e7eb */
+    --primary-hover-foreground: 220 7% 20%; /* #32343a */
+    --secondary: 220 7% 10%;         /* #23262b */
+    --secondary-foreground: 220 7% 20%; /* #32343a */
+    --muted: 0 0% 10%; /* #1a1a1a */
+    --muted-foreground: 0 0% 80%; /* #cccccc */
+    --accent: 220 7% 20%; 
+    --accent-foreground: 0 0% 100%; /* #fff */
+    --destructive: 0 72% 51%;         /* #e5484d */
+    --destructive-foreground: 0 0% 0%;   /* #000 */
+    --border: 0 0% 20%; /* #333 */
+    --input: 0 0% 15%; /* #262626 */
+    --ring: 0 0% 50%; /* #808080 */
+    --hover: 0 0% 18%; /* #2e2e2e */
+    --radius: 0.5rem;
+    --chart-1: 210 100% 60%;           /* #339cff */
+    --chart-2: 180 70% 60%;            /* #3ee6e6 */
+    --chart-3: 280 65% 70%;            /* #c299ff */
+    --chart-4: 330 75% 70%;            /* #ff7ab8 */
+    --chart-5: 150 65% 60%;            /* #5cffb2 */
+    --outline: 220 7% 100%;          /* #fff */
+    --outline-foreground: 220 7% 100%; /* #fff */
+    --outline-border: 220 7% 20%;      /* #23262b */
+    --ghost-foreground: 220 7% 80%;   /* #e5e7eb */
+    --ghost-hover: 220 7% 20%;        /* #32343a */
+    --link: 210 100% 50%;           /* #1473e6 */
+    --link-foreground: 0 0% 100%;   /* #fff */
   }
 
   /* Code editor syntax highlighting */
   .token {
     background: none !important;
   }
-
-  .token.property {
-    color: hsl(var(--chart-0));
-  }
-
-  .token.string {
-    color: hsl(var(--chart-5));
-  }
-
-  .token.number {
-    color: hsl(var(--chart-5));
-  }
-
-  .token.boolean {
-    color: hsl(var(--chart-2));
-  }
-
-  .token.punctuation {
-    color: hsl(var(--muted-foreground));
-  }
-
-  .token.operator {
-    color: hsl(var(--muted-foreground));
-  }
-
-  .token.keyword {
-    color: hsl(var(--chart-1));
-  }
-
-  .token.null {
-    color: hsl(var(--chart-2));
-  }
-
-  .token.comment {
-    color: hsl(var(--muted-foreground));
-  }
+  .token.property { color: hsl(var(--chart-0)); }
+  .token.string, .token.number { color: hsl(var(--chart-5)); }
+  .token.boolean, .token.null { color: hsl(var(--chart-2)); }
+  .token.punctuation, .token.operator, .token.comment { color: hsl(var(--muted-foreground)); }
 }
 
 @layer base {
-  * {
-    @apply border-border;
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground; }
+  button:hover, .nav-link:hover, .system-button:hover, .example-button:hover, .dropdown-menu-item:hover, .menu-item:hover {
+    background-color: hsl(var(--hover)) !important;
+    transition: background 0.2s;
   }
-  body {
-    @apply bg-background text-foreground;
-  }
-  
-  /* Add hover styles for buttons */
-  button:hover {
-    @apply bg-secondary transition-colors;
-  }
+  ::-webkit-scrollbar { @apply w-2 h-2; }
+  ::-webkit-scrollbar-track { @apply bg-secondary/50 rounded-full; }
+  ::-webkit-scrollbar-thumb { @apply bg-muted-foreground/50 rounded-full hover:bg-muted-foreground/70 transition-colors; }
+}
 
-  /* Custom scrollbar styles */
-  ::-webkit-scrollbar {
-    @apply w-2 h-2;
-  }
+html.light { color-scheme: light; }
+html.dark { color-scheme: dark; }
 
-  ::-webkit-scrollbar-track {
-    @apply bg-secondary/50 rounded-full;
+@layer components {
+  /* Red outline for destructive outline buttons */
+  .btn-outline.text-destructive,
+  .btn[variant="outline"].text-destructive,
+  .btn-outline-destructive {
+    border-color: hsl(var(--destructive)) !important;
+    color: hsl(var(--destructive)) !important;
   }
+  .btn-outline.text-destructive:hover,
+  .btn[variant="outline"].text-destructive:hover,
+  .btn-outline-destructive:hover {
+    background-color: hsl(var(--destructive) / 0.1) !important;
+    color: hsl(var(--destructive)) !important;
+    border-color: hsl(var(--destructive)) !important;
+  }
+  /* Red outline for ghost destructive buttons on hover */
+  .btn-ghost.text-destructive,
+  .btn[variant="ghost"].text-destructive {
+    color: hsl(var(--destructive)) !important;
+    border: none !important;
+    outline: none !important;
+    background-color: transparent !important;
+    transition: background 0.2s, color 0.2s;
+  }
+  .btn-ghost:hover:not(:disabled),
+  .btn[variant="ghost"]:hover:not(:disabled) {
+    background-color: hsl(var(--ghost-hover)) !important;
+    color: hsl(var(--ghost-foreground)) !important;
+  }
+  .btn-ghost.text-destructive:hover,
+  .btn[variant="ghost"].text-destructive:hover {
+    background-color: hsl(var(--destructive) / 0.5) !important;
+    color: hsl(var(--destructive)) !important;
+  }
+  .btn,
+  .btn-default,
+  .btn[variant="default"] {
+    background-color: hsl(var(--primary)) !important;
+    color: hsl(var(--primary-foreground)) !important;
+    border: none !important;
+    transition: background 0.2s, color 0.2s;
+  }
+  .btn:hover:not(:disabled),
+  .btn-default:hover:not(:disabled),
+  .btn[variant="default"]:hover:not(:disabled) {
+    background-color: hsl(var(--primary-hover)) !important;
+    color: hsl(var(--primary-hover-foreground)) !important;
+  }
+  .btn:disabled,
+  .btn-default:disabled,
+  .btn[variant="default"]:disabled {
+    background-color: hsl(var(--muted)) !important;
+    color: hsl(var(--muted-foreground)) !important;
+    border: none !important;
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  .btn-secondary {
+    background-color: hsl(var(--secondary)) !important;
+    color: hsl(var(--secondary-foreground)) !important;
+    border: none !important;
+    transition: background 0.2s, color 0.2s;
+  }
+  .btn-secondary:hover:not(:disabled) {
+    background-color: hsl(var(--secondary)) !important;
+    color: hsl(var(--secondary-foreground)) !important;
+    opacity: 0.85;
+  }
+  .btn-ghost {
+    background-color: transparent !important;
+    color: hsl(var(--ghost-foreground)) !important;
+    border: none !important;
+    transition: background 0.2s, color 0.2s;
+  }
+  .btn-link {
+    background-color: transparent !important;
+    color: hsl(var(--link)) !important;
+    border: none !important;
+    text-decoration: underline;
+    transition: color 0.2s;
+  }
+  .btn-link:hover:not(:disabled) {
+    color: hsl(var(--link-foreground)) !important;
+  }
+  .btn-destructive {
+    background-color: hsl(var(--destructive)) !important;
+    color: hsl(var(--destructive-foreground)) !important;
+    border: none !important;
+    transition: background 0.2s, color 0.2s;
+  }
+  .btn-destructive:hover:not(:disabled) {
+    background-color: hsl(var(--destructive)) !important;
+    color: hsl(var(--destructive-foreground)) !important;
+    opacity: 0.85;
+  }
+  .btn-outline {
+    background-color: transparent !important;
+    color: hsl(var(--outline-foreground)) !important;
+    border: 1px solid hsl(var(--outline-border)) !important;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+  }
+  .btn-outline:hover:not(:disabled) {
+    background-color: hsl(var(--hover)) !important;
+    color: hsl(var(--outline-foreground)) !important;
+    border-color: hsl(var(--outline-border)) !important;
+  }
+}
 
-  ::-webkit-scrollbar-thumb {
-    @apply bg-muted-foreground/50 rounded-full hover:bg-muted-foreground/70 transition-colors;
-  }
+/* Unify code editor and textarea focus ring */
+.code-editor textarea:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2), 0 0 #0000;
+  border-color: hsl(var(--ring));
+}
+
+.code-editor textarea {
+  @apply flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 font-mono text-xs;
+}
+
+.code-editor {
+  @apply rounded-md border border-input bg-transparent;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.code-editor:focus-within {
+  border-color: hsl(var(--ring));
+  box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2);
+}
+.switch-on,
+.custom-switch[data-state="checked"] {
+  background-color: #22c55e !important; /* ON: #22c55e (emerald-500) */
+}
+.switch-off,
+.custom-switch {
+  background-color: #e5e7eb !important; /* OFF: #e5e7eb (zinc-200) */
+  transition: background 0.2s;
+}
+
+.switch-thumb,
+.switch-on .switch-thumb,
+.custom-switch-thumb,
+.custom-switch > span,
+.custom-switch .custom-switch-thumb,
+.custom-switch [data-state] > span,
+.custom-switch * {
+  background-color: #fff !important;
+  transition: background 0.2s;
 }

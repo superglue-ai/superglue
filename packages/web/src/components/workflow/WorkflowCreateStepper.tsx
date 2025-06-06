@@ -678,15 +678,15 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-blue-500 hover:bg-blue-100 transition-colors"
+                              className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-[hsl(var(--hover))] transition-colors"
                               onClick={() => handleEditSystem(index)}
                             >
                               <Pencil className="h-4 w-4" />
                             </Button>
                             <Button
                               variant="ghost"
+                              className="text-destructive"
                               size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                               onClick={() => removeSystem(index)}
                             >
                               <Trash2 className="h-4 w-4" />
@@ -930,7 +930,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
               <div className="space-y-1">
                 <Label htmlFor="payload">Workflow Variables (Optional, JSON)</Label>
                 <HelpTooltip text="Provide dynamic variables for the workflow as a JSON object. Workflow variables are equivalent to your workflow's initial payload and can be referenced in the entire config. You can change them when you use the workflow later." />
-                <div className="flex-1 min-h-0 border rounded-md overflow-hidden">
+                <div className="flex-1 min-h-0 code-editor">
                   <div className="h-full font-mono relative bg-transparent overflow-auto">
                     <Editor
                       value={payload}
@@ -948,12 +948,9 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                       tabSize={2}
                       insertSpaces={true}
                       className={cn(
-                        "min-h-[96px] text-xs [&_textarea]:outline-none [&_textarea]:w-full [&_textarea]:resize-none [&_textarea]:p-0 [&_textarea]:border-0 [&_textarea]:bg-transparent dark:[&_textarea]:text-white",
+                        "font-mono text-xs w-full min-h-[60px]",
                         validationErrors.payload && inputErrorStyles
                       )}
-                      style={{
-                        fontFamily: 'var(--font-mono)',
-                      }}
                     />
                     {validationErrors.payload && (
                       <div className="absolute bottom-0 left-0 right-0 bg-red-500/10 text-red-500 p-2 text-xs">
