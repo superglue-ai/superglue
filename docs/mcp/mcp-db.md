@@ -62,9 +62,9 @@ Always tell superglue your database connection: postgres://superglue:superglue@d
 
 ### What Happened Under the Hood:
 
-- superglue MCP used `superglue_build_new_tool` to create a new database workflow that connects to PostgreSQL and executes the requested queries
-- superglue MCP used `superglue_execute_tool` to run the workflow and fetch the actual LEGO data
-- superglue MCP used `superglue_get_integration_code` to generate code for embedding this database workflow in your application
+- superglue MCP called the from instruction endpoint to build and execute the tool ad-hoc based on your natural language request
+- The tool was created, executed, and returned results without needing to be saved as a persistent workflow
+- This allows for immediate database operations through natural language without the overhead of tool creation and management
 
 ## Example: Creating a New Custom LEGO Set
 
