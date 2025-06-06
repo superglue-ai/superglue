@@ -1,8 +1,11 @@
 "use client";
 
-import { Book, Bot, History, Layout, PlayCircle } from "lucide-react";
+import { Book, Bot, History, Layout, PlayCircle, Sun, Moon, Monitor } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTheme } from "@/src/hooks/useTheme";
+import { Button } from "@/src/components/ui/button";
+import { useEffect, useState } from "react";
 
 const navItems = [
   { icon: Layout, label: "Configurations", href: "/" },
@@ -18,13 +21,16 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const [theme, setTheme, resolvedTheme] = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   return (
-    <div className="w-64 min-w-64 flex-shrink-0 bg-white dark:bg-gray-900 border-r dark:border-gray-800 flex flex-col">
+    <aside className="bg-background text-foreground border-r border-border h-full flex flex-col">
       <div className="p-6">
         <div className="relative mx-auto">
           <img src="/logo.svg" alt="superglue Logo" className="max-w-full h-[50px] w-[200px] ml-auto mr-auto" />
-          <div className="text-center text-sm text-gray-300 dark:text-gray-300 mt-2">Data Integration Agent</div>
+          <div className="text-center text-sm text-foreground mt-2">Data Integration Agent</div>
         </div>
       </div>
       <nav className="flex-1">
@@ -47,6 +53,36 @@ export function Sidebar() {
           );
         })}
       </nav>
-    </div>
+      <div className="p-6 mt-auto flex flex-col items-center">
+        {mounted && (
+          <div className="flex gap-2">
+            <Button
+              variant={theme === "light" ? "default" : "outline"}
+              size="icon"
+              aria-label="Light mode"
+              onClick={() => setTheme("light")}
+            >
+              <Sun className="h-5 w-5" />
+            </Button>
+            <Button
+              variant={theme === "system" ? "default" : "outline"}
+              size="icon"
+              aria-label="System mode"
+              onClick={() => setTheme("system")}
+            >
+              <Monitor className="h-5 w-5" />
+            </Button>
+            <Button
+              variant={theme === "dark" ? "default" : "outline"}
+              size="icon"
+              aria-label="Dark mode"
+              onClick={() => setTheme("dark")}
+            >
+              <Moon className="h-5 w-5" />
+            </Button>
+          </div>
+        )}
+      </div>
+    </aside>
   );
 }

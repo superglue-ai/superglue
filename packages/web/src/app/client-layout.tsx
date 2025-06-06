@@ -5,8 +5,8 @@ import { ServerMonitor } from '../components/utils/ServerMonitor'
 import { Sidebar } from '../components/Sidebar'
 import { Toaster } from '../components/ui/toaster'
 import { ConfigProvider } from './config-context'
-import { geistMono, geistSans } from './fonts'
 import { CSPostHogProvider } from './providers'
+import { jetbrainsMono, jetbrainsSans } from './fonts'
 import { LogSidebar } from '../components/utils/LogSidebar'
 
 interface Props {
@@ -21,7 +21,7 @@ export function ClientWrapper({ children, config }: Props) {
   return (
     <ConfigProvider config={config}>
       <CSPostHogProvider>
-        <div className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <div className={`${jetbrainsSans.variable} ${jetbrainsMono.variable} antialiased`}>
           {isAuthPage ? (
             children
           ) : (

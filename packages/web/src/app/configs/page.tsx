@@ -351,7 +351,7 @@ const ConfigTable = () => {
                 >
                   <TableCell className="w-[100px]">
                     <Button
-                      variant="secondary"
+                      variant="default"
                       size="sm"
                       onClick={handleRunClick}
                       className="gap-2"
@@ -444,6 +444,7 @@ const ConfigTable = () => {
                           <TooltipTrigger asChild>
                             <Button
                               variant="ghost"
+                              className="text-destructive"
                               size="icon"
                               onClick={(e) => {
                                 e.stopPropagation();

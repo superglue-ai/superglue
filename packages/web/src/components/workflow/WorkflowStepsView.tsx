@@ -87,11 +87,11 @@ export function WorkflowStepsView({ steps, onStepsChange, onStepEdit }: Workflow
     <div className="space-y-3">
       <div className="flex justify-end items-center gap-2 -mt-5">
         <Label htmlFor="editorMode" className="text-xs">Code Mode</Label>
-        <Switch id="stepsEditorMode" checked={isCodeMode} onCheckedChange={setIsCodeMode} />
+        <Switch className="custom-switch" id="stepsEditorMode" checked={isCodeMode} onCheckedChange={setIsCodeMode} />
       </div>
 
       {isCodeMode ? (
-        <div className="flex-1 min-h-0 border rounded-md overflow-hidden relative">
+        <div className="flex-1 min-h-0 border rounded-md overflow-hidden relative code-editor">
           <Editor
             value={codeValue}
             onValueChange={handleCodeChange}
@@ -100,12 +100,11 @@ export function WorkflowStepsView({ steps, onStepsChange, onStepEdit }: Workflow
             tabSize={2}
             insertSpaces={true}
             className={cn(
-              "min-h-[200px] h-full text-xs [&_textarea]:outline-none [&_textarea]:w-full [&_textarea]:h-full [&_textarea]:resize-none [&_textarea]:p-0 [&_textarea]:border-0 [&_textarea]:bg-transparent dark:[&_textarea]:text-white",
+              "font-mono text-xs w-full min-h-[200px]",
               jsonError && "border-red-500"
             )}
             style={{
-              fontFamily: 'var(--font-mono)',
-              minHeight: '200px', // Ensure a minimum height for the editor
+              minHeight: '200px',
             }}
           />
           {jsonError && (

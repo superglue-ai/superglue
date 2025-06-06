@@ -55,16 +55,16 @@ export function StepIndicator({ currentStep, steps }: StepIndicatorProps) {
     <div className="py-3">
       <div className="relative">
         {/* Progress bar background */}
-        <div className="absolute top-4 left-0 w-full h-0.5 bg-muted" />
+        <div className="absolute top-4 left-0 w-full h-0.5 bg-muted z-0" />
         
         {/* Active progress bar */}
         <div 
-          className="absolute top-4 left-0 h-0.5 bg-primary transition-all duration-500 ease-in-out"
+          className="absolute top-4 left-0 h-0.5 bg-primary transition-all duration-500 ease-in-out z-0"
           style={{ width: `${(currentIndex / (steps.length - 1)) * 100}%` }}
         />
 
         {/* Steps */}
-        <div className={`relative grid grid-cols-${steps.length} w-full`}>
+        <div className={`relative grid grid-cols-${steps.length} w-full z-10`}>
           {steps.map((step, index) => {
             const isActive = index === currentIndex
             const isCompleted = index < currentIndex
@@ -72,15 +72,15 @@ export function StepIndicator({ currentStep, steps }: StepIndicatorProps) {
             return (
               <div
                 key={step.id}
-                className="flex flex-col items-center"
+                className="flex flex-col items-center z-10"
               >
-                <div className="flex flex-col items-center gap-1.5">
+                <div className="flex flex-col items-center gap-1.5 z-10">
                   <div
                     className={cn(
-                      'w-7 h-7 rounded-full border-2 flex items-center justify-center text-sm font-medium transition-colors',
+                      'w-7 h-7 rounded-full border-2 flex items-center justify-center text-sm font-medium transition-colors z-10',
                       isCompleted && 'border-primary bg-primary text-primary-foreground',
                       isActive && 'border-primary bg-background text-foreground',
-                      !isCompleted && !isActive && 'border-muted bg-muted/50 text-muted-foreground'
+                      !isCompleted && !isActive && 'border-muted bg-muted text-muted-foreground'
                     )}
                   >
                     {isCompleted ? (
