@@ -66,7 +66,7 @@ type TransformConfig implements BaseConfig {
   updatedAt: DateTime
 
   # Specific implementation
-  instruction: String!
+  instruction: String
   responseSchema: JSONSchema
   responseMapping: JSONata
 }
