@@ -23,7 +23,7 @@ type ApiConfig implements BaseConfig {
   # Specific implementation
   urlHost: String!
   urlPath: String
-  instruction: String!
+  instruction: String
   method: HttpMethod
   queryParams: JSON
   headers: JSON
@@ -47,7 +47,7 @@ type ExtractConfig implements BaseConfig {
   urlHost: String!
   urlPath: String
   queryParams: JSON
-  instruction: String!
+  instruction: String
   method: HttpMethod
   headers: JSON
   body: String
@@ -175,7 +175,7 @@ input ApiInput {
   id: ID!
   urlHost: String!
   urlPath: String
-  instruction: String!
+  instruction: String
   queryParams: JSON
   method: HttpMethod
   headers: JSON
@@ -194,7 +194,7 @@ input ExtractInput {
   urlHost: String!
   urlPath: String
   queryParams: JSON
-  instruction: String!
+  instruction: String
   method: HttpMethod
   headers: JSON
   body: String
@@ -208,7 +208,7 @@ input ExtractInput {
 
 input TransformInput {
   id: ID!
-  instruction: String!
+  instruction: String
   responseSchema: JSONSchema
   responseMapping: JSONata
   version: String
