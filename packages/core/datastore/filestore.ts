@@ -83,6 +83,10 @@ export class FileStore implements DataStore {
         logMessage('info', 'File Datastore: No existing data found, starting with empty storage');
         await this.persist();
       }
+      else {
+        logMessage('error', 'COULD NOT LOAD FROM EXSTISTING FILE. EXITING. ' + error);
+        process.exit(1);
+      }
     }
     try {
       const logs = fs.readFileSync(this.logsFilePath, 'utf-8');
