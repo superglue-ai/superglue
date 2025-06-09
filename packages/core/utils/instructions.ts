@@ -97,8 +97,8 @@ export function sanitizeInstructionSuggestions(raw: unknown): string[] {
     }
   } else if (Array.isArray(raw)) {
     arr = raw;
-  } else if (raw != null) {
-    arr = [String(raw)];
+  } else  {
+    return [];
   }
 
   // Flatten any multi-line strings
@@ -107,17 +107,36 @@ export function sanitizeInstructionSuggestions(raw: unknown): string[] {
   );
 
   // Remove empty, header, or markdown lines
-  return arr
+  const headerRegex = /^(\s*[#>*-]+\s*)?((integration suggestions|individual suggestions|example output|example:|output:)[^a-zA-Z0-9]*|[\-*#_]{2,}|\s*)$/i;
+
+  // Remove lines that are just markdown separators or bullets
+  const isSeparator = (line: string) => {
+    const trimmed = line.trim();
+    // Remove if only made up of separator chars, or is a single separator char
+    return (
+      /^[\s\-_*>#]+$/.test(trimmed) ||
+      ["_", "-", "*", ">", "#"].includes(trimmed)
+    );
+  };
+
+  // Format, filter, and deduplicate
+  const seen = new Set<string>();
+  const filtered = arr
     .map((s) =>
       s
-        .replace(/^[-*]\s*/, "") // Remove leading - or *
-        .replace(/^[0-9]+\.\s*/, "") // Remove leading numbers
+        .replace(/^[-*#>\s]+/, "") // Remove leading markdown symbols and whitespace
+        .replace(/[-*#>\s]+$/, "") // Remove trailing markdown symbols and whitespace
         .replace(/^"|"$/g, "") // Remove leading/trailing quotes
         .trim()
     )
     .filter(
       (s) =>
         s.length > 0 &&
-        !/^(\*\*.*\*\*|Individual Suggestions:|Integration Suggestions:)/i.test(s)
+        !headerRegex.test(s) &&
+        !isSeparator(s) &&
+        !seen.has(s) &&
+        seen.add(s)
     );
+
+  return filtered;
 }
