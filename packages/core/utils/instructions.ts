@@ -11,18 +11,17 @@ export async function generateInstructions(systems: SystemDefinition[], metadata
 
 For each system, provide 1-2 specific retrieval-focused examples. Then, suggest 3-4 detailed integration workflows that combine multiple systems. Each suggestion should be specific enough to implement directly, including key data points or criteria to use.
 
-Example output for Stripe + MongoDB systems:
-Individual suggestions:
-- "Retrieve all Stripe customers who have spent over $1000 in the last 30 days"
-- "Find MongoDB documents where subscription_status is 'past_due'"
+**Important:** Return ONLY a JSON array of strings. Do NOT include any section headers, markdown, bullet points, numbers, or explanations. Each string in the array should be a single, specific, implementable instruction.
 
-Integration suggestions:
-- "When a customer's total spend in Stripe exceeds $5000, fetch their order history from MongoDB and update their loyalty tier"
-- "Query MongoDB for all users with premium_status=true and verify their Stripe subscription is still active"
-- "Retrieve failed Stripe payments from the last 24 hours and cross-reference with customer engagement data in MongoDB"
+**Example output:**
+[
+  "Retrieve all Stripe customers who have spent over $1000 in the last 30 days.",
+  "Find MongoDB documents where subscription_status is 'past_due'.",
+  "When a customer's total spend in Stripe exceeds $5000, fetch their order history from MongoDB and update their loyalty tier.",
+  "Query MongoDB for all users with premium_status=true and verify their Stripe subscription is still active."
+]
 
-Return the suggestions as an array of strings, each representing a specific, implementable instruction.
-Remember this important rule: Do not think long and keep each instruction concise and simple, with maximum 4 options total (not per system).
+Remember these important rules: The output MUST be a JSON array of strings, with no extra formatting or explanation. Do not think long and keep each instruction concise and simple, with maximum 4 options total (not per system).
 `
     },
     {
@@ -72,5 +71,53 @@ async function attemptInstructionGeneration(
     throw new Error("No valid instructions generated");
   }
 
-  return generatedInstructions;
+  try {
+    const sanitized = sanitizeInstructionSuggestions(generatedInstructions);
+    if (!Array.isArray(sanitized) || sanitized.length === 0) {
+      throw new Error("Sanitization failed or returned no valid instructions");
+    }
+    return sanitized;
+  } catch (err) {
+    logMessage('error', `Sanitization failed: ${err.message}`);
+    return [];
+  }
+}
+
+export function sanitizeInstructionSuggestions(raw: unknown): string[] {
+  let arr: string[] = [];
+
+  // Try to parse JSON if it's a string
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) arr = parsed;
+      else arr = [parsed];
+    } catch {
+      arr = [raw];
+    }
+  } else if (Array.isArray(raw)) {
+    arr = raw;
+  } else if (raw != null) {
+    arr = [String(raw)];
+  }
+
+  // Flatten any multi-line strings
+  arr = arr.flatMap((item) =>
+    typeof item === "string" ? item.split(/\r?\n/).map((s) => s.trim()) : []
+  );
+
+  // Remove empty, header, or markdown lines
+  return arr
+    .map((s) =>
+      s
+        .replace(/^[-*]\s*/, "") // Remove leading - or *
+        .replace(/^[0-9]+\.\s*/, "") // Remove leading numbers
+        .replace(/^"|"$/g, "") // Remove leading/trailing quotes
+        .trim()
+    )
+    .filter(
+      (s) =>
+        s.length > 0 &&
+        !/^(\*\*.*\*\*|Individual Suggestions:|Integration Suggestions:)/i.test(s)
+    );
 }
