@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LanguageModel } from '../llm/llm.js';
-import { generateInstructions } from './instructions.js';
+import { generateInstructions, sanitizeInstructionSuggestions } from './instructions.js';
 
 vi.mock('../llm/llm.js', () => {
   return {
@@ -108,4 +108,73 @@ describe('generateInstructions', () => {
     await expect(generateInstructions(systems, { orgId: 'test-org' })).rejects.toThrow('Persistent error')
     expect(generateObject).toHaveBeenCalledTimes(4) // Initial try + 3 retries
   })
-}) 
+})
+
+describe('sanitizeInstructionSuggestions', () => {
+  it('returns a clean array for a proper array of strings', () => {
+    const input = [
+      'Get all users',
+      'Fetch all orders',
+      'Sync data'
+    ];
+    expect(sanitizeInstructionSuggestions(input)).toEqual([
+      'Get all users',
+      'Fetch all orders',
+      'Sync data'
+    ]);
+  });
+
+  it('parses a JSON stringified array', () => {
+    const input = '["A", "B", "C"]';
+    expect(sanitizeInstructionSuggestions(input)).toEqual(['A', 'B', 'C']);
+  });
+
+  it('splits a single string with newlines and bullets', () => {
+    const input = '- Get all users\n- Fetch all orders\n- Sync data';
+    expect(sanitizeInstructionSuggestions(input)).toEqual([
+      'Get all users',
+      'Fetch all orders',
+      'Sync data'
+    ]);
+  });
+
+  it('removes headers and markdown from array', () => {
+    const input = [
+      '**Individual Suggestions:**',
+      '- Get all users',
+      '- Fetch all orders',
+      '**Integration Suggestions:**',
+      '- Sync data'
+    ];
+    expect(sanitizeInstructionSuggestions(input)).toEqual([
+      'Get all users',
+      'Fetch all orders',
+      'Sync data'
+    ]);
+  });
+
+  it('returns empty array for empty input', () => {
+    expect(sanitizeInstructionSuggestions('')).toEqual([]);
+    expect(sanitizeInstructionSuggestions([])).toEqual([]);
+    expect(sanitizeInstructionSuggestions(null)).toEqual([]);
+    expect(sanitizeInstructionSuggestions(undefined)).toEqual([]);
+  });
+
+  it('handles malformed JSON gracefully', () => {
+    expect(sanitizeInstructionSuggestions('["A", "B",')).toEqual(['["A", "B",']);
+  });
+
+  it('returns empty array if sanitizer throws', () => {
+    // Simulate a toString that throws
+    const evil = {
+      toString() { throw new Error('fail'); }
+    };
+    let result: string[];
+    try {
+      result = sanitizeInstructionSuggestions(evil);
+    } catch {
+      result = ['should not throw'];
+    }
+    expect(result).toEqual([]);
+  });
+}); 
