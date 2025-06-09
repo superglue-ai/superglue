@@ -900,8 +900,8 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                     className={cn("min-h-80", validationErrors.instruction && inputErrorStyles)}
                   />
                   {suggestions.length > 0 && !instruction && (
-                    <div className="absolute bottom-0  p-3 pointer-events-none">
-                      <div className="flex flex-wrap gap-2">
+                    <div className="absolute bottom-0 p-3 pointer-events-none w-full">
+                      <div className="flex gap-2 overflow-x-auto whitespace-nowrap w-full">
                         {suggestions.map((suggestion, index) => (
                           <Button
                             key={index}
