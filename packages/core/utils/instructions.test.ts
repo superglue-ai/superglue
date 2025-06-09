@@ -138,13 +138,62 @@ describe('sanitizeInstructionSuggestions', () => {
     ]);
   });
 
-  it('removes headers and markdown from array', () => {
+  it('removes headers and markdown from array (classic)', () => {
     const input = [
       '**Individual Suggestions:**',
       '- Get all users',
       '- Fetch all orders',
       '**Integration Suggestions:**',
       '- Sync data'
+    ];
+    expect(sanitizeInstructionSuggestions(input)).toEqual([
+      'Get all users',
+      'Fetch all orders',
+      'Sync data'
+    ]);
+  });
+
+  it('removes headers and markdown from array (various cases)', () => {
+    const input = [
+      '# Example Output',
+      '## Integration Suggestions',
+      '---',
+      '***',
+      'Output:',
+      'Example:',
+      'Individual Suggestions',
+      'Integration Suggestions',
+      'Get all users',
+      'Fetch all orders',
+      'Sync data',
+      '***Integration Suggestions***',
+      '   ##   Example Output   ',
+      '   * Individual Suggestions *   ',
+      '   # Output:   ',
+      '   ----   ',
+      '   ***   ',
+      '   ',
+      '',
+      '   #   ',
+      '   *   ',
+      '   -   ',
+      '   _   ',
+      '   >   ',
+      '   > Output:',
+      '   > Example:',
+      '   > Integration Suggestions',
+      '   > Individual Suggestions',
+      '   > # Example Output',
+      '   > ## Integration Suggestions',
+      '   > ---',
+      '   > ***',
+      '   > Output:',
+      '   > Example:',
+      '   > Individual Suggestions',
+      '   > Integration Suggestions',
+      '   > Get all users',
+      '   > Fetch all orders',
+      '   > Sync data',
     ];
     expect(sanitizeInstructionSuggestions(input)).toEqual([
       'Get all users',
@@ -177,4 +226,9 @@ describe('sanitizeInstructionSuggestions', () => {
     }
     expect(result).toEqual([]);
   });
-}); 
+
+  it('handles non-string, non-array input', () => {
+    expect(sanitizeInstructionSuggestions(42)).toEqual([]);
+    expect(sanitizeInstructionSuggestions({ foo: 'bar' })).toEqual([]);
+  });
+}) 
