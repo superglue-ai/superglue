@@ -26,13 +26,13 @@ const EmptyStateActions: React.FC<EmptyStateActionsProps> = ({
         <div className="relative">
           <Button
             onClick={handleWorkflow}
-            className="h-auto md:h-80 shadow-md hover:shadow-lg transition-all duration-300 rounded-2xl bg-card border border-primary/20 hover:border-primary/30 flex flex-col justify-center p-6 w-full"
+            className="h-auto md:h-80 shadow-md hover:shadow-lg transition-all duration-300 rounded-2xl bg-card border border-primary/20 hover:border-primary/30 flex flex-col justify-center p-6 w-full group"
             variant="outline"
             size="lg"
           >
             <div className="flex flex-col items-center justify-center gap-4 md:gap-7">
-              <div className="p-4 md:p-6 rounded-full bg-primary/10 hover:bg-primary/15 transition-colors duration-300">
-                <GitBranch className="h-12 w-12 md:h-16 md:w-16 text-primary" strokeWidth={1.5} />
+              <div className="p-4 md:p-6 rounded-full bg-primary/70 transition-colors duration-300">
+                <GitBranch className="h-12 w-12 md:h-16 md:w-16 text-foreground group-hover:text-foreground" strokeWidth={1.5} />
               </div>
               <div className="flex flex-col items-center text-center">
                 <span className="text-lg md:text-2xl font-semibold mb-1 md:mb-2 max-w-full">Workflow</span>
@@ -69,8 +69,8 @@ const EmptyStateActions: React.FC<EmptyStateActionsProps> = ({
           size="lg"
         >
           <div className="flex flex-col items-center justify-center gap-4 md:gap-7">
-            <div className="p-4 md:p-6 rounded-full bg-primary/10 hover:bg-primary/15 transition-colors duration-300">
-              <Zap className="h-12 w-12 md:h-16 md:w-16 text-primary" strokeWidth={1.5} />
+            <div className="p-4 md:p-6 rounded-full bg-primary/70 transition-colors duration-300">
+              <Zap className="h-12 w-12 md:h-16 md:w-16 text-foreground group-hover:text-foreground" strokeWidth={1.5} />
             </div>
             <div className="flex flex-col items-center text-center">
               <span className="text-lg md:text-2xl font-semibold mb-1 md:mb-2 max-w-full">Transform</span>
