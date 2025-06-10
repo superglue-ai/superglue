@@ -11,8 +11,6 @@ export class FileStore implements DataStore {
     apis: Map<string, ApiConfig>;
     extracts: Map<string, ExtractConfig>;
     transforms: Map<string, TransformConfig>;
-    runs: Map<string, RunResult>;
-    runsIndex: Map<string, { id: string; timestamp: number; configId: string }[]>;
     workflows: Map<string, Workflow>;
     tenant: {
       email: string | null;
@@ -28,8 +26,6 @@ export class FileStore implements DataStore {
       apis: new Map(),
       extracts: new Map(),
       transforms: new Map(),
-      runs: new Map(),
-      runsIndex: new Map(),
       workflows: new Map(),
       tenant: {
         email: null,
@@ -44,7 +40,7 @@ export class FileStore implements DataStore {
     }
 
     this.filePath = path.join(storageDir, 'superglue_data.json');
-    this.logsFilePath = path.join(storageDir, 'superglue_logs.json');
+    this.logsFilePath = path.join(storageDir, 'superglue_logs.jsonl');
     logMessage('info', `File Datastore: Using storage path: ${this.filePath}`);
 
     this.initializeStorage();
@@ -69,8 +65,6 @@ export class FileStore implements DataStore {
         extracts: new Map(Object.entries(parsed.extracts || {})),
         transforms: new Map(Object.entries(parsed.transforms || {})),
         workflows: new Map(Object.entries(parsed.workflows || {})),
-        runs: new Map(Object.entries(parsed.runs || {})),
-        runsIndex: new Map(Object.entries(parsed.runsIndex || {})),
         tenant: {
           email: parsed.tenant?.email || null,
           emailEntrySkipped: parsed.tenant?.emailEntrySkipped || false
@@ -84,30 +78,15 @@ export class FileStore implements DataStore {
         await this.persist();
       }
       else {
-        logMessage('error', 'COULD NOT LOAD FROM EXSTISTING FILE. EXITING. ' + error);
+        logMessage('error', 'COULD NOT LOAD FROM EXISTING FILE. EXITING. ' + error);
         process.exit(1);
       }
     }
-    try {
-      const logs = fs.readFileSync(this.logsFilePath, 'utf-8');
-      const parsedLogs = JSON.parse(logs, (key, value) => {
-        if (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
-          return new Date(value);
-        }
-        return value;
-      });
-      // Merge logs with existing storage
-      this.storage = {
-        ...this.storage,
-        runs: new Map([...this.storage.runs, ...Object.entries(parsedLogs.runs as RunResult[] || {})]),
-        runsIndex: new Map([...this.storage.runsIndex, ...Object.entries(parsedLogs.runsIndex as object || {})]),
-      };
-    } catch (error) {
-      logMessage('error', 'Logs Datastore: Error loading data: ' + error);
-      if (!fs.existsSync(this.logsFilePath)) {
-        logMessage('info', 'Logs Datastore: No existing logs found, starting with empty storage');
-        await this.persistLogs();
-      }
+
+    // Ensure logs file exists
+    if (!fs.existsSync(this.logsFilePath)) {
+      fs.writeFileSync(this.logsFilePath, '', { mode: 0o644 });
+      logMessage('info', 'Logs Datastore: Created empty logs file');
     }
   }
 
@@ -129,25 +108,6 @@ export class FileStore implements DataStore {
     }
   }
 
-  private isWritingLogs = false;
-
-  private async persistLogs() {
-    if (this.isWritingLogs) return;
-    this.isWritingLogs = true;
-    try {
-      const serializedLogs = {
-        runs: Object.fromEntries(this.storage.runs),
-        runsIndex: Object.fromEntries(this.storage.runsIndex),
-      };
-      fs.writeFileSync(this.logsFilePath, JSON.stringify(serializedLogs, null, 2), { mode: 0o644 });
-    } catch (error) {
-      logMessage('error', 'Failed to persist logs: ' + error);
-      throw error;
-    } finally {
-      this.isWritingLogs = false;
-    }
-  }
-
   private getKey(prefix: string, id: string, orgId?: string): string {
     return `${orgId ? `${orgId}:` : ''}${prefix}:${id}`;
   }
@@ -161,6 +121,147 @@ export class FileStore implements DataStore {
   // Helper function to generate md5 hash
   private generateHash(data: any): string {
     return createHash('md5').update(JSON.stringify(data)).digest('hex');
+  }
+
+  // Helper function to read last N lines from file without reading entire file
+  private readLastLines(filePath: string, lineCount: number): string[] {
+    if (!fs.existsSync(filePath)) return [];
+
+    const BUFFER_SIZE = 8192;
+    const fd = fs.openSync(filePath, 'r');
+    const stats = fs.statSync(filePath);
+    let fileSize = stats.size;
+
+    if (fileSize === 0) {
+      fs.closeSync(fd);
+      return [];
+    }
+
+    const lines: string[] = [];
+    let buffer = Buffer.alloc(BUFFER_SIZE);
+    let leftover = '';
+    let position = fileSize;
+
+    try {
+      while (lines.length < lineCount && position > 0) {
+        const chunkSize = Math.min(BUFFER_SIZE, position);
+        position = Math.max(0, position - chunkSize);
+
+        const bytesRead = fs.readSync(fd, buffer, 0, chunkSize, position);
+        const chunk = buffer.subarray(0, bytesRead).toString('utf-8') + leftover;
+
+        const chunkLines = chunk.split('\n');
+        leftover = chunkLines.shift() || '';
+
+        // Add lines from end to beginning
+        for (let i = chunkLines.length - 1; i >= 0 && lines.length < lineCount; i--) {
+          if (chunkLines[i].trim()) {
+            lines.unshift(chunkLines[i]);
+          }
+        }
+      }
+
+      // Add leftover if we're at the start of file
+      if (position === 0 && leftover.trim() && lines.length < lineCount) {
+        lines.unshift(leftover);
+      }
+
+    } finally {
+      fs.closeSync(fd);
+    }
+
+    return lines.slice(-lineCount);
+  }
+
+  // Helper function to read runs from logs file
+  private readRunsFromLogs(orgId?: string, configId?: string, maxRuns?: number): RunResult[] {
+    try {
+      // Read more lines than needed to account for filtering
+      const linesToRead = maxRuns ? maxRuns * 3 : 1000;
+      const lines = this.readLastLines(this.logsFilePath, linesToRead);
+
+      const runs: RunResult[] = [];
+
+      for (const line of lines) {
+        try {
+          const run = JSON.parse(line, (key, value) => {
+            if (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
+              return new Date(value);
+            }
+            return value;
+          }) as RunResult & { orgId: string };
+
+          // Filter by orgId and configId if specified
+          if (orgId && run.orgId && run.orgId !== orgId) continue;
+          if (configId && run.config?.id !== configId) continue;
+
+          runs.push(run);
+
+          // Stop early if we have enough
+          if (maxRuns && runs.length >= maxRuns) break;
+        } catch (parseError) {
+          logMessage('warn', `Failed to parse log line: ${line}`);
+        }
+      }
+      return runs.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
+    } catch (error) {
+      logMessage('error', 'Failed to read runs from logs: ' + error);
+      return [];
+    }
+  }
+
+  // Helper function to write run to logs file
+  private appendRunToLogs(run: RunResult, orgId: string): void {
+    try {
+      const runWithOrgId = { ...run, orgId };
+      const logLine = JSON.stringify(runWithOrgId) + '\n';
+      fs.appendFileSync(this.logsFilePath, logLine, { mode: 0o644 });
+    } catch (error) {
+      logMessage('error', 'Failed to append run to logs: ' + error);
+      throw error;
+    }
+  }
+
+  // Helper function to remove run from logs file
+  private removeRunFromLogs(id: string, orgId?: string): boolean {
+    try {
+      if (!fs.existsSync(this.logsFilePath)) {
+        return false;
+      }
+
+      const content = fs.readFileSync(this.logsFilePath, 'utf-8');
+      if (!content.trim()) {
+        return false;
+      }
+
+      const lines = content.trim().split('\n');
+      const filteredLines: string[] = [];
+      let found = false;
+
+      for (const line of lines) {
+        try {
+          const run = JSON.parse(line) as RunResult & { orgId: string };
+          if (run.id === id && (!orgId || run.orgId === orgId)) {
+            found = true;
+            continue; // Skip this line
+          }
+          filteredLines.push(line);
+        } catch (parseError) {
+          // Keep unparseable lines
+          filteredLines.push(line);
+        }
+      }
+
+      if (found) {
+        const newContent = filteredLines.length > 0 ? filteredLines.join('\n') + '\n' : '';
+        fs.writeFileSync(this.logsFilePath, newContent, { mode: 0o644 });
+      }
+
+      return found;
+    } catch (error) {
+      logMessage('error', 'Failed to remove run from logs: ' + error);
+      return false;
+    }
   }
 
   // API Config Methods
@@ -260,90 +361,91 @@ export class FileStore implements DataStore {
   // Run Result Methods
   async getRun(id: string, orgId: string): Promise<RunResult | null> {
     if (!id) return null;
-    const key = this.getKey('run', id, orgId);
-    const run = this.storage.runs.get(key);
-    return run ? { ...run, id } : null;
+
+    const runs = this.readRunsFromLogs(orgId);
+    const run = runs.find(r => r.id === id);
+    if (!run) return null;
+    if ((run as any).orgId) delete (run as any).orgId;
+    return run || null;
   }
 
   async createRun(run: RunResult, orgId: string): Promise<RunResult> {
     if (!run) return null;
-    const key = this.getKey('run', run.id, orgId);
-    this.storage.runs.set(key, run);
 
-    if (!this.storage.runsIndex.has(orgId)) {
-      this.storage.runsIndex.set(orgId, []);
+    // Only log runs if disable_logs environment variable is not set
+    if (!process.env.DISABLE_LOGS) {
+      this.appendRunToLogs(run, orgId);
     }
 
-    const index = this.storage.runsIndex.get(orgId)!;
-    index.push({
-      id: run.id,
-      timestamp: run.startedAt.getTime(),
-      configId: run.config?.id
-    });
-    index.sort((a, b) => b.timestamp - a.timestamp);
-
-    await this.persistLogs();
     return run;
   }
 
   async listRuns(limit = 10, offset = 0, configId?: string, orgId?: string): Promise<{ items: RunResult[], total: number }> {
-    const index = this.storage.runsIndex.get(orgId) || [];
-    const runIds = index
-      .filter(entry => !configId || entry.configId === configId)
-      .slice(offset, offset + limit)
-      .map(entry => entry.id);
-
-    const items = runIds.map(id => {
-      const key = this.getKey('run', id, orgId);
-      const run = this.storage.runs.get(key);
-      return run ? { ...run, id } : null;
-    }).filter((run): run is RunResult => run !== null);
-    return { items, total: index.length };
+    const allRuns = this.readRunsFromLogs(orgId, configId);
+    const items = allRuns.slice(offset, offset + limit).map(run => {
+      if ((run as any).orgId) delete (run as any).orgId;
+      return run;
+    });
+    return { items, total: allRuns.length };
   }
 
   async deleteRun(id: string, orgId: string): Promise<boolean> {
     if (!id) return false;
-    const key = this.getKey('run', id, orgId);
-    const deleted = this.storage.runs.delete(key);
-
-    if (deleted && this.storage.runsIndex.has(orgId)) {
-      const index = this.storage.runsIndex.get(orgId)!;
-      const entryIndex = index.findIndex(entry => entry.id === id);
-      if (entryIndex !== -1) {
-        index.splice(entryIndex, 1);
-      }
-    }
-    await this.persistLogs();
-    return deleted;
+    return this.removeRunFromLogs(id, orgId);
   }
 
   async deleteAllRuns(orgId: string): Promise<boolean> {
-    const keys = Array.from(this.storage.runs.keys())
-      .filter(key => key.startsWith(`${orgId ? `${orgId}:` : ''}run:`));
+    try {
+      if (!fs.existsSync(this.logsFilePath)) {
+        return true;
+      }
 
-    for (const key of keys) {
-      this.storage.runs.delete(key);
+      const content = fs.readFileSync(this.logsFilePath, 'utf-8');
+      if (!content.trim()) {
+        return true;
+      }
+
+      const lines = content.trim().split('\n');
+      const filteredLines: string[] = [];
+
+      for (const line of lines) {
+        try {
+          const run = JSON.parse(line) as RunResult & { orgId: string };
+          if (run.orgId !== orgId) {
+            filteredLines.push(line);
+          }
+        } catch (parseError) {
+          // Keep unparseable lines
+          filteredLines.push(line);
+        }
+      }
+
+      const newContent = filteredLines.length > 0 ? filteredLines.join('\n') + '\n' : '';
+      fs.writeFileSync(this.logsFilePath, newContent, { mode: 0o644 });
+      return true;
+    } catch (error) {
+      logMessage('error', 'Failed to delete all runs: ' + error);
+      return false;
     }
-
-    this.storage.runsIndex.delete(orgId);
-    await this.persistLogs();
-    return true;
   }
 
   async clearAll(): Promise<void> {
     this.storage.apis.clear();
     this.storage.extracts.clear();
     this.storage.transforms.clear();
-    this.storage.runs.clear();
-    this.storage.runsIndex.clear();
     this.storage.workflows.clear();
     await this.persist();
-    await this.persistLogs();
+
+    // Clear logs file
+    try {
+      fs.writeFileSync(this.logsFilePath, '', { mode: 0o644 });
+    } catch (error) {
+      logMessage('error', 'Failed to clear logs file: ' + error);
+    }
   }
 
   async disconnect(): Promise<void> {
     await this.persist();
-    await this.persistLogs();
   }
 
   async ping(): Promise<boolean> {

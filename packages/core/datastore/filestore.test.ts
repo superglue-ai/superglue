@@ -8,7 +8,7 @@ describe('FileStore', () => {
   let store: FileStore;
   const testOrgId = 'test-org';
   const testDir = './.test-data';
-  const testLogsPath = path.join(testDir, 'superglue_logs.json');
+  const testLogsPath = path.join(testDir, 'superglue_logs.jsonl');
   const testPath = path.join(testDir, 'superglue_data.json');
 
   beforeEach(() => {
@@ -22,6 +22,8 @@ describe('FileStore', () => {
     if (fs.existsSync(testDir)) {
       fs.rmdirSync(testDir);
     }
+    // Clear the DISABLE_LOGS environment variable for tests
+    delete process.env.DISABLE_LOGS;
     store = new FileStore(testDir);
   });
 
@@ -38,6 +40,8 @@ describe('FileStore', () => {
     if (fs.existsSync(testDir)) {
       fs.rmdirSync(testDir);
     }
+    // Clean up environment variable
+    delete process.env.DISABLE_LOGS;
   });
 
   describe('API Config', () => {
@@ -204,7 +208,7 @@ describe('FileStore', () => {
 
       const { items, total } = await store.listRuns(10, 0, 'config1', testOrgId);
       expect(items.length).toBe(2);
-      expect(total).toBe(3); // Total is still all runs
+      expect(total).toBe(2); // Total should match filtered results since we changed the implementation
       expect(items.map(run => run.id).sort()).toEqual(['run1', 'run3']);
     });
 
@@ -216,6 +220,18 @@ describe('FileStore', () => {
       const newStore = new FileStore(testDir);
       const retrieved = await newStore.getRun(testRun.id, testOrgId);
       expect(retrieved).toEqual(testRun);
+    });
+
+    it('should not log runs when DISABLE_LOGS is set', async () => {
+      process.env.DISABLE_LOGS = 'true';
+      const storeWithDisabledLogs = new FileStore(testDir);
+
+      await storeWithDisabledLogs.createRun(testRun, testOrgId);
+
+      // With DISABLE_LOGS set, the run should not be logged to file
+      // but retrieval will fail since it's not persisted anywhere
+      const retrieved = await storeWithDisabledLogs.getRun(testRun.id, testOrgId);
+      expect(retrieved).toBeNull();
     });
   });
 
