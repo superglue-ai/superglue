@@ -100,7 +100,7 @@ export function CredentialsManager({ value, onChange, className }: CredentialsMa
             id="advancedMode" 
             checked={isAdvancedMode} 
             onCheckedChange={setIsAdvancedMode}
-            className="scale-75"
+            className="custom-switch"
           />
         </div>
 
