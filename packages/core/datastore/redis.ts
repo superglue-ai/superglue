@@ -1,4 +1,4 @@
-import type { ApiConfig, ExtractConfig, RunResult, TransformConfig, Workflow } from "@superglue/client";
+import type { ApiConfig, ExtractConfig, RunResult, TransformConfig, Workflow, Integration } from "@superglue/client";
 import { createHash } from 'node:crypto';
 import { type RedisClientType, createClient } from 'redis';
 import { logMessage } from "../utils/logs.js";
@@ -10,6 +10,7 @@ export class RedisService implements DataStore {
   private readonly EXTRACT_PREFIX = 'extract:';
   private readonly TRANSFORM_PREFIX = 'transform:';
   private readonly WORKFLOW_PREFIX = 'workflow:';
+  private readonly INTEGRATION_PREFIX = 'integration:';
   private readonly TTL = 60 * 60 * 24 * 90; // 90 days
 
   constructor(config: {
@@ -351,6 +352,43 @@ export class RedisService implements DataStore {
       console.error('Error deleting workflow:', error);
       return false;
     }
+  }
+
+  // Integration Methods
+  async getIntegration(id: string, orgId?: string): Promise<Integration | null> {
+    if (!id) return null;
+    const key = this.getKey(this.INTEGRATION_PREFIX, id, orgId);
+    const data = await this.redis.get(key);
+    return parseWithId(data, id);
+  }
+
+  async listIntegrations(limit = 10, offset = 0, orgId?: string): Promise<{ items: Integration[], total: number }> {
+    const pattern = this.getPattern(this.INTEGRATION_PREFIX, orgId);
+    const keys = await this.redis.keys(pattern);
+    const slicedKeys = keys.slice(offset, offset + limit);
+
+    const integrations = await Promise.all(
+      slicedKeys.map(async (key) => {
+        const data = await this.redis.get(key);
+        const id = key.split(':').pop()!.replace(this.INTEGRATION_PREFIX, '');
+        return parseWithId(data, id);
+      })
+    );
+    return { items: integrations.filter((i): i is Integration => i !== null), total: keys.length };
+  }
+
+  async upsertIntegration(id: string, integration: Integration, orgId?: string): Promise<Integration> {
+    if (!id || !integration) return null;
+    const key = this.getKey(this.INTEGRATION_PREFIX, id, orgId);
+    await this.redis.set(key, JSON.stringify(integration));
+    return { ...integration, id };
+  }
+
+  async deleteIntegration(id: string, orgId?: string): Promise<boolean> {
+    if (!id) return false;
+    const key = this.getKey(this.INTEGRATION_PREFIX, id, orgId);
+    const result = await this.redis.del(key);
+    return result > 0;
   }
 }
 

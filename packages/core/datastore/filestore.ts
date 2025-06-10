@@ -1,4 +1,4 @@
-import type { ApiConfig, ExtractConfig, RunResult, TransformConfig, Workflow } from "@superglue/client";
+import type { ApiConfig, ExtractConfig, RunResult, TransformConfig, Workflow, Integration } from "@superglue/client";
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -14,6 +14,7 @@ export class FileStore implements DataStore {
     runs: Map<string, RunResult>;
     runsIndex: Map<string, { id: string; timestamp: number; configId: string }[]>;
     workflows: Map<string, Workflow>;
+    integrations: Map<string, Integration>;
     tenant: {
       email: string | null;
       emailEntrySkipped: boolean;
@@ -31,6 +32,7 @@ export class FileStore implements DataStore {
       runs: new Map(),
       runsIndex: new Map(),
       workflows: new Map(),
+      integrations: new Map(),
       tenant: {
         email: null,
         emailEntrySkipped: false
@@ -69,6 +71,7 @@ export class FileStore implements DataStore {
         extracts: new Map(Object.entries(parsed.extracts || {})),
         transforms: new Map(Object.entries(parsed.transforms || {})),
         workflows: new Map(Object.entries(parsed.workflows || {})),
+        integrations: new Map(Object.entries(parsed.integrations || {})),
         runs: new Map(Object.entries(parsed.runs || {})),
         runsIndex: new Map(Object.entries(parsed.runsIndex || {})),
         tenant: {
@@ -118,6 +121,7 @@ export class FileStore implements DataStore {
         extracts: Object.fromEntries(this.storage.extracts),
         transforms: Object.fromEntries(this.storage.transforms),
         workflows: Object.fromEntries(this.storage.workflows),
+        integrations: Object.fromEntries(this.storage.integrations),
         tenant: this.storage.tenant
       };
       const tempPath = `${this.filePath}.tmp`;
@@ -337,6 +341,7 @@ export class FileStore implements DataStore {
     this.storage.runs.clear();
     this.storage.runsIndex.clear();
     this.storage.workflows.clear();
+    this.storage.integrations.clear();
     await this.persist();
     await this.persistLogs();
   }
@@ -390,6 +395,37 @@ export class FileStore implements DataStore {
     if (!id) return false;
     const key = this.getKey('workflow', id, orgId);
     const deleted = this.storage.workflows.delete(key);
+    await this.persist();
+    return deleted;
+  }
+
+  // Integration Methods
+  async getIntegration(id: string, orgId?: string): Promise<Integration | null> {
+    if (!id) return null;
+    const key = this.getKey('integration', id, orgId);
+    const integration = this.storage.integrations.get(key);
+    return integration ? { ...integration, id } : null;
+  }
+
+  async listIntegrations(limit = 10, offset = 0, orgId?: string): Promise<{ items: Integration[], total: number }> {
+    const orgItems = this.getOrgItems(this.storage.integrations, 'integration', orgId);
+    const items = orgItems.slice(offset, offset + limit);
+    const total = orgItems.length;
+    return { items, total };
+  }
+
+  async upsertIntegration(id: string, integration: Integration, orgId?: string): Promise<Integration> {
+    if (!id || !integration) return null;
+    const key = this.getKey('integration', id, orgId);
+    this.storage.integrations.set(key, integration);
+    await this.persist();
+    return { ...integration, id };
+  }
+
+  async deleteIntegration(id: string, orgId?: string): Promise<boolean> {
+    if (!id) return false;
+    const key = this.getKey('integration', id, orgId);
+    const deleted = this.storage.integrations.delete(key);
     await this.persist();
     return deleted;
   }
