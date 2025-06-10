@@ -83,7 +83,7 @@ export class DataStoreFactory {
   constructor(testDir = "./.test-data") {
     this.testDir = testDir;
     this.testPath = path.join(testDir, "superglue_data.json");
-    this.testLogsPath = path.join(testDir, "superglue_logs.json");
+    this.testLogsPath = path.join(testDir, "superglue_logs.jsonl");
   }
 
   init() {
