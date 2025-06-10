@@ -5,14 +5,14 @@ description: "Instant reliable tools for your agents"
 
 Turn any API into tools so your agents can get things done reliably.
 
-Stop drowning your agents in 20+ fragile tools that break when APIs change. **superglue MCP** lets you build reliable, validated capabilities that agents can request and use in natural language - no more tool overload, no more brittle integrations.
+**superglue MCP** provides a general tool that lets agents build reliable, validated tools for any app, database or API, simply by requesting them in natural language.
 
 ## How superglue MCP Works
 
 superglue MCP is a lightweight API-wrapper available via MCP that:
 
-1. **Merges multiple endpoints and APIs into custom tools** - we call them capabilities
-2. **Exposes them via one server** that abstracts away endpoints and API calls  
+1. **Merges multiple endpoints and APIs into custom tools** 
+2. **Exposes them via one server** that abstracts away endpoints and API calls
 3. **Acts like a repository pattern** that stays stable even as upstream APIs or mappings change
 
 ### Key Benefits
@@ -23,7 +23,7 @@ superglue MCP is a lightweight API-wrapper available via MCP that:
 
 ## Use superglue MCP to:
 
-**Stitch Stripe and HubSpot together**: Build cross-API workflows like fetching transactions in Stripe and updating them in HubSpot reliably.
+**Stitch Stripe and HubSpot together**: Build reliable cross-API workflows like fetching transactions in Stripe and updating them in HubSpot reliably.
 
 **Create Ambient Agents**: Build agents that react to app triggers and events. Create agents that monitor your systems and respond automatically to events, triggers and webhooks.
 
