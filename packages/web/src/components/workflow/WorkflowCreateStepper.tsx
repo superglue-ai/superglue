@@ -901,7 +901,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                   />
                   {suggestions.length > 0 && !instruction && (
                     <div className="absolute bottom-0 p-3 pointer-events-none w-full">
-                      <div className="flex gap-2 overflow-x-auto whitespace-nowrap w-full">
+                      <div className="flex gap-2 overflow-x-auto whitespace-nowrap w-full pointer-events-auto">
                         {suggestions.map((suggestion, index) => (
                           <Button
                             key={index}
