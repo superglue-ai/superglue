@@ -1,4 +1,4 @@
-import type { ApiConfig, ExtractConfig, RunResult, TransformConfig, Workflow, Integration } from "@superglue/client";
+import type { ApiConfig, ExtractConfig, Integration, RunResult, TransformConfig, Workflow } from "@superglue/client";
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -377,7 +377,7 @@ export class FileStore implements DataStore {
     if (!run) return null;
 
     // Only log runs if disable_logs environment variable is not set
-    if (String(process.env.DISABLE_LOGS).toLowerCase() !== 'true') {
+    if (!process.env.DISABLE_LOGS) {
       this.appendRunToLogs(run, orgId);
     }
 
