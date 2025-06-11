@@ -25,7 +25,7 @@ code, pre, tt {
     --secondary: 220 7% 96%;           /* #f3f4f6 */
     --secondary-foreground: 220 7% 90%;/* #e5e7eb */
     --muted: 220 7% 98%;               /* #f7f8fa */
-    --muted-foreground: 220 7% 70%;    /* #191c20 */
+    --muted-foreground: 220 7% 40%;    /* #191c20 */
     --border: 220 7% 90%;              /* #e5e7eb */
     --input: 220 7% 80%;               /* #cfd2d6 */
     --hover: 220 7% 82%;               /* #d7dbe0 */
@@ -62,7 +62,7 @@ code, pre, tt {
     --secondary: 220 7% 10%;         /* #23262b */
     --secondary-foreground: 220 7% 20%; /* #32343a */
     --muted: 0 0% 10%; /* #1a1a1a */
-    --muted-foreground: 0 0% 30%; /* #cccccc */
+    --muted-foreground: 0 0% 50%; /* #cccccc */
     --accent: 220 7% 20%; 
     --accent-foreground: 0 0% 100%; /* #fff */
     --destructive: 0 72% 51%;         /* #e5484d */
