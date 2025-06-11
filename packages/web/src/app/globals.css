@@ -18,14 +18,14 @@ code, pre, tt {
     --card-foreground: 220 7% 10%;     /* #191c20 */
     --popover: 220 7% 98%;             /* #f7f8fa */
     --popover-foreground: 220 7% 12%;  /* #1e2126 */
-    --primary: 220 7% 90%;             /* #e5e7eb (light grey) */
-    --primary-foreground: 220 7% 20%;  /* #32343a (dark grey) */
-    --primary-hover: 220 7% 20%;       /* #32343a */
+    --primary: 220 7% 0%;             /* #e5e7eb (light grey) */
+    --primary-foreground: 220 7% 100%;  /* #32343a (black) */
+    --primary-hover: 220 7% 25%;       /* #32343a */
     --primary-hover-foreground: 220 7% 100%; /* #fff */
     --secondary: 220 7% 96%;           /* #f3f4f6 */
     --secondary-foreground: 220 7% 90%;/* #e5e7eb */
     --muted: 220 7% 98%;               /* #f7f8fa */
-    --muted-foreground: 220 7% 10%;    /* #191c20 */
+    --muted-foreground: 220 7% 40%;    /* #191c20 */
     --border: 220 7% 90%;              /* #e5e7eb */
     --input: 220 7% 80%;               /* #cfd2d6 */
     --hover: 220 7% 82%;               /* #d7dbe0 */
@@ -55,14 +55,14 @@ code, pre, tt {
     --card-foreground: 0 0% 100%; /* #fff */
     --popover: 0 0% 8%; /* #18191b */
     --popover-foreground: 0 0% 100%; /* #fff */
-    --primary: 220 7% 20%;             /* #23262b */
+    --primary: 220 7% 30%;             /* #23262b */
     --primary-foreground: 220 7% 100%;  /* #fff */
     --primary-hover: 220 7% 90%;       /* #e5e7eb */
     --primary-hover-foreground: 220 7% 20%; /* #32343a */
     --secondary: 220 7% 10%;         /* #23262b */
     --secondary-foreground: 220 7% 20%; /* #32343a */
     --muted: 0 0% 10%; /* #1a1a1a */
-    --muted-foreground: 0 0% 80%; /* #cccccc */
+    --muted-foreground: 0 0% 50%; /* #cccccc */
     --accent: 220 7% 20%; 
     --accent-foreground: 0 0% 100%; /* #fff */
     --destructive: 0 72% 51%;         /* #e5484d */
@@ -216,6 +216,28 @@ html.dark { color-scheme: dark; }
     background-color: hsl(var(--hover)) !important;
     color: hsl(var(--outline-foreground)) !important;
     border-color: hsl(var(--outline-border)) !important;
+  }
+  .btn-success,
+  .btn[variant="success"] {
+    background-color: #22c55e !important;
+    color: #fff !important;
+    border: none !important;
+    transition: background 0.2s, color 0.2s;
+  }
+  .btn-success:hover:not(:disabled),
+  .btn[variant="success"]:hover:not(:disabled) {
+    background-color: #16a34a !important; /* emerald-600 */
+    color: #fff !important;
+  }
+  .dark .btn-success,
+  .dark .btn[variant="success"] {
+    background-color: #22c55e !important;
+    color: #fff !important;
+  }
+  .dark .btn-success:hover:not(:disabled),
+  .dark .btn[variant="success"]:hover:not(:disabled) {
+    background-color: #16a34a !important;
+    color: #fff !important;
   }
 }
 

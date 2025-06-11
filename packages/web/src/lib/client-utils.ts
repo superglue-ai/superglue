@@ -103,3 +103,15 @@ export const splitUrl = (url: string) => {
     urlPath: urlObj.pathname === '/' ? '' : urlObj.pathname
   }   
 }
+
+export function flattenWorkflowCredentials(systems: { id: string; credentials: Record<string, string> }[]): Record<string, string> {
+  return systems.reduce((acc, sys) => {
+    return {
+      ...acc,
+      ...Object.entries(sys.credentials || {}).reduce(
+        (obj, [name, value]) => ({ ...obj, [`${sys.id}_${name}`]: value }),
+        {}
+      ),
+    }
+  }, {});
+}
