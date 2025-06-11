@@ -15,6 +15,7 @@ const buttonVariants = cva(
         secondary: "btn-secondary",
         ghost: "btn-ghost",
         link: "btn-link",
+        success: "btn-success",
       },
       size: {
         default: "h-9 px-4 py-2",
