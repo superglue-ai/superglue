@@ -12,15 +12,15 @@ import {
   PopoverTrigger,
 } from "@/src/components/ui/popover";
 import { useToast } from '@/src/hooks/use-toast';
-import { inputErrorStyles, splitUrl } from '@/src/lib/client-utils';
+import { inputErrorStyles, splitUrl, flattenWorkflowCredentials } from '@/src/lib/client-utils';
 import { findMatchingIntegration, integrations } from '@/src/lib/integrations';
 import { cn, composeUrl } from '@/src/lib/utils';
 import { SuperglueClient, SystemInput, Workflow, WorkflowResult } from '@superglue/client';
-import { ArrowRight, Check, ChevronsUpDown, Globe, Loader2, Pencil, Play, Plus, Trash2, X } from 'lucide-react';
+import { ArrowRight, Check, ChevronsUpDown, Globe, Loader2, Pencil, Play, Plus, Trash2, X, ChevronRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import Editor from 'react-simple-code-editor';
 import type { SimpleIcon } from 'simple-icons';
 import * as simpleIcons from 'simple-icons';
@@ -109,6 +109,13 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]); // Store multiple suggestions
 
+  const [showSchemaEditor, setShowSchemaEditor] = useState(false);
+  const [showSteps, setShowSteps] = useState(false);
+
+  const [reviewCredentials, setReviewCredentials] = useState<string>(
+    JSON.stringify((currentWorkflow && (currentWorkflow as any).credentials) || {}, null, 2)
+  );
+
   // Create integration options array with custom option first
   const integrationOptions = [
     { value: "custom", label: "Custom", icon: "default" },
@@ -137,11 +144,11 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   };
 
   // Auto-open system form when no systems exist and we're on the systems step
-  useState(() => {
+  useEffect(() => {
     if (systems.length === 0 && step === 'integrations') {
       setSystemFormVisible(true);
     }
-  });
+  }, [systems.length, step]);
 
   const handleUrlChange = (urlHost: string, urlPath: string, queryParams?: Record<string, string>) => {
     const normalizedUrlPath = urlPath === "/" ? "" : urlPath;
@@ -258,6 +265,8 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     setCurrentSystem(systems[index]);
     setSystemFormVisible(true);
     setEditingSystemIndex(index);
+    setInstruction("");
+    setPayload("{}");
   };
 
   const removeSystem = (index: number) => {
@@ -492,9 +501,13 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         endpoint: superglueConfig.superglueEndpoint,
         apiKey: superglueConfig.superglueApiKey,
       });
-      const credentials = Object.values(systems).reduce((acc, sys) => {
-        return { ...acc, ...Object.entries(sys.credentials || {}).reduce((obj, [name, value]) => ({ ...obj, [`${sys.id}_${name}`]: value }), {}) };
-      }, {});
+      const credentials = (() => {
+        try {
+          return JSON.parse(reviewCredentials);
+        } catch {
+          return {};
+        }
+      })();
       console.log(credentials);
       console.log(payload);
       console.log(currentWorkflow);
@@ -600,6 +613,22 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       credentials: {},
     });
   };
+
+  const reviewCredentialsRef = useRef<string>(reviewCredentials);
+
+  useEffect(() => {
+    if (step === 'review') {
+      const flatCreds = flattenWorkflowCredentials(
+        systems.map(sys => ({
+          id: sys.id,
+          credentials: sys.credentials || {}
+        }))
+      );
+      setReviewCredentials(JSON.stringify(flatCreds, null, 2));
+      setCurrentWorkflow({ ...(currentWorkflow as any), credentials: flatCreds } as any);
+    }
+    // eslint-disable-next-line
+  }, [step, systems]);
 
   return (
     <div className="flex-1 flex flex-col h-full p-6">
@@ -930,35 +959,33 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
               <div className="space-y-1">
                 <Label htmlFor="payload">Workflow Variables (Optional, JSON)</Label>
                 <HelpTooltip text="Provide dynamic variables for the workflow as a JSON object. Workflow variables are equivalent to your workflow's initial payload and can be referenced in the entire config. You can change them when you use the workflow later." />
-                <div className="flex-1 min-h-0 code-editor">
-                  <div className="h-full font-mono relative bg-transparent overflow-auto">
-                    <Editor
-                      value={payload}
-                      onValueChange={(code) => {
-                        setPayload(code);
-                        try {
-                          JSON.parse(code);
-                          setValidationErrors(prev => ({ ...prev, payload: false }));
-                        } catch (e) {
-                          setValidationErrors(prev => ({ ...prev, payload: true }));
-                        }
-                      }}
-                      highlight={highlightJson}
-                      padding={10}
-                      tabSize={2}
-                      insertSpaces={true}
-                      className={cn(
-                        "font-mono text-xs w-full min-h-[60px]",
-                        validationErrors.payload && inputErrorStyles
-                      )}
-                    />
-                    {validationErrors.payload && (
-                      <div className="absolute bottom-0 left-0 right-0 bg-red-500/10 text-red-500 p-2 text-xs">
-                        Invalid JSON format
-                      </div>
-                    )}
-                  </div>
+                <div className={cn(
+                  "flex-1 min-h-0 code-editor rounded-md border bg-transparent",
+                  validationErrors.payload ? inputErrorStyles : "border-input"
+                )}>
+                  <Editor
+                    value={payload}
+                    onValueChange={(code) => {
+                      setPayload(code);
+                      try {
+                        JSON.parse(code);
+                        setValidationErrors(prev => ({ ...prev, payload: false }));
+                      } catch (e) {
+                        setValidationErrors(prev => ({ ...prev, payload: true }));
+                      }
+                    }}
+                    highlight={highlightJson}
+                    padding={10}
+                    tabSize={2}
+                    insertSpaces={true}
+                    className="font-mono text-xs w-full min-h-[60px] bg-transparent"
+                  />
                 </div>
+                {validationErrors.payload && (
+                  <div className="bg-red-500/10 text-red-500 p-2 text-xs mt-1 rounded">
+                    Invalid JSON format
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -970,34 +997,150 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                 <>
                   <div className="flex items-center justify-between">
                     <p className="text-lg font-medium"><span className="font-mono text-base bg-muted px-2 py-0.5 rounded">{currentWorkflow.id}</span></p>
-                    <Button
-                      onClick={handleExecuteWorkflow}
-                      disabled={isExecuting}
-                      variant="outline"
-                    >
-                      {isExecuting ? (
-                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Executing...</>
-                      ) : (
-                        <><Play className="mr-2 h-4 w-4" /> Test Workflow</>
-                      )}
-                    </Button>
                   </div>
-                  <div>
-                    <Label>Steps ({currentWorkflow.steps.length})</Label>
-                    <WorkflowStepsView
-                      steps={currentWorkflow.steps}
-                      onStepsChange={handleStepsChange}
-                      onStepEdit={handleStepEdit}
-                    />
+                  {/* Recap of instruction */}
+                  <div className="mb-2">
+                    <Label>Instruction</Label>
+                    <div className="font-mono text-xs text-muted-foreground rounded px-2 py-1 mt-1 break-words">
+                      {instruction}
+                    </div>
                   </div>
-                  <div className="flex flex-col gap-2">
-                    <div className="flex-1 min-h-0 bg-background h-[200px] mt-2 mb-4">
-                      <JsonSchemaEditor
-                        isOptional={true}
-                        value={schema}
-                        onChange={setSchema}
+
+                  {/* Editable credentials input */}
+                  <div className="mb-4">
+                    <Label htmlFor="review-credentials">Credentials</Label>
+                    <HelpTooltip text='API keys or tokens needed for this workflow. Enter without any prefix like Bearer. Use advanced mode to add multiple credentials.' />
+                    <div className="w-full max-w-full">
+                      <Input
+                        value={reviewCredentials}
+                        onChange={(e) => {
+                          setReviewCredentials(e.target.value);
+                          try {
+                            const parsed = JSON.parse(e.target.value);
+                            setCurrentWorkflow({ ...(currentWorkflow as any), credentials: parsed } as any);
+                          } catch (e) {
+                            // ignore parse errors for now
+                          }
+                        }}
+                        placeholder="Enter credentials"
+                        className={cn("min-h-10 font-mono text-xs", validationErrors.credentials && inputErrorStyles)}
                       />
                     </div>
+                    {(() => {
+                      try {
+                        const creds = JSON.parse(reviewCredentials);
+                        if (!creds || Object.keys(creds).length === 0) {
+                          return (
+                            <div className="text-xs text-amber-500 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded mt-2">
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                                <line x1="12" y1="9" x2="12" y2="13" />
+                                <line x1="12" y1="17" x2="12.01" y2="17" />
+                              </svg>
+                              No credentials added
+                            </div>
+                          );
+                        }
+                        return null;
+                      } catch {
+                        return (
+                          <div className="text-xs text-red-600 flex items-center gap-1.5 bg-red-500/10 py-1 px-2 rounded mt-2">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <circle cx="12" cy="12" r="10" />
+                              <line x1="12" y1="8" x2="12" y2="12" />
+                              <line x1="12" y1="16" x2="12.01" y2="16" />
+                            </svg>
+                            Invalid JSON format
+                          </div>
+                        );
+                      }
+                    })()}
+                  </div>
+
+                  {/* Editable workflow variables (payload) input */}
+                  <div className="mb-4">
+                    <Label htmlFor="review-payload">Workflow Variables</Label>
+                    <HelpTooltip text="Dynamic variables for the workflow as a JSON object. These are equivalent to your workflow's initial payload and can be referenced in the entire config." />
+                    <div className={cn(
+                      "w-full max-w-full code-editor rounded-md border bg-transparent",
+                      validationErrors.payload ? inputErrorStyles : "border-input"
+                    )}>
+                      <Editor
+                        value={payload}
+                        onValueChange={(code) => {
+                          setPayload(code);
+                          try {
+                            JSON.parse(code);
+                            setValidationErrors(prev => ({ ...prev, payload: false }));
+                          } catch (e) {
+                            setValidationErrors(prev => ({ ...prev, payload: true }));
+                          }
+                        }}
+                        highlight={highlightJson}
+                        padding={10}
+                        tabSize={2}
+                        insertSpaces={true}
+                        className="font-mono text-xs w-full min-h-[60px] bg-transparent"
+                      />
+                    </div>
+                    {validationErrors.payload && (
+                      <div className="bg-red-500/10 text-red-500 p-2 text-xs mt-1 rounded">
+                        Invalid JSON format
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col gap-2 mt-2">
+                    {/* Workflow Steps Toggle */}
+                    <div
+                      className="flex items-center gap-2 cursor-pointer select-none"
+                      onClick={() => setShowSteps(!showSteps)}
+                      role="button"
+                      tabIndex={0}
+                    >
+                      <ChevronRight
+                        className={cn(
+                          "h-4 w-4 transition-transform",
+                          showSteps && "rotate-90"
+                        )}
+                        aria-hidden="true"
+                      />
+                      <span className="font-medium text-sm">Workflow Steps</span>
+                    </div>
+                    {showSteps && (
+                      <div className="flex-1 min-h-0 bg-background h-[200px] mb-2">
+                        <WorkflowStepsView
+                          steps={currentWorkflow.steps}
+                          onStepsChange={handleStepsChange}
+                          onStepEdit={handleStepEdit}
+                        />
+                      </div>
+                    )}
+                    {/* Response Schema Editor Toggle */}
+                    <div
+                      className="flex items-center gap-2 cursor-pointer select-none"
+                      onClick={() => setShowSchemaEditor(!showSchemaEditor)}
+                      role="button"
+                      tabIndex={0}
+                    >
+                      <ChevronRight
+                        className={cn(
+                          "h-4 w-4 transition-transform",
+                          showSchemaEditor && "rotate-90"
+                        )}
+                        aria-hidden="true"
+                      />
+                      <span className="font-medium text-sm">Response Schema Editor</span>
+                    </div>
+                    {showSchemaEditor && (
+                      <div className="bg-background mt-2 mb-4">
+                        <JsonSchemaEditor
+                          isOptional={true}
+                          value={schema}
+                          onChange={setSchema}
+                        />
+                      </div>
+                    )}
                   </div>
                 </>
               ) : (
@@ -1080,25 +1223,40 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         >
           Back
         </Button>
-        <Button
-          onClick={() => {
-            urlFieldRef.current?.commit()
-            handleNext()
-          }}
-          disabled={
-            isBuilding ||
-            isSaving ||
-            isGeneratingSuggestions ||
-            (step === 'integrations' && (systemFormVisible || systems.length === 0))
-          }
-        >
-          {isBuilding ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Building...</> :
-            isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</> :
-              isGeneratingSuggestions ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating...</> :
-                step === 'review' ? 'Save & Complete' :
-                  step === 'success' ? 'Done' :
-                    'Next'}
-        </Button>
+        <div className="flex gap-2">
+          {step === 'review' && (
+            <Button
+              onClick={handleExecuteWorkflow}
+              disabled={isExecuting}
+              variant="success"
+            >
+              {isExecuting ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Executing...</>
+              ) : (
+                <><Play className="mr-2 h-4 w-4" /> Test Workflow</>
+              )}
+            </Button>
+          )}
+          <Button
+            onClick={() => {
+              urlFieldRef.current?.commit()
+              handleNext()
+            }}
+            disabled={
+              isBuilding ||
+              isSaving ||
+              isGeneratingSuggestions ||
+              (step === 'integrations' && (systemFormVisible || systems.length === 0))
+            }
+          >
+            {isBuilding ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Building...</> :
+              isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</> :
+                isGeneratingSuggestions ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating...</> :
+                  step === 'review' ? 'Save & Complete' :
+                    step === 'success' ? 'Done' :
+                      'Next'}
+          </Button>
+        </div>
       </div>
     </div>
   );

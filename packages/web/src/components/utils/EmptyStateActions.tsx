@@ -31,7 +31,7 @@ const EmptyStateActions: React.FC<EmptyStateActionsProps> = ({
             size="lg"
           >
             <div className="flex flex-col items-center justify-center gap-4 md:gap-7">
-              <div className="p-4 md:p-6 rounded-full bg-primary/70 transition-colors duration-300">
+              <div className="p-4 md:p-6 rounded-full bg-primary/25 transition-colors duration-300">
                 <GitBranch className="h-12 w-12 md:h-16 md:w-16 text-foreground group-hover:text-foreground" strokeWidth={1.5} />
               </div>
               <div className="flex flex-col items-center text-center">
@@ -69,7 +69,7 @@ const EmptyStateActions: React.FC<EmptyStateActionsProps> = ({
           size="lg"
         >
           <div className="flex flex-col items-center justify-center gap-4 md:gap-7">
-            <div className="p-4 md:p-6 rounded-full bg-primary/70 transition-colors duration-300">
+            <div className="p-4 md:p-6 rounded-full bg-primary/25 transition-colors duration-300">
               <Zap className="h-12 w-12 md:h-16 md:w-16 text-foreground group-hover:text-foreground" strokeWidth={1.5} />
             </div>
             <div className="flex flex-col items-center text-center">

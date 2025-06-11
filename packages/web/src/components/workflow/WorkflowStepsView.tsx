@@ -13,6 +13,7 @@ interface WorkflowStepsViewProps {
   steps: any[];
   onStepsChange: (steps: any[]) => void;
   onStepEdit: (stepId: string, updatedStep: any) => void;
+  codeModeOnly?: boolean;
 }
 
 const highlightJson = (code: string) => {
@@ -23,7 +24,7 @@ const highlightJson = (code: string) => {
   }
 };
 
-export function WorkflowStepsView({ steps, onStepsChange, onStepEdit }: WorkflowStepsViewProps) {
+export function WorkflowStepsView({ steps, onStepsChange, onStepEdit, codeModeOnly }: WorkflowStepsViewProps) {
   const [isCodeMode, setIsCodeMode] = useState(false);
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [codeValue, setCodeValue] = useState(JSON.stringify(steps, null, 2));
@@ -85,12 +86,14 @@ export function WorkflowStepsView({ steps, onStepsChange, onStepEdit }: Workflow
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-end items-center gap-2 -mt-5">
-        <Label htmlFor="editorMode" className="text-xs">Code Mode</Label>
-        <Switch className="custom-switch" id="stepsEditorMode" checked={isCodeMode} onCheckedChange={setIsCodeMode} />
-      </div>
+      {!codeModeOnly && (
+        <div className="flex justify-end items-center gap-2 -mt-5">
+          <Label htmlFor="editorMode" className="text-xs">Code Mode</Label>
+          <Switch className="custom-switch" id="stepsEditorMode" checked={isCodeMode} onCheckedChange={setIsCodeMode} />
+        </div>
+      )}
 
-      {isCodeMode ? (
+      {(isCodeMode || codeModeOnly) ? (
         <div className="flex-1 min-h-0 border rounded-md overflow-hidden relative code-editor">
           <Editor
             value={codeValue}
