@@ -1,14 +1,16 @@
 "use client";
 
-import { Book, Bot, History, Layout, PlayCircle, Sun, Moon, Monitor } from "lucide-react";
+import { Button } from "@/src/components/ui/button";
+import { useTheme } from "@/src/hooks/useTheme";
+import { Book, Bot, History, Home, Layout, Monitor, Moon, PlayCircle, Sun } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useTheme } from "@/src/hooks/useTheme";
-import { Button } from "@/src/components/ui/button";
 import { useEffect, useState } from "react";
 
 const navItems = [
-  { icon: Layout, label: "Configurations", href: "/" },
+  { icon: Home, label: "Home", href: "/" },
+  { icon: Bot, label: "AI Assistant", href: "/agent" },
+  { icon: Layout, label: "Configurations", href: "/configs" },
   { icon: History, label: "Runs", href: "/runs" },
   { icon: PlayCircle, label: "Playground", href: "/playground" },
   { icon: Bot, label: "MCP Setup", href: "https://docs.superglue.cloud/mcp", target: "_blank" },
