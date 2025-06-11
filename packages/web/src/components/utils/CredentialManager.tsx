@@ -46,7 +46,7 @@ export function CredentialsManager({ value, onChange, className }: CredentialsMa
         key,
         value: String(value)
       }))
-      setCredentials(entries.length > 0 ? entries : [{ key: '', value: '' }])
+      setCredentials(entries.length > 0 ? entries : [{ key: 'apiKey', value: '' }])
     } catch (e) {
       setCredentials([{ key: '', value: '' }])
     }
@@ -61,7 +61,7 @@ export function CredentialsManager({ value, onChange, className }: CredentialsMa
     setCredentials(newCredentials);
     const seen = new Set<string>();
     const validCreds = newCredentials.filter((cred, idx) => {
-      if (!cred.key.trim() || !cred.value.trim()) return false;
+      if (!cred.key.trim()) return false;
       if (duplicateIndexes.has(idx)) return false;
       if (seen.has(cred.key)) return false;
       seen.add(cred.key);
