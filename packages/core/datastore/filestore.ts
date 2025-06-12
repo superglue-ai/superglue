@@ -377,7 +377,7 @@ export class FileStore implements DataStore {
     if (!run) return null;
 
     // Only log runs if disable_logs environment variable is not set
-    if (!process.env.DISABLE_LOGS) {
+    if (String(process.env.DISABLE_LOGS).toLowerCase() !== 'true') {
       this.appendRunToLogs(run, orgId);
     }
 
