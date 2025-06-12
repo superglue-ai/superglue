@@ -2,12 +2,28 @@
   "$schema": "https://turbo.build/schema.json",
   "tasks": {
     "build": {
-      "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".next/**"],
-      "inputs": ["src/**/*.tsx", "src/**/*.ts", "*.ts", "*.tsx", "package.json"]
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        "dist/**",
+        ".next/**"
+      ],
+      "inputs": [
+        "src/**/*.tsx",
+        "src/**/*.ts",
+        "*.ts",
+        "*.tsx",
+        "package.json"
+      ],
+      "env": [
+        "NODE_OPTIONS=--no-inspect"
+      ]
     },
     "dev": {
-      "dependsOn": ["build"],
+      "dependsOn": [
+        "build"
+      ],
       "cache": false,
       "persistent": true
     },
@@ -16,12 +32,18 @@
       "persistent": true
     },
     "test": {
-        "dependsOn": ["@superglue/core#build"],
+      "dependsOn": [
+        "@superglue/core#build"
+      ],
       "outputs": []
     },
     "test:coverage": {
-        "dependsOn": ["@superglue/core#build"],
-      "outputs": ["coverage/**"]
+      "dependsOn": [
+        "@superglue/core#build"
+      ],
+      "outputs": [
+        "coverage/**"
+      ]
     }
   },
   "globalEnv": [

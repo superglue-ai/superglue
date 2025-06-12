@@ -1,10 +1,11 @@
-import React from 'react';
-import ConfigTable from '@/src/app/configs/page';
+'use client'
 
-const Main = () => {
+import { AgentInterface } from '../components/agent/AgentInterface'
+
+export default function HomePage() {
   return (
-    <ConfigTable />
-  );
-};
-
-export default Main;
+    <div className="container mx-auto p-6">
+      <AgentInterface />
+    </div>
+  )
+}
