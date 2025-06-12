@@ -1,4 +1,4 @@
-import { ApiConfig, ExtractConfig, RunResult, TransformConfig, Workflow } from "@superglue/client";
+import { ApiConfig, ExtractConfig, RunResult, TransformConfig, Workflow, Integration } from "@superglue/client";
 import { createHash } from 'node:crypto';
 import type { DataStore } from "./types.js";
 
@@ -10,6 +10,7 @@ export class MemoryStore implements DataStore {
     runs: Map<string, RunResult>;
     runsIndex: Map<string, { id: string; timestamp: number; configId: string }[]>;
     workflows: Map<string, Workflow>;
+    integrations: Map<string, Integration>;
   };
 
   private tenant: { email: string | null; emailEntrySkipped: boolean } = {
@@ -24,7 +25,8 @@ export class MemoryStore implements DataStore {
       transforms: new Map(),
       runs: new Map(),
       runsIndex: new Map(),
-      workflows: new Map()
+      workflows: new Map(),
+      integrations: new Map()
     };
   }
 
@@ -208,6 +210,7 @@ export class MemoryStore implements DataStore {
     this.storage.runs.clear();
     this.storage.runsIndex.clear();
     this.storage.workflows.clear();
+    this.storage.integrations.clear();
   }
 
   async disconnect(): Promise<void> {
@@ -256,6 +259,35 @@ export class MemoryStore implements DataStore {
     if (!id) return false;
     const key = this.getKey('workflow', id, orgId);
     const deleted = this.storage.workflows.delete(key);
+    return deleted;
+  }
+
+  // Integration Methods
+  async getIntegration(id: string, orgId?: string): Promise<Integration | null> {
+    if (!id) return null;
+    const key = this.getKey('integration', id, orgId);
+    const integration = this.storage.integrations.get(key);
+    return integration ? { ...integration, id } : null;
+  }
+
+  async listIntegrations(limit = 10, offset = 0, orgId?: string): Promise<{ items: Integration[], total: number }> {
+    const orgItems = this.getOrgItems(this.storage.integrations, 'integration', orgId);
+    const items = orgItems.slice(offset, offset + limit);
+    const total = orgItems.length;
+    return { items, total };
+  }
+
+  async upsertIntegration(id: string, integration: Integration, orgId?: string): Promise<Integration> {
+    if (!id || !integration) return null;
+    const key = this.getKey('integration', id, orgId);
+    this.storage.integrations.set(key, integration);
+    return { ...integration, id };
+  }
+
+  async deleteIntegration(id: string, orgId?: string): Promise<boolean> {
+    if (!id) return false;
+    const key = this.getKey('integration', id, orgId);
+    const deleted = this.storage.integrations.delete(key);
     return deleted;
   }
 } 

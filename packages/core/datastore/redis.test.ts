@@ -200,6 +200,43 @@ if (!testConfig.host || !testConfig.port || !testConfig.username || !testConfig.
       });
     });
 
+    describe('Integration', () => {
+      const testIntegration = {
+        id: 'test-int-id',
+        name: 'Test Integration',
+        urlHost: 'https://integration.test',
+        credentials: { apiKey: 'secret' },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      it('should store and retrieve integrations', async () => {
+        await store.upsertIntegration(testIntegration.id, testIntegration, testOrgId);
+        const retrieved = await store.getIntegration(testIntegration.id, testOrgId);
+        expect(retrieved).toEqual({ ...testIntegration, id: testIntegration.id });
+      });
+
+      it('should list integrations', async () => {
+        await store.upsertIntegration(testIntegration.id, testIntegration, testOrgId);
+        const { items, total } = await store.listIntegrations(10, 0, testOrgId);
+        expect(items).toHaveLength(1);
+        expect(total).toBe(1);
+        expect(items[0]).toEqual({ ...testIntegration, id: testIntegration.id });
+      });
+
+      it('should delete integrations', async () => {
+        await store.upsertIntegration(testIntegration.id, testIntegration, testOrgId);
+        await store.deleteIntegration(testIntegration.id, testOrgId);
+        const retrieved = await store.getIntegration(testIntegration.id, testOrgId);
+        expect(retrieved).toBeNull();
+      });
+
+      it('should return null for missing integration', async () => {
+        const retrieved = await store.getIntegration('does-not-exist', testOrgId);
+        expect(retrieved).toBeNull();
+      });
+    });
+
     describe('Health Check', () => {
       it('should return true when redis is connected', async () => {
         const result = await store.ping();

@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@playwright/test": "^1.50.1",
-    "@superglue/client": "^2.3.30",
+    "@superglue/client": "^2.3.32",
     "dotenv": "^16.4.7",
     "dotenv-cli": "^8.0.0"
   },
@@ -24,7 +24,8 @@
     "@biomejs/biome": "1.9.4",
     "@types/node": "^20.17.19",
     "mcp-remote": "^0.1.5",
+    "ts-node": "^10.9.2",
     "turbo": "^2.4.4",
-    "typescript": "^5.7.3"
+    "typescript": "^5.8.3"
   }
 }
