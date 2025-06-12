@@ -40,7 +40,7 @@ export const getIntegrationResolver = async (
     if (!integration) throw new Error("Integration not found");
     return integration;
   } catch (error) {
-    logMessage('error', `Error getting integration: ${String(error)}`, { orgId: context.orgId });
+    logMessage('error', `Error getting integration with id ${id}: ${String(error)}`, { orgId: context.orgId });
     throw error;
   }
 };
