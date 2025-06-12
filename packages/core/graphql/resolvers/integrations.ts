@@ -45,10 +45,12 @@ export const upsertIntegrationResolver = async (
   const oldIntegration = await context.datastore.getIntegration(input.id, context.orgId);
 
   const integration = {
-    ...oldIntegration,
-    ...input,
+    id: input.id,
+    name: resolveField(input.name, oldIntegration?.name, ''),
+    urlHost: resolveField(input.urlHost, oldIntegration?.urlHost, ''),
+    credentials: resolveField(input.credentials, oldIntegration?.credentials, {}),
     createdAt: oldIntegration?.createdAt || now,
-    updatedAt: now,
+    updatedAt: now
   };
 
   return await context.datastore.upsertIntegration(input.id, integration, context.orgId);
