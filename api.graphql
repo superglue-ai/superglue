@@ -112,6 +112,11 @@ type WorkflowList {
   total: Int!
 }
 
+type IntegrationList {
+  items: [Integration!]!
+  total: Int!
+}
+
 enum AuthType {
   NONE
   HEADER
@@ -274,12 +279,14 @@ type Query {
   listTransforms(limit: Int = 10, offset: Int = 0): TransformList!
   listExtracts(limit: Int = 10, offset: Int = 0): ExtractList!
   listWorkflows(limit: Int = 10, offset: Int = 0): WorkflowList!
+  listIntegrations(limit: Int = 10, offset: Int = 0): IntegrationList!
 
   getRun(id: ID!): RunResult
   getApi(id: ID!): ApiConfig
   getTransform(id: ID!): TransformConfig
   getExtract(id: ID!): ExtractConfig
   getWorkflow(id: ID!): Workflow
+  getIntegration(id: ID!): Integration
 
   generateSchema(instruction: String!, responseData: String): JSONSchema!
   generateInstructions(systems: [SystemInput!]!): [String!]!
@@ -407,8 +414,41 @@ type Mutation {
   
   upsertTransformation(id: ID!, input: JSON!): TransformConfig!
   deleteTransformation(id: ID!): Boolean!
+
+  upsertIntegration(input: IntegrationInput!): Integration!
+  deleteIntegration(id: ID!): Boolean!
 }
 
 type Subscription {
   logs: Log!
+}
+
+type Integration {
+  id: ID!
+  name: String
+  type: String
+  urlHost: String!
+  urlPath: String
+  credentials: JSON
+  documentationUrl: String
+  documentation: String
+  icon: String
+  orgId: String
+  version: String
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+input IntegrationInput {
+  id: ID!
+  name: String
+  type: String
+  urlHost: String!
+  urlPath: String
+  credentials: JSON
+  documentationUrl: String
+  documentation: String
+  icon: String
+  orgId: String
+  version: String
 }
