@@ -1,6 +1,7 @@
 import { Integration } from '@superglue/client';
 import { Context } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
+import { logMessage } from '../../utils/logs.js';
 
 function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined, defaultValue?: T): T | undefined {
   if (newValue === null) return undefined;
@@ -59,6 +60,7 @@ export const upsertIntegrationResolver = async (
 
     return await context.datastore.upsertIntegration(input.id, integration, context.orgId);
   } catch (error) {
+    logMessage('error', "Error upserting integration: " + String(error), { orgId: context.orgId });
     throw error;
   }
 };
