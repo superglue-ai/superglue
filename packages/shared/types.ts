@@ -22,15 +22,3 @@ export interface LogEntry {
   orgId?: string;
 }
 
-export interface Integration extends BaseConfig {
-  name?: string;
-  type?: string;
-  urlHost: string;
-  urlPath?: string;
-  credentials?: Record<string, any>;
-  documentationUrl?: string;
-  documentation?: string;
-  icon?: string;
-  orgId?: string;
-}
-
