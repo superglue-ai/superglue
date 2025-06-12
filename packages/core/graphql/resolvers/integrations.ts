@@ -40,20 +40,27 @@ export const upsertIntegrationResolver = async (
   context: Context,
   info: GraphQLResolveInfo
 ) => {
-  if (!input.id) throw new Error("id is required");
-  const now = new Date();
-  const oldIntegration = await context.datastore.getIntegration(input.id, context.orgId);
+  if (!input.id) {
+    throw new Error("id is required");
+  }
 
-  const integration = {
-    id: input.id,
-    name: resolveField(input.name, oldIntegration?.name, ''),
-    urlHost: resolveField(input.urlHost, oldIntegration?.urlHost, ''),
-    credentials: resolveField(input.credentials, oldIntegration?.credentials, {}),
-    createdAt: oldIntegration?.createdAt || now,
-    updatedAt: now
-  };
+  try {
+    const now = new Date();
+    const oldIntegration = await context.datastore.getIntegration(input.id, context.orgId);
 
-  return await context.datastore.upsertIntegration(input.id, integration, context.orgId);
+    const integration = {
+      id: input.id,
+      name: resolveField(input.name, oldIntegration?.name, ''),
+      urlHost: resolveField(input.urlHost, oldIntegration?.urlHost, ''),
+      credentials: resolveField(input.credentials, oldIntegration?.credentials, {}),
+      createdAt: oldIntegration?.createdAt || now,
+      updatedAt: now
+    };
+
+    return await context.datastore.upsertIntegration(input.id, integration, context.orgId);
+  } catch (error) {
+    throw error;
+  }
 };
 
 export const deleteIntegrationResolver = async (
