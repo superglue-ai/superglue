@@ -67,7 +67,7 @@ export const upsertIntegrationResolver = async (
     };
     return await context.datastore.upsertIntegration(input.id, integration, context.orgId);
   } catch (error) {
-    logMessage('error', `Error upserting integration: ${String(error)}`, { orgId: context.orgId });
+    logMessage('error', `Error upserting integration with id ${input.id}: ${String(error)}`, { orgId: context.orgId });
     throw error;
   }
 };
