@@ -16,11 +16,16 @@ export const listIntegrationsResolver = async (
   context: Context,
   info: GraphQLResolveInfo
 ) => {
-  const result = await context.datastore.listIntegrations(limit, offset, context.orgId);
-  return {
-    items: result.items,
-    total: result.total,
-  };
+  try {
+    const result = await context.datastore.listIntegrations(limit, offset, context.orgId);
+    return {
+      items: result.items,
+      total: result.total,
+    };
+  } catch (error) {
+    logMessage('error', `Error listing integrations: ${String(error)}`, { orgId: context.orgId });
+    throw error;
+  }
 };
 
 export const getIntegrationResolver = async (
@@ -30,9 +35,14 @@ export const getIntegrationResolver = async (
   info: GraphQLResolveInfo
 ) => {
   if (!id) throw new Error("id is required");
-  const integration = await context.datastore.getIntegration(id, context.orgId);
-  if (!integration) throw new Error("Integration not found");
-  return integration;
+  try {
+    const integration = await context.datastore.getIntegration(id, context.orgId);
+    if (!integration) throw new Error("Integration not found");
+    return integration;
+  } catch (error) {
+    logMessage('error', `Error getting integration: ${String(error)}`, { orgId: context.orgId });
+    throw error;
+  }
 };
 
 export const upsertIntegrationResolver = async (
@@ -44,11 +54,9 @@ export const upsertIntegrationResolver = async (
   if (!input.id) {
     throw new Error("id is required");
   }
-
   try {
     const now = new Date();
     const oldIntegration = await context.datastore.getIntegration(input.id, context.orgId);
-
     const integration = {
       id: input.id,
       name: resolveField(input.name, oldIntegration?.name, ''),
@@ -57,10 +65,9 @@ export const upsertIntegrationResolver = async (
       createdAt: oldIntegration?.createdAt || now,
       updatedAt: now
     };
-
     return await context.datastore.upsertIntegration(input.id, integration, context.orgId);
   } catch (error) {
-    logMessage('error', "Error upserting integration: " + String(error), { orgId: context.orgId });
+    logMessage('error', `Error upserting integration: ${String(error)}`, { orgId: context.orgId });
     throw error;
   }
 };
@@ -72,5 +79,10 @@ export const deleteIntegrationResolver = async (
   info: GraphQLResolveInfo
 ) => {
   if (!id) throw new Error("id is required");
-  return await context.datastore.deleteIntegration(id, context.orgId);
+  try {
+    return await context.datastore.deleteIntegration(id, context.orgId);
+  } catch (error) {
+    logMessage('error', `Error deleting integration: ${String(error)}`, { orgId: context.orgId });
+    throw error;
+  }
 };
