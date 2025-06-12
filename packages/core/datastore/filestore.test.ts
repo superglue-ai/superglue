@@ -233,6 +233,7 @@ describe('FileStore', () => {
       const retrieved = await storeWithDisabledLogs.getRun(testRun.id, testOrgId);
       expect(retrieved).toBeNull();
     });
+
   });
 
   describe('Integration', () => {
@@ -270,6 +271,7 @@ describe('FileStore', () => {
       const retrieved = await store.getIntegration('does-not-exist', testOrgId);
       expect(retrieved).toBeNull();
     });
+
   });
 
   describe('Clear All', () => {
