@@ -20,6 +20,7 @@ import {
   listWorkflowsResolver,
   upsertWorkflowResolver
 } from "./resolvers/workflow.js";
+import { listIntegrationsResolver, getIntegrationResolver, upsertIntegrationResolver, deleteIntegrationResolver } from "./resolvers/integrations.js";
 
 export const resolvers = {
   Query: {
@@ -36,6 +37,8 @@ export const resolvers = {
     getWorkflow: getWorkflowResolver,
     listWorkflows: listWorkflowsResolver,
     generateInstructions: generateInstructionsResolver,
+    getIntegration: getIntegrationResolver,
+    listIntegrations: listIntegrationsResolver,
   },
   Mutation: {
     setTenantInfo: setTenantInfoResolver,
@@ -53,6 +56,8 @@ export const resolvers = {
     deleteExtraction: deleteExtractResolver,
     upsertTransformation: upsertTransformResolver,
     deleteTransformation: deleteTransformResolver,
+    upsertIntegration: upsertIntegrationResolver,
+    deleteIntegration: deleteIntegrationResolver,
   },
   Subscription: {
     logs: logsResolver,

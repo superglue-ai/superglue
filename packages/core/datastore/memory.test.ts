@@ -202,6 +202,43 @@ describe('MemoryStore', () => {
     });
   });
 
+  describe('Integration', () => {
+    const testIntegration = {
+      id: 'test-int-id',
+      name: 'Test Integration',
+      urlHost: 'https://integration.test',
+      credentials: { apiKey: 'secret' },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    it('should store and retrieve integrations', async () => {
+      await store.upsertIntegration(testIntegration.id, testIntegration, testOrgId);
+      const retrieved = await store.getIntegration(testIntegration.id, testOrgId);
+      expect(retrieved).toEqual({ ...testIntegration, id: testIntegration.id });
+    });
+
+    it('should list integrations', async () => {
+      await store.upsertIntegration(testIntegration.id, testIntegration, testOrgId);
+      const { items, total } = await store.listIntegrations(10, 0, testOrgId);
+      expect(items).toHaveLength(1);
+      expect(total).toBe(1);
+      expect(items[0]).toEqual({ ...testIntegration, id: testIntegration.id });
+    });
+
+    it('should delete integrations', async () => {
+      await store.upsertIntegration(testIntegration.id, testIntegration, testOrgId);
+      await store.deleteIntegration(testIntegration.id, testOrgId);
+      const retrieved = await store.getIntegration(testIntegration.id, testOrgId);
+      expect(retrieved).toBeNull();
+    });
+
+    it('should return null for missing integration', async () => {
+      const retrieved = await store.getIntegration('does-not-exist', testOrgId);
+      expect(retrieved).toBeNull();
+    });
+  });
+
   describe('Clear All', () => {
     it('should clear all data', async () => {
       const testConfig: ApiConfig = {
@@ -241,10 +278,20 @@ describe('MemoryStore', () => {
         error: null,
       };
 
+      const testIntegration = {
+        id: 'test-int-id',
+        name: 'Test Integration',
+        urlHost: 'https://integration.test',
+        credentials: { apiKey: 'secret' },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
       await store.upsertApiConfig('test-api', testConfig, testOrgId);
       await store.upsertExtractConfig('test-extract', testExtractConfig, testOrgId);
       await store.upsertTransformConfig('test-transform', testTransformConfig, testOrgId);
       await store.createRun(testRun, testOrgId);
+      await store.upsertIntegration(testIntegration.id, testIntegration, testOrgId);
 
       await store.clearAll();
 
@@ -252,11 +299,13 @@ describe('MemoryStore', () => {
       const { total: extractTotal } = await store.listExtractConfigs(10, 0, testOrgId);
       const { total: transformTotal } = await store.listTransformConfigs(10, 0, testOrgId);
       const { total: runTotal } = await store.listRuns(10, 0, null, testOrgId);
+      const { total: integrationTotal } = await store.listIntegrations(10, 0, testOrgId);
 
       expect(apiTotal).toBe(0);
       expect(extractTotal).toBe(0);
       expect(transformTotal).toBe(0);
       expect(runTotal).toBe(0);
+      expect(integrationTotal).toBe(0);
     });
   });
 }); 

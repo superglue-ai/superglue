@@ -67,7 +67,6 @@ function validateEnvironment() {
 
 // Server Setup
 async function startServer() {
-  console.log('Hello World');
   validateEnvironment();
 
   // Express App Setup
