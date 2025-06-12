@@ -1,4 +1,5 @@
 import type { DataStore } from "./datastore.js";
+import { BaseConfig } from '@superglue/client';
 
 export type Context = {
   datastore: DataStore;
@@ -20,3 +21,4 @@ export interface LogEntry {
   runId?: string;
   orgId?: string;
 }
+
