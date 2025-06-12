@@ -9,7 +9,6 @@ import { useEffect, useState } from "react";
 
 const navItems = [
   { icon: Home, label: "Home", href: "/" },
-  { icon: Bot, label: "AI Assistant", href: "/agent" },
   { icon: Layout, label: "Configurations", href: "/configs" },
   { icon: History, label: "Runs", href: "/runs" },
   { icon: PlayCircle, label: "Playground", href: "/playground" },
