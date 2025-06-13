@@ -8,9 +8,10 @@ import { Textarea } from '@/src/components/ui/textarea'
 import { useToast } from '@/src/hooks/use-toast'
 import { cn } from '@/src/lib/utils'
 import { Integration, SuperglueClient } from '@superglue/client'
-import { Bot, Check, Edit2, Loader2, Plus, Send, Trash2, User, X, Zap } from 'lucide-react'
+import { Bot, Check, Edit2, Loader2, Plus, Send, User, X, Zap } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { handleCopyCode, parseMarkdownContent } from '../../lib/markdown-utils'
+import { ConversationHistory, type Conversation } from './ConversationHistory'
 import { ToolCallComponent } from './ToolCallComponent'
 
 const MAX_MESSAGE_LENGTH = 50000
@@ -51,11 +52,27 @@ export function AgentInterface() {
     const [editingContent, setEditingContent] = useState('')
     const [integrations, setIntegrations] = useState<Integration[]>([])
     const [integrationsLoading, setIntegrationsLoading] = useState(false)
+    const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
     const scrollAreaRef = useRef<HTMLDivElement>(null)
     const inputRef = useRef<HTMLTextAreaElement>(null)
     const editRef = useRef<HTMLTextAreaElement>(null)
     const { toast } = useToast()
     const messagesContainerRef = useRef<HTMLDivElement>(null)
+
+    const loadConversation = (conversation: Conversation) => {
+        setMessages(conversation.messages)
+        setCurrentConversationId(conversation.id)
+    }
+
+    const startNewConversation = () => {
+        setMessages([{
+            id: '1',
+            content: '',
+            role: 'assistant',
+            timestamp: new Date(),
+        }])
+        setCurrentConversationId(null)
+    }
 
     // Move fetchIntegrations here, outside useEffect
     const fetchIntegrations = async () => {
@@ -125,6 +142,8 @@ export function AgentInterface() {
             inputRef.current?.focus()
         }
     }, [messages])
+
+
 
     const handleEditMessage = (messageId: string, content: string) => {
         setEditingMessageId(messageId)
@@ -308,12 +327,7 @@ export function AgentInterface() {
     }
 
     const clearMessages = () => {
-        setMessages([{
-            id: '1',
-            content: '',
-            role: 'assistant',
-            timestamp: new Date(),
-        }])
+        startNewConversation()
     }
 
     const formatTimestamp = (date: Date) => {
@@ -555,6 +569,8 @@ export function AgentInterface() {
         );
     };
 
+
+
     const renderMessage = (message: Message) => {
         // Show welcome interface for the first empty message
         if (message.id === '1' && !message.content) {
@@ -673,12 +689,22 @@ export function AgentInterface() {
 
     return (
         <div className="h-[calc(100vh-3rem)] mx-auto flex flex-col relative">
-            {(messages.length > 1 || (messages.length === 1 && messages[0].content)) && (
-                <Button variant="outline" size="sm" className="w-32 fixed top-2 right-16" onClick={clearMessages}>
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Clear
-                </Button>
-            )}
+            <div className="flex gap-2 p-2">
+                <ConversationHistory
+                    messages={messages}
+                    currentConversationId={currentConversationId}
+                    onConversationLoad={loadConversation}
+                    onNewConversation={startNewConversation}
+                    onCurrentConversationIdChange={setCurrentConversationId}
+                />
+
+                {(messages.length > 1 || (messages.length === 1 && messages[0].content)) && (
+                    <Button variant="outline" size="sm" onClick={clearMessages}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        New
+                    </Button>
+                )}
+            </div>
 
             <ScrollArea ref={scrollAreaRef} className="flex-1 p-6">
                 <div className="space-y-2">
