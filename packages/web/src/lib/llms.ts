@@ -1,16 +1,7 @@
-import { SuperglueClient, Workflow, WorkflowResult } from '@superglue/client';
+import { Integration, SuperglueClient, Workflow, WorkflowResult } from '@superglue/client';
 import { getSDKCode } from '@superglue/shared/templates';
 import OpenAI from "openai";
 import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
-
-export interface SystemDefinition {
-    id: string;
-    urlHost: string;
-    urlPath?: string;
-    credentials: Record<string, any>;
-    documentationUrl?: string;
-    documentation?: string;
-}
 
 export class SuperglueMCPClient {
     private client: SuperglueClient
@@ -135,7 +126,6 @@ export class SuperglueMCPClient {
 
             // Execute tool calls if any
             if (hasToolCalls) {
-                const toolResults = [];
                 console.log(`Executing ${Object.keys(toolCalls).length} tool calls:`, Object.keys(toolCalls));
 
                 for (const [toolCallId, toolCall] of Object.entries(toolCalls)) {
@@ -145,238 +135,7 @@ export class SuperglueMCPClient {
                         continue;
                     }
 
-                    try {
-                        const args = JSON.parse(toolCall.arguments);
-
-                        // Use actualId for frontend consistency, fallback to toolCallId
-                        const frontendId = toolCall.actualId || toolCallId;
-
-                        yield {
-                            type: 'tool_call_start',
-                            toolCall: {
-                                id: frontendId,
-                                name: toolCall.name,
-                                input: args
-                            }
-                        };
-
-                        const result = await this.executeTool(toolCall.name, args);
-
-                        yield {
-                            type: 'tool_call_complete',
-                            toolCall: {
-                                id: frontendId,
-                                name: toolCall.name,
-                                input: args,
-                                output: result
-                            }
-                        };
-
-                        toolResults.push({
-                            tool_call_id: toolCall.actualId || toolCallId, // Use actualId for OpenAI
-                            role: 'tool',
-                            content: JSON.stringify(result)
-                        });
-
-                    } catch (error) {
-                        console.error(`Tool execution error for ${toolCall.name}:`, error);
-                        yield {
-                            type: 'tool_call_error',
-                            toolCall: {
-                                id: toolCall.actualId || toolCallId,
-                                name: toolCall.name,
-                                error: error instanceof Error ? error.message : String(error)
-                            }
-                        };
-                    }
-                }
-
-                // Only make final call if we have valid tool results
-                if (toolResults.length > 0) {
-                    const finalStream = await this.openai.chat.completions.create({
-                        model: process.env.OPENAI_MODEL || 'gpt-4o',
-                        messages: [
-                            { role: 'system', content: SYSTEM_PROMPT },
-                            ...messages.map(msg => ({
-                                role: msg.role || 'user',
-                                content: msg.content || msg.text || String(msg)
-                            })),
-                            {
-                                role: 'assistant',
-                                tool_calls: Object.entries(toolCalls)
-                                    .filter(([_, call]) => call.name && call.arguments.trim())
-                                    .map(([id, call]) => ({
-                                        id: call.actualId || id,
-                                        type: 'function' as const,
-                                        function: {
-                                            name: call.name,
-                                            arguments: call.arguments
-                                        }
-                                    }))
-                            },
-                            ...toolResults
-                        ],
-                        stream: true,
-                    });
-
-                    let finalToolCalls: { [key: string]: { name: string, arguments: string, actualId?: string } } = {};
-                    let finalToolCallIndexMap: { [index: number]: string } = {};
-                    let hasFinalToolCalls = false;
-
-                    for await (const chunk of finalStream) {
-                        const delta = chunk.choices[0]?.delta;
-
-                        if (delta?.content) {
-                            yield {
-                                type: 'content',
-                                content: delta.content
-                            };
-                        }
-
-                        // Handle additional tool calls in final response (sequential execution)
-                        if (delta?.tool_calls) {
-                            hasFinalToolCalls = true;
-                            for (const toolCall of delta.tool_calls) {
-                                const index = toolCall.index || 0;
-                                let toolCallId: string;
-
-                                if (toolCall.id) {
-                                    toolCallId = toolCall.id;
-                                    finalToolCallIndexMap[index] = toolCallId;
-                                } else {
-                                    toolCallId = finalToolCallIndexMap[index] || index.toString();
-                                }
-
-                                if (!finalToolCalls[toolCallId]) {
-                                    finalToolCalls[toolCallId] = { name: '', arguments: '', actualId: toolCall.id };
-                                }
-
-                                if (toolCall.id) {
-                                    finalToolCalls[toolCallId].actualId = toolCall.id;
-                                }
-
-                                if (toolCall.function?.name) {
-                                    finalToolCalls[toolCallId].name = toolCall.function.name;
-                                }
-
-                                if (toolCall.function?.arguments) {
-                                    finalToolCalls[toolCallId].arguments += toolCall.function.arguments;
-                                }
-                            }
-                        }
-                    }
-
-                    // Execute additional tool calls if any (sequential execution)
-                    if (hasFinalToolCalls) {
-                        console.log(`Executing ${Object.keys(finalToolCalls).length} additional tool calls:`, Object.keys(finalToolCalls));
-
-                        const additionalToolResults = [];
-
-                        for (const [toolCallId, toolCall] of Object.entries(finalToolCalls)) {
-                            if (!toolCall.name || !toolCall.arguments.trim()) {
-                                console.warn(`Skipping incomplete additional tool call ${toolCallId}: name="${toolCall.name}", args="${toolCall.arguments}"`);
-                                continue;
-                            }
-
-                            try {
-                                const args = JSON.parse(toolCall.arguments);
-                                const frontendId = toolCall.actualId || toolCallId;
-
-                                yield {
-                                    type: 'tool_call_start',
-                                    toolCall: {
-                                        id: frontendId,
-                                        name: toolCall.name,
-                                        input: args
-                                    }
-                                };
-
-                                const result = await this.executeTool(toolCall.name, args);
-
-                                yield {
-                                    type: 'tool_call_complete',
-                                    toolCall: {
-                                        id: frontendId,
-                                        name: toolCall.name,
-                                        input: args,
-                                        output: result
-                                    }
-                                };
-
-                                additionalToolResults.push({
-                                    tool_call_id: toolCall.actualId || toolCallId,
-                                    role: 'tool',
-                                    content: JSON.stringify(result)
-                                });
-
-                            } catch (error) {
-                                console.error(`Additional tool execution error for ${toolCall.name}:`, error);
-                                yield {
-                                    type: 'tool_call_error',
-                                    toolCall: {
-                                        id: toolCall.actualId || toolCallId,
-                                        name: toolCall.name,
-                                        error: error instanceof Error ? error.message : String(error)
-                                    }
-                                };
-                            }
-                        }
-
-                        // Make another final call if we have additional tool results
-                        if (additionalToolResults.length > 0) {
-                            const finalFinalStream = await this.openai.chat.completions.create({
-                                model: process.env.OPENAI_MODEL || 'gpt-4o',
-                                messages: [
-                                    { role: 'system', content: SYSTEM_PROMPT },
-                                    ...messages.map(msg => ({
-                                        role: msg.role || 'user',
-                                        content: msg.content || msg.text || String(msg)
-                                    })),
-                                    {
-                                        role: 'assistant',
-                                        tool_calls: Object.entries(toolCalls)
-                                            .filter(([_, call]) => call.name && call.arguments.trim())
-                                            .map(([id, call]) => ({
-                                                id: call.actualId || id,
-                                                type: 'function' as const,
-                                                function: {
-                                                    name: call.name,
-                                                    arguments: call.arguments
-                                                }
-                                            }))
-                                    },
-                                    ...toolResults,
-                                    {
-                                        role: 'assistant',
-                                        tool_calls: Object.entries(finalToolCalls)
-                                            .filter(([_, call]) => call.name && call.arguments.trim())
-                                            .map(([id, call]) => ({
-                                                id: call.actualId || id,
-                                                type: 'function' as const,
-                                                function: {
-                                                    name: call.name,
-                                                    arguments: call.arguments
-                                                }
-                                            }))
-                                    },
-                                    ...additionalToolResults
-                                ],
-                                stream: true,
-                            });
-
-                            for await (const chunk of finalFinalStream) {
-                                const delta = chunk.choices[0]?.delta;
-                                if (delta?.content) {
-                                    yield {
-                                        type: 'content',
-                                        content: delta.content
-                                    };
-                                }
-                            }
-                        }
-                    }
-
-
+                    yield* this.executeToolCall(toolCall.actualId || toolCallId, toolCall);
                 }
             }
 
@@ -446,7 +205,7 @@ export class SuperglueMCPClient {
                                 type: "string",
                                 description: "Natural language instructions"
                             },
-                            systems: {
+                            integrations: {
                                 type: "array",
                                 items: {
                                     type: "object",
@@ -493,7 +252,7 @@ export class SuperglueMCPClient {
                                 additionalProperties: true
                             }
                         },
-                        required: ["instruction", "systems"],
+                        required: ["instruction", "integrations"],
                         additionalProperties: false
                     }
                 }
@@ -533,7 +292,7 @@ export class SuperglueMCPClient {
                                 type: "string",
                                 description: "Natural language instructions"
                             },
-                            systems: {
+                            integrations: {
                                 type: "array",
                                 items: {
                                     type: "object",
@@ -580,7 +339,7 @@ export class SuperglueMCPClient {
                                 additionalProperties: true
                             }
                         },
-                        required: ["instruction", "systems"],
+                        required: ["instruction", "integrations"],
                         additionalProperties: false
                     }
                 }
@@ -596,6 +355,96 @@ export class SuperglueMCPClient {
                         additionalProperties: false
                     }
                 }
+            },
+            {
+                type: "function" as const,
+                function: {
+                    name: "add_integration",
+                    description: "Add or update an integration configuration",
+                    parameters: {
+                        type: "object",
+                        properties: {
+                            id: {
+                                type: "string",
+                                description: "Unique identifier for the integration"
+                            },
+                            name: {
+                                type: "string",
+                                description: "Display name for the integration"
+                            },
+                            type: {
+                                type: "string",
+                                description: "Type of integration (e.g., 'api', 'database', 'webhook')"
+                            },
+                            urlHost: {
+                                type: "string",
+                                description: "Base URL/hostname for the integration (e.g., 'api.example.com')"
+                            },
+                            urlPath: {
+                                type: "string",
+                                description: "Optional URL path prefix"
+                            },
+                            credentials: {
+                                type: "object",
+                                description: "Default credentials object with API keys/tokens as key-value pairs",
+                                additionalProperties: true
+                            },
+                            documentationUrl: {
+                                type: "string",
+                                description: "URL to the integration's API documentation"
+                            },
+                            documentation: {
+                                type: "string",
+                                description: "API documentation text or description"
+                            },
+                            icon: {
+                                type: "string",
+                                description: "Icon identifier for the integration"
+                            }
+                        },
+                        required: ["id", "urlHost"],
+                        additionalProperties: false
+                    }
+                }
+            },
+            {
+                type: "function" as const,
+                function: {
+                    name: "delete_integration",
+                    description: "Delete an integration configuration",
+                    parameters: {
+                        type: "object",
+                        properties: {
+                            id: {
+                                type: "string",
+                                description: "ID of the integration to delete"
+                            }
+                        },
+                        required: ["id"],
+                        additionalProperties: false
+                    }
+                }
+            },
+            {
+                type: "function" as const,
+                function: {
+                    name: "list_integrations",
+                    description: "List all available integrations",
+                    parameters: {
+                        type: "object",
+                        properties: {
+                            limit: {
+                                type: "number",
+                                description: "Maximum number of integrations to return (default: 20)"
+                            },
+                            offset: {
+                                type: "number",
+                                description: "Number of integrations to skip (default: 0)"
+                            }
+                        },
+                        additionalProperties: false
+                    }
+                }
             }
         ];
     }
@@ -605,13 +454,19 @@ export class SuperglueMCPClient {
             case 'execute_workflow':
                 return await this.executeWorkflow(args.id, args.payload, args.credentials);
             case 'build_workflow':
-                return await this.buildWorkflow(args.instruction, args.systems, args.payload, args.responseSchema);
+                return await this.buildWorkflow(args.instruction, args.integrations, args.payload, args.responseSchema);
             case 'generate_integration_code':
                 return await this.generateIntegrationCode(args.toolId, args.language);
             case 'run_instruction':
-                return await this.runInstruction(args.instruction, args.systems, args.payload, args.responseSchema);
+                return await this.runInstruction(args.instruction, args.integrations, args.payload, args.responseSchema);
             case 'list_available_tools':
                 return await this.listAvailableTools();
+            case 'add_integration':
+                return await this.addIntegration(args);
+            case 'delete_integration':
+                return await this.deleteIntegration(args.id);
+            case 'list_integrations':
+                return await this.listIntegrations(args.limit, args.offset);
             default:
                 throw new Error(`Unknown tool: ${name}`);
         }
@@ -631,8 +486,8 @@ export class SuperglueMCPClient {
         return result;
     }
 
-    async buildWorkflow(instruction: string, systems: SystemDefinition[], payload?: any, responseSchema?: any): Promise<Workflow> {
-        const validationErrors = this.validateToolBuilding({ instruction, systems });
+    async buildWorkflow(instruction: string, integrations: Integration[], payload?: any, responseSchema?: any): Promise<Workflow> {
+        const validationErrors = this.validateToolBuilding({ instruction, integrations });
         if (validationErrors.length > 0) {
             throw new Error(`Validation failed:\n${validationErrors.join('\n')}`);
         }
@@ -640,7 +495,7 @@ export class SuperglueMCPClient {
         return await this.client.buildWorkflow({
             instruction,
             payload: payload || {},
-            systems,
+            integrations: integrations,
             responseSchema: responseSchema || {}
         });
     }
@@ -660,8 +515,8 @@ export class SuperglueMCPClient {
         };
     }
 
-    async runInstruction(instruction: string, systems: SystemDefinition[], payload?: any, responseSchema?: any): Promise<any> {
-        const validationErrors = this.validateToolBuilding({ instruction, systems });
+    async runInstruction(instruction: string, integrations: Integration[], payload?: any, responseSchema?: any): Promise<any> {
+        const validationErrors = this.validateToolBuilding({ instruction, integrations });
         if (validationErrors.length > 0) {
             throw new Error(`Validation failed:\n${validationErrors.join('\n')}`);
         }
@@ -670,12 +525,12 @@ export class SuperglueMCPClient {
         const workflow = await this.client.buildWorkflow({
             instruction,
             payload: payload || {},
-            systems,
+            systems: integrations,
             responseSchema: responseSchema || {},
             save: false
-        });
+        } as any);
 
-        const credentials = Object.values(systems as SystemDefinition[]).reduce((acc, sys) => {
+        const credentials = Object.values(integrations as Integration[]).reduce((acc, sys) => {
             return { ...acc, ...Object.entries(sys.credentials || {}).reduce((obj, [name, value]) => ({ ...obj, [`${sys.id}_${name}`]: value }), {}) };
         }, {});
 
@@ -699,6 +554,54 @@ export class SuperglueMCPClient {
         return await this.client.listWorkflows(100);
     }
 
+    async addIntegration(integrationData: any): Promise<any> {
+        const validationErrors = this.validateIntegrationInput(integrationData);
+        if (validationErrors.length > 0) {
+            throw new Error(`Validation failed:\n${validationErrors.join('\n')}`);
+        }
+        try {
+            const result = await this.client.upsertIntegration(integrationData.id, integrationData);
+            return {
+                success: true,
+                integration: result,
+                message: `Integration '${integrationData.id}' ${integrationData.name ? `(${integrationData.name})` : ''} has been successfully added/updated.`
+            };
+        } catch (error) {
+            throw new Error(`Failed to add integration: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+
+    async deleteIntegration(id: string): Promise<any> {
+        if (!id) {
+            throw new Error("Integration ID is required for deletion.");
+        }
+
+        try {
+            const result = await this.client.deleteIntegration(id);
+            return {
+                success: result,
+                message: result ? `Integration '${id}' has been successfully deleted.` : `Failed to delete integration '${id}'.`
+            };
+        } catch (error) {
+            throw new Error(`Failed to delete integration: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+
+    async listIntegrations(limit: number = 20, offset: number = 0): Promise<any> {
+        try {
+            const result = await this.client.listIntegrations(limit, offset);
+            return {
+                integrations: result.items,
+                total: result.total,
+                count: result.items.length,
+                limit,
+                offset
+            };
+        } catch (error) {
+            throw new Error(`Failed to list integrations: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+
     private validateToolExecution(args: any): string[] {
         const errors: string[] = [];
 
@@ -717,11 +620,33 @@ export class SuperglueMCPClient {
         const errors: string[] = [];
 
         if (!args.instruction || args.instruction.length < 10) {
-            errors.push("Instruction must be detailed (minimum 10 characters). Describe what the tool should do, what systems it connects to, and expected inputs/outputs.");
+            errors.push("Instruction must be detailed (minimum 10 characters). Describe what the tool should do, what integrations it connects to, and expected inputs/outputs.");
         }
 
-        if (!args.systems || !Array.isArray(args.systems) || args.systems.length === 0) {
-            errors.push("Systems array is required with at least one system configuration including credentials.");
+        if (!args.integrations || !Array.isArray(args.integrations) || args.integrations.length === 0) {
+            errors.push("Integrations array is required with at least one integration.");
+        }
+
+        return errors;
+    }
+
+    private validateIntegrationInput(args: any): string[] {
+        const errors: string[] = [];
+
+        if (!args.id || args.id.trim().length === 0) {
+            errors.push("Integration ID is required and cannot be empty.");
+        }
+
+        if (!args.urlHost || args.urlHost.trim().length === 0) {
+            errors.push("URL Host is required and cannot be empty.");
+        }
+
+        if (args.credentials && typeof args.credentials !== 'object') {
+            errors.push("Credentials must be a JSON object with key-value pairs.");
+        }
+
+        if (args.urlHost && !args.urlHost.match(/^https?:\/\//) && !args.urlHost.match(/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/)) {
+            errors.push("URL Host must be a valid hostname or URL (e.g., 'api.example.com' or 'https://api.example.com').");
         }
 
         return errors;
@@ -782,6 +707,64 @@ export class SuperglueMCPClient {
 
     async fromGemini(messages: ChatCompletionMessageParam[]): Promise<string> {
         return "Hello, world!"
+    }
+
+    private async *executeToolCall(id: string, call: { name: string, arguments: string }): AsyncGenerator<{
+        type: 'tool_call_start' | 'tool_call_complete' | 'tool_call_error',
+        toolCall: {
+            id: string,
+            name: string,
+            input?: any,
+            output?: any,
+            error?: string
+        }
+    }> {
+        if (!call.name || !call.arguments.trim()) {
+            yield {
+                type: 'tool_call_error',
+                toolCall: {
+                    id,
+                    name: call.name || 'unknown',
+                    error: `Incomplete tool call: name="${call.name}", arguments="${call.arguments}"`
+                }
+            };
+            return;
+        }
+
+        try {
+            const args = JSON.parse(call.arguments);
+
+            yield {
+                type: 'tool_call_start',
+                toolCall: {
+                    id,
+                    name: call.name,
+                    input: args
+                }
+            };
+
+            const result = await this.executeTool(call.name, args);
+
+            yield {
+                type: 'tool_call_complete',
+                toolCall: {
+                    id,
+                    name: call.name,
+                    input: args,
+                    output: result
+                }
+            };
+        } catch (error) {
+            console.error(`Tool execution error for ${call.name}:`, error);
+            yield {
+                type: 'tool_call_error',
+                toolCall: {
+                    id,
+                    name: call.name,
+                    error: error instanceof Error ? error.message : String(error)
+                }
+            };
+        }
     }
 }
 

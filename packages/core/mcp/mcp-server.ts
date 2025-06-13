@@ -7,13 +7,13 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { SuperglueClient, Workflow, WorkflowResult } from '@superglue/client';
 import { LogEntry } from "@superglue/shared";
+import { getSDKCode } from '@superglue/shared/templates';
 import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import { jsonSchemaToZod } from 'json-schema-to-zod';
 import { z } from 'zod';
 import { validateToken } from '../auth/auth.js';
 import { logEmitter } from '../utils/logs.js';
-import { getSDKCode } from '@superglue/shared/templates';
 import { SystemDefinition } from "../workflow/workflow-builder.js";
 
 // Enums
@@ -334,7 +334,7 @@ export const toolDefinitions: Record<string, any> = {
         let tool = await client.buildWorkflow({
           instruction: args.instruction,
           payload: args.payload || {},
-          systems: args.systems,
+          integrations: args.systems,
           responseSchema: args.responseSchema || {}
         });
 
@@ -431,7 +431,7 @@ export const toolDefinitions: Record<string, any> = {
         const workflow = await client.buildWorkflow({
           instruction: args.instruction,
           payload: args.payload || {},
-          systems: args.systems,
+          integrations: args.systems,
           responseSchema: args.responseSchema || {},
           save: false
         });

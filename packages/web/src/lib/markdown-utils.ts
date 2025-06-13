@@ -58,6 +58,11 @@ export const parseMarkdownContent = (content: string, isStreaming: boolean = fal
         }
     }
 
+    // Escape @ symbols in database connection strings
+    content = content.replace(/(postgres:\/\/[^@]+@[^:\s]+)/g, (match) => {
+        return match.replace(/@/g, '&#64;');
+    });
+
     // Use marked to parse markdown
     let html: string
     try {

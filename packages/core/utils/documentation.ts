@@ -1,5 +1,4 @@
 import playwright from '@playwright/test';
-import { ApiConfig } from "@superglue/client";
 import { Metadata } from "@superglue/shared";
 import axios from "axios";
 import { getIntrospectionQuery } from "graphql";
@@ -18,7 +17,7 @@ interface ProcessingStrategy {
 }
 
 export interface DocumentationConfig {
-  urlHost: string;
+  urlHost?: string;
   instruction?: string;
   documentationUrl?: string;
   urlPath?: string;
@@ -185,7 +184,7 @@ export class Documentation {
 // --- Concrete Strategy Implementations ---
 
 class RawContentStrategy implements FetchingStrategy {
-  async tryFetch(config: ApiConfig, metadata: Metadata): Promise<string | null> {
+  async tryFetch(config: DocumentationConfig, metadata: Metadata): Promise<string | null> {
     if (!config.documentationUrl?.startsWith("http")) {
       // It's raw content passed directly in the URL field
       if (config.documentationUrl && config.documentationUrl.length > 0) {
@@ -199,7 +198,7 @@ class RawContentStrategy implements FetchingStrategy {
 }
 
 class GraphQLStrategy implements FetchingStrategy {
-  private async fetchGraphQLSchema(url: string, config: ApiConfig, metadata: Metadata): Promise<any | null> {
+  private async fetchGraphQLSchema(url: string, config: DocumentationConfig, metadata: Metadata): Promise<any | null> {
     const introspectionQuery = getIntrospectionQuery();
 
     try {
@@ -221,13 +220,13 @@ class GraphQLStrategy implements FetchingStrategy {
       return null;
     }
   }
-  private isLikelyGraphQL(url: string, config: ApiConfig): boolean {
+  private isLikelyGraphQL(url: string, config: DocumentationConfig): boolean {
     if (!url) return false;
     return url?.includes('graphql') ||
       Object.values({ ...config.queryParams, ...config.headers })
         .some(val => typeof val === 'string' && val.includes('IntrospectionQuery'));
   }
-  async tryFetch(config: ApiConfig, metadata: Metadata): Promise<string | null> {
+  async tryFetch(config: DocumentationConfig, metadata: Metadata): Promise<string | null> {
     if (!config.urlHost.startsWith("http")) return null; // Needs a valid HTTP URL
     const endpointUrl = composeUrl(config.urlHost, config.urlPath);
 
@@ -253,7 +252,7 @@ class GraphQLStrategy implements FetchingStrategy {
 }
 
 export class AxiosFetchingStrategy implements FetchingStrategy {
-  async tryFetch(config: ApiConfig, metadata: Metadata): Promise<string | null> {
+  async tryFetch(config: DocumentationConfig, metadata: Metadata): Promise<string | null> {
     if (!config.documentationUrl?.startsWith("http")) return null;
 
     try {
@@ -294,7 +293,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       await closedInstance.close();
     }
   }
-  private async fetchPageContentWithPlaywright(urlString: string, config: ApiConfig, metadata: Metadata): Promise<{ content: string; links: Record<string, string> } | null> {
+  private async fetchPageContentWithPlaywright(urlString: string, config: DocumentationConfig, metadata: Metadata): Promise<{ content: string; links: Record<string, string> } | null> {
 
     if (!urlString?.startsWith("http")) {
       return null;
@@ -367,7 +366,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     }
   }
 
-  async tryFetch(config: ApiConfig, metadata: Metadata): Promise<string | null> {
+  async tryFetch(config: DocumentationConfig, metadata: Metadata): Promise<string | null> {
     // Only fetch if it's an HTTP URL and content hasn't been fetched yet
     // Pass metadata
     const docResult = await this.fetchPageContentWithPlaywright(config?.documentationUrl, config, metadata);
@@ -406,7 +405,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
 }
 
 class PostgreSqlStrategy implements ProcessingStrategy {
-  async tryProcess(content: string, config: ApiConfig, metadata: Metadata, credentials?: Record<string, any>): Promise<string | null> {
+  async tryProcess(content: string, config: DocumentationConfig, metadata: Metadata, credentials?: Record<string, any>): Promise<string | null> {
     if (config.urlHost.startsWith("postgres://")) {
       const url = composeUrl(config.urlHost, config.urlPath);
 
@@ -423,7 +422,7 @@ WHERE table_schema = 'public'
 ORDER BY table_name, ordinal_position;`
       };
 
-      const schemaResponse = await callPostgres({ ...config, body: JSON.stringify(schemaQuery) }, null, credentials, null);
+      const schemaResponse = await callPostgres({ id: crypto.randomUUID(), instruction: "Get schema", ...config, body: JSON.stringify(schemaQuery) }, null, credentials, null);
       if (!schemaResponse) return null;
       return `<DOCUMENTATION>${content}</DOCUMENTATION><DB_SCHEMA>\n\n${JSON.stringify(schemaResponse, null, 2)}\n\n</DB_SCHEMA>`;
     }
@@ -476,7 +475,7 @@ class OpenApiStrategy implements ProcessingStrategy {
       return null;
     }
   }
-  private async fetchOpenApiFromUrl(openApiUrl: string, config: ApiConfig, metadata: Metadata): Promise<string | null> {
+  private async fetchOpenApiFromUrl(openApiUrl: string, config: DocumentationConfig, metadata: Metadata): Promise<string | null> {
     try {
       let absoluteOpenApiUrl = openApiUrl;
       if (openApiUrl.startsWith("/")) {
@@ -519,7 +518,7 @@ class OpenApiStrategy implements ProcessingStrategy {
     }
   }
 
-  async tryProcess(content: string, config: ApiConfig, metadata: Metadata): Promise<string | null> {
+  async tryProcess(content: string, config: DocumentationConfig, metadata: Metadata): Promise<string | null> {
     // Needs page content fetched by PlaywrightFetchingStrategy (or null if fetch failed)
     if (content === undefined || content === null) {
       return null;
@@ -570,7 +569,7 @@ class OpenApiStrategy implements ProcessingStrategy {
 }
 
 class HtmlMarkdownStrategy implements ProcessingStrategy {
-  async tryProcess(content: string, config: ApiConfig, metadata: Metadata): Promise<string | null> {
+  async tryProcess(content: string, config: DocumentationConfig, metadata: Metadata): Promise<string | null> {
     // Needs page content fetched by PlaywrightFetchingStrategy
     if (content === undefined || content === null) {
       return null;
@@ -591,7 +590,7 @@ class HtmlMarkdownStrategy implements ProcessingStrategy {
 }
 
 class RawPageContentStrategy implements ProcessingStrategy {
-  async tryProcess(content: string, config: ApiConfig, metadata: Metadata): Promise<string | null> {
+  async tryProcess(content: string, config: DocumentationConfig, metadata: Metadata): Promise<string | null> {
     // This is the final fallback if content was fetched but not processed by other strategies
     if (content) {
       logMessage('info', "Using raw fetched content as final documentation.", metadata);

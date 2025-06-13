@@ -36,9 +36,9 @@ export async function callPostgres(endpoint: ApiConfig, payload: Record<string, 
     statement_timeout: options?.timeout || DEFAULT_TIMEOUT,
     ssl: {
       rejectUnauthorized: false, // Set to true for production with valid certs
-      // ca: fs.readFileSync('path/to/ca-cert.pem'), // Optional: CA certificate
-      // cert: fs.readFileSync('path/to/client-cert.pem'), // Optional: client certificate
-      // key: fs.readFileSync('path/to/client-key.pem'), // Optional: client key
+      // ca: await fs.readFile('path/to/ca-cert.pem'), // Optional: CA certificate
+      // cert: await fs.readFile('path/to/client-cert.pem'), // Optional: client certificate
+      // key: await fs.readFile('path/to/client-key.pem'), // Optional: client key
     }
   };
 

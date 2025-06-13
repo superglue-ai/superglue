@@ -12,15 +12,15 @@ import {
   PopoverTrigger,
 } from "@/src/components/ui/popover";
 import { useToast } from '@/src/hooks/use-toast';
-import { inputErrorStyles, splitUrl, flattenWorkflowCredentials } from '@/src/lib/client-utils';
+import { flattenWorkflowCredentials, inputErrorStyles, splitUrl } from '@/src/lib/client-utils';
 import { findMatchingIntegration, integrations } from '@/src/lib/integrations';
 import { cn, composeUrl } from '@/src/lib/utils';
-import { SuperglueClient, SystemInput, Workflow, WorkflowResult } from '@superglue/client';
-import { ArrowRight, Check, ChevronsUpDown, Globe, Loader2, Pencil, Play, Plus, Trash2, X, ChevronRight } from 'lucide-react';
+import { Integration, SuperglueClient, Workflow, WorkflowResult } from '@superglue/client';
+import { ArrowRight, Check, ChevronRight, ChevronsUpDown, Globe, Loader2, Pencil, Play, Plus, Trash2, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
-import { useRef, useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Editor from 'react-simple-code-editor';
 import type { SimpleIcon } from 'simple-icons';
 import * as simpleIcons from 'simple-icons';
@@ -49,7 +49,7 @@ interface WorkflowCreateStepperProps {
 
 // Create an extended client class
 class ExtendedSuperglueClient extends SuperglueClient {
-  async generateInstructions(systems: SystemInput[]): Promise<string[]> {
+  async generateInstructions(systems: Integration[]): Promise<string[]> {
     const response = await fetch(`${this['endpoint']}/graphql`, {
       method: 'POST',
       headers: {
@@ -79,8 +79,8 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const router = useRouter();
   const superglueConfig = useConfig();
 
-  const [systems, setSystems] = useState<SystemInput[]>([]);
-  const [currentSystem, setCurrentSystem] = useState<SystemInput>({
+  const [systems, setSystems] = useState<Integration[]>([]);
+  const [currentSystem, setCurrentSystem] = useState<Integration>({
     id: '',
     urlHost: '',
     urlPath: '',
@@ -176,7 +176,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   };
 
   // --- System Management ---
-  const handleSystemInputChange = (field: keyof SystemInput | 'fullUrl') => (
+  const handleSystemInputChange = (field: keyof Integration | 'fullUrl') => (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     let newValue = e.target.value;
@@ -330,7 +330,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         const response = await superglueClient.buildWorkflow({
           instruction: instruction,
           payload: parsedPayload,
-          systems: systems,
+          integrations: systems,
           responseSchema: schema,
           save: false
         });

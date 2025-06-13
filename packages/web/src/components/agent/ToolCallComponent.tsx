@@ -7,7 +7,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@radix-ui/r
 import { ChevronDown, ChevronRight, Loader2 } from 'lucide-react'
 import { useState } from 'react'
 import { ToolCall } from './AgentInterface'
-import { EditableJsonInput } from './EditableJsonInput'
 
 interface ToolCallComponentProps {
     tool: ToolCall
@@ -68,11 +67,11 @@ export function ToolCallComponent({ tool, onInputChange }: ToolCallComponentProp
                         {tool.input && (
                             <div>
                                 <div className="text-sm font-medium text-muted-foreground mb-2">Input</div>
-                                <EditableJsonInput
-                                    value={tool.input}
-                                    onChange={onInputChange}
-                                    disabled={tool.status === 'running' || tool.status === 'completed'}
-                                />
+                                <div className="bg-muted/50 p-3 rounded-md">
+                                    <pre className="text-xs font-mono overflow-x-auto whitespace-pre-wrap">
+                                        {JSON.stringify(tool.input, null, 2)}
+                                    </pre>
+                                </div>
                             </div>
                         )}
 

@@ -36,9 +36,8 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        const { messages, stream = true } = await request.json() as {
+        const { messages } = await request.json() as {
             messages: ChatCompletionMessageParam[],
-            stream?: boolean
         }
 
         if (!messages || !Array.isArray(messages)) {
@@ -49,49 +48,37 @@ export async function POST(request: NextRequest) {
         }
 
         const client = new SuperglueMCPClient(apiKey)
-
-        // Handle streaming
-        if (stream) {
-            const encoder = new TextEncoder()
-            const readable = new ReadableStream({
-                async start(controller) {
-                    try {
-                        for await (const chunk of client.streamLLMResponse(messages)) {
-                            const data = `data: ${JSON.stringify(chunk)}\n\n`
-                            controller.enqueue(encoder.encode(data))
-                        }
-                        controller.close()
-                    } catch (error) {
-                        console.error('Streaming error:', error)
-                        const errorData = `data: ${JSON.stringify({
-                            type: 'error',
-                            content: error instanceof Error ? error.message : 'Unknown error'
-                        })}\n\n`
-                        controller.enqueue(encoder.encode(errorData))
-                        controller.close()
+        const encoder = new TextEncoder()
+        const readable = new ReadableStream({
+            async start(controller) {
+                try {
+                    for await (const chunk of client.streamLLMResponse(messages)) {
+                        const data = `data: ${JSON.stringify(chunk)}\n\n`
+                        controller.enqueue(encoder.encode(data))
                     }
+                    controller.close()
+                } catch (error) {
+                    console.error('Streaming error:', error)
+                    const errorData = `data: ${JSON.stringify({
+                        type: 'error',
+                        content: error instanceof Error ? error.message : 'Unknown error'
+                    })}\n\n`
+                    controller.enqueue(encoder.encode(errorData))
+                    controller.close()
                 }
-            })
-
-            return new Response(readable, {
-                headers: {
-                    'Content-Type': 'text/event-stream',
-                    'Cache-Control': 'no-cache',
-                    'Connection': 'keep-alive',
-                    'Access-Control-Allow-Origin': '*',
-                    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-                    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-                },
-            })
-        }
-
-        // Fallback to non-streaming
-        const response = await client.getLLMResponse(messages)
-        return NextResponse.json({
-            content: response,
-            timestamp: new Date().toISOString()
+            }
         })
 
+        return new Response(readable, {
+            headers: {
+                'Content-Type': 'text/event-stream',
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive',
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+            },
+        })
     } catch (error) {
         console.error('Chat API error:', error)
         return NextResponse.json(

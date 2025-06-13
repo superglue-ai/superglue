@@ -1,4 +1,4 @@
-import type { ApiConfig, ExtractConfig, RunResult, TransformConfig, Workflow, Integration } from "@superglue/client";
+import type { ApiConfig, ExtractConfig, Integration, RunResult, TransformConfig, Workflow } from "@superglue/client";
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -54,7 +54,7 @@ export class FileStore implements DataStore {
       fs.mkdirSync(path.dirname(this.filePath), { recursive: true, mode: 0o755 });
       logMessage('info', `File Datastore: Created/verified directory: ${path.dirname(this.filePath)}`);
 
-      const data = fs.readFileSync(this.filePath, 'utf-8');
+      const data = await fs.promises.readFile(this.filePath, 'utf-8');
       const parsed = JSON.parse(data, (key, value) => {
         if (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
           return new Date(value);
@@ -88,7 +88,7 @@ export class FileStore implements DataStore {
 
     // Ensure logs file exists
     if (!fs.existsSync(this.logsFilePath)) {
-      fs.writeFileSync(this.logsFilePath, '', { mode: 0o644 });
+      await fs.promises.writeFile(this.logsFilePath, '');
       logMessage('info', 'Logs Datastore: Created empty logs file');
     }
   }
@@ -104,7 +104,7 @@ export class FileStore implements DataStore {
         tenant: this.storage.tenant
       };
       const tempPath = `${this.filePath}.tmp`;
-      fs.writeFileSync(tempPath, JSON.stringify(serialized, null, 2), { mode: 0o644 });
+      await fs.promises.writeFile(tempPath, JSON.stringify(serialized, null, 2), { mode: 0o644 });
       fs.renameSync(tempPath, this.filePath);
     } catch (error) {
       logMessage('error', 'Failed to persist data: ' + error);
@@ -215,11 +215,11 @@ export class FileStore implements DataStore {
   }
 
   // Helper function to write run to logs file
-  private appendRunToLogs(run: RunResult, orgId: string): void {
+  private async appendRunToLogs(run: RunResult, orgId: string): Promise<void> {
     try {
       const runWithOrgId = { ...run, orgId };
       const logLine = JSON.stringify(runWithOrgId) + '\n';
-      fs.appendFileSync(this.logsFilePath, logLine, { mode: 0o644 });
+      await fs.promises.appendFile(this.logsFilePath, logLine, { mode: 0o644 });
     } catch (error) {
       logMessage('error', 'Failed to append run to logs: ' + error);
       throw error;
@@ -227,13 +227,13 @@ export class FileStore implements DataStore {
   }
 
   // Helper function to remove run from logs file
-  private removeRunFromLogs(id: string, orgId?: string): boolean {
+  private async removeRunFromLogs(id: string, orgId?: string): Promise<boolean> {
     try {
       if (!fs.existsSync(this.logsFilePath)) {
         return false;
       }
 
-      const content = fs.readFileSync(this.logsFilePath, 'utf-8');
+      const content = await fs.promises.readFile(this.logsFilePath, 'utf-8');
       if (!content.trim()) {
         return false;
       }
@@ -258,7 +258,7 @@ export class FileStore implements DataStore {
 
       if (found) {
         const newContent = filteredLines.length > 0 ? filteredLines.join('\n') + '\n' : '';
-        fs.writeFileSync(this.logsFilePath, newContent, { mode: 0o644 });
+        await fs.promises.writeFile(this.logsFilePath, newContent, { mode: 0o644 });
       }
 
       return found;
@@ -404,7 +404,7 @@ export class FileStore implements DataStore {
         return true;
       }
 
-      const content = fs.readFileSync(this.logsFilePath, 'utf-8');
+      const content = await fs.promises.readFile(this.logsFilePath, 'utf-8');
       if (!content.trim()) {
         return true;
       }
@@ -425,7 +425,7 @@ export class FileStore implements DataStore {
       }
 
       const newContent = filteredLines.length > 0 ? filteredLines.join('\n') + '\n' : '';
-      fs.writeFileSync(this.logsFilePath, newContent, { mode: 0o644 });
+      await fs.promises.writeFile(this.logsFilePath, newContent, { mode: 0o644 });
       return true;
     } catch (error) {
       logMessage('error', 'Failed to delete all runs: ' + error);
@@ -443,7 +443,7 @@ export class FileStore implements DataStore {
 
     // Clear logs file
     try {
-      fs.writeFileSync(this.logsFilePath, '', { mode: 0o644 });
+      await fs.promises.writeFile(this.logsFilePath, '', { mode: 0o644 });
     } catch (error) {
       logMessage('error', 'Failed to clear logs file: ' + error);
     }
