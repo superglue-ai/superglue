@@ -5,7 +5,7 @@ import {
   CallToolResult,
   isInitializeRequest
 } from "@modelcontextprotocol/sdk/types.js";
-import { SuperglueClient, Workflow, WorkflowResult } from '@superglue/client';
+import { SuperglueClient, Workflow, WorkflowResult, Integration } from '@superglue/client';
 import { LogEntry } from "@superglue/shared";
 import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
@@ -14,7 +14,6 @@ import { z } from 'zod';
 import { validateToken } from '../auth/auth.js';
 import { logEmitter } from '../utils/logs.js';
 import { getSDKCode } from '@superglue/shared/templates';
-import { SystemDefinition } from "../workflow/workflow-builder.js";
 
 // Enums
 export const CacheModeEnum = z.enum(["ENABLED", "READONLY", "WRITEONLY", "DISABLED"]);
@@ -104,12 +103,12 @@ export const ToolInputRequestSchema = z.object({
   message: "Either 'tool' or 'id' must be provided, but not both for ToolInputRequest.",
 });
 
-export const SystemInputSchema = {
-  id: z.string().describe("Unique identifier for the system"),
+export const IntegrationInputSchema = {
+  id: z.string().describe("Unique identifier for the integration"),
   urlHost: z.string().describe("Base URL/hostname for the API including protocol. For https://, use the format: https://<<hostname>>. For postgres, use the format: postgres://<<user>>:<<password>>@<<hostname>>:<<port>>"),
   urlPath: z.string().optional().describe("Path component of the URL. For postgres, use the db name as the path."),
   documentationUrl: z.string().optional().describe("URL to API documentation"),
-  credentials: z.any().optional().describe("Credentials for accessing the system. MAKE SURE YOU INCLUDE ALL OF THEM BEFORE BUILDING THE CAPABILITY, OTHERWISE IT WILL FAIL."),
+  credentials: z.any().optional().describe("Credentials for accessing the integration. MAKE SURE YOU INCLUDE ALL OF THEM BEFORE BUILDING THE CAPABILITY, OTHERWISE IT WILL FAIL."),
 };
 
 export const ListToolsInputSchema = {
@@ -131,7 +130,7 @@ export const ExecuteToolInputSchema = {
 export const BuildToolInputSchema = {
   instruction: z.string().describe("Natural language instruction for building the tool"),
   payload: z.any().optional().describe("Example JSON payload for the tool. This should be data needed to fulfill the request (e.g. a list of ids to loop over), not settings or filters. If not strictly needed, leave this empty."),
-  systems: z.array(z.object(SystemInputSchema)).describe("Array of systems the tool can interact with"),
+  integrations: z.array(z.object(IntegrationInputSchema)).describe("Array of integrations the tool can interact with"),
   responseSchema: z.any().optional().describe("JSONSchema for the expected response structure"),
 };
 
@@ -153,7 +152,7 @@ export const GenerateCodeInputSchema = {
 export const RunInstructionInputSchema = {
   instruction: z.string().describe("Natural language instruction for the one-time execution"),
   payload: z.any().optional().describe("Example JSON payload for the execution. This should be data needed to fulfill the request (e.g. a list of ids to loop over), not settings or filters. If not strictly needed, leave this empty."),
-  systems: z.array(z.object(SystemInputSchema)).describe("Array of systems the execution can interact with"),
+  integrations: z.array(z.object(IntegrationInputSchema)).describe("Array of integrations the execution can interact with"),
   responseSchema: z.any().optional().describe("JSONSchema for the expected response structure"),
 };
 
@@ -243,19 +242,19 @@ const validateToolBuilding = (args: any) => {
   const errors: string[] = [];
 
   if (!args.instruction || args.instruction.length < 10) {
-    errors.push("Instruction must be detailed (minimum 10 characters). Describe what the tool should do, what systems it connects to, and expected inputs/outputs.");
+    errors.push("Instruction must be detailed (minimum 10 characters). Describe what the tool should do, what integrations it connects to, and expected inputs/outputs.");
   }
 
-  if (!args.systems || !Array.isArray(args.systems) || args.systems.length === 0) {
-    errors.push("Systems array is required with at least one system configuration including credentials.");
+  if (!args.integrations || !Array.isArray(args.integrations) || args.integrations.length === 0) {
+    errors.push("integrations array is required with at least one integration configuration including credentials.");
   }
 
-  args.systems?.forEach((system: any, index: number) => {
-    if (!system.urlHost) {
-      errors.push(`System ${index}: urlHost is required (e.g., 'api.example.com')`);
+  args.integrations?.forEach((integration: any, index: number) => {
+    if (!integration.urlHost) {
+      errors.push(`Integration ${index}: urlHost is required (e.g., 'api.example.com')`);
     }
-    if (!system.credentials || Object.keys(system.credentials).length === 0) {
-      errors.push(`System ${index}: credentials object is required with API keys/tokens. You can use a placeholder.`);
+    if (!integration.credentials || Object.keys(integration.credentials).length === 0) {
+      errors.push(`Integration ${index}: credentials object is required with API keys/tokens. You can use a placeholder.`);
     }
   });
 
@@ -316,7 +315,7 @@ export const toolDefinitions: Record<string, any> = {
     </use_case>
 
     <important_notes>
-      - Gather ALL system credentials BEFORE building (API keys, tokens, documentation url if the system is less known)
+      - Gather ALL integration credentials BEFORE building (API keys, tokens, documentation url if the integration is less known)
       - Provide detailed, specific instructions
       - superglue handles pagination for you, so you don't need to worry about it
       - Tool building may take 30-60 seconds
@@ -334,7 +333,7 @@ export const toolDefinitions: Record<string, any> = {
         let tool = await client.buildWorkflow({
           instruction: args.instruction,
           payload: args.payload || {},
-          systems: args.systems,
+          integrations: args.integrations,
           responseSchema: args.responseSchema || {}
         });
 
@@ -347,7 +346,7 @@ export const toolDefinitions: Record<string, any> = {
         return {
           success: false,
           error: error.message,
-          suggestion: "Ensure all system credentials are provided and instruction is detailed"
+          suggestion: "Ensure all integration credentials are provided and instruction is detailed"
         };
       }
     },
@@ -413,7 +412,7 @@ export const toolDefinitions: Record<string, any> = {
 
     <important_notes>
       - Builds and executes immediately without persistence
-      - Requires ALL system credentials upfront  
+      - Requires ALL integration credentials upfront  
       - Faster than build + execute workflow for one-time tasks
       - Results are returned but tool definition is discarded
     </important_notes>
@@ -431,11 +430,11 @@ export const toolDefinitions: Record<string, any> = {
         const workflow = await client.buildWorkflow({
           instruction: args.instruction,
           payload: args.payload || {},
-          systems: args.systems,
+          integrations: args.integrations,
           responseSchema: args.responseSchema || {},
           save: false
         });
-        const credentials = Object.values(args.systems as SystemDefinition[]).reduce((acc, sys) => {
+        const credentials = Object.values(args.integrations as Integration[]).reduce((acc, sys) => {
           return { ...acc, ...Object.entries(sys.credentials || {}).reduce((obj, [name, value]) => ({ ...obj, [`${sys.id}_${name}`]: value }), {}) };
         }, {});
 
@@ -459,7 +458,7 @@ export const toolDefinitions: Record<string, any> = {
         return {
           success: false,
           error: error.message,
-          suggestion: "Ensure all system credentials are provided and instruction is detailed"
+          suggestion: "Ensure all integration credentials are provided and instruction is detailed"
         };
       }
     },

@@ -21,7 +21,7 @@ type ApiConfig implements BaseConfig {
   updatedAt: DateTime
 
   # Specific implementation
-  urlHost: String!
+  urlHost: String
   urlPath: String
   instruction: String
   method: HttpMethod
@@ -44,7 +44,7 @@ type ExtractConfig implements BaseConfig {
   updatedAt: DateTime
 
   # Specific implementation
-  urlHost: String!
+  urlHost: String
   urlPath: String
   queryParams: JSON
   instruction: String
@@ -178,7 +178,7 @@ input PaginationInput {
 
 input ApiInput {
   id: ID!
-  urlHost: String!
+  urlHost: String
   urlPath: String
   instruction: String
   queryParams: JSON
@@ -196,7 +196,7 @@ input ApiInput {
 
 input ExtractInput {
   id: ID!
-  urlHost: String!
+  urlHost: String
   urlPath: String
   queryParams: JSON
   instruction: String
@@ -256,9 +256,14 @@ input WorkflowInputRequest @oneOf {
   id: ID
 }
 
-input SystemInput {
-  id: String!
-  urlHost: String!
+input IntegrationInputRequest @oneOf {
+  integration: IntegrationInput
+  id: ID
+}
+
+input IntegrationInput {
+  id: ID!
+  urlHost: String
   urlPath: String
   documentationUrl: String
   documentation: String
@@ -289,7 +294,7 @@ type Query {
   getIntegration(id: ID!): Integration
 
   generateSchema(instruction: String!, responseData: String): JSONSchema!
-  generateInstructions(systems: [SystemInput!]!): [String!]!
+  generateInstructions(integrations: [IntegrationInput!]!): [String!]!
   getTenantInfo: TenantInfo
   
   # Workflow queries
@@ -329,6 +334,7 @@ type Workflow implements BaseConfig {
 
   # Specific implementation
   steps: [ExecutionStep!]
+  integrationIds: [ID]
   instruction: String
   finalTransform: JSONata
   responseSchema: JSONSchema
@@ -397,7 +403,7 @@ type Mutation {
   buildWorkflow(
     instruction: String!
     payload: JSON
-    systems: [SystemInput!]!
+    integrations: [IntegrationInputRequest!]!
     responseSchema: JSONSchema
   ): Workflow!
 
@@ -427,13 +433,12 @@ type Integration {
   id: ID!
   name: String
   type: String
-  urlHost: String!
+  urlHost: String
   urlPath: String
   credentials: JSON
   documentationUrl: String
   documentation: String
   icon: String
-  orgId: String
   version: String
   createdAt: DateTime
   updatedAt: DateTime
@@ -443,7 +448,7 @@ input IntegrationInput {
   id: ID!
   name: String
   type: String
-  urlHost: String!
+  urlHost: String
   urlPath: String
   credentials: JSON
   documentationUrl: String

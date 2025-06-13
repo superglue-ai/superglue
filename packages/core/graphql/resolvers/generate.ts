@@ -4,7 +4,7 @@ import { generateInstructions } from "../../utils/instructions.js";
 import { generateSchema } from "../../utils/schema.js";
 import { telemetryClient } from "../../utils/telemetry.js";
 import { getSchemaFromData } from "../../utils/tools.js";
-import { SystemDefinition } from "../../workflow/workflow-builder.js";
+import { Integration } from "@superglue/client";
 export const generateSchemaResolver = async (
   _: any,
   { instruction, responseData }: { instruction: string; responseData?: string; },
@@ -36,15 +36,15 @@ export const generateSchemaResolver = async (
 
 export const generateInstructionsResolver = async (
   _: any,
-  { systems }: { systems: SystemDefinition[] },
+  { integrations }: { integrations: Integration[] },
   context: Context,
   info: GraphQLResolveInfo
 ) => {
   try {
-    return generateInstructions(systems, { orgId: context.orgId });
+    return generateInstructions(integrations, { orgId: context.orgId });
   } catch (error) {
     telemetryClient?.captureException(error, context.orgId, {
-      systems: systems
+      integrations: integrations
     });
     throw error;
   }

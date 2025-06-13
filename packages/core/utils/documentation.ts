@@ -18,7 +18,7 @@ interface ProcessingStrategy {
 }
 
 export interface DocumentationConfig {
-  urlHost: string;
+  urlHost?: string;
   instruction?: string;
   documentationUrl?: string;
   urlPath?: string;
