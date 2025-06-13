@@ -23,7 +23,7 @@ describe('generateInstructions', () => {
   const originalEnv = { ...process.env }
 
   // Test data
-  const systems = [
+  const integrations = [
     {
       id: "stripe",
       urlHost: "https://api.stripe.com",
@@ -58,7 +58,7 @@ describe('generateInstructions', () => {
     const generateObject = vi.mocked(LanguageModel.generateObject)
     generateObject.mockResolvedValueOnce({ response: expectedInstructions, messages: [] })
 
-    const instructions = await generateInstructions(systems, { orgId: 'test-org' })
+    const instructions = await generateInstructions(integrations, { orgId: 'test-org' })
     expect(instructions).toEqual(expectedInstructions)
     expect(LanguageModel.generateObject).toHaveBeenCalledTimes(1)
   })
@@ -72,7 +72,7 @@ describe('generateInstructions', () => {
     // Second call succeeds
     generateObject.mockResolvedValueOnce({ response: expectedInstructions, messages: [] })
 
-    const instructions = await generateInstructions(systems, { orgId: 'test-org' })
+    const instructions = await generateInstructions(integrations, { orgId: 'test-org' })
     expect(instructions).toEqual(expectedInstructions)
     expect(generateObject).toHaveBeenCalledTimes(2)
 
@@ -90,7 +90,7 @@ describe('generateInstructions', () => {
     generateObject.mockRejectedValueOnce(new Error('Second failure'))
     generateObject.mockResolvedValueOnce({ response: expectedInstructions, messages: [] })
 
-    await generateInstructions(systems, { orgId: 'test-org' })
+    await generateInstructions(integrations, { orgId: 'test-org' })
 
     // Check that temperature increased with each retry
     expect(generateObject).toHaveBeenNthCalledWith(1, expect.any(Array), expect.any(Object), 0)
@@ -105,7 +105,7 @@ describe('generateInstructions', () => {
     // Make it fail consistently
     generateObject.mockRejectedValue(error)
 
-    await expect(generateInstructions(systems, { orgId: 'test-org' })).rejects.toThrow('Persistent error')
+    await expect(generateInstructions(integrations, { orgId: 'test-org' })).rejects.toThrow('Persistent error')
     expect(generateObject).toHaveBeenCalledTimes(4) // Initial try + 3 retries
   })
 })

@@ -9,7 +9,7 @@ function getValidArgs(overrides = {}) {
   return {
     instruction: 'Fetch all users from CRM and enrich with orders',
     payload: { userId: 123 },
-    systems: [
+    integrations: [
       { urlHost: 'api.example.com', credentials: { apiKey: 'test' } }
     ],
     client: {
@@ -30,25 +30,25 @@ describe('superglue_build_new_tool', () => {
       .rejects.toThrow(/Instruction must be detailed/)
   })
 
-  it('throws if systems is missing', async () => {
-    await expect(buildNewTool(getValidArgs({ systems: undefined }), {}))
-      .rejects.toThrow(/Systems array is required/)
+  it('throws if integrations is missing', async () => {
+    await expect(buildNewTool(getValidArgs({ integrations: undefined }), {}))
+      .rejects.toThrow(/integrations array is required/)
   })
 
-  it('throws if systems is empty', async () => {
-    await expect(buildNewTool(getValidArgs({ systems: [] }), {}))
-      .rejects.toThrow(/Systems array is required/)
+  it('throws if integrations is empty', async () => {
+    await expect(buildNewTool(getValidArgs({ integrations: [] }), {}))
+      .rejects.toThrow(/integrations array is required/)
   })
 
-  it('throws if a system is missing urlHost', async () => {
+  it('throws if a integration is missing urlHost', async () => {
     await expect(buildNewTool(getValidArgs({
-      systems: [{ credentials: { apiKey: 'test' } }]
+      integrations: [{ credentials: { apiKey: 'test' } }]
     }), {})).rejects.toThrow(/urlHost is required/)
   })
 
-  it('throws if a system is missing credentials', async () => {
+  it('throws if a integration is missing credentials', async () => {
     await expect(buildNewTool(getValidArgs({
-      systems: [{ urlHost: 'api.example.com', credentials: {} }]
+      integrations: [{ urlHost: 'api.example.com', credentials: {} }]
     }), {})).rejects.toThrow(/credentials object is required/)
   })
 
