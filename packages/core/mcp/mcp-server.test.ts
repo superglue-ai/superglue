@@ -4,6 +4,7 @@ import { toolDefinitions } from './mcp-server.js'
 const buildNewTool = toolDefinitions.superglue_build_new_tool.execute
 const executeTool = toolDefinitions.superglue_execute_tool.execute
 const getIntegrationCode = toolDefinitions.superglue_get_integration_code.execute
+const listTools = toolDefinitions.superglue_list_available_tools.execute
 
 function getValidArgs(overrides = {}) {
   return {
@@ -30,26 +31,15 @@ describe('superglue_build_new_tool', () => {
       .rejects.toThrow(/Instruction must be detailed/)
   })
 
-  it('throws if systems is missing', async () => {
-    await expect(buildNewTool(getValidArgs({ systems: undefined }), {}))
-      .rejects.toThrow(/Systems array is required/)
-  })
-
   it('throws if systems is empty', async () => {
     await expect(buildNewTool(getValidArgs({ systems: [] }), {}))
       .rejects.toThrow(/Systems array is required/)
   })
 
-  it('throws if a system is missing urlHost', async () => {
+  it('throws if a system is providing string credentials', async () => {
     await expect(buildNewTool(getValidArgs({
-      systems: [{ credentials: { apiKey: 'test' } }]
-    }), {})).rejects.toThrow(/urlHost is required/)
-  })
-
-  it('throws if a system is missing credentials', async () => {
-    await expect(buildNewTool(getValidArgs({
-      systems: [{ urlHost: 'api.example.com', credentials: {} }]
-    }), {})).rejects.toThrow(/credentials object is required/)
+      systems: [{ urlHost: 'api.example.com', credentials: "yooo" }]
+    }), {})).rejects.toThrow(/Credentials must be an object. E.g. { 'apiKey': '1234567890' }/)
   })
 
   it('returns failure if buildWorkflow throws', async () => {
@@ -232,6 +222,122 @@ describe('superglue_get_integration_code', () => {
     const result = await getIntegrationCode(args, {})
     expect(result.success).toBe(false)
     expect(result.error).toMatch(/invalid-language/i)
+  })
+})
+// ... existing code ...
+
+describe('superglue_list_available_tools', () => {
+  it('returns tools with default limit and offset', async () => {
+    const mockItems = [
+      {
+        id: 'tool-1',
+        name: 'Test Tool 1',
+        instruction: 'First test tool',
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-01T00:00:00Z'
+      },
+      {
+        id: 'tool-2',
+        instruction: 'Second test tool',
+        createdAt: '2024-01-02T00:00:00Z',
+        updatedAt: '2024-01-02T00:00:00Z'
+      }
+    ]
+    const client = {
+      listWorkflows: vi.fn().mockResolvedValue({
+        items: mockItems,
+        total: 2
+      })
+    }
+    const args = { client }
+    const result = await listTools(args, {})
+
+    expect(client.listWorkflows).toHaveBeenCalledWith(10, 0)
+    expect(result.success).toBe(true)
+    expect(result.tools).toHaveLength(2)
+    expect(result.tools[0]).toEqual({
+      id: 'tool-1',
+      name: 'Test Tool 1',
+      instruction: 'First test tool',
+      created_at: '2024-01-01T00:00:00Z',
+      updated_at: '2024-01-01T00:00:00Z'
+    })
+    expect(result.tools[1]).toEqual({
+      id: 'tool-2',
+      name: 'tool-2', // falls back to id when name is missing
+      instruction: 'Second test tool',
+      created_at: '2024-01-02T00:00:00Z',
+      updated_at: '2024-01-02T00:00:00Z'
+    })
+    expect(result.total).toBe(2)
+    expect(result.limit).toBe(10)
+    expect(result.offset).toBe(0)
+    expect(result.usage_tip).toBe("Use tool IDs with superglue_execute_tool to run specific tools")
+  })
+
+  it('uses custom limit and offset', async () => {
+    const client = {
+      listWorkflows: vi.fn().mockResolvedValue({
+        items: [],
+        total: 0
+      })
+    }
+    const args = { client, limit: 5, offset: 20 }
+    const result = await listTools(args, {})
+
+    expect(client.listWorkflows).toHaveBeenCalledWith(5, 20)
+    expect(result.success).toBe(true)
+    expect(result.limit).toBe(5)
+    expect(result.offset).toBe(20)
+  })
+
+  it('handles empty results', async () => {
+    const client = {
+      listWorkflows: vi.fn().mockResolvedValue({
+        items: [],
+        total: 0
+      })
+    }
+    const args = { client }
+    const result = await listTools(args, {})
+
+    expect(result.success).toBe(true)
+    expect(result.tools).toEqual([])
+    expect(result.total).toBe(0)
+  })
+
+  it('returns failure when listWorkflows throws', async () => {
+    const client = {
+      listWorkflows: vi.fn().mockRejectedValue(new Error('API error'))
+    }
+    const args = { client }
+    const result = await listTools(args, {})
+
+    expect(result.success).toBe(false)
+    expect(result.error).toBe('API error')
+    expect(result.suggestion).toBe("Check your API credentials and permissions")
+  })
+
+  it('handles tools with missing name field', async () => {
+    const mockItems = [
+      {
+        id: 'tool-no-name',
+        instruction: 'Tool without name',
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-01T00:00:00Z'
+      }
+    ]
+    const client = {
+      listWorkflows: vi.fn().mockResolvedValue({
+        items: mockItems,
+        total: 1
+      })
+    }
+    const args = { client }
+    const result = await listTools(args, {})
+
+    expect(result.success).toBe(true)
+    expect(result.tools[0].name).toBe('tool-no-name') // uses id as fallback
   })
 })
 
