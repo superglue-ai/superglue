@@ -5,15 +5,14 @@ import {
   CallToolResult,
   isInitializeRequest
 } from "@modelcontextprotocol/sdk/types.js";
-import { SuperglueClient, Workflow, WorkflowResult } from '@superglue/client';
+import { SuperglueClient, WorkflowResult } from '@superglue/client';
 import { LogEntry } from "@superglue/shared";
+import { getSDKCode } from '@superglue/shared/templates';
 import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
-import { jsonSchemaToZod } from 'json-schema-to-zod';
 import { z } from 'zod';
 import { validateToken } from '../auth/auth.js';
 import { logEmitter } from '../utils/logs.js';
-import { getSDKCode } from '@superglue/shared/templates';
 import { SystemDefinition } from "../workflow/workflow-builder.js";
 
 // Enums
@@ -108,8 +107,8 @@ export const SystemInputSchema = {
   id: z.string().describe("Unique identifier for the system"),
   urlHost: z.string().describe("Base URL/hostname for the API including protocol. For https://, use the format: https://<<hostname>>. For postgres, use the format: postgres://<<user>>:<<password>>@<<hostname>>:<<port>>"),
   urlPath: z.string().optional().describe("Path component of the URL. For postgres, use the db name as the path."),
-  documentationUrl: z.string().optional().describe("URL to API documentation"),
-  credentials: z.any().optional().describe("Credentials for accessing the system. MAKE SURE YOU INCLUDE ALL OF THEM BEFORE BUILDING THE CAPABILITY, OTHERWISE IT WILL FAIL."),
+  documentationUrl: z.string().optional().describe("URL to API documentation."),
+  credentials: z.record(z.string()).optional().describe("JSON Credentials for accessing the system. Do not include prefixes like Bearer or Basic. E.g. { 'apiKey': '1234567890' }"),
 };
 
 export const ListToolsInputSchema = {
@@ -124,7 +123,7 @@ export const GetToolInputSchema = {
 export const ExecuteToolInputSchema = {
   id: z.string().describe("The ID of the tool to execute"),
   payload: z.any().optional().describe("JSON payload to pass to the tool"),
-  credentials: z.any().optional().describe("JSON credentials for the tool execution"),
+  credentials: z.record(z.string()).optional().describe("JSON credentials for the tool execution. Do not include prefixes like Bearer or Basic. E.g. { 'apiKey': '1234567890' }"),
   options: RequestOptionsSchema.optional().describe("Optional request configuration"),
 };
 
@@ -233,7 +232,7 @@ const validateToolExecution = (args: any) => {
   }
 
   if (args.credentials && typeof args.credentials !== 'object') {
-    errors.push("Credentials must be a JSON object with key-value pairs.");
+    errors.push("Credentials must be an object. E.g. { 'apiKey': '1234567890' }");
   }
 
   return errors;
@@ -250,20 +249,56 @@ const validateToolBuilding = (args: any) => {
     errors.push("Systems array is required with at least one system configuration including credentials.");
   }
 
-  args.systems?.forEach((system: any, index: number) => {
-    if (!system.urlHost) {
-      errors.push(`System ${index}: urlHost is required (e.g., 'api.example.com')`);
-    }
-    if (!system.credentials || Object.keys(system.credentials).length === 0) {
-      errors.push(`System ${index}: credentials object is required with API keys/tokens. You can use a placeholder.`);
-    }
-  });
+  if (args.systems.some(system => system.credentials && typeof system.credentials !== 'object')) {
+    errors.push("Credentials must be an object. E.g. { 'apiKey': '1234567890' }");
+  }
 
   return errors;
 };
 
 // Update execute functions with validation
 export const toolDefinitions: Record<string, any> = {
+  superglue_list_available_tools: {
+    description: `
+    <use_case>
+      List all available Superglue tools for the current organization. Use this to discover what tools are available for execution.
+    </use_case>
+
+    <important_notes>
+      - Returns paginated list of tools with their IDs, names, and descriptions
+      - Use the tool IDs with superglue_execute_tool to run specific tools
+      - Default returns 10 tools, use limit/offset for pagination
+    </important_notes>
+    `,
+    inputSchema: ListToolsInputSchema,
+    execute: async (args: any & { client: SuperglueClient }, request) => {
+      const { client, limit = 10, offset = 0 } = args;
+      try {
+        const result = await client.listWorkflows(limit, offset);
+        return {
+          success: true,
+          tools: result.items.map(tool => ({
+            id: tool.id,
+            name: tool.name || tool.id,
+            instruction: tool.instruction,
+            created_at: tool.createdAt,
+            updated_at: tool.updatedAt
+          })),
+          total: result.total,
+          limit,
+          offset,
+          usage_tip: "Use tool IDs with superglue_execute_tool to run specific tools"
+        };
+      } catch (error: any) {
+        return {
+          success: false,
+          error: error.message,
+          suggestion: "Check your API credentials and permissions"
+        };
+      }
+    },
+  },
+
   superglue_execute_tool: {
     description: `
     <use_case>
@@ -449,10 +484,10 @@ export const toolDefinitions: Record<string, any> = {
         // Note: We don't call upsertWorkflow here, so it's not persisted
 
         return {
-          success: result.success,
-          data: result.data,
-          error: result.error,
-          instruction_executed: args.instruction,
+          success: result?.success || false,
+          data: result?.data,
+          error: result?.error,
+          workflow_executed: result?.config || workflow,
           note: "Tool was executed once and not saved. Use superglue_build_new_tool if you want to save it for reuse."
         };
       } catch (error: any) {
@@ -466,76 +501,6 @@ export const toolDefinitions: Record<string, any> = {
   },
 };
 
-// Add a new function to create dynamic tools from tools
-const createDynamicTools = async (tools: Workflow[], client: SuperglueClient) => {
-  const dynamicTools: Record<string, any> = {};
-
-  for (const tool of tools) {
-    let inputSchema;
-
-    if (tool.inputSchema) {
-      try {
-        // Parse the schema if it's a string
-        const schema = typeof tool.inputSchema === 'string'
-          ? JSON.parse(tool.inputSchema)
-          : tool.inputSchema;
-
-        // Convert JSONSchema to Zod and extract the object properties
-        const zodSchemaString = jsonSchemaToZod(schema);
-        // Extract the object properties from the generated z.object() call
-        const objectPropertiesMatch = zodSchemaString.match(/z\.object\((\{.*\})\)/s);
-        if (objectPropertiesMatch) {
-          const objectProperties = eval(`(${objectPropertiesMatch[1]})`);
-          inputSchema = { ...objectProperties, options: RequestOptionsSchema.optional() };
-        } else {
-          throw new Error('Could not extract object properties from generated schema');
-        }
-      } catch (error) {
-        console.warn(`Failed to convert inputSchema for tool ${tool.id}:`, error);
-        // Fallback to flexible schema with descriptions
-        inputSchema = {
-          payload: z.any().optional().describe("JSON payload data for the tool"),
-          credentials: z.any().optional().describe("Authentication credentials for the tool"),
-          options: RequestOptionsSchema.optional().describe("Optional request configuration"),
-        };
-      }
-    } else {
-      inputSchema = {
-        payload: z.any().optional().describe("JSON payload data for the tool"),
-        credentials: z.any().optional().describe("Authentication credentials for the tool"),
-        options: RequestOptionsSchema.optional().describe("Optional request configuration"),
-      };
-    }
-
-    dynamicTools[`execute_${tool.id}`] = {
-      description: tool.instruction || `Execute tool: ${tool.id}`,
-      inputSchema,
-      execute: async (args: any, request: any): Promise<CallToolResult> => {
-        const result = await client.executeWorkflow({
-          id: tool.id,
-          payload: args.payload,
-          credentials: args.credentials,
-          options: args.options,
-        });
-        if (result.success) {
-          await client.upsertWorkflow(result.config.id, result.config);
-        }
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(result),
-              mimeType: "text/plain",
-            },
-          ],
-        } as CallToolResult;
-      },
-    };
-  }
-
-  return dynamicTools;
-};
-
 // Modified server creation function
 export const createMcpServer = async (apiKey: string) => {
   const mcpServer = new McpServer({
@@ -546,18 +511,19 @@ Superglue: Universal API Integration Platform
 
 AGENT WORKFLOW:
 1. DISCOVER: Use superglue_list_available_tools to see what's available
-2. EXECUTE: Use superglue_execute_tool for existing tools OR superglue_build_new_tool for new integrations  
+2. EXECUTE: Use superglue_execute_tool for existing tools OR superglue_run_instruction for one-time tasks
 3. INTEGRATE: Use superglue_get_integration_code to show users how to implement
 
 CAPABILITIES:
-- Connect to any REST API, database, or web service
-- Transform data between different formats and schemas
-- Build custom tools from natural language instructions
+- Execute existing tools by ID
+- Run one-time instructions without persistence
 - Generate production-ready code in TypeScript, Python, Go
+- Transform data between different formats and schemas
 
 BEST PRACTICES:
-- Always gather ALL credentials before building tools
-- Use descriptive instructions when building new tools
+- Always gather ALL credentials before executing tools
+- If the request fails or the system is less known, suggest the user to provide a documentation url
+- Use superglue_list_available_tools to discover available tools
 - Validate tool IDs exist before execution
 - Provide integration code when users ask "how do I use this?"
     `,
@@ -598,7 +564,7 @@ BEST PRACTICES:
     logEmitter.removeListener('log', logHandler);
   };
 
-  // Register static tools
+  // Register static tools only
   for (const toolName of Object.keys(toolDefinitions)) {
     const tool = toolDefinitions[toolName];
     mcpServer.tool(
@@ -607,20 +573,6 @@ BEST PRACTICES:
       tool.inputSchema,
       async (args, extra) => {
         const result = await tool.execute({ ...args, client }, extra);
-
-        if (result && result.success && ["superglue_build_new_tool"].includes(toolName)) {
-          const id = `execute_${result.id}`;
-          const tools = await createDynamicTools([result], client);
-          const dynamicTool = tools[id];
-          mcpServer.tool(
-            id,
-            dynamicTool.description,
-            dynamicTool.inputSchema,
-            dynamicTool.execute
-          );
-          mcpServer.sendToolListChanged();
-          mcpServer.server.sendToolListChanged();
-        }
 
         return {
           content: [
@@ -633,22 +585,6 @@ BEST PRACTICES:
         } as CallToolResult;
       }
     );
-  }
-
-  // Register dynamic tools
-  try {
-    const workflows = await client.listWorkflows(100, 0);
-    const dynamicTools = await createDynamicTools(workflows.items, client);
-    for (const [toolName, tool] of Object.entries(dynamicTools)) {
-      mcpServer.tool(
-        toolName,
-        tool.description,
-        tool.inputSchema,
-        tool.execute
-      );
-    }
-  } catch (error) {
-    console.warn('Failed to load dynamic tools:', error);
   }
 
   return mcpServer;
