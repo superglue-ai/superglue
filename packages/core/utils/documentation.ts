@@ -45,91 +45,62 @@ export class Documentation {
   // --- Post Processing ---
 
   private postProcess(documentation: string, instruction: string): string {
-    // (Renamed from postProcessLargeDoc - same logic)
     if (documentation.length <= Documentation.MAX_LENGTH) {
       return documentation;
     }
-    const CONTEXT_SEPARATOR = "\n\n";
+
+    const CHUNK_SIZE = Documentation.MAX_LENGTH / 10;
+    const MAX_CHUNKS = 10; // Limit number of chunks to return
     const MIN_SEARCH_TERM_LENGTH = 4;
 
-    const docLower = documentation.toLowerCase();
-    const positions: number[] = [];
-
-    let searchTerms = instruction?.toLowerCase()?.split(/[^a-z0-9]/)
+    // Extract search terms from instruction
+    const searchTerms = instruction?.toLowerCase()?.split(/[^a-z0-9]/)
       .map(term => term.trim())
-      .filter(term => term.length >= MIN_SEARCH_TERM_LENGTH);
+      .filter(term => term.length >= MIN_SEARCH_TERM_LENGTH) || [];
 
-    for (const searchTerm of searchTerms) {
-      let pos = docLower.indexOf(searchTerm);
-      while (pos !== -1) {
-        positions.push(pos);
-        pos = docLower.indexOf(searchTerm, pos + 1);
+    // Add common auth-related terms
+    searchTerms.push('securityschemes', 'authorization', 'authentication');
+
+    // Split document into chunks
+    const chunks: { content: string; score: number; index: number }[] = [];
+
+    for (let i = 0; i < documentation.length; i += CHUNK_SIZE) {
+      const chunk = documentation.slice(i, i + CHUNK_SIZE);
+      const chunkLower = chunk.toLowerCase();
+
+      // Score chunk based on search term matches
+      let score = 0;
+      for (const term of searchTerms) {
+        const matches = (chunkLower.match(new RegExp(term, 'g')) || []).length;
+        score += matches;
       }
+
+      chunks.push({
+        content: chunk,
+        score,
+        index: i
+      });
     }
 
-    let authPosSecuritySchemes = docLower.indexOf("securityschemes");
-    if (authPosSecuritySchemes !== -1) positions.push(authPosSecuritySchemes);
-    let authPosAuthorization = docLower.indexOf("authorization");
-    if (authPosAuthorization !== -1) positions.push(authPosAuthorization);
+    // Sort by score (highest first) and take top chunks
+    const topChunks = chunks
+      .sort((a, b) => b.score - a.score)
+      .slice(0, MAX_CHUNKS);
 
-    if (positions.length === 0) {
+    // If no chunks have matches, return first chunk
+    if (topChunks.every(chunk => chunk.score === 0)) {
       return documentation.slice(0, Documentation.MAX_LENGTH);
     }
-    positions.sort((a, b) => a - b);
 
-    const firstHalfLength = Math.floor(Documentation.MAX_LENGTH * 0.4);
-    const secondHalfLength = Documentation.MAX_LENGTH - firstHalfLength;
+    // Sort selected chunks by their original position to maintain document order
+    topChunks.sort((a, b) => a.index - b.index);
 
-    // Calculate chunk size for the second half, ensuring it's an integer
-    const chunkSize = Math.floor(secondHalfLength / positions.length);
-    if (chunkSize <= 0) {
-      // Fallback if MAX_LENGTH is too small or too many positions
-      return documentation.slice(0, Documentation.MAX_LENGTH);
-    }
+    const result = topChunks.map(chunk => chunk.content).join('\n\n');
 
-    // Extract the first half
-    const firstHalf = documentation.slice(0, firstHalfLength);
-
-    // Extract chunks for the second half, avoiding overlaps and out-of-bounds
-    const chunks: string[] = [];
-    let lastChunkEnd = firstHalfLength; // Start checking for overlaps after the first half
-
-    for (const pos of positions) {
-      // Calculate start and end, trying to center the chunk around the position
-      const halfChunk = Math.floor(chunkSize / 2);
-      let start = Math.max(0, pos - halfChunk);
-      let end = start + chunkSize;
-
-      // Adjust if chunk goes beyond document length
-      if (end > documentation.length) {
-        end = documentation.length;
-        start = Math.max(0, end - chunkSize); // Readjust start if possible
-      }
-
-      // Skip if the chunk is entirely contained within the first half or previous chunks
-      if (start >= end || end <= lastChunkEnd) {
-        continue;
-      }
-
-      // Adjust start if it overlaps with the last chunk
-      start = Math.max(start, lastChunkEnd);
-
-      // Only add if the adjusted chunk has content
-      if (start < end) {
-        chunks.push(documentation.slice(start, end));
-        lastChunkEnd = end;
-      }
-    }
-
-    // Combine the first half and the extracted chunks
-    let finalDoc = firstHalf + CONTEXT_SEPARATOR + chunks.join(CONTEXT_SEPARATOR);
-
-    // Final trim if we somehow exceeded length due to rounding/logic or separators
-    if (finalDoc.length > Documentation.MAX_LENGTH) {
-      finalDoc = finalDoc.slice(0, Documentation.MAX_LENGTH);
-    }
-
-    return finalDoc;
+    // Final trim if needed
+    return result.length > Documentation.MAX_LENGTH
+      ? result.slice(0, Documentation.MAX_LENGTH)
+      : result;
   }
 
 
