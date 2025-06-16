@@ -9,7 +9,6 @@ import express from 'express';
 import { graphqlUploadExpress } from 'graphql-upload-minimal';
 import { useServer } from 'graphql-ws/use/ws';
 import http from 'http';
-import os from 'os';
 import { WebSocketServer } from 'ws';
 import { authMiddleware, extractToken, validateToken } from './auth/auth.js';
 import { createDataStore } from './datastore/datastore.js';
@@ -153,12 +152,10 @@ async function startServer() {
 }
 
 // cluster mode for CPU-bound work
+// we cannot use multiple workers because of the datastore and mcp statefulness
+// larger refactor needed to support multiple workers
 if (cluster.isPrimary) {
-  const useSingleWorker = process.env.DATASTORE_TYPE === 'file' || process.env.DATASTORE_TYPE === 'memory';
-  const workerCount = useSingleWorker ? 1 : Math.max(8, os.cpus().length);
-  for (let i = 0; i < workerCount; i++) {
-    cluster.fork();
-  }
+  cluster.fork();
 } else {
   startServer();
 }
