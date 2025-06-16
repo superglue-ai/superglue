@@ -1,10 +1,10 @@
 "use client";
 
-import { Book, Bot, History, Layout, PlayCircle, Sun, Moon, Monitor } from "lucide-react";
+import { Button } from "@/src/components/ui/button";
+import { useTheme } from "@/src/hooks/useTheme";
+import { Book, Bot, History, Layout, Monitor, Moon, PlayCircle, Sun } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useTheme } from "@/src/hooks/useTheme";
-import { Button } from "@/src/components/ui/button";
 import { useEffect, useState } from "react";
 
 const navItems = [
@@ -30,7 +30,6 @@ export function Sidebar() {
       <div className="p-6">
         <div className="relative mx-auto">
           <img src="/logo.svg" alt="superglue Logo" className="max-w-full h-[50px] w-[200px] ml-auto mr-auto" />
-          <div className="text-center text-sm text-foreground mt-2">Data Integration Agent</div>
         </div>
       </div>
       <nav className="flex-1">
