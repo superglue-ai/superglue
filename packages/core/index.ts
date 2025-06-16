@@ -3,11 +3,13 @@ import { expressMiddleware } from '@apollo/server/express4';
 import { ApolloServerPluginDrainHttpServer } from '@apollo/server/plugin/drainHttpServer';
 import { ApolloServerPluginLandingPageLocalDefault } from '@apollo/server/plugin/landingPage/default';
 import { makeExecutableSchema } from '@graphql-tools/schema';
+import cluster from 'cluster';
 import cors from 'cors';
 import express from 'express';
 import { graphqlUploadExpress } from 'graphql-upload-minimal';
 import { useServer } from 'graphql-ws/use/ws';
 import http from 'http';
+import os from 'os';
 import { WebSocketServer } from 'ws';
 import { authMiddleware, extractToken, validateToken } from './auth/auth.js';
 import { createDataStore } from './datastore/datastore.js';
@@ -150,8 +152,13 @@ async function startServer() {
   logMessage('info', `🚀 Superglue server ready at http://localhost:${PORT}/ and ws://localhost:${PORT}/`);
 }
 
-// Start the server
-startServer().catch(error => {
-  logMessage('error', 'Failed to start server:', error);
-  process.exit(1);
-});
+// cluster mode for CPU-bound work
+if (cluster.isPrimary) {
+  const useSingleWorker = process.env.DATASTORE_TYPE === 'file' || process.env.DATASTORE_TYPE === 'memory';
+  const workerCount = useSingleWorker ? 1 : Math.max(4, os.cpus().length);
+  for (let i = 0; i < workerCount; i++) {
+    cluster.fork();
+  }
+} else {
+  startServer();
+}
