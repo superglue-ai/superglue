@@ -779,3 +779,64 @@ export function findMatchingIntegration(url: string): { key: string; integration
 //   console.log(`API URL: ${match.integration.apiUrl}`);
 //   console.log(`Icon: ${match.integration.icon}`);
 // }
+
+/**
+ * Polls for all integrations to have documentation fetched (documentationPending === false and documentation non-empty).
+ * Throws if docs are missing or timeout is reached.
+ */
+export async function waitForIntegrationsReady(
+  ids: string[],
+  client: any,
+  toast: any,
+  maxWaitMs = 20000,
+  pollInterval = 1000
+) {
+  const start = Date.now();
+  let prevPending: Record<string, boolean> = {};
+  let activeIds = [...ids];
+
+  while (Date.now() - start < maxWaitMs && activeIds.length > 0) {
+    const settled = await Promise.allSettled(activeIds.map(id => client.getIntegration(id)));
+    const results = settled.map(r => r.status === 'fulfilled' ? r.value : null);
+
+    // Remove deleted integrations from polling
+    activeIds = activeIds.filter((id, idx) => results[idx] !== null);
+
+    // Show toast for each integration that transitions from pending to ready or failed
+    results.forEach(i => {
+      if (!i) return;
+      const pending = i.documentationPending === true;
+      if (prevPending[i.id] && !pending) {
+        if (!i.documentation) {
+          toast && toast({
+            title: 'Documentation Fetch Failed',
+            description: `Documentation fetch failed for integration "${i.id}". Please edit the integration or refresh docs.`,
+            variant: 'destructive',
+          });
+        } else {
+          toast && toast({
+            title: 'Documentation Ready',
+            description: `Documentation for integration "${i.id}" is now ready!`,
+            variant: 'success',
+          });
+        }
+      }
+      prevPending[i.id] = pending;
+    });
+
+    // Only wait for integrations that still exist and are not ready
+    const notReady = results.find(i => i && (i.documentationPending === true || !i.documentation));
+    if (!notReady) return results.filter(Boolean);
+
+    await new Promise(res => setTimeout(res, pollInterval));
+  }
+
+  toast && toast({
+    title: 'Timeout',
+    description: 'Waiting for integration documentation timed out.',
+    variant: 'destructive',
+  });
+  return [];
+}
+
+

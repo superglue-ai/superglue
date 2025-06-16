@@ -1,3 +1,4 @@
+import { useConfig } from '@/src/app/config-context';
 import { Button } from '@/src/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/src/components/ui/command';
@@ -8,9 +9,12 @@ import { CredentialsManager } from '@/src/components/utils/CredentialManager';
 import { DocumentationField } from '@/src/components/utils/DocumentationField';
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import { URLField } from '@/src/components/utils/URLField';
+import { useToast } from '@/src/hooks/use-toast';
+import { waitForIntegrationsReady } from '@/src/lib/integrations';
 import { cn, composeUrl } from '@/src/lib/utils';
 import type { Integration } from '@superglue/client';
-import { Check, ChevronsUpDown, Globe } from 'lucide-react';
+import { SuperglueClient } from '@superglue/client';
+import { Check, ChevronsUpDown, Globe, Loader2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 
 export interface IntegrationFormProps {
@@ -62,6 +66,10 @@ export function IntegrationForm({
     const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
     const urlFieldRef = useRef<any>(null);
     const isEditing = !!integration;
+    const config = useConfig();
+    const { toast } = useToast();
+    const [isWaitingForDocs, setIsWaitingForDocs] = useState(false);
+    const [docFileUploaded, setDocFileUploaded] = useState(false);
 
     const handleIntegrationSelect = (value: string) => {
         setSelectedIntegration(value);
@@ -102,7 +110,37 @@ export function IntegrationForm({
         }
     };
 
-    const handleSubmit = () => {
+    // Shared upsert logic
+    const upsertIntegration = async () => {
+        const client = new SuperglueClient({
+            endpoint: config.superglueEndpoint,
+            apiKey: config.superglueApiKey,
+        });
+        const integrationId = isEditing ? integration!.id : id.trim();
+        const creds = credentials ? JSON.parse(credentials) : {};
+        await client.upsertIntegration(integrationId, {
+            id: integrationId,
+            urlHost: urlHost.trim(),
+            urlPath: urlPath.trim(),
+            documentationUrl: documentationUrl.trim(),
+            documentation: documentation.trim(),
+            credentials: creds,
+        });
+        return { client, integrationId };
+    };
+
+    // Fire-and-forget poller for background doc fetch, always show toast when started
+    const triggerDocPoller = (integrationId: string, client: any) => {
+        toast({
+            title: 'Documentation Fetching',
+            description: 'Documentation fetching has started and may take a while. You can continue working.',
+            variant: 'default',
+        });
+        // Poller is safe and never throws
+        waitForIntegrationsReady([integrationId], client, toast, 60000);
+    };
+
+    const handleSubmit = async () => {
         const errors: Record<string, boolean> = {};
         if (!id.trim()) errors.id = true;
         if (!urlHost.trim()) errors.urlHost = true;
@@ -116,14 +154,52 @@ export function IntegrationForm({
             return;
         }
         setValidationErrors({});
-        onSave({
-            id: isEditing ? integration!.id : id.trim(),
-            urlHost: urlHost.trim(),
-            urlPath: urlPath.trim(),
-            documentationUrl: documentationUrl.trim(),
-            documentation: documentation.trim(),
-            credentials: creds,
-        });
+        setIsWaitingForDocs(true);
+        try {
+            // If a file was uploaded, just upsert and skip doc fetching
+            if (docFileUploaded) {
+                await upsertIntegration();
+            } else {
+                const needsDocFetch = !isEditing || !integration ||
+                    integration.urlHost !== urlHost.trim() ||
+                    integration.urlPath !== urlPath.trim() ||
+                    integration.documentationUrl !== documentationUrl.trim();
+                const { client, integrationId } = await upsertIntegration();
+                if (needsDocFetch) {
+                    triggerDocPoller(integrationId, client);
+                }
+            }
+            onSave({
+                id: isEditing ? integration!.id : id.trim(),
+                urlHost: urlHost.trim(),
+                urlPath: urlPath.trim(),
+                documentationUrl: documentationUrl.trim(),
+                documentation: documentation.trim(),
+                credentials: creds,
+            });
+        } catch (e: any) {
+            toast({
+                title: 'Integration Error',
+                description: e?.message || 'Failed to save integration.',
+                variant: 'destructive',
+            });
+        } finally {
+            setIsWaitingForDocs(false);
+        }
+    };
+
+    const handleRefreshDocs = async () => {
+        setIsWaitingForDocs(true);
+        try {
+            if (docFileUploaded) {
+                await upsertIntegration();
+            } else {
+                const { client, integrationId } = await upsertIntegration();
+                triggerDocPoller(integrationId, client);
+            }
+        } finally {
+            setIsWaitingForDocs(false);
+        }
     };
 
     return (
@@ -255,6 +331,11 @@ export function IntegrationForm({
                         content={documentation || ''}
                         onUrlChange={setDocumentationUrl}
                         onContentChange={setDocumentation}
+                        onRefreshDocs={handleRefreshDocs}
+                        className={isWaitingForDocs ? 'opacity-50 pointer-events-none' : ''}
+                        hideRefreshButton={!isEditing || docFileUploaded}
+                        onFileUpload={() => setDocFileUploaded(true)}
+                        refreshingDocs={isWaitingForDocs}
                     />
                 </div>
                 <div>
@@ -270,8 +351,11 @@ export function IntegrationForm({
                     {validationErrors.credentials && <p className="text-sm text-destructive mt-1">Credentials must be valid JSON.</p>}
                 </div>
                 <div className="flex justify-end gap-2 pt-2">
-                    <Button variant="outline" onClick={onCancel}>Cancel</Button>
-                    <Button onClick={handleSubmit}>{integration ? 'Save Changes' : 'Add Integration'}</Button>
+                    <Button variant="outline" onClick={onCancel} disabled={isWaitingForDocs}>Cancel</Button>
+                    <Button onClick={handleSubmit} disabled={isWaitingForDocs}>
+                        {isWaitingForDocs ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                        {integration ? 'Save Changes' : 'Add Integration'}
+                    </Button>
                 </div>
             </CardContent>
         </Card>

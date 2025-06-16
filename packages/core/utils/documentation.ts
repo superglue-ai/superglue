@@ -9,6 +9,9 @@ import { logMessage } from "./logs.js";
 import { callPostgres } from './postgres.js';
 import { composeUrl } from "./tools.js";
 
+const DOC_AXIOS_TIMEOUT_MS = 30000;
+const DOC_PLAYWRIGHT_TIMEOUT_MS = 15000;
+
 // Strategy Interface
 interface FetchingStrategy {
   tryFetch(config: DocumentationConfig, metadata: Metadata, credentials?: Record<string, any>): Promise<string | null>;
@@ -209,7 +212,7 @@ class GraphQLStrategy implements FetchingStrategy {
           query: introspectionQuery,
           operationName: 'IntrospectionQuery'
         },
-        { headers: config.headers, params: config.queryParams }
+        { headers: config.headers, params: config.queryParams, timeout: DOC_AXIOS_TIMEOUT_MS }
       );
 
       if (response.data.errors) {
@@ -264,7 +267,7 @@ export class AxiosFetchingStrategy implements FetchingStrategy {
         });
       }
 
-      const response = await axios.get(url.toString(), { headers: config.headers });
+      const response = await axios.get(url.toString(), { headers: config.headers, timeout: DOC_AXIOS_TIMEOUT_MS });
       logMessage('info', `Successfully fetched content with axios for ${config.documentationUrl}`, metadata);
       return response.data;
     } catch (error) {
@@ -321,7 +324,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       await page.goto(url.toString());
       // Wait for network idle might be better for SPAs, but has risks of timeout
       // Let's stick with domcontentloaded + short timeout
-      await page.waitForLoadState('domcontentloaded', { timeout: 15000 });
+      await page.waitForLoadState('domcontentloaded', { timeout: DOC_PLAYWRIGHT_TIMEOUT_MS });
       await page.waitForTimeout(1000); // Allow JS execution
 
       const links: Record<string, string> = await page.evaluate(() => {
@@ -483,7 +486,7 @@ class OpenApiStrategy implements ProcessingStrategy {
         const baseUrl = config.documentationUrl ? new URL(config.documentationUrl).origin : config.urlHost;
         absoluteOpenApiUrl = composeUrl(baseUrl, openApiUrl);
       }
-      const openApiResponse = await axios.get(absoluteOpenApiUrl, { headers: config.headers });
+      const openApiResponse = await axios.get(absoluteOpenApiUrl, { headers: config.headers, timeout: DOC_AXIOS_TIMEOUT_MS });
       const openApiData = openApiResponse.data;
 
       if (!openApiData) return null;
