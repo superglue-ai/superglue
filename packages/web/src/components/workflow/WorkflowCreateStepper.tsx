@@ -2,7 +2,7 @@ import { useConfig } from '@/src/app/config-context';
 import { IntegrationForm } from '@/src/components/integrations/IntegrationForm';
 import { useToast } from '@/src/hooks/use-toast';
 import { inputErrorStyles, splitUrl } from '@/src/lib/client-utils';
-import { findMatchingIntegration, integrations as integrationTemplates } from '@/src/lib/integrations';
+import { findMatchingIntegration, integrations as integrationTemplates, waitForIntegrationsReady } from '@/src/lib/integrations';
 import { cn, composeUrl } from '@/src/lib/utils';
 import { Integration, IntegrationInput, SuperglueClient, Workflow, WorkflowResult } from '@superglue/client';
 import { flattenAndNamespaceWorkflowCredentials } from '@superglue/shared/utils';
@@ -184,92 +184,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       .replace(/[^a-zA-Z0-9-]/g, ""); // Remove special characters
   };
 
-  // --- Integration Management ---
-  const handleIntegrationChange = (field: keyof Integration | 'fullUrl') => (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    let newValue = e.target.value;
-
-    // Apply sanitization for the id field
-    if (field === 'id') {
-      newValue = sanitizeIntegrationId(newValue);
-      setIdManuallyEdited(true); // Track that user manually edited the ID
-    } else if (field === 'credentials') {
-      try {
-        newValue = JSON.parse(newValue);
-      } catch {
-        setValidationErrors(prev => ({ ...prev, credentials: true }));
-      }
-    }
-
-    setCurrentIntegration(prev => ({ ...prev, [field]: newValue }));
-    setValidationErrors(prev => ({ ...prev, [field]: false })); // Clear error on change
-  };
-
-  const handleAddIntegration = async (input: Partial<Integration>) => {
-    setLoading(true);
-    try {
-      await client.upsertIntegration(input.id!, input);
-      const { items } = await client.listIntegrations(100, 0);
-      setIntegrations(items);
-      setAddModalOpen(false);
-      setIntegrationFormVisible(false);
-      setCurrentIntegration({
-        id: '',
-        urlHost: '',
-        urlPath: '',
-        documentationUrl: '',
-        documentation: '',
-        credentials: {},
-      });
-      setIdManuallyEdited(false);
-      setSelectedIntegration("custom");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleEditIntegration = (integration: Integration) => {
-    setEditingIntegration(integration);
-    setAddModalOpen(true);
-  };
-
-  const handleSaveIntegrationEdit = async (input: Partial<Integration>) => {
-    setLoading(true);
-    try {
-      await client.upsertIntegration(input.id!, input);
-      const { items } = await client.listIntegrations(100, 0);
-      setIntegrations(items);
-      setAddModalOpen(false);
-      setIntegrationFormVisible(false);
-      setEditingIntegration(null);
-      setCurrentIntegration({
-        id: '',
-        urlHost: '',
-        urlPath: '',
-        documentationUrl: '',
-        documentation: '',
-        credentials: {},
-      });
-      setIdManuallyEdited(false);
-      setSelectedIntegration("custom");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDeleteIntegration = async (id: string) => {
-    setLoading(true);
-    try {
-      await client.deleteIntegration(id);
-      const { items } = await client.listIntegrations(100, 0);
-      setIntegrations(items);
-      setSelectedIntegrationIds(ids => ids.filter(i => i !== id));
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // --- Step Navigation ---
   const handleNext = async () => {
     const steps: WorkflowCreateStep[] = ['integrations', 'prompt', 'review', 'success'];
@@ -311,16 +225,18 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       setValidationErrors({});
       setIsBuilding(true);
       try {
-        // Generate schema first
+        // Wait for docs to be ready
+        await waitForIntegrationsReady(selectedIntegrationIds, client, toast);
+        // Refresh integrations list to ensure up-to-date docs
+        const { items: freshIntegrations } = await client.listIntegrations(100, 0);
+        setIntegrations(freshIntegrations);
         const schema = await client.generateSchema(instruction, "");
         setSchema(JSON.stringify(schema, null, 2));
         const parsedPayload = JSON.parse(payload || '{}');
-        // Prepare IntegrationInputRequest[] for workflow builder
         const integrationInputRequests = selectedIntegrationIds
-          .map(id => integrations.find(i => i.id === id))
+          .map(id => freshIntegrations.find(i => i.id === id))
           .filter(Boolean)
           .map(i => ({ integration: toIntegrationInput(i) }));
-        // Then build workflow
         const response = await client.buildWorkflow({
           instruction: instruction,
           payload: parsedPayload,
@@ -361,6 +277,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
               id: step.apiConfig?.id || step.id,
             }
           })),
+          integrationIds: selectedIntegrationIds,
           inputSchema: currentWorkflow.inputSchema,
           finalTransform: currentWorkflow.finalTransform,
           responseSchema: JSON.parse(schema),
@@ -645,11 +562,12 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     setLoading(true);
     try {
       await client.upsertIntegration(integration.id, integration);
+      // Wait for docs to be ready
+      await waitForIntegrationsReady([integration.id], client, toast);
       const { items } = await client.listIntegrations(100, 0);
       setIntegrations(items);
       setShowIntegrationForm(false);
       setIntegrationFormEdit(null);
-      // Auto-select newly added integration
       setSelectedIntegrationIds(ids => ids.includes(integration.id) ? ids : [...ids, integration.id]);
     } finally {
       setLoading(false);

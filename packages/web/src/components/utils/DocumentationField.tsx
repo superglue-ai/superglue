@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { Badge } from '@/src/components/ui/badge'
 import { Button } from '@/src/components/ui/button'
 import { Input } from '@/src/components/ui/input'
-import { Upload, Link, FileText, FileQuestion } from 'lucide-react'
-import { Badge } from '@/src/components/ui/badge'
+import { FileQuestion, FileText, Link, Loader2, RotateCw, Upload } from 'lucide-react'
+import { useCallback, useState } from 'react'
 
 interface DocumentationFieldProps {
   url: string
@@ -12,6 +12,10 @@ interface DocumentationFieldProps {
   onUrlChange: (url: string) => void
   onContentChange: (content: string) => void
   className?: string
+  onRefreshDocs?: () => void
+  hideRefreshButton?: boolean
+  onFileUpload?: () => void
+  refreshingDocs?: boolean
 }
 
 export function DocumentationField({
@@ -19,11 +23,15 @@ export function DocumentationField({
   content,
   onUrlChange,
   onContentChange,
-  className
+  className,
+  onRefreshDocs,
+  hideRefreshButton,
+  onFileUpload,
+  refreshingDocs = false
 }: DocumentationFieldProps) {
   const [docFile, setDocFile] = useState<File | null>(null)
   const activeType = url ? 'url' : content ? (docFile ? 'file' : 'content') : 'empty'
-  
+
   // Derived state for display purposes only
   const displayValue = url || (content ? (
     content.length > 200 ? content.substring(0, 200) + '...' : content
@@ -32,7 +40,7 @@ export function DocumentationField({
   const handleDocFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    
+
     try {
       let text = ''
       if (file.type === 'application/pdf') {
@@ -40,10 +48,10 @@ export function DocumentationField({
         const pdfjsLib = await import('pdfjs-dist');
         // Update worker path to use .mjs extension
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
-        
+
         const arrayBuffer = await file.arrayBuffer();
         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-        
+
         let fullText = '';
         for (let i = 1; i <= pdf.numPages; i++) {
           const page = await pdf.getPage(i);
@@ -59,6 +67,7 @@ export function DocumentationField({
       setDocFile(file)
       onContentChange(text)
       onUrlChange('')
+      if (typeof onFileUpload === 'function') onFileUpload();
     } catch (error) {
       console.error('Error reading file:', error)
       // You might want to add user-facing error handling here
@@ -71,7 +80,7 @@ export function DocumentationField({
   const handleInputChange = useCallback((value: string) => {
     // Don't allow changes if a file is uploaded
     if (docFile) return
-    
+
     // Quick check before regex for better performance
     if (value.startsWith('http://') || value.startsWith('https://')) {
       onUrlChange(value)
@@ -115,22 +124,23 @@ export function DocumentationField({
         >
           Upload
         </Button>
-        
-        {(url || content) && (
+
+        {(url || content) && !docFile && !hideRefreshButton && (
           <Button
             variant="ghost"
             size="sm"
-            className="shrink-0 text-muted-foreground hover:text-destructive transition-colors"
+            className="shrink-0 text-muted-foreground hover:text-primary transition-colors"
             onClick={() => {
-              onContentChange('')
-              onUrlChange('')
-              setDocFile(null)
+              if (typeof onRefreshDocs === 'function') onRefreshDocs();
             }}
+            disabled={refreshingDocs}
+            title="Refresh documentation from URL"
           >
-            Clear
+            {refreshingDocs ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RotateCw className="h-4 w-4 mr-1" />}
+            Refresh Docs
           </Button>
         )}
-            
+
         <input
           type="file"
           id="doc-file-upload"

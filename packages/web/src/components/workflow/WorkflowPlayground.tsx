@@ -1,10 +1,12 @@
 "use client";
-
 import { useConfig } from "@/src/app/config-context";
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import JsonSchemaEditor from "@/src/components/utils/JsonSchemaEditor";
 import { parseCredentialsHelper, removeNullUndefined } from "@/src/lib/client-utils";
+import { cn } from "@/src/lib/utils";
 import { ExecutionStep, SuperglueClient, WorkflowResult } from "@superglue/client";
+import { flattenAndNamespaceWorkflowCredentials } from "@superglue/shared/utils";
+import { ChevronRight, X } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from "react";
 import { useToast } from "../../hooks/use-toast";
@@ -14,7 +16,6 @@ import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { WorkflowResultsView } from "./WorkflowResultsView";
 import { WorkflowStepsView } from "./WorkflowStepsView";
-import { X } from "lucide-react";
 
 export default function WorkflowPlayground({ id }: { id?: string }) {
   const router = useRouter();
@@ -32,6 +33,9 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<WorkflowResult | null>(null);
   const [activeResultTab, setActiveResultTab] = useState<'results' | 'transform' | 'final' | 'instructions'>("final");
+  const [integrationCredentials, setIntegrationCredentials] = useState<Record<string, string>>({});
+  const [showSteps, setShowSteps] = useState(false);
+  const [showSchemaEditor, setShowSchemaEditor] = useState(false);
 
   const updateWorkflowId = (id: string) => {
     const sanitizedId = id
@@ -84,11 +88,12 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
       if (!workflow) {
         throw new Error(`Workflow with ID "${idToLoad}" not found.`);
       }
-      console.log(workflow);
       const cleanedWorkflow = removeNullUndefined(workflow);
       updateWorkflowId(cleanedWorkflow.id || '');
       setSteps(cleanedWorkflow.steps || []);
-      setFinalTransform(cleanedWorkflow.finalTransform || `{\n  "result": $\n}`);
+      setFinalTransform(cleanedWorkflow.finalTransform || `{
+  "result": $
+}`);
 
       if (cleanedWorkflow.responseSchema === null || cleanedWorkflow.responseSchema === undefined) {
         setResponseSchema(null);
@@ -96,17 +101,30 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
         setResponseSchema(JSON.stringify(cleanedWorkflow.responseSchema));
       }
 
-      // Handle inputSchema to populate credentials and payload defaults
-      if (cleanedWorkflow.inputSchema) {
+      // If there are integrationIds, always fetch and flatten credentials
+      if (cleanedWorkflow.integrationIds && cleanedWorkflow.integrationIds.length > 0) {
+        const superglueClient = new SuperglueClient({
+          endpoint: config.superglueEndpoint,
+          apiKey: config.superglueApiKey,
+        });
+        const integrations = await Promise.all(
+          cleanedWorkflow.integrationIds.map(id => superglueClient.getIntegration(id))
+        );
+        const creds = flattenAndNamespaceWorkflowCredentials(
+          integrations.filter(Boolean).map(i => ({ id: i.id, credentials: i.credentials || {} }))
+        );
+        console.log('Flattened credentials:', creds);
+        setIntegrationCredentials(creds);
+        setCredentials(JSON.stringify(creds, null, 2)); // Always overwrite
+      } else if (cleanedWorkflow.inputSchema) {
+        // Only use inputSchema defaults if no integrations
         const defaultValues = generateDefaultFromSchema(cleanedWorkflow.inputSchema);
-
         if (defaultValues.credentials !== undefined) {
           const credentialsValue = typeof defaultValues.credentials === 'string'
             ? defaultValues.credentials
             : JSON.stringify(defaultValues.credentials);
           setCredentials(credentialsValue);
         }
-
         if (defaultValues.payload !== undefined) {
           setPayload(JSON.stringify(defaultValues.payload));
         }
@@ -123,7 +141,6 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
         description: error.message,
         variant: "destructive",
       });
-      // Reset state, keeping the attempted ID in the input field for convenience
       setSteps([]);
       setFinalTransform(`{\n  "result": $\n}`);
       setResponseSchema('{"type": "object", "properties": {"result": {"type": "object"}}}');
@@ -319,6 +336,22 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
     return false;
   };
 
+  const fetchAndFlattenIntegrationCredentials = async (integrationIds: string[]) => {
+    if (!integrationIds || integrationIds.length === 0) return;
+    const superglueClient = new SuperglueClient({
+      endpoint: config.superglueEndpoint,
+      apiKey: config.superglueApiKey,
+    });
+    const integrations = await Promise.all(
+      integrationIds.map(id => superglueClient.getIntegration(id))
+    );
+    const creds = flattenAndNamespaceWorkflowCredentials(
+      integrations.filter(Boolean).map(i => ({ id: i.id, credentials: i.credentials || {} }))
+    );
+    setIntegrationCredentials(creds);
+    setCredentials(JSON.stringify(creds, null, 2)); // Prefill credentials input
+  };
+
   return (
     <div className="p-6 max-w-none w-full">
       <div className="flex justify-end items-center mb-2">
@@ -412,23 +445,57 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
 
             {/* Steps and Final Transform */}
             <div className="space-y-3 flex flex-col flex-grow">
-              <div className="flex-1 flex flex-col min-h-0">
-                <Label htmlFor="steps" className="mb-1 block">
-                  Steps
-                </Label>
-                <WorkflowStepsView
-                  steps={steps}
-                  onStepsChange={handleStepsChange}
-                  onStepEdit={handleStepEdit}
-                />
-              </div>
-
-              <div className="flex-1 flex flex-col min-h-0">
-                <JsonSchemaEditor
-                  isOptional={true}
-                  value={responseSchema}
-                  onChange={setResponseSchema}
-                />
+              {/* Steps Toggle */}
+              <div className="flex flex-col gap-2">
+                <div
+                  className="flex items-center gap-2 cursor-pointer select-none"
+                  onClick={() => setShowSteps((v) => !v)}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <ChevronRight
+                    className={cn(
+                      "h-4 w-4 transition-transform",
+                      showSteps && "rotate-90"
+                    )}
+                    aria-hidden="true"
+                  />
+                  <span className="font-medium text-sm">Workflow Steps</span>
+                </div>
+                {showSteps && (
+                  <div className="flex-1 min-h-0 bg-background mb-2">
+                    <WorkflowStepsView
+                      steps={steps}
+                      onStepsChange={handleStepsChange}
+                      onStepEdit={handleStepEdit}
+                    />
+                  </div>
+                )}
+                {/* Schema Toggle */}
+                <div
+                  className="flex items-center gap-2 cursor-pointer select-none"
+                  onClick={() => setShowSchemaEditor((v) => !v)}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <ChevronRight
+                    className={cn(
+                      "h-4 w-4 transition-transform",
+                      showSchemaEditor && "rotate-90"
+                    )}
+                    aria-hidden="true"
+                  />
+                  <span className="font-medium text-sm">Response Schema Editor</span>
+                </div>
+                {showSchemaEditor && (
+                  <div className="bg-background mt-2 mb-4">
+                    <JsonSchemaEditor
+                      isOptional={true}
+                      value={responseSchema}
+                      onChange={setResponseSchema}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </CardContent>
@@ -442,7 +509,12 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
             >
               {saving ? "Saving..." : "Save Workflow"}
             </Button>
-            <Button onClick={executeWorkflow} disabled={loading || saving} className="w-full">
+            <Button
+              variant="success"
+              onClick={executeWorkflow}
+              disabled={loading || saving}
+              className="w-full"
+            >
               {loading ? "Running..." : "Run Workflow"}
             </Button>
           </CardFooter>

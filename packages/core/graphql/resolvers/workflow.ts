@@ -227,6 +227,23 @@ export const buildWorkflowResolver = async (
       })
     );
 
+    const blocked = resolvedIntegrations.find(
+      i => (i as any).documentationPending || !i.documentation
+    );
+    if (blocked) {
+      const reason = (blocked as any).documentationPending
+        ? `documentation is still being fetched`
+        : `documentation could not be fetched`;
+      logMessage(
+        'warn',
+        `Workflow build blocked: ${reason} for integration "${blocked.id}"`,
+        metadata
+      );
+      throw new Error(
+        `Cannot build workflow: ${reason} for integration "${blocked.id}".`
+      );
+    }
+
     const builder = new WorkflowBuilder(resolvedIntegrations, instruction, payload, responseSchema, metadata);
     const workflow = await builder.build();
     // prevent collisions with existing workflows

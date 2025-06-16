@@ -1,4 +1,4 @@
-import { ApiConfig, ExecutionStep, HttpMethod, Workflow, Integration } from "@superglue/client";
+import { ApiConfig, ExecutionStep, HttpMethod, Integration, Workflow } from "@superglue/client";
 import { ExecutionMode, Metadata } from "@superglue/shared";
 import { type OpenAI } from "openai";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
@@ -7,7 +7,6 @@ import { zodToJsonSchema } from "zod-to-json-schema";
 import { toJsonSchema } from "../external/json-schema.js";
 import { LanguageModel } from "../llm/llm.js";
 import { PLANNING_PROMPT } from "../llm/prompts.js";
-import { Documentation } from "../utils/documentation.js";
 import { logMessage } from "../utils/logs.js"; // Added import
 import { composeUrl, safeHttpMethod } from "../utils/tools.js"; // Assuming path
 
@@ -145,23 +144,7 @@ Output a JSON object conforming to the WorkflowPlan schema. Define the necessary
     return { plan, messages: updatedMessagesFromLLM };
   }
 
-  private async fetchDocumentation(): Promise<void> {
-    for (const integration of Object.values(this.integrations)) {
-      if (integration.documentation) {
-        continue;
-      }
-      const documentation = new Documentation({
-        urlHost: integration.urlHost,
-        urlPath: integration.urlPath,
-        documentationUrl: integration.documentationUrl
-      }, integration.credentials, this.metadata);
-      integration.documentation = await documentation.fetch(this.instruction);
-    }
-  }
-
-
   public async build(): Promise<Workflow> {
-    await this.fetchDocumentation();
     let success = false;
     let attempts = 0;
     const MAX_ATTEMPTS = 3;
