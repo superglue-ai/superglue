@@ -179,7 +179,7 @@ export const API_PROMPT = `You are an API configuration assistant. Generate API 
   - ERROR 400: please pay special attention to the request body and url params. Maybe not all are requried? skip pagination? be creative here! this can be specific to the specific route.
   - ERROR 401: please pay special attention to the authentication type and headers.
   - ERROR 403: please pay special attention to the authentication type and headers.
-  - ERROR 404: check the documentation, then check the request parameters and be creative.
+  - ERROR 404: check the documentation, then check the request parameters, particularly the entire url path and the method - are they really correct?
   - ERROR 500: please pay special attention to the documentation to understand if the resource exists.
 
 Important: Listen closely to the feedback, identify the cause of the error and adress the cause of the error.
