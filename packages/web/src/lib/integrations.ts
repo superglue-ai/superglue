@@ -22,6 +22,12 @@ export const integrations: Record<string, {
     icon: "hubspot",
     docsUrl: "https://developers.hubspot.com/docs/api/overview"
   },
+  attio: {
+    apiUrl: "https://api.attio.com/v2/",
+    regex: "^(.*\\.)?attio\\.com(/.*)?$",
+    icon: "attio",
+    docsUrl: "https://api.attio.com/openapi/api"
+  },
   twilio: {
     apiUrl: "https://api.twilio.com",
     regex: "^(.*\\.)?twilio\\.com(/.*)?$",
