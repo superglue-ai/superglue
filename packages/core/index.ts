@@ -155,7 +155,7 @@ async function startServer() {
 // cluster mode for CPU-bound work
 if (cluster.isPrimary) {
   const useSingleWorker = process.env.DATASTORE_TYPE === 'file' || process.env.DATASTORE_TYPE === 'memory';
-  const workerCount = useSingleWorker ? 1 : Math.max(4, os.cpus().length);
+  const workerCount = useSingleWorker ? 1 : Math.max(8, os.cpus().length);
   for (let i = 0; i < workerCount; i++) {
     cluster.fork();
   }
