@@ -3,7 +3,6 @@ import { expressMiddleware } from '@apollo/server/express4';
 import { ApolloServerPluginDrainHttpServer } from '@apollo/server/plugin/drainHttpServer';
 import { ApolloServerPluginLandingPageLocalDefault } from '@apollo/server/plugin/landingPage/default';
 import { makeExecutableSchema } from '@graphql-tools/schema';
-import cluster from 'cluster';
 import cors from 'cors';
 import express from 'express';
 import { graphqlUploadExpress } from 'graphql-upload-minimal';
@@ -151,11 +150,4 @@ async function startServer() {
   logMessage('info', `🚀 Superglue server ready at http://localhost:${PORT}/ and ws://localhost:${PORT}/`);
 }
 
-// cluster mode for CPU-bound work
-// we cannot use multiple workers because of the datastore and mcp statefulness
-// larger refactor needed to support multiple workers
-if (cluster.isPrimary) {
-  cluster.fork();
-} else {
-  startServer();
-}
+startServer();
