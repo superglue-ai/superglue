@@ -36,7 +36,7 @@ const directStrategy: ExecutionStrategy = {
       config: step.apiConfig
     }
     try {
-      const apiResponse = await executeApiCall(step.apiConfig, payload, credentials, options, metadata);
+      const apiResponse = await executeApiCall(step.apiConfig, payload, credentials, options, metadata, step.integrationId);
       const transformedData = await applyJsonata(apiResponse.data, step.responseMapping);
 
       result.rawData = apiResponse.data;
@@ -103,7 +103,7 @@ const loopStrategy: ExecutionStrategy = {
         };
 
         try {
-          const apiResponse = await executeApiCall(step.apiConfig, loopPayload, credentials, options, metadata);
+          const apiResponse = await executeApiCall(step.apiConfig, loopPayload, credentials, options, metadata, step.integrationId);
           const rawData = { currentItem: currentItem, ...(typeof apiResponse.data === 'object' ? apiResponse.data : { data: apiResponse.data }) };
           const transformedData = await applyJsonata(rawData, step.responseMapping);
           stepResults.push({

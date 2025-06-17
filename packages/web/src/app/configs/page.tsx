@@ -72,7 +72,7 @@ const ConfigTable = () => {
         ...apiConfigs.items.map(item => ({ ...item, type: 'api' as const })),
         ...extractConfigs.items.map(item => ({ ...item, type: 'extract' as const })),
         ...transformConfigs.items.map(item => ({ ...item, type: 'transform' as const })),
-        ...workflowConfigs.items.map((item: any) => ({ ...item, type: 'workflow' as const })),
+        ...workflowConfigs.items.map((item: any) => ({ ...item, type: 'workflow' as const }))
       ].sort((a, b) => {
         // Use updatedAt first, fallback to createdAt
         const dateA = new Date(a.updatedAt || a.createdAt).getTime();

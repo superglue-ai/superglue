@@ -45,101 +45,10 @@ export class Documentation {
     this.metadata = metadata;
   }
 
-  // --- Post Processing ---
-
-  private postProcess(documentation: string, instruction: string): string {
-    // (Renamed from postProcessLargeDoc - same logic)
-    if (documentation.length <= Documentation.MAX_LENGTH) {
-      return documentation;
-    }
-    const CONTEXT_SEPARATOR = "\n\n";
-    const MIN_SEARCH_TERM_LENGTH = 4;
-
-    const docLower = documentation.toLowerCase();
-    const positions: number[] = [];
-
-    let searchTerms = instruction?.toLowerCase()?.split(/[^a-z0-9]/)
-      .map(term => term.trim())
-      .filter(term => term.length >= MIN_SEARCH_TERM_LENGTH);
-
-    for (const searchTerm of searchTerms) {
-      let pos = docLower.indexOf(searchTerm);
-      while (pos !== -1) {
-        positions.push(pos);
-        pos = docLower.indexOf(searchTerm, pos + 1);
-      }
-    }
-
-    let authPosSecuritySchemes = docLower.indexOf("securityschemes");
-    if (authPosSecuritySchemes !== -1) positions.push(authPosSecuritySchemes);
-    let authPosAuthorization = docLower.indexOf("authorization");
-    if (authPosAuthorization !== -1) positions.push(authPosAuthorization);
-
-    if (positions.length === 0) {
-      return documentation.slice(0, Documentation.MAX_LENGTH);
-    }
-    positions.sort((a, b) => a - b);
-
-    const firstHalfLength = Math.floor(Documentation.MAX_LENGTH * 0.4);
-    const secondHalfLength = Documentation.MAX_LENGTH - firstHalfLength;
-
-    // Calculate chunk size for the second half, ensuring it's an integer
-    const chunkSize = Math.floor(secondHalfLength / positions.length);
-    if (chunkSize <= 0) {
-      // Fallback if MAX_LENGTH is too small or too many positions
-      return documentation.slice(0, Documentation.MAX_LENGTH);
-    }
-
-    // Extract the first half
-    const firstHalf = documentation.slice(0, firstHalfLength);
-
-    // Extract chunks for the second half, avoiding overlaps and out-of-bounds
-    const chunks: string[] = [];
-    let lastChunkEnd = firstHalfLength; // Start checking for overlaps after the first half
-
-    for (const pos of positions) {
-      // Calculate start and end, trying to center the chunk around the position
-      const halfChunk = Math.floor(chunkSize / 2);
-      let start = Math.max(0, pos - halfChunk);
-      let end = start + chunkSize;
-
-      // Adjust if chunk goes beyond document length
-      if (end > documentation.length) {
-        end = documentation.length;
-        start = Math.max(0, end - chunkSize); // Readjust start if possible
-      }
-
-      // Skip if the chunk is entirely contained within the first half or previous chunks
-      if (start >= end || end <= lastChunkEnd) {
-        continue;
-      }
-
-      // Adjust start if it overlaps with the last chunk
-      start = Math.max(start, lastChunkEnd);
-
-      // Only add if the adjusted chunk has content
-      if (start < end) {
-        chunks.push(documentation.slice(start, end));
-        lastChunkEnd = end;
-      }
-    }
-
-    // Combine the first half and the extracted chunks
-    let finalDoc = firstHalf + CONTEXT_SEPARATOR + chunks.join(CONTEXT_SEPARATOR);
-
-    // Final trim if we somehow exceeded length due to rounding/logic or separators
-    if (finalDoc.length > Documentation.MAX_LENGTH) {
-      finalDoc = finalDoc.slice(0, Documentation.MAX_LENGTH);
-    }
-
-    return finalDoc;
-  }
-
-
-  // --- Main Method using Strategies ---
-  async fetch(instruction: string = ""): Promise<string> {
+  // Main function to fetch and process documentation using strategies
+  public async fetchAndProcess(): Promise<string> {
     if (this.lastResult) {
-      return this.postProcess(this.lastResult, instruction);
+      return this.lastResult;
     }
 
     const fetchingStrategies: FetchingStrategy[] = [
@@ -176,12 +85,100 @@ export class Documentation {
       if (result == null || result.length === 0) {
         continue;
       }
-      this.lastResult = this.postProcess(result, instruction);
+      this.lastResult = result;
       return this.lastResult;
     }
 
     logMessage('warn', "No processing strategy could handle the fetched documentation.", this.metadata);
     return "";
+  }
+
+  public static postProcess(documentation: string, instruction: string): string {
+    if (!documentation) {
+      return "";
+    }
+
+    // If no instruction or documentation is already within limits, return as is
+    if (!instruction || documentation.length <= Documentation.MAX_LENGTH) {
+      return documentation;
+    }
+
+    const CONTEXT_SEPARATOR = "\n\n";
+    const MIN_SEARCH_TERM_LENGTH = 4;
+
+    const docLower = documentation.toLowerCase();
+    const positions: number[] = [];
+
+    // Extract search terms from instruction
+    const searchTerms = instruction.toLowerCase().split(/[^a-z0-9]/)
+      .map(term => term.trim())
+      .filter(term => term.length >= MIN_SEARCH_TERM_LENGTH);
+
+    // Find positions of search terms
+    for (const searchTerm of searchTerms) {
+      let pos = docLower.indexOf(searchTerm);
+      while (pos !== -1) {
+        positions.push(pos);
+        pos = docLower.indexOf(searchTerm, pos + 1);
+      }
+    }
+
+    // Always include auth-related sections if they exist
+    const authPosSecuritySchemes = docLower.indexOf("securityschemes");
+    if (authPosSecuritySchemes !== -1) positions.push(authPosSecuritySchemes);
+    const authPosAuthorization = docLower.indexOf("authorization");
+    if (authPosAuthorization !== -1) positions.push(authPosAuthorization);
+
+    // If no relevant positions found, return first MAX_LENGTH characters
+    if (positions.length === 0) {
+      return documentation.slice(0, Documentation.MAX_LENGTH);
+    }
+
+    positions.sort((a, b) => a - b);
+
+    const firstHalfLength = Math.floor(Documentation.MAX_LENGTH * 0.4);
+    const secondHalfLength = Documentation.MAX_LENGTH - firstHalfLength;
+
+    // Calculate chunk size for the second half
+    const chunkSize = Math.floor(secondHalfLength / positions.length);
+    if (chunkSize <= 0) {
+      return documentation.slice(0, Documentation.MAX_LENGTH);
+    }
+
+    // Extract the first half
+    const firstHalf = documentation.slice(0, firstHalfLength);
+
+    // Extract chunks for the second half
+    const chunks: string[] = [];
+    let lastChunkEnd = firstHalfLength;
+
+    for (const pos of positions) {
+      const halfChunk = Math.floor(chunkSize / 2);
+      let start = Math.max(0, pos - halfChunk);
+      let end = start + chunkSize;
+
+      if (end > documentation.length) {
+        end = documentation.length;
+        start = Math.max(0, end - chunkSize);
+      }
+
+      if (start >= end || end <= lastChunkEnd) {
+        continue;
+      }
+
+      start = Math.max(start, lastChunkEnd);
+
+      if (start < end) {
+        chunks.push(documentation.slice(start, end));
+        lastChunkEnd = end;
+      }
+    }
+
+    // Combine chunks and ensure final length
+    let finalDoc = firstHalf + CONTEXT_SEPARATOR + chunks.join(CONTEXT_SEPARATOR);
+    return finalDoc.length > Documentation.MAX_LENGTH
+      ? finalDoc.slice(0, Documentation.MAX_LENGTH)
+      : finalDoc;
   }
 }
 
@@ -278,7 +275,7 @@ export class AxiosFetchingStrategy implements FetchingStrategy {
 }
 // Special strategy solely responsible for fetching page content if needed
 export class PlaywrightFetchingStrategy implements FetchingStrategy {
-  // --- Static Helpers (accessible by strategies) ---
+  private static readonly MAX_FETCHED_LINKS = 10;
   private static browserInstance: playwright.Browser | null = null;
 
   private static async getBrowser(): Promise<playwright.Browser> {
@@ -373,6 +370,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
   async tryFetch(config: ApiConfig, metadata: Metadata): Promise<string | null> {
     // Only fetch if it's an HTTP URL and content hasn't been fetched yet
     // Pass metadata
+    await new Promise(resolve => setTimeout(resolve, 10000));
     const docResult = await this.fetchPageContentWithPlaywright(config?.documentationUrl, config, metadata);
     let fetchedLinks = new Set<string>();
     if (!config.instruction && docResult?.content) {
@@ -396,7 +394,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     rankedLinks.sort((a, b) => b.matchCount - a.matchCount);
 
     for (const rankedLink of rankedLinks) {
-      if (fetchedLinks.size > 3) break;
+      if (fetchedLinks.size > PlaywrightFetchingStrategy.MAX_FETCHED_LINKS) break;
       if (fetchedLinks.has(rankedLink.href)) continue;
       const linkResult = await this.fetchPageContentWithPlaywright(rankedLink.href, config, metadata);
       if (linkResult && linkResult.content) { // Ensure content exists

@@ -105,9 +105,11 @@ export const ToolInputRequestSchema = z.object({
 
 export const IntegrationInputSchema = {
   id: z.string().describe("Unique identifier for the integration"),
-  urlHost: z.string().describe("Base URL/hostname for the API including protocol. For https://, use the format: https://<<hostname>>. For postgres, use the format: postgres://<<user>>:<<password>>@<<hostname>>:<<port>>"),
+  urlHost: z.string().optional().describe("Base URL/hostname for the API including protocol. For https://, use the format: https://<<hostname>>. For postgres, use the format: postgres://<<user>>:<<password>>@<<hostname>>:<<port>>"),
   urlPath: z.string().optional().describe("Path component of the URL. For postgres, use the db name as the path."),
   documentationUrl: z.string().optional().describe("URL to API documentation"),
+  documentation: z.string().optional().describe("Available documentation for the integration"),
+  documentationPending: z.boolean().optional().describe("Whether the documentation is still being fetched and processed"),
   credentials: z.any().optional().describe("Credentials for accessing the integration. MAKE SURE YOU INCLUDE ALL OF THEM BEFORE BUILDING THE CAPABILITY, OTHERWISE IT WILL FAIL."),
 };
 

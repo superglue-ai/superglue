@@ -84,7 +84,13 @@ export const upsertIntegrationResolver = async (
             input.credentials || {},
             { orgId: context.orgId }
           );
-          const docString = await docFetcher.fetch();
+          const docString = await docFetcher.fetchAndProcess();
+          // Check if integration still exists before upserting
+          const stillExists = await context.datastore.getIntegration(input.id, context.orgId);
+          if (!stillExists) {
+            logMessage('warn', `Integration ${input.id} was deleted while fetching documentation. Skipping upsert.`, { orgId: context.orgId });
+            return;
+          }
           await context.datastore.upsertIntegration(input.id, {
             ...input,
             documentation: docString,
