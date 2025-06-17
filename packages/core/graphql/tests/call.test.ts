@@ -91,7 +91,7 @@ describe('Call Resolver', () => {
         });
 
       // Mock documentation and generateApiConfig
-      vi.mocked(Documentation.prototype.fetch).mockResolvedValue('test docs');
+      vi.mocked(Documentation.prototype.fetchAndProcess).mockResolvedValue('test docs');
       mockedApi.generateApiConfig.mockResolvedValue({
         config: { ...testInput.endpoint },
         messages: []
@@ -126,7 +126,7 @@ describe('Call Resolver', () => {
         .mockRejectedValueOnce(new Error('Initial API call failed to trigger retry logic')) // Fails first time
         .mockResolvedValue({ data: { result: 'success' } }); // Succeeds on retries
 
-      vi.mocked(Documentation.prototype.fetch).mockResolvedValue('test docs');
+      vi.mocked(Documentation.prototype.fetchAndProcess).mockResolvedValue('test docs');
       mockedApi.generateApiConfig.mockResolvedValue({
         config: { ...testInput.endpoint },
         messages: []
@@ -155,7 +155,7 @@ describe('Call Resolver', () => {
         .mockRejectedValueOnce(new Error('Initial API call failed to trigger retry logic')) // Fails first time to enter retry
         .mockResolvedValue({ data: { result: 'successful data' } }); // Succeeds on subsequent calls
 
-      vi.mocked(Documentation.prototype.fetch).mockResolvedValue('test docs');
+      vi.mocked(Documentation.prototype.fetchAndProcess).mockResolvedValue('test docs');
       mockedApi.generateApiConfig.mockResolvedValue({
         config: { ...testInput.endpoint, responseSchema: {} }, // ensure responseSchema is present
         messages: []
@@ -197,7 +197,7 @@ describe('Call Resolver', () => {
       mockedApi.callEndpoint.mockResolvedValue({ data: null });
 
       // Add these missing mocks
-      vi.mocked(Documentation.prototype.fetch).mockResolvedValue('test docs');
+      vi.mocked(Documentation.prototype.fetchAndProcess).mockResolvedValue('test docs');
       mockedApi.generateApiConfig.mockResolvedValue({
         config: { ...testInput.endpoint },
         messages: []

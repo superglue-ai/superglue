@@ -244,7 +244,7 @@ export const buildWorkflowResolver = async (
       );
     }
 
-    const builder = new WorkflowBuilder(resolvedIntegrations, instruction, payload, responseSchema, metadata);
+    const builder = new WorkflowBuilder(instruction, resolvedIntegrations, payload, responseSchema, metadata);
     const workflow = await builder.build();
     // prevent collisions with existing workflows
     while (await context.datastore.getWorkflow(workflow.id, context.orgId)) {
