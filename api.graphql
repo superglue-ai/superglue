@@ -263,11 +263,15 @@ input IntegrationInputRequest @oneOf {
 
 input IntegrationInput {
   id: ID!
+  name: String
+  type: String
   urlHost: String
   urlPath: String
+  credentials: JSON
   documentationUrl: String
   documentation: String
-  credentials: JSON
+  icon: String
+  version: String
 }
 
 type Log {
@@ -308,6 +312,7 @@ type TenantInfo {
 type ExecutionStep {
   id: String!
   apiConfig: ApiConfig!
+  integrationId: String!
   executionMode: String  # DIRECT | LOOP
   loopSelector: JSONata
   loopMaxIters: Int
@@ -318,6 +323,7 @@ type ExecutionStep {
 input ExecutionStepInput {
   id: String!
   apiConfig: ApiInput!
+  integrationId: String
   executionMode: String  # DIRECT | LOOP
   loopSelector: JSONata
   loopMaxIters: Int
@@ -443,18 +449,4 @@ type Integration {
   version: String
   createdAt: DateTime
   updatedAt: DateTime
-}
-
-input IntegrationInput {
-  id: ID!
-  name: String
-  type: String
-  urlHost: String
-  urlPath: String
-  credentials: JSON
-  documentationUrl: String
-  documentation: String
-  icon: String
-  orgId: String
-  version: String
 }

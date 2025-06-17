@@ -32,13 +32,7 @@ query Query {
 const datastore = createDataStore({ type: process.env.DATASTORE_TYPE as any });
 
 // Create the schema, which will be used separately by ApolloServer and useServer
-let schema;
-try {
-  schema = makeExecutableSchema({ typeDefs, resolvers });
-} catch (err) {
-  logMessage('error', 'Schema creation failed:', err);
-  throw err;
-}
+const schema = makeExecutableSchema({ typeDefs, resolvers });
 
 // Context Configuration (can be shared or adapted for WS context)
 const getHttpContext = async ({ req }) => {

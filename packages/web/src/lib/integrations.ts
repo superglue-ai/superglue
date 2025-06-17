@@ -796,7 +796,14 @@ export async function waitForIntegrationsReady(
   let activeIds = [...ids];
 
   while (Date.now() - start < maxWaitMs && activeIds.length > 0) {
-    const settled = await Promise.allSettled(activeIds.map(id => client.getIntegration(id)));
+    let settled = await Promise.allSettled(activeIds.map(async (id) => {
+      try {
+        return await client.getIntegration(id);
+      } catch (e) {
+        return null;
+      }
+    }));
+    settled = settled.filter(r => r !== null);
     const results = settled.map(r => r.status === 'fulfilled' ? r.value : null);
 
     // Remove deleted integrations from polling

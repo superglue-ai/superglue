@@ -40,13 +40,13 @@ describe('superglue_build_new_tool', () => {
       .rejects.toThrow(/integrations array is required/)
   })
 
-  it('throws if a integration is missing urlHost', async () => {
+  it('throws if an integration is missing urlHost', async () => {
     await expect(buildNewTool(getValidArgs({
       integrations: [{ credentials: { apiKey: 'test' } }]
     }), {})).rejects.toThrow(/urlHost is required/)
   })
 
-  it('throws if a integration is missing credentials', async () => {
+  it('throws if an integration is missing credentials', async () => {
     await expect(buildNewTool(getValidArgs({
       integrations: [{ urlHost: 'api.example.com', credentials: {} }]
     }), {})).rejects.toThrow(/credentials object is required/)

@@ -7,6 +7,7 @@ import { zodToJsonSchema } from "zod-to-json-schema";
 import { toJsonSchema } from "../external/json-schema.js";
 import { LanguageModel } from "../llm/llm.js";
 import { PLANNING_PROMPT } from "../llm/prompts.js";
+import { Documentation } from "../utils/documentation.js";
 import { logMessage } from "../utils/logs.js"; // Added import
 import { composeUrl, safeHttpMethod } from "../utils/tools.js"; // Assuming path
 
@@ -15,7 +16,7 @@ type ChatMessage = OpenAI.Chat.ChatCompletionMessageParam;
 // Define the structure for the output of the planning step
 interface WorkflowPlanStep {
   stepId: string;
-  integrationId: string;
+  integrationId?: string;
   urlHost?: string;
   urlPath?: string;
   instruction: string;
@@ -39,14 +40,14 @@ export class WorkflowBuilder {
   private inputSchema: JSONSchema;
 
   constructor(
-    integrations: Integration[],
     instruction: string,
+    integrations: Integration[],
     initialPayload: Record<string, unknown>,
     responseSchema: JSONSchema,
     metadata: Metadata
   ) {
-    this.integrations = integrations.reduce((acc, sys) => {
-      acc[sys.id] = sys;
+    this.integrations = integrations.reduce((acc, int) => {
+      acc[int.id] = int;
       return acc;
     }, {} as Record<string, Integration>);
     this.instruction = instruction;
@@ -54,8 +55,8 @@ export class WorkflowBuilder {
     this.metadata = metadata;
     this.responseSchema = responseSchema;
     try {
-      const credentials = Object.values(integrations).reduce((acc, sys) => {
-        return { ...acc, ...Object.entries(sys.credentials || {}).reduce((obj, [name, value]) => ({ ...obj, [`${sys.id}_${name}`]: value }), {}) };
+      const credentials = Object.values(integrations).reduce((acc, int) => {
+        return { ...acc, ...Object.entries(int.credentials || {}).reduce((obj, [name, value]) => ({ ...obj, [`${int.id}_${name}`]: value }), {}) };
       }, {});
       this.inputSchema = toJsonSchema(
         {
@@ -88,15 +89,19 @@ export class WorkflowBuilder {
       })).describe("The sequence of steps required to fulfill the overall instruction.")
     }));
 
-    const integrationDescriptions = Object.values(this.integrations).map(sys => `
---- integration ID: ${sys.id} ---
-Base URL: ${composeUrl(sys.urlHost, sys.urlPath)}
-Credentials available: ${JSON.stringify(Object.entries(sys.credentials || {}).reduce((obj, [name, value]) => ({ ...obj, [`${sys.id}_${name}`]: value }), {}) || 'None')}
+
+    const integrationDescriptions = Object.values(this.integrations).map(int => {
+      const processedDoc = Documentation.postProcess(int.documentation || "", this.instruction);
+
+      return `
+--- integration ID: ${int.id} ---
+Base URL: ${composeUrl(int.urlHost, int.urlPath)}
+Credentials available: ${JSON.stringify(Object.entries(int.credentials || {}).reduce((obj, [name, value]) => ({ ...obj, [`${int.id}_${name}`]: value }), {}) || 'None')}
 Documentation:
 \`\`\`
-${sys.documentation || 'No documentation content available.'}
-\`\`\``
-    ).join("\n");
+${processedDoc || 'No documentation content available.'}
+\`\`\``;
+    }).join("\n");
 
     const initialPayloadDescription = this.initialPayload ? `Initial Input Payload contains keys: ${Object.keys(this.initialPayload).join(", ") || 'None'}\nPayload example: ${JSON.stringify(this.initialPayload)}` : '';
 
@@ -181,6 +186,7 @@ Output a JSON object conforming to the WorkflowPlan schema. Define the necessary
           const executionStep: ExecutionStep = {
             id: plannedStep.stepId,
             apiConfig: partialApiConfig,
+            integrationId: plannedStep.integrationId,
             executionMode: plannedStep.mode,
             loopSelector: plannedStep.mode === "LOOP" ? "$" : undefined,
             inputMapping: "$",
