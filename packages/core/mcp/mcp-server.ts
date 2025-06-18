@@ -5,11 +5,7 @@ import {
   CallToolResult,
   isInitializeRequest
 } from "@modelcontextprotocol/sdk/types.js";
-<<<<<<< feature/reusing-integrations-in-workflows
 import { SuperglueClient, Workflow, WorkflowResult, Integration } from '@superglue/client';
-=======
-import { SuperglueClient, WorkflowResult } from '@superglue/client';
->>>>>>> main
 import { LogEntry } from "@superglue/shared";
 import { getSDKCode } from '@superglue/shared/templates';
 import { randomUUID } from 'crypto';
@@ -17,11 +13,6 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { validateToken } from '../auth/auth.js';
 import { logEmitter } from '../utils/logs.js';
-<<<<<<< feature/reusing-integrations-in-workflows
-import { getSDKCode } from '@superglue/shared/templates';
-=======
-import { SystemDefinition } from "../workflow/workflow-builder.js";
->>>>>>> main
 
 // Enums
 export const CacheModeEnum = z.enum(["ENABLED", "READONLY", "WRITEONLY", "DISABLED"]);
@@ -115,15 +106,10 @@ export const IntegrationInputSchema = {
   id: z.string().describe("Unique identifier for the integration"),
   urlHost: z.string().optional().describe("Base URL/hostname for the API including protocol. For https://, use the format: https://<<hostname>>. For postgres, use the format: postgres://<<user>>:<<password>>@<<hostname>>:<<port>>"),
   urlPath: z.string().optional().describe("Path component of the URL. For postgres, use the db name as the path."),
-<<<<<<< feature/reusing-integrations-in-workflows
   documentationUrl: z.string().optional().describe("URL to API documentation"),
   documentation: z.string().optional().describe("Available documentation for the integration"),
   documentationPending: z.boolean().optional().describe("Whether the documentation is still being fetched and processed"),
   credentials: z.any().optional().describe("Credentials for accessing the integration. MAKE SURE YOU INCLUDE ALL OF THEM BEFORE BUILDING THE CAPABILITY, OTHERWISE IT WILL FAIL."),
-=======
-  documentationUrl: z.string().optional().describe("URL to API documentation."),
-  credentials: z.record(z.string()).optional().describe("JSON Credentials for accessing the system. Do not include prefixes like Bearer or Basic. E.g. { 'apiKey': '1234567890' }"),
->>>>>>> main
 };
 
 export const ListToolsInputSchema = {
@@ -264,20 +250,9 @@ const validateToolBuilding = (args: any) => {
     errors.push("integrations array is required with at least one integration configuration including credentials.");
   }
 
-<<<<<<< feature/reusing-integrations-in-workflows
-  args.integrations?.forEach((integration: any, index: number) => {
-    if (!integration.urlHost) {
-      errors.push(`Integration ${index}: urlHost is required (e.g., 'api.example.com')`);
-    }
-    if (!integration.credentials || Object.keys(integration.credentials).length === 0) {
-      errors.push(`Integration ${index}: credentials object is required with API keys/tokens. You can use a placeholder.`);
-    }
-  });
-=======
-  if (args.systems.some(system => system.credentials && typeof system.credentials !== 'object')) {
+  if (args.integrations.some(integration => integration.credentials && typeof integration.credentials !== 'object')) {
     errors.push("Credentials must be an object. E.g. { 'apiKey': '1234567890' }");
   }
->>>>>>> main
 
   return errors;
 };
