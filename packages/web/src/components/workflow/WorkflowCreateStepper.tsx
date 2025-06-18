@@ -12,7 +12,6 @@ import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Editor from 'react-simple-code-editor';
-import { FixedSizeList as List } from 'react-window';
 import type { SimpleIcon } from 'simple-icons';
 import * as simpleIcons from 'simple-icons';
 import { Button } from '../ui/button';
@@ -494,12 +493,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
 
   useEffect(() => {
     if (step === 'review') {
-      const flatCreds = flattenAndNamespaceWorkflowCredentials(
-        integrations.map(sys => ({
-          id: sys.id,
-          credentials: sys.credentials || {}
-        }))
-      );
+      const flatCreds = flattenAndNamespaceWorkflowCredentials(integrations);
       setReviewCredentials(JSON.stringify(flatCreds, null, 2));
       setCurrentWorkflow({ ...(currentWorkflow as any), credentials: flatCreds } as any);
     }
@@ -626,87 +620,90 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                   <Plus className="mr-2 h-4 w-4" /> Add Integration
                 </Button>
               </div>
-              <div className="rounded-md bg-muted/50" style={{ height: 320 }}>
-                <List
-                  height={320}
-                  itemCount={sortedIntegrations.length}
-                  itemSize={72}
-                  width="100%"
-                >
-                  {({ index, style }) => {
-                    const sys = sortedIntegrations[index];
-                    const selected = selectedIntegrationIds.includes(sys.id);
-                    return (
-                      <div
-                        key={sys.id}
-                        style={style}
-                        className={cn(
-                          "flex items-center justify-between px-4 py-3 cursor-pointer transition-colors rounded-lg",
-                          selected ? "bg-primary/20" : "hover:bg-accent/50"
-                        )}
-                        onClick={() => {
-                          if (selected) {
-                            setSelectedIntegrationIds(ids => ids.filter(i => i !== sys.id));
-                          } else {
-                            setSelectedIntegrationIds(ids => {
-                              const newIds = [...ids, sys.id];
-                              // Move selected to top by reordering sortedIntegrations
-                              setSortedIntegrations(sortIntegrations(filteredIntegrations, newIds));
-                              return newIds;
-                            });
-                          }
-                        }}
-                      >
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          {(() => {
-                            const integration = findMatchingIntegration(sys.urlHost);
-                            const icon = integration?.integration.icon ? getSimpleIcon(integration.integration.icon) : null;
-                            return icon ? (
-                              <svg
-                                width="20"
-                                height="20"
-                                viewBox="0 0 24 24"
-                                fill={`#${icon.hex}`}
-                                className="flex-shrink-0"
-                              >
-                                <path d={icon.path} />
-                              </svg>
-                            ) : (
-                              <Globe className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
-                            );
-                          })()}
-                          <div className="flex flex-col min-w-0">
-                            <span className="font-medium truncate max-w-[200px]">{sys.id}</span>
-                            <span className="text-xs text-muted-foreground truncate max-w-[240px]">
-                              {composeUrl(sys.urlHost, sys.urlPath)}
-                            </span>
-                          </div>
-                          {(!sys.credentials || Object.keys(sys.credentials).length === 0) && (
-                            <span className="ml-2 text-xs text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded">No credentials</span>
+              <div className="rounded-md bg-muted/50 overflow-y-auto" style={{ height: 320 }}>
+                {loading ? (
+                  <div className="h-full bg-background" />
+                ) : sortedIntegrations.length === 0 ? (
+                  <div className="h-[320px] flex items-center justify-center bg-background">
+                    <p className="text-sm text-muted-foreground italic">
+                      No integrations added yet. Define the APIs or data sources your workflow will use.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border">
+                    {sortedIntegrations.map(sys => {
+                      const selected = selectedIntegrationIds.includes(sys.id);
+                      return (
+                        <div
+                          key={sys.id}
+                          className={cn(
+                            "flex items-center justify-between px-4 py-3 cursor-pointer transition-colors",
+                            selected ? "bg-primary/20" : "hover:bg-accent/50"
                           )}
+                          onClick={() => {
+                            if (selected) {
+                              setSelectedIntegrationIds(ids => ids.filter(i => i !== sys.id));
+                            } else {
+                              setSelectedIntegrationIds(ids => {
+                                const newIds = [...ids, sys.id];
+                                // Move selected to top by reordering sortedIntegrations
+                                setSortedIntegrations(sortIntegrations(filteredIntegrations, newIds));
+                                return newIds;
+                              });
+                            }
+                          }}
+                        >
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            {(() => {
+                              const integration = findMatchingIntegration(sys.urlHost);
+                              const icon = integration?.integration.icon ? getSimpleIcon(integration.integration.icon) : null;
+                              return icon ? (
+                                <svg
+                                  width="20"
+                                  height="20"
+                                  viewBox="0 0 24 24"
+                                  fill={`#${icon.hex}`}
+                                  className="flex-shrink-0"
+                                >
+                                  <path d={icon.path} />
+                                </svg>
+                              ) : (
+                                <Globe className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
+                              );
+                            })()}
+                            <div className="flex flex-col min-w-0">
+                              <span className="font-medium truncate max-w-[200px]">{sys.id}</span>
+                              <span className="text-xs text-muted-foreground truncate max-w-[240px]">
+                                {composeUrl(sys.urlHost, sys.urlPath)}
+                              </span>
+                            </div>
+                            {(!sys.credentials || Object.keys(sys.credentials).length === 0) && (
+                              <span className="ml-2 text-xs text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded">No credentials</span>
+                            )}
+                          </div>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                              onClick={e => { e.stopPropagation(); handleOpenEditIntegration(sys); }}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <input
+                              type="checkbox"
+                              checked={selected}
+                              onChange={() => { }}
+                              className="ml-2 accent-primary"
+                              tabIndex={-1}
+                              readOnly
+                            />
+                          </div>
                         </div>
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                            onClick={e => { e.stopPropagation(); handleOpenEditIntegration(sys); }}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <input
-                            type="checkbox"
-                            checked={selected}
-                            onChange={() => { }}
-                            className="ml-2 accent-primary"
-                            tabIndex={-1}
-                            readOnly
-                          />
-                        </div>
-                      </div>
-                    );
-                  }}
-                </List>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
               {showIntegrationForm && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
@@ -722,11 +719,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                     />
                   </div>
                 </div>
-              )}
-              {integrations.length === 0 && !showIntegrationForm && (
-                <p className="text-sm text-muted-foreground italic text-center py-4">
-                  No integrations added yet. Define the APIs or data sources your workflow will use.
-                </p>
               )}
             </div>
           )}

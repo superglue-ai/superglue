@@ -12,4 +12,4 @@ export function flattenAndNamespaceWorkflowCredentials(
         });
         return acc;
     }, {} as Record<string, string>);
-}
+} 

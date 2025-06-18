@@ -66,10 +66,8 @@ export const executeWorkflowResolver = async (
         )
       ).filter(Boolean);
 
-      const integrationCreds = flattenAndNamespaceWorkflowCredentials(
-        integrations.map((i) => ({ id: i.id, credentials: i.credentials || {} }))
-      );
-      mergedCredentials = { ...integrationCreds, ...(args.credentials ?? {}) };
+      const integrationCreds = flattenAndNamespaceWorkflowCredentials(integrations);
+      mergedCredentials = { ...integrationCreds, ...(args.credentials || {}) };
     }
 
     const executor = new WorkflowExecutor(workflow, metadata);
