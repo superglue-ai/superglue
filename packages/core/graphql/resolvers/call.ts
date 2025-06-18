@@ -18,6 +18,7 @@ export async function executeApiCall(
   credentials: Record<string, string>,
   options: RequestOptions,
   metadata: Metadata,
+  context?: Context,
   integrationId?: string,
 ): Promise<{
   data: any;
@@ -34,9 +35,14 @@ export async function executeApiCall(
     try {
       if (retryCount > 0 && isSelfHealing) {
         logMessage('info', `Generating API config for ${endpoint?.urlHost}${retryCount > 0 ? ` (${retryCount})` : ""}`, metadata);
+        let integration;
+        try {
+          integration = await context.datastore.getIntegration(integrationId, context.orgId);
+        } catch (error) {
+          logMessage('error', `Failed to fetch integration ${integrationId}: ${error.message}`, metadata);
+          throw new Error(`Failed to fetch integration: ${error.message}`);
+        }
 
-        // Get integration from datastore
-        const integration = await metadata.datastore.getIntegration(integrationId, metadata.orgId);
         let documentationString = "";
 
         if (!integration) {
@@ -141,7 +147,7 @@ export const callResolver = async (
       throw new Error("zod is not supported for response schema. Please use json schema instead. you can use the zod-to-json-schema package to convert zod to json schema.");
     }
 
-    const callResult = await executeApiCall(endpoint, payload, credentials, options, metadata);
+    const callResult = await executeApiCall(endpoint, payload, credentials, options, metadata, context);
     endpoint = callResult.endpoint;
     const data = callResult.data;
 

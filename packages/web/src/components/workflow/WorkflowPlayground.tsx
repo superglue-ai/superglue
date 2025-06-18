@@ -4,11 +4,11 @@ import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import JsonSchemaEditor from "@/src/components/utils/JsonSchemaEditor";
 import { parseCredentialsHelper, removeNullUndefined } from "@/src/lib/client-utils";
 import { cn } from "@/src/lib/utils";
-import { ExecutionStep, SuperglueClient, WorkflowResult } from "@superglue/client";
+import { ExecutionStep, SuperglueClient, Workflow, WorkflowResult } from "@superglue/client";
 import { flattenAndNamespaceWorkflowCredentials } from "@superglue/shared/utils";
 import { ChevronRight, X } from "lucide-react";
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useToast } from "../../hooks/use-toast";
 import { Button } from "../ui/button";
 import { Card, CardContent, CardFooter } from "../ui/card";
@@ -16,6 +16,8 @@ import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { WorkflowResultsView } from "./WorkflowResultsView";
 import { WorkflowStepsView } from "./WorkflowStepsView";
+
+const inputErrorStyles = "border-red-500 focus-visible:ring-red-500";
 
 export default function WorkflowPlayground({ id }: { id?: string }) {
   const router = useRouter();
@@ -27,15 +29,22 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
   "result": $
 }`);
   const [responseSchema, setResponseSchema] = useState<string | null>(`{"type": "object", "properties": {"result": {"type": "object"}}}`);
-  const [credentials, setCredentials] = useState("");
-  const [payload, setPayload] = useState("{}");
+  const [credentials, setCredentials] = useState<string>('');
+  const [payload, setPayload] = useState<string>('{}');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<WorkflowResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [activeResultTab, setActiveResultTab] = useState<'results' | 'transform' | 'final' | 'instructions'>("final");
   const [integrationCredentials, setIntegrationCredentials] = useState<Record<string, string>>({});
   const [showSteps, setShowSteps] = useState(false);
   const [showSchemaEditor, setShowSchemaEditor] = useState(false);
+  const [loadedWorkflow, setLoadedWorkflow] = useState<Workflow | null>(null);
+  const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
+  const client = useMemo(() => new SuperglueClient({
+    endpoint: config.superglueEndpoint,
+    apiKey: config.superglueApiKey,
+  }), [config.superglueEndpoint, config.superglueApiKey]);
 
   const updateWorkflowId = (id: string) => {
     const sanitizedId = id
@@ -77,57 +86,67 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
   const loadWorkflow = async (idToLoad: string) => {
     try {
       if (!idToLoad) return;
-
       setLoading(true);
       setResult(null);
-      const superglueClient = new SuperglueClient({
-        endpoint: config.superglueEndpoint,
-        apiKey: config.superglueApiKey,
-      });
-      const workflow = await superglueClient.getWorkflow(idToLoad);
+      const workflow = await client.getWorkflow(idToLoad);
       if (!workflow) {
         throw new Error(`Workflow with ID "${idToLoad}" not found.`);
       }
+
       const cleanedWorkflow = removeNullUndefined(workflow);
+      setLoadedWorkflow(cleanedWorkflow);
       updateWorkflowId(cleanedWorkflow.id || '');
       setSteps(cleanedWorkflow.steps || []);
       setFinalTransform(cleanedWorkflow.finalTransform || `{
   "result": $
 }`);
 
-      if (cleanedWorkflow.responseSchema === null || cleanedWorkflow.responseSchema === undefined) {
-        setResponseSchema(null);
+      // Handle response schema
+      setResponseSchema(cleanedWorkflow.responseSchema ? JSON.stringify(cleanedWorkflow.responseSchema) : null);
+
+      // Handle credentials - only if integrationIds exist
+      if (cleanedWorkflow.integrationIds?.length > 0) {
+        try {
+          const integrations = await Promise.all(
+            cleanedWorkflow.integrationIds.map(id => client.getIntegration(id))
+          );
+
+          // Flatten and namespace integration credentials
+          const flattenedCreds = flattenAndNamespaceWorkflowCredentials(
+            integrations.filter(Boolean).map(i => ({
+              id: i.id,
+              credentials: i.credentials || {}
+            }))
+          );
+
+          setIntegrationCredentials(flattenedCreds);
+          setCredentials(JSON.stringify(flattenedCreds, null, 2));
+          setValidationErrors(prev => ({ ...prev, credentials: false }));
+        } catch (error) {
+          console.warn('Failed to load integration credentials:', error);
+          setCredentials('{}');
+          setValidationErrors(prev => ({ ...prev, credentials: false }));
+        }
       } else {
-        setResponseSchema(JSON.stringify(cleanedWorkflow.responseSchema));
+        setCredentials('{}');
+        setValidationErrors(prev => ({ ...prev, credentials: false }));
       }
 
-      // If there are integrationIds, always fetch and flatten credentials
-      if (cleanedWorkflow.integrationIds && cleanedWorkflow.integrationIds.length > 0) {
-        const superglueClient = new SuperglueClient({
-          endpoint: config.superglueEndpoint,
-          apiKey: config.superglueApiKey,
-        });
-        const integrations = await Promise.all(
-          cleanedWorkflow.integrationIds.map(id => superglueClient.getIntegration(id))
-        );
-        const creds = flattenAndNamespaceWorkflowCredentials(
-          integrations.filter(Boolean).map(i => ({ id: i.id, credentials: i.credentials || {} }))
-        );
-        console.log('Flattened credentials:', creds);
-        setIntegrationCredentials(creds);
-        setCredentials(JSON.stringify(creds, null, 2)); // Always overwrite
-      } else if (cleanedWorkflow.inputSchema) {
-        // Only use inputSchema defaults if no integrations
-        const defaultValues = generateDefaultFromSchema(cleanedWorkflow.inputSchema);
-        if (defaultValues.credentials !== undefined) {
-          const credentialsValue = typeof defaultValues.credentials === 'string'
-            ? defaultValues.credentials
-            : JSON.stringify(defaultValues.credentials);
-          setCredentials(credentialsValue);
+      // Handle payload - only if inputSchema exists
+      if (cleanedWorkflow.inputSchema) {
+        try {
+          const defaultValues = generateDefaultFromSchema(cleanedWorkflow.inputSchema);
+          if (defaultValues.payload !== undefined) {
+            setPayload(JSON.stringify(defaultValues.payload));
+          } else {
+            setPayload('{}');
+          }
+        } catch (error) {
+          console.warn('Failed to generate payload from schema:', error);
+          setPayload('{}');
         }
-        if (defaultValues.payload !== undefined) {
-          setPayload(JSON.stringify(defaultValues.payload));
-        }
+      } else {
+        setPayload('{}');
       }
 
       toast({
@@ -141,10 +160,6 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
         description: error.message,
         variant: "destructive",
       });
-      setSteps([]);
-      setFinalTransform(`{\n  "result": $\n}`);
-      setResponseSchema('{"type": "object", "properties": {"result": {"type": "object"}}}');
-      setResult(null);
     } finally {
       setLoading(false);
     }
@@ -228,11 +243,7 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
         finalTransform
       };
 
-      const superglueClient = new SuperglueClient({
-        endpoint: config.superglueEndpoint,
-        apiKey: config.superglueApiKey,
-      });
-      const savedWorkflow = await superglueClient.upsertWorkflow(workflowId, input);
+      const savedWorkflow = await client.upsertWorkflow(workflowId, input);
 
       if (!savedWorkflow) {
         throw new Error("Failed to save workflow");
@@ -257,45 +268,49 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
     }
   };
 
-  const executeWorkflow = async () => {
+  const validateJson = (json: string, field: string): boolean => {
     try {
-      setLoading(true);
-      if (!workflowId) {
-        updateWorkflowId(`wf-${Date.now()}`);
+      JSON.parse(json);
+      setValidationErrors(prev => ({ ...prev, [field]: false }));
+      return true;
+    } catch (e) {
+      setValidationErrors(prev => ({ ...prev, [field]: true }));
+      return false;
+    }
+  };
+
+  const executeWorkflow = async () => {
+    if (!loadedWorkflow) return;
+    setLoading(true);
+    setResult(null);
+    setError(null);
+
+    try {
+      // Validate JSON before execution
+      try {
+        JSON.parse(credentials);
+      } catch (e) {
+        throw new Error("Invalid credentials JSON format");
       }
-      const workflowData = {
-        id: workflowId,
-        steps: steps.map((step: ExecutionStep) => ({
-          ...step,
-          apiConfig: {
-            id: step.apiConfig.id || step.id,
-            ...step.apiConfig
-          }
-        })),
-        responseSchema: responseSchema ? JSON.parse(responseSchema) : null,
-        finalTransform
-      };
-      const parsedCredentials = parseCredentialsHelper(credentials);
-      const parsedPayload = JSON.parse(payload || "{}");
-      const superglueClient = new SuperglueClient({
-        endpoint: config.superglueEndpoint,
-        apiKey: config.superglueApiKey,
+
+      const workflowResult = await client.executeWorkflow({
+        workflow: {
+          id: loadedWorkflow.id,
+          steps: loadedWorkflow.steps,
+          responseSchema: loadedWorkflow.responseSchema,
+          finalTransform: loadedWorkflow.finalTransform,
+          inputSchema: loadedWorkflow.inputSchema,
+          instruction: loadedWorkflow.instruction
+        },
+        payload: JSON.parse(payload || '{}'),
+        credentials: JSON.parse(credentials)
       });
-      const workflowResult = await superglueClient.executeWorkflow({
-        workflow: workflowData,
-        credentials: parsedCredentials,
-        payload: parsedPayload
-      });
-      if (!workflowResult.success) {
+
+      if (workflowResult.error) {
         throw new Error(workflowResult.error || "Workflow execution failed without a specific error message.");
       }
-      console.log(workflowResult);
+
       setResult(workflowResult);
-      if (workflowResult.success) {
-        setFinalTransform(workflowResult.config.finalTransform);
-        setSteps(workflowResult.config.steps);
-      }
-      setLoading(false);
     } catch (error) {
       console.error("Error executing workflow:", error);
       toast({
@@ -303,6 +318,7 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
         description: error.message,
         variant: "destructive",
       });
+    } finally {
       setLoading(false);
     }
   };
@@ -338,15 +354,8 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
 
   const fetchAndFlattenIntegrationCredentials = async (integrationIds: string[]) => {
     if (!integrationIds || integrationIds.length === 0) return;
-    const superglueClient = new SuperglueClient({
-      endpoint: config.superglueEndpoint,
-      apiKey: config.superglueApiKey,
-    });
-    const integrations = await Promise.all(
-      integrationIds.map(id => superglueClient.getIntegration(id))
-    );
     const creds = flattenAndNamespaceWorkflowCredentials(
-      integrations.filter(Boolean).map(i => ({ id: i.id, credentials: i.credentials || {} }))
+      integrationIds.map(id => ({ id, credentials: {} }))
     );
     setIntegrationCredentials(creds);
     setCredentials(JSON.stringify(creds, null, 2)); // Prefill credentials input
@@ -404,43 +413,98 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
               </div>
             </div>
 
-            {/* Add Credentials Input */}
-            <div className="mb-3">
-              <div className="flex items-center gap-2 mb-1">
-                <Label htmlFor="credentials">Credentials (Optional)</Label>
-                <HelpTooltip text="Enter API keys/tokens needed for steps in this workflow. Can be a single string or a JSON object for multiple keys." />
+            {/* Credentials Input */}
+            <div className="mb-4">
+              <Label htmlFor="credentials">Credentials</Label>
+              <HelpTooltip text='API keys or tokens needed for this workflow. Enter without any prefix like Bearer. If you need to add new credentials keys to the JSON, go back and add them to your integrations or add them to the workflow variables.' />
+              <div className="w-full max-w-full">
+                <Input
+                  value={credentials}
+                  onChange={(e) => {
+                    setCredentials(e.target.value);
+                    try {
+                      JSON.parse(e.target.value);
+                      setValidationErrors(prev => ({ ...prev, credentials: false }));
+                    } catch (e) {
+                      setValidationErrors(prev => ({ ...prev, credentials: true }));
+                    }
+                  }}
+                  placeholder="Enter credentials"
+                  className="min-h-10 font-mono text-xs"
+                />
               </div>
-              <Input
-                id="credentials"
-                value={credentials}
-                onChange={(e) => setCredentials(e.target.value)}
-                placeholder="Enter API key, token, or JSON object"
-              />
-              {isCredentialsEmpty() && (
-                <div className="text-xs text-amber-500 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded mt-1">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                    <line x1="12" y1="9" x2="12" y2="13" />
-                    <line x1="12" y1="17" x2="12.01" y2="17" />
-                  </svg>
-                  No credentials added
-                </div>
-              )}
+              {(() => {
+                try {
+                  const creds = JSON.parse(credentials);
+                  if (!creds || Object.keys(creds).length === 0) {
+                    return (
+                      <div className="text-xs text-amber-500 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded mt-2">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                          <line x1="12" y1="9" x2="12" y2="13" />
+                          <line x1="12" y1="17" x2="12.01" y2="17" />
+                        </svg>
+                        No credentials added
+                      </div>
+                    );
+                  }
+                  return null;
+                } catch {
+                  return (
+                    <div className="text-xs text-red-600 flex items-center gap-1.5 bg-red-500/10 py-1 px-2 rounded mt-2">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="12" />
+                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                      </svg>
+                      Invalid JSON format
+                    </div>
+                  );
+                }
+              })()}
             </div>
 
-            {/* Add Payload Input */}
-            <div className="mb-3">
-              <div className="flex items-center gap-2 mb-1">
-                <Label htmlFor="payload">Payload (Optional)</Label>
-                <HelpTooltip text="Enter JSON payload to be used as input data for the workflow" />
+            {/* Payload Input */}
+            <div className="mb-4">
+              <Label htmlFor="payload">Workflow Variables</Label>
+              <HelpTooltip text="Dynamic variables for the workflow as a JSON object. These are equivalent to your workflow's initial payload and can be referenced in the entire config." />
+              <div className="w-full max-w-full">
+                <Input
+                  value={payload}
+                  onChange={(e) => setPayload(e.target.value)}
+                  placeholder="Enter payload"
+                  className="min-h-10 font-mono text-xs"
+                />
               </div>
-              <Input
-                id="payload"
-                value={payload}
-                onChange={(e) => setPayload(e.target.value)}
-                placeholder="Enter JSON payload"
-                className="font-mono text-xs"
-              />
+              {(() => {
+                try {
+                  const parsed = JSON.parse(payload || '{}');
+                  if (!parsed || Object.keys(parsed).length === 0) {
+                    return (
+                      <div className="text-xs text-amber-500 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded mt-2">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                          <line x1="12" y1="9" x2="12" y2="13" />
+                          <line x1="12" y1="17" x2="12.01" y2="17" />
+                        </svg>
+                        No variables added
+                      </div>
+                    );
+                  }
+                  return null;
+                } catch {
+                  return (
+                    <div className="text-xs text-red-600 flex items-center gap-1.5 bg-red-500/10 py-1 px-2 rounded mt-2">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="12" />
+                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                      </svg>
+                      Invalid JSON format
+                    </div>
+                  );
+                }
+              })()}
             </div>
 
             {/* Steps and Final Transform */}

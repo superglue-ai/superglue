@@ -123,6 +123,11 @@ export default function IntegrationsPage() {
         setSelectedIntegration(value);
     };
 
+    const handleIntegrationFormSave = (integration: Integration) => {
+        setAddFormOpen(false);
+        setEditingIntegration(null);
+    };
+
     return (
         <div className="flex flex-col h-full p-8 w-full">
             {initialLoading ? null : (

@@ -1,7 +1,7 @@
+import { Integration } from "@superglue/client";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { LanguageModel } from "../llm/llm.js";
 import { logMessage } from "./logs.js";
-import { Integration } from "@superglue/client";
 
 export async function generateInstructions(integrations: Integration[], metadata: { orgId: string }): Promise<string[]> {
   const messages: ChatCompletionMessageParam[] = [
@@ -26,7 +26,14 @@ Remember these important rules: The output MUST be a JSON array of strings, with
     },
     {
       role: "user",
-      content: `integrations: ${JSON.stringify(integrations, null, 2)}`
+      content: `integrations: ${JSON.stringify(integrations.map(i => ({
+        id: i.id,
+        urlHost: i.urlHost,
+        urlPath: i.urlPath,
+        // Only include first page of docs (roughly 1000 chars)
+        documentation: i.documentation?.split('\n\n')[0] || '',
+        documentationUrl: i.documentationUrl
+      })), null, 2)}`
     }
   ];
 
@@ -97,7 +104,7 @@ export function sanitizeInstructionSuggestions(raw: unknown): string[] {
     }
   } else if (Array.isArray(raw)) {
     arr = raw;
-  } else  {
+  } else {
     return [];
   }
 

@@ -94,91 +94,62 @@ export class Documentation {
   }
 
   public static postProcess(documentation: string, instruction: string): string {
-    if (!documentation) {
-      return "";
-    }
-
-    // If no instruction or documentation is already within limits, return as is
-    if (!instruction || documentation.length <= Documentation.MAX_LENGTH) {
+    if (documentation.length <= Documentation.MAX_LENGTH) {
       return documentation;
     }
 
-    const CONTEXT_SEPARATOR = "\n\n";
+    const CHUNK_SIZE = Documentation.MAX_LENGTH / 10;
+    const MAX_CHUNKS = 10; // Limit number of chunks to return
     const MIN_SEARCH_TERM_LENGTH = 4;
 
-    const docLower = documentation.toLowerCase();
-    const positions: number[] = [];
-
     // Extract search terms from instruction
-    const searchTerms = instruction.toLowerCase().split(/[^a-z0-9]/)
+    const searchTerms = instruction?.toLowerCase()?.split(/[^a-z0-9]/)
       .map(term => term.trim())
-      .filter(term => term.length >= MIN_SEARCH_TERM_LENGTH);
+      .filter(term => term.length >= MIN_SEARCH_TERM_LENGTH) || [];
 
-    // Find positions of search terms
-    for (const searchTerm of searchTerms) {
-      let pos = docLower.indexOf(searchTerm);
-      while (pos !== -1) {
-        positions.push(pos);
-        pos = docLower.indexOf(searchTerm, pos + 1);
+    // Add common auth-related terms
+    searchTerms.push('securityschemes', 'authorization', 'authentication');
+
+    // Split document into chunks
+    const chunks: { content: string; score: number; index: number }[] = [];
+
+    for (let i = 0; i < documentation.length; i += CHUNK_SIZE) {
+      const chunk = documentation.slice(i, i + CHUNK_SIZE);
+      const chunkLower = chunk.toLowerCase();
+
+      // Score chunk based on search term matches
+      let score = 0;
+      for (const term of searchTerms) {
+        const matches = (chunkLower.match(new RegExp(term, 'g')) || []).length;
+        score += matches;
       }
+
+      chunks.push({
+        content: chunk,
+        score,
+        index: i
+      });
     }
 
-    // Always include auth-related sections if they exist
-    const authPosSecuritySchemes = docLower.indexOf("securityschemes");
-    if (authPosSecuritySchemes !== -1) positions.push(authPosSecuritySchemes);
-    const authPosAuthorization = docLower.indexOf("authorization");
-    if (authPosAuthorization !== -1) positions.push(authPosAuthorization);
+    // Sort by score (highest first) and take top chunks
+    const topChunks = chunks
+      .sort((a, b) => b.score - a.score)
+      .slice(0, MAX_CHUNKS);
 
-    // If no relevant positions found, return first MAX_LENGTH characters
-    if (positions.length === 0) {
+    // If no chunks have matches, return first chunk
+    if (topChunks.every(chunk => chunk.score === 0)) {
       return documentation.slice(0, Documentation.MAX_LENGTH);
     }
 
-    positions.sort((a, b) => a - b);
+    // Sort selected chunks by their original position to maintain document order
+    topChunks.sort((a, b) => a.index - b.index);
 
-    const firstHalfLength = Math.floor(Documentation.MAX_LENGTH * 0.4);
-    const secondHalfLength = Documentation.MAX_LENGTH - firstHalfLength;
+    const result = topChunks.map(chunk => chunk.content).join('\n\n');
 
-    // Calculate chunk size for the second half
-    const chunkSize = Math.floor(secondHalfLength / positions.length);
-    if (chunkSize <= 0) {
-      return documentation.slice(0, Documentation.MAX_LENGTH);
-    }
-
-    // Extract the first half
-    const firstHalf = documentation.slice(0, firstHalfLength);
-
-    // Extract chunks for the second half
-    const chunks: string[] = [];
-    let lastChunkEnd = firstHalfLength;
-
-    for (const pos of positions) {
-      const halfChunk = Math.floor(chunkSize / 2);
-      let start = Math.max(0, pos - halfChunk);
-      let end = start + chunkSize;
-
-      if (end > documentation.length) {
-        end = documentation.length;
-        start = Math.max(0, end - chunkSize);
-      }
-
-      if (start >= end || end <= lastChunkEnd) {
-        continue;
-      }
-
-      start = Math.max(start, lastChunkEnd);
-
-      if (start < end) {
-        chunks.push(documentation.slice(start, end));
-        lastChunkEnd = end;
-      }
-    }
-
-    // Combine chunks and ensure final length
-    let finalDoc = firstHalf + CONTEXT_SEPARATOR + chunks.join(CONTEXT_SEPARATOR);
-    return finalDoc.length > Documentation.MAX_LENGTH
-      ? finalDoc.slice(0, Documentation.MAX_LENGTH)
-      : finalDoc;
+    // Final trim if needed
+    return result.length > Documentation.MAX_LENGTH
+      ? result.slice(0, Documentation.MAX_LENGTH)
+      : result;
   }
 }
 
@@ -368,40 +339,78 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
   }
 
   async tryFetch(config: ApiConfig, metadata: Metadata): Promise<string | null> {
-    // Only fetch if it's an HTTP URL and content hasn't been fetched yet
-    // Pass metadata
-    await new Promise(resolve => setTimeout(resolve, 10000));
     const docResult = await this.fetchPageContentWithPlaywright(config?.documentationUrl, config, metadata);
     let fetchedLinks = new Set<string>();
-    if (!config.instruction && docResult?.content) {
-      return docResult?.content;
-    }
+    if (!docResult?.content) return null;
+
     fetchedLinks.add(config.documentationUrl);
-    const instructions = ["auth", "authentication", "introduction", "authorization", "started"];
-    instructions.push(...(config.instruction?.toLowerCase().split(/[^a-z0-9]/g).filter(i => i.length > 3) || []));
 
-    if (!docResult || !docResult.links) return null;
+    // Expanded keywords to catch more relevant documentation pages
+    const requiredKeywords = [
+      // Auth related
+      "auth", "authentication", "authorization", "oauth", "api key", "apikey",
+      // Getting started
+      "introduction", "getting started", "quickstart", "guide", "tutorial",
+      // API specific
+      "rest", "api", "endpoints", "reference", "methods", "operations",
+      // HTTP methods
+      "get", "post", "put", "delete", "patch",
+      // Common API concepts
+      "rate limit", "pagination", "webhook", "callback", "error", "response"
+    ];
 
-    const rankedLinks: { linkText: string, href: string, matchCount: number }[] = [];
+    if (!docResult.links) return docResult.content;
+
+    const rankedLinks: { linkText: string, href: string, priority: number }[] = [];
 
     for (const [linkText, href] of Object.entries(docResult.links)) {
-      const keywords = linkText.split(" ").filter(i => i.length > 3);
-      const matchCount = keywords.filter(k => instructions.some(instr => k.includes(instr) || instr.includes(k))).length;
-      rankedLinks.push({ linkText, href, matchCount });
+      // Skip obviously non-doc pages
+      if (href.includes('signup') ||
+        href.includes('pricing') ||
+        href.includes('contact') ||
+        href.includes('cookie') ||
+        href.includes('privacy') ||
+        href.includes('terms') ||
+        href.includes('legal') ||
+        href.includes('policy') ||
+        href.includes('status') ||
+        href.includes('help')) {
+        continue;
+      }
+
+      // Priority levels:
+      // 0: Required keywords (auth/intro)
+      // 1: Everything else
+      let priority = 1;
+
+      // Check for required keywords
+      const hasRequiredKeyword = requiredKeywords.some(keyword =>
+        linkText.toLowerCase().includes(keyword) || href.toLowerCase().includes(keyword)
+      );
+      if (hasRequiredKeyword) priority = 0;
+
+      rankedLinks.push({ linkText, href, priority });
     }
 
-    // Sort links by match count in descending order
-    rankedLinks.sort((a, b) => b.matchCount - a.matchCount);
+    // Sort by priority (highest first)
+    rankedLinks.sort((a, b) => b.priority - a.priority);
 
-    for (const rankedLink of rankedLinks) {
-      if (fetchedLinks.size > PlaywrightFetchingStrategy.MAX_FETCHED_LINKS) break;
-      if (fetchedLinks.has(rankedLink.href)) continue;
-      const linkResult = await this.fetchPageContentWithPlaywright(rankedLink.href, config, metadata);
-      if (linkResult && linkResult.content) { // Ensure content exists
-        docResult.content += `\n\n${linkResult.content}`;
-        fetchedLinks.add(rankedLink.href);
+    // Fetch links up to MAX_FETCHED_LINKS, prioritizing higher priority ones
+    for (const link of rankedLinks) {
+      if (fetchedLinks.size >= PlaywrightFetchingStrategy.MAX_FETCHED_LINKS) break;
+      if (fetchedLinks.has(link.href)) continue;
+
+      try {
+        const linkResult = await this.fetchPageContentWithPlaywright(link.href, config, metadata);
+        if (linkResult?.content) {
+          docResult.content += `\n\n${linkResult.content}`;
+          fetchedLinks.add(link.href);
+        }
+      } catch (error) {
+        logMessage('warn', `Failed to fetch link ${link.href}: ${error?.message}`, metadata);
       }
     }
+
     return docResult.content;
   }
 }

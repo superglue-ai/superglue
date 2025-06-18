@@ -73,7 +73,7 @@ export const executeWorkflowResolver = async (
     }
 
     const executor = new WorkflowExecutor(workflow, metadata);
-    const result = await executor.execute(args.payload, mergedCredentials, args.options);
+    const result = await executor.execute(args.payload, mergedCredentials, args.options, context);
     // Save run to datastore
     context.datastore.createRun({
       id: runId,
@@ -228,19 +228,16 @@ export const buildWorkflowResolver = async (
     );
 
     const blocked = resolvedIntegrations.find(
-      i => (i as any).documentationPending || !i.documentation
+      i => i.documentationPending === true
     );
     if (blocked) {
-      const reason = (blocked as any).documentationPending
-        ? `documentation is still being fetched`
-        : `documentation could not be fetched`;
       logMessage(
         'warn',
-        `Workflow build blocked: ${reason} for integration "${blocked.id}"`,
+        `Workflow build blocked: documentation is still being fetched for integration "${blocked.id}"`,
         metadata
       );
       throw new Error(
-        `Cannot build workflow: ${reason} for integration "${blocked.id}".`
+        `Cannot build workflow: documentation is still being fetched for integration "${blocked.id}".`
       );
     }
 
