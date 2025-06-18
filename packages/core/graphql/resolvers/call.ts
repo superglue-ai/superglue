@@ -1,4 +1,4 @@
-import { ApiConfig, ApiInputRequest, CacheMode, RequestOptions, SelfHealingMode, TransformConfig } from "@superglue/client";
+import { ApiConfig, ApiInputRequest, CacheMode, Integration, RequestOptions, SelfHealingMode, TransformConfig } from "@superglue/client";
 import type { Context, Metadata } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import OpenAI from "openai";
@@ -18,8 +18,7 @@ export async function executeApiCall(
   credentials: Record<string, string>,
   options: RequestOptions,
   metadata: Metadata,
-  context?: Context,
-  integrationId?: string,
+  integration?: Integration,
 ): Promise<{
   data: any;
   endpoint: ApiConfig;
@@ -31,28 +30,19 @@ export async function executeApiCall(
   let success = false;
   let isSelfHealing = isSelfHealingEnabled(options);
 
+  let documentationString = "";
+  if (!integration) {
+    logMessage('warn', `No integration provided. Proceeding without documentation.`, metadata);
+  } else if (integration.documentationPending) {
+    logMessage('warn', `Documentation for integration ${integration.id} is still being fetched. Proceeding without documentation.`, metadata);
+  } else if (integration.documentation) {
+    documentationString = Documentation.postProcess(integration.documentation, endpoint.instruction || "");
+  }
+
   do {
     try {
       if (retryCount > 0 && isSelfHealing) {
         logMessage('info', `Generating API config for ${endpoint?.urlHost}${retryCount > 0 ? ` (${retryCount})` : ""}`, metadata);
-        let integration;
-        try {
-          integration = await context.datastore.getIntegration(integrationId, context.orgId);
-        } catch (error) {
-          logMessage('error', `Failed to fetch integration ${integrationId}: ${error.message}`, metadata);
-          throw new Error(`Failed to fetch integration: ${error.message}`);
-        }
-
-        let documentationString = "";
-
-        if (!integration) {
-          logMessage('warn', `Integration ${integrationId} not found in datastore. Proceeding without documentation.`, metadata);
-        } else if (integration.documentationPending) {
-          logMessage('warn', `Documentation for integration ${integrationId} is still being fetched. Proceeding without documentation.`, metadata);
-        } else if (integration.documentation) {
-          documentationString = Documentation.postProcess(integration.documentation, endpoint.instruction || "");
-        }
-
         const computedApiCallConfig = await generateApiConfig(endpoint, documentationString, payload, credentials, retryCount, messages);
         endpoint = computedApiCallConfig.config;
         messages = computedApiCallConfig.messages;

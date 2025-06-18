@@ -302,6 +302,7 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
         workflow: {
           id: loadedWorkflow.id,
           steps: loadedWorkflow.steps,
+          integrationIds: loadedWorkflow.integrationIds,
           responseSchema: loadedWorkflow.responseSchema,
           finalTransform: loadedWorkflow.finalTransform,
           inputSchema: loadedWorkflow.inputSchema,

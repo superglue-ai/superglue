@@ -60,7 +60,7 @@ export default function IntegrationsPage() {
     const [editFormId, setEditFormId] = useState<string | null>(null);
 
     const [page, setPage] = useState(0);
-    const PAGE_SIZE = 4;
+    const PAGE_SIZE = 5;
     const paginatedIntegrations = integrations.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
     const totalPages = Math.ceil(integrations.length / PAGE_SIZE);
 
