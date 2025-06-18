@@ -25,9 +25,9 @@ export function convertBasicAuthToBase64(headerValue: string) {
   return headerValue;
 }
 
-export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions): Promise<{ data: any }> {
+export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions): Promise<{ data: any, headers: Record<string, any> }> {
   if (endpoint.urlHost.startsWith("postgres")) {
-    return { data: await callPostgres(endpoint, payload, credentials, options) };
+    return { data: await callPostgres(endpoint, payload, credentials, options), headers: {} };
   }
 
   const allVariables = { ...payload, ...credentials };
@@ -39,6 +39,7 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
   let hasMore = true;
   let loopCounter = 0;
   let seenResponseHashes = new Set<string>();
+  let responseHeaders = {};
 
   while (hasMore && loopCounter < 500) {
     // Generate pagination variables if enabled
@@ -111,6 +112,9 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
     };
 
     const response = await callAxios(axiosConfig, options);
+
+    // Capture headers from each response
+    responseHeaders[loopCounter] = response.headers || {};
 
     if (![200, 201, 204].includes(response?.status) ||
       response.data?.error ||
@@ -214,12 +218,14 @@ config: ${JSON.stringify(axiosConfig)}`;
       data: {
         next_cursor: cursor,
         ...(Array.isArray(allResults) ? { results: allResults } : allResults)
-      }
+      },
+      headers: responseHeaders
     };
   }
 
   return {
-    data: allResults?.length === 1 ? allResults[0] : allResults
+    data: allResults?.length === 1 ? allResults[0] : allResults,
+    headers: responseHeaders
   };
 }
 

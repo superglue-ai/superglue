@@ -75,6 +75,7 @@ type RunResult {
   id: ID!
   success: Boolean!
   data: JSON
+  responseHeaders: JSON
   error: String
   startedAt: DateTime!
   completedAt: DateTime!

@@ -20,6 +20,7 @@ export async function executeApiCall(
   metadata: Metadata,
 ): Promise<{
   data: any;
+  responseHeaders: Record<string, any>;
   endpoint: ApiConfig;
 }> {
   let response: any = null;
@@ -90,7 +91,7 @@ export async function executeApiCall(
     throw new Error(`API call failed after ${retryCount} retries. Last error: ${lastError}`);
   }
 
-  return { data: response?.data, endpoint };
+  return { data: response?.data, responseHeaders: response?.headers, endpoint };
 }
 function isSelfHealingEnabled(options: RequestOptions): boolean {
   return options?.selfHealing ? options.selfHealing === SelfHealingMode.ENABLED || options.selfHealing === SelfHealingMode.REQUEST_ONLY : true;
@@ -167,7 +168,7 @@ export const callResolver = async (
       completedAt: new Date(),
     };
     context.datastore.createRun(result, context.orgId);
-    return { ...result, data: transformResult.data };
+    return { ...result, data: transformResult.data, responseHeaders: callResult.responseHeaders };
   } catch (error) {
     const maskedError = maskCredentials(error.message, credentials);
 
