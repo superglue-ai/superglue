@@ -3,7 +3,7 @@
   <img src="https://github.com/user-attachments/assets/be0e65d4-dcd8-4133-9841-b08799e087e7" width="350" alt="superglue_logo_white">
 </p>
 
-<h2 align="center">one SDK for all your data.</h2>
+<h2 align="center">Automate workflows with natural language.</h2>
 <div align="center">
   
  [![GitHub](https://img.shields.io/github/license/superglue-ai/superglue?style=flat-square)](https://github.com/superglue-ai/superglue/blob/main/LICENSE)
@@ -13,18 +13,17 @@
 [![Weave Badge](https://img.shields.io/endpoint?url=https%3A%2F%2Fapp.workweave.ai%2Fapi%2Frepository%2Fbadge%2Forg_0S2o9PLamHvNsTjHbszc38vC%2F914997268&cacheSeconds=3600&labelColor=#EC6341)](https://app.workweave.ai/reports/repository/org_0S2o9PLamHvNsTjHbszc38vC/914997268)
 
 </div>
-
-![Add a heading (13)](https://github.com/user-attachments/assets/594a78f6-56b6-4477-9f01-f1c8007cef9c)
-<h3 align="center"> Our latest launch lets your agents build their own custom tools, wrapping any API into a personalized MCP.<br>
+<h3 align="center"> Now live: let agents build deterministic workflows across apps, databases and APIs using the superglue MCP<br>
 Let's glue.<br>
 
 [Read the docs](https://docs.superglue.cloud/mcp) 🍯🍯🍯</h3>
 
 
 ## what is superglue?
-superglue automates data integration via one stable, self-healing endpoint. Comes with automated schema-drift detection, retries and remappings so your data keeps moving no matter what - no connector maintenance, no rewrites. You can deploy it as a proxy between you and any SaaS app, API and data source and always get the data that you want in the format you expect.
+superglue automates workflows from natural language. Tell it what you want to do in your CRM, ERP and co. and superglue builds, runs and executes the integration pipelines automatically. Comes with automated schema mapping, drift detection, retries and remappings so your workflows keep running no matter what. 
+superglue makes agents reliable in prod by letting them build deterministic workflows across any SaaS app, API and data source. Use the superglue MCP instead of hard-coding tools and let your agent use APIs the way they want to, not the way they were written. 
 
-- Lightweight proxy: point it at any REST / GraphQL / SQL / file endpoint.
+- Lightweight proxy: point it at any REST / GraphQL / SQL / postgres / file endpoint.
 - LLM‑assisted mapping during config; cached Javascript transforms at runtime (no LLM latency).
 - Self‑heals schema drift: when the upstream API or schema changes, superglue regenerates the transform automatically, and keeps the pipeline running.
 - Security‑first: zero data stored; run fully on‑prem or use [our hosted version](https://app.superglue.cloud/).
@@ -93,12 +92,13 @@ console.log(JSON.stringify(workflowResult, null, 2));
 ```
 
 ## what people build with superglue
+- Voice assistants: reliably map intent to tool usage
+- Extended GPT: offer more data sources and a whitelabel agent builder inside your internal GPT
+- Extend AI assistant/co-pilot: offer more actions than search 
 - Ship connectors 10x faster, without the maintenance overhead
 - Simple interface for legacy API pipelines
 - CMS or cloud migration
 - Transforming SQL queries into Rest API calls
-- Data lake consolidation
-- Track data lineage
 - And many more...
 
 
