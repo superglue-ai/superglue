@@ -25,8 +25,10 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
   const config = useConfig();
   const [workflowId, setWorkflowId] = useState("");
   const [steps, setSteps] = useState<any[]>([]);
-  const [finalTransform, setFinalTransform] = useState(`{
-  "result": $
+  const [finalTransform, setFinalTransform] = useState(`(sourceData) => {
+  return {
+    result: sourceData
+  }
 }`);
   const [responseSchema, setResponseSchema] = useState<string | null>(`{"type": "object", "properties": {"result": {"type": "object"}}}`);
   const [credentials, setCredentials] = useState<string>('');
@@ -97,8 +99,10 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
       setLoadedWorkflow(cleanedWorkflow);
       updateWorkflowId(cleanedWorkflow.id || '');
       setSteps(cleanedWorkflow.steps || []);
-      setFinalTransform(cleanedWorkflow.finalTransform || `{
-  "result": $
+      setFinalTransform(cleanedWorkflow.finalTransform || `(sourceData) => {
+  return {
+    result: sourceData
+  }
 }`);
 
       // Handle response schema
@@ -113,10 +117,7 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
 
           // Flatten and namespace integration credentials
           const flattenedCreds = flattenAndNamespaceWorkflowCredentials(
-            integrations.filter(Boolean).map(i => ({
-              id: i.id,
-              credentials: i.credentials || {}
-            }))
+            integrations.filter(Boolean)
           );
 
           setIntegrationCredentials(flattenedCreds);
@@ -172,7 +173,11 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
       // Reset to a clean slate if id is removed or not provided
       updateWorkflowId("");
       setSteps([]);
-      setFinalTransform(`{\n  "result": $\n}`);
+      setFinalTransform(`(sourceData) => {
+  return {
+    result: sourceData
+  }
+}`);
       setResponseSchema('{"type": "object", "properties": {"result": {"type": "object"}}}');
       setCredentials("");
       setPayload("{}");
