@@ -311,7 +311,7 @@ type TenantInfo {
 type ExecutionStep {
   id: String!
   apiConfig: ApiConfig!
-  integrationId: String!
+  integrationId: String
   executionMode: String  # DIRECT | LOOP
   loopSelector: JSONata
   loopMaxIters: Int
@@ -368,6 +368,7 @@ type WorkflowResult {
 input WorkflowInput {
   id: String!
   steps: [ExecutionStepInput!]
+  integrationIds: [ID!]
   finalTransform: JSONata
   inputSchema: JSONSchema
   responseSchema: JSONSchema

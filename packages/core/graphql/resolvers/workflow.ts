@@ -39,22 +39,38 @@ export const executeWorkflowResolver = async (
   let startedAt = new Date();
   let metadata: Metadata = { orgId: context.orgId, runId };
   let workflow: Workflow | undefined;
+
   try {
-    const workflowFromStore = await context.datastore.getWorkflow(args.input.id || args.input.workflow?.id, context.orgId);
-    workflow = { ...workflowFromStore, ...args.input.workflow };
-    if (!workflow) {
-      throw new Error("Workflow not found");
+    if (args.input.id) {
+      workflow = await context.datastore.getWorkflow(args.input.id, context.orgId);
+      if (!workflow) {
+        throw new Error("Workflow not found");
+      }
+    } else if (args.input.workflow) {
+      workflow = args.input.workflow;
+      // Validate required workflow fields
+      if (!workflow.id) throw new Error("Workflow must have an ID");
+      if (!workflow.steps || !Array.isArray(workflow.steps)) throw new Error("Workflow must have steps array");
+      if (!workflow.integrationIds || !Array.isArray(workflow.integrationIds)) {
+        logMessage('warn', `Workflow ${workflow.id} missing integrationIds array`, metadata);
+      }
+      logMessage('info', `Executing workflow ${workflow.id}`, metadata);
+    } else {
+      throw new Error("Must provide either workflow ID or workflow object");
     }
-    if (workflow.inputSchema && typeof workflow.inputSchema == 'string') {
+
+    // Parse schemas if they're strings
+    if (workflow.inputSchema && typeof workflow.inputSchema === 'string') {
       workflow.inputSchema = JSON.parse(workflow.inputSchema);
     }
-    if (workflow.responseSchema && typeof workflow.responseSchema == 'string') {
+    if (workflow.responseSchema && typeof workflow.responseSchema === 'string') {
       workflow.responseSchema = JSON.parse(workflow.responseSchema);
     }
 
     let mergedCredentials = args.credentials || {};
+    let integrations: Integration[] = [];
     if (Array.isArray(workflow.integrationIds) && workflow.integrationIds.length > 0) {
-      const integrations = (
+      integrations = (
         await Promise.all(
           workflow.integrationIds.map(async (id) => {
             const integration = await context.datastore.getIntegration(id, context.orgId);
@@ -70,14 +86,15 @@ export const executeWorkflowResolver = async (
       mergedCredentials = { ...integrationCreds, ...(args.credentials || {}) };
     }
 
-    const executor = new WorkflowExecutor(workflow, metadata);
-    const result = await executor.execute(args.payload, mergedCredentials, args.options, context);
+    const executor = new WorkflowExecutor(workflow, metadata, integrations);
+    const result = await executor.execute(args.payload, mergedCredentials, args.options);
+
     // Save run to datastore
     context.datastore.createRun({
       id: runId,
       success: result.success,
       error: result.error || undefined,
-      config: result.config || workflow || { id: args.input.id, steps: [] },
+      config: result.config || workflow,
       stepResults: result.stepResults || [],
       startedAt,
       completedAt: new Date()

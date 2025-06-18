@@ -1,5 +1,5 @@
 import type { ExecutionStep, RequestOptions, WorkflowStepResult } from "@superglue/client";
-import { Context, Metadata } from "@superglue/shared";
+import { Integration, Metadata } from "@superglue/shared";
 import { executeApiCall } from "../graphql/resolvers/call.js";
 import { logMessage } from "../utils/logs.js";
 import { applyJsonata } from "../utils/tools.js";
@@ -12,7 +12,7 @@ export interface ExecutionStrategy {
     credentials: Record<string, string>,
     options: RequestOptions,
     metadata: Metadata,
-    context: Context
+    integration?: Integration
   ): Promise<WorkflowStepResult>;
 }
 
@@ -30,7 +30,7 @@ const directStrategy: ExecutionStrategy = {
     credentials: Record<string, string>,
     options: RequestOptions = {},
     metadata: Metadata,
-    context: Context
+    integration?: Integration
   ): Promise<WorkflowStepResult> {
     const result: WorkflowStepResult = {
       stepId: step.id,
@@ -44,8 +44,7 @@ const directStrategy: ExecutionStrategy = {
         credentials,
         options,
         metadata,
-        context,
-        step.integrationId
+        integration
       );
       const transformedData = await applyJsonata(apiResponse.data, step.responseMapping);
 
@@ -73,7 +72,7 @@ const loopStrategy: ExecutionStrategy = {
     credentials: Record<string, string>,
     options: RequestOptions = {},
     metadata: Metadata,
-    context: Context
+    integration?: Integration
   ): Promise<WorkflowStepResult> {
     const result: WorkflowStepResult = {
       stepId: step.id,
@@ -120,8 +119,7 @@ const loopStrategy: ExecutionStrategy = {
             credentials,
             options,
             metadata,
-            context,
-            step.integrationId
+            integration
           );
           const rawData = { currentItem: currentItem, ...(typeof apiResponse.data === 'object' ? apiResponse.data : { data: apiResponse.data }) };
           const transformedData = await applyJsonata(rawData, step.responseMapping);

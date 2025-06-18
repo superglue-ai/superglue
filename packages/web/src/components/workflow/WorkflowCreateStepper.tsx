@@ -402,6 +402,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         workflow: {
           id: currentWorkflow.id,
           steps: currentWorkflow.steps,
+          integrationIds: selectedIntegrationIds,
           responseSchema: JSON.parse(schema),
           finalTransform: currentWorkflow.finalTransform,
           inputSchema: currentWorkflow.inputSchema,
