@@ -31,38 +31,15 @@ describe('superglue_build_new_tool', () => {
       .rejects.toThrow(/Instruction must be detailed/)
   })
 
-<<<<<<< feature/reusing-integrations-in-workflows
-  it('throws if integrations is missing', async () => {
-    await expect(buildNewTool(getValidArgs({ integrations: undefined }), {}))
-      .rejects.toThrow(/integrations array is required/)
-  })
-
   it('throws if integrations is empty', async () => {
     await expect(buildNewTool(getValidArgs({ integrations: [] }), {}))
-      .rejects.toThrow(/integrations array is required/)
+      .rejects.toThrow(/Integrations array is required/)
   })
 
-  it('throws if an integration is missing urlHost', async () => {
+  it('throws if a integration is providing string credentials', async () => {
     await expect(buildNewTool(getValidArgs({
-      integrations: [{ credentials: { apiKey: 'test' } }]
-    }), {})).rejects.toThrow(/urlHost is required/)
-  })
-
-  it('throws if an integration is missing credentials', async () => {
-    await expect(buildNewTool(getValidArgs({
-      integrations: [{ urlHost: 'api.example.com', credentials: {} }]
-    }), {})).rejects.toThrow(/credentials object is required/)
-=======
-  it('throws if systems is empty', async () => {
-    await expect(buildNewTool(getValidArgs({ systems: [] }), {}))
-      .rejects.toThrow(/Systems array is required/)
-  })
-
-  it('throws if a system is providing string credentials', async () => {
-    await expect(buildNewTool(getValidArgs({
-      systems: [{ urlHost: 'api.example.com', credentials: "yooo" }]
+      integrations: [{ urlHost: 'api.example.com', credentials: "yooo" }]
     }), {})).rejects.toThrow(/Credentials must be an object. E.g. { 'apiKey': '1234567890' }/)
->>>>>>> main
   })
 
   it('returns failure if buildWorkflow throws', async () => {
