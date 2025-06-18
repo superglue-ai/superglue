@@ -179,7 +179,7 @@ export const API_PROMPT = `You are an API configuration assistant. Generate API 
   - ERROR 400: please pay special attention to the request body and url params. Maybe not all are requried? skip pagination? be creative here! this can be specific to the specific route.
   - ERROR 401: please pay special attention to the authentication type and headers.
   - ERROR 403: please pay special attention to the authentication type and headers.
-  - ERROR 404: check the documentation, then check the request parameters and be creative.
+  - ERROR 404: check the documentation, then check the request parameters, particularly the entire url path and the method - are they really correct?
   - ERROR 500: please pay special attention to the documentation to understand if the resource exists.
 
 Important: Listen closely to the feedback, identify the cause of the error and adress the cause of the error.
@@ -298,6 +298,7 @@ Output the plan as a JSON object adhering to the specified schema.
 - Choose the appropriate integration for each step based on the provided documentation
 - Assign descriptive stepIds in camelCase that indicate the purpose of the step
 - Make absolutely sure that each step can be achieved with a single API call (or a loop of the same call)
+- Aggregation, grouping, sorting, filtering is covered by a separate final transformation and does not need to be added as a dedicated step. However, if the API supports e.g. filtering when retrieving, this should be part of the retrieval step, just do not add an extra one.
 </STEP_CREATION>
 
 <EXECUTION_MODES>

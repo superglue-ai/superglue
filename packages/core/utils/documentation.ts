@@ -47,6 +47,7 @@ export class Documentation {
 
   // Main function to fetch and process documentation using strategies
   public async fetchAndProcess(): Promise<string> {
+    
     if (this.lastResult) {
       return this.lastResult;
     }

@@ -8,7 +8,7 @@ import { LanguageModel } from "../llm/llm.js";
 import { API_PROMPT } from "../llm/prompts.js";
 import { parseFile } from "./file.js";
 import { callPostgres } from "./postgres.js";
-import { callAxios, composeUrl, generateId, replaceVariables } from "./tools.js";
+import { callAxios, composeUrl, generateId, replaceVariables, sample } from "./tools.js";
 
 export function convertBasicAuthToBase64(headerValue: string) {
   if (!headerValue) return headerValue;
@@ -64,13 +64,6 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
     // Combine all variables
     const requestVars = { ...paginationVars, ...allVariables };
 
-    // Check for any {var} in the generated config that isn't in available variables
-    //const invalidVars = validateVariables(endpoint, Object.keys(requestVars));
-
-    //if (invalidVars.length > 0) {
-    //  throw new Error(`The following variables are not defined: ${invalidVars.join(', ')}`);  
-    //}
-
     // Generate request parameters with variables replaced
     const headers = Object.fromEntries(
       (await Promise.all(
@@ -79,14 +72,20 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
       )).filter(([_, value]) => value && value !== "undefined" && value !== "null")
     );
 
-    // Process headers for Basic Auth
+    // Process headers for Auth
     const processedHeaders = {};
     for (const [key, value] of Object.entries(headers)) {
-      if (key.toLowerCase() === 'authorization' && typeof value === 'string' && value.startsWith('Basic ')) {
-        processedHeaders[key] = convertBasicAuthToBase64(value);
-      } else {
-        processedHeaders[key] = value;
+      let processedValue = value;
+      // Remove duplicate auth prefixes (e.g. "Basic Basic " or "Bearer Bearer ")
+      if (key.toLowerCase() === 'authorization' && typeof value === 'string') {
+        processedValue = value.replace(/^(Basic|Bearer)\s+(Basic|Bearer)\s+/, '$1 $2');
       }
+      // Convert Basic Auth to Base64
+      if (key.toLowerCase() === 'authorization' && typeof processedValue === 'string' && processedValue.startsWith('Basic ')) {
+        processedValue = convertBasicAuthToBase64(processedValue);
+      }
+
+      processedHeaders[key] = processedValue;
     }
 
     const queryParams = Object.fromEntries(
@@ -249,7 +248,7 @@ export async function generateApiConfig(
     dataPath: z.string().optional().describe("The path to the data you want to extract from the response. E.g. products.variants.size"),
     pagination: z.object({
       type: z.enum(Object.values(PaginationType) as [string, ...string[]]),
-      pageSize: z.string().describe("Number of items per page. Set this to a number. In headers or query params, you can access it as {limit}."),
+      pageSize: z.string().describe("Number of items per page. Set this to a number. Once you set it here as a number, you can access it using <<limit>> in headers, params, body, or url path."),
       cursorPath: z.string().optional().describe("If cursor_based: The path to the cursor in the response. E.g. cursor.current or next_cursor")
     }).optional()
   }));
@@ -257,13 +256,14 @@ export async function generateApiConfig(
     ...Object.keys(credentials || {}),
     ...Object.keys(payload || {}),
   ].map(v => `{${v}}`).join(", ");
-  const userPrompt = `Generate API configuration for the following:
+  if (messages.length === 0) {
+    const userPrompt = `Generate API configuration for the following:
 
 Instructions: ${apiConfig.instruction}
 
 Base URL: ${composeUrl(apiConfig.urlHost, apiConfig.urlPath)}
 
-${Object.values(apiConfig).filter(Boolean).length > 0 ? "Also, the user provided the following information, which is probably correct. Ensure to at least try where it makes sense: " : ""}
+${Object.values(apiConfig).filter(Boolean).length > 0 ? "Also, the user provided the following information. Ensure to at least try where it makes sense: " : ""}
 ${apiConfig.headers ? `Headers: ${JSON.stringify(apiConfig.headers)}` : ""}
 ${apiConfig.queryParams ? `Query Params: ${JSON.stringify(apiConfig.queryParams)}` : ""}
 ${apiConfig.body ? `Body: ${JSON.stringify(apiConfig.body)}` : ''}
@@ -274,11 +274,9 @@ ${apiConfig.method ? `Method: ${apiConfig.method}` : ''}
 
 Available variables: ${availableVariables}
 Available pagination variables (if pagination is enabled): page, pageSize, offset, cursor, limit
-Example payload: ${JSON.stringify(payload || {})}
+Example payload: ${JSON.stringify(payload || {}).slice(0, LanguageModel.contextLength / 10)}
 
 Documentation: ${String(documentation)}`;
-
-  if (messages.length === 0) {
     messages.push({
       role: "system",
       content: API_PROMPT
@@ -288,7 +286,7 @@ Documentation: ${String(documentation)}`;
       content: userPrompt
     });
   }
-  const temperature = Math.min(retryCount * 0.2, 1);
+  const temperature = Math.min(retryCount * 0.1, 1);
   const { response: generatedConfig, messages: updatedMessages } = await LanguageModel.generateObject(messages, schema, temperature);
 
   return {
@@ -315,6 +313,10 @@ Documentation: ${String(documentation)}`;
 }
 
 export async function evaluateResponse(data: any, responseSchema: JSONSchema, instruction: string): Promise<{ success: boolean, refactorNeeded: boolean, shortReason: string }> {
+  let content = JSON.stringify(data);
+  if (content.length > LanguageModel.contextLength / 2) {
+    content = JSON.stringify(sample(data, 10)) + "\n\n...truncated...";
+  }
   const request = [
     {
       role: "system",
@@ -328,9 +330,12 @@ If the instruction contains a filter and the response contains data not matching
 If the reponse is valid but hard to comprehend, return { success: true, refactorNeeded: true, shortReason: "The response is valid but hard to comprehend. Please refactor the instruction to make it easier to understand." }.
 E.g. if the response is something like { "data": { "products": [{"id": 1, "name": "Product 1"}, {"id": 2, "name": "Product 2"}] } }, no refactoring is needed.
 If the response reads something like [ "12/2", "22.2", "frejgeiorjgrdelo"] that makes it very hard to parse the required information of the instruction, refactoring is needed. 
+If the response needs to be grouped or sorted or aggregated, this will be handled in a later step, so the appropriate response for you is to return { success: true, refactorNeeded: false, shortReason: "" }.
+Refactoring is NOT needed if the response contains extra fields or needs to be grouped.
+
 Instruction: ${instruction}`
     },
-    { role: "user", content: JSON.stringify(data) }
+    { role: "user", content: content }
   ] as OpenAI.Chat.ChatCompletionMessageParam[];
 
   const response = await LanguageModel.generateObject(

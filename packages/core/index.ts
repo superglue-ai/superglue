@@ -149,8 +149,4 @@ async function startServer() {
   logMessage('info', `🚀 Superglue server ready at http://localhost:${PORT}/ and ws://localhost:${PORT}/`);
 }
 
-// Start the server
-startServer().catch(error => {
-  logMessage('error', 'Failed to start server:', error);
-  process.exit(1);
-});
+startServer();
