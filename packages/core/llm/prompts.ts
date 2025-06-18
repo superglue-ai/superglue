@@ -298,6 +298,7 @@ Output the plan as a JSON object adhering to the specified schema.
 - Choose the appropriate system for each step based on the provided documentation
 - Assign descriptive stepIds in camelCase that indicate the purpose of the step
 - Make absolutely sure that each step can be achieved with a single API call (or a loop of the same call)
+- Aggregation, grouping, sorting, filtering is covered by a separate final transformation and does not need to be added as a dedicated step. However, if the API supports e.g. filtering when retrieving, this should be part of the retrieval step, just do not add an extra one.
 </STEP_CREATION>
 
 <EXECUTION_MODES>
