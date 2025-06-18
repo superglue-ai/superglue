@@ -361,7 +361,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
 
     if (!docResult.links) return docResult.content;
 
-    const rankedLinks: { linkText: string, href: string, priority: number }[] = [];
+    const rankedLinks: { linkText: string, href: string, priority: number; matchCount: number }[] = [];
 
     for (const [linkText, href] of Object.entries(docResult.links)) {
       // Skip obviously non-doc pages
@@ -378,22 +378,32 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
         continue;
       }
 
+      // Count keyword matches
+      let matchCount = 0;
+      const linkTextLower = linkText.toLowerCase();
+      const hrefLower = href.toLowerCase();
+
+      for (const keyword of requiredKeywords) {
+        if (linkTextLower.includes(keyword) || hrefLower.includes(keyword)) {
+          matchCount++;
+        }
+      }
+
       // Priority levels:
       // 0: Required keywords (auth/intro)
       // 1: Everything else
-      let priority = 1;
+      let priority = matchCount > 0 ? 0 : 1;
 
-      // Check for required keywords
-      const hasRequiredKeyword = requiredKeywords.some(keyword =>
-        linkText.toLowerCase().includes(keyword) || href.toLowerCase().includes(keyword)
-      );
-      if (hasRequiredKeyword) priority = 0;
-
-      rankedLinks.push({ linkText, href, priority });
+      rankedLinks.push({ linkText, href, priority, matchCount });
     }
 
-    // Sort by priority (highest first)
-    rankedLinks.sort((a, b) => b.priority - a.priority);
+    // Sort by priority first (highest first), then by match count (highest first)
+    rankedLinks.sort((a, b) => {
+      if (a.priority !== b.priority) {
+        return b.priority - a.priority;
+      }
+      return b.matchCount - a.matchCount;
+    });
 
     // Fetch links up to MAX_FETCHED_LINKS, prioritizing higher priority ones
     for (const link of rankedLinks) {
