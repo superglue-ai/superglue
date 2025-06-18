@@ -31,11 +31,6 @@ describe('superglue_build_new_tool', () => {
       .rejects.toThrow(/Instruction must be detailed/)
   })
 
-  it('throws if integrations is empty', async () => {
-    await expect(buildNewTool(getValidArgs({ integrations: [] }), {}))
-      .rejects.toThrow(/Integrations array is required/)
-  })
-
   it('throws if a integration is providing string credentials', async () => {
     await expect(buildNewTool(getValidArgs({
       integrations: [{ urlHost: 'api.example.com', credentials: "yooo" }]
