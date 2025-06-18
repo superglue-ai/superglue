@@ -1,7 +1,7 @@
 import { useConfig } from '@/src/app/config-context';
 import { IntegrationForm } from '@/src/components/integrations/IntegrationForm';
 import { useToast } from '@/src/hooks/use-toast';
-import { inputErrorStyles, splitUrl } from '@/src/lib/client-utils';
+import { inputErrorStyles, parseCredentialsHelper, splitUrl } from '@/src/lib/client-utils';
 import { findMatchingIntegration, integrations as integrationTemplates, waitForIntegrationsReady } from '@/src/lib/integrations';
 import { cn, composeUrl } from '@/src/lib/utils';
 import { Integration, IntegrationInput, SuperglueClient, Workflow, WorkflowResult } from '@superglue/client';
@@ -409,13 +409,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
           instruction: currentWorkflow.instruction
         },
         payload: JSON.parse(payload || '{}'),
-        credentials: (() => {
-          try {
-            return JSON.parse(reviewCredentials);
-          } catch {
-            return {};
-          }
-        })()
+        credentials: parseCredentialsHelper(reviewCredentials)
       });
       setExecutionResult(result);
       setCurrentWorkflow(result.config);
@@ -559,15 +553,18 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     setShowIntegrationForm(true);
   };
   const handleIntegrationFormSave = async (integration: Integration) => {
+    // Close form immediately
+    setShowIntegrationForm(false);
+    setIntegrationFormEdit(null);
+
+    // Handle background operations
     setLoading(true);
     try {
       await client.upsertIntegration(integration.id, integration);
-      // Wait for docs to be ready
-      await waitForIntegrationsReady([integration.id], client, toast);
+      // Wait for docs to be ready in background
+      waitForIntegrationsReady([integration.id], client, toast);
       const { items } = await client.listIntegrations(100, 0);
       setIntegrations(items);
-      setShowIntegrationForm(false);
-      setIntegrationFormEdit(null);
       setSelectedIntegrationIds(ids => ids.includes(integration.id) ? ids : [...ids, integration.id]);
     } finally {
       setLoading(false);
@@ -829,7 +826,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                   {/* Editable credentials input */}
                   <div className="mb-4">
                     <Label htmlFor="review-credentials">Credentials</Label>
-                    <HelpTooltip text='API keys or tokens needed for this workflow. Enter without any prefix like Bearer. Use advanced mode to add multiple credentials.' />
+                    <HelpTooltip text='API keys or tokens needed for this workflow. Enter without any prefix like Bearer. If you need to add new credentials keys to the JSON, go back and add them to your integrations or add them to the workflow variables.' />
                     <div className="w-full max-w-full">
                       <Input
                         value={reviewCredentials}

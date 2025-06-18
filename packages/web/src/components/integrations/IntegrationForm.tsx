@@ -154,9 +154,23 @@ export function IntegrationForm({
             return;
         }
         setValidationErrors({});
+
+        // Create the integration object
+        const integrationData = {
+            id: isEditing ? integration!.id : id.trim(),
+            urlHost: urlHost.trim(),
+            urlPath: urlPath.trim(),
+            documentationUrl: documentationUrl.trim(),
+            documentation: documentation.trim(),
+            credentials: creds,
+        };
+
+        // Call onSave immediately with the integration
+        onSave(integrationData);
+
+        // Start doc fetching in background
         setIsWaitingForDocs(true);
         try {
-            // If a file was uploaded, just upsert and skip doc fetching
             if (docFileUploaded) {
                 await upsertIntegration();
             } else {
@@ -169,14 +183,6 @@ export function IntegrationForm({
                     triggerDocPoller(integrationId, client);
                 }
             }
-            onSave({
-                id: isEditing ? integration!.id : id.trim(),
-                urlHost: urlHost.trim(),
-                urlPath: urlPath.trim(),
-                documentationUrl: documentationUrl.trim(),
-                documentation: documentation.trim(),
-                credentials: creds,
-            });
         } catch (e: any) {
             toast({
                 title: 'Integration Error',

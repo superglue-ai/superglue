@@ -788,8 +788,8 @@ export async function waitForIntegrationsReady(
   ids: string[],
   client: any,
   toast: any,
-  maxWaitMs = 20000,
-  pollInterval = 1000
+  maxWaitMs = 60000,
+  pollInterval = 4000
 ) {
   const start = Date.now();
   let prevPending: Record<string, boolean> = {};

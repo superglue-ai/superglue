@@ -1,5 +1,6 @@
 import { Metadata } from "@playwright/test";
 import { ExecutionStep, RequestOptions, Workflow, WorkflowResult, WorkflowStepResult } from "@superglue/client";
+import { Context } from "@superglue/shared";
 import { Validator } from "jsonschema";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { logMessage } from "../utils/logs.js";
@@ -42,6 +43,7 @@ export class WorkflowExecutor implements Workflow {
     payload: Record<string, any>,
     credentials: Record<string, string>,
     options?: RequestOptions,
+    context?: Context,
   ): Promise<WorkflowResult> {
     this.result = {
       ...this.result,
@@ -64,7 +66,14 @@ export class WorkflowExecutor implements Workflow {
         try {
           const strategy = selectStrategy(step);
           const stepInputPayload = await this.prepareStepInput(step, payload);
-          stepResult = await strategy.execute(step, stepInputPayload, credentials, options, this.metadata);
+          stepResult = await strategy.execute(
+            step,
+            stepInputPayload,
+            credentials,
+            options,
+            this.metadata,
+            context
+          );
           step.apiConfig = stepResult.config;
         } catch (stepError) {
           stepResult = {

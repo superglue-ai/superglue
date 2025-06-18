@@ -264,7 +264,6 @@ input IntegrationInputRequest @oneOf {
 input IntegrationInput {
   id: ID!
   name: String
-  type: String
   urlHost: String
   urlPath: String
   credentials: JSON
