@@ -1,4 +1,4 @@
-import type { ApiConfig, ExtractConfig, Integration, RunResult, TransformConfig, Workflow } from "@superglue/client";
+import type { ApiConfig, ExtractConfig, RunResult, TransformConfig, Workflow, Integration } from "@superglue/client";
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -21,8 +21,6 @@ export class FileStore implements DataStore {
 
   private filePath: string;
   private logsFilePath: string;
-  private initialized: boolean = false;
-  private initPromise: Promise<void> | null = null;
 
   constructor(storageDir = '/data') {
     this.storage = {
@@ -37,91 +35,61 @@ export class FileStore implements DataStore {
       }
     };
 
-    // Set initial paths synchronously - async check will happen in initialization
-    if (storageDir === '/data') {
-      // We'll check this async during initialization and potentially switch
-      this.filePath = path.join(storageDir, 'superglue_data.json');
-      this.logsFilePath = path.join(storageDir, 'superglue_logs.jsonl');
-    } else {
-      this.filePath = path.join(storageDir, 'superglue_data.json');
-      this.logsFilePath = path.join(storageDir, 'superglue_logs.jsonl');
-    }
-    this.ensureInitialized();
-    logMessage('info', `File Datastore: Initial storage path: ${this.filePath}`);
-  }
-
-  private async ensureInitialized(): Promise<void> {
-    if (this.initialized) return;
-
-    if (!this.initPromise) {
-      this.initPromise = this.initializeStorage();
+    // Check if /data exists synchronously
+    if (storageDir === '/data' && !fs.existsSync('/data')) {
+      logMessage('warn', 'File Datastore: "/data" directory not found, using local ".superglue" directory instead');
+      storageDir = './.superglue';
     }
 
-    await this.initPromise;
+    this.filePath = path.join(storageDir, 'superglue_data.json');
+    this.logsFilePath = path.join(storageDir, 'superglue_logs.jsonl');
+    logMessage('info', `File Datastore: Using storage path: ${this.filePath}`);
+
+    this.initializeStorage();
   }
 
-  private async initializeStorage(): Promise<void> {
+  private async initializeStorage() {
     try {
-      try {
-        await fs.promises.access(path.dirname(this.filePath));
-      } catch {
-        if (this.filePath.startsWith('/data/')) {
-          logMessage('warn', 'File Datastore: "/data" directory not found, switching to local ".superglue" directory');
-          this.filePath = path.join('./.superglue', 'superglue_data.json');
-          this.logsFilePath = path.join('./.superglue', 'superglue_logs.jsonl');
-          logMessage('info', `File Datastore: Updated storage path: ${this.filePath}`);
+      // Ensure the directory exists with proper permissions
+      fs.mkdirSync(path.dirname(this.filePath), { recursive: true, mode: 0o755 });
+      logMessage('info', `File Datastore: Created/verified directory: ${path.dirname(this.filePath)}`);
+
+      const data = fs.readFileSync(this.filePath, 'utf-8');
+      const parsed = JSON.parse(data, (key, value) => {
+        if (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
+          return new Date(value);
         }
-        // Don't exit - just create the directory
-        logMessage('info', `File Datastore: Creating directory: ${path.dirname(this.filePath)}`);
-        await fs.promises.mkdir(path.dirname(this.filePath), { recursive: true, mode: 0o755 });
-        logMessage('info', `File Datastore: Created/verified directory: ${path.dirname(this.filePath)}`);
-      }
-
-      try {
-        const data = await fs.promises.readFile(this.filePath, 'utf-8');
-        const parsed = JSON.parse(data, (key, value) => {
-          if (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
-            return new Date(value);
-          }
-          return value;
-        });
-        this.storage = {
-          ...this.storage,
-          apis: new Map(Object.entries(parsed.apis || {})),
-          extracts: new Map(Object.entries(parsed.extracts || {})),
-          transforms: new Map(Object.entries(parsed.transforms || {})),
-          workflows: new Map(Object.entries(parsed.workflows || {})),
-          integrations: new Map(Object.entries(parsed.integrations || {})),
-          tenant: {
-            email: parsed.tenant?.email || null,
-            emailEntrySkipped: parsed.tenant?.emailEntrySkipped || false
-          }
-        };
-        logMessage('info', 'File Datastore: Successfully loaded existing data');
-      } catch (error) {
-        logMessage('error', 'File Datastore: Error loading data: ' + error);
-        try {
-          await fs.promises.access(this.filePath);
-          logMessage('error', 'COULD NOT LOAD FROM EXISTING FILE. EXITING. ' + error);
-          throw new Error('Could not load from existing file: ' + error);
-        } catch {
-          logMessage('info', 'File Datastore: No existing data found, starting with empty storage');
-          await this.persist();
+        return value;
+      });
+      this.storage = {
+        ...this.storage,
+        apis: new Map(Object.entries(parsed.apis || {})),
+        extracts: new Map(Object.entries(parsed.extracts || {})),
+        transforms: new Map(Object.entries(parsed.transforms || {})),
+        workflows: new Map(Object.entries(parsed.workflows || {})),
+        integrations: new Map(Object.entries(parsed.integrations || {})),
+        tenant: {
+          email: parsed.tenant?.email || null,
+          emailEntrySkipped: parsed.tenant?.emailEntrySkipped || false
         }
-      }
-
-      // Ensure logs file exists
-      try {
-        await fs.promises.access(this.logsFilePath);
-      } catch {
-        await fs.promises.writeFile(this.logsFilePath, '');
-        logMessage('info', 'Logs Datastore: Created empty logs file');
-      }
-
-      this.initialized = true;
+      };
+      logMessage('info', 'File Datastore: Successfully loaded existing data');
     } catch (error) {
-      logMessage('error', 'Failed to initialize storage: ' + error);
-      throw error;
+      logMessage('error', 'File Datastore: Error loading data: ' + error);
+      if (!fs.existsSync(this.filePath)) {
+        logMessage('info', 'File Datastore: No existing data found, starting with empty storage');
+        await this.persist();
+      }
+      else {
+        logMessage('error', 'COULD NOT LOAD FROM EXISTING FILE. EXITING. ' + error);
+        process.exit(1);
+      }
+    }
+
+    // Ensure logs file exists
+    if (!fs.existsSync(this.logsFilePath)) {
+      fs.writeFileSync(this.logsFilePath, '', { mode: 0o644 });
+      logMessage('info', 'Logs Datastore: Created empty logs file');
     }
   }
 
@@ -135,9 +103,9 @@ export class FileStore implements DataStore {
         integrations: Object.fromEntries(this.storage.integrations),
         tenant: this.storage.tenant
       };
-
-      // Write directly to the target file instead of using temp file + rename
-      await fs.promises.writeFile(this.filePath, JSON.stringify(serialized, null, 2), { mode: 0o644 });
+      const tempPath = `${this.filePath}.tmp`;
+      fs.writeFileSync(tempPath, JSON.stringify(serialized, null, 2), { mode: 0o644 });
+      fs.renameSync(tempPath, this.filePath);
     } catch (error) {
       logMessage('error', 'Failed to persist data: ' + error);
       throw error;
@@ -159,38 +127,32 @@ export class FileStore implements DataStore {
     return createHash('md5').update(JSON.stringify(data)).digest('hex');
   }
 
-  // Helper function to read last N lines from file without reading entire file (async version)
-  private async readLastLines(filePath: string, lineCount: number): Promise<string[]> {
-    try {
-      await fs.promises.access(filePath);
-    } catch {
+  // Helper function to read last N lines from file without reading entire file
+  private readLastLines(filePath: string, lineCount: number): string[] {
+    if (!fs.existsSync(filePath)) return [];
+
+    const BUFFER_SIZE = 8192;
+    const fd = fs.openSync(filePath, 'r');
+    const stats = fs.statSync(filePath);
+    let fileSize = stats.size;
+
+    if (fileSize === 0) {
+      fs.closeSync(fd);
       return [];
     }
 
-    const BUFFER_SIZE = 8192;
-    let fileHandle: fs.promises.FileHandle;
+    const lines: string[] = [];
+    let buffer = Buffer.alloc(BUFFER_SIZE);
+    let leftover = '';
+    let position = fileSize;
 
     try {
-      fileHandle = await fs.promises.open(filePath, 'r');
-      const stats = await fileHandle.stat();
-      let fileSize = stats.size;
-
-      if (fileSize === 0) {
-        await fileHandle.close();
-        return [];
-      }
-
-      const lines: string[] = [];
-      let buffer = Buffer.alloc(BUFFER_SIZE);
-      let leftover = '';
-      let position = fileSize;
-
       while (lines.length < lineCount && position > 0) {
         const chunkSize = Math.min(BUFFER_SIZE, position);
         position = Math.max(0, position - chunkSize);
 
-        const result = await fileHandle.read(buffer, 0, chunkSize, position);
-        const chunk = buffer.subarray(0, result.bytesRead).toString('utf-8') + leftover;
+        const bytesRead = fs.readSync(fd, buffer, 0, chunkSize, position);
+        const chunk = buffer.subarray(0, bytesRead).toString('utf-8') + leftover;
 
         const chunkLines = chunk.split('\n');
         leftover = chunkLines.shift() || '';
@@ -208,23 +170,19 @@ export class FileStore implements DataStore {
         lines.unshift(leftover);
       }
 
-      await fileHandle.close();
-      return lines.slice(-lineCount);
-    } catch (error) {
-      if (fileHandle!) {
-        await fileHandle.close();
-      }
-      logMessage('error', 'Failed to read last lines: ' + error);
-      return [];
+    } finally {
+      fs.closeSync(fd);
     }
+
+    return lines.slice(-lineCount);
   }
 
   // Helper function to read runs from logs file
-  private async readRunsFromLogs(orgId?: string, configId?: string, maxRuns?: number): Promise<RunResult[]> {
+  private readRunsFromLogs(orgId?: string, configId?: string, maxRuns?: number): RunResult[] {
     try {
       // Read more lines than needed to account for filtering
       const linesToRead = maxRuns ? maxRuns * 3 : 1000;
-      const lines = await this.readLastLines(this.logsFilePath, linesToRead);
+      const lines = this.readLastLines(this.logsFilePath, linesToRead);
 
       const runs: RunResult[] = [];
 
@@ -257,11 +215,11 @@ export class FileStore implements DataStore {
   }
 
   // Helper function to write run to logs file
-  private async appendRunToLogs(run: RunResult, orgId: string): Promise<void> {
+  private appendRunToLogs(run: RunResult, orgId: string): void {
     try {
       const runWithOrgId = { ...run, orgId };
       const logLine = JSON.stringify(runWithOrgId) + '\n';
-      await fs.promises.appendFile(this.logsFilePath, logLine, { mode: 0o644 });
+      fs.appendFileSync(this.logsFilePath, logLine, { mode: 0o644 });
     } catch (error) {
       logMessage('error', 'Failed to append run to logs: ' + error);
       throw error;
@@ -269,15 +227,13 @@ export class FileStore implements DataStore {
   }
 
   // Helper function to remove run from logs file
-  private async removeRunFromLogs(id: string, orgId?: string): Promise<boolean> {
+  private removeRunFromLogs(id: string, orgId?: string): boolean {
     try {
-      try {
-        await fs.promises.access(this.logsFilePath);
-      } catch {
+      if (!fs.existsSync(this.logsFilePath)) {
         return false;
       }
 
-      const content = await fs.promises.readFile(this.logsFilePath, 'utf-8');
+      const content = fs.readFileSync(this.logsFilePath, 'utf-8');
       if (!content.trim()) {
         return false;
       }
@@ -302,7 +258,7 @@ export class FileStore implements DataStore {
 
       if (found) {
         const newContent = filteredLines.length > 0 ? filteredLines.join('\n') + '\n' : '';
-        await fs.promises.writeFile(this.logsFilePath, newContent, { mode: 0o644 });
+        fs.writeFileSync(this.logsFilePath, newContent, { mode: 0o644 });
       }
 
       return found;
@@ -314,7 +270,6 @@ export class FileStore implements DataStore {
 
   // API Config Methods
   async getApiConfig(id: string, orgId: string): Promise<ApiConfig | null> {
-    await this.ensureInitialized();
     if (!id) return null;
     const key = this.getKey('api', id, orgId);
     const config = this.storage.apis.get(key);
@@ -322,7 +277,6 @@ export class FileStore implements DataStore {
   }
 
   async listApiConfigs(limit = 10, offset = 0, orgId?: string): Promise<{ items: ApiConfig[], total: number }> {
-    await this.ensureInitialized();
     const orgItems = this.getOrgItems(this.storage.apis, 'api', orgId);
     const items = orgItems
       .slice(offset, offset + limit);
@@ -331,7 +285,6 @@ export class FileStore implements DataStore {
   }
 
   async upsertApiConfig(id: string, config: ApiConfig, orgId?: string): Promise<ApiConfig> {
-    await this.ensureInitialized();
     if (!id || !config) return null;
     const key = this.getKey('api', id, orgId);
     this.storage.apis.set(key, config);
@@ -340,7 +293,6 @@ export class FileStore implements DataStore {
   }
 
   async deleteApiConfig(id: string, orgId: string): Promise<boolean> {
-    await this.ensureInitialized();
     if (!id) return false;
     const key = this.getKey('api', id, orgId);
     const deleted = this.storage.apis.delete(key);
@@ -350,7 +302,6 @@ export class FileStore implements DataStore {
 
   // Extract Config Methods
   async getExtractConfig(id: string, orgId: string): Promise<ExtractConfig | null> {
-    await this.ensureInitialized();
     if (!id) return null;
     const key = this.getKey('extract', id, orgId);
     const config = this.storage.extracts.get(key);
@@ -358,7 +309,6 @@ export class FileStore implements DataStore {
   }
 
   async listExtractConfigs(limit = 10, offset = 0, orgId?: string): Promise<{ items: ExtractConfig[], total: number }> {
-    await this.ensureInitialized();
     const items = this.getOrgItems(this.storage.extracts, 'extract', orgId)
       .slice(offset, offset + limit);
     const total = this.getOrgItems(this.storage.extracts, 'extract', orgId).length;
@@ -366,7 +316,6 @@ export class FileStore implements DataStore {
   }
 
   async upsertExtractConfig(id: string, config: ExtractConfig, orgId: string): Promise<ExtractConfig> {
-    await this.ensureInitialized();
     if (!id || !config) return null;
     const key = this.getKey('extract', id, orgId);
     this.storage.extracts.set(key, config);
@@ -375,7 +324,6 @@ export class FileStore implements DataStore {
   }
 
   async deleteExtractConfig(id: string, orgId: string): Promise<boolean> {
-    await this.ensureInitialized();
     if (!id) return false;
     const key = this.getKey('extract', id, orgId);
     const deleted = this.storage.extracts.delete(key);
@@ -383,9 +331,8 @@ export class FileStore implements DataStore {
     return deleted;
   }
 
-  // Transform Config Methods  
+  // Transform Config Methods
   async getTransformConfig(id: string, orgId: string): Promise<TransformConfig | null> {
-    await this.ensureInitialized();
     if (!id) return null;
     const key = this.getKey('transform', id, orgId);
     const config = this.storage.transforms.get(key);
@@ -393,7 +340,6 @@ export class FileStore implements DataStore {
   }
 
   async listTransformConfigs(limit = 10, offset = 0, orgId?: string): Promise<{ items: TransformConfig[], total: number }> {
-    await this.ensureInitialized();
     const items = this.getOrgItems(this.storage.transforms, 'transform', orgId)
       .slice(offset, offset + limit);
     const total = this.getOrgItems(this.storage.transforms, 'transform', orgId).length;
@@ -401,7 +347,6 @@ export class FileStore implements DataStore {
   }
 
   async upsertTransformConfig(id: string, config: TransformConfig, orgId: string): Promise<TransformConfig> {
-    await this.ensureInitialized();
     if (!id || !config) return null;
     const key = this.getKey('transform', id, orgId);
     this.storage.transforms.set(key, config);
@@ -410,7 +355,6 @@ export class FileStore implements DataStore {
   }
 
   async deleteTransformConfig(id: string, orgId: string): Promise<boolean> {
-    await this.ensureInitialized();
     if (!id) return false;
     const key = this.getKey('transform', id, orgId);
     const deleted = this.storage.transforms.delete(key);
@@ -420,10 +364,9 @@ export class FileStore implements DataStore {
 
   // Run Result Methods
   async getRun(id: string, orgId: string): Promise<RunResult | null> {
-    await this.ensureInitialized();
     if (!id) return null;
 
-    const runs = await this.readRunsFromLogs(orgId);
+    const runs = this.readRunsFromLogs(orgId);
     const run = runs.find(r => r.id === id);
     if (!run) return null;
     if ((run as any).orgId) delete (run as any).orgId;
@@ -431,20 +374,18 @@ export class FileStore implements DataStore {
   }
 
   async createRun(run: RunResult, orgId: string): Promise<RunResult> {
-    await this.ensureInitialized();
     if (!run) return null;
 
     // Only log runs if disable_logs environment variable is not set
     if (String(process.env.DISABLE_LOGS).toLowerCase() !== 'true') {
-      await this.appendRunToLogs(run, orgId);
+      this.appendRunToLogs(run, orgId);
     }
 
     return run;
   }
 
   async listRuns(limit = 10, offset = 0, configId?: string, orgId?: string): Promise<{ items: RunResult[], total: number }> {
-    await this.ensureInitialized();
-    const allRuns = await this.readRunsFromLogs(orgId, configId);
+    const allRuns = this.readRunsFromLogs(orgId, configId);
     const items = allRuns.slice(offset, offset + limit).map(run => {
       if ((run as any).orgId) delete (run as any).orgId;
       return run;
@@ -453,21 +394,17 @@ export class FileStore implements DataStore {
   }
 
   async deleteRun(id: string, orgId: string): Promise<boolean> {
-    await this.ensureInitialized();
     if (!id) return false;
     return this.removeRunFromLogs(id, orgId);
   }
 
   async deleteAllRuns(orgId: string): Promise<boolean> {
-    await this.ensureInitialized();
     try {
-      try {
-        await fs.promises.access(this.logsFilePath);
-      } catch {
+      if (!fs.existsSync(this.logsFilePath)) {
         return true;
       }
 
-      const content = await fs.promises.readFile(this.logsFilePath, 'utf-8');
+      const content = fs.readFileSync(this.logsFilePath, 'utf-8');
       if (!content.trim()) {
         return true;
       }
@@ -488,7 +425,7 @@ export class FileStore implements DataStore {
       }
 
       const newContent = filteredLines.length > 0 ? filteredLines.join('\n') + '\n' : '';
-      await fs.promises.writeFile(this.logsFilePath, newContent, { mode: 0o644 });
+      fs.writeFileSync(this.logsFilePath, newContent, { mode: 0o644 });
       return true;
     } catch (error) {
       logMessage('error', 'Failed to delete all runs: ' + error);
@@ -497,7 +434,6 @@ export class FileStore implements DataStore {
   }
 
   async clearAll(): Promise<void> {
-    await this.ensureInitialized();
     this.storage.apis.clear();
     this.storage.extracts.clear();
     this.storage.transforms.clear();
@@ -507,29 +443,25 @@ export class FileStore implements DataStore {
 
     // Clear logs file
     try {
-      await fs.promises.writeFile(this.logsFilePath, '', { mode: 0o644 });
+      fs.writeFileSync(this.logsFilePath, '', { mode: 0o644 });
     } catch (error) {
       logMessage('error', 'Failed to clear logs file: ' + error);
     }
   }
 
   async disconnect(): Promise<void> {
-    await this.ensureInitialized();
     await this.persist();
   }
 
   async ping(): Promise<boolean> {
-    await this.ensureInitialized();
     return true;
   }
 
   async getTenantInfo(): Promise<{ email: string | null; emailEntrySkipped: boolean }> {
-    await this.ensureInitialized();
     return this.storage.tenant;
   }
 
   async setTenantInfo(email?: string, emailEntrySkipped?: boolean): Promise<void> {
-    await this.ensureInitialized();
     const currentInfo = this.storage.tenant;
     this.storage.tenant = {
       email: email !== undefined ? email : currentInfo.email,
@@ -540,7 +472,6 @@ export class FileStore implements DataStore {
 
   // Workflow Methods
   async getWorkflow(id: string, orgId?: string): Promise<Workflow | null> {
-    await this.ensureInitialized();
     if (!id) return null;
     const key = this.getKey('workflow', id, orgId);
     const workflow = this.storage.workflows.get(key);
@@ -548,7 +479,6 @@ export class FileStore implements DataStore {
   }
 
   async listWorkflows(limit = 10, offset = 0, orgId?: string): Promise<{ items: Workflow[], total: number }> {
-    await this.ensureInitialized();
     const items = this.getOrgItems(this.storage.workflows, 'workflow', orgId)
       .slice(offset, offset + limit);
     const total = this.getOrgItems(this.storage.workflows, 'workflow', orgId).length;
@@ -556,7 +486,6 @@ export class FileStore implements DataStore {
   }
 
   async upsertWorkflow(id: string, workflow: Workflow, orgId?: string): Promise<Workflow> {
-    await this.ensureInitialized();
     if (!id || !workflow) return null;
     const key = this.getKey('workflow', id, orgId);
     this.storage.workflows.set(key, workflow);
@@ -565,7 +494,6 @@ export class FileStore implements DataStore {
   }
 
   async deleteWorkflow(id: string, orgId?: string): Promise<boolean> {
-    await this.ensureInitialized();
     if (!id) return false;
     const key = this.getKey('workflow', id, orgId);
     const deleted = this.storage.workflows.delete(key);
@@ -575,7 +503,6 @@ export class FileStore implements DataStore {
 
   // Integration Methods
   async getIntegration(id: string, orgId?: string): Promise<Integration | null> {
-    await this.ensureInitialized();
     if (!id) return null;
     const key = this.getKey('integration', id, orgId);
     const integration = this.storage.integrations.get(key);
@@ -583,7 +510,6 @@ export class FileStore implements DataStore {
   }
 
   async listIntegrations(limit = 10, offset = 0, orgId?: string): Promise<{ items: Integration[], total: number }> {
-    await this.ensureInitialized();
     const orgItems = this.getOrgItems(this.storage.integrations, 'integration', orgId);
     const items = orgItems.slice(offset, offset + limit);
     const total = orgItems.length;
@@ -591,7 +517,6 @@ export class FileStore implements DataStore {
   }
 
   async upsertIntegration(id: string, integration: Integration, orgId?: string): Promise<Integration> {
-    await this.ensureInitialized();
     if (!id || !integration) return null;
     const key = this.getKey('integration', id, orgId);
     this.storage.integrations.set(key, integration);
@@ -600,7 +525,6 @@ export class FileStore implements DataStore {
   }
 
   async deleteIntegration(id: string, orgId?: string): Promise<boolean> {
-    await this.ensureInitialized();
     if (!id) return false;
     const key = this.getKey('integration', id, orgId);
     const deleted = this.storage.integrations.delete(key);
