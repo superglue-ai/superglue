@@ -66,7 +66,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const router = useRouter();
   const superglueConfig = useConfig();
 
-  const { integrations, pendingDocIds, loading, refreshIntegrations, setPendingDocIds } = useIntegrations();
+  const { integrations, pendingDocIds, loading, setPendingDocIds, refreshIntegrations } = useIntegrations();
 
   const [instruction, setInstruction] = useState('');
   const [payload, setPayload] = useState('{}');
@@ -172,7 +172,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     }
 
     // For URL-based docs, check if not pending and has URL
-    if (integration.documentationUrl && !pendingDocIds.has(integration.id) && !integration.documentationPending) {
+    if (integration.documentationUrl && !pendingDocIds.has(integration.id)) {
       return true;
     }
 
@@ -262,12 +262,24 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         waitForIntegrationReady([integration.id], 60000).then(() => {
           // Remove from pending when done
           setPendingDocIds(prev => new Set([...prev].filter(id => id !== integration.id)));
-        }).catch(console.error);
+        }).catch((error) => {
+          console.error('Error waiting for docs:', error);
+          // Remove from pending on error
+          setPendingDocIds(prev => new Set([...prev].filter(id => id !== integration.id)));
+        });
       }
 
       setSelectedIntegrationIds(ids => ids.includes(integration.id) ? ids : [...ids, integration.id]);
+
+      // Refresh integrations to ensure UI is updated
+      await refreshIntegrations();
     } catch (error) {
       console.error('Error saving integration:', error);
+      toast({
+        title: 'Error Saving Integration',
+        description: error instanceof Error ? error.message : 'Failed to save integration',
+        variant: 'destructive',
+      });
     }
   };
   const handleIntegrationFormCancel = () => {
@@ -289,6 +301,18 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         });
         return;
       }
+
+      // Check if any selected integrations are still pending
+      const pendingSelectedIds = selectedIntegrationIds.filter(id => pendingDocIds.has(id));
+      if (pendingSelectedIds.length > 0) {
+        toast({
+          title: 'Documentation Still Processing',
+          description: `Please wait for documentation to finish processing for: ${pendingSelectedIds.join(', ')}`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
       setIsGeneratingSuggestions(true);
       try {
         await handleGenerateInstructions();
@@ -314,10 +338,19 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       }
       setIsBuilding(true);
       try {
+        // Check if any selected integrations are still pending locally
+        const pendingSelectedIds = selectedIntegrationIds.filter(id => pendingDocIds.has(id));
+        if (pendingSelectedIds.length > 0) {
+          toast({
+            title: 'Documentation Still Processing',
+            description: `Please wait for documentation to finish processing for: ${pendingSelectedIds.join(', ')}`,
+            variant: 'destructive',
+          });
+          return;
+        }
+
         // Wait for docs to be ready
         await waitForIntegrationReady(selectedIntegrationIds, 60000);
-        // Refresh integrations list to ensure up-to-date docs
-        await refreshIntegrations();
         const freshIntegrations = integrations; // Use the updated integrations from context
         const schema = await client.generateSchema(instruction, "");
         setSchema(JSON.stringify(schema, null, 2));
@@ -1078,7 +1111,8 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
               isBuilding ||
               isSaving ||
               isGeneratingSuggestions ||
-              (step === 'integrations' && integrations.length === 0)
+              (step === 'integrations' && integrations.length === 0) ||
+              (step === 'integrations' && selectedIntegrationIds.some(id => pendingDocIds.has(id)))
             }
           >
             {isBuilding ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Building...</> :

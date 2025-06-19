@@ -73,14 +73,20 @@ export default function IntegrationsPage() {
 
     const inputErrorStyles = "border-destructive focus-visible:ring-destructive";
 
-    const [loading, setLoading] = useState(false);
-    const [showIntegrationForm, setShowIntegrationForm] = useState(false);
-
     const handleDelete = async (id: string) => {
-        // Optimistically remove from UI
-        await client.deleteIntegration(id);
-        // Refresh to ensure consistency
-        await refreshIntegrations();
+        try {
+            // Optimistically remove from UI
+            await client.deleteIntegration(id);
+            // Refresh to ensure consistency
+            await refreshIntegrations();
+        } catch (error) {
+            console.error('Error deleting integration:', error);
+            toast({
+                title: 'Error Deleting Integration',
+                description: error instanceof Error ? error.message : 'Failed to delete integration',
+                variant: 'destructive',
+            });
+        }
     };
 
     const handleEdit = (integration: Integration) => {
@@ -96,28 +102,45 @@ export default function IntegrationsPage() {
         setEditingIntegration(null);
     };
     const handleSave = async (integration: Integration) => {
-        if (integration.id) {
-            await client.upsertIntegration(integration.id, integration);
+        try {
+            if (integration.id) {
+                await client.upsertIntegration(integration.id, integration);
 
-            // Only trigger doc polling if there's a documentation URL (not raw text)
-            const hasDocUrl = integration.documentationUrl && integration.documentationUrl.trim();
-            const needsDocFetch = hasDocUrl && (!editingIntegration ||
-                editingIntegration.urlHost !== integration.urlHost ||
-                editingIntegration.urlPath !== integration.urlPath ||
-                editingIntegration.documentationUrl !== integration.documentationUrl);
+                // Only trigger doc polling if there's a documentation URL (not raw text)
+                const hasDocUrl = integration.documentationUrl && integration.documentationUrl.trim();
+                const needsDocFetch = hasDocUrl && (!editingIntegration ||
+                    editingIntegration.urlHost !== integration.urlHost ||
+                    editingIntegration.urlPath !== integration.urlPath ||
+                    editingIntegration.documentationUrl !== integration.documentationUrl);
 
-            if (needsDocFetch) {
-                // Set pending state for new integrations with doc URLs
-                setPendingDocIds(prev => new Set([...prev, integration.id]));
+                if (needsDocFetch) {
+                    // Set pending state for new integrations with doc URLs
+                    setPendingDocIds(prev => new Set([...prev, integration.id]));
 
-                // Fire-and-forget poller for background doc fetch
-                waitForIntegrationReady([integration.id], 60000).then(() => {
-                    // Remove from pending when done
-                    setPendingDocIds(prev => new Set([...prev].filter(id => id !== integration.id)));
-                }).catch(console.error);
+                    // Fire-and-forget poller for background doc fetch
+                    waitForIntegrationReady([integration.id], 60000).then(() => {
+                        // Remove from pending when done
+                        setPendingDocIds(prev => new Set([...prev].filter(id => id !== integration.id)));
+                    }).catch((error) => {
+                        console.error('Error waiting for docs:', error);
+                        // Remove from pending on error
+                        setPendingDocIds(prev => new Set([...prev].filter(id => id !== integration.id)));
+                    });
+                }
+
+                // Refresh integrations to ensure UI is updated
+                await refreshIntegrations();
             }
+        } catch (error) {
+            console.error('Error saving integration:', error);
+            toast({
+                title: 'Error Saving Integration',
+                description: error instanceof Error ? error.message : 'Failed to save integration',
+                variant: 'destructive',
+            });
+        } finally {
+            handleModalClose();
         }
-        handleModalClose();
     };
 
     // Function to refresh documentation for a specific integration
