@@ -107,6 +107,37 @@ export default function IntegrationsPage() {
         previousPendingIdsRef.current = currentPendingIds;
     }, [pendingIds, integrations, toast]);
 
+    // Function to wait for integration docs to be ready (one-time polling)
+    const waitForIntegrationReady = async (integrationId: string, timeoutMs = 60000) => {
+        const start = Date.now();
+        let activeIds = [integrationId];
+
+        while (Date.now() - start < timeoutMs && activeIds.length > 0) {
+            let settled = await Promise.allSettled(
+                activeIds.map(async (id) => {
+                    try {
+                        return await client.getIntegration(id);
+                    } catch (e) {
+                        return null;
+                    }
+                })
+            );
+            settled = settled.filter(r => r !== null);
+            const results = settled.map(r => r.status === 'fulfilled' ? r.value : null);
+
+            // Remove deleted integrations from polling
+            activeIds = activeIds.filter((id, idx) => results[idx] !== null);
+
+            // Check if any integration is still pending
+            const notReady = results.find(i => i && (i.documentationPending === true || !i.documentation));
+            if (!notReady) return results.filter(Boolean);
+
+            await new Promise(res => setTimeout(res, 4000));
+        }
+
+        return [];
+    };
+
     // Function to refresh documentation for a specific integration
     const handleRefreshDocs = async (integrationId: string) => {
         try {
@@ -210,10 +241,8 @@ export default function IntegrationsPage() {
                 editingIntegration.documentationUrl !== integration.documentationUrl);
 
             if (needsDocFetch) {
-                // Import the polling function
-                const { waitForIntegrationsReady } = await import('@/src/lib/integrations');
                 // Fire-and-forget poller for background doc fetch
-                waitForIntegrationsReady([integration.id], client, null, 60000);
+                waitForIntegrationReady(integration.id, 60000).catch(console.error);
             }
 
             // Refresh the integrations list to get updated data including documentation

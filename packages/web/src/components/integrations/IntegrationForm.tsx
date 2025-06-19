@@ -10,7 +10,6 @@ import { DocumentationField } from '@/src/components/utils/DocumentationField';
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import { URLField } from '@/src/components/utils/URLField';
 import { useToast } from '@/src/hooks/use-toast';
-import { waitForIntegrationsReady } from '@/src/lib/integrations';
 import { cn, composeUrl } from '@/src/lib/utils';
 import type { Integration } from '@superglue/client';
 import { SuperglueClient } from '@superglue/client';
@@ -142,10 +141,46 @@ export function IntegrationForm({
         return { client, integrationId };
     };
 
+    // Function to wait for integration docs to be ready (one-time polling)
+    const waitForIntegrationReady = async (integrationId: string, timeoutMs = 60000) => {
+        const client = new SuperglueClient({
+            endpoint: config.superglueEndpoint,
+            apiKey: config.superglueApiKey,
+        });
+
+        const start = Date.now();
+        let activeIds = [integrationId];
+
+        while (Date.now() - start < timeoutMs && activeIds.length > 0) {
+            let settled = await Promise.allSettled(
+                activeIds.map(async (id) => {
+                    try {
+                        return await client.getIntegration(id);
+                    } catch (e) {
+                        return null;
+                    }
+                })
+            );
+            settled = settled.filter(r => r !== null);
+            const results = settled.map(r => r.status === 'fulfilled' ? r.value : null);
+
+            // Remove deleted integrations from polling
+            activeIds = activeIds.filter((id, idx) => results[idx] !== null);
+
+            // Check if any integration is still pending
+            const notReady = results.find(i => i && (i.documentationPending === true || !i.documentation));
+            if (!notReady) return results.filter(Boolean);
+
+            await new Promise(res => setTimeout(res, 4000));
+        }
+
+        return [];
+    };
+
     // Fire-and-forget poller for background doc fetch, no toast needed since UI shows spinner
     const triggerDocPoller = (integrationId: string, client: any) => {
         // Poller is safe and never throws - UI will show spinner in integrations list
-        waitForIntegrationsReady([integrationId], client, null, 60000);
+        waitForIntegrationReady(integrationId, 60000);
     };
 
     const handleSubmit = async () => {
