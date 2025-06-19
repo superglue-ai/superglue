@@ -1,4 +1,5 @@
 import { useConfig } from '@/src/app/config-context';
+import { useIntegrations } from '@/src/app/integrations-context';
 import { IntegrationForm } from '@/src/components/integrations/IntegrationForm';
 import { useIntegrationPolling } from '@/src/hooks/use-integration-polling';
 import { useToast } from '@/src/hooks/use-toast';
@@ -65,7 +66,8 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const router = useRouter();
   const superglueConfig = useConfig();
 
-  const [integrations, setIntegrations] = useState<Integration[]>([]);
+  const { integrations, pendingDocIds, loading, refreshIntegrations, setPendingDocIds } = useIntegrations();
+
   const [instruction, setInstruction] = useState('');
   const [payload, setPayload] = useState('{}');
   const [currentWorkflow, setCurrentWorkflow] = useState<Workflow | null>(null); // To store result from buildWorkflow
@@ -90,8 +92,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
 
   const [selectedIntegrationIds, setSelectedIntegrationIds] = useState<string[]>([]);
 
-  const [loading, setLoading] = useState(false);
-
   const [integrationSearch, setIntegrationSearch] = useState('');
   const [showIntegrationForm, setShowIntegrationForm] = useState(false);
   const [integrationFormEdit, setIntegrationFormEdit] = useState<Integration | null>(null);
@@ -103,43 +103,10 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     apiKey: superglueConfig.superglueApiKey,
   }), [superglueConfig.superglueEndpoint, superglueConfig.superglueApiKey]);
 
-  // Get integration IDs for polling
-  const integrationIds = useMemo(() => integrations.map(i => i.id), [integrations]);
+  const { waitForIntegrationReady } = useIntegrationPolling(client);
 
   // Track previous pending IDs to detect completion
   const previousPendingIdsRef = useRef<Set<string>>(new Set());
-
-  // Poll for documentation status
-  const { pendingIds, isPolling, hasPending } = useIntegrationPolling({
-    client,
-    integrationIds,
-    enabled: integrations.length > 0
-  });
-
-  // Detect when documentation processing completes and show toast
-  useEffect(() => {
-    const currentPendingIds = new Set(pendingIds);
-    const previousPendingIds = previousPendingIdsRef.current;
-
-    // Find integrations that were pending before but are no longer pending
-    const completedIds = Array.from(previousPendingIds).filter(id => !currentPendingIds.has(id));
-
-    if (completedIds.length > 0) {
-      completedIds.forEach(id => {
-        const integration = integrations.find(i => i.id === id);
-        if (integration) {
-          toast({
-            title: 'Documentation Ready',
-            description: `Documentation for integration "${integration.id}" is now ready!`,
-            variant: 'default',
-          });
-        }
-      });
-    }
-
-    // Update the ref for next comparison
-    previousPendingIdsRef.current = currentPendingIds;
-  }, [pendingIds, integrations, toast]);
 
   // Create integration options array with custom option first
   const integrationOptions = [
@@ -151,69 +118,12 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     }))
   ];
 
-  // Function to wait for integration docs to be ready (one-time polling)
-  const waitForIntegrationReady = async (integrationIds: string[], timeoutMs = 60000) => {
-    const start = Date.now();
-    let activeIds = [...integrationIds];
-
-    while (Date.now() - start < timeoutMs && activeIds.length > 0) {
-      let settled = await Promise.allSettled(
-        activeIds.map(async (id) => {
-          try {
-            return await client.getIntegration(id);
-          } catch (e) {
-            return null;
-          }
-        })
-      );
-      settled = settled.filter(r => r !== null);
-      const results = settled.map(r => r.status === 'fulfilled' ? r.value : null);
-
-      // Remove deleted integrations from polling
-      activeIds = activeIds.filter((id, idx) => results[idx] !== null);
-
-      // Check if any integration is still pending
-      const notReady = results.find(i => i && (i.documentationPending === true || !i.documentation));
-      if (!notReady) return results.filter(Boolean);
-
-      await new Promise(res => setTimeout(res, 4000));
-    }
-
-    return [];
-  };
-
-  // Helper function to get SimpleIcon
-  const getSimpleIcon = (name: string): SimpleIcon | null => {
-    if (!name || name === "default") return null;
-
-    // Convert service name to proper format for simple-icons
-    const formatted = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
-    const iconKey = `si${formatted}`;
-    try {
-      // Try the direct lookup
-      // @ts-ignore - The type definitions don't properly handle string indexing
-      let icon = simpleIcons[iconKey];
-      return icon || null;
-    } catch (e) {
-      return null;
-    }
-  };
-
   // Auto-open integration form when no integrations exist and we're on the integrations step
   useEffect(() => {
-    let ignore = false;
-    setLoading(true);
-    client.listIntegrations(100, 0)
-      .then(({ items }) => {
-        if (ignore) return;
-        setIntegrations(items);
-        if (items.length === 0) setShowIntegrationForm(true);
-      })
-      .finally(() => {
-        if (!ignore) setLoading(false);
-      });
-    return () => { ignore = true; };
-  }, [client]);
+    if (integrations.length === 0) {
+      setShowIntegrationForm(true);
+    }
+  }, [integrations.length]);
 
   // Add this helper function near the top of the component
   const highlightJson = (code: string) => {
@@ -256,12 +166,13 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     const hasDirectDocs = !!(integration.documentation || integration.documentationUrl);
 
     // For direct doc upload scenarios, if there's documentation content, consider it available
+    // even if documentationPending might be true (since it's already uploaded)
     if (integration.documentation && integration.documentation.trim()) {
       return true;
     }
 
-    // For URL-based docs, check if has URL
-    if (integration.documentationUrl) {
+    // For URL-based docs, check if not pending and has URL
+    if (integration.documentationUrl && !pendingDocIds.has(integration.id) && !integration.documentationPending) {
       return true;
     }
 
@@ -270,31 +181,64 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
 
   // Function to refresh documentation for a specific integration
   const handleRefreshDocs = async (integrationId: string) => {
+    // Set pending state immediately
+    setPendingDocIds(prev => new Set([...prev, integrationId]));
+
     try {
+      // Get current integration to upsert with documentationPending=true
       const integration = integrations.find(i => i.id === integrationId);
       if (!integration) return;
 
-      // Trigger manual documentation refresh by upserting with only required fields
-      // Don't pass existing documentation to avoid large payloads
-      // Note: documentationPending is set by the backend, not the client
-      await client.upsertIntegration(integrationId, {
+      // Use documentationPending flag to trigger backend refresh
+      const upsertData = {
         id: integration.id,
         urlHost: integration.urlHost,
         urlPath: integration.urlPath,
         documentationUrl: integration.documentationUrl,
         credentials: integration.credentials || {},
-      });
+        documentation: integration.documentation || '', // Keep existing docs
+        documentationPending: true // Trigger refresh
+      };
 
-      // Refresh the integrations list to update doc status
-      const { items } = await client.listIntegrations(100, 0);
-      setIntegrations(items);
+      await client.upsertIntegration(integrationId, upsertData);
+
+      // Use proper polling to wait for docs to be ready
+      const results = await waitForIntegrationReady([integrationId], 60000);
+
+      if (results.length > 0 && results[0]?.documentation) {
+        // Success - docs are ready
+        setPendingDocIds(prev => new Set([...prev].filter(id => id !== integrationId)));
+      } else {
+        // Polling failed - reset documentationPending to false
+        await client.upsertIntegration(integrationId, {
+          ...upsertData,
+          documentationPending: false
+        });
+
+        setPendingDocIds(prev => new Set([...prev].filter(id => id !== integrationId)));
+      }
+
     } catch (error) {
       console.error('Error refreshing docs:', error);
-      toast({
-        title: 'Error Refreshing Docs',
-        description: 'Failed to refresh documentation. Please try again.',
-        variant: 'destructive',
-      });
+      // Reset documentationPending to false on error
+      try {
+        const integration = integrations.find(i => i.id === integrationId);
+        if (integration) {
+          await client.upsertIntegration(integrationId, {
+            id: integration.id,
+            urlHost: integration.urlHost,
+            urlPath: integration.urlPath,
+            documentationUrl: integration.documentationUrl,
+            credentials: integration.credentials || {},
+            documentation: integration.documentation || '',
+            documentationPending: false
+          });
+        }
+      } catch (resetError) {
+        console.error('Error resetting documentationPending:', resetError);
+      }
+
+      setPendingDocIds(prev => new Set([...prev].filter(id => id !== integrationId)));
     }
   };
 
@@ -305,17 +249,25 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     setIntegrationFormEdit(null);
 
     // Handle background operations
-    setLoading(true);
     try {
       await client.upsertIntegration(integration.id, integration);
-      // Wait for docs to be ready in background - no toast needed since UI shows spinner
-      waitForIntegrationReady([integration.id], 60000);
-      // Refresh integrations list to get updated data including documentation
-      const { items } = await client.listIntegrations(100, 0);
-      setIntegrations(items);
+
+      // Check if this integration needs doc fetching
+      const hasDocUrl = integration.documentationUrl && integration.documentationUrl.trim();
+      if (hasDocUrl) {
+        // Set pending state for new integrations with doc URLs
+        setPendingDocIds(prev => new Set([...prev, integration.id]));
+
+        // Wait for docs to be ready in background - no toast needed since UI shows spinner
+        waitForIntegrationReady([integration.id], 60000).then(() => {
+          // Remove from pending when done
+          setPendingDocIds(prev => new Set([...prev].filter(id => id !== integration.id)));
+        }).catch(console.error);
+      }
+
       setSelectedIntegrationIds(ids => ids.includes(integration.id) ? ids : [...ids, integration.id]);
-    } finally {
-      setLoading(false);
+    } catch (error) {
+      console.error('Error saving integration:', error);
     }
   };
   const handleIntegrationFormCancel = () => {
@@ -365,8 +317,8 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         // Wait for docs to be ready
         await waitForIntegrationReady(selectedIntegrationIds, 60000);
         // Refresh integrations list to ensure up-to-date docs
-        const { items: freshIntegrations } = await client.listIntegrations(100, 0);
-        setIntegrations(freshIntegrations);
+        await refreshIntegrations();
+        const freshIntegrations = integrations; // Use the updated integrations from context
         const schema = await client.generateSchema(instruction, "");
         setSchema(JSON.stringify(schema, null, 2));
         const parsedPayload = JSON.parse(payload || '{}');
@@ -594,6 +546,23 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     }
   };
 
+  // Helper function to get SimpleIcon
+  const getSimpleIcon = (name: string): SimpleIcon | null => {
+    if (!name || name === "default") return null;
+
+    // Convert service name to proper format for simple-icons
+    const formatted = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+    const iconKey = `si${formatted}`;
+    try {
+      // Try the direct lookup
+      // @ts-ignore - The type definitions don't properly handle string indexing
+      let icon = simpleIcons[iconKey];
+      return icon || null;
+    } catch (e) {
+      return null;
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col h-full p-6">
       {/* Header */}
@@ -608,7 +577,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
             <Button
               variant="outline"
               className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-200/50 hover:border-blue-300/50 text-blue-600 hover:text-blue-700 text-sm px-4 py-1 h-8 rounded-full animate-pulse shrink-0"
-              onClick={() => window.open('https://cal.com/superglue/onboarding', '_blank')}
+              onClick={() => window.open('https://cal.com/supergle/onboarding', '_blank')}
             >
               ✨ Get help from our team
             </Button>
@@ -703,7 +672,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                             <div className="flex flex-col items-center gap-2">
                               <div className="flex items-center gap-2">
                                 <DocStatus
-                                  pending={pendingIds.includes(sys.id)}
+                                  pending={pendingDocIds.has(sys.id)}
                                   hasDocumentation={hasDocumentation(sys)}
                                 />
                                 {(!sys.credentials || Object.keys(sys.credentials).length === 0) && (
@@ -716,8 +685,14 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                              onClick={e => { e.stopPropagation(); setIntegrationFormEdit(sys); }}
+                              className="h-8 w-8 text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+                              onClick={e => {
+                                e.stopPropagation();
+                                setIntegrationFormEdit(sys);
+                                setShowIntegrationForm(true);
+                              }}
+                              disabled={pendingDocIds.has(sys.id)}
+                              title={pendingDocIds.has(sys.id) ? "Documentation is being processed" : "Edit integration"}
                             >
                               <Pencil className="h-4 w-4" />
                             </Button>
@@ -726,7 +701,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                               size="icon"
                               className="h-8 w-8 text-muted-foreground hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
                               onClick={e => { e.stopPropagation(); handleRefreshDocs(sys.id); }}
-                              disabled={!sys.documentationUrl || !sys.documentationUrl.trim() || pendingIds.includes(sys.id)}
+                              disabled={!sys.documentationUrl || !sys.documentationUrl.trim() || pendingDocIds.has(sys.id)}
                               title={sys.documentationUrl && sys.documentationUrl.trim() ? "Refresh documentation from URL" : "No documentation URL to refresh"}
                             >
                               <RotateCw className="h-4 w-4" />

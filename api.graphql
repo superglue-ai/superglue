@@ -269,6 +269,7 @@ input IntegrationInput {
   credentials: JSON
   documentationUrl: String
   documentation: String
+  documentationPending: Boolean
   icon: String
   version: String
 }

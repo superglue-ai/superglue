@@ -9,12 +9,13 @@ import { CredentialsManager } from '@/src/components/utils/CredentialManager';
 import { DocumentationField } from '@/src/components/utils/DocumentationField';
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import { URLField } from '@/src/components/utils/URLField';
+import { useIntegrationPolling } from '@/src/hooks/use-integration-polling';
 import { useToast } from '@/src/hooks/use-toast';
 import { cn, composeUrl } from '@/src/lib/utils';
 import type { Integration } from '@superglue/client';
 import { SuperglueClient } from '@superglue/client';
 import { Check, ChevronsUpDown, Globe } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 
 export interface IntegrationFormProps {
     integration?: Integration;
@@ -68,6 +69,13 @@ export function IntegrationForm({
     const isEditing = !!integration;
     const config = useConfig();
     const { toast } = useToast();
+
+    const client = useMemo(() => new SuperglueClient({
+        endpoint: config.superglueEndpoint,
+        apiKey: config.superglueApiKey,
+    }), [config.superglueEndpoint, config.superglueApiKey]);
+
+    const { waitForIntegrationReady } = useIntegrationPolling(client);
 
     // Function to immediately save integration when file is uploaded
     const handleFileUpload = async (extractedText: string) => {
@@ -124,10 +132,6 @@ export function IntegrationForm({
 
     // Shared upsert logic
     const upsertIntegration = async () => {
-        const client = new SuperglueClient({
-            endpoint: config.superglueEndpoint,
-            apiKey: config.superglueApiKey,
-        });
         const integrationId = isEditing ? integration!.id : id.trim();
         const creds = credentials ? JSON.parse(credentials) : {};
         await client.upsertIntegration(integrationId, {
@@ -141,46 +145,10 @@ export function IntegrationForm({
         return { client, integrationId };
     };
 
-    // Function to wait for integration docs to be ready (one-time polling)
-    const waitForIntegrationReady = async (integrationId: string, timeoutMs = 60000) => {
-        const client = new SuperglueClient({
-            endpoint: config.superglueEndpoint,
-            apiKey: config.superglueApiKey,
-        });
-
-        const start = Date.now();
-        let activeIds = [integrationId];
-
-        while (Date.now() - start < timeoutMs && activeIds.length > 0) {
-            let settled = await Promise.allSettled(
-                activeIds.map(async (id) => {
-                    try {
-                        return await client.getIntegration(id);
-                    } catch (e) {
-                        return null;
-                    }
-                })
-            );
-            settled = settled.filter(r => r !== null);
-            const results = settled.map(r => r.status === 'fulfilled' ? r.value : null);
-
-            // Remove deleted integrations from polling
-            activeIds = activeIds.filter((id, idx) => results[idx] !== null);
-
-            // Check if any integration is still pending
-            const notReady = results.find(i => i && (i.documentationPending === true || !i.documentation));
-            if (!notReady) return results.filter(Boolean);
-
-            await new Promise(res => setTimeout(res, 4000));
-        }
-
-        return [];
-    };
-
     // Fire-and-forget poller for background doc fetch, no toast needed since UI shows spinner
     const triggerDocPoller = (integrationId: string, client: any) => {
         // Poller is safe and never throws - UI will show spinner in integrations list
-        waitForIntegrationReady(integrationId, 60000);
+        waitForIntegrationReady([integrationId], 60000);
     };
 
     const handleSubmit = async () => {
@@ -345,7 +313,7 @@ export function IntegrationForm({
                 </div>
                 <div>
                     <Label htmlFor="credentials">Credentials</Label>
-                    <HelpTooltip text='API keys or tokens needed for this specific integration. Enter without any prefix like Bearer. Use advanced mode to add multiple credentials.' />
+                    <HelpTooltip text='API keys or tokens needed for this specific integration. Enter without any prefix like Bearer.' />
                     <div className="w-full max-w-full">
                         <CredentialsManager
                             value={credentials}
