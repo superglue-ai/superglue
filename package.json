@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@playwright/test": "^1.50.1",
-    "@superglue/client": "github:superglue-ai/superglue-js#feature/reusing-integrations-in-workflows#84287c597d0a4ab8493fda5e3d95974cad5f4912",
+    "@superglue/client": "github:superglue-ai/superglue-js#feature/reusing-integrations-in-workflows#17fe6554eadb33ceaf77d1370ddf2dbaa215175b",
     "dotenv": "^16.4.7",
     "dotenv-cli": "^8.0.0"
   },

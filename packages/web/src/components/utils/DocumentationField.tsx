@@ -99,7 +99,7 @@ export function DocumentationField({
             title={content?.length > 200 ? content : undefined}
             readOnly={hasUploadedFile}
           />
-          <Badge variant="outline" className="absolute right-2 top-1/2 -translate-y-1/2">
+          <Badge variant="outline" className="absolute right-2 top-1/2 -translate-y-1/2 bg-background border">
             {hasUploadedFile ? (
               <><Upload className="h-3 w-3 mr-1 text-green-600" /> File Uploaded</>
             ) : activeType === 'url' ? (
