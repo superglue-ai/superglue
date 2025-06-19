@@ -3,9 +3,10 @@ import { IntegrationForm } from '@/src/components/integrations/IntegrationForm';
 import { useIntegrationPolling } from '@/src/hooks/use-integration-polling';
 import { useToast } from '@/src/hooks/use-toast';
 import { inputErrorStyles, parseCredentialsHelper } from '@/src/lib/client-utils';
-import { findMatchingIntegration, integrations as integrationTemplates, waitForIntegrationsReady } from '@/src/lib/integrations';
+import { findMatchingIntegration, integrations as integrationTemplates } from '@/src/lib/integrations';
 import { cn, composeUrl } from '@/src/lib/utils';
 import { Integration, IntegrationInput, SuperglueClient, Workflow, WorkflowResult } from '@superglue/client';
+import { flattenAndNamespaceWorkflowCredentials } from '@superglue/shared/utils';
 import { ArrowRight, ChevronRight, Globe, Loader2, Pencil, Play, Plus, RotateCw, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Prism from 'prismjs';
@@ -95,6 +96,8 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const [showIntegrationForm, setShowIntegrationForm] = useState(false);
   const [integrationFormEdit, setIntegrationFormEdit] = useState<Integration | null>(null);
 
+  const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
+
   const client = useMemo(() => new ExtendedSuperglueClient({
     endpoint: superglueConfig.superglueEndpoint,
     apiKey: superglueConfig.superglueApiKey,
@@ -148,6 +151,37 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     }))
   ];
 
+  // Function to wait for integration docs to be ready (one-time polling)
+  const waitForIntegrationReady = async (integrationIds: string[], timeoutMs = 60000) => {
+    const start = Date.now();
+    let activeIds = [...integrationIds];
+
+    while (Date.now() - start < timeoutMs && activeIds.length > 0) {
+      let settled = await Promise.allSettled(
+        activeIds.map(async (id) => {
+          try {
+            return await client.getIntegration(id);
+          } catch (e) {
+            return null;
+          }
+        })
+      );
+      settled = settled.filter(r => r !== null);
+      const results = settled.map(r => r.status === 'fulfilled' ? r.value : null);
+
+      // Remove deleted integrations from polling
+      activeIds = activeIds.filter((id, idx) => results[idx] !== null);
+
+      // Check if any integration is still pending
+      const notReady = results.find(i => i && (i.documentationPending === true || !i.documentation));
+      if (!notReady) return results.filter(Boolean);
+
+      await new Promise(res => setTimeout(res, 4000));
+    }
+
+    return [];
+  };
+
   // Helper function to get SimpleIcon
   const getSimpleIcon = (name: string): SimpleIcon | null => {
     if (!name || name === "default") return null;
@@ -184,6 +218,36 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   // Add this helper function near the top of the component
   const highlightJson = (code: string) => {
     return Prism.highlight(code, Prism.languages.json, 'json');
+  };
+
+  const generateDefaultFromSchema = (schema: any): any => {
+    if (!schema || typeof schema !== 'object') return {};
+
+    if (schema.type === 'object' && schema.properties) {
+      const result: any = {};
+      for (const [key, propSchema] of Object.entries(schema.properties)) {
+        result[key] = generateDefaultFromSchema(propSchema);
+      }
+      return result;
+    }
+
+    if (schema.type === 'array') {
+      return [];
+    }
+
+    if (schema.type === 'string') {
+      return schema.default || '';
+    }
+
+    if (schema.type === 'number' || schema.type === 'integer') {
+      return schema.default || 0;
+    }
+
+    if (schema.type === 'boolean') {
+      return schema.default || false;
+    }
+
+    return schema.default || null;
   };
 
   // Helper function to determine if integration has documentation
@@ -245,7 +309,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     try {
       await client.upsertIntegration(integration.id, integration);
       // Wait for docs to be ready in background - no toast needed since UI shows spinner
-      waitForIntegrationsReady([integration.id], client, null);
+      waitForIntegrationReady([integration.id], 60000);
       // Refresh integrations list to get updated data including documentation
       const { items } = await client.listIntegrations(100, 0);
       setIntegrations(items);
@@ -299,7 +363,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       setIsBuilding(true);
       try {
         // Wait for docs to be ready
-        await waitForIntegrationsReady(selectedIntegrationIds, client, toast);
+        await waitForIntegrationReady(selectedIntegrationIds, 60000);
         // Refresh integrations list to ensure up-to-date docs
         const { items: freshIntegrations } = await client.listIntegrations(100, 0);
         setIntegrations(freshIntegrations);
@@ -321,6 +385,31 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
           throw new Error('Failed to build workflow');
         }
         setCurrentWorkflow(response);
+
+        // Populate review credentials from integrations
+        const selectedIntegrations = selectedIntegrationIds
+          .map(id => freshIntegrations.find(i => i.id === id))
+          .filter(Boolean);
+        const credentialsFromIntegrations = flattenAndNamespaceWorkflowCredentials(selectedIntegrations);
+        setReviewCredentials(JSON.stringify(credentialsFromIntegrations, null, 2));
+
+        // Populate payload with required fields from inputSchema
+        if (response.inputSchema) {
+          try {
+            const defaultValues = generateDefaultFromSchema(response.inputSchema);
+            if (defaultValues.payload !== undefined) {
+              setPayload(JSON.stringify(defaultValues.payload, null, 2));
+            } else {
+              setPayload('{}');
+            }
+          } catch (error) {
+            console.warn('Failed to generate payload from schema:', error);
+            setPayload('{}');
+          }
+        } else {
+          setPayload('{}');
+        }
+
         toast({
           title: 'Workflow Built',
           description: `Workflow "${response.id}" generated successfully.`,
@@ -726,6 +815,12 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                     value={payload}
                     onValueChange={(code) => {
                       setPayload(code);
+                      try {
+                        JSON.parse(code);
+                        setValidationErrors(prev => ({ ...prev, payload: false }));
+                      } catch (e) {
+                        setValidationErrors(prev => ({ ...prev, payload: true }));
+                      }
                     }}
                     highlight={highlightJson}
                     padding={10}
@@ -763,11 +858,46 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                         value={reviewCredentials}
                         onChange={(e) => {
                           setReviewCredentials(e.target.value);
+                          try {
+                            JSON.parse(e.target.value);
+                            setValidationErrors(prev => ({ ...prev, credentials: false }));
+                          } catch (e) {
+                            setValidationErrors(prev => ({ ...prev, credentials: true }));
+                          }
                         }}
                         placeholder="Enter credentials"
                         className={cn("min-h-10 font-mono text-xs")}
                       />
                     </div>
+                    {(() => {
+                      try {
+                        const creds = JSON.parse(reviewCredentials);
+                        if (!creds || Object.keys(creds).length === 0) {
+                          return (
+                            <div className="text-xs text-amber-500 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded mt-2">
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                                <line x1="12" y1="9" x2="12" y2="13" />
+                                <line x1="12" y1="17" x2="12.01" y2="17" />
+                              </svg>
+                              No credentials added
+                            </div>
+                          );
+                        }
+                        return null;
+                      } catch {
+                        return (
+                          <div className="text-xs text-red-600 flex items-center gap-1.5 bg-red-500/10 py-1 px-2 rounded mt-2">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <circle cx="12" cy="12" r="10" />
+                              <line x1="12" y1="8" x2="12" y2="12" />
+                              <line x1="12" y1="16" x2="12.01" y2="16" />
+                            </svg>
+                            Invalid JSON format
+                          </div>
+                        );
+                      }
+                    })()}
                   </div>
 
                   {/* Editable workflow variables (payload) input */}
@@ -789,6 +919,35 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                         className="font-mono text-xs w-full min-h-[60px] bg-transparent"
                       />
                     </div>
+                    {(() => {
+                      try {
+                        const parsedPayload = JSON.parse(payload);
+                        if (!parsedPayload || Object.keys(parsedPayload).length === 0) {
+                          return (
+                            <div className="text-xs text-amber-500 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded mt-2">
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                                <line x1="12" y1="9" x2="12" y2="13" />
+                                <line x1="12" y1="17" x2="12.01" y2="17" />
+                              </svg>
+                              No workflow variables added
+                            </div>
+                          );
+                        }
+                        return null;
+                      } catch {
+                        return (
+                          <div className="text-xs text-red-600 flex items-center gap-1.5 bg-red-500/10 py-1 px-2 rounded mt-2">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <circle cx="12" cy="12" r="10" />
+                              <line x1="12" y1="8" x2="12" y2="12" />
+                              <line x1="12" y1="16" x2="12.01" y2="16" />
+                            </svg>
+                            Invalid JSON format
+                          </div>
+                        );
+                      }
+                    })()}
                   </div>
 
                   <div className="flex flex-col gap-2 mt-2">
