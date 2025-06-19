@@ -3,7 +3,7 @@
 import { Badge } from '@/src/components/ui/badge'
 import { Button } from '@/src/components/ui/button'
 import { Input } from '@/src/components/ui/input'
-import { FileQuestion, FileText, Link, Loader2, RotateCw, Upload } from 'lucide-react'
+import { FileQuestion, FileText, Link, Upload } from 'lucide-react'
 import { useCallback, useState } from 'react'
 
 interface DocumentationFieldProps {
@@ -12,10 +12,8 @@ interface DocumentationFieldProps {
   onUrlChange: (url: string) => void
   onContentChange: (content: string) => void
   className?: string
-  onRefreshDocs?: () => void
-  hideRefreshButton?: boolean
-  onFileUpload?: () => void
-  refreshingDocs?: boolean
+  onFileUpload?: (extractedText: string) => void
+  hasUploadedFile?: boolean
 }
 
 export function DocumentationField({
@@ -24,13 +22,11 @@ export function DocumentationField({
   onUrlChange,
   onContentChange,
   className,
-  onRefreshDocs,
-  hideRefreshButton,
   onFileUpload,
-  refreshingDocs = false
+  hasUploadedFile = false
 }: DocumentationFieldProps) {
   const [docFile, setDocFile] = useState<File | null>(null)
-  const activeType = url ? 'url' : content ? (docFile ? 'file' : 'content') : 'empty'
+  const activeType = url ? 'url' : content ? (hasUploadedFile ? 'file' : 'content') : 'empty'
 
   // Derived state for display purposes only
   const displayValue = url || (content ? (
@@ -67,7 +63,7 @@ export function DocumentationField({
       setDocFile(file)
       onContentChange(text)
       onUrlChange('')
-      if (typeof onFileUpload === 'function') onFileUpload();
+      if (typeof onFileUpload === 'function') onFileUpload(text);
     } catch (error) {
       console.error('Error reading file:', error)
       // You might want to add user-facing error handling here
@@ -79,7 +75,7 @@ export function DocumentationField({
   // Optimize input change handling
   const handleInputChange = useCallback((value: string) => {
     // Don't allow changes if a file is uploaded
-    if (docFile) return
+    if (hasUploadedFile) return
 
     // Quick check before regex for better performance
     if (value.startsWith('http://') || value.startsWith('https://')) {
@@ -89,7 +85,7 @@ export function DocumentationField({
       onContentChange(value)
       if (url) onUrlChange('')
     }
-  }, [content, url, docFile, onUrlChange, onContentChange]);
+  }, [content, url, hasUploadedFile, onUrlChange, onContentChange]);
 
   return (
     <div className={className}>
@@ -99,17 +95,17 @@ export function DocumentationField({
             value={displayValue}
             onChange={(e) => handleInputChange(e.target.value)}
             placeholder="Enter URL or documentation content..."
-            className={`pr-20 ${docFile ? 'bg-muted cursor-not-allowed' : ''}`}
+            className={`pr-20 ${hasUploadedFile ? 'bg-muted cursor-not-allowed' : ''}`}
             title={content?.length > 200 ? content : undefined}
-            readOnly={docFile !== null}
+            readOnly={hasUploadedFile}
           />
           <Badge variant="outline" className="absolute right-2 top-1/2 -translate-y-1/2">
-            {activeType === 'url' ? (
+            {hasUploadedFile ? (
+              <><Upload className="h-3 w-3 mr-1 text-green-600" /> File Uploaded</>
+            ) : activeType === 'url' ? (
               <><Link className="h-3 w-3 mr-1" /> URL</>
-            ) : activeType === 'file' ? (
-              <><Upload className="h-3 w-3 mr-1" /> File</>
             ) : activeType === 'content' ? (
-              <><FileText className="h-3 w-3 mr-1" /> Content</>
+              <><FileText className="h-3 w-3 mr-1" /> Manual Content</>
             ) : (
               <><FileQuestion className="h-3 w-3 mr-1" /> None</>
             )}
@@ -124,22 +120,6 @@ export function DocumentationField({
         >
           Upload
         </Button>
-
-        {(url || content) && !docFile && !hideRefreshButton && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="shrink-0 text-muted-foreground hover:text-primary transition-colors"
-            onClick={() => {
-              if (typeof onRefreshDocs === 'function') onRefreshDocs();
-            }}
-            disabled={refreshingDocs}
-            title="Refresh documentation from URL"
-          >
-            {refreshingDocs ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RotateCw className="h-4 w-4 mr-1" />}
-            Refresh Docs
-          </Button>
-        )}
 
         <input
           type="file"

@@ -793,7 +793,7 @@ export function findMatchingIntegration(url: string): { key: string; integration
 export async function waitForIntegrationsReady(
   ids: string[],
   client: any,
-  toast: any,
+  toast: any = null,
   maxWaitMs = 60000,
   pollInterval = 4000
 ) {
