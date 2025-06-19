@@ -46,7 +46,7 @@ export class FileStore implements DataStore {
       this.filePath = path.join(storageDir, 'superglue_data.json');
       this.logsFilePath = path.join(storageDir, 'superglue_logs.jsonl');
     }
-
+    this.ensureInitialized();
     logMessage('info', `File Datastore: Initial storage path: ${this.filePath}`);
   }
 
@@ -62,15 +62,18 @@ export class FileStore implements DataStore {
 
   private async initializeStorage(): Promise<void> {
     try {
-      // Check if we need to switch from /data to .superglue
-      if (this.filePath.includes('/data/')) {
-        try {
-          await fs.promises.access('/data');
-        } catch {
+      try {
+        await fs.promises.access(path.dirname(this.filePath));
+      } catch {
+        if (this.filePath.startsWith('/data/')) {
           logMessage('warn', 'File Datastore: "/data" directory not found, switching to local ".superglue" directory');
           this.filePath = path.join('./.superglue', 'superglue_data.json');
           this.logsFilePath = path.join('./.superglue', 'superglue_logs.jsonl');
           logMessage('info', `File Datastore: Updated storage path: ${this.filePath}`);
+        }
+        else {
+          logMessage('error', `File Datastore: "${path.dirname(this.filePath)}" directory not accessible, exiting`);
+          process.exit(1);
         }
       }
 

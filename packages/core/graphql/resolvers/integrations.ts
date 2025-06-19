@@ -12,11 +12,29 @@ function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined
 }
 
 function needsDocFetch(input: Integration, oldIntegration?: Integration): boolean {
+  // If there's manual documentation in the input, no need to fetch
+  if (input.documentation && input.documentation.trim()) return false;
+
+  // If there's no documentation URL, no need to fetch
+  if (!input.documentationUrl || !input.documentationUrl.trim()) return false;
+
+  // For URL-based docs, fetch if:
+  // 1. No old integration exists
+  // 2. URL/path has changed
+  // 3. Documentation URL has changed
+  // 4. Manual refresh: input has documentationUrl but no documentation field (refresh case)
   if (!oldIntegration) return true;
-  if (!oldIntegration.documentation) return true;
   if (input.urlHost !== oldIntegration.urlHost) return true;
   if (input.urlPath !== oldIntegration.urlPath) return true;
   if (input.documentationUrl !== oldIntegration.documentationUrl) return true;
+
+  // Manual refresh detection: if input has URL but no documentation, and old integration has same URL
+  if (input.documentationUrl === oldIntegration.documentationUrl &&
+    (!input.documentation || !input.documentation.trim()) &&
+    oldIntegration.documentationUrl && oldIntegration.documentationUrl.trim()) {
+    return true;
+  }
+
   return false;
 }
 
@@ -101,6 +119,21 @@ export const upsertIntegrationResolver = async (
           logMessage('info', `Completed documentation fetch for integration ${input.id}`, { orgId: context.orgId });
         } catch (err) {
           logMessage('error', `Documentation fetch failed for integration ${input.id}: ${String(err)}`, { orgId: context.orgId });
+          // Reset documentationPending to false on failure to prevent corrupted state
+          try {
+            const stillExists = await context.datastore.getIntegration(input.id, context.orgId);
+            if (stillExists) {
+              await context.datastore.upsertIntegration(input.id, {
+                ...input,
+                documentationPending: false,
+                createdAt: oldIntegration?.createdAt || now,
+                updatedAt: new Date(),
+              }, context.orgId);
+              logMessage('info', `Reset documentationPending to false for integration ${input.id} after fetch failure`, { orgId: context.orgId });
+            }
+          } catch (resetError) {
+            logMessage('error', `Failed to reset documentationPending for integration ${input.id}: ${String(resetError)}`, { orgId: context.orgId });
+          }
         }
       })();
     }

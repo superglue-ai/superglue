@@ -1,12 +1,12 @@
 import { useConfig } from '@/src/app/config-context';
 import { IntegrationForm } from '@/src/components/integrations/IntegrationForm';
+import { useIntegrationPolling } from '@/src/hooks/use-integration-polling';
 import { useToast } from '@/src/hooks/use-toast';
-import { inputErrorStyles, parseCredentialsHelper, splitUrl } from '@/src/lib/client-utils';
+import { inputErrorStyles, parseCredentialsHelper } from '@/src/lib/client-utils';
 import { findMatchingIntegration, integrations as integrationTemplates, waitForIntegrationsReady } from '@/src/lib/integrations';
 import { cn, composeUrl } from '@/src/lib/utils';
 import { Integration, IntegrationInput, SuperglueClient, Workflow, WorkflowResult } from '@superglue/client';
-import { flattenAndNamespaceWorkflowCredentials } from '@superglue/shared/utils';
-import { ArrowRight, ChevronRight, Globe, Loader2, Pencil, Play, Plus, X } from 'lucide-react';
+import { ArrowRight, ChevronRight, Globe, Loader2, Pencil, Play, Plus, RotateCw, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
@@ -18,10 +18,10 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
+import { DocStatus } from '../utils/DocStatusSpinner';
 import { HelpTooltip } from '../utils/HelpTooltip';
 import JsonSchemaEditor from '../utils/JsonSchemaEditor';
 import { StepIndicator, WORKFLOW_CREATE_STEPS } from '../utils/StepIndicator';
-import type { URLFieldHandle } from '../utils/URLField';
 import { WorkflowCreateSuccess } from './WorkflowCreateSuccess';
 import { WorkflowResultsView } from './WorkflowResultsView';
 import { WorkflowStepsView } from './WorkflowStepsView';
@@ -65,23 +65,9 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const superglueConfig = useConfig();
 
   const [integrations, setIntegrations] = useState<Integration[]>([]);
-  const [currentIntegration, setCurrentIntegration] = useState<Integration>({
-    id: '',
-    urlHost: '',
-    urlPath: '',
-    documentationUrl: '',
-    documentation: '',
-    credentials: {},
-  });
   const [instruction, setInstruction] = useState('');
   const [payload, setPayload] = useState('{}');
   const [currentWorkflow, setCurrentWorkflow] = useState<Workflow | null>(null); // To store result from buildWorkflow
-  const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
-  const [integrationFormVisible, setIntegrationFormVisible] = useState(false);
-  const [editingIntegration, setEditingIntegration] = useState<Integration | null>(null);
-  const [idManuallyEdited, setIdManuallyEdited] = useState(false);
-  const [selectedIntegration, setSelectedIntegration] = useState<string>("custom");
-  const [integrationDropdownOpen, setIntegrationDropdownOpen] = useState(false);
 
   const [schema, setSchema] = useState<string>('{}');
   const [activeTab, setActiveTab] = useState<'results' | 'transform' | 'final' | 'instructions'>('results');
@@ -103,7 +89,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
 
   const [selectedIntegrationIds, setSelectedIntegrationIds] = useState<string[]>([]);
 
-  const [isAddModalOpen, setAddModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const [integrationSearch, setIntegrationSearch] = useState('');
@@ -114,6 +99,44 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     endpoint: superglueConfig.superglueEndpoint,
     apiKey: superglueConfig.superglueApiKey,
   }), [superglueConfig.superglueEndpoint, superglueConfig.superglueApiKey]);
+
+  // Get integration IDs for polling
+  const integrationIds = useMemo(() => integrations.map(i => i.id), [integrations]);
+
+  // Track previous pending IDs to detect completion
+  const previousPendingIdsRef = useRef<Set<string>>(new Set());
+
+  // Poll for documentation status
+  const { pendingIds, isPolling, hasPending } = useIntegrationPolling({
+    client,
+    integrationIds,
+    enabled: integrations.length > 0
+  });
+
+  // Detect when documentation processing completes and show toast
+  useEffect(() => {
+    const currentPendingIds = new Set(pendingIds);
+    const previousPendingIds = previousPendingIdsRef.current;
+
+    // Find integrations that were pending before but are no longer pending
+    const completedIds = Array.from(previousPendingIds).filter(id => !currentPendingIds.has(id));
+
+    if (completedIds.length > 0) {
+      completedIds.forEach(id => {
+        const integration = integrations.find(i => i.id === id);
+        if (integration) {
+          toast({
+            title: 'Documentation Ready',
+            description: `Documentation for integration "${integration.id}" is now ready!`,
+            variant: 'default',
+          });
+        }
+      });
+    }
+
+    // Update the ref for next comparison
+    previousPendingIdsRef.current = currentPendingIds;
+  }, [pendingIds, integrations, toast]);
 
   // Create integration options array with custom option first
   const integrationOptions = [
@@ -150,7 +173,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       .then(({ items }) => {
         if (ignore) return;
         setIntegrations(items);
-        if (items.length === 0) setAddModalOpen(true);
+        if (items.length === 0) setShowIntegrationForm(true);
       })
       .finally(() => {
         if (!ignore) setLoading(false);
@@ -158,29 +181,82 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     return () => { ignore = true; };
   }, [client]);
 
-  const handleUrlChange = (urlHost: string, urlPath: string, queryParams?: Record<string, string>) => {
-    const normalizedUrlPath = urlPath === "/" ? "" : urlPath;
-    if (urlHost) {
-      const match = findMatchingIntegration(urlHost);
-      setCurrentIntegration(prev => ({
-        ...prev,
-        urlHost,
-        urlPath: normalizedUrlPath,
-        id: idManuallyEdited ? prev.id : sanitizeIntegrationId(urlHost),
-        documentationUrl: prev.documentationUrl || match?.integration.docsUrl,
-      }));
-    }
-  }
+  // Add this helper function near the top of the component
+  const highlightJson = (code: string) => {
+    return Prism.highlight(code, Prism.languages.json, 'json');
+  };
 
-  const sanitizeIntegrationId = (id: string) => {
-    return id
-      .replace('www.', '')
-      .replace('api.', '')
-      .replace('http://', '')
-      .replace('https://', '')
-      .replace(/\./g, "-") // Replace dots with hyphens
-      .replace(/ /g, "-") // Replace spaces with hyphens
-      .replace(/[^a-zA-Z0-9-]/g, ""); // Remove special characters
+  // Helper function to determine if integration has documentation
+  const hasDocumentation = (integration: Integration) => {
+    // Check for direct documentation content or URL
+    const hasDirectDocs = !!(integration.documentation || integration.documentationUrl);
+
+    // For direct doc upload scenarios, if there's documentation content, consider it available
+    if (integration.documentation && integration.documentation.trim()) {
+      return true;
+    }
+
+    // For URL-based docs, check if has URL
+    if (integration.documentationUrl) {
+      return true;
+    }
+
+    return hasDirectDocs;
+  };
+
+  // Function to refresh documentation for a specific integration
+  const handleRefreshDocs = async (integrationId: string) => {
+    try {
+      const integration = integrations.find(i => i.id === integrationId);
+      if (!integration) return;
+
+      // Trigger manual documentation refresh by upserting with only required fields
+      // Don't pass existing documentation to avoid large payloads
+      // Note: documentationPending is set by the backend, not the client
+      await client.upsertIntegration(integrationId, {
+        id: integration.id,
+        urlHost: integration.urlHost,
+        urlPath: integration.urlPath,
+        documentationUrl: integration.documentationUrl,
+        credentials: integration.credentials || {},
+      });
+
+      // Refresh the integrations list to update doc status
+      const { items } = await client.listIntegrations(100, 0);
+      setIntegrations(items);
+    } catch (error) {
+      console.error('Error refreshing docs:', error);
+      toast({
+        title: 'Error Refreshing Docs',
+        description: 'Failed to refresh documentation. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // --- Integration Management (add/edit) ---
+  const handleIntegrationFormSave = async (integration: Integration) => {
+    // Close form immediately
+    setShowIntegrationForm(false);
+    setIntegrationFormEdit(null);
+
+    // Handle background operations
+    setLoading(true);
+    try {
+      await client.upsertIntegration(integration.id, integration);
+      // Wait for docs to be ready in background - no toast needed since UI shows spinner
+      waitForIntegrationsReady([integration.id], client, null);
+      // Refresh integrations list to get updated data including documentation
+      const { items } = await client.listIntegrations(100, 0);
+      setIntegrations(items);
+      setSelectedIntegrationIds(ids => ids.includes(integration.id) ? ids : [...ids, integration.id]);
+    } finally {
+      setLoading(false);
+    }
+  };
+  const handleIntegrationFormCancel = () => {
+    setShowIntegrationForm(false);
+    setIntegrationFormEdit(null);
   };
 
   // --- Step Navigation ---
@@ -213,7 +289,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         errors.payload = true;
       }
       if (Object.keys(errors).length > 0) {
-        setValidationErrors(errors);
         toast({
           title: 'Validation Error',
           description: 'Please provide a valid instruction and JSON payload.',
@@ -221,7 +296,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         });
         return;
       }
-      setValidationErrors({});
       setIsBuilding(true);
       try {
         // Wait for docs to be ready
@@ -337,42 +411,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     }
   };
 
-  const handleIntegrationSelect = (value: string) => {
-    setSelectedIntegration(value);
-
-    if (value === "custom") {
-      // For custom, just reset URL fields but keep other values
-      setCurrentIntegration(prev => ({
-        ...prev,
-        urlHost: '',
-        urlPath: '',
-        documentationUrl: ''
-      }));
-      return;
-    }
-
-    // Use the static template
-    const integration = integrationTemplates[value];
-    if (integration) {
-      const apiUrl = integration.apiUrl || '';
-      const { urlHost, urlPath } = splitUrl(apiUrl);
-      setCurrentIntegration(prev => ({
-        ...prev,
-        id: idManuallyEdited ? prev.id : sanitizeIntegrationId(value),
-        urlHost,
-        urlPath,
-        documentationUrl: integration.docsUrl || '',
-      }));
-
-      handleUrlChange(urlHost, urlPath);
-    }
-  };
-
-  // Add this helper function near the top of the component
-  const highlightJson = (code: string) => {
-    return Prism.highlight(code, Prism.languages.json, 'json');
-  };
-
   const handleStepEdit = (stepId: string, updatedStep: any) => {
     if (!currentWorkflow) return;
 
@@ -392,7 +430,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       steps: newSteps
     });
   };
-
 
   const handleExecuteWorkflow = async () => {
     setIsExecuting(true);
@@ -426,11 +463,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     } finally {
       setIsExecuting(false);
     }
-  };
-
-  // Add this helper function near your other helpers
-  const getResponseLines = (response: any) => {
-    return response ? JSON.stringify(response, null, 2).split('\n') : ['No results yet...'];
   };
 
   // Helper to convert Integration to IntegrationInput (strip extra fields)
@@ -471,103 +503,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     } finally {
       setIsGeneratingSuggestions(false);
     }
-  };
-
-  const urlFieldRef = useRef<URLFieldHandle>(null)
-
-  const handleCancelEditOrAdd = () => {
-    setIntegrationFormVisible(false);
-    setValidationErrors({});
-    setIdManuallyEdited(false);
-    setSelectedIntegration("custom");
-    setCurrentIntegration({
-      id: '',
-      urlHost: '',
-      urlPath: '',
-      documentationUrl: '',
-      documentation: '',
-      credentials: {},
-    });
-  };
-
-  const reviewCredentialsRef = useRef<string>(reviewCredentials);
-
-  useEffect(() => {
-    if (step === 'review') {
-      const flatCreds = flattenAndNamespaceWorkflowCredentials(integrations);
-      setReviewCredentials(JSON.stringify(flatCreds, null, 2));
-      setCurrentWorkflow({ ...(currentWorkflow as any), credentials: flatCreds } as any);
-    }
-    // eslint-disable-next-line
-  }, [step, integrations]);
-
-  function handleSelectIntegration(id: string) {
-    setSelectedIntegrationIds(ids => ids.includes(id) ? ids : [...ids, id]);
-  }
-
-  function handleDeselectIntegration(id: string) {
-    setSelectedIntegrationIds(ids => ids.filter(i => i !== id));
-  }
-
-  // When moving to the next step:
-  const integrationInputRequests = selectedIntegrationIds.map(id => ({ id }));
-
-  // For instruction generation:
-  const resolvedIntegrations = selectedIntegrationIds
-    .map(id => integrations.find(i => i.id === id))
-    .filter(Boolean);
-
-  // Filtered integrations for search
-  const filteredIntegrations = useMemo(() => {
-    if (!integrationSearch.trim()) return integrations;
-    const term = integrationSearch.toLowerCase();
-    return integrations.filter(i =>
-      i.id.toLowerCase().includes(term) ||
-      i.urlHost.toLowerCase().includes(term) ||
-      (i.urlPath && i.urlPath.toLowerCase().includes(term))
-    );
-  }, [integrationSearch, integrations]);
-
-  // Helper: sort integrations so selected are always at the top
-  const sortIntegrations = (list, selectedIds) => [
-    ...list.filter(i => selectedIds.includes(i.id)),
-    ...list.filter(i => !selectedIds.includes(i.id))
-  ];
-  const [sortedIntegrations, setSortedIntegrations] = useState(sortIntegrations(filteredIntegrations, selectedIntegrationIds));
-  useEffect(() => {
-    setSortedIntegrations(sortIntegrations(filteredIntegrations, selectedIntegrationIds));
-  }, [filteredIntegrations, selectedIntegrationIds]);
-
-  // --- Integration Management (add/edit) ---
-  const handleOpenAddIntegration = () => {
-    setIntegrationFormEdit(null);
-    setShowIntegrationForm(true);
-  };
-  const handleOpenEditIntegration = (integration: Integration) => {
-    setIntegrationFormEdit(integration);
-    setShowIntegrationForm(true);
-  };
-  const handleIntegrationFormSave = async (integration: Integration) => {
-    // Close form immediately
-    setShowIntegrationForm(false);
-    setIntegrationFormEdit(null);
-
-    // Handle background operations
-    setLoading(true);
-    try {
-      await client.upsertIntegration(integration.id, integration);
-      // Wait for docs to be ready in background
-      waitForIntegrationsReady([integration.id], client, toast);
-      const { items } = await client.listIntegrations(100, 0);
-      setIntegrations(items);
-      setSelectedIntegrationIds(ids => ids.includes(integration.id) ? ids : [...ids, integration.id]);
-    } finally {
-      setLoading(false);
-    }
-  };
-  const handleIntegrationFormCancel = () => {
-    setShowIntegrationForm(false);
-    setIntegrationFormEdit(null);
   };
 
   return (
@@ -617,14 +552,14 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                   onChange={e => setIntegrationSearch(e.target.value)}
                   className="w-full max-w-md"
                 />
-                <Button variant="outline" size="sm" onClick={handleOpenAddIntegration}>
+                <Button variant="outline" size="sm" onClick={() => setShowIntegrationForm(true)}>
                   <Plus className="mr-2 h-4 w-4" /> Add Integration
                 </Button>
               </div>
               <div className="rounded-md bg-muted/50 overflow-y-auto" style={{ height: 320 }}>
                 {loading ? (
                   <div className="h-full bg-background" />
-                ) : sortedIntegrations.length === 0 ? (
+                ) : integrations.length === 0 ? (
                   <div className="h-[320px] flex items-center justify-center bg-background">
                     <p className="text-sm text-muted-foreground italic">
                       No integrations added yet. Define the APIs or data sources your workflow will use.
@@ -632,7 +567,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                   </div>
                 ) : (
                   <div className="divide-y divide-border">
-                    {sortedIntegrations.map(sys => {
+                    {integrations.map(sys => {
                       const selected = selectedIntegrationIds.includes(sys.id);
                       return (
                         <div
@@ -647,8 +582,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                             } else {
                               setSelectedIntegrationIds(ids => {
                                 const newIds = [...ids, sys.id];
-                                // Move selected to top by reordering sortedIntegrations
-                                setSortedIntegrations(sortIntegrations(filteredIntegrations, newIds));
                                 return newIds;
                               });
                             }
@@ -678,18 +611,36 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                                 {composeUrl(sys.urlHost, sys.urlPath)}
                               </span>
                             </div>
-                            {(!sys.credentials || Object.keys(sys.credentials).length === 0) && (
-                              <span className="ml-2 text-xs text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded">No credentials</span>
-                            )}
+                            <div className="flex flex-col items-center gap-2">
+                              <div className="flex items-center gap-2">
+                                <DocStatus
+                                  pending={pendingIds.includes(sys.id)}
+                                  hasDocumentation={hasDocumentation(sys)}
+                                />
+                                {(!sys.credentials || Object.keys(sys.credentials).length === 0) && (
+                                  <span className="text-xs text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded">No credentials</span>
+                                )}
+                              </div>
+                            </div>
                           </div>
                           <div className="flex gap-1">
                             <Button
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                              onClick={e => { e.stopPropagation(); handleOpenEditIntegration(sys); }}
+                              onClick={e => { e.stopPropagation(); setIntegrationFormEdit(sys); }}
                             >
                               <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                              onClick={e => { e.stopPropagation(); handleRefreshDocs(sys.id); }}
+                              disabled={!sys.documentationUrl || !sys.documentationUrl.trim() || pendingIds.includes(sys.id)}
+                              title={sys.documentationUrl && sys.documentationUrl.trim() ? "Refresh documentation from URL" : "No documentation URL to refresh"}
+                            >
+                              <RotateCw className="h-4 w-4" />
                             </Button>
                             <input
                               type="checkbox"
@@ -734,9 +685,9 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                   <Textarea
                     id="instruction"
                     value={instruction}
-                    onChange={(e) => { setInstruction(e.target.value); setValidationErrors(prev => ({ ...prev, instruction: false })); }}
+                    onChange={(e) => { setInstruction(e.target.value); }}
                     placeholder="e.g., 'Fetch customer details from CRM using the input email, then get their recent orders from productApi.'"
-                    className={cn("min-h-80", validationErrors.instruction && inputErrorStyles)}
+                    className={cn("min-h-80")}
                   />
                   {suggestions.length > 0 && !instruction && (
                     <div className="absolute bottom-0 p-3 pointer-events-none w-full">
@@ -756,7 +707,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                     </div>
                   )}
                 </div>
-                {validationErrors.instruction && <p className="text-sm text-destructive mt-1">Instruction is required.</p>}
               </div>
 
               {/* Show loading state */}
@@ -771,18 +721,11 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                 <HelpTooltip text="Provide dynamic variables for the workflow as a JSON object. Workflow variables are equivalent to your workflow's initial payload and can be referenced in the entire config. You can change them when you use the workflow later." />
                 <div className={cn(
                   "flex-1 min-h-0 code-editor rounded-md border bg-transparent",
-                  validationErrors.payload ? inputErrorStyles : "border-input"
                 )}>
                   <Editor
                     value={payload}
                     onValueChange={(code) => {
                       setPayload(code);
-                      try {
-                        JSON.parse(code);
-                        setValidationErrors(prev => ({ ...prev, payload: false }));
-                      } catch (e) {
-                        setValidationErrors(prev => ({ ...prev, payload: true }));
-                      }
                     }}
                     highlight={highlightJson}
                     padding={10}
@@ -791,11 +734,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                     className="font-mono text-xs w-full min-h-[60px] bg-transparent"
                   />
                 </div>
-                {validationErrors.payload && (
-                  <div className="bg-red-500/10 text-red-500 p-2 text-xs mt-1 rounded">
-                    Invalid JSON format
-                  </div>
-                )}
               </div>
             </div>
           )}
@@ -825,46 +763,11 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                         value={reviewCredentials}
                         onChange={(e) => {
                           setReviewCredentials(e.target.value);
-                          try {
-                            const parsed = JSON.parse(e.target.value);
-                            setCurrentWorkflow({ ...(currentWorkflow as any), credentials: parsed } as any);
-                          } catch (e) {
-                            // ignore parse errors for now
-                          }
                         }}
                         placeholder="Enter credentials"
-                        className={cn("min-h-10 font-mono text-xs", validationErrors.credentials && inputErrorStyles)}
+                        className={cn("min-h-10 font-mono text-xs")}
                       />
                     </div>
-                    {(() => {
-                      try {
-                        const creds = JSON.parse(reviewCredentials);
-                        if (!creds || Object.keys(creds).length === 0) {
-                          return (
-                            <div className="text-xs text-amber-500 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded mt-2">
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                                <line x1="12" y1="9" x2="12" y2="13" />
-                                <line x1="12" y1="17" x2="12.01" y2="17" />
-                              </svg>
-                              No credentials added
-                            </div>
-                          );
-                        }
-                        return null;
-                      } catch {
-                        return (
-                          <div className="text-xs text-red-600 flex items-center gap-1.5 bg-red-500/10 py-1 px-2 rounded mt-2">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <circle cx="12" cy="12" r="10" />
-                              <line x1="12" y1="8" x2="12" y2="12" />
-                              <line x1="12" y1="16" x2="12.01" y2="16" />
-                            </svg>
-                            Invalid JSON format
-                          </div>
-                        );
-                      }
-                    })()}
                   </div>
 
                   {/* Editable workflow variables (payload) input */}
@@ -873,18 +776,11 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                     <HelpTooltip text="Dynamic variables for the workflow as a JSON object. These are equivalent to your workflow's initial payload and can be referenced in the entire config." />
                     <div className={cn(
                       "w-full max-w-full code-editor rounded-md border bg-transparent",
-                      validationErrors.payload ? inputErrorStyles : "border-input"
                     )}>
                       <Editor
                         value={payload}
                         onValueChange={(code) => {
                           setPayload(code);
-                          try {
-                            JSON.parse(code);
-                            setValidationErrors(prev => ({ ...prev, payload: false }));
-                          } catch (e) {
-                            setValidationErrors(prev => ({ ...prev, payload: true }));
-                          }
                         }}
                         highlight={highlightJson}
                         padding={10}
@@ -893,11 +789,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                         className="font-mono text-xs w-full min-h-[60px] bg-transparent"
                       />
                     </div>
-                    {validationErrors.payload && (
-                      <div className="bg-red-500/10 text-red-500 p-2 text-xs mt-1 rounded">
-                        Invalid JSON format
-                      </div>
-                    )}
                   </div>
 
                   <div className="flex flex-col gap-2 mt-2">
@@ -1027,7 +918,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
           variant="outline"
           onClick={handleBack}
           disabled={
-            (step === 'integrations' && (integrationFormVisible || isBuilding || isSaving)) ||
+            (step === 'integrations' && showIntegrationForm) ||
             isBuilding || isSaving
           }
         >
@@ -1048,15 +939,12 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
             </Button>
           )}
           <Button
-            onClick={() => {
-              urlFieldRef.current?.commit()
-              handleNext()
-            }}
+            onClick={handleNext}
             disabled={
               isBuilding ||
               isSaving ||
               isGeneratingSuggestions ||
-              (step === 'integrations' && (integrationFormVisible || integrations.length === 0 || selectedIntegrationIds.length === 0))
+              (step === 'integrations' && integrations.length === 0)
             }
           >
             {isBuilding ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Building...</> :
