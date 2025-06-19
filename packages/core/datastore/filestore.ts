@@ -71,15 +71,11 @@ export class FileStore implements DataStore {
           this.logsFilePath = path.join('./.superglue', 'superglue_logs.jsonl');
           logMessage('info', `File Datastore: Updated storage path: ${this.filePath}`);
         }
-        else {
-          logMessage('error', `File Datastore: "${path.dirname(this.filePath)}" directory not accessible, exiting`);
-          process.exit(1);
-        }
+        // Don't exit - just create the directory
+        logMessage('info', `File Datastore: Creating directory: ${path.dirname(this.filePath)}`);
+        await fs.promises.mkdir(path.dirname(this.filePath), { recursive: true, mode: 0o755 });
+        logMessage('info', `File Datastore: Created/verified directory: ${path.dirname(this.filePath)}`);
       }
-
-      // Ensure the directory exists with proper permissions
-      await fs.promises.mkdir(path.dirname(this.filePath), { recursive: true, mode: 0o755 });
-      logMessage('info', `File Datastore: Created/verified directory: ${path.dirname(this.filePath)}`);
 
       try {
         const data = await fs.promises.readFile(this.filePath, 'utf-8');
@@ -107,7 +103,7 @@ export class FileStore implements DataStore {
         try {
           await fs.promises.access(this.filePath);
           logMessage('error', 'COULD NOT LOAD FROM EXISTING FILE. EXITING. ' + error);
-          process.exit(1);
+          throw new Error('Could not load from existing file: ' + error);
         } catch {
           logMessage('info', 'File Datastore: No existing data found, starting with empty storage');
           await this.persist();
@@ -139,9 +135,9 @@ export class FileStore implements DataStore {
         integrations: Object.fromEntries(this.storage.integrations),
         tenant: this.storage.tenant
       };
-      const tempPath = `${this.filePath}.tmp`;
-      await fs.promises.writeFile(tempPath, JSON.stringify(serialized, null, 2), { mode: 0o644 });
-      await fs.promises.rename(tempPath, this.filePath);
+
+      // Write directly to the target file instead of using temp file + rename
+      await fs.promises.writeFile(this.filePath, JSON.stringify(serialized, null, 2), { mode: 0o644 });
     } catch (error) {
       logMessage('error', 'Failed to persist data: ' + error);
       throw error;
