@@ -1,5 +1,6 @@
 import { Integration } from '@superglue/client';
 import { Context } from "@superglue/shared";
+import { generateUniqueId } from '@superglue/shared/utils';
 import { GraphQLResolveInfo } from "graphql";
 import { Documentation } from '../../utils/documentation.js';
 import { logMessage } from '../../utils/logs.js';
@@ -76,7 +77,7 @@ export const getIntegrationResolver = async (
 
 export const upsertIntegrationResolver = async (
   _: any,
-  { input }: { input: Integration },
+  { input, mode = 'UPSERT' }: { input: Integration, mode?: 'CREATE' | 'UPDATE' | 'UPSERT' },
   context: Context,
   info: GraphQLResolveInfo
 ) => {
@@ -86,6 +87,15 @@ export const upsertIntegrationResolver = async (
   try {
     const now = new Date();
     const oldIntegration = await context.datastore.getIntegration(input.id, context.orgId);
+
+    if (mode === 'CREATE') {
+      if (oldIntegration) {
+        input.id = await generateUniqueId(input.id, context.orgId, async (id, orgId) => !!(await context.datastore.getIntegration(id, orgId)));
+      }
+    } else if (mode === 'UPDATE' && !oldIntegration) {
+      throw new Error(`Integration with ID '${input.id}' not found.`);
+    }
+
     const shouldFetchDoc = needsDocFetch(input, oldIntegration);
 
     if (shouldFetchDoc) {

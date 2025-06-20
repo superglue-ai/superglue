@@ -20,7 +20,7 @@ import { needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
 import { integrations as integrationTemplates } from '@/src/lib/integrations';
 import { composeUrl } from '@/src/lib/utils';
 import type { Integration } from '@superglue/client';
-import { SuperglueClient } from '@superglue/client';
+import { SuperglueClient, UpsertMode } from '@superglue/client';
 import { FileDown, Globe, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { SimpleIcon } from 'simple-icons';
@@ -105,21 +105,22 @@ export default function IntegrationsPage() {
     const handleSave = async (integration: Integration) => {
         try {
             if (integration.id) {
-                await client.upsertIntegration(integration.id, integration)
-                const needsDocFetch = needsUIToTriggerDocFetch(integration, editingIntegration);
+                const mode = editingIntegration ? UpsertMode.UPDATE : UpsertMode.CREATE;
+                const savedIntegration = await client.upsertIntegration(integration.id, integration, mode)
+                const needsDocFetch = needsUIToTriggerDocFetch(savedIntegration, editingIntegration);
 
                 if (needsDocFetch) {
                     // Set pending state for new integrations with doc URLs
-                    setPendingDocIds(prev => new Set([...prev, integration.id]));
+                    setPendingDocIds(prev => new Set([...prev, savedIntegration.id]));
 
                     // Fire-and-forget poller for background doc fetch
-                    waitForIntegrationReady([integration.id], 60000).then(() => {
+                    waitForIntegrationReady([savedIntegration.id], 60000).then(() => {
                         // Remove from pending when done
-                        setPendingDocIds(prev => new Set([...prev].filter(id => id !== integration.id)));
+                        setPendingDocIds(prev => new Set([...prev].filter(id => id !== savedIntegration.id)));
                     }).catch((error) => {
                         console.error('Error waiting for docs:', error);
                         // Remove from pending on error
-                        setPendingDocIds(prev => new Set([...prev].filter(id => id !== integration.id)));
+                        setPendingDocIds(prev => new Set([...prev].filter(id => id !== savedIntegration.id)));
                     });
                 }
 
@@ -158,7 +159,7 @@ export default function IntegrationsPage() {
                 documentationPending: true // Trigger refresh
             };
 
-            await client.upsertIntegration(integrationId, upsertData);
+            await client.upsertIntegration(integrationId, upsertData, UpsertMode.UPDATE);
 
             // Use proper polling to wait for docs to be ready
             const results = await waitForIntegrationReady([integrationId], 60000);
@@ -177,7 +178,7 @@ export default function IntegrationsPage() {
                 await client.upsertIntegration(integrationId, {
                     ...upsertData,
                     documentationPending: false
-                });
+                }, UpsertMode.UPDATE);
 
                 setPendingDocIds(prev => new Set([...prev].filter(id => id !== integrationId)));
 
@@ -202,7 +203,7 @@ export default function IntegrationsPage() {
                         credentials: integration.credentials || {},
                         documentation: integration.documentation || '',
                         documentationPending: false
-                    });
+                    }, UpsertMode.UPDATE);
                 }
             } catch (resetError) {
                 console.error('Error resetting documentationPending:', resetError);

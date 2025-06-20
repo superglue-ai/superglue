@@ -13,3 +13,29 @@ export function flattenAndNamespaceWorkflowCredentials(
         return acc;
     }, {} as Record<string, string>);
 }
+
+export async function generateUniqueId(
+    baseId: string,
+    exists: (id: string) => Promise<boolean> | boolean
+): Promise<string> {
+    if (!(await exists(baseId))) {
+        return baseId;
+    }
+
+    let counter = 1;
+    const match = baseId.match(/(.*)-(\d+)$/);
+    let root = baseId;
+
+    if (match) {
+        root = match[1];
+        counter = parseInt(match[2], 10) + 1;
+    }
+
+    while (true) {
+        const newId = `${root}-${counter}`;
+        if (!(await exists(newId))) {
+            return newId;
+        }
+        counter++;
+    }
+} 
