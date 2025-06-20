@@ -1,19 +1,20 @@
-import { useState, useEffect } from 'react';
 import { Button } from '@/src/components/ui/button';
-import { Switch } from '@/src/components/ui/switch';
 import { Label } from '@/src/components/ui/label';
-import { Textarea } from '@/src/components/ui/textarea';
-import { WorkflowStepCard } from './WorkflowStepCard';
-import Editor from 'react-simple-code-editor';
+import { Switch } from '@/src/components/ui/switch';
+import { cn } from '@/src/lib/utils';
+import { Integration } from "@superglue/client";
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
-import { cn } from '@/src/lib/utils';
+import { useEffect, useState } from 'react';
+import Editor from 'react-simple-code-editor';
+import { WorkflowStepCard } from './WorkflowStepCard';
 
 interface WorkflowStepsViewProps {
   steps: any[];
   onStepsChange: (steps: any[]) => void;
   onStepEdit: (stepId: string, updatedStep: any) => void;
   codeModeOnly?: boolean;
+  integrations?: Integration[];
 }
 
 const highlightJson = (code: string) => {
@@ -24,7 +25,7 @@ const highlightJson = (code: string) => {
   }
 };
 
-export function WorkflowStepsView({ steps, onStepsChange, onStepEdit, codeModeOnly }: WorkflowStepsViewProps) {
+export function WorkflowStepsView({ steps, onStepsChange, onStepEdit, codeModeOnly, integrations }: WorkflowStepsViewProps) {
   const [isCodeMode, setIsCodeMode] = useState(false);
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [codeValue, setCodeValue] = useState(JSON.stringify(steps, null, 2));
@@ -65,6 +66,7 @@ export function WorkflowStepsView({ steps, onStepsChange, onStepEdit, codeModeOn
       name: "New Step",
       type: "default", // Or some other default type
       apiConfig: {
+        id: `new-step-${Date.now()}`,
         method: 'GET',
         urlHost: '',
         urlPath: '',
@@ -72,6 +74,8 @@ export function WorkflowStepsView({ steps, onStepsChange, onStepEdit, codeModeOn
         queryParams: {},
         body: ''
       },
+      inputMapping: "$",
+      responseMapping: "$",
       executionMode: 'DIRECT',
       // Add other default properties for a new step as needed
     };
@@ -120,11 +124,12 @@ export function WorkflowStepsView({ steps, onStepsChange, onStepEdit, codeModeOn
         <div className="space-y-2">
           {steps.map((step, index) => (
             <WorkflowStepCard
-              key={step.id || index} // Use step.id if available, otherwise index
+              key={step.id || index}
               step={step}
               isLast={index === steps.length - 1}
               onEdit={onStepEdit}
               onRemove={handleRemoveStep}
+              integrations={integrations}
             />
           ))}
           <div className="pt-2">
