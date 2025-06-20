@@ -8,7 +8,7 @@ import { findMatchingIntegration, integrations as integrationTemplates } from '@
 import { cn, composeUrl } from '@/src/lib/utils';
 import { Integration, IntegrationInput, SuperglueClient, Workflow, WorkflowResult } from '@superglue/client';
 import { flattenAndNamespaceWorkflowCredentials } from '@superglue/shared/utils';
-import { ArrowRight, ChevronRight, Globe, Loader2, Pencil, Play, Plus, RotateCw, X } from 'lucide-react';
+import { ArrowRight, ChevronRight, FileDown, Globe, Loader2, Pencil, Play, Plus, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
@@ -736,7 +736,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                               disabled={!sys.documentationUrl || !sys.documentationUrl.trim() || pendingDocIds.has(sys.id)}
                               title={sys.documentationUrl && sys.documentationUrl.trim() ? "Refresh documentation from URL" : "No documentation URL to refresh"}
                             >
-                              <RotateCw className="h-4 w-4" />
+                              <FileDown className="h-4 w-4" />
                             </Button>
                             <input
                               type="checkbox"
@@ -928,19 +928,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                     </div>
                     {(() => {
                       try {
-                        const parsedPayload = JSON.parse(payload);
-                        if (!parsedPayload || Object.keys(parsedPayload).length === 0) {
-                          return (
-                            <div className="text-xs text-amber-500 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded mt-2">
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                                <line x1="12" y1="9" x2="12" y2="13" />
-                                <line x1="12" y1="17" x2="12.01" y2="17" />
-                              </svg>
-                              No workflow variables added
-                            </div>
-                          );
-                        }
+                        JSON.parse(payload);
                         return null;
                       } catch {
                         return (
