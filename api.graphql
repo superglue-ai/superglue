@@ -286,6 +286,11 @@ type Log {
   runId: ID
 }
 
+type SuggestedIntegration {
+  id: String!
+  reason: String!
+}
+
 type Query {
   listRuns(limit: Int = 10, offset: Int = 0, configId: ID): RunList!
   listApis(limit: Int = 10, offset: Int = 0): ApiList!
@@ -300,6 +305,7 @@ type Query {
   getExtract(id: ID!): ExtractConfig
   getWorkflow(id: ID!): Workflow
   getIntegration(id: ID!): Integration
+  findRelevantIntegrations(instruction: String): [SuggestedIntegration!]
 
   generateSchema(instruction: String!, responseData: String): JSONSchema!
   generateInstructions(integrations: [IntegrationInput!]!): [String!]!
