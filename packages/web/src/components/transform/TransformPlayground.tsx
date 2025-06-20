@@ -4,6 +4,7 @@ import { useConfig } from "@/src/app/config-context";
 import JsonSchemaEditor from "@/src/components/utils/JsonSchemaEditor";
 import { WorkflowResultsView } from "@/src/components/workflow/WorkflowResultsView";
 import { CacheMode, SuperglueClient, TransformResult, WorkflowResult } from "@superglue/client";
+import { X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from "react";
 import { useToast } from "../../hooks/use-toast";
@@ -12,7 +13,6 @@ import { Card, CardContent } from "../ui/card";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Textarea } from "../ui/textarea";
-import { X } from 'lucide-react';
 
 type InputType = 'raw' | 'url' | 'file';
 
@@ -503,7 +503,7 @@ export default function TransformPlayground({ id }: { id?: string }) {
                                 className="font-mono text-xs min-h-[200px]"
                             />
                             {!rawData.trim() && (
-                                <div className="text-xs text-amber-500 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded mt-1">
+                                <div className="text-xs text-amber-800 dark:text-amber-300 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded mt-1">
                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
                                         <line x1="12" y1="9" x2="12" y2="13" />
@@ -527,7 +527,7 @@ export default function TransformPlayground({ id }: { id?: string }) {
                                 placeholder="https://api.example.com/data"
                             />
                             {!inputUrl.trim() && (
-                                <div className="text-xs text-amber-500 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded mt-1">
+                                <div className="text-xs text-amber-800 dark:text-amber-300 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded mt-1">
                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
                                         <line x1="12" y1="9" x2="12" y2="13" />
@@ -555,7 +555,7 @@ export default function TransformPlayground({ id }: { id?: string }) {
                                 </p>
                             )}
                             {!inputFile && (
-                                <div className="text-xs text-amber-500 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded mt-1">
+                                <div className="text-xs text-amber-800 dark:text-amber-300 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded mt-1">
                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
                                         <line x1="12" y1="9" x2="12" y2="13" />

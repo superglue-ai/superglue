@@ -65,32 +65,6 @@ export const parseCredentialsHelper = (simpleCreds: string): Record<string, stri
   }
 }
 
-export const removeNullUndefined = (obj: any): any => {
-  if (Array.isArray(obj)) {
-    // Filter out null/undefined values after mapping
-    return obj
-      .map(removeNullUndefined)
-      .filter(v => v !== null && v !== undefined);
-  } else if (typeof obj === 'object' && obj !== null) {
-    const newObj: Record<string, any> = {};
-    for (const key in obj) {
-      if (Object.prototype.hasOwnProperty.call(obj, key)) {
-        const value = removeNullUndefined(obj[key]);
-        // Only add the key back if the processed value is not null/undefined
-        if (value !== null && value !== undefined) {
-          newObj[key] = value;
-        }
-      }
-    }
-    // Return null if the object becomes empty after cleaning,
-    // or you could return {} depending on desired behavior.
-    // Let's return {} for now to avoid removing empty objects entirely.
-    return newObj;
-  }
-  // Return primitives, null, or undefined as is
-  return obj;
-};
-
 export const splitUrl = (url: string) => {
   if (!url) {
     return {

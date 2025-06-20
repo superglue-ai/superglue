@@ -1,12 +1,12 @@
 import { useConfig } from "@/src/app/config-context";
 import { Button } from "@/src/components/ui/button";
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/src/components/ui/dialog";
 import { Input } from "@/src/components/ui/input";
 import { useToast } from "@/src/hooks/use-toast";
@@ -82,7 +82,7 @@ const ApiConfigIdEditModal = ({
       });
 
       const result = await response.json();
-      
+
       if (result.errors) {
         throw new Error(result.errors[0].message);
       }
@@ -114,7 +114,7 @@ const ApiConfigIdEditModal = ({
         <DialogHeader>
           <DialogTitle>Edit API Config ID</DialogTitle>
           <DialogDescription>
-            Changing the API Config ID updates all references in the database. 
+            Changing the API Config ID updates all references in the database.
           </DialogDescription>
         </DialogHeader>
 
@@ -142,7 +142,7 @@ const ApiConfigIdEditModal = ({
             )}
 
             <div className="bg-amber-50 dark:bg-amber-950 p-3 rounded-md border border-amber-200 dark:border-amber-800 mt-2">
-              <p className="text-amber-800 dark:text-amber-300 text-sm">
+              <p className="text-amber-800 dark:text-amber-300 dark:text-amber-300 text-sm">
                 <strong>Warning:</strong> Changing the ID will break any existing code that references the current ID.
                 Make sure to update all references in your application code.
               </p>

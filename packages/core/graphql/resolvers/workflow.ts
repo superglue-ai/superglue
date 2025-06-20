@@ -51,9 +51,6 @@ export const executeWorkflowResolver = async (
       // Validate required workflow fields
       if (!workflow.id) throw new Error("Workflow must have an ID");
       if (!workflow.steps || !Array.isArray(workflow.steps)) throw new Error("Workflow must have steps array");
-      if (!workflow.integrationIds || !Array.isArray(workflow.integrationIds)) {
-        logMessage('warn', `Workflow ${workflow.id} missing integrationIds array`, metadata);
-      }
       logMessage('info', `Executing workflow ${workflow.id}`, metadata);
     } else {
       throw new Error("Must provide either workflow ID or workflow object");
@@ -69,10 +66,28 @@ export const executeWorkflowResolver = async (
 
     let mergedCredentials = args.credentials || {};
     let integrations: Integration[] = [];
-    if (Array.isArray(workflow.integrationIds) && workflow.integrationIds.length > 0) {
+
+    // Collect integration IDs from workflow level and steps
+    const allIntegrationIds = new Set<string>();
+
+    // Add workflow-level integration IDs
+    if (Array.isArray(workflow.integrationIds)) {
+      workflow.integrationIds.forEach(id => allIntegrationIds.add(id));
+    }
+
+    // Add integration IDs from each step
+    if (Array.isArray(workflow.steps)) {
+      workflow.steps.forEach(step => {
+        if (step.integrationId) {
+          allIntegrationIds.add(step.integrationId);
+        }
+      });
+    }
+
+    if (allIntegrationIds.size > 0) {
       integrations = (
         await Promise.all(
-          workflow.integrationIds.map(async (id) => {
+          Array.from(allIntegrationIds).map(async (id) => {
             const integration = await context.datastore.getIntegration(id, context.orgId);
             if (!integration) {
               logMessage('warn', `Integration with id "${id}" not found, skipping.`, metadata);

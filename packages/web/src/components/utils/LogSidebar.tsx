@@ -1,13 +1,13 @@
 "use client"
-import { useState, useEffect, useMemo, useRef } from "react"
-import { motion } from "framer-motion"
-import { ChevronLeft, ChevronRight, X } from "lucide-react"
-import { Button } from "../ui/button"
-import { ScrollArea } from "../ui/scroll-area"
 import { ApolloClient, gql, InMemoryCache, useSubscription } from "@apollo/client"
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions'
+import { motion } from "framer-motion"
 import { createClient } from 'graphql-ws'
+import { ChevronRight, X } from "lucide-react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useConfig } from "../../app/config-context"
+import { Button } from "../ui/button"
+import { ScrollArea } from "../ui/scroll-area"
 import { Switch } from "../ui/switch"
 
 export interface LogEntry {
@@ -23,7 +23,7 @@ const LOGS_SUBSCRIPTION = gql`
   subscription OnNewLog {
     logs {
       id
-      message
+      message   
       level
       timestamp
       runId
@@ -31,7 +31,7 @@ const LOGS_SUBSCRIPTION = gql`
   }
 `
 
-const LOG_MIN_WIDTH = 500
+const LOG_MIN_WIDTH = 300
 const LOG_MAX_WIDTH = 1500
 const LOG_COLLAPSED_WIDTH = 50
 
@@ -44,8 +44,9 @@ export function LogSidebar() {
   const resizingWidthRef = useRef(logViewWidth)
   const logViewRef = useRef<HTMLDivElement | null>(null)
   const [showDebug, setShowDebug] = useState(true)
+  const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set())
   const config = useConfig();
-  
+
   const client = useMemo(() => {
     const wsLink = new GraphQLWsLink(createClient({
       url: config.superglueEndpoint?.replace('https', 'wss')?.replace('http', 'ws') || 'ws://localhost:3000/graphql',
@@ -71,12 +72,12 @@ export function LogSidebar() {
       },
     })
   }, [config.superglueEndpoint, config.superglueApiKey])
-          
+
   const filteredLogs = useMemo(
     () => showDebug ? logs : logs.filter(log => log.level !== "DEBUG"),
     [logs, showDebug]
   )
-          
+
   useEffect(() => {
     return () => {
       client.stop()
@@ -130,7 +131,7 @@ export function LogSidebar() {
       const delta = startX - moveEvent.clientX
       let newWidth = startWidth + delta
       newWidth = Math.min(LOG_MAX_WIDTH, Math.max(LOG_MIN_WIDTH, newWidth))
-      
+
       resizingWidthRef.current = newWidth
       if (logViewRef.current) {
         logViewRef.current.style.width = `${newWidth}px`
@@ -183,24 +184,49 @@ export function LogSidebar() {
 
           <ScrollArea className="max-w-full block flex-1">
             <div className="p-4 max-w-[100%-5rem]">
-              {filteredLogs.map((log) => (
-                <div
-                  key={log.id}
-                  className={`mb-2 p-2 rounded text-sm max-w-full  overflow-hidden ${
-                    log.level === "ERROR"
+              {filteredLogs.map((log) => {
+                const isLogExpanded = expandedLogs.has(log.id)
+                const shouldTruncate = log.message.length > 100
+                const displayMessage = shouldTruncate && !isLogExpanded
+                  ? log.message.slice(0, 100) + '...'
+                  : log.message
+
+                return (
+                  <div
+                    key={log.id}
+                    className={`mb-2 p-2 rounded text-sm max-w-full  overflow-hidden ${log.level === "ERROR"
                       ? "bg-red-500/10"
                       : log.level === "WARN"
-                      ? "bg-yellow-500/10"
-                      : "bg-muted"
-                  }`}
-                >
-                  <div className="flex justify-between">
-                    <span className="font-mono">{new Date(log.timestamp).toLocaleTimeString()}</span>
-                    <span className="font-semibold">{log.level}</span>
+                        ? "bg-yellow-500/10"
+                        : "bg-muted"
+                      }`}
+                  >
+                    <div className="flex justify-between">
+                      <span className="font-mono">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                      <span className="font-semibold">{log.level}</span>
+                    </div>
+                    <p className="max-w-full break-words">{displayMessage}</p>
+                    {shouldTruncate && (
+                      <button
+                        onClick={() => {
+                          setExpandedLogs(prev => {
+                            const newSet = new Set(prev)
+                            if (isLogExpanded) {
+                              newSet.delete(log.id)
+                            } else {
+                              newSet.add(log.id)
+                            }
+                            return newSet
+                          })
+                        }}
+                        className="text-xs text-muted-foreground hover:text-foreground mt-1"
+                      >
+                        {isLogExpanded ? 'Show less' : 'Show more'}
+                      </button>
+                    )}
                   </div>
-                  <p className="max-w-full break-words">{log.message}</p>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </ScrollArea>
           <div

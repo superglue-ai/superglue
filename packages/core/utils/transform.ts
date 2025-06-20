@@ -207,7 +207,7 @@ ${JSON.stringify(sample(payload, 2), null, 2).slice(0, 50000)}
   } catch (error) {
     if (retry < 10) {
       const errorMessage = String(error.message);
-      logMessage('warn', "Error generating JS mapping: " + errorMessage.slice(0, 250), metadata);
+      logMessage('warn', "Error generating JS mapping: " + errorMessage.slice(0, 1000), metadata);
       messages?.push({ role: "user", content: errorMessage });
       return generateTransformCode(schema, payload, instruction, metadata, retry + 1, messages);
     }
