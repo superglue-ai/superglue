@@ -158,6 +158,20 @@ export const SaveWorkflowInputSchema = {
   workflow: z.object(WorkflowInputSchemaInternal).describe("The workflow configuration object to save."),
 };
 
+export const ListIntegrationsInputSchema = {
+  limit: z.number().int().optional().default(10).describe("Number of integrations to return (default: 10)"),
+  offset: z.number().int().optional().default(0).describe("Offset for pagination (default: 0)"),
+};
+
+export const CreateIntegrationInputSchema = {
+  id: z.string().describe("A unique identifier for the new integration (e.g., 'stripe-production')."),
+  name: z.string().describe("A human-readable name for the integration (e.g., 'Stripe Production')."),
+  urlHost: z.string().optional().describe("Base URL for the API (e.g., 'https://api.stripe.com')."),
+  documentationUrl: z.string().optional().describe("URL to the API documentation."),
+  documentation: z.string().optional().describe("A string containing the API documentation, if provided directly."),
+  credentials: z.any().optional().describe("Credentials for accessing the integration."),
+};
+
 // --- Tool Definitions ---
 // Map tool names to their Zod schemas and GraphQL details
 // This remains largely the same, but SuperglueClient will be created with the passed graphqlEndpoint
@@ -528,6 +542,63 @@ export const toolDefinitions: Record<string, any> = {
       }
     },
   },
+
+  superglue_list_integrations: {
+    description: `
+    <use_case>
+      Lists all available integrations for the current organization. Use this to see what connections are already configured before creating a new one.
+    </use_case>
+    `,
+    inputSchema: ListIntegrationsInputSchema,
+    execute: async (args: any & { client: SuperglueClient }, request) => {
+      const { client, limit = 10, offset = 0 } = args;
+      try {
+        const result = await client.listIntegrations(limit, offset);
+        return {
+          success: true,
+          integrations: result.items,
+          total: result.total,
+        };
+      } catch (error: any) {
+        return {
+          success: false,
+          error: error.message,
+          suggestion: "Failed to list integrations. Please check your connection and credentials."
+        };
+      }
+    },
+  },
+
+  superglue_create_integration: {
+    description: `
+    <use_case>
+      Creates a new integration configuration. Use this only after confirming with the user that a suitable integration does not already exist.
+    </use_case>
+
+    <important_notes>
+      - Before using this tool, ALWAYS call 'superglue_list_integrations' to ensure an integration with the same purpose doesn't already exist.
+      - The 'id' MUST be unique. If the desired ID is taken, ask the user for a new one or suggest adding a suffix (e.g., '-v2').
+      - If the user provides both a 'documentationUrl' and a block of text for 'documentation', prioritize the pasted text for the 'documentation' field to avoid triggering a web fetch, unless the text is clearly just a minor note.
+    </important_notes>
+    `,
+    inputSchema: CreateIntegrationInputSchema,
+    execute: async (args: any & { client: SuperglueClient }, request) => {
+      const { client, ...integrationInput } = args;
+      try {
+        const result = await client.upsertIntegration(integrationInput);
+        return {
+          success: true,
+          integration: result,
+        };
+      } catch (error: any) {
+        return {
+          success: false,
+          error: error.message,
+          suggestion: "Failed to create integration. Please ensure the ID is unique and all required fields are provided."
+        };
+      }
+    },
+  },
 };
 
 // Modified server creation function
@@ -539,13 +610,16 @@ export const createMcpServer = async (apiKey: string) => {
 superglue: Universal API Integration Platform
 
 AGENT WORKFLOW:
-1. FIND RELEVANT INTEGRATIONS: Use superglue_find_relevant_integrations with the user's instruction to get a list of suggested integrations.
-2. RUN & VALIDATE: Use superglue_run_instruction with the instruction and selected integrations to test the workflow. Analyze the results. If it fails, repeat this step with a refined instruction.
-3. SAVE (Optional): Once the workflow succeeds, confirm with the user. If they agree, use superglue_save_workflow with the 'workflow_executed' object from the successful run to persist it for future use.
-4. EXECUTE (for existing): Use superglue_execute_workflow to run previously saved workflows by their ID.
-5. GET CODE: Use superglue_get_workflow_integration_code to show users how to implement a saved workflow in their applications.
+1. DISCOVER: Use superglue_list_integrations to see if a suitable integration already exists.
+2. CREATE (if necessary): If no suitable integration exists, ask the user for confirmation and details, then use superglue_create_integration.
+3. FIND RELEVANT INTEGRATIONS: Use superglue_find_relevant_integrations with the user's instruction to get a list of suggested integrations for the workflow.
+4. RUN & VALIDATE: Use superglue_run_instruction with the instruction and selected integrations to test the workflow. Analyze the results. If it fails, repeat this step with a refined instruction.
+5. SAVE (Optional): Once the workflow succeeds, confirm with the user. If they agree, use superglue_save_workflow with the 'workflow_executed' object from the successful run to persist it for future use.
+6. EXECUTE (for existing): Use superglue_execute_workflow to run previously saved workflows by their ID.
+7. GET CODE: Use superglue_get_workflow_integration_code to show users how to implement a saved workflow in their applications.
 
 CAPABILITIES:
+- Create and manage integrations
 - Build, test and run workflows without persistence
 - Save validated workflows for reuse
 - Execute existing workflows by ID
