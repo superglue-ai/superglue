@@ -1,9 +1,10 @@
 import { Integration } from '@superglue/client';
-import { Context } from "@superglue/shared";
+import { Context, Metadata } from "@superglue/shared";
 import { generateUniqueId } from '@superglue/shared/utils';
 import { GraphQLResolveInfo } from "graphql";
 import { Documentation } from '../../utils/documentation.js';
 import { logMessage } from '../../utils/logs.js';
+import { IntegrationSelector } from '../../workflow/integration-selector.js';
 
 function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined, defaultValue?: T): T | undefined {
   if (newValue === null) return undefined;
@@ -181,5 +182,37 @@ export const deleteIntegrationResolver = async (
   } catch (error) {
     logMessage('error', `Error deleting integration: ${String(error)}`, { orgId: context.orgId });
     throw error;
+  }
+};
+
+export const findRelevantIntegrationsResolver = async (
+  _: any,
+  { instruction }: { instruction?: string },
+  context: Context,
+  info: GraphQLResolveInfo
+) => {
+  try {
+    const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
+    const allIntegrations = await context.datastore.listIntegrations(1000, 0, context.orgId); // Fetch all
+
+    if (!allIntegrations || allIntegrations.items.length === 0) {
+      return []; // No integrations exist for this user
+    }
+
+    // Filter out integrations with pending documentation
+    const availableIntegrations = allIntegrations.items.filter(int => !int.documentationPending);
+
+    if (availableIntegrations.length === 0) {
+      logMessage('info', `No integrations with complete documentation found.`, metadata);
+      return [];
+    }
+
+    const selector = new IntegrationSelector(metadata);
+    const suggestedIntegrations = await selector.select(instruction, availableIntegrations);
+
+    return suggestedIntegrations;
+  } catch (error) {
+    logMessage('error', `Error finding relevant integrations: ${String(error)}`, { orgId: context.orgId });
+    return [];
   }
 };
