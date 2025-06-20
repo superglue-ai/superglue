@@ -47,7 +47,7 @@ export class Documentation {
 
   // Main function to fetch and process documentation using strategies
   public async fetchAndProcess(): Promise<string> {
-    
+
     if (this.lastResult) {
       return this.lastResult;
     }
@@ -544,6 +544,9 @@ class OpenApiStrategy implements ProcessingStrategy {
     // Needs page content fetched by PlaywrightFetchingStrategy (or null if fetch failed)
     if (content === undefined || content === null) {
       return null;
+    }
+    if (typeof content !== 'string') {
+      content = JSON.stringify(content, null, 2);
     }
     const trimmedContent = content.trim();
     const isJson = trimmedContent.startsWith('{') && trimmedContent.endsWith('}');
