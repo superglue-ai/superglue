@@ -21,7 +21,7 @@ import { integrations as integrationTemplates } from '@/src/lib/integrations';
 import { composeUrl } from '@/src/lib/utils';
 import type { Integration } from '@superglue/client';
 import { SuperglueClient } from '@superglue/client';
-import { Globe, Pencil, Plus, RotateCw, Trash2 } from 'lucide-react';
+import { FileDown, Globe, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { SimpleIcon } from 'simple-icons';
 import * as simpleIcons from 'simple-icons';
@@ -65,8 +65,8 @@ export default function IntegrationsPage() {
     const [addFormOpen, setAddFormOpen] = useState(false);
 
     const [page, setPage] = useState(0);
-    const PAGE_SIZE = 5;
-    const paginatedIntegrations = integrations.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+    const PAGE_SIZE = 10;
+    const paginatedIntegrations = integrations?.sort((a, b) => a.id.localeCompare(b.id)).slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE) || [];
     const totalPages = Math.ceil(integrations.length / PAGE_SIZE);
 
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -247,7 +247,7 @@ export default function IntegrationsPage() {
     }
 
     return (
-        <div className="flex flex-col h-full p-8 w-full">
+        <div className="flex flex-col min-h-full p-8 w-full">
             {initialLoading ? null : (
                 <>
                     <h1 className="text-2xl font-semibold mb-6">Integrations</h1>
@@ -334,7 +334,7 @@ export default function IntegrationsPage() {
                                                 disabled={!integration.documentationUrl || !integration.documentationUrl.trim() || pendingDocIds.has(integration.id)}
                                                 title={integration.documentationUrl && integration.documentationUrl.trim() ? "Refresh documentation from URL" : "No documentation URL to refresh"}
                                             >
-                                                <RotateCw className="h-4 w-4" />
+                                                <FileDown className="h-4 w-4" />
                                             </Button>
                                             <Button
                                                 variant="ghost"
