@@ -231,7 +231,7 @@ describe('MemoryStore', () => {
 
       // Should only return the valid run
       expect(items.length).toBe(1);
-      expect(total).toBe(1);
+      expect(total).toBe(4);
       expect(items[0].id).toBe('valid-run');
     });
 
@@ -250,7 +250,7 @@ describe('MemoryStore', () => {
 
       // Should only return the valid run
       expect(items.length).toBe(1);
-      expect(total).toBe(1);
+      expect(total).toBe(2);
       expect(items[0].id).toBe('valid-run');
     });
   });

@@ -152,7 +152,7 @@ export class MemoryStore implements DataStore {
     const index = this.storage.runsIndex.get(orgId)!;
     index.push({
       id: run.id,
-      timestamp: run.startedAt.getTime(),
+      timestamp: run.startedAt?.getTime() ?? 0,
       configId: run.config?.id
     });
     index.sort((a, b) => b.timestamp - a.timestamp);
