@@ -5,7 +5,7 @@ import {
   CallToolResult,
   isInitializeRequest
 } from "@modelcontextprotocol/sdk/types.js";
-import { SuperglueClient, Workflow, WorkflowResult, Integration } from '@superglue/client';
+import { Integration, SuperglueClient, WorkflowResult } from '@superglue/client';
 import { LogEntry } from "@superglue/shared";
 import { getSDKCode } from '@superglue/shared/templates';
 import { randomUUID } from 'crypto';
@@ -57,7 +57,7 @@ export const TransformOperationInputSchema = {
   options: RequestOptionsSchema.optional().describe("Optional request configuration (caching, timeouts, etc.)")
 };
 
-// Tool-related Schemas (previously Workflow-related)
+// Workflow-related Schemas
 export const ApiInputSchemaInternal = {
   id: z.string().describe("Unique identifier for the API endpoint"),
   urlHost: z.string().describe("Base URL/hostname for the API including protocol. For https://, use the format: https://<<hostname>>. For postgres, use the format: postgres://<<user>>:<<password>>@<<hostname>>:<<port>>"),
@@ -86,20 +86,20 @@ export const ExecutionStepInputSchemaInternal = {
   responseMapping: z.any().optional().describe("JSONata expression to transform step output"),
 };
 
-export const ToolInputSchemaInternal = {
-  id: z.string().describe("Unique identifier for the tool"),
-  steps: z.array(z.object(ExecutionStepInputSchemaInternal)).describe("Array of execution steps that make up the tool"),
-  finalTransform: z.any().optional().describe("JSONata expression to transform final tool output"),
+export const WorkflowInputSchemaInternal = {
+  id: z.string().describe("Unique identifier for the workflow"),
+  steps: z.array(z.object(ExecutionStepInputSchemaInternal)).describe("Array of execution steps that make up the workflow"),
+  finalTransform: z.any().optional().describe("JSONata expression to transform final workflow output"),
   responseSchema: z.any().optional().describe("JSONSchema defining expected final output structure"),
-  version: z.string().optional().describe("Version identifier for the tool"),
-  instruction: z.string().optional().describe("Natural language description of what this tool does"),
+  version: z.string().optional().describe("Version identifier for the workflow"),
+  instruction: z.string().optional().describe("Natural language description of what this workflow does"),
 };
 
-export const ToolInputRequestSchema = z.object({
-  tool: z.object(ToolInputSchemaInternal).optional().describe("Complete tool definition (mutually exclusive with id)"),
-  id: z.string().optional().describe("Reference to existing tool by ID (mutually exclusive with tool)"),
-}).refine(data => (data.tool && !data.id) || (!data.tool && data.id), {
-  message: "Either 'tool' or 'id' must be provided, but not both for ToolInputRequest.",
+export const WorkflowInputRequestSchema = z.object({
+  workflow: z.object(WorkflowInputSchemaInternal).optional().describe("Complete workflow definition (mutually exclusive with id)"),
+  id: z.string().optional().describe("Reference to existing workflow by ID (mutually exclusive with workflow)"),
+}).refine(data => (data.workflow && !data.id) || (!data.workflow && !data.id), {
+  message: "Either 'workflow' or 'id' must be provided, but not both for WorkflowInputRequest.",
 });
 
 export const IntegrationInputSchema = {
@@ -112,40 +112,40 @@ export const IntegrationInputSchema = {
   credentials: z.any().optional().describe("Credentials for accessing the integration. MAKE SURE YOU INCLUDE ALL OF THEM BEFORE BUILDING THE CAPABILITY, OTHERWISE IT WILL FAIL."),
 };
 
-export const ListToolsInputSchema = {
-  limit: z.number().int().optional().default(10).describe("Number of tools to return (default: 10)"),
+export const ListWorkflowsInputSchema = {
+  limit: z.number().int().optional().default(10).describe("Number of workflows to return (default: 10)"),
   offset: z.number().int().optional().default(0).describe("Offset for pagination (default: 0)"),
 };
 
-export const GetToolInputSchema = {
-  id: z.string().describe("The ID of the tool to retrieve"),
+export const GetWorkflowInputSchema = {
+  id: z.string().describe("The ID of the workflow to retrieve"),
 };
 
-export const ExecuteToolInputSchema = {
-  id: z.string().describe("The ID of the tool to execute"),
-  payload: z.any().optional().describe("JSON payload to pass to the tool"),
-  credentials: z.record(z.string()).optional().describe("JSON credentials for the tool execution. Do not include prefixes like Bearer or Basic. E.g. { 'apiKey': '1234567890' }"),
+export const ExecuteWorkflowInputSchema = {
+  id: z.string().describe("The ID of the workflow to execute"),
+  payload: z.any().optional().describe("JSON payload to pass to the workflow"),
+  credentials: z.record(z.string()).optional().describe("JSON credentials for the workflow execution. Do not include prefixes like Bearer or Basic. E.g. { 'apiKey': '1234567890' }"),
   options: RequestOptionsSchema.optional().describe("Optional request configuration"),
 };
 
-export const BuildToolInputSchema = {
-  instruction: z.string().describe("Natural language instruction for building the tool"),
-  payload: z.any().optional().describe("Example JSON payload for the tool. This should be data needed to fulfill the request (e.g. a list of ids to loop over), not settings or filters. If not strictly needed, leave this empty."),
-  integrations: z.array(z.object(IntegrationInputSchema)).describe("Array of integrations the tool can interact with"),
+export const BuildWorkflowInputSchema = {
+  instruction: z.string().describe("Natural language instruction for building the workflow"),
+  payload: z.any().optional().describe("Example JSON payload for the workflow. This should be data needed to fulfill the request (e.g. a list of ids to loop over), not settings or filters. If not strictly needed, leave this empty."),
+  integrations: z.array(z.object(IntegrationInputSchema)).describe("Array of integrations the workflow can interact with"),
   responseSchema: z.any().optional().describe("JSONSchema for the expected response structure"),
 };
 
-export const UpsertToolInputSchema = {
-  id: z.string().describe("The ID for the tool (used for creation or update)"),
-  input: z.any().describe("The tool definition (JSON, conforming to Superglue's tool structure)"),
+export const UpsertWorkflowInputSchema = {
+  id: z.string().describe("The ID for the workflow (used for creation or update)"),
+  input: z.any().describe("The workflow definition (JSON, conforming to superglue's workflow structure)"),
 };
 
-export const DeleteToolInputSchema = {
-  id: z.string().describe("The ID of the tool to delete"),
+export const DeleteWorkflowInputSchema = {
+  id: z.string().describe("The ID of the workflow to delete"),
 };
 
 export const GenerateCodeInputSchema = {
-  toolId: z.string().describe("The ID of the tool to generate code for"),
+  workflowId: z.string().describe("The ID of the workflow to generate code for"),
   language: z.enum(["typescript", "python", "go"]).describe("Programming language for the generated code"),
 };
 
@@ -170,12 +170,12 @@ const createClient = (apiKey: string) => {
   });
 }
 
-// Helper function to generate SDK code for a tool
-const generateSDKCode = async (client: SuperglueClient, toolId: string) => {
+// Helper function to generate SDK code for a workflow
+const generateSDKCode = async (client: SuperglueClient, workflowId: string) => {
   const endpoint = process.env.GRAPHQL_ENDPOINT || "https://graphql.superglue.ai";
 
   try {
-    const tool = await client.getWorkflow(toolId);
+    const workflow = await client.getWorkflow(workflowId);
 
     const generatePlaceholders = (schema: any) => {
       if (!schema || !schema.properties) return { payload: {}, credentials: {} };
@@ -204,8 +204,8 @@ const generateSDKCode = async (client: SuperglueClient, toolId: string) => {
       return { payload, credentials };
     };
 
-    const inputSchema = tool.inputSchema ?
-      (typeof tool.inputSchema === 'string' ? JSON.parse(tool.inputSchema) : tool.inputSchema) :
+    const inputSchema = workflow.inputSchema ?
+      (typeof workflow.inputSchema === 'string' ? JSON.parse(workflow.inputSchema) : workflow.inputSchema) :
       null;
 
     const { payload, credentials } = generatePlaceholders(inputSchema);
@@ -213,23 +213,23 @@ const generateSDKCode = async (client: SuperglueClient, toolId: string) => {
     return getSDKCode({
       apiKey: process.env.SUPERGLUE_API_KEY || 'YOUR_API_KEY',
       endpoint: endpoint,
-      workflowId: toolId,
+      workflowId: workflowId,
       payload,
       credentials,
     });
 
   } catch (error) {
-    console.warn(`Failed to generate SDK code for tool ${toolId}:`, error);
+    console.warn(`Failed to generate SDK code for workflow ${workflowId}:`, error);
     return null;
   }
 };
 
 // Add validation helpers
-const validateToolExecution = (args: any) => {
+const validateWorkflowExecution = (args: any) => {
   const errors: string[] = [];
 
   if (!args.id) {
-    errors.push("Tool ID is required. Use superglue_list_available_tools to find valid IDs.");
+    errors.push("Workflow ID is required. Use superglue_list_available_workflows to find valid IDs.");
   }
 
   if (args.credentials && typeof args.credentials !== 'object') {
@@ -239,11 +239,11 @@ const validateToolExecution = (args: any) => {
   return errors;
 };
 
-const validateToolBuilding = (args: any) => {
+const validateWorkflowBuilding = (args: any) => {
   const errors: string[] = [];
 
   if (!args.instruction || args.instruction.length < 10) {
-    errors.push("Instruction must be detailed (minimum 10 characters). Describe what the tool should do, what integrations it connects to, and expected inputs/outputs.");
+    errors.push("Instruction must be detailed (minimum 10 characters). Describe what the workflow should do, what integrations it connects to, and expected inputs/outputs.");
   }
 
   if (!args.integrations || !Array.isArray(args.integrations) || args.integrations.length === 0) {
@@ -259,36 +259,46 @@ const validateToolBuilding = (args: any) => {
 
 // Update execute functions with validation
 export const toolDefinitions: Record<string, any> = {
-  superglue_list_available_tools: {
+  superglue_list_available_workflows: {
     description: `
     <use_case>
-      List all available Superglue tools for the current organization. Use this to discover what tools are available for execution.
+      List all available superglue workflows for the current organization. Use this to discover what workflows are available for execution.
     </use_case>
 
     <important_notes>
-      - Returns paginated list of tools with their IDs, names, and descriptions
-      - Use the tool IDs with superglue_execute_tool to run specific tools
-      - Default returns 10 tools, use limit/offset for pagination
+      - Returns paginated list of workflows with their IDs, names, and descriptions
+      - Use the workflow IDs with superglue_execute_workflow to run specific workflows
+      - Default returns 10 workflows, use limit/offset for pagination
     </important_notes>
     `,
-    inputSchema: ListToolsInputSchema,
+    inputSchema: ListWorkflowsInputSchema,
     execute: async (args: any & { client: SuperglueClient }, request) => {
       const { client, limit = 10, offset = 0 } = args;
       try {
         const result = await client.listWorkflows(limit, offset);
+        const staticWorkflows = Object.keys(toolDefinitions).map(id => ({
+          id,
+          name: id,
+          instruction: toolDefinitions[id].description.split('<use_case>')[1].split('</use_case>')[0].trim(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }));
+
+        const allWorkflows = [...staticWorkflows, ...result.items.map(workflow => ({
+          id: workflow.id,
+          name: workflow.name || workflow.id,
+          instruction: workflow.instruction,
+          created_at: workflow.createdAt,
+          updated_at: workflow.updatedAt
+        }))];
+
         return {
           success: true,
-          tools: result.items.map(tool => ({
-            id: tool.id,
-            name: tool.name || tool.id,
-            instruction: tool.instruction,
-            created_at: tool.createdAt,
-            updated_at: tool.updatedAt
-          })),
-          total: result.total,
+          workflows: allWorkflows.slice(offset, offset + limit),
+          total: allWorkflows.length,
           limit,
           offset,
-          usage_tip: "Use tool IDs with superglue_execute_tool to run specific tools"
+          usage_tip: "Use workflow IDs with superglue_execute_workflow to run specific workflows"
         };
       } catch (error: any) {
         return {
@@ -300,22 +310,22 @@ export const toolDefinitions: Record<string, any> = {
     },
   },
 
-  superglue_execute_tool: {
+  superglue_execute_workflow: {
     description: `
     <use_case>
-      Execute a specific Superglue tool by ID. Use this when you know the exact tool needed for a task.
+      Execute a specific superglue workflow by ID. Use this when you know the exact workflow needed for a task.
     </use_case>
 
     <important_notes>
-      - Tool ID must exist (use superglue_list_available_tools to find valid IDs)
+      - Workflow ID must exist (use superglue_list_available_workflows to find valid IDs)
       - CRITICAL: Include ALL required credentials in the credentials object
-      - Payload structure must match the tool's expected input schema
+      - Payload structure must match the workflow's expected input schema
       - Returns execution results + SDK code for integration
     </important_notes>
     `,
-    inputSchema: ExecuteToolInputSchema,
+    inputSchema: ExecuteWorkflowInputSchema,
     execute: async (args, request) => {
-      const validationErrors = validateToolExecution(args);
+      const validationErrors = validateWorkflowExecution(args);
       if (validationErrors.length > 0) {
         throw new Error(`Validation failed:\n${validationErrors.join('\n')}`);
       }
@@ -327,47 +337,47 @@ export const toolDefinitions: Record<string, any> = {
           return {
             success: false,
             error: result.error || "Unknown error",
-            suggestion: "Check that the tool ID exists and all required credentials are provided"
+            suggestion: "Check that the workflow ID exists and all required credentials are provided"
           };
         }
         await client.upsertWorkflow(result.config.id, result.config);
         return {
           ...result,
-          usage_tip: "Use the superglue_get_integration_code tool to integrate this tool into your applications"
+          usage_tip: "Use the superglue_get_workflow_integration_code tool to integrate this workflow into your applications"
         };
       } catch (error: any) {
         return {
           success: false,
           error: error.message,
-          suggestion: "Check that the tool ID exists and all required credentials are provided"
+          suggestion: "Check that the workflow ID exists and all required credentials are provided"
         };
       }
     },
   },
 
-  superglue_build_new_tool: {
+  superglue_build_new_workflow: {
     description: `
     <use_case>
-      Build a new integration tool from natural language instructions. Use when existing tools don't meet requirements.
+      Build a new integration workflow from natural language instructions. Use when existing workflows don't meet requirements.
     </use_case>
 
     <important_notes>
       - Gather ALL integration credentials BEFORE building (API keys, tokens, documentation url if the integration is less known)
       - Provide detailed, specific instructions
       - superglue handles pagination for you, so you don't need to worry about it
-      - Tool building may take 30-60 seconds
+      - Workflow building may take 30-60 seconds
     </important_notes>
     `,
-    inputSchema: BuildToolInputSchema,
+    inputSchema: BuildWorkflowInputSchema,
     execute: async (args: any & { client: SuperglueClient }, request) => {
-      const validationErrors = validateToolBuilding(args);
+      const validationErrors = validateWorkflowBuilding(args);
       if (validationErrors.length > 0) {
         throw new Error(`Validation failed:\n${validationErrors.join('\n')}`);
       }
 
       const { client }: { client: SuperglueClient } = args;
       try {
-        let tool = await client.buildWorkflow({
+        let workflow = await client.buildWorkflow({
           instruction: args.instruction,
           payload: args.payload || {},
           integrations: args.integrations,
@@ -376,8 +386,8 @@ export const toolDefinitions: Record<string, any> = {
 
         return {
           success: true,
-          ...tool,
-          next_steps: `Tool saved successfully. Use with execute_${tool.id} to run it or generate code with superglue_get_integration_code.`
+          ...workflow,
+          next_steps: `Workflow saved successfully. Use with execute_${workflow.id} to run it or generate code with superglue_get_workflow_integration_code.`
         };
       } catch (error: any) {
         return {
@@ -389,30 +399,30 @@ export const toolDefinitions: Record<string, any> = {
     },
   },
 
-  superglue_get_integration_code: {
+  superglue_get_workflow_integration_code: {
     description: `
     <use_case>
-      Generate integration code for a specific tool. Use this to show users how to implement a tool in their applications.
+      Generate integration code for a specific workflow. Use this to show users how to implement a workflow in their applications.
     </use_case>
 
     <important_notes>
       - Generates code in TypeScript, Python, or Go
-      - Includes example payload and credentials based on the tool's input schema
+      - Includes example payload and credentials based on the workflow's expected input schema
       - Returns ready-to-use SDK code for integration
     </important_notes>
     `,
     inputSchema: GenerateCodeInputSchema,
     execute: async (args: any & { client: SuperglueClient }, request) => {
-      const { client, toolId, language } = args;
+      const { client, workflowId, language } = args;
 
       try {
-        const sdkCode = await generateSDKCode(client, toolId);
+        const sdkCode = await generateSDKCode(client, workflowId);
 
         if (!sdkCode) {
           return {
             success: false,
-            error: `Failed to generate code for tool ${toolId}`,
-            suggestion: "Verify the tool ID exists and is accessible"
+            error: `Failed to generate code for workflow ${workflowId}`,
+            suggestion: "Verify the workflow ID exists and is accessible"
           };
         }
 
@@ -426,16 +436,16 @@ export const toolDefinitions: Record<string, any> = {
 
         return {
           success: true,
-          toolId,
+          workflowId,
           language,
           code: sdkCode[language],
-          usage_tip: `Copy this ${language} code to integrate the tool into your application`
+          usage_tip: `Copy this ${language} code to integrate the workflow into your application`
         };
       } catch (error: any) {
         return {
           success: false,
           error: error.message,
-          suggestion: "Check that the tool ID exists and you have access to it"
+          suggestion: "Check that the workflow ID exists and you have access to it"
         };
       }
     },
@@ -444,26 +454,26 @@ export const toolDefinitions: Record<string, any> = {
   superglue_run_instruction: {
     description: `
     <use_case>
-      Execute an instruction once without saving it as a persistent tool. Use for ad-hoc tasks that don't need to be reused.
+      Execute an instruction once without saving it as a persistent workflow. Use for ad-hoc tasks that don't need to be reused.
     </use_case>
 
     <important_notes>
       - Builds and executes immediately without persistence
       - Requires ALL integration credentials upfront  
       - Faster than build + execute workflow for one-time tasks
-      - Results are returned but tool definition is discarded
+      - Results are returned but workflow definition is discarded
     </important_notes>
     `,
     inputSchema: RunInstructionInputSchema,
     execute: async (args: any & { client: SuperglueClient }, request) => {
-      const validationErrors = validateToolBuilding(args);
+      const validationErrors = validateWorkflowBuilding(args);
       if (validationErrors.length > 0) {
         throw new Error(`Validation failed:\n${validationErrors.join('\n')}`);
       }
 
       const { client }: { client: SuperglueClient } = args;
       try {
-        // Build the tool temporarily
+        // Build the workflow temporarily
         const workflow = await client.buildWorkflow({
           instruction: args.instruction,
           payload: args.payload || {},
@@ -489,7 +499,7 @@ export const toolDefinitions: Record<string, any> = {
           data: result?.data,
           error: result?.error,
           workflow_executed: result?.config || workflow,
-          note: "Tool was executed once and not saved. Use superglue_build_new_tool if you want to save it for reuse."
+          note: "Workflow was executed once and not saved. Use superglue_build_new_workflow if you want to save it for reuse."
         };
       } catch (error: any) {
         return {
@@ -508,24 +518,24 @@ export const createMcpServer = async (apiKey: string) => {
     name: "superglue",
     version: "0.1.0",
     description: `
-Superglue: Universal API Integration Platform
+superglue: Universal API Integration Platform
 
 AGENT WORKFLOW:
-1. DISCOVER: Use superglue_list_available_tools to see what's available
-2. EXECUTE: Use superglue_execute_tool for existing tools OR superglue_run_instruction for one-time tasks
-3. INTEGRATE: Use superglue_get_integration_code to show users how to implement
+1. DISCOVER: Use superglue_list_available_workflows to see what's available
+2. EXECUTE: Use superglue_execute_workflow for existing workflows OR superglue_run_instruction for one-time tasks
+3. INTEGRATE: Use superglue_get_workflow_integration_code to show users how to implement
 
 CAPABILITIES:
-- Execute existing tools by ID
+- Execute existing workflows by ID
 - Run one-time instructions without persistence
 - Generate production-ready code in TypeScript, Python, Go
 - Transform data between different formats and schemas
 
 BEST PRACTICES:
-- Always gather ALL credentials before executing tools
+- Always gather ALL credentials before executing workflows
 - If the request fails or the system is less known, suggest the user to provide a documentation url
-- Use superglue_list_available_tools to discover available tools
-- Validate tool IDs exist before execution
+- Use superglue_list_available_workflows to discover available workflows
+- Validate workflow IDs exist before execution
 - Provide integration code when users ask "how do I use this?"
     `,
   },
