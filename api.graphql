@@ -170,6 +170,12 @@ enum LogLevel {
   ERROR
 }
 
+enum UpsertMode {
+  CREATE
+  UPDATE
+  UPSERT
+}
+
 input PaginationInput {
   type: PaginationType!
   pageSize: String
@@ -426,7 +432,10 @@ type Mutation {
   upsertTransformation(id: ID!, input: JSON!): TransformConfig!
   deleteTransformation(id: ID!): Boolean!
 
-  upsertIntegration(input: IntegrationInput!): Integration!
+  upsertIntegration(
+    input: IntegrationInput!
+    mode: UpsertMode = UPSERT
+  ): Integration!
   deleteIntegration(id: ID!): Boolean!
 }
 
