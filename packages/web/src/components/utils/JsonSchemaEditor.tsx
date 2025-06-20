@@ -16,7 +16,7 @@ import {
   TooltipTrigger,
 } from "@/src/components/ui/tooltip";
 import { cn } from "@/src/lib/utils";
-import { ListPlus, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
 import React from 'react';
@@ -29,14 +29,30 @@ interface JsonSchemaEditorProps {
   title?: string;
 }
 
-const SCHEMA_TYPES = ['object', 'array', 'string', 'number', 'boolean', 'integer'];
+const SCHEMA_TYPES = ['object', 'string', 'number', 'boolean', 'integer', 'any', 'string[]', 'number[]', 'boolean[]', 'integer[]', 'object[]', 'any[]'];
 const SCHEMA_TYPE_DISPLAY = {
   'object': 'object',
-  'array': 'array',
   'string': 'string',
   'number': 'number',
   'boolean': 'bool',
   'integer': 'integer',
+  'any': 'any',
+  'string[]': 'string[]',
+  'number[]': 'number[]',
+  'boolean[]': 'bool[]',
+  'integer[]': 'integer[]',
+  'object[]': 'object[]',
+  'any[]': 'any[]',
+};
+
+const ARRAY_ITEM_TYPES = ['object', 'string', 'number', 'boolean', 'integer', 'any'];
+const ARRAY_ITEM_TYPE_DISPLAY = {
+  'object': 'object[]',
+  'string': 'string[]',
+  'number': 'number[]',
+  'boolean': 'bool[]',
+  'integer': 'integer[]',
+  'any': 'any[]',
 };
 
 const DEFAULT_EMPTY_SCHEMA = `{"type":"object","properties":{}}`;
@@ -300,15 +316,43 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
               </div>
             ))}
             <Select
-              value={typeof schema.type === 'string' ? schema.type : 'string'}
-              onValueChange={(value) => updateVisualSchema([...path, 'type'], value)}
+              value={
+                isArrayChild
+                  ? (typeof schema.type === 'string' ? schema.type : 'string')
+                  : schema.type === 'array' && schema.items?.type
+                    ? `${schema.items.type}[]`
+                    : (typeof schema.type === 'string' ? schema.type : 'string')
+              }
+              onValueChange={(value) => {
+                if (isArrayChild) {
+                  updateVisualSchema([...path, 'type'], value);
+                } else if (value.endsWith('[]')) {
+                  // Handle array types like 'string[]'
+                  const itemType = value.slice(0, -2);
+                  const newSchema = { ...visualSchema };
+                  let current = newSchema;
+                  for (let i = 0; i < path.length - 1; i++) {
+                    current = current[path[i]];
+                  }
+                  current[path[path.length - 1]] = {
+                    type: 'array',
+                    items: { type: itemType }
+                  };
+                  setVisualSchema(newSchema);
+                  onChange(JSON.stringify(newSchema, null, 2));
+                } else {
+                  updateVisualSchema([...path, 'type'], value);
+                }
+              }}
             >
               <SelectTrigger className="w-24 h-8 text-xs sm:text-sm">
                 <SelectValue placeholder="Type" />
               </SelectTrigger>
               <SelectContent className="text-xs sm:text-sm">
-                {SCHEMA_TYPES.map(type => (
-                  <SelectItem key={type} value={type}>{SCHEMA_TYPE_DISPLAY[type]}</SelectItem>
+                {(isArrayChild ? ARRAY_ITEM_TYPES : SCHEMA_TYPES).map(type => (
+                  <SelectItem key={type} value={type}>
+                    {isArrayChild ? ARRAY_ITEM_TYPE_DISPLAY[type] : SCHEMA_TYPE_DISPLAY[type]}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -458,31 +502,32 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
           </div>
         )}
 
-        {schema.type === 'array' && (
+        {schema.type === 'array' && schema.items?.type === 'object' && (
           <div className="pl-2 mt-1">
             <div className="overflow-x-auto">
-              {schema.items && renderSchemaField('items', schema.items, [...path, 'items'], true)}
+              {schema.items.properties && Object.entries(schema.items.properties).map(([key, value]) =>
+                renderSchemaField(key, value, [...path, 'items', 'properties', key])
+              )}
             </div>
-            {!schema.items && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="gap-2 text-xs sm:text-sm"
-                onClick={() => updateVisualSchema(
-                  [...path, 'items'],
-                  {
-                    type: 'string',
-                    ...(schema.items || {}),
-                  }
-                )}
-              >
-                <ListPlus className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="text-xs sm:text-sm">Set Item</span>
-              </Button>
-            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-2 text-xs sm:text-sm"
+              onClick={() => updateVisualSchema(
+                [...path, 'items', 'properties'],
+                {
+                  ...(schema.items.properties || {}),
+                  [generateUniqueFieldName(schema.items.properties)]: { type: 'string' }
+                }
+              )}
+            >
+              <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="text-xs sm:text-sm">Add Property</span>
+            </Button>
           </div>
         )}
+
       </div>
     );
   };
