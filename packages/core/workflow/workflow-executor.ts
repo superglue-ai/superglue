@@ -1,5 +1,6 @@
 import { Metadata } from "@playwright/test";
-import { ExecutionStep, RequestOptions, Workflow, WorkflowResult, WorkflowStepResult } from "@superglue/client";
+import { ExecutionStep, Integration, RequestOptions, Workflow, WorkflowResult, WorkflowStepResult } from "@superglue/client";
+import { Context } from "@superglue/shared";
 import { Validator } from "jsonschema";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { logMessage } from "../utils/logs.js";
@@ -16,10 +17,12 @@ export class WorkflowExecutor implements Workflow {
   public metadata: Metadata;
   public instruction?: string;
   public inputSchema?: JSONSchema;
+  private integrations: Record<string, Integration>;
 
   constructor(
     workflow: Workflow,
     metadata: Metadata,
+    integrations: Integration[] = []
   ) {
     this.id = workflow.id;
     this.steps = workflow.steps;
@@ -28,6 +31,10 @@ export class WorkflowExecutor implements Workflow {
     this.instruction = workflow.instruction;
     this.metadata = metadata;
     this.inputSchema = workflow.inputSchema;
+    this.integrations = integrations.reduce((acc, int) => {
+      acc[int.id] = int;
+      return acc;
+    }, {} as Record<string, Integration>);
     this.result = {
       id: crypto.randomUUID(),
       success: false,
@@ -64,7 +71,15 @@ export class WorkflowExecutor implements Workflow {
         try {
           const strategy = selectStrategy(step);
           const stepInputPayload = await this.prepareStepInput(step, payload);
-          stepResult = await strategy.execute(step, stepInputPayload, credentials, options, this.metadata);
+          const integration = step.integrationId ? this.integrations[step.integrationId] : undefined;
+          stepResult = await strategy.execute(
+            step,
+            stepInputPayload,
+            credentials,
+            options || {},
+            this.metadata,
+            integration
+          );
           step.apiConfig = stepResult.config;
         } catch (stepError) {
           stepResult = {

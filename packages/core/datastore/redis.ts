@@ -1,4 +1,4 @@
-import type { ApiConfig, ExtractConfig, RunResult, TransformConfig, Workflow, Integration } from "@superglue/client";
+import type { ApiConfig, ExtractConfig, Integration, RunResult, TransformConfig, Workflow } from "@superglue/client";
 import { createHash } from 'node:crypto';
 import { type RedisClientType, createClient } from 'redis';
 import { logMessage } from "../utils/logs.js";
@@ -192,7 +192,12 @@ export class RedisService implements DataStore {
     );
 
     const validRuns = runs
-      .filter((run): run is RunResult => run !== null)
+      .filter((run): run is RunResult =>
+        run !== null &&
+        run.config &&
+        run.config.id &&
+        run.startedAt
+      )
       .sort((a, b) => (b.startedAt?.getTime() ?? 0) - (a.startedAt?.getTime() ?? 0));
 
     return {
@@ -395,13 +400,19 @@ export class RedisService implements DataStore {
 function parseWithId(data: string, id: string): any {
   if (!data) return null;
   const parsed = typeof data === 'string' ? JSON.parse(data) : data;
-  return {
+  const result = {
     ...parsed,
     ...(parsed.startedAt && { startedAt: new Date(parsed.startedAt) }),
     ...(parsed.completedAt && { completedAt: new Date(parsed.completedAt) }),
     ...(parsed.createdAt && { createdAt: new Date(parsed.createdAt) }),
     ...(parsed.updatedAt && { updatedAt: new Date(parsed.updatedAt) }),
-    ...(parsed.config && { config: parseWithId(parsed.config, parsed.config.id) }),
     id: id
   };
+
+  // Only parse config if it exists and has an id
+  if (parsed.config && parsed.config.id) {
+    result.config = parseWithId(parsed.config, parsed.config.id);
+  }
+
+  return result;
 }

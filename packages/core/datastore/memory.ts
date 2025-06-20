@@ -1,4 +1,4 @@
-import { ApiConfig, ExtractConfig, RunResult, TransformConfig, Workflow, Integration } from "@superglue/client";
+import { ApiConfig, ExtractConfig, Integration, RunResult, TransformConfig, Workflow } from "@superglue/client";
 import { createHash } from 'node:crypto';
 import type { DataStore } from "./types.js";
 
@@ -152,7 +152,7 @@ export class MemoryStore implements DataStore {
     const index = this.storage.runsIndex.get(orgId)!;
     index.push({
       id: run.id,
-      timestamp: run.startedAt.getTime(),
+      timestamp: run.startedAt?.getTime() ?? 0,
       configId: run.config?.id
     });
     index.sort((a, b) => b.timestamp - a.timestamp);
@@ -171,7 +171,15 @@ export class MemoryStore implements DataStore {
       const key = this.getKey('run', id, orgId);
       const run = this.storage.runs.get(key);
       return run ? { ...run, id } : null;
-    }).filter((run): run is RunResult => run !== null);
+    }).filter((run): run is RunResult =>
+      run !== null &&
+      run.config &&
+      run.config.id &&
+      run.startedAt instanceof Date
+    );
+
+    // Sort by startedAt timestamp (most recent first)
+    items.sort((a, b) => (b.startedAt?.getTime() ?? 0) - (a.startedAt?.getTime() ?? 0));
 
     return { items, total: index.length };
   }

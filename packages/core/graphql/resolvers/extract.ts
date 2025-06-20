@@ -60,7 +60,8 @@ export const extractResolver = async (
             throw new Error("Id could not be found and no endpoint provided.");
           }
           const documentation = new Documentation(input.endpoint, credentials, metadata);
-          const documentationString = await documentation.fetch(input.endpoint.instruction || "");
+          const rawDoc = await documentation.fetchAndProcess();
+          const documentationString = Documentation.postProcess(rawDoc, input.endpoint.instruction || "");
           preparedExtract = await generateExtractConfig(input.endpoint, documentationString, payload, credentials, lastError);
         }
 

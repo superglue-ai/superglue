@@ -1,5 +1,5 @@
 import type { ExecutionStep, RequestOptions, WorkflowStepResult } from "@superglue/client";
-import { Metadata } from "@superglue/shared";
+import { Integration, Metadata } from "@superglue/shared";
 import { executeApiCall } from "../graphql/resolvers/call.js";
 import { logMessage } from "../utils/logs.js";
 import { applyJsonata } from "../utils/tools.js";
@@ -11,7 +11,8 @@ export interface ExecutionStrategy {
     payload: Record<string, any>,
     credentials: Record<string, string>,
     options: RequestOptions,
-    metadata: Metadata
+    metadata: Metadata,
+    integration?: Integration
   ): Promise<WorkflowStepResult>;
 }
 
@@ -28,7 +29,8 @@ const directStrategy: ExecutionStrategy = {
     payload: Record<string, any>,
     credentials: Record<string, string>,
     options: RequestOptions = {},
-    metadata: Metadata
+    metadata: Metadata,
+    integration?: Integration
   ): Promise<WorkflowStepResult> {
     const result: WorkflowStepResult = {
       stepId: step.id,
@@ -36,7 +38,14 @@ const directStrategy: ExecutionStrategy = {
       config: step.apiConfig
     }
     try {
-      const apiResponse = await executeApiCall(step.apiConfig, payload, credentials, options, metadata);
+      const apiResponse = await executeApiCall(
+        step.apiConfig,
+        payload,
+        credentials,
+        options,
+        metadata,
+        integration
+      );
       const transformedData = await applyJsonata(apiResponse.data, step.responseMapping);
 
       result.rawData = apiResponse.data;
@@ -62,7 +71,8 @@ const loopStrategy: ExecutionStrategy = {
     payload: Record<string, any>,
     credentials: Record<string, string>,
     options: RequestOptions = {},
-    metadata: Metadata
+    metadata: Metadata,
+    integration?: Integration
   ): Promise<WorkflowStepResult> {
     const result: WorkflowStepResult = {
       stepId: step.id,
@@ -103,7 +113,14 @@ const loopStrategy: ExecutionStrategy = {
         };
 
         try {
-          const apiResponse = await executeApiCall(step.apiConfig, loopPayload, credentials, options, metadata);
+          const apiResponse = await executeApiCall(
+            step.apiConfig,
+            loopPayload,
+            credentials,
+            options,
+            metadata,
+            integration
+          );
           const rawData = { currentItem: currentItem, ...(typeof apiResponse.data === 'object' ? apiResponse.data : { data: apiResponse.data }) };
           const transformedData = await applyJsonata(rawData, step.responseMapping);
           stepResults.push({

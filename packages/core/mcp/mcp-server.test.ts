@@ -10,7 +10,7 @@ function getValidArgs(overrides = {}) {
   return {
     instruction: 'Fetch all users from CRM and enrich with orders',
     payload: { userId: 123 },
-    systems: [
+    integrations: [
       { urlHost: 'api.example.com', credentials: { apiKey: 'test' } }
     ],
     client: {
@@ -31,14 +31,9 @@ describe('superglue_build_new_tool', () => {
       .rejects.toThrow(/Instruction must be detailed/)
   })
 
-  it('throws if systems is empty', async () => {
-    await expect(buildNewTool(getValidArgs({ systems: [] }), {}))
-      .rejects.toThrow(/Systems array is required/)
-  })
-
-  it('throws if a system is providing string credentials', async () => {
+  it('throws if a integration is providing string credentials', async () => {
     await expect(buildNewTool(getValidArgs({
-      systems: [{ urlHost: 'api.example.com', credentials: "yooo" }]
+      integrations: [{ urlHost: 'api.example.com', credentials: "yooo" }]
     }), {})).rejects.toThrow(/Credentials must be an object. E.g. { 'apiKey': '1234567890' }/)
   })
 

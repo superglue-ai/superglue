@@ -1,5 +1,4 @@
 import type { ApiConfig, ExtractConfig, Integration, RunResult, TransformConfig, Workflow } from "@superglue/client";
-import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { logMessage } from "../utils/logs.js";
@@ -37,15 +36,9 @@ export class FileStore implements DataStore {
       }
     };
 
-    // Set initial paths synchronously - async check will happen in initialization
-    if (storageDir === '/data') {
-      // We'll check this async during initialization and potentially switch
-      this.filePath = path.join(storageDir, 'superglue_data.json');
-      this.logsFilePath = path.join(storageDir, 'superglue_logs.jsonl');
-    } else {
-      this.filePath = path.join(storageDir, 'superglue_data.json');
-      this.logsFilePath = path.join(storageDir, 'superglue_logs.jsonl');
-    }
+    this.filePath = path.join(storageDir, 'superglue_data.json');
+    this.logsFilePath = path.join(storageDir, 'superglue_logs.jsonl');
+
     this.ensureInitialized();
     logMessage('info', `File Datastore: Initial storage path: ${this.filePath}`);
   }
@@ -70,10 +63,6 @@ export class FileStore implements DataStore {
           this.filePath = path.join('./.superglue', 'superglue_data.json');
           this.logsFilePath = path.join('./.superglue', 'superglue_logs.jsonl');
           logMessage('info', `File Datastore: Updated storage path: ${this.filePath}`);
-        }
-        else {
-          logMessage('error', `File Datastore: "${path.dirname(this.filePath)}" directory not accessible, exiting`);
-          process.exit(1);
         }
       }
 
@@ -129,8 +118,14 @@ export class FileStore implements DataStore {
     }
   }
 
+
+  private isPersisting = false;
   private async persist() {
     try {
+      while (this.isPersisting) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      this.isPersisting = true;
       const serialized = {
         apis: Object.fromEntries(this.storage.apis),
         extracts: Object.fromEntries(this.storage.extracts),
@@ -139,12 +134,13 @@ export class FileStore implements DataStore {
         integrations: Object.fromEntries(this.storage.integrations),
         tenant: this.storage.tenant
       };
-      const tempPath = `${this.filePath}.tmp`;
-      await fs.promises.writeFile(tempPath, JSON.stringify(serialized, null, 2), { mode: 0o644 });
-      await fs.promises.rename(tempPath, this.filePath);
+      await fs.promises.writeFile(this.filePath, JSON.stringify(serialized, null, 2), { mode: 0o644 });
     } catch (error) {
       logMessage('error', 'Failed to persist data: ' + error);
       throw error;
+    }
+    finally {
+      this.isPersisting = false;
     }
   }
 
@@ -156,11 +152,6 @@ export class FileStore implements DataStore {
     return Array.from(map.entries())
       .filter(([key]) => key.startsWith(`${orgId ? `${orgId}:` : ''}${prefix}:`))
       .map(([key, value]) => ({ ...value, id: key.split(':').pop() })) as T[];
-  }
-
-  // Helper function to generate md5 hash
-  private generateHash(data: any): string {
-    return createHash('md5').update(JSON.stringify(data)).digest('hex');
   }
 
   // Helper function to read last N lines from file without reading entire file (async version)
@@ -449,11 +440,20 @@ export class FileStore implements DataStore {
   async listRuns(limit = 10, offset = 0, configId?: string, orgId?: string): Promise<{ items: RunResult[], total: number }> {
     await this.ensureInitialized();
     const allRuns = await this.readRunsFromLogs(orgId, configId);
-    const items = allRuns.slice(offset, offset + limit).map(run => {
+
+    // Filter out invalid runs
+    const validRuns = allRuns.filter((run): run is RunResult =>
+      run !== null &&
+      run.config &&
+      run.config.id &&
+      run.startedAt instanceof Date
+    ).map(run => {
       if ((run as any).orgId) delete (run as any).orgId;
       return run;
     });
-    return { items, total: allRuns.length };
+
+    const items = validRuns.slice(offset, offset + limit);
+    return { items, total: validRuns.length };
   }
 
   async deleteRun(id: string, orgId: string): Promise<boolean> {

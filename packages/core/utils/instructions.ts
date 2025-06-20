@@ -1,15 +1,15 @@
+import { Integration } from "@superglue/client";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { LanguageModel } from "../llm/llm.js";
-import { SystemDefinition } from "../workflow/workflow-builder.js";
 import { logMessage } from "./logs.js";
 
-export async function generateInstructions(systems: SystemDefinition[], metadata: { orgId: string }): Promise<string[]> {
+export async function generateInstructions(integrations: Integration[], metadata: { orgId: string }): Promise<string[]> {
   const messages: ChatCompletionMessageParam[] = [
     {
       role: "system",
-      content: `You are an expert at suggesting specific, implementable workflows combining different APIs and systems. Given a set of systems, suggest natural language instructions that can be directly built into workflows, with a focus on data retrieval and practical integrations.
+      content: `You are an expert at suggesting specific, implementable workflows combining different APIs and integrations. Given a set of integrations, suggest natural language instructions that can be directly built into workflows, with a focus on data retrieval and practical integrations.
 
-For each system, provide 1-2 specific retrieval-focused examples. Then, suggest 3-4 detailed integration workflows that combine multiple systems. Each suggestion should be specific enough to implement directly, including key data points or criteria to use.
+For each integration, provide 1-2 specific retrieval-focused examples. Then, suggest 3-4 detailed integration workflows that combine multiple integrations. Each suggestion should be specific enough to implement directly, including key data points or criteria to use.
 
 **Important:** Return ONLY a JSON array of strings. Do NOT include any section headers, markdown, bullet points, numbers, or explanations. Each string in the array should be a single, specific, implementable instruction.
 
@@ -21,12 +21,19 @@ For each system, provide 1-2 specific retrieval-focused examples. Then, suggest 
   "Query MongoDB for all users with premium_status=true and verify their Stripe subscription is still active."
 ]
 
-Remember these important rules: The output MUST be a JSON array of strings, with no extra formatting or explanation. Do not think long and keep each instruction concise and simple, with maximum 4 options total (not per system).
+Remember these important rules: The output MUST be a JSON array of strings, with no extra formatting or explanation. Do not think long and keep each instruction concise and simple, with maximum 4 options total (not per integration).
 `
     },
     {
       role: "user",
-      content: `Systems: ${JSON.stringify(systems, null, 2)}`
+      content: `integrations: ${JSON.stringify(integrations.map(i => ({
+        id: i.id,
+        urlHost: i.urlHost,
+        urlPath: i.urlPath,
+        // Only include first page of docs (roughly 1000 chars)
+        documentation: i.documentation?.split('\n\n')[0] || '',
+        documentationUrl: i.documentationUrl
+      })), null, 2)}`
     }
   ];
 
@@ -97,7 +104,7 @@ export function sanitizeInstructionSuggestions(raw: unknown): string[] {
     }
   } else if (Array.isArray(raw)) {
     arr = raw;
-  } else  {
+  } else {
     return [];
   }
 
