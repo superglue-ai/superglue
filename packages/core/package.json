@@ -79,6 +79,6 @@
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "^3.24.4",
     "zod-to-json-schema": "^3.24.5",
-    "@superglue/client": "github:superglue-ai/superglue-js#feature/reusing-integrations-in-workflows"
+    "@superglue/client": "^2.3.37"
   }
 }
