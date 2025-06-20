@@ -12,15 +12,13 @@ function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined
 }
 
 function needsDocFetch(input: Integration, oldIntegration?: Integration): boolean {
+  if (input.documentationPending === true) return true;
+
   // If there's manual documentation in the input, no need to fetch
-  if (input.documentation && input.documentation.trim()) return false;
+  if (input.documentation && input.documentation.trim() && !input.documentationPending) return false;
 
   // If there's no documentation URL, no need to fetch
   if (!input.documentationUrl || !input.documentationUrl.trim()) return false;
-
-  // If documentationPending is explicitly set to true, fetch docs
-  if (input.documentationPending === true) return true;
-
   // For URL-based docs, fetch if:
   // 1. No old integration exists
   // 2. URL/path has changed
@@ -89,14 +87,6 @@ export const upsertIntegrationResolver = async (
     const now = new Date();
     const oldIntegration = await context.datastore.getIntegration(input.id, context.orgId);
     const shouldFetchDoc = needsDocFetch(input, oldIntegration);
-    let documentationPending = false;
-
-    // If input explicitly sets documentationPending, use that value
-    if (input.documentationPending !== undefined) {
-      documentationPending = input.documentationPending;
-    } else if (shouldFetchDoc) {
-      documentationPending = true;
-    }
 
     if (shouldFetchDoc) {
       // Fire-and-forget async doc fetch
@@ -154,7 +144,7 @@ export const upsertIntegrationResolver = async (
       urlPath: resolveField(input.urlPath, oldIntegration?.urlPath, ''),
       documentationUrl: resolveField(input.documentationUrl, oldIntegration?.documentationUrl, ''),
       documentation: resolveField(input.documentation, oldIntegration?.documentation, ''),
-      documentationPending: documentationPending,
+      documentationPending: shouldFetchDoc,
       credentials: resolveField(input.credentials, oldIntegration?.credentials, {}),
       createdAt: oldIntegration?.createdAt || now,
       updatedAt: now

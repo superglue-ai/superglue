@@ -16,6 +16,7 @@ import { Button } from '@/src/components/ui/button';
 import { DocStatus } from '@/src/components/utils/DocStatusSpinner';
 import { useIntegrationPolling } from '@/src/hooks/use-integration-polling';
 import { useToast } from '@/src/hooks/use-toast';
+import { needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
 import { integrations as integrationTemplates } from '@/src/lib/integrations';
 import { composeUrl } from '@/src/lib/utils';
 import type { Integration } from '@superglue/client';
@@ -104,14 +105,8 @@ export default function IntegrationsPage() {
     const handleSave = async (integration: Integration) => {
         try {
             if (integration.id) {
-                await client.upsertIntegration(integration.id, integration);
-
-                // Only trigger doc polling if there's a documentation URL (not raw text)
-                const hasDocUrl = integration.documentationUrl && integration.documentationUrl.trim();
-                const needsDocFetch = hasDocUrl && (!editingIntegration ||
-                    editingIntegration.urlHost !== integration.urlHost ||
-                    editingIntegration.urlPath !== integration.urlPath ||
-                    editingIntegration.documentationUrl !== integration.documentationUrl);
+                await client.upsertIntegration(integration.id, integration)
+                const needsDocFetch = needsUIToTriggerDocFetch(integration, editingIntegration);
 
                 if (needsDocFetch) {
                     // Set pending state for new integrations with doc URLs

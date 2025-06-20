@@ -3,7 +3,7 @@ import { useIntegrations } from '@/src/app/integrations-context';
 import { IntegrationForm } from '@/src/components/integrations/IntegrationForm';
 import { useIntegrationPolling } from '@/src/hooks/use-integration-polling';
 import { useToast } from '@/src/hooks/use-toast';
-import { inputErrorStyles, parseCredentialsHelper } from '@/src/lib/client-utils';
+import { inputErrorStyles, needsUIToTriggerDocFetch, parseCredentialsHelper } from '@/src/lib/client-utils';
 import { findMatchingIntegration, integrations as integrationTemplates } from '@/src/lib/integrations';
 import { cn, composeUrl } from '@/src/lib/utils';
 import { Integration, IntegrationInput, SuperglueClient, Workflow, WorkflowResult } from '@superglue/client';
@@ -251,10 +251,9 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     // Handle background operations
     try {
       await client.upsertIntegration(integration.id, integration);
+      const needsDocFetch = needsUIToTriggerDocFetch(integration, integrationFormEdit);
 
-      // Check if this integration needs doc fetching
-      const hasDocUrl = integration.documentationUrl && integration.documentationUrl.trim();
-      if (hasDocUrl) {
+      if (needsDocFetch) {
         // Set pending state for new integrations with doc URLs
         setPendingDocIds(prev => new Set([...prev, integration.id]));
 

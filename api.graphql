@@ -270,8 +270,6 @@ input IntegrationInput {
   documentationUrl: String
   documentation: String
   documentationPending: Boolean
-  icon: String
-  version: String
 }
 
 type Log {
@@ -312,7 +310,7 @@ type TenantInfo {
 type ExecutionStep {
   id: String!
   apiConfig: ApiConfig!
-  integrationId: String
+  integrationId: ID
   executionMode: String  # DIRECT | LOOP
   loopSelector: JSONata
   loopMaxIters: Int
@@ -323,7 +321,7 @@ type ExecutionStep {
 input ExecutionStepInput {
   id: String!
   apiConfig: ApiInput!
-  integrationId: String
+  integrationId: ID
   executionMode: String  # DIRECT | LOOP
   loopSelector: JSONata
   loopMaxIters: Int
