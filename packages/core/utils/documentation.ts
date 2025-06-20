@@ -599,6 +599,9 @@ class HtmlMarkdownStrategy implements ProcessingStrategy {
     if (content === undefined || content === null) {
       return null;
     }
+    if (typeof content !== 'string') {
+      content = JSON.stringify(content, null, 2);
+    }
     // Only apply if content looks like HTML
     if (!content.slice(0, 500).toLowerCase().includes("<html")) {
       return null;
@@ -619,6 +622,9 @@ class RawPageContentStrategy implements ProcessingStrategy {
     // This is the final fallback if content was fetched but not processed by other strategies
     if (content) {
       logMessage('info', "Using raw fetched content as final documentation.", metadata);
+      if (typeof content !== 'string') {
+        content = JSON.stringify(content, null, 2);
+      }
       return content;
     }
     return null; // No content was fetched or available
