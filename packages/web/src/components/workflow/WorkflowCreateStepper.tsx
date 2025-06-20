@@ -8,7 +8,7 @@ import { findMatchingIntegration, integrations as integrationTemplates } from '@
 import { cn, composeUrl } from '@/src/lib/utils';
 import { Integration, IntegrationInput, SuperglueClient, UpsertMode, Workflow, WorkflowResult } from '@superglue/client';
 import { flattenAndNamespaceWorkflowCredentials } from '@superglue/shared/utils';
-import { ArrowRight, Check, ChevronRight, FileText, Globe, Loader2, Pencil, Play, Plus, Workflow as WorkflowIcon, X } from 'lucide-react';
+import { ArrowRight, ChevronRight, Globe, Loader2, Pencil, Play, Plus, RotateCw, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
@@ -665,144 +665,100 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                     </p>
                   </div>
                 ) : (
-                  <div className="gap-2 flex flex-col">
-                    {/* Header row */}
-                    <div className="flex items-center justify-between px-2 py-2 text-sm font-medium text-foreground border-b">
-                      <span>Integration</span>
-                      <div className="flex items-center gap-2">
-                        <span>Selected</span>
-                        <Button
-                          variant="default"
-                          size="icon"
-                          className="h-4 w-4 p-0"
+                  <div className="divide-y divide-border">
+                    {integrations.map(sys => {
+                      const selected = selectedIntegrationIds.includes(sys.id);
+                      return (
+                        <div
+                          key={sys.id}
+                          className={cn(
+                            "flex items-center justify-between px-4 py-3 cursor-pointer transition-colors",
+                            selected ? "bg-primary/20" : "hover:bg-accent/50"
+                          )}
                           onClick={() => {
-                            const filteredIntegrations = integrations.filter(sys =>
-                              integrationSearch === '' ||
-                              sys.id.toLowerCase().includes(integrationSearch.toLowerCase()) ||
-                              sys.urlHost.toLowerCase().includes(integrationSearch.toLowerCase()) ||
-                              sys.urlPath.toLowerCase().includes(integrationSearch.toLowerCase())
-                            );
-                            const filteredIds = filteredIntegrations.map(i => i.id);
-                            const allSelected = filteredIds.length > 0 && filteredIds.every(id => selectedIntegrationIds.includes(id));
-
-                            if (allSelected) {
-                              // Unselect all filtered
-                              setSelectedIntegrationIds(ids => ids.filter(id => !filteredIds.includes(id)));
+                            if (selected) {
+                              setSelectedIntegrationIds(ids => ids.filter(i => i !== sys.id));
                             } else {
-                              // Select all filtered
-                              setSelectedIntegrationIds(ids => [...new Set([...ids, ...filteredIds])]);
+                              setSelectedIntegrationIds(ids => {
+                                const newIds = [...ids, sys.id];
+                                return newIds;
+                              });
                             }
                           }}
                         >
-                          {(() => {
-                            const filteredIntegrations = integrations.filter(sys =>
-                              integrationSearch === '' ||
-                              sys.id.toLowerCase().includes(integrationSearch.toLowerCase()) ||
-                              sys.urlHost.toLowerCase().includes(integrationSearch.toLowerCase()) ||
-                              sys.urlPath.toLowerCase().includes(integrationSearch.toLowerCase())
-                            );
-                            const filteredIds = filteredIntegrations.map(i => i.id);
-                            const allSelected = filteredIds.length > 0 && filteredIds.every(id => selectedIntegrationIds.includes(id));
-                            return allSelected ? <Check className="h-2 w-2" /> : <div className="h-2 w-2" />;
-                          })()}
-                        </Button>
-                      </div>
-                    </div>
-                    {selectedIntegrationIds.length === 0 && integrations.length > 0 && (
-                      <div className="text-xs text-amber-800 dark:text-amber-300 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded whitespace-nowrap mx-4 mt-2">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                          <line x1="12" y1="9" x2="12" y2="13" />
-                          <line x1="12" y1="17" x2="12.01" y2="17" />
-                        </svg>
-                        Select at least one integration
-                      </div>
-                    )}
-                    {integrations
-                      .filter(sys =>
-                        integrationSearch === '' ||
-                        sys.id.toLowerCase().includes(integrationSearch.toLowerCase()) ||
-                        sys.urlHost.toLowerCase().includes(integrationSearch.toLowerCase()) ||
-                        sys.urlPath.toLowerCase().includes(integrationSearch.toLowerCase())
-                      )
-                      .map(sys => {
-                        const selected = selectedIntegrationIds.includes(sys.id);
-                        return (
-                          <div
-                            key={sys.id}
-                            className={cn(
-                              "flex items-center justify-between rounded-md px-4 py-3 transition-colors",
-                              selected
-                                ? "hover:bg-accent/50 border border-[#ffffff/10]"
-                                : "hover:bg-accent/50 border border-transparent"
-                            )}
-                          >
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                              {(() => {
-                                const integration = findMatchingIntegration(sys.urlHost);
-                                const icon = integration?.integration.icon ? getSimpleIcon(integration.integration.icon) : null;
-                                return icon ? (
-                                  <svg
-                                    width="20"
-                                    height="20"
-                                    viewBox="0 0 24 24"
-                                    fill={`#${icon.hex}`}
-                                    className="flex-shrink-0"
-                                  >
-                                    <path d={icon.path} />
-                                  </svg>
-                                ) : (
-                                  <Globe className="h-5 w-5 flex-shrink-0 text-foreground" />
-                                );
-                              })()}
-                              <div className="flex flex-col min-w-0">
-                                <span className="font-medium truncate max-w-[200px]">{sys.id}</span>
-                                <span className="text-xs text-foreground truncate max-w-[240px]">
-                                  {composeUrl(sys.urlHost, sys.urlPath)}
-                                </span>
-                              </div>
-                              <div className="flex flex-col items-center gap-2">
-                                <div className="flex items-center gap-2">
-                                  <DocStatus
-                                    pending={pendingDocIds.has(sys.id)}
-                                    hasDocumentation={hasDocumentation(sys)}
-                                  />
-                                  {(!sys.credentials || Object.keys(sys.credentials).length === 0) && (
-                                    <span className="text-xs text-amber-800 dark:text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded">No credentials</span>
-                                  )}
-                                </div>
-                              </div>
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            {(() => {
+                              const integration = findMatchingIntegration(sys.urlHost);
+                              const icon = integration?.integration.icon ? getSimpleIcon(integration.integration.icon) : null;
+                              return icon ? (
+                                <svg
+                                  width="20"
+                                  height="20"
+                                  viewBox="0 0 24 24"
+                                  fill={`#${icon.hex}`}
+                                  className="flex-shrink-0"
+                                >
+                                  <path d={icon.path} />
+                                </svg>
+                              ) : (
+                                <Globe className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
+                              );
+                            })()}
+                            <div className="flex flex-col min-w-0">
+                              <span className="font-medium truncate max-w-[200px]">{sys.id}</span>
+                              <span className="text-xs text-muted-foreground truncate max-w-[240px]">
+                                {composeUrl(sys.urlHost, sys.urlPath)}
+                              </span>
                             </div>
-                            <div className="flex gap-2 items-center">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
-                                onClick={e => {
-                                  e.stopPropagation();
-                                  setIntegrationFormEdit(sys);
-                                  setShowIntegrationForm(true);
-                                }}
-                                disabled={pendingDocIds.has(sys.id)}
-                                title={pendingDocIds.has(sys.id) ? "Documentation is being processed" : "Edit integration"}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Switch
-                                className="custom-switch"
-                                checked={selected}
-                                onCheckedChange={(checked) => {
-                                  if (checked) {
-                                    setSelectedIntegrationIds(ids => [...ids, sys.id]);
-                                  } else {
-                                    setSelectedIntegrationIds(ids => ids.filter(i => i !== sys.id));
-                                  }
-                                }}
-                              />
+                            <div className="flex flex-col items-center gap-2">
+                              <div className="flex items-center gap-2">
+                                <DocStatus
+                                  pending={pendingDocIds.has(sys.id)}
+                                  hasDocumentation={hasDocumentation(sys)}
+                                />
+                                {(!sys.credentials || Object.keys(sys.credentials).length === 0) && (
+                                  <span className="text-xs text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded">No credentials</span>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        );
-                      })}
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+                              onClick={e => {
+                                e.stopPropagation();
+                                setIntegrationFormEdit(sys);
+                                setShowIntegrationForm(true);
+                              }}
+                              disabled={pendingDocIds.has(sys.id)}
+                              title={pendingDocIds.has(sys.id) ? "Documentation is being processed" : "Edit integration"}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                              onClick={e => { e.stopPropagation(); handleRefreshDocs(sys.id); }}
+                              disabled={!sys.documentationUrl || !sys.documentationUrl.trim() || pendingDocIds.has(sys.id)}
+                              title={sys.documentationUrl && sys.documentationUrl.trim() ? "Refresh documentation from URL" : "No documentation URL to refresh"}
+                            >
+                              <RotateCw className="h-4 w-4" />
+                            </Button>
+                            <input
+                              type="checkbox"
+                              checked={selected}
+                              onChange={() => { }}
+                              className="ml-2 accent-primary"
+                              tabIndex={-1}
+                              readOnly
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -989,7 +945,19 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                     </div>
                     {(() => {
                       try {
-                        JSON.parse(payload);
+                        const parsedPayload = JSON.parse(payload);
+                        if (!parsedPayload || Object.keys(parsedPayload).length === 0) {
+                          return (
+                            <div className="text-xs text-amber-500 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded mt-2">
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                                <line x1="12" y1="9" x2="12" y2="13" />
+                                <line x1="12" y1="17" x2="12.01" y2="17" />
+                              </svg>
+                              No workflow variables added
+                            </div>
+                          );
+                        }
                         return null;
                       } catch {
                         return (

@@ -268,7 +268,7 @@ Make the schema as simple as possible. No need to include every possible field, 
 - The schema should be a JSON schema object.
 - The schema should be valid.
 - Include all instruction filters in the schema element as a description.
-- If a value can take any shape or form, make it of type "any" with no other properties. Always use the "any" type for arbitrary data, do not use the "object" type with additional properties since the parser will fail.
+- If a value can take any shape or form, make it of type "any" with no other properties.
 
 Example:
 
