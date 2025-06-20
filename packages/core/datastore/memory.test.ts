@@ -198,7 +198,60 @@ describe('MemoryStore', () => {
       expect(filteredItems[0].id).toBe('run2');
 
       const { items: allItems } = await store.listRuns(10, 0, null, testOrgId);
-      expect(allItems.length).toBe(2);
+      expect(allItems.length).toBe(1); // Only the valid run should be returned
+    });
+
+    it('should filter out corrupted runs and continue listing valid ones', async () => {
+      // Create a valid run
+      const validRun = { ...testRun, id: 'valid-run' };
+      await store.createRun(validRun, testOrgId);
+
+      // Manually insert corrupted runs into storage to simulate corruption
+      const corruptedRun1 = { id: 'corrupted-run-1', config: null, startedAt: null };
+      const corruptedRun2 = { id: 'corrupted-run-2', config: { id: 'config-id' }, startedAt: null };
+      const corruptedRun3 = { id: 'corrupted-run-3', config: null, startedAt: new Date() };
+
+      const key1 = store['getKey']('run', 'corrupted-run-1', testOrgId);
+      const key2 = store['getKey']('run', 'corrupted-run-2', testOrgId);
+      const key3 = store['getKey']('run', 'corrupted-run-3', testOrgId);
+
+      store['storage'].runs.set(key1, corruptedRun1 as any);
+      store['storage'].runs.set(key2, corruptedRun2 as any);
+      store['storage'].runs.set(key3, corruptedRun3 as any);
+
+      // Add to index
+      const index = store['storage'].runsIndex.get(testOrgId) || [];
+      index.push(
+        { id: 'corrupted-run-1', timestamp: Date.now(), configId: 'config1' },
+        { id: 'corrupted-run-2', timestamp: Date.now(), configId: 'config2' },
+        { id: 'corrupted-run-3', timestamp: Date.now(), configId: 'config3' }
+      );
+
+      const { items, total } = await store.listRuns(10, 0, null, testOrgId);
+
+      // Should only return the valid run
+      expect(items.length).toBe(1);
+      expect(total).toBe(4);
+      expect(items[0].id).toBe('valid-run');
+    });
+
+    it('should handle runs with missing startedAt dates', async () => {
+      const runWithoutStartedAt = {
+        ...testRun,
+        id: 'run-no-started-at',
+        startedAt: undefined
+      };
+      const validRun = { ...testRun, id: 'valid-run' };
+
+      await store.createRun(runWithoutStartedAt, testOrgId);
+      await store.createRun(validRun, testOrgId);
+
+      const { items, total } = await store.listRuns(10, 0, null, testOrgId);
+
+      // Should only return the valid run
+      expect(items.length).toBe(1);
+      expect(total).toBe(2);
+      expect(items[0].id).toBe('valid-run');
     });
   });
 

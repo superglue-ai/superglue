@@ -1,4 +1,4 @@
-import { ApiConfig, ApiInputRequest, CacheMode, RequestOptions, SelfHealingMode, TransformConfig } from "@superglue/client";
+import { ApiConfig, ApiInputRequest, CacheMode, Integration, RequestOptions, SelfHealingMode, TransformConfig } from "@superglue/client";
 import type { Context, Metadata } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import OpenAI from "openai";
@@ -18,6 +18,7 @@ export async function executeApiCall(
   credentials: Record<string, string>,
   options: RequestOptions,
   metadata: Metadata,
+  integration?: Integration,
 ): Promise<{
   data: any;
   endpoint: ApiConfig;
@@ -26,17 +27,22 @@ export async function executeApiCall(
   let retryCount = 0;
   let lastError: string | null = null;
   let messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
-  let documentation: Documentation;
   let success = false;
   let isSelfHealing = isSelfHealingEnabled(options);
+
+  let documentationString = "";
+  if (!integration) {
+    logMessage('warn', `No integration provided. Proceeding without documentation.`, metadata);
+  } else if (integration.documentationPending) {
+    logMessage('warn', `Documentation for integration ${integration.id} is still being fetched. Proceeding without documentation.`, metadata);
+  } else if (integration.documentation) {
+    documentationString = Documentation.postProcess(integration.documentation, endpoint.instruction || "");
+  }
+
   do {
     try {
       if (retryCount > 0 && isSelfHealing) {
         logMessage('info', `Generating API config for ${endpoint?.urlHost}${retryCount > 0 ? ` (${retryCount})` : ""}`, metadata);
-        if (!documentation) {
-          documentation = new Documentation(endpoint, credentials, metadata);
-        }
-        const documentationString = await documentation.fetch(endpoint.instruction);
         const computedApiCallConfig = await generateApiConfig(endpoint, documentationString, payload, credentials, retryCount, messages);
         endpoint = computedApiCallConfig.config;
         messages = computedApiCallConfig.messages;

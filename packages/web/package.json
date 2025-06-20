@@ -44,7 +44,8 @@
         "shadcn-ui": "^0.9.5",
         "simple-icons": "^14.12.3",
         "tailwind-merge": "^2.6.0",
-        "tailwindcss-animate": "^1.0.7"
+        "tailwindcss-animate": "^1.0.7",
+        "@superglue/client": "github:superglue-ai/superglue-js#feature/reusing-integrations-in-workflows"
     },
     "devDependencies": {
         "@types/node": "^20.17.19",
