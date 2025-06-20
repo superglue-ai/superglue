@@ -128,13 +128,6 @@ export const ExecuteWorkflowInputSchema = {
   options: RequestOptionsSchema.optional().describe("Optional request configuration"),
 };
 
-export const BuildWorkflowInputSchema = {
-  instruction: z.string().describe("Natural language instruction for building the workflow"),
-  payload: z.any().optional().describe("Example JSON payload for the workflow. This should be data needed to fulfill the request (e.g. a list of ids to loop over), not settings or filters. If not strictly needed, leave this empty."),
-  integrations: z.array(z.object(IntegrationInputSchema)).describe("Array of integrations the workflow can interact with"),
-  responseSchema: z.any().optional().describe("JSONSchema for the expected response structure"),
-};
-
 export const UpsertWorkflowInputSchema = {
   id: z.string().describe("The ID for the workflow (used for creation or update)"),
   input: z.any().describe("The workflow definition (JSON, conforming to superglue's workflow structure)"),
@@ -155,6 +148,14 @@ export const RunInstructionInputSchema = {
   payload: z.any().optional().describe("Example JSON payload for the execution. This should be data needed to fulfill the request (e.g. a list of ids to loop over), not settings or filters. If not strictly needed, leave this empty."),
   integrations: z.array(z.object(IntegrationInputSchema)).describe("Array of integrations the execution can interact with"),
   responseSchema: z.any().optional().describe("JSONSchema for the expected response structure"),
+};
+
+export const FindRelevantIntegrationsInputSchema = {
+  instruction: z.string().describe("The natural language instruction to find relevant integrations for."),
+};
+
+export const SaveWorkflowInputSchema = {
+  workflow: z.object(WorkflowInputSchemaInternal).describe("The workflow configuration object to save."),
 };
 
 // --- Tool Definitions ---
@@ -354,46 +355,32 @@ export const toolDefinitions: Record<string, any> = {
       }
     },
   },
-
-  superglue_build_new_workflow: {
+  superglue_find_relevant_integrations: {
     description: `
     <use_case>
-      Build a new integration workflow from natural language instructions. Use when existing workflows don't meet requirements.
+      Finds relevant integrations from the user's available integrations based on a natural language instruction. Use this as the first step before building a new workflow.
     </use_case>
 
     <important_notes>
-      - Gather ALL integration credentials BEFORE building (API keys, tokens, documentation url if the integration is less known)
-      - Provide detailed, specific instructions
-      - superglue handles pagination for you, so you don't need to worry about it
-      - Workflow building may take 30-60 seconds
+      - This tool returns a list of suggested integration IDs and a reason for each suggestion.
+      - Use this list to make a final decision on which integrations to use for building a workflow.
+      - If the instruction is vague or too broad, the tool may return an empty list or a list of less relevant integrations.
     </important_notes>
     `,
-    inputSchema: BuildWorkflowInputSchema,
+    inputSchema: FindRelevantIntegrationsInputSchema,
     execute: async (args: any & { client: SuperglueClient }, request) => {
-      const validationErrors = validateWorkflowBuilding(args);
-      if (validationErrors.length > 0) {
-        throw new Error(`Validation failed:\n${validationErrors.join('\n')}`);
-      }
-
-      const { client }: { client: SuperglueClient } = args;
+      const { client, instruction } = args;
       try {
-        let workflow = await client.buildWorkflow({
-          instruction: args.instruction,
-          payload: args.payload || {},
-          integrations: args.integrations,
-          responseSchema: args.responseSchema || {}
-        });
-
+        const result = await client.findRelevantIntegrations(instruction);
         return {
           success: true,
-          ...workflow,
-          next_steps: `Workflow saved successfully. Use with execute_${workflow.id} to run it or generate code with superglue_get_workflow_integration_code.`
+          suggestedIntegrations: result,
         };
       } catch (error: any) {
         return {
           success: false,
           error: error.message,
-          suggestion: "Ensure all integration credentials are provided and instruction is detailed"
+          suggestion: "Failed to find relevant integrations. Please check the instruction or your available integrations."
         };
       }
     },
@@ -454,14 +441,14 @@ export const toolDefinitions: Record<string, any> = {
   superglue_run_instruction: {
     description: `
     <use_case>
-      Execute an instruction once without saving it as a persistent workflow. Use for ad-hoc tasks that don't need to be reused.
+      Builds and executes a workflow in a single, non-persistent step. Use this for testing and one-off tasks and validate a new workflow before saving it.
     </use_case>
 
     <important_notes>
-      - Builds and executes immediately without persistence
-      - Requires ALL integration credentials upfront  
-      - Faster than build + execute workflow for one-time tasks
-      - Results are returned but workflow definition is discarded
+      - This is the primary tool for iterative workflow development.
+      - The workflow is NOT saved to the datastore with this tool.
+      - If the execution is successful, the returned 'workflow_executed' object can be passed to 'superglue_save_workflow' to persist it.
+      - Requires ALL integration credentials upfront.
     </important_notes>
     `,
     inputSchema: RunInstructionInputSchema,
@@ -510,6 +497,37 @@ export const toolDefinitions: Record<string, any> = {
       }
     },
   },
+
+  superglue_save_workflow: {
+    description: `
+    <use_case>
+      Saves a workflow configuration that has been successfully executed. Use this to persist a workflow for future use.
+    </use_case>
+
+    <important_notes>
+      - This tool should only be called after a workflow has been validated using 'superglue_run_instruction'.
+      - The 'workflow' object should be the exact configuration returned from a successful 'superglue_run_instruction' call.
+    </important_notes>
+    `,
+    inputSchema: SaveWorkflowInputSchema,
+    execute: async (args: any & { client: SuperglueClient }, request) => {
+      const { client, workflow } = args;
+      try {
+        const result = await client.upsertWorkflow(workflow.id, workflow);
+        return {
+          success: true,
+          workflow: result,
+          next_steps: `Workflow ${result.id} saved successfully. You can now execute it by ID.`
+        };
+      } catch (error: any) {
+        return {
+          success: false,
+          error: error.message,
+          suggestion: "Failed to save the workflow. Please check the workflow configuration object."
+        };
+      }
+    },
+  },
 };
 
 // Modified server creation function
@@ -521,21 +539,25 @@ export const createMcpServer = async (apiKey: string) => {
 superglue: Universal API Integration Platform
 
 AGENT WORKFLOW:
-1. DISCOVER: Use superglue_list_available_workflows to see what's available
-2. EXECUTE: Use superglue_execute_workflow for existing workflows OR superglue_run_instruction for one-time tasks
-3. INTEGRATE: Use superglue_get_workflow_integration_code to show users how to implement
+1. FIND RELEVANT INTEGRATIONS: Use superglue_find_relevant_integrations with the user's instruction to get a list of suggested integrations.
+2. RUN & VALIDATE: Use superglue_run_instruction with the instruction and selected integrations to test the workflow. Analyze the results. If it fails, repeat this step with a refined instruction.
+3. SAVE (Optional): Once the workflow succeeds, confirm with the user. If they agree, use superglue_save_workflow with the 'workflow_executed' object from the successful run to persist it for future use.
+4. EXECUTE (for existing): Use superglue_execute_workflow to run previously saved workflows by their ID.
+5. GET CODE: Use superglue_get_workflow_integration_code to show users how to implement a saved workflow in their applications.
 
 CAPABILITIES:
+- Build, test and run workflows without persistence
+- Save validated workflows for reuse
 - Execute existing workflows by ID
-- Run one-time instructions without persistence
 - Generate production-ready code in TypeScript, Python, Go
 - Transform data between different formats and schemas
 
 BEST PRACTICES:
-- Always gather ALL credentials before executing workflows
-- If the request fails or the system is less known, suggest the user to provide a documentation url
 - Use superglue_list_available_workflows to discover available workflows
-- Validate workflow IDs exist before execution
+- Use superglue_find_relevant_integrations to find relevant integrations for a given instruction
+- Always gather ALL credentials before executing workflows
+- Always validate a new workflow with superglue_run_instruction before saving.
+- If the request fails or the integration is less known, suggest rephrasing the instruction or providing credentials
 - Provide integration code when users ask "how do I use this?"
     `,
   },

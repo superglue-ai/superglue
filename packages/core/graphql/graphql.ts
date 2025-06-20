@@ -5,7 +5,7 @@ import { deleteApiResolver, deleteExtractResolver, deleteTransformResolver } fro
 import { extractResolver } from "./resolvers/extract.js";
 import { generateInstructionsResolver, generateSchemaResolver } from "./resolvers/generate.js";
 import { getApiResolver, getExtractResolver, getRunResolver, getTransformResolver } from "./resolvers/get.js";
-import { deleteIntegrationResolver, getIntegrationResolver, listIntegrationsResolver, upsertIntegrationResolver } from "./resolvers/integrations.js";
+import { deleteIntegrationResolver, findRelevantIntegrationsResolver, getIntegrationResolver, listIntegrationsResolver, upsertIntegrationResolver } from "./resolvers/integrations.js";
 import { listApisResolver, listExtractsResolver, listRunsResolver, listTransformsResolver } from "./resolvers/list.js";
 import { logsResolver } from "./resolvers/logs.js";
 import { JSONResolver, JSONSchemaResolver, JSONataResolver } from "./resolvers/scalars.js";
@@ -39,6 +39,7 @@ export const resolvers = {
     generateInstructions: generateInstructionsResolver,
     getIntegration: getIntegrationResolver,
     listIntegrations: listIntegrationsResolver,
+    findRelevantIntegrations: findRelevantIntegrationsResolver,
   },
   Mutation: {
     setTenantInfo: setTenantInfoResolver,
