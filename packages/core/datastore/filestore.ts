@@ -449,11 +449,20 @@ export class FileStore implements DataStore {
   async listRuns(limit = 10, offset = 0, configId?: string, orgId?: string): Promise<{ items: RunResult[], total: number }> {
     await this.ensureInitialized();
     const allRuns = await this.readRunsFromLogs(orgId, configId);
-    const items = allRuns.slice(offset, offset + limit).map(run => {
+
+    // Filter out invalid runs
+    const validRuns = allRuns.filter((run): run is RunResult =>
+      run !== null &&
+      run.config &&
+      run.config.id &&
+      run.startedAt instanceof Date
+    ).map(run => {
       if ((run as any).orgId) delete (run as any).orgId;
       return run;
     });
-    return { items, total: allRuns.length };
+
+    const items = validRuns.slice(offset, offset + limit);
+    return { items, total: validRuns.length };
   }
 
   async deleteRun(id: string, orgId: string): Promise<boolean> {

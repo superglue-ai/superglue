@@ -137,7 +137,7 @@ export const callResolver = async (
       throw new Error("zod is not supported for response schema. Please use json schema instead. you can use the zod-to-json-schema package to convert zod to json schema.");
     }
 
-    const callResult = await executeApiCall(endpoint, payload, credentials, options, metadata, context);
+    const callResult = await executeApiCall(endpoint, payload, credentials, options, metadata);
     endpoint = callResult.endpoint;
     const data = callResult.data;
 

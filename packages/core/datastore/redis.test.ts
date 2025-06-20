@@ -198,6 +198,70 @@ if (!testConfig.host || !testConfig.port || !testConfig.username || !testConfig.
         expect(items).toHaveLength(0);
         expect(total).toBe(0);
       });
+
+      it('should filter out corrupted runs and continue listing valid ones', async () => {
+        // Create a valid run
+        const validRun = { ...testRun, id: 'valid-run' };
+        await store.createRun(validRun, testOrgId);
+
+        // Manually insert corrupted runs into Redis to simulate corruption
+        const corruptedRun1 = { id: 'corrupted-run-1', config: null, startedAt: null };
+        const corruptedRun2 = { id: 'corrupted-run-2', config: { id: 'config-id' }, startedAt: null };
+        const corruptedRun3 = { id: 'corrupted-run-3', config: null, startedAt: new Date() };
+
+        const key1 = `${testOrgId}:run:config1:corrupted-run-1`;
+        const key2 = `${testOrgId}:run:config2:corrupted-run-2`;
+        const key3 = `${testOrgId}:run:config3:corrupted-run-3`;
+
+        await store['redis'].set(key1, JSON.stringify(corruptedRun1));
+        await store['redis'].set(key2, JSON.stringify(corruptedRun2));
+        await store['redis'].set(key3, JSON.stringify(corruptedRun3));
+
+        const { items, total } = await store.listRuns(10, 0, null, testOrgId);
+
+        // Should only return the valid run
+        expect(items.length).toBe(1);
+        expect(total).toBe(1);
+        expect(items[0].id).toBe('valid-run');
+      });
+
+      it('should handle runs with missing startedAt dates', async () => {
+        const runWithoutStartedAt = {
+          ...testRun,
+          id: 'run-no-started-at',
+          startedAt: undefined
+        };
+        const validRun = { ...testRun, id: 'valid-run' };
+
+        await store.createRun(runWithoutStartedAt, testOrgId);
+        await store.createRun(validRun, testOrgId);
+
+        const { items, total } = await store.listRuns(10, 0, null, testOrgId);
+
+        // Should only return the valid run
+        expect(items.length).toBe(1);
+        expect(total).toBe(1);
+        expect(items[0].id).toBe('valid-run');
+      });
+
+      it('should handle runs with missing config IDs', async () => {
+        const runWithoutConfigId = {
+          ...testRun,
+          id: 'run-no-config-id',
+          config: { ...testRun.config, id: undefined }
+        };
+        const validRun = { ...testRun, id: 'valid-run' };
+
+        await store.createRun(runWithoutConfigId, testOrgId);
+        await store.createRun(validRun, testOrgId);
+
+        const { items, total } = await store.listRuns(10, 0, null, testOrgId);
+
+        // Should only return the valid run
+        expect(items.length).toBe(1);
+        expect(total).toBe(1);
+        expect(items[0].id).toBe('valid-run');
+      });
     });
 
     describe('Integration', () => {

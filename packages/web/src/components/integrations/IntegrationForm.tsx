@@ -130,27 +130,6 @@ export function IntegrationForm({
         }
     };
 
-    // Shared upsert logic
-    const upsertIntegration = async () => {
-        const integrationId = isEditing ? integration!.id : id.trim();
-        const creds = credentials ? JSON.parse(credentials) : {};
-        await client.upsertIntegration(integrationId, {
-            id: integrationId,
-            urlHost: urlHost.trim(),
-            urlPath: urlPath.trim(),
-            documentationUrl: documentationUrl.trim(),
-            documentation: documentation.trim(),
-            credentials: creds,
-        });
-        return { client, integrationId };
-    };
-
-    // Fire-and-forget poller for background doc fetch, no toast needed since UI shows spinner
-    const triggerDocPoller = (integrationId: string, client: any) => {
-        // Poller is safe and never throws - UI will show spinner in integrations list
-        waitForIntegrationReady([integrationId], 60000);
-    };
-
     const handleSubmit = async () => {
         const errors: Record<string, boolean> = {};
         if (!id.trim()) errors.id = true;

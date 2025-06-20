@@ -234,6 +234,68 @@ describe('FileStore', () => {
       expect(retrieved).toBeNull();
     });
 
+    it('should filter out corrupted runs and continue listing valid ones', async () => {
+      // Create a valid run
+      const validRun = { ...testRun, id: 'valid-run' };
+      await store.createRun(validRun, testOrgId);
+
+      // Manually append corrupted JSON lines to the logs file to simulate corruption
+      const corruptedLines = [
+        '{"id":"corrupted-run-1","config":null,"startedAt":null}\n',
+        '{"id":"corrupted-run-2","config":{"id":"config-id"},"startedAt":null}\n',
+        '{"id":"corrupted-run-3","config":null,"startedAt":"2023-01-01T00:00:00.000Z"}\n',
+        'invalid json line\n',
+        '{"id":"corrupted-run-4","config":{"id":"config-id"},"startedAt":"not-a-date"}\n'
+      ];
+
+      await fs.promises.appendFile(testLogsPath, corruptedLines.join(''));
+
+      const { items, total } = await store.listRuns(10, 0, null, testOrgId);
+
+      // Should only return the valid run
+      expect(items.length).toBe(1);
+      expect(total).toBe(1);
+      expect(items[0].id).toBe('valid-run');
+    });
+
+    it('should handle runs with missing startedAt dates', async () => {
+      const runWithoutStartedAt = {
+        ...testRun,
+        id: 'run-no-started-at',
+        startedAt: undefined
+      };
+      const validRun = { ...testRun, id: 'valid-run' };
+
+      await store.createRun(runWithoutStartedAt, testOrgId);
+      await store.createRun(validRun, testOrgId);
+
+      const { items, total } = await store.listRuns(10, 0, null, testOrgId);
+
+      // Should only return the valid run
+      expect(items.length).toBe(1);
+      expect(total).toBe(1);
+      expect(items[0].id).toBe('valid-run');
+    });
+
+    it('should handle runs with missing config IDs', async () => {
+      const runWithoutConfigId = {
+        ...testRun,
+        id: 'run-no-config-id',
+        config: { ...testRun.config, id: undefined }
+      };
+      const validRun = { ...testRun, id: 'valid-run' };
+
+      await store.createRun(runWithoutConfigId, testOrgId);
+      await store.createRun(validRun, testOrgId);
+
+      const { items, total } = await store.listRuns(10, 0, null, testOrgId);
+
+      // Should only return the valid run
+      expect(items.length).toBe(1);
+      expect(total).toBe(1);
+      expect(items[0].id).toBe('valid-run');
+    });
+
   });
 
   describe('Integration', () => {
