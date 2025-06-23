@@ -8,7 +8,7 @@ import { findMatchingIntegration, integrations as integrationTemplates } from '@
 import { cn, composeUrl } from '@/src/lib/utils';
 import { Integration, IntegrationInput, SuperglueClient, Workflow, WorkflowResult } from '@superglue/client';
 import { flattenAndNamespaceWorkflowCredentials } from '@superglue/shared/utils';
-import { ArrowRight, ChevronRight, FileText, Globe, Loader2, Pencil, Play, Plus, Workflow as WorkflowIcon, X } from 'lucide-react';
+import { ArrowRight, Check, ChevronRight, FileText, Globe, Loader2, Pencil, Play, Plus, Workflow as WorkflowIcon, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
@@ -19,6 +19,7 @@ import * as simpleIcons from 'simple-icons';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
+import { Switch } from '../ui/switch';
 import { Textarea } from '../ui/textarea';
 import { DocStatus } from '../utils/DocStatusSpinner';
 import { HelpTooltip } from '../utils/HelpTooltip';
@@ -97,15 +98,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const [integrationFormEdit, setIntegrationFormEdit] = useState<Integration | null>(null);
 
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
-  const [hasAutoSelectedIntegrations, setHasAutoSelectedIntegrations] = useState(false);
 
-  // Auto-select all integrations by default (only once)
-  useEffect(() => {
-    if (integrations.length > 0 && !hasAutoSelectedIntegrations && selectedIntegrationIds.length === 0) {
-      setSelectedIntegrationIds(integrations.map(integration => integration.id));
-      setHasAutoSelectedIntegrations(true);
-    }
-  }, [integrations, hasAutoSelectedIntegrations, selectedIntegrationIds.length]);
 
   const client = useMemo(() => new ExtendedSuperglueClient({
     endpoint: superglueConfig.superglueEndpoint,
@@ -645,16 +638,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                 <h3 className="mb-2 font-medium">
                   Select one or more integrations to use in your workflow. You can add new integrations as needed.
                 </h3>
-                {selectedIntegrationIds.length === 0 && integrations.length > 0 && (
-                  <div className="text-xs text-amber-800 dark:text-amber-300 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded whitespace-nowrap">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                      <line x1="12" y1="9" x2="12" y2="13" />
-                      <line x1="12" y1="17" x2="12.01" y2="17" />
-                    </svg>
-                    Select at least one integration
-                  </div>
-                )}
               </div>
               <div className="mb-2 flex gap-2 items-center">
                 <Input
@@ -678,6 +661,58 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                   </div>
                 ) : (
                   <div className="gap-2 flex flex-col">
+                    {/* Header row */}
+                    <div className="flex items-center justify-between px-2 py-2 text-sm font-medium text-foreground border-b">
+                      <span>Integration</span>
+                      <div className="flex items-center gap-2">
+                        <span>Selected</span>
+                        <Button
+                          variant="default"
+                          size="icon"
+                          className="h-4 w-4 p-0"
+                          onClick={() => {
+                            const filteredIntegrations = integrations.filter(sys =>
+                              integrationSearch === '' ||
+                              sys.id.toLowerCase().includes(integrationSearch.toLowerCase()) ||
+                              sys.urlHost.toLowerCase().includes(integrationSearch.toLowerCase()) ||
+                              sys.urlPath.toLowerCase().includes(integrationSearch.toLowerCase())
+                            );
+                            const filteredIds = filteredIntegrations.map(i => i.id);
+                            const allSelected = filteredIds.length > 0 && filteredIds.every(id => selectedIntegrationIds.includes(id));
+
+                            if (allSelected) {
+                              // Unselect all filtered
+                              setSelectedIntegrationIds(ids => ids.filter(id => !filteredIds.includes(id)));
+                            } else {
+                              // Select all filtered
+                              setSelectedIntegrationIds(ids => [...new Set([...ids, ...filteredIds])]);
+                            }
+                          }}
+                        >
+                          {(() => {
+                            const filteredIntegrations = integrations.filter(sys =>
+                              integrationSearch === '' ||
+                              sys.id.toLowerCase().includes(integrationSearch.toLowerCase()) ||
+                              sys.urlHost.toLowerCase().includes(integrationSearch.toLowerCase()) ||
+                              sys.urlPath.toLowerCase().includes(integrationSearch.toLowerCase())
+                            );
+                            const filteredIds = filteredIntegrations.map(i => i.id);
+                            const allSelected = filteredIds.length > 0 && filteredIds.every(id => selectedIntegrationIds.includes(id));
+                            return allSelected ? <Check className="h-2 w-2" /> : <div className="h-2 w-2" />;
+                          })()}
+                        </Button>
+                      </div>
+                    </div>
+                    {selectedIntegrationIds.length === 0 && integrations.length > 0 && (
+                      <div className="text-xs text-amber-800 dark:text-amber-300 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded whitespace-nowrap mx-4 mt-2">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                          <line x1="12" y1="9" x2="12" y2="13" />
+                          <line x1="12" y1="17" x2="12.01" y2="17" />
+                        </svg>
+                        Select at least one integration
+                      </div>
+                    )}
                     {integrations
                       .filter(sys =>
                         integrationSearch === '' ||
@@ -693,7 +728,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                             className={cn(
                               "flex items-center justify-between rounded-md px-4 py-3 transition-colors",
                               selected
-                                ? "bg-primary/20 border border-[#ffffff/10]"
+                                ? "hover:bg-accent/50 border border-[#ffffff/10]"
                                 : "hover:bg-accent/50 border border-transparent"
                             )}
                           >
@@ -712,12 +747,12 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                                     <path d={icon.path} />
                                   </svg>
                                 ) : (
-                                  <Globe className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
+                                  <Globe className="h-5 w-5 flex-shrink-0 text-foreground" />
                                 );
                               })()}
                               <div className="flex flex-col min-w-0">
                                 <span className="font-medium truncate max-w-[200px]">{sys.id}</span>
-                                <span className="text-xs text-muted-foreground truncate max-w-[240px]">
+                                <span className="text-xs text-foreground truncate max-w-[240px]">
                                   {composeUrl(sys.urlHost, sys.urlPath)}
                                 </span>
                               </div>
@@ -733,11 +768,11 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                                 </div>
                               </div>
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 items-center">
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="h-8 w-8 text-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
                                 onClick={e => {
                                   e.stopPropagation();
                                   setIntegrationFormEdit(sys);
@@ -748,20 +783,17 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                               >
                                 <Pencil className="h-4 w-4" />
                               </Button>
-                              <Button
-                                variant={selected ? "default" : "outline"}
-                                size="sm"
-                                className="h-8"
-                                onClick={() => {
-                                  if (selected) {
-                                    setSelectedIntegrationIds(ids => ids.filter(i => i !== sys.id));
-                                  } else {
+                              <Switch
+                                className="custom-switch"
+                                checked={selected}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
                                     setSelectedIntegrationIds(ids => [...ids, sys.id]);
+                                  } else {
+                                    setSelectedIntegrationIds(ids => ids.filter(i => i !== sys.id));
                                   }
                                 }}
-                              >
-                                {selected ? "Selected" : "Select"}
-                              </Button>
+                              />
                             </div>
                           </div>
                         );
@@ -867,12 +899,12 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                   {/* Recap of instruction */}
                   <div className="mb-2">
                     <Label>Instruction</Label>
-                    <div className="font-mono text-sm text-muted-foreground rounded py-1 mt-1 break-words flex items-start gap-2">
+                    <div className="font-mono text-sm text-foreground rounded py-1 mt-1 break-words flex items-start gap-2">
                       {instruction}
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-4 w-4 p-0 text-muted-foreground hover:text-foreground flex-shrink-0"
+                        className="h-4 w-4 p-0 text-foreground hover:text-foreground flex-shrink-0"
                         onClick={() => setStep('prompt')}
                       >
                         <Pencil className="h-3 w-3" />
@@ -1125,7 +1157,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
               isBuilding ||
               isSaving ||
               isGeneratingSuggestions ||
-              (step === 'integrations' && integrations.length === 0) ||
+              (step === 'integrations' && selectedIntegrationIds.length === 0) ||
               (step === 'integrations' && selectedIntegrationIds.some(id => pendingDocIds.has(id)))
             }
           >
@@ -1141,3 +1173,4 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     </div>
   );
 }
+
