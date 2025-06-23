@@ -275,7 +275,10 @@ export const buildWorkflowResolver = async (
     const builder = new WorkflowBuilder(instruction, resolvedIntegrations, payload, responseSchema, metadata);
     const workflow = await builder.build();
     // prevent collisions with existing workflows
-    workflow.id = await generateUniqueId(workflow.id, context.orgId, async (id, orgId) => !!(await context.datastore.getWorkflow(id, orgId)));
+    workflow.id = await generateUniqueId({
+      baseId: workflow.id,
+      exists: async (id) => !!(await context.datastore.getWorkflow(id, context.orgId))
+    });
 
     return workflow;
   } catch (error) {

@@ -14,10 +14,13 @@ export function flattenAndNamespaceWorkflowCredentials(
     }, {} as Record<string, string>);
 }
 
-export async function generateUniqueId(
-    baseId: string,
-    exists: (id: string) => Promise<boolean> | boolean
-): Promise<string> {
+export async function generateUniqueId({
+    baseId,
+    exists
+}: {
+    baseId: string;
+    exists: (id: string) => Promise<boolean> | boolean;
+}): Promise<string> {
     if (!(await exists(baseId))) {
         return baseId;
     }
