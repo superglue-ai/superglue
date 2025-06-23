@@ -505,14 +505,8 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
             <div className="mb-4">
               <Label htmlFor="instructions">Workflow Instructions</Label>
               <HelpTooltip text="Describe what this workflow does and how it should behave. This helps with documentation and AI assistance." />
-              <div className="w-full max-w-full">
-                <Input
-                  id="instructions"
-                  value={instructions}
-                  onChange={(e) => setInstructions(e.target.value)}
-                  placeholder="Describe what this workflow does..."
-                  className="min-h-10 text-xs"
-                />
+              <div className="font-mono text-sm text-foreground rounded py-1 mt-1 break-words">
+                {instructions || <span className="italic text-muted-foreground">No instructions provided</span>}
               </div>
             </div>
 

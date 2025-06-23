@@ -97,7 +97,7 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations,
                 <RotateCw className="h-4 w-4 text-muted-foreground" />
               )}
               <span className="font-mono">{step.id}</span>
-              {linkedIntegration && (
+              {linkedIntegration && !isEditing && (
                 <Badge variant="outline" className="text-xs">
                   {linkedIntegration && (
                     <div className="text-xs flex items-center gap-1">
