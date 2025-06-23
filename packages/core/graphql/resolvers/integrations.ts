@@ -90,7 +90,10 @@ export const upsertIntegrationResolver = async (
 
     if (mode === 'CREATE') {
       if (oldIntegration) {
-        input.id = await generateUniqueId(input.id, async (id) => !!(await context.datastore.getIntegration(id, context.orgId)));
+        input.id = await generateUniqueId({
+          baseId: input.id,
+          exists: async (id) => !!(await context.datastore.getIntegration(id, context.orgId))
+        });
       }
     } else if (mode === 'UPDATE' && !oldIntegration) {
       throw new Error(`Integration with ID '${input.id}' not found.`);

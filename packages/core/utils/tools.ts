@@ -94,6 +94,12 @@ export function superglueJsonata(expr: string) {
       throw new Error(`Invalid date: ${e.message}`);
     }
   });
+
+  expression.registerFunction("now", () => new Date().toISOString());
+
+  expression.registerFunction("seconds", () => Math.floor(Date.now() / 1000));
+  expression.registerFunction("millis", () => Date.now());
+
   expression.registerFunction("dateMax", (dates: string[]) =>
     dates.reduce((max, curr) => new Date(max) > new Date(curr) ? max : curr));
 
