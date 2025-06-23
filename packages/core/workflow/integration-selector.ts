@@ -24,14 +24,14 @@ export class IntegrationSelector {
     }
 
     public async select(
-        instruction: string,
+        instruction: string | undefined,
         integrations: Integration[]
     ): Promise<SuggestedIntegration[]> {
         if (!instruction || instruction.trim() === "") {
             // If no instruction, return all integrations with a generic reason
             return integrations.map(int => ({
                 id: int.id,
-                reason: "Selected as part of the default available integrations."
+                reason: "Available integration (no specific instruction provided)"
             }));
         }
 
