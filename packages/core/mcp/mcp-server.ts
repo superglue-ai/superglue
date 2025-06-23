@@ -29,80 +29,10 @@ export const RequestOptionsSchema = z.object({
   webhookUrl: z.string().optional().describe("Optional webhook URL for async notifications"),
 }).optional();
 
-export const PaginationInputSchema = z.object({
-  type: PaginationTypeEnum.describe("The pagination strategy to use"),
-  pageSize: z.string().optional().describe("Number of items per page"),
-  cursorPath: z.string().optional().describe("JSONPath to the cursor field in responses (for cursor-based pagination)"),
-});
 
-// Transform-related Schemas
-export const TransformInputSchemaInternal = z.object({
-  id: z.string().describe("Unique identifier for the transform"),
-  instruction: z.string().describe("Natural language description of the transformation"),
-  responseSchema: z.any().describe("JSONSchema defining the expected output structure"),
-  responseMapping: z.any().optional().describe("JSONata expression for mapping input to output"),
-  version: z.string().optional().describe("Version identifier for the transform"),
-});
 
-export const TransformInputRequestSchema = z.object({
-  endpoint: TransformInputSchemaInternal.optional().describe("Complete transform definition (mutually exclusive with id)"),
-  id: z.string().optional().describe("Reference to existing transform by ID (mutually exclusive with endpoint)"),
-}).refine(data => (data.endpoint && !data.id) || (!data.endpoint && data.id), {
-  message: "Either 'endpoint' or 'id' must be provided, but not both for TransformInputRequest.",
-});
-
-export const TransformOperationInputSchema = {
-  input: TransformInputRequestSchema.describe("Transform definition or reference"),
-  data: z.any().describe("The JSON data to be transformed"),
-  options: RequestOptionsSchema.optional().describe("Optional request configuration (caching, timeouts, etc.)")
-};
-
-// Workflow-related Schemas
-export const ApiInputSchemaInternal = {
-  id: z.string().describe("Unique identifier for the API endpoint"),
-  urlHost: z.string().describe("Base URL/hostname for the API including protocol. For https://, use the format: https://<<hostname>>. For postgres, use the format: postgres://<<user>>:<<password>>@<<hostname>>:<<port>>"),
-  urlPath: z.string().optional().describe("Path component of the URL. For postgres, use the db name as the path."),
-  instruction: z.string().describe("Natural language description of what this API does"),
-  queryParams: z.any().optional().describe("JSON object containing URL query parameters"),
-  method: HttpMethodEnum.optional().describe("HTTP method to use"),
-  headers: z.any().optional().describe("JSON object containing HTTP headers"),
-  body: z.string().optional().describe("Request body as string"),
-  documentationUrl: z.string().optional().describe("URL to API documentation"),
-  responseSchema: z.any().optional().describe("JSONSchema defining expected response structure"),
-  responseMapping: z.any().optional().describe("JSONata expression for response transformation"),
-  authentication: AuthTypeEnum.optional().describe("Authentication method required"),
-  pagination: PaginationInputSchema.optional().describe("Pagination configuration if supported"),
-  dataPath: z.string().optional().describe("JSONPath to extract data from response"),
-  version: z.string().optional().describe("Version identifier for the API config"),
-};
-
-export const ExecutionStepInputSchemaInternal = {
-  id: z.string().describe("Unique identifier for the execution step"),
-  apiConfig: z.object(ApiInputSchemaInternal).describe("API configuration for this step"),
-  executionMode: z.enum(["DIRECT", "LOOP"]).optional().describe("How to execute this step (DIRECT or LOOP)"),
-  loopSelector: z.any().optional().describe("JSONata expression to select items for looping"),
-  loopMaxIters: z.number().int().optional().describe("Maximum number of loop iterations"),
-  inputMapping: z.any().optional().describe("JSONata expression to map tool data to step input"),
-  responseMapping: z.any().optional().describe("JSONata expression to transform step output"),
-};
-
-export const WorkflowInputSchemaInternal = {
-  id: z.string().describe("Unique identifier for the workflow"),
-  steps: z.array(z.object(ExecutionStepInputSchemaInternal)).describe("Array of execution steps that make up the workflow"),
-  finalTransform: z.any().optional().describe("JSONata expression to transform final workflow output"),
-  responseSchema: z.any().optional().describe("JSONSchema defining expected final output structure"),
-  version: z.string().optional().describe("Version identifier for the workflow"),
-  instruction: z.string().optional().describe("Natural language description of what this workflow does"),
-};
-
-export const WorkflowInputRequestSchema = z.object({
-  workflow: z.object(WorkflowInputSchemaInternal).optional().describe("Complete workflow definition (mutually exclusive with id)"),
-  id: z.string().optional().describe("Reference to existing workflow by ID (mutually exclusive with workflow)"),
-}).refine(data => (data.workflow && !data.id) || (!data.workflow && !data.id), {
-  message: "Either 'workflow' or 'id' must be provided, but not both for WorkflowInputRequest.",
-});
-
-export const IntegrationInputSchema = z.object({
+// Integration Schema
+export const IntegrationInputSchema = {
   id: z.string().describe("Unique identifier for the integration"),
   name: z.string().optional().describe("Human-readable name for the integration."),
   urlHost: z.string().optional().describe("Base URL/hostname for the API including protocol. For https://, use the format: https://<<hostname>>. For postgres, use the format: postgres://<<user>>:<<password>>@<<hostname>>:<<port>>"),
@@ -111,26 +41,21 @@ export const IntegrationInputSchema = z.object({
   documentation: z.string().optional().describe("Available documentation for the integration"),
   documentationPending: z.boolean().optional().describe("Whether the documentation is still being fetched and processed"),
   credentials: z.any().optional().describe("Credentials for accessing the integration. MAKE SURE YOU INCLUDE ALL OF THEM BEFORE BUILDING THE CAPABILITY, OTHERWISE IT WILL FAIL."),
-});
+};
 
-export const BuildAndRunWorkflowInputSchema = z.object({
+// MCP Tool Input Schemas
+export const BuildAndRunWorkflowInputSchema = {
   instruction: z.string().optional().describe("Natural language instruction to build a new workflow from scratch."),
   workflow: z.any().optional().describe("A complete, validated workflow configuration object to save."),
-  integrations: z.array(IntegrationInputSchema).optional().describe("Array of integrations to use. For existing integrations, only 'id' is required. For new ones, provide the full configuration."),
+  integrations: z.array(z.object(IntegrationInputSchema)).optional().describe("Array of integrations to use. For existing integrations, only 'id' is required. For new ones, provide the full configuration."),
   payload: z.any().optional().describe("JSON payload for the workflow execution."),
   save: z.boolean().optional().default(false).describe("If true, and a 'workflow' object is provided, saves the workflow and any new integrations. This flag is ignored if only an 'instruction' is provided."),
   responseSchema: z.any().optional().describe("JSONSchema for the expected output structure (used with 'instruction').")
-}).refine(data => data.instruction || data.workflow, {
-  message: "Either 'instruction' or a 'workflow' object must be provided.",
-});
+};
 
 export const ListWorkflowsInputSchema = {
   limit: z.number().int().optional().default(10).describe("Number of workflows to return (default: 10)"),
   offset: z.number().int().optional().default(0).describe("Offset for pagination (default: 0)"),
-};
-
-export const GetWorkflowInputSchema = {
-  id: z.string().describe("The ID of the workflow to retrieve"),
 };
 
 export const ExecuteWorkflowInputSchema = {
@@ -154,14 +79,14 @@ export const ListIntegrationsInputSchema = {
   offset: z.number().int().optional().default(0).describe("Offset for pagination (default: 0)"),
 };
 
-export const CreateIntegrationInputSchema = z.object({
+export const CreateIntegrationInputSchema = {
   id: z.string().describe("A unique identifier for the new integration (e.g., 'stripe-production')."),
   name: z.string().describe("A human-readable name for the integration (e.g., 'Stripe Production')."),
   urlHost: z.string().optional().describe("Base URL for the API (e.g., 'https://api.stripe.com')."),
   documentationUrl: z.string().optional().describe("URL to the API documentation."),
   documentation: z.string().optional().describe("A string containing the API documentation, if provided directly."),
   credentials: z.any().optional().describe("Credentials for accessing the integration."),
-});
+};
 
 // --- Tool Definitions ---
 // Map tool names to their Zod schemas and GraphQL details
@@ -454,15 +379,10 @@ export const toolDefinitions: Record<string, any> = {
       Builds, tests, and saves workflows. This is the primary tool for creating new automated processes. It follows an iterative "test-then-save" model.
     </use_case>
 
-    <workflow_path>
-      1. TEST: Call with an 'instruction' and 'integrations'. This builds and runs a workflow in memory without saving it. Analyze the 'workflow_executed' object in the response.
-      2. SAVE: If the test run was successful, call again with 'save: true'. This time, pass the 'workflow_executed' object from the previous step as the 'workflow' parameter. This will persist the workflow and any new integrations without re-running anything.
-    </workflow_path>
-
     <important_notes>
       - To test a new idea, provide: 'instruction', 'integrations'. 'save' should be false or omitted.
       - To save a working workflow, provide: 'workflow' (the validated object from the test run), 'integrations' (the same ones used to build it), and 'save: true'.
-      - INTEGRATIONS: Use 'superglue_find_relevant_integrations' first. If a new integration is needed, provide its full configuration in the 'integrations' array. For existing ones, just provide the 'id'.
+      - INTEGRATIONS: Use 'superglue_find_relevant_integrations' first. If a new integration is needed, provide its full configuration in the 'integrations' array. For existing ones, just provide the 'id'. There is no need to manually search for documentation.
       - CREDENTIALS: All necessary credentials for new integrations MUST be provided in the integration objects.
     </important_notes>
     `,
