@@ -187,16 +187,19 @@ export const deleteIntegrationResolver = async (
 
 export const findRelevantIntegrationsResolver = async (
   _: any,
-  { instruction, limit, offset }: { instruction: string, limit?: number, offset?: number },
+  { instruction, limit, offset }: { instruction?: string, limit?: number, offset?: number },
   context: Context,
   info: GraphQLResolveInfo
 ) => {
-  logMessage('info', `Finding relevant integrations for instruction: ${instruction}`, { orgId: context.orgId });
+  const logInstruction = instruction ? `instruction: ${instruction}` : 'no instruction (returning all integrations)';
+  logMessage('info', `Finding relevant integrations for ${logInstruction}`, { orgId: context.orgId });
+
   try {
     const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
-    const allIntegrations = await context.datastore.listIntegrations(limit ?? 1000, offset ?? 0, context.orgId); // Fetch all
+    const allIntegrations = await context.datastore.listIntegrations(limit ?? 1000, offset ?? 0, context.orgId);
 
     if (!allIntegrations || allIntegrations.items.length === 0) {
+      logMessage('info', `No integrations found for organization.`, metadata);
       return []; // No integrations exist for this user
     }
 
@@ -208,6 +211,15 @@ export const findRelevantIntegrationsResolver = async (
       return [];
     }
 
+    // Handle empty/undefined instruction - return all available integrations
+    if (!instruction || instruction.trim() === '') {
+      logMessage('info', `No instruction provided, returning all available integrations.`, metadata);
+      return availableIntegrations.map(int => ({
+        id: int.id,
+        reason: "Available integration (no specific instruction provided)"
+      }));
+    }
+
     const selector = new IntegrationSelector(metadata);
     let suggestedIntegrations = await selector.select(instruction, availableIntegrations);
 
@@ -215,7 +227,7 @@ export const findRelevantIntegrationsResolver = async (
       logMessage('info', `Integration selector returned no specific integrations. Returning all available integrations as a fallback.`, metadata);
       suggestedIntegrations = availableIntegrations.map(int => ({
         id: int.id,
-        reason: "Could not determine a specific match. This integration is available for use."
+        reason: "No specific match found for your request, but this integration is available for use"
       }));
     }
 
