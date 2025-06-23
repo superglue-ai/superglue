@@ -4,6 +4,7 @@ import { flattenAndNamespaceWorkflowCredentials } from "@superglue/shared/utils"
 import type { GraphQLResolveInfo } from "graphql";
 import { WorkflowExecutor } from "../../workflow/workflow-executor.js";
 
+import { generateUniqueId } from "@superglue/shared/utils";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { logMessage } from "../../utils/logs.js";
 import { WorkflowBuilder } from "../../workflow/workflow-builder.js";
@@ -274,9 +275,10 @@ export const buildWorkflowResolver = async (
     const builder = new WorkflowBuilder(instruction, resolvedIntegrations, payload, responseSchema, metadata);
     const workflow = await builder.build();
     // prevent collisions with existing workflows
-    while (await context.datastore.getWorkflow(workflow.id, context.orgId)) {
-      workflow.id = workflow.id + "-1";
-    }
+    workflow.id = await generateUniqueId({
+      baseId: workflow.id,
+      exists: async (id) => !!(await context.datastore.getWorkflow(id, context.orgId))
+    });
 
     return workflow;
   } catch (error) {

@@ -6,7 +6,7 @@ import { useToast } from '@/src/hooks/use-toast';
 import { inputErrorStyles, needsUIToTriggerDocFetch, parseCredentialsHelper } from '@/src/lib/client-utils';
 import { findMatchingIntegration, integrations as integrationTemplates } from '@/src/lib/integrations';
 import { cn, composeUrl } from '@/src/lib/utils';
-import { Integration, IntegrationInput, SuperglueClient, Workflow, WorkflowResult } from '@superglue/client';
+import { Integration, IntegrationInput, SuperglueClient, UpsertMode, Workflow, WorkflowResult } from '@superglue/client';
 import { flattenAndNamespaceWorkflowCredentials } from '@superglue/shared/utils';
 import { ArrowRight, Check, ChevronRight, FileText, Globe, Loader2, Pencil, Play, Plus, Workflow as WorkflowIcon, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -202,7 +202,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         documentationPending: true // Trigger refresh
       };
 
-      await client.upsertIntegration(integrationId, upsertData);
+      await client.upsertIntegration(integrationId, upsertData, UpsertMode.UPDATE);
 
       // Use proper polling to wait for docs to be ready
       const results = await waitForIntegrationReady([integrationId], 60000);
@@ -215,7 +215,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         await client.upsertIntegration(integrationId, {
           ...upsertData,
           documentationPending: false
-        });
+        }, UpsertMode.UPDATE);
 
         setPendingDocIds(prev => new Set([...prev].filter(id => id !== integrationId)));
       }
@@ -234,7 +234,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
             credentials: integration.credentials || {},
             documentation: integration.documentation || '',
             documentationPending: false
-          });
+          }, UpsertMode.UPDATE);
         }
       } catch (resetError) {
         console.error('Error resetting documentationPending:', resetError);
@@ -252,25 +252,30 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
 
     // Handle background operations
     try {
-      await client.upsertIntegration(integration.id, integration);
-      const needsDocFetch = needsUIToTriggerDocFetch(integration, integrationFormEdit);
+      const mode = integrationFormEdit ? UpsertMode.UPDATE : UpsertMode.CREATE;
+      const savedIntegration = await client.upsertIntegration(integration.id, integration, mode);
+      const needsDocFetch = needsUIToTriggerDocFetch(savedIntegration, integrationFormEdit);
 
       if (needsDocFetch) {
         // Set pending state for new integrations with doc URLs
-        setPendingDocIds(prev => new Set([...prev, integration.id]));
+        setPendingDocIds(prev => new Set([...prev, savedIntegration.id]));
 
         // Wait for docs to be ready in background - no toast needed since UI shows spinner
-        waitForIntegrationReady([integration.id], 60000).then(() => {
+        waitForIntegrationReady([savedIntegration.id], 60000).then(() => {
           // Remove from pending when done
-          setPendingDocIds(prev => new Set([...prev].filter(id => id !== integration.id)));
+          setPendingDocIds(prev => new Set([...prev].filter(id => id !== savedIntegration.id)));
         }).catch((error) => {
           console.error('Error waiting for docs:', error);
           // Remove from pending on error
-          setPendingDocIds(prev => new Set([...prev].filter(id => id !== integration.id)));
+          setPendingDocIds(prev => new Set([...prev].filter(id => id !== savedIntegration.id)));
         });
       }
 
-      setSelectedIntegrationIds(ids => ids.includes(integration.id) ? ids : [...ids, integration.id]);
+      setSelectedIntegrationIds(ids => {
+        const newIds = ids.filter(id => id !== (integrationFormEdit?.id || integration.id));
+        newIds.push(savedIntegration.id);
+        return newIds;
+      });
 
       // Refresh integrations to ensure UI is updated
       await refreshIntegrations();
