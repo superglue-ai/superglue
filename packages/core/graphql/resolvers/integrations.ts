@@ -2,7 +2,6 @@ import { Integration } from '@superglue/client';
 
 import { generateUniqueId } from '@superglue/shared/utils';
 import { Context, Metadata } from "@superglue/shared";
-import { generateUniqueId } from '@superglue/shared/utils';
 import { GraphQLResolveInfo } from "graphql";
 import { Documentation } from '../../utils/documentation.js';
 import { logMessage } from '../../utils/logs.js';
