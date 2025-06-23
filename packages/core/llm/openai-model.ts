@@ -26,8 +26,7 @@ export class OpenAIModel implements LLM {
     const result = await this.model.chat.completions.create({
       messages: [dateMessage, ...messages],
       model: process.env.OPENAI_MODEL || "gpt-4o",
-      temperature: temperature,
-      max_tokens: 65536,
+      temperature: temperature
     });
     let responseText = result.choices[0].message.content;
 
