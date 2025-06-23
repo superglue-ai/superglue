@@ -187,13 +187,14 @@ export const deleteIntegrationResolver = async (
 
 export const findRelevantIntegrationsResolver = async (
   _: any,
-  { instruction }: { instruction?: string },
+  { instruction, limit, offset }: { instruction: string, limit?: number, offset?: number },
   context: Context,
   info: GraphQLResolveInfo
 ) => {
+  logMessage('info', `Finding relevant integrations for instruction: ${instruction}`, { orgId: context.orgId });
   try {
     const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
-    const allIntegrations = await context.datastore.listIntegrations(1000, 0, context.orgId); // Fetch all
+    const allIntegrations = await context.datastore.listIntegrations(limit ?? 1000, offset ?? 0, context.orgId); // Fetch all
 
     if (!allIntegrations || allIntegrations.items.length === 0) {
       return []; // No integrations exist for this user
@@ -208,7 +209,15 @@ export const findRelevantIntegrationsResolver = async (
     }
 
     const selector = new IntegrationSelector(metadata);
-    const suggestedIntegrations = await selector.select(instruction, availableIntegrations);
+    let suggestedIntegrations = await selector.select(instruction, availableIntegrations);
+
+    if (!suggestedIntegrations || suggestedIntegrations.length === 0) {
+      logMessage('info', `Integration selector returned no specific integrations. Returning all available integrations as a fallback.`, metadata);
+      suggestedIntegrations = availableIntegrations.map(int => ({
+        id: int.id,
+        reason: "Could not determine a specific match. This integration is available for use."
+      }));
+    }
 
     return suggestedIntegrations;
   } catch (error) {

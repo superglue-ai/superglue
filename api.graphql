@@ -298,6 +298,7 @@ type Query {
   listExtracts(limit: Int = 10, offset: Int = 0): ExtractList!
   listWorkflows(limit: Int = 10, offset: Int = 0): WorkflowList!
   listIntegrations(limit: Int = 10, offset: Int = 0): IntegrationList!
+  findRelevantIntegrations(instruction: String!, limit: Int = 10, offset: Int = 0): [SuggestedIntegration!]
 
   getRun(id: ID!): RunResult
   getApi(id: ID!): ApiConfig
@@ -305,7 +306,6 @@ type Query {
   getExtract(id: ID!): ExtractConfig
   getWorkflow(id: ID!): Workflow
   getIntegration(id: ID!): Integration
-  findRelevantIntegrations(instruction: String): [SuggestedIntegration!]
 
   generateSchema(instruction: String!, responseData: String): JSONSchema!
   generateInstructions(integrations: [IntegrationInput!]!): [String!]!
