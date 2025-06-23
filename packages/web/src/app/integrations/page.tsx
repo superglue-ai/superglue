@@ -312,7 +312,7 @@ export default function IntegrationsPage() {
                                                     hasDocumentation={hasDocumentation(integration)}
                                                 />
                                                 {(!integration.credentials || Object.keys(integration.credentials).length === 0) && (
-                                                    <span className="text-xs text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded">No credentials</span>
+                                                    <span className="text-xs text-amber-800 dark:text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded">No credentials</span>
                                                 )}
                                             </div>
                                         </div>

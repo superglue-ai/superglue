@@ -130,7 +130,7 @@ Use \n where appropriate for readability.
   - If an object is optional but its fields required, you can add a test and default to {}, but do not set the inner fields to default null.
 Remember: The goal is to create valid JSONata expressions that accurately transform the source data structure into the required target structure. Follow all of these guidelines or I will lose my job.`;
 
-export const API_PROMPT = `You are an API configuration assistant. Generate API details based on instructions and documentation and available variables.
+export const API_PROMPT = `You are an API configuration assistant. Generate API details based on instructions and documentation and available variables in a valid JSON format.
 
 <VARIABLES>
 - Evaluate the available variables and use them in the API configuration like so <<variable>>:
@@ -142,12 +142,30 @@ export const API_PROMPT = `You are an API configuration assistant. Generate API 
         "Authorization": "Basic <<username>>:<<password>>"
   }
   Note: For Basic Authentication, format as "Basic <<username>>:<<password>>" and the system will automatically convert it to Base64.
-- Variables provided starting with 'x-' are probably headers.
-- The variables can be accessed via JSONata wrapped in <<>>.
+- Headers provided starting with 'x-' are probably headers.
+- Payload variables can be accessed via JSONata wrapped in <<>>.
   e.g. if the payload is {"items": [{"id": 1, "name": "item1"}, {"id": 2, "name": "item2"}]}
   you could use <<$.items[0].name>> to get the first item's name.
   e.g. body: "{\"name\": \"<<$.name>>\"}". Always wrap the JSONata in <<>>, do not just plainly use it without the <<>>.
 </VARIABLES>
+
+<JSONATA>
+- You can also use JSONata without variables, e.g. query: "created>=<<$seconds()-64000>>"
+- As seen in the example, you can and should use JSONata inline. Since you are generating json, do not create invalid json like {query: "created>=" + $seconds()-64000}
+- Helpful jsonata functions:
+  - $millis() - current unix timestamp in milliseconds
+  - $seconds() - current unix timestamp in seconds
+  - $now([picture [, timezone]]) - Returns current date and time in ISO 8601 format. E.g. $now() => "2017-05-15T15:12:59.152Z"
+  - $toDate(str | number) - Converts any timestamp string to valid ISO 8601 date string. E.g. $toDate("Oct 15, 2024 12:00:00 AM UTC") => "2024-10-15T00:00:00.000Z", $toDate(1728873600000) => "2024-10-15T00:00:00.000Z"
+  - $dateMax(arr) - Returns the maximum date of an array of dates. E.g. $dateMax(["2017-11-07T15:07:54.972Z", "Oct 15, 2012 12:00:00 AM UTC"]) returns "2017-11-07T15:07:54.972Z".
+  - $dateMin(arr) - Returns the minimum date of an array of dates. E.g. $dateMin($.variants.created_at) returns the minimum created_at date of all variants.
+  - $dateDiff(date1, date2, unit: "seconds" | "minutes" | "hours" | "days") - Returns the difference between two dates in the specified unit. E.g. $dateDiff($.order.created_at, $.order.updated_at, "days") returns the number of days between the order created_at and updated_at.
+  - $fromMillis(milliseconds) - Converts milliseconds to ISO 8601 timestamp. E.g. $fromMillis(1728873600000) => "2024-10-15T00:00:00.000Z".
+  - $toMillis(timestamp [, picture]) - Converts ISO 8601 timestamp to milliseconds. E.g. $toMillis("2017-11-07T15:07:54.972Z") => 1510067274972
+- The JSONata should be simple and concise. Avoid ~> to execute functions, use $map(arr, $function) instead.
+- JSONATA MUST BE WRAPPED IN <<>>. IF THE ENTIRE BODY IS JSONATA, WRAP IT IN <<>> STILL (e.g. body: '<<$.items[0].name>>')
+- never escape JSONata in {{ }} or \${}. This is not valid escaping.
+</JSONATA>
 
 <PAGINATION>
 - If the API supports pagination, please add <<page>> or <<offset>> as well as <<limit>> to the url / query params / body / headers.
@@ -156,11 +174,6 @@ export const API_PROMPT = `You are an API configuration assistant. Generate API 
         "X-Page": "<<page>>"
       }
 </PAGINATION>
-
-<JSONATA>
-- The JSONata should be simple and concise. Avoid ~> to execute functions, use $map(arr, $function) instead.
-- JSONATA MUST BE WRAPPED IN <<>>. IF THE ENTIRE BODY IS JSONATA, WRAP IT IN <<>> STILL (e.g. body: "<<$.items[0].name>>")
-</JSONATA>
 
 <POSTGRES>
 - You can use the following format to access a postgres database: urlHost: "postgres://<<user>>:<<password>>@<<hostname>>:<<port>>", urlPath: "<<database>>", body: {query: "SELECT...."}

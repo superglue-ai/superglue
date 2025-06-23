@@ -41,25 +41,14 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
   let seenResponseHashes = new Set<string>();
 
   while (hasMore && loopCounter < 500) {
-    // Generate pagination variables if enabled
-    let paginationVars = {};
-    switch (endpoint.pagination?.type) {
-      case PaginationType.PAGE_BASED:
-        const pageSize = endpoint.pagination?.pageSize || "50";
-        paginationVars = { page, limit: pageSize, pageSize: pageSize };
-        break;
-      case PaginationType.OFFSET_BASED:
-        const offsetPageSize = endpoint.pagination?.pageSize || "50";
-        paginationVars = { offset, limit: offsetPageSize, pageSize: offsetPageSize };
-        break;
-      case PaginationType.CURSOR_BASED:
-        const cursorPageSize = endpoint.pagination?.pageSize || "50";
-        paginationVars = { cursor: cursor, limit: cursorPageSize, pageSize: cursorPageSize };
-        break;
-      default:
-        hasMore = false;
-        break;
-    }
+    // Generate pagination variables
+    let paginationVars = {
+      page,
+      offset,
+      cursor,
+      limit: endpoint.pagination?.pageSize || "50",
+      pageSize: endpoint.pagination?.pageSize || "50"
+    };
 
     // Combine all variables
     const requestVars = { ...paginationVars, ...allVariables };
@@ -206,6 +195,9 @@ config: ${JSON.stringify(axiosConfig)}`;
         hasMore = false;
       }
     }
+    else {
+      hasMore = false;
+    }
     loopCounter++;
   }
 
@@ -255,7 +247,7 @@ export async function generateApiConfig(
   const availableVariables = [
     ...Object.keys(credentials || {}),
     ...Object.keys(payload || {}),
-  ].map(v => `{${v}}`).join(", ");
+  ].map(v => `<<${v}>>`).join(", ");
   if (messages.length === 0) {
     const userPrompt = `Generate API configuration for the following:
 

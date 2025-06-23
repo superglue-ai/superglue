@@ -2,11 +2,11 @@
 import { useConfig } from "@/src/app/config-context";
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import JsonSchemaEditor from "@/src/components/utils/JsonSchemaEditor";
-import { parseCredentialsHelper, removeNullUndefined } from "@/src/lib/client-utils";
+import { parseCredentialsHelper } from "@/src/lib/client-utils";
 import { cn } from "@/src/lib/utils";
-import { ExecutionStep, SuperglueClient, Workflow, WorkflowResult } from "@superglue/client";
+import { ExecutionStep, Integration, SuperglueClient, WorkflowResult } from "@superglue/client";
 import { flattenAndNamespaceWorkflowCredentials } from "@superglue/shared/utils";
-import { ChevronRight, X } from "lucide-react";
+import { ChevronRight, Database, FileText, Workflow, X } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from "react";
 import { useToast } from "../../hooks/use-toast";
@@ -16,8 +16,6 @@ import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { WorkflowResultsView } from "./WorkflowResultsView";
 import { WorkflowStepsView } from "./WorkflowStepsView";
-
-const inputErrorStyles = "border-red-500 focus-visible:ring-red-500";
 
 export default function WorkflowPlayground({ id }: { id?: string }) {
   const router = useRouter();
@@ -31,6 +29,7 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
   }
 }`);
   const [responseSchema, setResponseSchema] = useState<string | null>(`{"type": "object", "properties": {"result": {"type": "object"}}}`);
+  const [inputSchema, setInputSchema] = useState<string | null>(`{"type": "object", "properties": {"payload": {"type": "object"}, "credentials": {"type": "object"}}}`);
   const [credentials, setCredentials] = useState<string>('');
   const [payload, setPayload] = useState<string>('{}');
   const [loading, setLoading] = useState(false);
@@ -40,9 +39,12 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
   const [activeResultTab, setActiveResultTab] = useState<'results' | 'transform' | 'final' | 'instructions'>("final");
   const [integrationCredentials, setIntegrationCredentials] = useState<Record<string, string>>({});
   const [showSteps, setShowSteps] = useState(false);
-  const [showSchemaEditor, setShowSchemaEditor] = useState(false);
-  const [loadedWorkflow, setLoadedWorkflow] = useState<Workflow | null>(null);
+  const [showResponseSchemaEditor, setShowResponseSchemaEditor] = useState(false);
+  const [showInputSchemaEditor, setShowInputSchemaEditor] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
+  const [integrations, setIntegrations] = useState<Integration[]>([]);
+  const [instructions, setInstructions] = useState<string>('');
+
   const client = useMemo(() => new SuperglueClient({
     endpoint: config.superglueEndpoint,
     apiKey: config.superglueApiKey,
@@ -85,6 +87,24 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
     return schema.default || null;
   };
 
+  const loadIntegrations = async () => {
+    try {
+      setLoading(true);
+      const result = await client.listIntegrations(100, 0);
+      setIntegrations(result.items);
+      return result.items;
+    } catch (error: any) {
+      console.error("Error loading integrations:", error);
+      toast({
+        title: "Error loading integrations",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const loadWorkflow = async (idToLoad: string) => {
     try {
       if (!idToLoad) return;
@@ -94,65 +114,50 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
       if (!workflow) {
         throw new Error(`Workflow with ID "${idToLoad}" not found.`);
       }
-
-      const cleanedWorkflow = removeNullUndefined(workflow);
-      setLoadedWorkflow(cleanedWorkflow);
-      updateWorkflowId(cleanedWorkflow.id || '');
-      setSteps(cleanedWorkflow.steps || []);
-      setFinalTransform(cleanedWorkflow.finalTransform || `(sourceData) => {
+      updateWorkflowId(workflow.id || '');
+      setSteps(workflow?.steps?.map(step => ({ ...step, apiConfig: { ...step.apiConfig, id: step.apiConfig.id || step.id } })) || []);
+      setFinalTransform(workflow.finalTransform || `(sourceData) => {
   return {
     result: sourceData
   }
 }`);
 
+      // Add instructions loading
+      setInstructions(workflow.instruction || '');
+
       // Handle response schema
-      setResponseSchema(cleanedWorkflow.responseSchema ? JSON.stringify(cleanedWorkflow.responseSchema) : null);
+      setResponseSchema(workflow.responseSchema ? JSON.stringify(workflow.responseSchema, null, 2) : null);
 
-      // Handle credentials - only if integrationIds exist
-      if (cleanedWorkflow.integrationIds?.length > 0) {
+      // Handle input schema
+      const inputSchemaStr = workflow.inputSchema ? JSON.stringify(workflow.inputSchema, null, 2) : `{"type": "object", "properties": {"payload": {"type": "object"}, "credentials": {"type": "object"}}}`;
+      setInputSchema(inputSchemaStr);
+
+      const integrations = await loadIntegrations();
+      if (workflow.integrationIds?.length > 0 || workflow.steps?.some((step: ExecutionStep) => step.integrationId)) {
         try {
-          const integrations = await Promise.all(
-            cleanedWorkflow.integrationIds.map(id => client.getIntegration(id))
-          );
-
           // Flatten and namespace integration credentials
           const flattenedCreds = flattenAndNamespaceWorkflowCredentials(
             integrations.filter(Boolean)
           );
 
+          // Set integration credentials first, then construct from schema
           setIntegrationCredentials(flattenedCreds);
-          setCredentials(JSON.stringify(flattenedCreds, null, 2));
-          setValidationErrors(prev => ({ ...prev, credentials: false }));
+
+          // Construct from schema using the integration credentials
+          constructFromInputSchemaWithCreds(inputSchemaStr, flattenedCreds);
+
         } catch (error) {
           console.warn('Failed to load integration credentials:', error);
-          setCredentials('{}');
-          setValidationErrors(prev => ({ ...prev, credentials: false }));
+          // Fallback to schema-only construction
+          constructFromInputSchemaWithCreds(inputSchemaStr, {});
         }
       } else {
-        setCredentials('{}');
-        setValidationErrors(prev => ({ ...prev, credentials: false }));
+        // No integration IDs, just use schema
+        constructFromInputSchemaWithCreds(inputSchemaStr, {});
       }
-
-      // Handle payload - only if inputSchema exists
-      if (cleanedWorkflow.inputSchema) {
-        try {
-          const defaultValues = generateDefaultFromSchema(cleanedWorkflow.inputSchema);
-          if (defaultValues.payload !== undefined) {
-            setPayload(JSON.stringify(defaultValues.payload));
-          } else {
-            setPayload('{}');
-          }
-        } catch (error) {
-          console.warn('Failed to generate payload from schema:', error);
-          setPayload('{}');
-        }
-      } else {
-        setPayload('{}');
-      }
-
       toast({
         title: "Workflow loaded",
-        description: `Loaded "${cleanedWorkflow.id}" successfully`,
+        description: `Loaded "${workflow.id}" successfully`,
       });
     } catch (error: any) {
       console.error("Error loading workflow:", error);
@@ -166,6 +171,49 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
     }
   };
 
+  // Updated function that takes integration credentials as parameter
+  const constructFromInputSchemaWithCreds = (schema: string | null, integCreds: Record<string, string>) => {
+    if (!schema) return;
+
+    try {
+      const parsedSchema = JSON.parse(schema);
+      const defaultValues = generateDefaultFromSchema(parsedSchema);
+
+      // Handle credentials - prioritize integration credentials
+      if (defaultValues.credentials !== undefined) {
+        if (Object.keys(integCreds).length > 0) {
+          const mergedCredentials = {
+            ...defaultValues.credentials,
+            ...integCreds
+          };
+          setCredentials(JSON.stringify(mergedCredentials, null, 1));
+        } else {
+          setCredentials(JSON.stringify(defaultValues.credentials, null, 1));
+        }
+        setValidationErrors(prev => ({ ...prev, credentials: false }));
+      } else if (Object.keys(integCreds).length > 0) {
+        setCredentials(JSON.stringify(integCreds, null, 1));
+        setValidationErrors(prev => ({ ...prev, credentials: false }));
+      } else {
+        setCredentials('{}');
+      }
+
+      // Handle payload from schema
+      if (defaultValues.payload !== undefined) {
+        setPayload(JSON.stringify(defaultValues.payload, null, 1));
+      } else {
+        setPayload('{}');
+      }
+    } catch (error) {
+      console.warn('Failed to construct from input schema:', error);
+    }
+  };
+
+  // Update the original function to use current integration credentials
+  const constructFromInputSchema = (schema: string | null) => {
+    constructFromInputSchemaWithCreds(schema, integrationCredentials);
+  };
+
   useEffect(() => {
     if (id) {
       loadWorkflow(id);
@@ -173,25 +221,45 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
       // Reset to a clean slate if id is removed or not provided
       updateWorkflowId("");
       setSteps([]);
+      setInstructions("");
       setFinalTransform(`(sourceData) => {
   return {
     result: sourceData
   }
 }`);
       setResponseSchema('{"type": "object", "properties": {"result": {"type": "object"}}}');
-      setCredentials("");
-      setPayload("{}");
+      const defaultInputSchema = '{"type": "object", "properties": {"payload": {"type": "object"}, "credentials": {"type": "object"}}}';
+      setInputSchema(defaultInputSchema);
+      // Construct default credentials and payload from default schema
+      constructFromInputSchema(defaultInputSchema);
       setResult(null);
     }
   }, [id]);
 
+  // Effect to update credentials and payload when input schema changes (but not during workflow loading)
+  useEffect(() => {
+    // Only run this if we're not in the middle of loading a workflow
+    if (!loading) {
+      constructFromInputSchema(inputSchema);
+    }
+  }, [inputSchema]);
+
+  // Separate effect for when integration credentials change
+  useEffect(() => {
+    if (!loading && Object.keys(integrationCredentials).length > 0) {
+      constructFromInputSchema(inputSchema);
+    }
+  }, [integrationCredentials]);
+
   const fillDogExample = () => {
     updateWorkflowId("Dog Breed Workflow");
+    setInstructions("This workflow fetches all dog breeds and gets random images for the first 5 breeds");
     setSteps(
       [
         {
           id: "getAllBreeds",
           apiConfig: {
+            id: "getAllBreeds",
             urlPath: "/breeds/list/all",
             instruction: "Get all dog breeds",
             urlHost: "https://dog.ceo/api",
@@ -204,6 +272,7 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
         {
           id: "getBreedImage",
           apiConfig: {
+            id: "getBreedImage",
             urlPath: "/breed/{currentItem}/images/random",
             instruction: "Get a random image for a specific dog breed",
             urlHost: "https://dog.ceo/api",
@@ -217,11 +286,13 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
         },
       ]
     );
-    setFinalTransform(`$.getBreedImage.(
-  {"breed": currentItem, "image": message.data}
-)`);
+    setFinalTransform(`(sourceData) => {
+  return {
+    result: sourceData
+  }
+}`);
     setResponseSchema(`{"type": "object", "properties": {"result": {"type": "array", "items": {"type": "object", "properties": {"breed": {"type": "string"}, "image": {"type": "string"}}}}}}`);
-
+    setInputSchema(`{"type": "object", "properties": {"payload": {"type": "object"}, "credentials": {"type": "object"}}}`);
     toast({
       title: "Example loaded",
       description: "Dog breed example has been loaded",
@@ -245,7 +316,9 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
           }
         })),
         responseSchema: responseSchema ? JSON.parse(responseSchema) : null,
-        finalTransform
+        inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
+        finalTransform,
+        instruction: instructions
       };
 
       const savedWorkflow = await client.upsertWorkflow(workflowId, input);
@@ -273,19 +346,7 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
     }
   };
 
-  const validateJson = (json: string, field: string): boolean => {
-    try {
-      JSON.parse(json);
-      setValidationErrors(prev => ({ ...prev, [field]: false }));
-      return true;
-    } catch (e) {
-      setValidationErrors(prev => ({ ...prev, [field]: true }));
-      return false;
-    }
-  };
-
   const executeWorkflow = async () => {
-    if (!loadedWorkflow) return;
     setLoading(true);
     setResult(null);
     setError(null);
@@ -293,23 +354,21 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
     try {
       // Validate JSON before execution
       try {
-        JSON.parse(credentials);
+        JSON.parse(credentials || '{}');
       } catch (e) {
         throw new Error("Invalid credentials JSON format");
       }
-
       const workflowResult = await client.executeWorkflow({
         workflow: {
-          id: loadedWorkflow.id,
-          steps: loadedWorkflow.steps,
-          integrationIds: loadedWorkflow.integrationIds,
-          responseSchema: loadedWorkflow.responseSchema,
-          finalTransform: loadedWorkflow.finalTransform,
-          inputSchema: loadedWorkflow.inputSchema,
-          instruction: loadedWorkflow.instruction
+          id: workflowId,
+          steps: steps,
+          integrationIds: [],
+          responseSchema: responseSchema ? JSON.parse(responseSchema) : null,
+          inputSchema: inputSchema ? JSON.parse(inputSchema) : { type: "object" },
+          finalTransform: finalTransform,
         },
         payload: JSON.parse(payload || '{}'),
-        credentials: JSON.parse(credentials)
+        credentials: JSON.parse(credentials || '{}')
       });
 
       if (workflowResult.error) {
@@ -335,7 +394,7 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
 
   const handleStepEdit = (stepId: string, updatedStep: any) => {
     setSteps(prevSteps =>
-      prevSteps.map(step => (step.id === stepId ? updatedStep : step))
+      prevSteps.map(step => (step.id === stepId ? { ...updatedStep, apiConfig: { ...updatedStep.apiConfig, id: updatedStep.apiConfig.id || updatedStep.id } } : step))
     );
   };
 
@@ -360,11 +419,34 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
 
   const fetchAndFlattenIntegrationCredentials = async (integrationIds: string[]) => {
     if (!integrationIds || integrationIds.length === 0) return;
-    const creds = flattenAndNamespaceWorkflowCredentials(
-      integrationIds.map(id => ({ id, credentials: {} }))
-    );
-    setIntegrationCredentials(creds);
-    setCredentials(JSON.stringify(creds, null, 2)); // Prefill credentials input
+
+    try {
+      const integrations = await Promise.all(
+        integrationIds.map(id => client.getIntegration(id))
+      );
+
+      // Flatten and namespace integration credentials
+      const flattenedCreds = flattenAndNamespaceWorkflowCredentials(
+        integrations.filter(Boolean)
+      );
+
+      setIntegrationCredentials(flattenedCreds);
+
+      // Reconstruct credentials from schema with new integration data
+      constructFromInputSchema(inputSchema);
+
+      toast({
+        title: "Integration credentials loaded",
+        description: `Loaded credentials for ${integrations.length} integrations`,
+      });
+    } catch (error) {
+      console.error('Failed to load integration credentials:', error);
+      toast({
+        title: "Error loading integration credentials",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -419,6 +501,15 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
               </div>
             </div>
 
+            {/* Workflow Instructions */}
+            <div className="mb-4">
+              <Label htmlFor="instructions">Workflow Instructions</Label>
+              <HelpTooltip text="Describe what this workflow does and how it should behave. This helps with documentation and AI assistance." />
+              <div className="font-mono text-sm text-foreground rounded py-1 mt-1 break-words">
+                {instructions || <span className="italic text-muted-foreground">No instructions provided</span>}
+              </div>
+            </div>
+
             {/* Credentials Input */}
             <div className="mb-4">
               <Label htmlFor="credentials">Credentials</Label>
@@ -441,10 +532,13 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
               </div>
               {(() => {
                 try {
-                  const creds = JSON.parse(credentials);
-                  if (!creds || Object.keys(creds).length === 0) {
+                  const parsed = JSON.parse(credentials || '{}');
+                  if (!parsed) {
+                    return null;
+                  }
+                  if (Object.values(parsed).some(value => value === '' || value === null || value === undefined)) {
                     return (
-                      <div className="text-xs text-amber-500 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded mt-2">
+                      <div className="text-xs text-amber-800 dark:text-amber-300 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded mt-2">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
                           <line x1="12" y1="9" x2="12" y2="13" />
@@ -485,9 +579,12 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
               {(() => {
                 try {
                   const parsed = JSON.parse(payload || '{}');
-                  if (!parsed || Object.keys(parsed).length === 0) {
+                  if (!parsed) {
+                    return null;
+                  }
+                  if (Object.values(parsed).some(value => value === '' || value === null || value === undefined)) {
                     return (
-                      <div className="text-xs text-amber-500 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded mt-2">
+                      <div className="text-xs text-amber-800 dark:text-amber-300 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded mt-2">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
                           <line x1="12" y1="9" x2="12" y2="13" />
@@ -513,60 +610,91 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
               })()}
             </div>
 
-            {/* Steps and Final Transform */}
+            {/* Steps and Schema Editors */}
             <div className="space-y-3 flex flex-col flex-grow">
               {/* Steps Toggle */}
-              <div className="flex flex-col gap-2">
-                <div
-                  className="flex items-center gap-2 cursor-pointer select-none"
-                  onClick={() => setShowSteps((v) => !v)}
-                  role="button"
-                  tabIndex={0}
-                >
-                  <ChevronRight
-                    className={cn(
-                      "h-4 w-4 transition-transform",
-                      showSteps && "rotate-90"
-                    )}
-                    aria-hidden="true"
-                  />
-                  <span className="font-medium text-sm">Workflow Steps</span>
-                </div>
-                {showSteps && (
-                  <div className="flex-1 min-h-0 bg-background mb-2">
-                    <WorkflowStepsView
-                      steps={steps}
-                      onStepsChange={handleStepsChange}
-                      onStepEdit={handleStepEdit}
-                    />
-                  </div>
-                )}
-                {/* Schema Toggle */}
-                <div
-                  className="flex items-center gap-2 cursor-pointer select-none"
-                  onClick={() => setShowSchemaEditor((v) => !v)}
-                  role="button"
-                  tabIndex={0}
-                >
-                  <ChevronRight
-                    className={cn(
-                      "h-4 w-4 transition-transform",
-                      showSchemaEditor && "rotate-90"
-                    )}
-                    aria-hidden="true"
-                  />
-                  <span className="font-medium text-sm">Response Schema Editor</span>
-                </div>
-                {showSchemaEditor && (
-                  <div className="bg-background mt-2 mb-4">
-                    <JsonSchemaEditor
-                      isOptional={true}
-                      value={responseSchema}
-                      onChange={setResponseSchema}
-                    />
-                  </div>
-                )}
+              <div
+                className="flex items-center gap-2 cursor-pointer select-none"
+                onClick={() => setShowSteps((v) => !v)}
+                role="button"
+                tabIndex={0}
+              >
+                <ChevronRight
+                  className={cn(
+                    "h-4 w-4 transition-transform",
+                    showSteps && "rotate-90"
+                  )}
+                  aria-hidden="true"
+                />
+                <Workflow className="h-4 w-4" />
+                <span className="font-medium text-sm">Workflow Steps</span>
+                <HelpTooltip text="Define the sequence of API calls that make up your workflow. You can add multiple steps to your workflow and each step can call an external API." />
               </div>
+              {showSteps && (
+                <div className="flex-1 min-h-0 mb-2">
+                  <WorkflowStepsView
+                    steps={steps}
+                    onStepsChange={handleStepsChange}
+                    onStepEdit={handleStepEdit}
+                    integrations={integrations}
+                  />
+                </div>
+              )}
+
+              {/* Input Schema Toggle */}
+              <div
+                className="flex items-center gap-2 cursor-pointer select-none"
+                onClick={() => setShowInputSchemaEditor((v) => !v)}
+                role="button"
+                tabIndex={0}
+              >
+                <ChevronRight
+                  className={cn(
+                    "h-4 w-4 transition-transform",
+                    showInputSchemaEditor && "rotate-90"
+                  )}
+                  aria-hidden="true"
+                />
+                <Database className="h-4 w-4" />
+                <span className="font-medium text-sm">Input Schema Editor</span>
+                <HelpTooltip text="Define the expected structure of input data (payload and credentials) that your workflow accepts. This validates and documents the required input format." />
+              </div>
+              {showInputSchemaEditor && (
+                <div className="mt-2 mb-4">
+                  <JsonSchemaEditor
+                    isOptional={true}
+                    value={inputSchema}
+                    onChange={setInputSchema}
+                  />
+                </div>
+              )}
+              {/* Response Schema Toggle */}
+              <div
+                className="flex items-center gap-2 cursor-pointer select-none"
+                onClick={() => setShowResponseSchemaEditor((v) => !v)}
+                role="button"
+                tabIndex={0}
+              >
+                <ChevronRight
+                  className={cn(
+                    "h-4 w-4 transition-transform",
+                    showResponseSchemaEditor && "rotate-90"
+                  )}
+                  aria-hidden="true"
+                />
+                <FileText className="h-4 w-4" />
+                <span className="font-medium text-sm">Response Schema Editor</span>
+                <HelpTooltip text="Define the expected structure of your workflow's final output. This schema validates and documents what data format the workflow will return." />
+              </div>
+              {showResponseSchemaEditor && (
+                <div className="mt-2 mb-4">
+                  <JsonSchemaEditor
+                    isOptional={true}
+                    value={responseSchema}
+                    onChange={setResponseSchema}
+                  />
+                </div>
+              )}
             </div>
           </CardContent>
 
@@ -591,7 +719,7 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
         </Card>
 
         {/* Right Column - Results */}
-        <Card className="flex flex-col">
+        <Card className="flex flex-col min-h-[80vh]">
           <WorkflowResultsView
             activeTab={activeResultTab}
             setActiveTab={setActiveResultTab}
@@ -607,6 +735,7 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
                 }
               })),
               responseSchema: responseSchema ? JSON.parse(responseSchema) : null,
+              inputSchema: inputSchema ? JSON.parse(inputSchema) : { type: "object" },
               finalTransform
             }}
             credentials={parseCredentialsHelper(credentials)}
