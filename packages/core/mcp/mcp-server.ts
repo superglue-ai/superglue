@@ -8,6 +8,7 @@ import {
 import { SuperglueClient, WorkflowResult } from '@superglue/client';
 import { LogEntry } from "@superglue/shared";
 import { getSDKCode } from '@superglue/shared/templates';
+import { waitForIntegrationsReady } from '@superglue/shared/utils';
 import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import { z } from 'zod';
@@ -29,24 +30,94 @@ export const RequestOptionsSchema = z.object({
   webhookUrl: z.string().optional().describe("Optional webhook URL for async notifications"),
 }).optional();
 
-// Integration Schema
-export const IntegrationInputSchema = {
-  id: z.string().describe("Unique identifier for the integration"),
-  name: z.string().optional().describe("Human-readable name for the integration."),
-  urlHost: z.string().optional().describe("Base URL/hostname for the API including protocol. For https://, use the format: https://<<hostname>>. For postgres, use the format: postgres://<<user>>:<<password>>@<<hostname>>:<<port>>"),
-  urlPath: z.string().optional().describe("Path component of the URL. For postgres, use the db name as the path."),
-  documentationUrl: z.string().optional().describe("URL to API documentation"),
-  documentation: z.string().optional().describe("Available documentation for the integration"),
-  documentationPending: z.boolean().optional().describe("Whether the documentation is still being fetched and processed"),
-  credentials: z.any().optional().describe("Credentials for accessing the integration. MAKE SURE YOU INCLUDE ALL OF THEM BEFORE BUILDING THE CAPABILITY, OTHERWISE IT WILL FAIL."),
+export const PaginationInputSchema = z.object({
+  type: PaginationTypeEnum.describe("The pagination strategy to use"),
+  pageSize: z.string().optional().describe("Number of items per page"),
+  cursorPath: z.string().optional().describe("JSONPath to the cursor field in responses (for cursor-based pagination)"),
+});
+
+// Transform-related Schemas (restored for completeness)
+export const TransformInputSchemaInternal = z.object({
+  id: z.string().describe("Unique identifier for the transform"),
+  instruction: z.string().describe("Natural language description of the transformation"),
+  responseSchema: z.record(z.unknown()).describe("JSONSchema defining the expected output structure"),
+  responseMapping: z.string().optional().describe("JSONata expression for mapping input to output"),
+  version: z.string().optional().describe("Version identifier for the transform"),
+});
+
+export const TransformInputRequestSchema = z.object({
+  endpoint: TransformInputSchemaInternal.optional().describe("Complete transform definition (mutually exclusive with id)"),
+  id: z.string().optional().describe("Reference to existing transform by ID (mutually exclusive with endpoint)"),
+}).refine(data => (data.endpoint && !data.id) || (!data.endpoint && data.id), {
+  message: "Either 'endpoint' or 'id' must be provided, but not both for TransformInputRequest.",
+});
+
+export const TransformOperationInputSchema = {
+  input: TransformInputRequestSchema.describe("Transform definition or reference"),
+  data: z.unknown().describe("The JSON data to be transformed"),
+  options: RequestOptionsSchema.optional().describe("Optional request configuration (caching, timeouts, etc.)")
 };
 
-// MCP Tool Input Schemas
+// Workflow component schemas (these are used by BuildAndRunWorkflowInputSchema)
+export const ApiInputSchemaInternal = {
+  id: z.string().describe("Unique identifier for the API endpoint"),
+  urlHost: z.string().describe("Base URL/hostname for the API including protocol. For https://, use the format: https://<<hostname>>. For postgres, use the format: postgres://<<user>>:<<password>>@<<hostname>>:<<port>>"),
+  urlPath: z.string().optional().describe("Path component of the URL. For postgres, use the db name as the path."),
+  instruction: z.string().describe("Natural language description of what this API does"),
+  queryParams: z.record(z.string()).optional().describe("JSON object containing URL query parameters"),
+  method: HttpMethodEnum.optional().describe("HTTP method to use"),
+  headers: z.record(z.string()).optional().describe("JSON object containing HTTP headers"),
+  body: z.string().optional().describe("Request body as string"),
+  documentationUrl: z.string().optional().describe("URL to API documentation"),
+  responseSchema: z.record(z.unknown()).optional().describe("JSONSchema defining expected response structure"),
+  responseMapping: z.string().optional().describe("JSONata expression for response transformation"),
+  authentication: AuthTypeEnum.optional().describe("Authentication method required"),
+  pagination: PaginationInputSchema.optional().describe("Pagination configuration if supported"),
+  dataPath: z.string().optional().describe("JSONPath to extract data from response"),
+  version: z.string().optional().describe("Version identifier for the API config"),
+};
+
+export const ExecutionStepInputSchemaInternal = {
+  id: z.string().describe("Unique identifier for the execution step"),
+  apiConfig: z.object(ApiInputSchemaInternal).describe("API configuration for this step"),
+  executionMode: z.enum(["DIRECT", "LOOP"]).optional().describe("How to execute this step (DIRECT or LOOP)"),
+  loopSelector: z.string().optional().describe("JSONata expression to select items for looping"),
+  loopMaxIters: z.number().int().optional().describe("Maximum number of loop iterations"),
+  inputMapping: z.string().optional().describe("JSONata expression to map workflow data to step input"),
+  responseMapping: z.string().optional().describe("JSONata expression to transform step output"),
+};
+
+
+export const CreateIntegrationInputSchema = {
+  id: z.string().describe("A unique identifier for the new integration."),
+  name: z.string().optional().describe("Human-readable name for the integration."),
+  urlHost: z.string().optional().describe("Base URL/hostname for the API including protocol."),
+  documentationUrl: z.string().optional().describe("URL to the API documentation."),
+  documentation: z.string().optional().describe("API documentation content, if provided directly."),
+  credentials: z.record(z.string()).optional().describe("Credentials for accessing the integration."),
+};
+
+// Workflow structure schemas (for validation)
+export const WorkflowInputSchema = z.object({
+  id: z.string().describe("Unique identifier for the workflow"),
+  steps: z.array(z.object(ExecutionStepInputSchemaInternal)).describe("Array of execution steps that make up the workflow"),
+  integrationIds: z.array(z.string()).optional().describe("Array of integration IDs used by this workflow"),
+  inputSchema: z.record(z.unknown()).optional().describe("JSONSchema defining the expected input structure"),
+  responseSchema: z.record(z.unknown()).optional().describe("JSONSchema defining the expected output structure"),
+  finalTransform: z.string().optional().describe("JSONata expression to transform final workflow output"),
+  instruction: z.string().optional().describe("Natural language description of what this workflow does"),
+  version: z.string().optional().describe("Version identifier for the workflow"),
+  createdAt: z.string().optional().describe("ISO timestamp when workflow was created"),
+  updatedAt: z.string().optional().describe("ISO timestamp when workflow was last updated"),
+});
+
+// MCP Tool Input Schemas (workflow-centric)
 export const BuildAndRunWorkflowInputSchema = {
   instruction: z.string().describe("Natural language instruction to build a new workflow from scratch."),
-  integrations: z.array(z.object(IntegrationInputSchema)).describe("Array of integrations to use. For existing integrations, only 'id' is required. For new ones, provide the full configuration."),
+  integrations: z.array(z.string()).describe("Array of integration IDs to use in the workflow."),
   payload: z.any().optional().describe("JSON payload for the workflow execution."),
-  responseSchema: z.any().optional().describe("JSONSchema for the expected output structure (used with 'instruction').")
+  credentials: z.record(z.string()).optional().describe("Additional credentials that will be merged with integration credentials."),
+  responseSchema: z.any().optional().describe("JSONSchema for the expected output structure.")
 };
 
 export const ListWorkflowsInputSchema = {
@@ -54,10 +125,14 @@ export const ListWorkflowsInputSchema = {
   offset: z.number().int().optional().default(0).describe("Offset for pagination (default: 0)"),
 };
 
+export const GetWorkflowInputSchema = {
+  id: z.string().describe("The ID of the workflow to retrieve"),
+};
+
 export const ExecuteWorkflowInputSchema = {
   id: z.string().describe("The ID of the workflow to execute"),
   payload: z.any().optional().describe("JSON payload to pass to the workflow"),
-  credentials: z.record(z.string()).optional().describe("JSON credentials for the workflow execution. Do not include prefixes like Bearer or Basic. E.g. { 'apiKey': '1234567890' }"),
+  credentials: z.record(z.string()).optional().describe("Additional credentials that will be merged with integration credentials."),
   options: RequestOptionsSchema.optional().describe("Optional request configuration"),
 };
 
@@ -75,18 +150,9 @@ export const ListIntegrationsInputSchema = {
   offset: z.number().int().optional().default(0).describe("Offset for pagination (default: 0)"),
 };
 
-export const CreateIntegrationInputSchema = {
-  id: z.string().describe("A unique identifier for the new integration (e.g., 'stripe-production')."),
-  name: z.string().describe("A human-readable name for the integration (e.g., 'Stripe Production')."),
-  urlHost: z.string().optional().describe("Base URL for the API (e.g., 'https://api.stripe.com')."),
-  documentationUrl: z.string().optional().describe("URL to the API documentation."),
-  documentation: z.string().optional().describe("A string containing the API documentation, if provided directly."),
-  credentials: z.any().optional().describe("Credentials for accessing the integration."),
-};
-
 export const SaveWorkflowInputSchema = {
-  workflow: z.any().describe("A complete, validated workflow configuration object to save."),
-  integrations: z.array(z.object(IntegrationInputSchema)).optional().describe("Array of integrations used by the workflow. For existing integrations, only 'id' is required. For new ones, provide the full configuration."),
+  workflow: WorkflowInputSchema.describe("A complete, validated workflow configuration object to save."),
+  integrations: z.array(z.string()).optional().describe("Array of integration IDs used by the workflow."),
 };
 
 // --- Tool Definitions ---
@@ -179,11 +245,20 @@ const validateWorkflowBuilding = (args: any) => {
   }
 
   if (!args.integrations || !Array.isArray(args.integrations) || args.integrations.length === 0) {
-    errors.push("integrations array is required with at least one integration configuration including credentials.");
+    errors.push("integrations array is required with at least one integration ID.");
   }
 
-  if (args.integrations.some((integration: any) => integration.credentials && typeof integration.credentials !== 'object')) {
-    errors.push("Credentials within an integration must be an object. E.g. { 'apiKey': '1234567890' }");
+  // Validate each integration is a string
+  if (args.integrations) {
+    for (const integration of args.integrations) {
+      if (typeof integration !== 'string') {
+        errors.push("Each integration must be a string ID. Use 'superglue_find_relevant_integrations' to discover available integration IDs.");
+      }
+    }
+  }
+
+  if (args.credentials && typeof args.credentials !== 'object') {
+    errors.push("Credentials must be an object. E.g. { 'apiKey': '1234567890' }");
   }
 
   return errors;
@@ -201,7 +276,7 @@ const validateWorkflowSaving = (args: any) => {
   }
 
   if (args.integrations && !Array.isArray(args.integrations)) {
-    errors.push("integrations must be an array.");
+    errors.push("integrations must be an array of string IDs.");
   }
 
   return errors;
@@ -270,7 +345,6 @@ export const toolDefinitions: Record<string, any> = {
       - This tool is for running existing, saved workflows. It CANNOT build, test, or save workflows.
       - To create a new workflow, use 'superglue_build_and_run'.
       - Workflow ID must exist (use 'superglue_list_available_workflows' to find valid IDs).
-      - CRITICAL: Include ALL required credentials in the credentials object if not already stored with the integrations.
     </important_notes>
     `,
     inputSchema: ExecuteWorkflowInputSchema,
@@ -330,7 +404,7 @@ export const toolDefinitions: Record<string, any> = {
               success: true,
               suggestedIntegrations: [],
               message: "No integrations found for your request.",
-              suggestion: "Consider creating a new integration or use 'superglue_list_integrations' to see all available integrations."
+              suggestion: "Consider creating a new integration or use 'superglue_find_relevant_integrations' with an empty instruction to see all available integrations."
             };
           }
         }
@@ -415,16 +489,14 @@ export const toolDefinitions: Record<string, any> = {
 
     <important_notes>
       - This tool only builds and tests workflows - it does NOT save them.
-      - Note that the building and testing process can take up to 1 minute. Tell the user this.
-      - Provide 'instruction' and 'integrations' to build and test a workflow.
-      - INTEGRATIONS: Use 'superglue_find_relevant_integrations' first. If a new integration is needed, provide its full configuration in the 'integrations' array. For existing ones, just provide the 'id'.
-      - CREDENTIALS: All necessary credentials for new integrations MUST be provided in the integration objects. Can optionally take in additional credentials as a payload.
+      - Building and testing can take up to 1 minute.
+      - Use 'superglue_find_relevant_integrations' first to discover available integration IDs.
       - After successful execution, use 'superglue_save_workflow' to persist the workflow if desired.
     </important_notes>
     `,
     inputSchema: BuildAndRunWorkflowInputSchema,
     execute: async (args: any & { client: SuperglueClient }, request) => {
-      const { client, instruction, integrations, payload, responseSchema } = args;
+      const { client, instruction, integrations, payload, credentials, responseSchema } = args;
 
       try {
         const validationErrors = validateWorkflowBuilding(args);
@@ -432,29 +504,41 @@ export const toolDefinitions: Record<string, any> = {
           throw new Error(`Validation failed:\n${validationErrors.join('\n')}`);
         }
 
+        // Wait for integrations to be ready (using existing pattern)
+        logEmitter.emit('log', { level: 'info', message: `Checking integration documentation status...` });
+
+        const waitResult = await waitForIntegrationsReady(client, integrations, 60000);
+
+        if (Array.isArray(waitResult)) {
+          // Success - all integrations ready
+          logEmitter.emit('log', { level: 'info', message: `All ${integrations.length} integration(s) ready. Proceeding with workflow build...` });
+        } else {
+          // Timeout - some integrations still pending
+          const pendingList = waitResult.pendingIntegrations.join(', ');
+          return {
+            success: false,
+            error: `Documentation processing timeout. Integration(s) still pending: ${pendingList}`,
+            suggestion: `Documentation processing is taking longer than expected. Try again in a few minutes, or check if the integrations have valid documentation URLs.`,
+            pending_integrations: waitResult.pendingIntegrations
+          };
+        }
+
         logEmitter.emit('log', { level: 'info', message: `Building workflow from instruction...` });
 
         const builtWorkflow = await client.buildWorkflow({
           instruction,
-          integrations,
+          integrations: integrations.map(id => ({ id })),
           payload,
           responseSchema,
           save: false
         });
 
         logEmitter.emit('log', { level: 'info', message: `Executing workflow ${builtWorkflow.id}...` });
-        const credentials = (integrations || []).reduce((acc, integ) => {
-          if (integ.credentials && !integ.createdAt) { // Only for new integrations
-            const nsCreds = Object.entries(integ.credentials).reduce((obj, [name, value]) => ({ ...obj, [`${integ.id}_${name}`]: value }), {});
-            Object.assign(acc, nsCreds);
-          }
-          return acc;
-        }, {});
 
         const result = await client.executeWorkflow({
           workflow: builtWorkflow,
           payload: payload,
-          credentials
+          credentials: credentials
         });
 
         if (!result.success) {
@@ -477,7 +561,7 @@ export const toolDefinitions: Record<string, any> = {
         return {
           success: false,
           error: error.message,
-          suggestion: "The build and run process failed. Please check your instructions, integration details, and credentials."
+          suggestion: "The build and run process failed. Please check your instructions and integrations. Have you added credentials and documentation?"
         };
       }
     }
@@ -491,9 +575,9 @@ export const toolDefinitions: Record<string, any> = {
 
     <important_notes>
       - This tool persists workflows that have been built and tested using 'superglue_build_and_run'.
-      - Provide the 'workflow_ready_to_save' object from a successful build_and_run execution.
-      - Include the same 'integrations' array that was used to build the workflow.
-      - Any new integrations will be created/upserted during the save process.
+      - Pass the 'workflow_ready_to_save' object from build_and_run result as the 'workflow' parameter.
+      - Pass the 'integrations_used' array from build_and_run result as the 'integrations' parameter.
+      - All integrations should already exist - this tool does not create new integrations.
     </important_notes>
     `,
     inputSchema: SaveWorkflowInputSchema,
@@ -507,16 +591,6 @@ export const toolDefinitions: Record<string, any> = {
         }
 
         logEmitter.emit('log', { level: 'info', message: `Saving workflow ${workflow.id}...` });
-
-        // Upsert any new integrations first (those with credentials but no createdAt)
-        if (integrations && Array.isArray(integrations)) {
-          for (const integration of integrations) {
-            if (integration.credentials && !integration.createdAt) {
-              logEmitter.emit('log', { level: 'info', message: `Creating new integration ${integration.id}...` });
-              await client.upsertIntegration(integration.id, integration, 'CREATE');
-            }
-          }
-        }
 
         // Save the workflow
         const savedWorkflow = await client.upsertWorkflow(workflow.id, workflow);
@@ -544,10 +618,9 @@ export const toolDefinitions: Record<string, any> = {
     </use_case>
 
     <important_notes>
-      - Providing a 'documentationUrl' will trigger an asynchronous documentation fetch and processing job on the backend. This takes up to 1 minute, but can run in the background.
-      - Providing documentation directly in the chat will override the 'documentationUrl' field and lead to that documentation being used instead.
-      - Workflow building will automatically use the documentation and the credentials saved in the integrations passed to the workflow builder.
-      - Tell the user that the integration will be created but it will not be available for workflow building until the documentation has finished processing, which can take up to 1 minute.
+      - Most APIs require authentication (API keys, tokens, etc.).
+      - Providing a 'documentationUrl' will trigger asynchronous documentation processing.
+      - Credentials stored in integrations are automatically used during workflow execution.
     </important_notes>
     `,
     inputSchema: CreateIntegrationInputSchema,
@@ -572,6 +645,7 @@ export const toolDefinitions: Record<string, any> = {
     },
   },
 };
+
 // Modified server creation function
 export const createMcpServer = async (apiKey: string) => {
   const mcpServer = new McpServer({
@@ -581,21 +655,15 @@ export const createMcpServer = async (apiKey: string) => {
 superglue: Universal API Integration Platform
 
 AGENT WORKFLOW:
-1. DISCOVER: For new tasks, ALWAYS start with 'superglue_find_relevant_integrations' to get targeted suggestions for your specific instruction.
-2. BUILD & TEST (Iterative Loop): Call 'superglue_build_and_run' with an 'instruction' and the suggested 'integrations'.
-    - For new integrations, provide the full configuration object including credentials. For existing ones, just the ID is needed. Can optionally take in additional credentials as a payload.
-    - Analyze the execution result from the response. If it fails, refine the instruction/integrations and repeat.
-    - Continue until you get a successful execution with the desired results.
-3. SAVE (Optional): Once the workflow runs successfully and meets requirements, ASK THE USER if they want to save the workflow.
-    - If yes, call 'superglue_save_workflow' with the 'workflow_ready_to_save' object and 'integrations_used' array from the successful build_and_run response.
-    - This will persist the workflow and create any new integrations.
-4. EXECUTE SAVED WORKFLOWS: For workflows that are already saved, use 'superglue_execute_workflow' with the workflow ID for simple, direct execution.
+1. DISCOVER: Use 'superglue_find_relevant_integrations' to find available integrations for your task.
+2. BUILD & TEST: Use 'superglue_build_and_run' with instruction and integrations. Iterate until successful.
+3. SAVE (Optional): Ask user if they want to save the workflow, then use 'superglue_save_workflow'.
+4. EXECUTE: Use 'superglue_execute_workflow' for saved workflows.
 
 BEST PRACTICES:
-- ALWAYS start with 'superglue_find_relevant_integrations' for discovery.
-- Create new integrations only when existing ones don't meet the requirements or when the user explicitly requests it.
-- When creating new integrations, ask users for API documentation URLs for better results. Also ask them to provide required credentials, or to use the superglue user interface to enter them.
-- Always ask the user before saving workflows - don't assume they want to save every successful test.
+- Always start with 'superglue_find_relevant_integrations' for discovery.
+- Create integrations with credentials when needed using 'superglue_create_integration'.
+- Ask user before saving workflows.
     `,
   },
     {
