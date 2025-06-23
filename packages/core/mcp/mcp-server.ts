@@ -5,7 +5,7 @@ import {
   CallToolResult,
   isInitializeRequest
 } from "@modelcontextprotocol/sdk/types.js";
-import { SuperglueClient, Workflow, WorkflowResult, Integration } from '@superglue/client';
+import { Integration, SuperglueClient, WorkflowResult } from '@superglue/client';
 import { LogEntry } from "@superglue/shared";
 import { getSDKCode } from '@superglue/shared/templates';
 import { randomUUID } from 'crypto';
@@ -168,7 +168,7 @@ const createClient = (apiKey: string) => {
     endpoint,
     apiKey,
   });
-}
+};
 
 // Helper function to generate SDK code for a tool
 const generateSDKCode = async (client: SuperglueClient, toolId: string) => {
@@ -272,7 +272,7 @@ export const toolDefinitions: Record<string, any> = {
     </important_notes>
     `,
     inputSchema: ListToolsInputSchema,
-    execute: async (args: any & { client: SuperglueClient }, request) => {
+    execute: async (args: any & { client: SuperglueClient; }, request) => {
       const { client, limit = 10, offset = 0 } = args;
       try {
         const result = await client.listWorkflows(limit, offset);
@@ -320,7 +320,7 @@ export const toolDefinitions: Record<string, any> = {
         throw new Error(`Validation failed:\n${validationErrors.join('\n')}`);
       }
 
-      const { client }: { client: SuperglueClient } = args;
+      const { client }: { client: SuperglueClient; } = args;
       try {
         const result: WorkflowResult = await client.executeWorkflow(args);
         if (!result.success) {
@@ -359,18 +359,18 @@ export const toolDefinitions: Record<string, any> = {
     </important_notes>
     `,
     inputSchema: BuildToolInputSchema,
-    execute: async (args: any & { client: SuperglueClient }, request) => {
+    execute: async (args: any & { client: SuperglueClient; }, request) => {
       const validationErrors = validateToolBuilding(args);
       if (validationErrors.length > 0) {
         throw new Error(`Validation failed:\n${validationErrors.join('\n')}`);
       }
 
-      const { client }: { client: SuperglueClient } = args;
+      const { client }: { client: SuperglueClient; } = args;
       try {
         let tool = await client.buildWorkflow({
           instruction: args.instruction,
           payload: args.payload || {},
-          integrations: args.integrations,
+          integrations: args.integrations?.map(integration => { return { integration: integration }; }),
           responseSchema: args.responseSchema || {}
         });
 
@@ -402,7 +402,7 @@ export const toolDefinitions: Record<string, any> = {
     </important_notes>
     `,
     inputSchema: GenerateCodeInputSchema,
-    execute: async (args: any & { client: SuperglueClient }, request) => {
+    execute: async (args: any & { client: SuperglueClient; }, request) => {
       const { client, toolId, language } = args;
 
       try {
@@ -455,19 +455,19 @@ export const toolDefinitions: Record<string, any> = {
     </important_notes>
     `,
     inputSchema: RunInstructionInputSchema,
-    execute: async (args: any & { client: SuperglueClient }, request) => {
+    execute: async (args: any & { client: SuperglueClient; }, request) => {
       const validationErrors = validateToolBuilding(args);
       if (validationErrors.length > 0) {
         throw new Error(`Validation failed:\n${validationErrors.join('\n')}`);
       }
 
-      const { client }: { client: SuperglueClient } = args;
+      const { client }: { client: SuperglueClient; } = args;
       try {
         // Build the tool temporarily
         const workflow = await client.buildWorkflow({
           instruction: args.instruction,
           payload: args.payload || {},
-          integrations: args.integrations,
+          integrations: args.integrations?.map(integration => { return { integration: integration }; }),
           responseSchema: args.responseSchema || {},
           save: false
         });
@@ -591,7 +591,7 @@ BEST PRACTICES:
   return mcpServer;
 };
 
-export const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
+export const transports: { [sessionId: string]: StreamableHTTPServerTransport; } = {};
 
 export const mcpHandler = async (req: Request, res: Response) => {
   // Check for existing session ID
