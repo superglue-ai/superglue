@@ -398,21 +398,18 @@ User Instruction:
 Available Integrations:
 ---
 Integration ID: stripe-prod
-Integration Name: Stripe Production
 Documentation Summary:
 """
 API for processing payments, managing customers, and handling subscriptions. Endpoints: POST /v1/customers, GET /v1/customers/{id}, POST /v1/charges
 """
 ---
 Integration ID: sendgrid-main
-Integration Name: SendGrid
 Documentation Summary:
 """
 API for sending transactional and marketing emails. Endpoints: POST /v3/mail/send
 """
 ---
 Integration ID: hubspot-crm
-Integration Name: HubSpot
 Documentation Summary:
 """
 CRM platform for managing contacts, deals, and companies. Endpoints: GET /crm/v3/objects/contacts, POST /crm/v3/objects/contacts
