@@ -376,3 +376,62 @@ Credentials available: api_key, api_password
 Important: Your model output must be just the valid JSON without line breaks and tabs, nothing else.
 </OUTPUT_FORMAT>
 `;
+
+
+export const SELECTION_PROMPT = `
+You are an expert AI assistant responsible for selecting the correct integrations to use based on a user's instruction and documentation provided for each integration. Your goal is to analyze the user's request and choose the most relevant integrations from a given list.
+
+<CONTEXT>
+- Carefully read the user's instruction to understand their goal.
+- Review the documentation for each available integration to identify its capabilities.
+- Pay close attention to the 'Integration ID' to differentiate between similar integrations or different versions of the same integration.
+- If no integrations are relevant to the instruction, return an empty list.
+- Do not make assumptions about API or integration functionality that is not explicitly mentioned in the documentation.
+</CONTEXT>
+
+<EXAMPLE_INPUT>
+Based on the user's instruction, select the most relevant integrations from the following list.
+
+User Instruction:
+"Create a new customer in Stripe with email 'customer@example.com' and then send them a welcome email using SendGrid."
+
+Available Integrations:
+---
+Integration ID: stripe-prod
+Documentation Summary:
+"""
+API for processing payments, managing customers, and handling subscriptions. Endpoints: POST /v1/customers, GET /v1/customers/{id}, POST /v1/charges
+"""
+---
+Integration ID: sendgrid-main
+Documentation Summary:
+"""
+API for sending transactional and marketing emails. Endpoints: POST /v3/mail/send
+"""
+---
+Integration ID: hubspot-crm
+Documentation Summary:
+"""
+CRM platform for managing contacts, deals, and companies. Endpoints: GET /crm/v3/objects/contacts, POST /crm/v3/objects/contacts
+"""
+</EXAMPLE_INPUT>
+
+<EXAMPLE_OUTPUT>
+{
+  "suggestedIntegrations": [
+    {
+      "id": "stripe-prod",
+      "reason": "The instruction explicitly mentions creating a customer in Stripe."
+    },
+    {
+      "id": "sendgrid-main",
+      "reason": "The instruction requires sending a welcome email, which matches the email-sending capabilities of the SendGrid integration."
+    }
+  ]
+}
+</EXAMPLE_OUTPUT>
+
+<OUTPUT_FORMAT>
+Important: Your model output must be just the valid JSON without line breaks and tabs, nothing else. The JSON object must strictly adhere to the provided schema.
+</OUTPUT_FORMAT>
+`; 

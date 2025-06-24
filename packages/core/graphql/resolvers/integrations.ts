@@ -1,9 +1,11 @@
 import { Integration } from '@superglue/client';
-import { Context } from "@superglue/shared";
+
 import { generateUniqueId } from '@superglue/shared/utils';
+import { Context, Metadata } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { Documentation } from '../../utils/documentation.js';
 import { logMessage } from '../../utils/logs.js';
+import { IntegrationSelector } from '../../integrations/integration-selector.js';
 
 function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined, defaultValue?: T): T | undefined {
   if (newValue === null) return undefined;
@@ -181,5 +183,50 @@ export const deleteIntegrationResolver = async (
   } catch (error) {
     logMessage('error', `Error deleting integration: ${String(error)}`, { orgId: context.orgId });
     throw error;
+  }
+};
+
+export const findRelevantIntegrationsResolver = async (
+  _: any,
+  { instruction }: { instruction?: string },
+  context: Context,
+  info: GraphQLResolveInfo
+) => {
+  const logInstruction = instruction ? `instruction: ${instruction}` : 'no instruction (returning all integrations)';
+  logMessage('info', `Finding relevant integrations for ${logInstruction}`, { orgId: context.orgId });
+
+  try {
+    const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
+    const allIntegrations = await context.datastore.listIntegrations(1000, 0, context.orgId);
+
+    if (!allIntegrations || allIntegrations.items?.length === 0) {
+      logMessage('info', `No integrations found for organization.`, metadata);
+      return []; // No integrations exist for this user
+    }
+
+    // Handle empty/undefined instruction - return all available integrations
+    if (!instruction || instruction.trim() === '') {
+      logMessage('info', `No instruction provided, returning all available integrations.`, metadata);
+      return allIntegrations.items.map(int => ({
+        id: int.id,
+        reason: "Available integration (no specific instruction provided)"
+      }));
+    }
+
+    const selector = new IntegrationSelector(metadata);
+    let suggestedIntegrations = await selector.select(instruction, allIntegrations.items);
+
+    if (!suggestedIntegrations || suggestedIntegrations.length === 0) {
+      logMessage('info', `Integration selector returned no specific integrations. Returning all available integrations as a fallback.`, metadata);
+      suggestedIntegrations = allIntegrations.items.map(int => ({
+        id: int.id,
+        reason: "No specific match found for your request, but this integration is available for use"
+      }));
+    }
+
+    return suggestedIntegrations;
+  } catch (error) {
+    logMessage('error', `Error finding relevant integrations: ${String(error)}`, { orgId: context.orgId });
+    return [];
   }
 };

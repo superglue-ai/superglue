@@ -1178,4 +1178,3 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     </div>
   );
 }
-
