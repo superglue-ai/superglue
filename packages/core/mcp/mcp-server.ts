@@ -5,7 +5,7 @@ import {
   CallToolResult,
   isInitializeRequest
 } from "@modelcontextprotocol/sdk/types.js";
-import { Integration, SuperglueClient, WorkflowResult } from '@superglue/client';
+import { SuperglueClient, WorkflowResult } from '@superglue/client';
 import { LogEntry } from "@superglue/shared";
 import { getSDKCode } from '@superglue/shared/templates';
 import { waitForIntegrationsReady } from '@superglue/shared/utils';
@@ -93,9 +93,10 @@ export const CreateIntegrationInputSchema = {
   id: z.string().describe("A unique identifier for the new integration."),
   name: z.string().optional().describe("Human-readable name for the integration."),
   urlHost: z.string().optional().describe("Base URL/hostname for the API including protocol."),
+  urlPath: z.string().optional().describe("Path component of the URL. For postgres, use db name as the path."),
   documentationUrl: z.string().optional().describe("URL to the API documentation."),
   documentation: z.string().optional().describe("API documentation content, if provided directly."),
-  credentials: z.record(z.string()).optional().describe("Credentials for accessing the integration."),
+  credentials: z.record(z.string()).describe("Credentials for accessing the integration. Provide an empty object if no credentials are needed / given. Can be referenced by brackets: <<{integration_id}_{credential_name}>>. "),
 };
 
 // Workflow structure schemas (for validation)
@@ -266,7 +267,7 @@ const validateWorkflowBuilding = (args: any) => {
   return errors;
 };
 
-const validateWorkflowSaving = (args: any): { cleanedWorkflow: any; errors: string[] } => {
+const validateWorkflowSaving = (args: any): { cleanedWorkflow: any; errors: string[]; } => {
   const errors: string[] = [];
 
   if (!args.id || typeof args.id !== 'string') {
@@ -388,7 +389,7 @@ export const toolDefinitions: Record<string, any> = {
     </important_notes>
     `,
     inputSchema: ListWorkflowsInputSchema,
-    execute: async (args: any & { client: SuperglueClient }, request) => {
+    execute: async (args: any & { client: SuperglueClient; }, request) => {
       const { client, limit = 10, offset = 0 } = args;
       try {
         const result = await client.listWorkflows(limit, offset);
@@ -478,7 +479,7 @@ export const toolDefinitions: Record<string, any> = {
     `,
 
     inputSchema: FindRelevantIntegrationsInputSchema,
-    execute: async (args: any & { client: SuperglueClient }, request) => {
+    execute: async (args: any & { client: SuperglueClient; }, request) => {
       const { client, instruction } = args;
       try {
         const result = await client.findRelevantIntegrations(instruction);
@@ -534,7 +535,7 @@ export const toolDefinitions: Record<string, any> = {
     </important_notes>
     `,
     inputSchema: GenerateCodeInputSchema,
-    execute: async (args: any & { client: SuperglueClient }, request) => {
+    execute: async (args: any & { client: SuperglueClient; }, request) => {
       const { client, workflowId, language } = args;
 
       try {
@@ -587,7 +588,7 @@ export const toolDefinitions: Record<string, any> = {
     </important_notes>
     `,
     inputSchema: BuildAndRunWorkflowInputSchema,
-    execute: async (args: any & { client: SuperglueClient }, request) => {
+    execute: async (args: any & { client: SuperglueClient; }, request) => {
       const { client, instruction, integrations, payload, credentials, responseSchema } = args;
 
       try {
@@ -599,19 +600,19 @@ export const toolDefinitions: Record<string, any> = {
         // Wait for integrations to be ready (using existing pattern)
         logEmitter.emit('log', { level: 'info', message: `Checking integration documentation status...` });
 
-        const waitResult = await waitForIntegrationsReady(client, integrations, 60000);
+        const integrationsResult = await waitForIntegrationsReady(client, integrations, 60000);
 
-        if (Array.isArray(waitResult)) {
+        if (Array.isArray(integrationsResult)) {
           // Success - all integrations ready
           logEmitter.emit('log', { level: 'info', message: `All ${integrations.length} integration(s) ready. Proceeding with workflow build...` });
         } else {
           // Timeout - some integrations still pending
-          const pendingList = waitResult.pendingIntegrations.join(', ');
+          const pendingList = integrationsResult.pendingIntegrations.join(', ');
           return {
             success: false,
             error: `Documentation processing timeout. Integration(s) still pending: ${pendingList}`,
             suggestion: `Documentation processing is taking longer than expected. Try again in a few minutes, or check if the integrations have valid documentation URLs.`,
-            pending_integrations: waitResult.pendingIntegrations
+            pending_integrations: integrationsResult.pendingIntegrations
           };
         }
 
@@ -673,7 +674,7 @@ export const toolDefinitions: Record<string, any> = {
     </important_notes>
     `,
     inputSchema: SaveWorkflowInputSchema,
-    execute: async (args: any & { client: SuperglueClient }, request) => {
+    execute: async (args: any & { client: SuperglueClient; }, request) => {
       const { client, id, integrations } = args;
       let { workflow } = args;
 
@@ -728,18 +729,20 @@ export const toolDefinitions: Record<string, any> = {
   superglue_create_integration: {
     description: `
     <use_case>
-      Creates and immediately saves a new integration. Integrations are building blocks for workflows.
+      Creates and immediately saves a new integration. Integrations are building blocks for workflows and contain the credentials for accessing the API.
+      For the integration to be usable, you MUST store the credentials in the credentials field and use placeholder references in the urlHost and urlPath.
     </use_case>
 
     <important_notes>
-      - Most APIs require authentication (API keys, tokens, etc.). Ask users for credentials if needed.
-      - Providing a 'documentationUrl' will trigger asynchronous documentation processing.
-      - Credentials stored in integrations are automatically used during workflow execution.
-      - Ask the users to confirm the integration inputs before creating the integration.
+      - Most APIs require authentication (API keys, tokens, etc.). Always ask the user for credentials if needed.
+      - The credentials object is REQUIRED. Always store any credentials the user gives you as credentials (even dummy ones or ones embedded in a connection string) in the credentials field. Use placeholder references in the format: <<{integration_id}_{credential_name}>> to reference them.
+      - if no credentials are given, ask the user for them. If no credentials are needed or the user explicitly says no, provide an empty object.
+      - Always split information clearly: urlHost (without secrets), urlPath, credentials (with secrets), etc.
+      - Providing a documentationUrl will trigger asynchronous API documentation processing.
     </important_notes>
     `,
     inputSchema: CreateIntegrationInputSchema,
-    execute: async (args: any & { client: SuperglueClient }, request) => {
+    execute: async (args: any & { client: SuperglueClient; }, request) => {
       const { client, ...integrationInput } = args;
 
       try {
@@ -783,7 +786,7 @@ AGENT WORKFLOW:
 
 BEST PRACTICES:
 - Always start with 'superglue_find_relevant_integrations' for discovery.
-- Create integrations with credentials when needed using 'superglue_create_integration'. Ask users for credentials if needed.
+- Create integrations and store credentials in integrations using 'superglue_create_integration'. Ask users for credentials if needed.
 - Ask user before saving workflows.
 - When saving workflows, NEVER set fields to null - omit optional fields if no value available.
 - Copy actual values from build_and_run results, don't assume fields are empty.

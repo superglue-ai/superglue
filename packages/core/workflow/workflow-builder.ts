@@ -74,7 +74,7 @@ export class WorkflowBuilder {
   private async planWorkflow(
     currentMessages: ChatMessage[],
     lastErrorFromPreviousAttempt: string | null
-  ): Promise<{ plan: WorkflowPlan; messages: ChatMessage[] }> {
+  ): Promise<{ plan: WorkflowPlan; messages: ChatMessage[]; }> {
 
     const planSchema = zodToJsonSchema(z.object({
       id: z.string().describe("Come up with an ID for the workflow e.g. 'stripe-create-order'"),
@@ -82,7 +82,7 @@ export class WorkflowBuilder {
         stepId: z.string().describe("Unique camelCase identifier for the step (e.g., 'fetchCustomerDetails', 'updateOrderStatus')."),
         integrationId: z.string().describe("The ID of the integration (from the provided list) to use for this step."),
         instruction: z.string().describe("A specific, concise instruction for what this single API call should achieve (e.g., 'Get user profile by email', 'Create a new order')."),
-        mode: z.enum(["DIRECT", "LOOP"]).describe("The mode of execution for this step. Use 'DIRECT' for simple calls executed once or 'LOOP' when the call needs to be executed multiple times over a collection (e.g. payload is a list of customer ids and call is executed for each customer id)."),
+        mode: z.enum(["DIRECT", "LOOP"]).describe("The mode of execution for this step. Use 'DIRECT' for simple calls executed once or 'LOOP' when the call needs to be executed multiple times over a collection (e.g. payload is a list of customer ids and call is executed for each customer id). Important: Pagination is NOT a reason to use LOOP since pagination is handled by the execution engine itself."),
         urlHost: z.string().optional().describe("Optional. Override the integration's default host. If not provided, the integration's urlHost will be used."),
         urlPath: z.string().optional().describe("Optional. Specific API path for this step. If not provided, the integration's urlPath might be used or the LLM needs to determine it from documentation if the integration's base URL is just a host."),
         method: z.enum(["GET", "POST", "PUT", "DELETE", "PATCH"]).optional().describe("Tentative HTTP method for this step, e.g. GET, POST, PUT, DELETE, PATCH. If unsure, default to GET.")
@@ -92,18 +92,18 @@ export class WorkflowBuilder {
 
     const integrationDescriptions = Object.values(this.integrations).map(int => {
       const processedDoc = Documentation.postProcess(int.documentation || "", this.instruction);
-
       return `
---- integration ID: ${int.id} ---
-Base URL: ${composeUrl(int.urlHost, int.urlPath)}
-Credentials available: ${JSON.stringify(Object.entries(int.credentials || {}).reduce((obj, [name, value]) => ({ ...obj, [`${int.id}_${name}`]: value }), {}) || 'None')}
-Documentation:
-\`\`\`
-${processedDoc || 'No documentation content available.'}
-\`\`\``;
+  <${int.id}>
+    Base URL: ${composeUrl(int.urlHost, int.urlPath)}
+    Credentials available: ${JSON.stringify(Object.entries(int.credentials || {}).reduce((obj, [name, value]) => ({ ...obj, [`${int.id}_${name}`]: value }), {}) || 'None')}
+    Documentation:
+    \`\`\`
+    ${processedDoc || 'No documentation content available.'}
+    \`\`\`
+  </${int.id}>`;
     }).join("\n");
-
-    const initialPayloadDescription = this.initialPayload ? `Initial Input Payload contains keys: ${Object.keys(this.initialPayload).join(", ") || 'None'}\nPayload example: ${JSON.stringify(this.initialPayload)}` : '';
+    const initialPayloadText = JSON.stringify(this.initialPayload);
+    const initialPayloadDescription = this.initialPayload ? `Initial Input Payload contains keys: ${Object.keys(this.initialPayload).join(", ") || 'None'}\nPayload example: ${initialPayloadText.length > 10000 ? initialPayloadText.slice(0, 10000) + '...[truncated]' : initialPayloadText}` : '';
 
     let newMessages = [...currentMessages];
 
@@ -112,15 +112,23 @@ ${processedDoc || 'No documentation content available.'}
       const initialUserPrompt = `
 Create a plan to fulfill the user's request by orchestrating single API calls across the available integrations.
 
-Overall Instruction:
-"${this.instruction}"
+<instruction>
+${this.instruction}
+</instruction>
 
-Available integrations and their API Documentation:
+<available_integrations>
 ${integrationDescriptions}
+</available_integrations>
 
+<initial_payload>
 ${initialPayloadDescription}
+</initial_payload>
 
-Output a JSON object conforming to the WorkflowPlan schema. Define the necessary steps, assigning a unique lowercase \`stepId\`, selecting the appropriate \`integrationId\`, writing a clear \`instruction\` for that specific API call based on documentation, and setting the execution \`mode\`.  For each step, also include a tentative HTTP \`method\` (GET, POST, etc.)—if unsure, default to GET. Assume data from previous steps is available implicitly for subsequent steps. If a step involves iteration, ensure \`loopSelector\` is appropriately defined. The plan should also include a \`finalTransform\` field, which is a JSONata expression for the final output transformation (default to '$' if no specific transformation is needed).
+<output_schema>
+Output a JSON object conforming to the WorkflowPlan schema. Define the necessary steps, assigning a unique lowercase \`stepId\`, selecting the appropriate \`integrationId\`, writing a clear \`instruction\` for that specific API call based on documentation, and setting the execution \`mode\`. 
+For each step, also include a tentative HTTP \`method\` (GET, POST, etc.)—if unsure, default to GET. Assume data from previous steps is available implicitly for subsequent steps. If a step involves iteration, ensure \`loopSelector\` is appropriately defined. 
+The plan should also include a \`finalTransform\` field, which is a JSONata expression for the final output transformation (default to '$' if no specific transformation is needed).
+</output_schema>
 `;
       newMessages.push({ role: "user", content: initialUserPrompt });
     }
