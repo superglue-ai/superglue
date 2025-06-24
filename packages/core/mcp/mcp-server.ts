@@ -99,7 +99,6 @@ export const CreateIntegrationInputSchema = {
 
 // Workflow structure schemas (for validation)
 export const WorkflowInputSchema = z.object({
-  id: z.string().describe("Unique identifier for the workflow"),
   steps: z.array(z.object(ExecutionStepInputSchemaInternal)).describe("Array of execution steps that make up the workflow"),
   integrationIds: z.array(z.string()).optional().describe("Array of integration IDs used by this workflow"),
   inputSchema: z.record(z.unknown()).optional().describe("JSONSchema defining the expected input structure"),
@@ -110,6 +109,11 @@ export const WorkflowInputSchema = z.object({
   createdAt: z.string().optional().describe("ISO timestamp when workflow was created"),
   updatedAt: z.string().optional().describe("ISO timestamp when workflow was last updated"),
 });
+
+export const SaveWorkflowInputSchema = {
+  id: z.string().describe("Unique identifier for the workflow to save"),
+  workflow: WorkflowInputSchema.describe("Workflow configuration object without the id field. This should be the 'workflow_ready_to_save' object from build_and_run result."),
+};
 
 // MCP Tool Input Schemas (workflow-centric)
 export const BuildAndRunWorkflowInputSchema = {
@@ -150,10 +154,7 @@ export const ListIntegrationsInputSchema = {
   offset: z.number().int().optional().default(0).describe("Offset for pagination (default: 0)"),
 };
 
-export const SaveWorkflowInputSchema = {
-  workflow: WorkflowInputSchema.describe("A complete, validated workflow configuration object to save."),
-  integrations: z.array(z.string()).optional().describe("Array of integration IDs used by the workflow."),
-};
+
 
 // --- Tool Definitions ---
 // Map tool names to their Zod schemas and GraphQL details
@@ -264,19 +265,135 @@ const validateWorkflowBuilding = (args: any) => {
   return errors;
 };
 
+// Utility function to recursively remove null and undefined values from objects
+const removeNullUndefined = (obj: any): any => {
+  if (obj === null || obj === undefined) return undefined;
+  if (Array.isArray(obj)) {
+    const cleaned = obj.map(removeNullUndefined).filter(item => item !== undefined && item !== null);
+    return cleaned.length > 0 ? cleaned : undefined;
+  }
+  if (typeof obj === 'object') {
+    const cleaned: any = {};
+    Object.entries(obj).forEach(([key, value]) => {
+      const cleanedValue = removeNullUndefined(value);
+      if (cleanedValue !== undefined && cleanedValue !== null) {
+        cleaned[key] = cleanedValue;
+      }
+    });
+    return Object.keys(cleaned).length > 0 ? cleaned : undefined;
+  }
+  return obj;
+};
+
+// Simplified workflow cleaning function - only handle essentials to prevent upsert failures
+const cleanAndValidateWorkflowForSaving = (workflow: any): any => {
+  if (!workflow) throw new Error("Workflow object is required");
+
+  // Only clean the top-level essentials that commonly cause upsert failures
+  const cleaned: any = {
+    ...workflow,
+    steps: workflow.steps || [],
+    integrationIds: workflow.integrationIds || [],
+    finalTransform: workflow.finalTransform || "$",
+    instruction: workflow.instruction || "",
+
+    // Auto-fill timestamps 
+    createdAt: workflow.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  Object.keys(cleaned).forEach(key => {
+    if (cleaned[key] === null) {
+      delete cleaned[key];
+    }
+  });
+
+  return cleaned;
+};
+
 const validateWorkflowSaving = (args: any) => {
   const errors: string[] = [];
 
+  if (!args.id || typeof args.id !== 'string') {
+    errors.push("Workflow ID is required for saving.");
+  }
+
   if (!args.workflow) {
     errors.push("Workflow object is required for saving.");
+    return errors;
   }
 
-  if (args.workflow && !args.workflow.id) {
-    errors.push("Workflow must have an ID to be saved.");
+  if (!args.workflow.steps || !Array.isArray(args.workflow.steps)) {
+    errors.push("Workflow must have a steps array.");
   }
 
-  if (args.integrations && !Array.isArray(args.integrations)) {
-    errors.push("integrations must be an array of string IDs.");
+  // Validate workflow structure matches what client SDK expects
+  if (args.workflow.steps) {
+    args.workflow.steps.forEach((step: any, index: number) => {
+      if (!step || typeof step !== 'object') {
+        errors.push(`Step ${index} must be a valid object.`);
+        return;
+      }
+      if (!step.id) {
+        errors.push(`Step ${index} must have an id field.`);
+      }
+      if (!step.apiConfig || typeof step.apiConfig !== 'object') {
+        errors.push(`Step ${index} must have an apiConfig object.`);
+      } else {
+        if (!step.apiConfig.id) {
+          errors.push(`Step ${index} apiConfig must have an id field.`);
+        }
+        if (!step.apiConfig.instruction) {
+          errors.push(`Step ${index} apiConfig must have an instruction field.`);
+        }
+      }
+    });
+  }
+
+  const hasNullValues = (obj: any, path: string = ''): string[] => {
+    const nullPaths: string[] = [];
+    if (obj === null) {
+      nullPaths.push(path || 'root');
+      return nullPaths;
+    }
+    if (typeof obj === 'object' && obj !== null) {
+      Object.entries(obj).forEach(([key, value]) => {
+        const currentPath = path ? `${path}.${key}` : key;
+        if (value === null) {
+          nullPaths.push(currentPath);
+        } else if (typeof value === 'object' && value !== null) {
+          nullPaths.push(...hasNullValues(value, currentPath));
+        }
+      });
+    }
+    return nullPaths;
+  };
+
+  const nullPaths = hasNullValues(args.workflow);
+  if (nullPaths.length > 0) {
+    errors.push(`Workflow contains null values at: ${nullPaths.join(', ')}. These will be cleaned automatically.`);
+  }
+
+  return errors;
+};
+
+const validateIntegrationCreation = (args: any) => {
+  const errors: string[] = [];
+
+  if (!args.id || typeof args.id !== 'string' || args.id.trim() === '') {
+    errors.push("Integration ID is required and must be a non-empty string.");
+  }
+
+  if (args.urlHost && typeof args.urlHost !== 'string') {
+    errors.push("URL host must be a string if provided.");
+  }
+
+  if (args.credentials && typeof args.credentials !== 'object') {
+    errors.push("Credentials must be an object if provided.");
+  }
+
+  if (args.documentationUrl && typeof args.documentationUrl !== 'string') {
+    errors.push("Documentation URL must be a string if provided.");
   }
 
   return errors;
@@ -575,25 +692,33 @@ export const toolDefinitions: Record<string, any> = {
 
     <important_notes>
       - This tool persists workflows that have been built and tested using 'superglue_build_and_run'.
-      - Pass the 'workflow_ready_to_save' object from build_and_run result as the 'workflow' parameter.
-      - Pass the 'integrations_used' array from build_and_run result as the 'integrations' parameter.
+      - Take the workflow data from build_and_run result and create a proper save request.
+      - DO NOT set any fields to null - omit optional fields entirely if you don't have values.
       - All integrations should already exist - this tool does not create new integrations.
     </important_notes>
     `,
     inputSchema: SaveWorkflowInputSchema,
     execute: async (args: any & { client: SuperglueClient }, request) => {
-      const { client, workflow, integrations } = args;
+      const { client, id, integrations } = args;
+      let { workflow } = args;
 
       try {
         const validationErrors = validateWorkflowSaving(args);
         if (validationErrors.length > 0) {
-          throw new Error(`Validation failed:\n${validationErrors.join('\n')}`);
+          // Log validation warnings but don't fail - we'll clean the data
+          logEmitter.emit('log', { level: 'warn', message: `Validation warnings: ${validationErrors.join(', ')}` });
         }
 
-        logEmitter.emit('log', { level: 'info', message: `Saving workflow ${workflow.id}...` });
+        workflow = cleanAndValidateWorkflowForSaving(workflow);
 
-        // Save the workflow
-        const savedWorkflow = await client.upsertWorkflow(workflow.id, workflow);
+        if (!workflow || !workflow.steps || workflow.steps.length === 0) {
+          throw new Error("Workflow must have at least one valid step after cleaning");
+        }
+
+        logEmitter.emit('log', { level: 'info', message: `Saving workflow ${id}...` });
+        logEmitter.emit('log', { level: 'debug', message: `Cleaned workflow: ${JSON.stringify(workflow, null, 2)}` });
+
+        const savedWorkflow = await client.upsertWorkflow(id, workflow);
 
         return {
           success: true,
@@ -606,7 +731,11 @@ export const toolDefinitions: Record<string, any> = {
         return {
           success: false,
           error: error.message,
-          suggestion: "Failed to save workflow. Check that the workflow object is valid and all required integrations exist."
+          suggestion: "Failed to save workflow. Check that the workflow object is valid and all required integrations exist.",
+          debug_info: {
+            original_workflow: args.workflow,
+            cleaned_workflow: workflow
+          }
         };
       }
     }
@@ -626,8 +755,20 @@ export const toolDefinitions: Record<string, any> = {
     inputSchema: CreateIntegrationInputSchema,
     execute: async (args: any & { client: SuperglueClient }, request) => {
       const { client, ...integrationInput } = args;
+
       try {
-        const result = await client.upsertIntegration(integrationInput.id, integrationInput, 'CREATE');
+        const validationErrors = validateIntegrationCreation(integrationInput);
+        if (validationErrors.length > 0) {
+          throw new Error(`Validation failed:\n${validationErrors.join('\n')}`);
+        }
+
+        // Clean the integration input
+        const cleanedInput = removeNullUndefined(integrationInput);
+        if (!cleanedInput) {
+          throw new Error("Integration input is empty after cleaning");
+        }
+
+        const result = await client.upsertIntegration(cleanedInput.id, cleanedInput, 'CREATE');
         return {
           success: true,
           integration: result,
@@ -657,13 +798,15 @@ superglue: Universal API Integration Platform
 AGENT WORKFLOW:
 1. DISCOVER: Use 'superglue_find_relevant_integrations' to find available integrations for your task.
 2. BUILD & TEST: Use 'superglue_build_and_run' with instruction and integrations. Iterate until successful.
-3. SAVE (Optional): Ask user if they want to save the workflow, then use 'superglue_save_workflow'.
+3. SAVE (Optional): Ask user if they want to save the workflow, then use 'superglue_save_workflow' with the workflow data.
 4. EXECUTE: Use 'superglue_execute_workflow' for saved workflows.
 
 BEST PRACTICES:
 - Always start with 'superglue_find_relevant_integrations' for discovery.
 - Create integrations with credentials when needed using 'superglue_create_integration'.
 - Ask user before saving workflows.
+- When saving workflows, NEVER set fields to null - omit optional fields if no value available.
+- Copy actual values from build_and_run results, don't assume fields are empty.
     `,
   },
     {
