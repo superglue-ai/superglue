@@ -286,6 +286,11 @@ type Log {
   runId: ID
 }
 
+type SuggestedIntegration {
+  id: String!
+  reason: String!
+}
+
 type Query {
   listRuns(limit: Int = 10, offset: Int = 0, configId: ID): RunList!
   listApis(limit: Int = 10, offset: Int = 0): ApiList!
@@ -293,6 +298,7 @@ type Query {
   listExtracts(limit: Int = 10, offset: Int = 0): ExtractList!
   listWorkflows(limit: Int = 10, offset: Int = 0): WorkflowList!
   listIntegrations(limit: Int = 10, offset: Int = 0): IntegrationList!
+  findRelevantIntegrations(instruction: String, limit: Int = 10, offset: Int = 0): [SuggestedIntegration!]
 
   getRun(id: ID!): RunResult
   getApi(id: ID!): ApiConfig
