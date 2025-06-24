@@ -306,8 +306,15 @@ export default function TransformPlayground({ id }: { id?: string }) {
                     if (!inputFile) {
                         throw new Error('No file selected');
                     }
-                    const fileContent = await inputFile.text();
-                    inputData = fileContent;
+                    // Handle binary files (xlsx) vs text files
+                    const isBinaryFile = inputFile.name.toLowerCase().endsWith('.xlsx');
+                    if (isBinaryFile) {
+                        const arrayBuffer = await inputFile.arrayBuffer();
+                        inputData = Array.from(new Uint8Array(arrayBuffer));
+                    } else {
+                        const fileContent = await inputFile.text();
+                        inputData = fileContent;
+                    }
                     break;
                 default:
                     throw new Error('Invalid input type');
@@ -546,7 +553,7 @@ export default function TransformPlayground({ id }: { id?: string }) {
                             <Input
                                 id="inputFile"
                                 type="file"
-                                accept=".json,.txt"
+                                accept=".json,.txt,.csv,.xml,.xlsx"
                                 onChange={handleFileChange}
                             />
                             {inputFile && (
