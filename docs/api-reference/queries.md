@@ -51,6 +51,13 @@ Returns a paginated list of execution runs.
               createdAt
               updatedAt
             }
+            ... on Workflow {
+              id
+              version
+              instruction
+              createdAt
+              updatedAt
+            }
           }
         }
         total
@@ -166,35 +173,77 @@ Returns a paginated list of workflow configurations.
     ```graphql
     query ListWorkflows($limit: Int = 10, $offset: Int = 0) {
       listWorkflows(limit: $limit, offset: $offset) {
-        id
-        version
-        createdAt
-        updatedAt
-        steps {
+        items {
           id
-          apiConfig {
+          version
+          createdAt
+          updatedAt
+          instruction
+          steps {
             id
-            urlHost
-            urlPath
-            method
-            instruction
-            authentication
+            apiConfig {
+              id
+              urlHost
+              urlPath
+              method
+              instruction
+              authentication
+            }
+            integrationId
+            executionMode
+            loopSelector
+            loopMaxIters
+            inputMapping
+            responseMapping
           }
-          executionMode
-          loopSelector
-          loopMaxIters
-          inputMapping
-          responseMapping
+          integrationIds
+          finalTransform
+          responseSchema
+          inputSchema
         }
-        finalTransform
-        responseSchema
+        total
       }
     }
     ```
   </Tab>
   <Tab title="Client">
     ```typescript
-    const workflows = await client.listWorkflows(10, 0);
+    const { items, total } = await client.listWorkflows(10, 0);
+    ```
+  </Tab>
+</Tabs>
+
+### listIntegrations
+
+Returns a paginated list of integration configurations.
+
+<Tabs>
+  <Tab title="GraphQL">
+    ```graphql
+    query ListIntegrations($limit: Int = 10, $offset: Int = 0) {
+      listIntegrations(limit: $limit, offset: $offset) {
+        items {
+          id
+          name
+          type
+          urlHost
+          urlPath
+          documentationUrl
+          documentation
+          documentationPending
+          icon
+          version
+          createdAt
+          updatedAt
+        }
+        total
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Client">
+    ```typescript
+    const { items, total } = await client.listIntegrations(10, 0);
     ```
   </Tab>
 </Tabs>
@@ -243,6 +292,13 @@ Retrieves a specific execution run by ID.
             instruction
             responseSchema
             responseMapping
+            createdAt
+            updatedAt
+          }
+          ... on Workflow {
+            id
+            version
+            instruction
             createdAt
             updatedAt
           }
@@ -364,6 +420,7 @@ Retrieves a specific workflow configuration by ID.
         version
         createdAt
         updatedAt
+        instruction
         steps {
           id
           apiConfig {
@@ -374,14 +431,17 @@ Retrieves a specific workflow configuration by ID.
             instruction
             authentication
           }
+          integrationId
           executionMode
           loopSelector
           loopMaxIters
           inputMapping
           responseMapping
         }
+        integrationIds
         finalTransform
         responseSchema
+        inputSchema
       }
     }
     ```
@@ -392,6 +452,41 @@ Retrieves a specific workflow configuration by ID.
     ```
   </Tab>
 </Tabs>
+
+### getIntegration
+
+Retrieves a specific integration configuration by ID.
+
+<Tabs>
+  <Tab title="GraphQL">
+    ```graphql
+    query GetIntegration($id: ID!) {
+      getIntegration(id: $id) {
+        id
+        name
+        type
+        urlHost
+        urlPath
+        credentials
+        documentationUrl
+        documentation
+        documentationPending
+        icon
+        version
+        createdAt
+        updatedAt
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Client">
+    ```typescript
+    const integration = await client.getIntegration("integration-id");
+    ```
+  </Tab>
+</Tabs>
+
+## Utility Queries
 
 ### generateSchema
 
@@ -411,6 +506,54 @@ Generates a JSON schema based on instructions and optional response data.
       "Get me all characters with only their name",
       '[{"name": "Rick", "species": "Human"}, {"name": "Morty", "species": "Human"}]'
     );
+    ```
+  </Tab>
+</Tabs>
+
+### generateInstructions
+
+Generates natural language instructions based on integration configurations.
+
+<Tabs>
+  <Tab title="GraphQL">
+    ```graphql
+    query GenerateInstructions($integrations: [IntegrationInput!]!) {
+      generateInstructions(integrations: $integrations)
+    }
+    ```
+  </Tab>
+  <Tab title="Client">
+    ```typescript
+    const instructions = await client.generateInstructions([
+      {
+        id: "integration-1",
+        name: "GitHub API",
+        urlHost: "https://api.github.com",
+        documentationUrl: "https://docs.github.com/en/rest"
+      }
+    ]);
+    ```
+  </Tab>
+</Tabs>
+
+### getTenantInfo
+
+Retrieves tenant account information.
+
+<Tabs>
+  <Tab title="GraphQL">
+    ```graphql
+    query GetTenantInfo {
+      getTenantInfo {
+        email
+        emailEntrySkipped
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Client">
+    ```typescript
+    const tenantInfo = await client.getTenantInfo();
     ```
   </Tab>
 </Tabs>

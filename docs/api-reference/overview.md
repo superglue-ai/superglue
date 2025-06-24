@@ -8,7 +8,8 @@ The Core API provides GraphQL endpoints for managing API configurations, data ex
 * **API Calls**: Execute and transform API requests
 * **Extractions**: Process and parse files/responses
 * **Transformations**: Convert data between formats
-* **Workflows**: Chain multiple steps (API, extract, transform) into a single execution
+* **Workflows**: Chain multiple steps into a single execution
+* **Integrations**: Manage integrations (e.g. Stripe, Hubspot) and their credentials
 
 ## Endpoint
 
@@ -32,7 +33,7 @@ interface BaseConfig {
   updatedAt: DateTime
 }
 
-union ConfigType = ApiConfig | ExtractConfig | TransformConfig
+union ConfigType = ApiConfig | ExtractConfig | TransformConfig | Workflow
 ```
 
 ## Input Types
@@ -77,7 +78,28 @@ union ConfigType = ApiConfig | ExtractConfig | TransformConfig
 - responseMapping: JSONata
 - version: String
 
+### WorkflowInput
+- id: String!
+- steps: [ExecutionStepInput!]
+- integrationIds: [ID!]
+- finalTransform: JSONata
+- inputSchema: JSONSchema
+- responseSchema: JSONSchema
+- version: String
+- instruction: String
+
+### IntegrationInput
+- id: ID!
+- name: String
+- urlHost: String
+- urlPath: String
+- credentials: JSON
+- documentationUrl: String
+- documentation: String
+- documentationPending: Boolean
+
 ### RequestOptions
+- selfHealing: SelfHealingMode
 - cacheMode: CacheMode
 - timeout: Int
 - retries: Int
@@ -120,6 +142,12 @@ OFFSET_BASED, PAGE_BASED, CURSOR_BASED, DISABLED
 ### LogLevel
 DEBUG, INFO, WARN, ERROR
 
+### SelfHealingMode
+ENABLED, TRANSFORM_ONLY, REQUEST_ONLY, DISABLED
+
+### UpsertMode
+CREATE, UPDATE, UPSERT
+
 ## Common Parameters
 
 All execution operations (`call`, `extract`, `transform`, `executeWorkflow`) accept a `RequestOptions` object.
@@ -151,7 +179,11 @@ If `webhookUrl` is set in options:
 
 ## Workflows
 
-Workflows let you chain multiple steps (API, extract, transform) into a single execution. See queries and mutations for details.
+Workflows let you chain multiple steps (API, extract, transform) into a single execution. Each step can run in DIRECT mode or LOOP mode for batch processing.
+
+## Integrations
+
+Integrations manage connections to third-party services, storing credentials and configuration needed for API calls.
 
 See also:
 - [Types Reference](types.md)
