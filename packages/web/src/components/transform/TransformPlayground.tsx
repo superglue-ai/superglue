@@ -23,6 +23,21 @@ interface SavedInputData {
     fileName?: string;
 }
 
+// Utility to detect binary file formats that need extraction
+const isBinaryFile = (filename: string): boolean => {
+    const binaryExtensions = [
+        '.xlsx', '.xls', '.xlsm', '.xlsb',  // Excel formats
+        '.docx', '.doc', '.docm',          // Word formats  
+        '.pptx', '.ppt', '.pptm',          // PowerPoint formats
+        '.zip', '.rar', '.7z',             // Archive formats
+        '.pdf',                            // PDF format
+        '.odt', '.ods', '.odp',            // OpenDocument formats
+    ];
+
+    const ext = filename.toLowerCase().split('.').pop();
+    return binaryExtensions.includes(`.${ext}`);
+};
+
 // Cookie utility functions
 const saveInputDataToCookie = (transformId: string, inputData: SavedInputData) => {
     if (!transformId) return;
@@ -285,6 +300,11 @@ export default function TransformPlayground({ id }: { id?: string }) {
                 saveInputDataToCookie(transformId, inputDataToSave);
             }
 
+            const superglueClient = new SuperglueClient({
+                endpoint: config.superglueEndpoint,
+                apiKey: config.superglueApiKey,
+            });
+
             // Prepare input based on type
             switch (inputType) {
                 case 'raw':
@@ -306,17 +326,31 @@ export default function TransformPlayground({ id }: { id?: string }) {
                     if (!inputFile) {
                         throw new Error('No file selected');
                     }
-                    const fileContent = await inputFile.text();
-                    inputData = fileContent;
+
+                    if (isBinaryFile(inputFile.name)) {
+                        // Use extract to convert binary files to JSON first
+                        const extractResult = await superglueClient.extract({
+                            file: inputFile,
+                            endpoint: {
+                                id: `extract-${Date.now()}`,
+                                instruction: "Extract structured data from this file"
+                            }
+                        });
+
+                        if (!extractResult.success) {
+                            throw new Error(`Failed to extract data from binary file: ${extractResult.error}`);
+                        }
+
+                        inputData = extractResult.data;
+                    } else {
+                        // Handle text files normally
+                        const fileContent = await inputFile.text();
+                        inputData = fileContent;
+                    }
                     break;
                 default:
                     throw new Error('Invalid input type');
             }
-
-            const superglueClient = new SuperglueClient({
-                endpoint: config.superglueEndpoint,
-                apiKey: config.superglueApiKey,
-            });
 
             // Execute transform
             let transformResult: TransformResult & { data: any };
@@ -542,11 +576,11 @@ export default function TransformPlayground({ id }: { id?: string }) {
                 {
                     inputType === 'file' && (
                         <div>
-                            <Label htmlFor="inputFile" className="mb-1 block">Upload File (JSON, XML, CSV)</Label>
+                            <Label htmlFor="inputFile" className="mb-1 block">Upload File (JSON, XML, CSV, Excel)</Label>
                             <Input
                                 id="inputFile"
                                 type="file"
-                                accept=".json,.txt"
+                                accept=".json,.txt,.csv,.xml,.xlsx"
                                 onChange={handleFileChange}
                             />
                             {inputFile && (
