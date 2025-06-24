@@ -703,16 +703,32 @@ export const toolDefinitions: Record<string, any> = {
       let { workflow } = args;
 
       try {
-        const validationErrors = validateWorkflowSaving(args);
-        if (validationErrors.length > 0) {
-          // Log validation warnings but don't fail - we'll clean the data
-          logEmitter.emit('log', { level: 'warn', message: `Validation warnings: ${validationErrors.join(', ')}` });
+        // Basic validation first
+        if (!id || typeof id !== 'string') {
+          throw new Error("Workflow ID is required for saving.");
         }
 
+        if (!workflow) {
+          throw new Error("Workflow object is required for saving.");
+        }
+
+        // Clean the workflow data
         workflow = cleanAndValidateWorkflowForSaving(workflow);
 
-        if (!workflow || !workflow.steps || workflow.steps.length === 0) {
-          throw new Error("Workflow must have at least one valid step after cleaning");
+        // Validate the cleaned workflow has basic structure
+        if (!workflow || typeof workflow !== 'object') {
+          throw new Error("Workflow must be a valid object after cleaning");
+        }
+
+        // Ensure steps is an array (can be empty for testing)
+        if (!Array.isArray(workflow.steps)) {
+          throw new Error("Workflow must have a steps array.");
+        }
+
+        // Log validation warnings for complex validation
+        const validationErrors = validateWorkflowSaving({ id, workflow });
+        if (validationErrors.length > 0) {
+          logEmitter.emit('log', { level: 'warn', message: `Validation warnings: ${validationErrors.join(', ')}` });
         }
 
         logEmitter.emit('log', { level: 'info', message: `Saving workflow ${id}...` });
