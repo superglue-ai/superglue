@@ -37,20 +37,23 @@ services:
     env_file:
       - .env
     depends_on:
-      - redis
+      - postgres
     restart: unless-stopped
 
-  redis:
-    image: redis:6.2-alpine
+  postgres:
+    image: postgres:15-alpine
     ports:
-      - "6379:6379"
-    command: redis-server --requirepass ${REDIS_PASSWORD}
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-superglue}
+      - POSTGRES_USER=${POSTGRES_USERNAME}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     volumes:
-      - redis_data:/data
+      - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
 
 volumes:
-  redis_data:
+  postgres_data:
 ```
 
 2. **Configure Environment Variables**
@@ -69,15 +72,22 @@ WEB_PORT=3001
 # Authentication token for API access
 AUTH_TOKEN=your-secret-token
 
-# Datastore type (redis or memory or file)
+# Datastore type (redis, memory, file, or postgres)
 DATASTORE_TYPE=file
 
 # if file, the path to the datastore directory
 # if not given or existing, the datastore will be created in the current directory
 STORAGE_DIR=/data
 
+# If POSTGRES: Database connection settings
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_USERNAME=superglue
+POSTGRES_PASSWORD=your-secure-password
+POSTGRES_DB=superglue
+
 # AI Provider - OPENAI or GEMINI
-# best performance / price ratio right now is GEMINI with gemini-2.5-flash-preview-04-17
+# best performance / price ratio right now is OPENAI with gpt-4.1
 LLM_PROVIDER=GEMINI
 
 # If GEMINI: Your Google API key
@@ -89,8 +99,8 @@ GEMINI_MODEL=gemini-2.5-flash-preview-04-17
 # If OPENAI: Your OpenAI API key
 # You can get one here : https://platform.openai.com/api-keys
 OPENAI_API_KEY=sk-proj-XXXXXXXX
-# OpenAI model to use. Use gpt-4.5-preview-2025-02-27 for best results or gpt-4o for speed / cost.
-OPENAI_MODEL=gpt-4o
+# OpenAI model to use. Use gpt-4.1 for best results.
+OPENAI_MODEL=gpt-4.1
 # Optional: Set a custom OpenAI API URL (for self-hosted models or providers like fireworks.ai)
 # for fireworks, use https://api.fireworks.ai/inference/v1
 OPENAI_API_BASE_URL=https://api.openai.com/v1
@@ -115,22 +125,28 @@ If you prefer more control over the container setup:
 docker pull superglueai/superglue
 ```
 
-2. **Create a Docker Network**
-
-```bash
-docker network create superglue-network
-```
-
-3. **Start Redis**
+1. **Start Redis (if using Redis datastore)**
 
 ```bash
 docker run -d \
   --name superglue-redis \
-  --network superglue-network \
   -v redis_data:/data \
   -p 6379:6379 \
   redis:6.2-alpine \
   redis-server --requirepass your-secure-password
+```
+
+**Or Start PostgreSQL (if using PostgreSQL datastore)**
+
+```bash
+docker run -d \
+  --name superglue-postgres \
+  -v postgres_data:/var/lib/postgresql/data \
+  -p 5432:5432 \
+  -e POSTGRES_DB=superglue \
+  -e POSTGRES_USER=superglue \
+  -e POSTGRES_PASSWORD=your-secure-password \
+  postgres:15-alpine
 ```
 
 4. **Start Superglue**
@@ -138,7 +154,6 @@ docker run -d \
 ```bash
 docker run -d \
   --name superglue \
-  --network superglue-network \
   --env-file .env \
   -p 3000:3000 \
   -p 3001:3001 \
@@ -155,10 +170,11 @@ curl http://localhost:3000/health
 
 Expected response: `OK`
 
-### Monitoring Endpoints
+### Endpoints
 
 - **Dashboard**: `http://localhost:3001/`
 - **GraphQL Playground**: `http://localhost:3000/graphql`
+- **MCP**: `http://localhost:3000/mcp`
 
 ## Other Considerations
 
@@ -169,24 +185,12 @@ Expected response: `OK`
 
 2. **Authentication**
    - Change default AUTH_TOKEN
-   - Use strong Redis passwords
+   - Use strong db passwords
    - Rotate credentials regularly
 
 3. **Telemetry**
    - Superglue uses telemetry to understand how many users are using the platform.
    - You can opt out by setting the DISABLE_TELEMETRY environment variable to true.
-
-## Performance Tuning
-
-### Redis Configuration
-
-Optimize Redis for your workload:
-
-```conf
-maxmemory 2gb
-maxmemory-policy allkeys-lru
-appendonly yes
-```
 
 ### Resource Allocation
 
@@ -195,23 +199,6 @@ Recommended minimum resources:
 - 2 CPU cores
 - 4GB RAM
 - 20GB storage
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Connection Refused**
-   - Check if containers are running: `docker ps`
-   - Verify network connectivity: `docker network inspect superglue-network`
-
-2. **Authentication Failed**
-   - Verify if the query params token or the Authorization Bearer is present and set to AUTH_TOKEN in the .env file
-   - Check Redis credentials
-
-3. **High Memory Usage**
-   - Monitor Redis memory: `docker stats`
-   - Adjust cache settings
-   - Consider upgrading resources
 
 ### Logs
 
@@ -223,6 +210,9 @@ docker logs superglue
 
 # Redis logs
 docker logs superglue-redis
+
+# PostgreSQL logs
+docker logs superglue-postgres
 
 # Follow logs
 docker logs -f superglue
