@@ -36,12 +36,12 @@ export const PaginationInputSchema = z.object({
   cursorPath: z.string().optional().describe("JSONPath to the cursor field in responses (for cursor-based pagination)"),
 });
 
-// Transform-related Schemas (restored for completeness)
+// Transform-related Schemas
 export const TransformInputSchemaInternal = z.object({
   id: z.string().describe("Unique identifier for the transform"),
   instruction: z.string().describe("Natural language description of the transformation"),
   responseSchema: z.record(z.unknown()).describe("JSONSchema defining the expected output structure"),
-  responseMapping: z.string().optional().describe("JSONata expression for mapping input to output"),
+  responseMapping: z.any().describe("JSONata expression for mapping input to output"),
   version: z.string().optional().describe("Version identifier for the transform"),
 });
 
@@ -54,23 +54,23 @@ export const TransformInputRequestSchema = z.object({
 
 export const TransformOperationInputSchema = {
   input: TransformInputRequestSchema.describe("Transform definition or reference"),
-  data: z.unknown().describe("The JSON data to be transformed"),
+  data: z.record(z.unknown()).describe("The JSON data to be transformed"),
   options: RequestOptionsSchema.optional().describe("Optional request configuration (caching, timeouts, etc.)")
 };
 
-// Workflow component schemas (these are used by BuildAndRunWorkflowInputSchema)
+// Workflow component schemas
 export const ApiInputSchemaInternal = {
   id: z.string().describe("Unique identifier for the API endpoint"),
   urlHost: z.string().describe("Base URL/hostname for the API including protocol. For https://, use the format: https://<<hostname>>. For postgres, use the format: postgres://<<user>>:<<password>>@<<hostname>>:<<port>>"),
   urlPath: z.string().optional().describe("Path component of the URL. For postgres, use the db name as the path."),
   instruction: z.string().describe("Natural language description of what this API does"),
-  queryParams: z.record(z.string()).optional().describe("JSON object containing URL query parameters"),
+  queryParams: z.record(z.unknown()).optional().describe("JSON object containing URL query parameters"),
   method: HttpMethodEnum.optional().describe("HTTP method to use"),
-  headers: z.record(z.string()).optional().describe("JSON object containing HTTP headers"),
+  headers: z.record(z.unknown()).optional().describe("JSON object containing HTTP headers"),
   body: z.string().optional().describe("Request body as string"),
   documentationUrl: z.string().optional().describe("URL to API documentation"),
   responseSchema: z.record(z.unknown()).optional().describe("JSONSchema defining expected response structure"),
-  responseMapping: z.string().optional().describe("JSONata expression for response transformation"),
+  responseMapping: z.any().optional().describe("JSONata expression for response transformation"),
   authentication: AuthTypeEnum.optional().describe("Authentication method required"),
   pagination: PaginationInputSchema.optional().describe("Pagination configuration if supported"),
   dataPath: z.string().optional().describe("JSONPath to extract data from response"),
@@ -80,11 +80,12 @@ export const ApiInputSchemaInternal = {
 export const ExecutionStepInputSchemaInternal = {
   id: z.string().describe("Unique identifier for the execution step"),
   apiConfig: z.object(ApiInputSchemaInternal).describe("API configuration for this step"),
+  integrationId: z.string().optional().describe("ID of the integration used by this step - REQUIRED for workflow execution to access credentials"),
   executionMode: z.enum(["DIRECT", "LOOP"]).optional().describe("How to execute this step (DIRECT or LOOP)"),
-  loopSelector: z.string().optional().describe("JSONata expression to select items for looping"),
+  loopSelector: z.any().optional().describe("JSONata expression to select items for looping"),
   loopMaxIters: z.number().int().optional().describe("Maximum number of loop iterations"),
-  inputMapping: z.string().optional().describe("JSONata expression to map workflow data to step input"),
-  responseMapping: z.string().optional().describe("JSONata expression to transform step output"),
+  inputMapping: z.any().optional().describe("JSONata expression to map workflow data to step input"),
+  responseMapping: z.any().optional().describe("JSONata expression to transform step output"),
 };
 
 
@@ -103,7 +104,7 @@ export const WorkflowInputSchema = z.object({
   integrationIds: z.array(z.string()).optional().describe("Array of integration IDs used by this workflow"),
   inputSchema: z.record(z.unknown()).optional().describe("JSONSchema defining the expected input structure"),
   responseSchema: z.record(z.unknown()).optional().describe("JSONSchema defining the expected output structure"),
-  finalTransform: z.string().optional().describe("JSONata expression to transform final workflow output"),
+  finalTransform: z.any().optional().describe("JSONata expression to transform final workflow output"),
   instruction: z.string().optional().describe("Natural language description of what this workflow does"),
   version: z.string().optional().describe("Version identifier for the workflow"),
   createdAt: z.string().optional().describe("ISO timestamp when workflow was created"),
@@ -112,16 +113,16 @@ export const WorkflowInputSchema = z.object({
 
 export const SaveWorkflowInputSchema = {
   id: z.string().describe("Unique identifier for the workflow to save"),
-  workflow: WorkflowInputSchema.describe("Workflow configuration object without the id field. This should be the 'workflow_ready_to_save' object from build_and_run result."),
+  workflow: WorkflowInputSchema.describe("Workflow configuration object without the id field. This should be a workflow object populated from the build_and_run result."),
 };
 
 // MCP Tool Input Schemas (workflow-centric)
 export const BuildAndRunWorkflowInputSchema = {
   instruction: z.string().describe("Natural language instruction to build a new workflow from scratch."),
   integrations: z.array(z.string()).describe("Array of integration IDs to use in the workflow."),
-  payload: z.any().optional().describe("JSON payload for the workflow execution."),
+  payload: z.record(z.unknown()).optional().describe("JSON payload for the workflow execution."),
   credentials: z.record(z.string()).optional().describe("Additional credentials that will be merged with integration credentials."),
-  responseSchema: z.any().optional().describe("JSONSchema for the expected output structure.")
+  responseSchema: z.record(z.unknown()).optional().describe("JSONSchema for the expected output structure.")
 };
 
 export const ListWorkflowsInputSchema = {
@@ -135,7 +136,7 @@ export const GetWorkflowInputSchema = {
 
 export const ExecuteWorkflowInputSchema = {
   id: z.string().describe("The ID of the workflow to execute"),
-  payload: z.any().optional().describe("JSON payload to pass to the workflow"),
+  payload: z.record(z.unknown()).optional().describe("JSON payload to pass to the workflow"),
   credentials: z.record(z.string()).optional().describe("Additional credentials that will be merged with integration credentials."),
   options: RequestOptionsSchema.optional().describe("Optional request configuration"),
 };
@@ -265,53 +266,7 @@ const validateWorkflowBuilding = (args: any) => {
   return errors;
 };
 
-// Utility function to recursively remove null and undefined values from objects
-const removeNullUndefined = (obj: any): any => {
-  if (obj === null || obj === undefined) return undefined;
-  if (Array.isArray(obj)) {
-    const cleaned = obj.map(removeNullUndefined).filter(item => item !== undefined && item !== null);
-    return cleaned.length > 0 ? cleaned : undefined;
-  }
-  if (typeof obj === 'object') {
-    const cleaned: any = {};
-    Object.entries(obj).forEach(([key, value]) => {
-      const cleanedValue = removeNullUndefined(value);
-      if (cleanedValue !== undefined && cleanedValue !== null) {
-        cleaned[key] = cleanedValue;
-      }
-    });
-    return Object.keys(cleaned).length > 0 ? cleaned : undefined;
-  }
-  return obj;
-};
-
-// Simplified workflow cleaning function - only handle essentials to prevent upsert failures
-const cleanAndValidateWorkflowForSaving = (workflow: any): any => {
-  if (!workflow) throw new Error("Workflow object is required");
-
-  // Only clean the top-level essentials that commonly cause upsert failures
-  const cleaned: any = {
-    ...workflow,
-    steps: workflow.steps || [],
-    integrationIds: workflow.integrationIds || [],
-    finalTransform: workflow.finalTransform || "$",
-    instruction: workflow.instruction || "",
-
-    // Auto-fill timestamps 
-    createdAt: workflow.createdAt || new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-
-  Object.keys(cleaned).forEach(key => {
-    if (cleaned[key] === null) {
-      delete cleaned[key];
-    }
-  });
-
-  return cleaned;
-};
-
-const validateWorkflowSaving = (args: any) => {
+const validateWorkflowSaving = (args: any): { cleanedWorkflow: any; errors: string[] } => {
   const errors: string[] = [];
 
   if (!args.id || typeof args.id !== 'string') {
@@ -320,16 +275,38 @@ const validateWorkflowSaving = (args: any) => {
 
   if (!args.workflow) {
     errors.push("Workflow object is required for saving.");
-    return errors;
+    return { cleanedWorkflow: null, errors };
   }
 
-  if (!args.workflow.steps || !Array.isArray(args.workflow.steps)) {
+  // Clean and prepare workflow data
+  const cleaned: any = {
+    ...args.workflow,
+    steps: args.workflow.steps || [],
+    integrationIds: args.workflow.integrationIds || [],
+    finalTransform: args.workflow.finalTransform || "$",
+    instruction: args.workflow.instruction || "",
+    createdAt: args.workflow.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  // Remove null values
+  Object.keys(cleaned).forEach(key => {
+    if (cleaned[key] === null) {
+      delete cleaned[key];
+    }
+  });
+
+  // Validate cleaned workflow structure
+  if (!Array.isArray(cleaned.steps)) {
     errors.push("Workflow must have a steps array.");
   }
 
-  // Validate workflow structure matches what client SDK expects
-  if (args.workflow.steps) {
-    args.workflow.steps.forEach((step: any, index: number) => {
+  // Collect all integration IDs from steps for validation
+  const stepIntegrationIds = new Set<string>();
+
+  // Validate each step structure
+  if (cleaned.steps) {
+    cleaned.steps.forEach((step: any, index: number) => {
       if (!step || typeof step !== 'object') {
         errors.push(`Step ${index} must be a valid object.`);
         return;
@@ -347,34 +324,31 @@ const validateWorkflowSaving = (args: any) => {
           errors.push(`Step ${index} apiConfig must have an instruction field.`);
         }
       }
+
+      // CRITICAL: Validate integration ID on step
+      if (!step.integrationId || typeof step.integrationId !== 'string') {
+        errors.push(`Step ${index} (${step.id || 'unnamed'}) must have an integrationId field - this is REQUIRED for credential access during execution.`);
+      } else {
+        stepIntegrationIds.add(step.integrationId);
+      }
     });
   }
 
-  const hasNullValues = (obj: any, path: string = ''): string[] => {
-    const nullPaths: string[] = [];
-    if (obj === null) {
-      nullPaths.push(path || 'root');
-      return nullPaths;
+  // Ensure workflow integrationIds includes all step integration IDs
+  const workflowIntegrationIds = new Set(cleaned.integrationIds || []);
+  stepIntegrationIds.forEach(stepIntegrationId => {
+    if (!workflowIntegrationIds.has(stepIntegrationId)) {
+      workflowIntegrationIds.add(stepIntegrationId);
     }
-    if (typeof obj === 'object' && obj !== null) {
-      Object.entries(obj).forEach(([key, value]) => {
-        const currentPath = path ? `${path}.${key}` : key;
-        if (value === null) {
-          nullPaths.push(currentPath);
-        } else if (typeof value === 'object' && value !== null) {
-          nullPaths.push(...hasNullValues(value, currentPath));
-        }
-      });
-    }
-    return nullPaths;
-  };
+  });
+  cleaned.integrationIds = Array.from(workflowIntegrationIds);
 
-  const nullPaths = hasNullValues(args.workflow);
-  if (nullPaths.length > 0) {
-    errors.push(`Workflow contains null values at: ${nullPaths.join(', ')}. These will be cleaned automatically.`);
+  // Validate that workflow has integration IDs
+  if (!cleaned.integrationIds || cleaned.integrationIds.length === 0) {
+    errors.push("Workflow must have integrationIds - this is REQUIRED for credential access during execution.");
   }
 
-  return errors;
+  return { cleanedWorkflow: cleaned, errors };
 };
 
 const validateIntegrationCreation = (args: any) => {
@@ -695,7 +669,7 @@ export const toolDefinitions: Record<string, any> = {
       - This tool persists workflows that have been built and tested using 'superglue_build_and_run'.
       - Take the workflow data from build_and_run result and create a proper save request.
       - DO NOT set any fields to null - omit optional fields entirely if you don't have values.
-      - All integrations should already exist - this tool does not create new integrations.
+      - CRITICAL: Each step MUST have an integrationId field and workflow MUST have integrationIds array - these are REQUIRED for credential access during execution.
     </important_notes>
     `,
     inputSchema: SaveWorkflowInputSchema,
@@ -713,24 +687,18 @@ export const toolDefinitions: Record<string, any> = {
           throw new Error("Workflow object is required for saving.");
         }
 
-        // Clean the workflow data
-        workflow = cleanAndValidateWorkflowForSaving(workflow);
+        // Validate and clean the workflow data
+        const { cleanedWorkflow, errors } = validateWorkflowSaving({ id, workflow });
 
-        // Validate the cleaned workflow has basic structure
-        if (!workflow || typeof workflow !== 'object') {
+        if (errors.length > 0) {
+          logEmitter.emit('log', { level: 'warn', message: `Validation warnings: ${errors.join(', ')}` });
+        }
+
+        if (!cleanedWorkflow || typeof cleanedWorkflow !== 'object') {
           throw new Error("Workflow must be a valid object after cleaning");
         }
 
-        // Ensure steps is an array (can be empty for testing)
-        if (!Array.isArray(workflow.steps)) {
-          throw new Error("Workflow must have a steps array.");
-        }
-
-        // Log validation warnings for complex validation
-        const validationErrors = validateWorkflowSaving({ id, workflow });
-        if (validationErrors.length > 0) {
-          logEmitter.emit('log', { level: 'warn', message: `Validation warnings: ${validationErrors.join(', ')}` });
-        }
+        workflow = cleanedWorkflow;
 
         logEmitter.emit('log', { level: 'info', message: `Saving workflow ${id}...` });
         logEmitter.emit('log', { level: 'debug', message: `Cleaned workflow: ${JSON.stringify(workflow, null, 2)}` });
@@ -779,13 +747,7 @@ export const toolDefinitions: Record<string, any> = {
           throw new Error(`Validation failed:\n${validationErrors.join('\n')}`);
         }
 
-        // Clean the integration input
-        const cleanedInput = removeNullUndefined(integrationInput);
-        if (!cleanedInput) {
-          throw new Error("Integration input is empty after cleaning");
-        }
-
-        const result = await client.upsertIntegration(cleanedInput.id, cleanedInput, 'CREATE');
+        const result = await client.upsertIntegration(integrationInput.id, integrationInput, 'CREATE');
         return {
           success: true,
           integration: result,

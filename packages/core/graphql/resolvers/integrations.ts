@@ -204,29 +204,21 @@ export const findRelevantIntegrationsResolver = async (
       return []; // No integrations exist for this user
     }
 
-    // Filter out integrations with pending documentation
-    const availableIntegrations = allIntegrations.items.filter(int => !int.documentationPending);
-
-    if (availableIntegrations.length === 0) {
-      logMessage('info', `No integrations with complete documentation found.`, metadata);
-      return [];
-    }
-
     // Handle empty/undefined instruction - return all available integrations
     if (!instruction || instruction.trim() === '') {
       logMessage('info', `No instruction provided, returning all available integrations.`, metadata);
-      return availableIntegrations.map(int => ({
+      return allIntegrations.items.map(int => ({
         id: int.id,
         reason: "Available integration (no specific instruction provided)"
       }));
     }
 
     const selector = new IntegrationSelector(metadata);
-    let suggestedIntegrations = await selector.select(instruction, availableIntegrations);
+    let suggestedIntegrations = await selector.select(instruction, allIntegrations.items);
 
     if (!suggestedIntegrations || suggestedIntegrations.length === 0) {
       logMessage('info', `Integration selector returned no specific integrations. Returning all available integrations as a fallback.`, metadata);
-      suggestedIntegrations = availableIntegrations.map(int => ({
+      suggestedIntegrations = allIntegrations.items.map(int => ({
         id: int.id,
         reason: "No specific match found for your request, but this integration is available for use"
       }));
