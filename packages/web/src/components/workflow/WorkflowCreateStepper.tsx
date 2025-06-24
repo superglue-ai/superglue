@@ -655,7 +655,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                   <Plus className="mr-2 h-4 w-4" /> Add Integration
                 </Button>
               </div>
-              <div className="overflow-y-auto" style={{ height: 320 }}>
+              <div className="overflow-y-auto">
                 {loading ? (
                   <div className="h-full bg-background" />
                 ) : integrations.length === 0 ? (
@@ -1091,7 +1091,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                         (obj, [name, value]) => ({ ...obj, [`${sys.id}_${name}`]: value }),
                         {}
                       ),
-                    }
+                    };
                   }, {})
                 }
                 payload={(() => {

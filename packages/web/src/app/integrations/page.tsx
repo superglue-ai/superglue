@@ -21,7 +21,7 @@ import { integrations as integrationTemplates } from '@/src/lib/integrations';
 import { composeUrl } from '@/src/lib/utils';
 import type { Integration } from '@superglue/client';
 import { SuperglueClient, UpsertMode } from '@superglue/client';
-import { FileDown, Globe, Pencil, Plus, Trash2 } from 'lucide-react';
+import { FileDown, Globe, Pencil, Plus, RotateCw, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { SimpleIcon } from 'simple-icons';
 import * as simpleIcons from 'simple-icons';
@@ -74,6 +74,8 @@ export default function IntegrationsPage() {
 
     const inputErrorStyles = "border-destructive focus-visible:ring-destructive";
 
+    const [isRefreshing, setIsRefreshing] = useState(false);
+
     const handleDelete = async (id: string) => {
         try {
             // Optimistically remove from UI
@@ -106,7 +108,7 @@ export default function IntegrationsPage() {
         try {
             if (integration.id) {
                 const mode = editingIntegration ? UpsertMode.UPDATE : UpsertMode.CREATE;
-                const savedIntegration = await client.upsertIntegration(integration.id, integration, mode)
+                const savedIntegration = await client.upsertIntegration(integration.id, integration, mode);
                 const needsDocFetch = needsUIToTriggerDocFetch(savedIntegration, editingIntegration);
 
                 if (needsDocFetch) {
@@ -247,11 +249,27 @@ export default function IntegrationsPage() {
         return match ? getSimpleIcon(match.icon) : null;
     }
 
+    const handleRefresh = async () => {
+        setIsRefreshing(true);
+        await refreshIntegrations();
+        setIsRefreshing(false);
+    };
+
     return (
         <div className="flex flex-col min-h-full p-8 w-full">
             {initialLoading ? null : (
                 <>
-                    <h1 className="text-2xl font-semibold mb-6">Integrations</h1>
+                    <div className="flex justify-between items-center mb-6">
+                        <h1 className="text-2xl font-semibold">Integrations</h1>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={handleRefresh}
+                            className="transition-transform"
+                        >
+                            <RotateCw className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                        </Button>
+                    </div>
                     {addFormOpen && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
                             <div className="bg-background rounded-xl max-w-2xl w-full p-0">
