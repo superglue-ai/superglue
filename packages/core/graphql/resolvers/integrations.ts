@@ -5,7 +5,7 @@ import { Context, Metadata } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { Documentation } from '../../utils/documentation.js';
 import { logMessage } from '../../utils/logs.js';
-import { IntegrationSelector } from '../../workflow/integration-selector.js';
+import { IntegrationSelector } from '../../integrations/integration-selector.js';
 
 function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined, defaultValue?: T): T | undefined {
   if (newValue === null) return undefined;
@@ -188,7 +188,7 @@ export const deleteIntegrationResolver = async (
 
 export const findRelevantIntegrationsResolver = async (
   _: any,
-  { instruction, limit, offset }: { instruction?: string, limit?: number, offset?: number },
+  { instruction }: { instruction?: string },
   context: Context,
   info: GraphQLResolveInfo
 ) => {
@@ -197,9 +197,9 @@ export const findRelevantIntegrationsResolver = async (
 
   try {
     const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
-    const allIntegrations = await context.datastore.listIntegrations(limit ?? 1000, offset ?? 0, context.orgId);
+    const allIntegrations = await context.datastore.listIntegrations(1000, 0, context.orgId);
 
-    if (!allIntegrations || allIntegrations.items.length === 0) {
+    if (!allIntegrations || allIntegrations.items?.length === 0) {
       logMessage('info', `No integrations found for organization.`, metadata);
       return []; // No integrations exist for this user
     }
