@@ -732,9 +732,10 @@ export const toolDefinitions: Record<string, any> = {
     </use_case>
 
     <important_notes>
-      - Most APIs require authentication (API keys, tokens, etc.).
+      - Most APIs require authentication (API keys, tokens, etc.). Ask users for credentials if needed.
       - Providing a 'documentationUrl' will trigger asynchronous documentation processing.
       - Credentials stored in integrations are automatically used during workflow execution.
+      - Ask the users to confirm the integration inputs before creating the integration.
     </important_notes>
     `,
     inputSchema: CreateIntegrationInputSchema,
@@ -782,7 +783,7 @@ AGENT WORKFLOW:
 
 BEST PRACTICES:
 - Always start with 'superglue_find_relevant_integrations' for discovery.
-- Create integrations with credentials when needed using 'superglue_create_integration'.
+- Create integrations with credentials when needed using 'superglue_create_integration'. Ask users for credentials if needed.
 - Ask user before saving workflows.
 - When saving workflows, NEVER set fields to null - omit optional fields if no value available.
 - Copy actual values from build_and_run results, don't assume fields are empty.
