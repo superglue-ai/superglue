@@ -470,11 +470,11 @@ export const toolDefinitions: Record<string, any> = {
     </use_case>
 
     <important_notes>
-      - If no instruction is provided, returns all available integrations with their IDs.
-      - If an instruction is provided but no integrations exist, returns an empty list.
-      - If an instruction is provided but no specific matches are found, returns all available integrations as fallback options.
-      - This tool returns a list of suggested integration IDs and a reason for each suggestion.
-      - Use this list to make a final decision on which integrations to use for building a workflow.
+      - This tool returns a list of suggested integration IDs, a reason for each suggestion, and the availablecredentials for each integration.
+      - If no instruction is provided, returns all available integrations with their IDs and credentials.
+      - If no integrations exist, it returns an empty list. If no specific matches are found, it returns all existing integrations.
+      - Use this list to make a final decision on which integrations to use for building a workflow. 
+      - If relevant integrations are missing credentials, you can decide based on the user instruction whether workflow building requires new integrations or not.
     </important_notes>
     `,
 

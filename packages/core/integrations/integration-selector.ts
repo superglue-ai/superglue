@@ -14,6 +14,7 @@ type ChatMessage = OpenAI.Chat.ChatCompletionMessageParam;
 export interface SuggestedIntegration {
     id: string;
     reason: string;
+    credentials: any;
 }
 
 export class IntegrationSelector {
@@ -31,7 +32,8 @@ export class IntegrationSelector {
             // If no instruction or instruction is *, return all integrations with a generic reason
             return integrations.map(int => ({
                 id: int.id,
-                reason: "Available integration (no specific instruction provided)"
+                reason: "Available integration (no specific instruction provided)",
+                credentials: int.credentials || {}
             }));
         }
 
@@ -79,7 +81,15 @@ Return a JSON object conforming to the schema, containing a list of suggested in
             );
 
             if (rawSelection && rawSelection.suggestedIntegrations && Array.isArray(rawSelection.suggestedIntegrations)) {
-                return rawSelection.suggestedIntegrations;
+                // Enrich LLM suggestions with credentials
+                return rawSelection.suggestedIntegrations.map(suggestion => {
+                    const integration = integrations.find(int => int.id === suggestion.id);
+                    return {
+                        id: suggestion.id,
+                        reason: suggestion.reason,
+                        credentials: integration ? (integration.credentials || {}) : {}
+                    };
+                });
             }
 
             logMessage('warn', "Integration selection returned an unexpected format.", this.metadata);

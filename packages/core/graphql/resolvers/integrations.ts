@@ -1,11 +1,11 @@
 import { Integration } from '@superglue/client';
 
-import { generateUniqueId } from '@superglue/shared/utils';
 import { Context, Metadata } from "@superglue/shared";
+import { generateUniqueId } from '@superglue/shared/utils';
 import { GraphQLResolveInfo } from "graphql";
+import { IntegrationSelector } from '../../integrations/integration-selector.js';
 import { Documentation } from '../../utils/documentation.js';
 import { logMessage } from '../../utils/logs.js';
-import { IntegrationSelector } from '../../integrations/integration-selector.js';
 
 function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined, defaultValue?: T): T | undefined {
   if (newValue === null) return undefined;
@@ -209,7 +209,8 @@ export const findRelevantIntegrationsResolver = async (
       logMessage('info', `No instruction provided, returning all available integrations.`, metadata);
       return allIntegrations.items.map(int => ({
         id: int.id,
-        reason: "Available integration (no specific instruction provided)"
+        reason: "Available integration (no specific instruction provided)",
+        credentials: int.credentials || {}
       }));
     }
 
@@ -218,9 +219,10 @@ export const findRelevantIntegrationsResolver = async (
 
     if (!suggestedIntegrations || suggestedIntegrations.length === 0) {
       logMessage('info', `Integration selector returned no specific integrations. Returning all available integrations as a fallback.`, metadata);
-      suggestedIntegrations = allIntegrations.items.map(int => ({
+      return allIntegrations.items.map(int => ({
         id: int.id,
-        reason: "No specific match found for your request, but this integration is available for use"
+        reason: "No specific match found for your request, but this integration is available for use",
+        credentials: int.credentials || {}
       }));
     }
 
