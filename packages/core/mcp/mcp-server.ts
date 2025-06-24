@@ -5,7 +5,7 @@ import {
   CallToolResult,
   isInitializeRequest
 } from "@modelcontextprotocol/sdk/types.js";
-import { SuperglueClient, WorkflowResult } from '@superglue/client';
+import { Integration, SuperglueClient, WorkflowResult } from '@superglue/client';
 import { LogEntry } from "@superglue/shared";
 import { getSDKCode } from '@superglue/shared/templates';
 import { waitForIntegrationsReady } from '@superglue/shared/utils';
@@ -167,7 +167,7 @@ const createClient = (apiKey: string) => {
     endpoint,
     apiKey,
   });
-}
+};
 
 // Helper function to generate SDK code for a workflow
 const generateSDKCode = async (client: SuperglueClient, workflowId: string) => {
@@ -471,7 +471,7 @@ export const toolDefinitions: Record<string, any> = {
         throw new Error(`Validation failed:\n${validationErrors.join('\n')}`);
       }
 
-      const { client }: { client: SuperglueClient } = args;
+      const { client }: { client: SuperglueClient; } = args;
       try {
         const result: WorkflowResult = await client.executeWorkflow(args);
         return {
@@ -502,6 +502,7 @@ export const toolDefinitions: Record<string, any> = {
       - Use this list to make a final decision on which integrations to use for building a workflow.
     </important_notes>
     `,
+
     inputSchema: FindRelevantIntegrationsInputSchema,
     execute: async (args: any & { client: SuperglueClient }, request) => {
       const { client, instruction } = args;
@@ -887,7 +888,7 @@ BEST PRACTICES:
   return mcpServer;
 };
 
-export const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
+export const transports: { [sessionId: string]: StreamableHTTPServerTransport; } = {};
 
 export const mcpHandler = async (req: Request, res: Response) => {
   // Check for existing session ID

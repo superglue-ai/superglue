@@ -12,7 +12,7 @@ import { WebSocketServer } from 'ws';
 import { authMiddleware, extractToken, validateToken } from './auth/auth.js';
 import { createDataStore } from './datastore/datastore.js';
 import { resolvers, typeDefs } from './graphql/graphql.js';
-import { handleMcpSessionRequest, mcpHandler } from './mcp/mcp-server.js';
+import { mcpHandler } from './mcp/mcp-server.js';
 import { logMessage } from "./utils/logs.js";
 import { createTelemetryPlugin, telemetryMiddleware } from './utils/telemetry.js';
 // Constants
@@ -139,8 +139,8 @@ async function startServer() {
   app.use(graphqlUploadExpress({ maxFileSize: 10000000, maxFiles: 1 })); // Consider if needed before auth
 
   app.post('/mcp', mcpHandler);
-  app.get('/mcp', handleMcpSessionRequest);
-  app.delete('/mcp', handleMcpSessionRequest);
+  app.get('/mcp', mcpHandler);
+  app.delete('/mcp', mcpHandler);
 
   app.use('/', expressMiddleware(server, { context: getHttpContext }));
   // Modified server startup
