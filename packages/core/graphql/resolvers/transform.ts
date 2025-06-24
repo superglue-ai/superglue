@@ -38,8 +38,6 @@ export const transformResolver = async (
       } catch (error) {
         data = await parseFile(Buffer.from(data), FileType.AUTO);
       }
-    } else if (Array.isArray(data) && data.every(item => typeof item === 'number')) {
-      data = await parseFile(Buffer.from(data), FileType.AUTO);
     }
 
     transformResult = await executeTransform({
