@@ -395,12 +395,12 @@ export const toolDefinitions: Record<string, any> = {
         const result = await client.listWorkflows(limit, offset);
         const integrations = await client.listIntegrations(100, 0);
         const allWorkflows =
-          [...result.items.map(workflow => {
+          [...result.items?.map(workflow => {
             const currentIntegrations = Array.from(new Set(
-              workflow.steps.map(step =>
-                integrations.items.find(integration => integration.id === step.integrationId)
+              workflow.steps?.map(step =>
+                integrations.items?.find(integration => integration.id === step.integrationId)
               )
-            )).filter(Boolean);
+            ))?.filter(Boolean);
             const credentials = Object.keys(flattenAndNamespaceWorkflowCredentials(currentIntegrations));
             return {
               id: workflow.id,
