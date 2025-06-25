@@ -6,6 +6,7 @@ node_modules
 .DS_Store
 **/.next
 build.sh
+publish.sh
 diff.txt
 diff.sh
 **/superglue_data.json
