@@ -5,7 +5,6 @@ import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { LanguageModel } from "../llm/llm.js";
 import { SELECTION_PROMPT } from "../llm/prompts.js";
-import { Documentation } from "../utils/documentation.js";
 import { logMessage } from "../utils/logs.js";
 
 type ChatMessage = OpenAI.Chat.ChatCompletionMessageParam;
@@ -43,14 +42,10 @@ export class IntegrationSelector {
         }));
 
         const integrationDescriptions = integrations.map(int => {
-            const processedDoc = Documentation.postProcess(int.documentation || "", instruction);
             return `
 ---
 Integration ID: ${int.id}
-Documentation Summary:
-\`\`\`
-${processedDoc || 'No documentation available.'}
-\`\`\`
+Documentation Summary: ${int.documentation?.slice(0, 1000)}
 `;
         }).join("\n");
 
