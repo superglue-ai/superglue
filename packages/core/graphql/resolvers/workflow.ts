@@ -26,7 +26,7 @@ interface ExecuteWorkflowArgs {
 interface BuildWorkflowArgs {
   instruction: string;
   payload?: Record<string, unknown>;
-  integrations: string[];
+  integrationIds: string[];
   responseSchema?: JSONSchema;
 }
 
@@ -232,7 +232,7 @@ export const buildWorkflowResolver = async (
 ): Promise<Workflow> => {
   try {
     const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
-    const { instruction, payload = {}, integrations: integrationIds, responseSchema } = args;
+    const { instruction, payload = {}, integrationIds, responseSchema } = args;
 
     if (!instruction || instruction.trim() === "") {
       throw new Error("Instruction is required to build a workflow.");
@@ -241,7 +241,18 @@ export const buildWorkflowResolver = async (
       throw new Error("At least one integration is required.");
     }
 
-    // Wait for documentation processing for all integration IDs
+    // Validate that all integration IDs exist
+    const fetchedIntegrations = await Promise.all(
+      integrationIds.map(async (id) => {
+        const integration = await context.datastore.getIntegration(id, context.orgId);
+        if (!integration) {
+          throw new Error(`Integration not found: ${id}`);
+        }
+        return integration;
+      })
+    );
+
+    // Wait for documentation processing for existing integrations
     const datastoreAdapter = {
       getIntegration: async (id: string): Promise<Integration | null> => {
         const integration = await context.datastore.getIntegration(id, context.orgId);
@@ -249,26 +260,7 @@ export const buildWorkflowResolver = async (
       }
     };
 
-    const resolvedIntegrations = await waitForIntegrationProcessing(datastoreAdapter, integrationIds, 60000);
-
-    if (resolvedIntegrations.length === 0) {
-      const integrationNames = integrationIds.join(', ');
-      logMessage(
-        'warn',
-        `Workflow build timed out waiting for documentation processing on integrations: ${integrationNames}`,
-        metadata
-      );
-      throw new Error(
-        `Workflow build timed out after 60 seconds waiting for documentation processing to complete for: ${integrationNames}. Please try again in a few minutes.`
-      );
-    }
-
-    // Validate that we got all requested integrations
-    if (resolvedIntegrations.length !== integrationIds.length) {
-      const foundIds = resolvedIntegrations.map(i => i.id);
-      const missingIds = integrationIds.filter(id => !foundIds.includes(id));
-      throw new Error(`Integration(s) not found: ${missingIds.join(', ')}`);
-    }
+    const resolvedIntegrations = await waitForIntegrationProcessing(datastoreAdapter, integrationIds);
 
     const builder = new WorkflowBuilder(instruction, resolvedIntegrations, payload, responseSchema, metadata);
     const workflow = await builder.build();

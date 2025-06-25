@@ -76,12 +76,12 @@ export function IntegrationForm({
     }), [config.superglueEndpoint, config.superglueApiKey]);
 
     const { waitForIntegrationReady } = useMemo(() => ({
-        waitForIntegrationReady: (integrationIds: string[], timeoutMs: number = 60000) => {
+        waitForIntegrationReady: (integrationIds: string[]) => {
             // Create adapter for SuperglueClient to work with shared utility
             const clientAdapter = {
                 getIntegration: (id: string) => client.getIntegration(id)
             };
-            return waitForIntegrationProcessing(clientAdapter, integrationIds, timeoutMs);
+            return waitForIntegrationProcessing(clientAdapter, integrationIds);
         }
     }), [client]);
 

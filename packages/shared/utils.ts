@@ -49,18 +49,18 @@ interface IntegrationGetter {
 }
 
 // Generic integration polling utility that works with any integration getter
+// Assumes all integrationIds are valid and exist
 export async function waitForIntegrationProcessing(
     integrationGetter: IntegrationGetter,
     integrationIds: string[],
-    timeoutMs: number = 60000
+    timeoutMs: number = 90000
 ): Promise<Integration[]> {
     const start = Date.now();
-    let activeIds = [...integrationIds];
 
-    while (Date.now() - start < timeoutMs && activeIds.length > 0) {
-        // Use Promise.allSettled for better error handling and parallel requests
+    while (Date.now() - start < timeoutMs) {
+        // Fetch all integrations
         const settled = await Promise.allSettled(
-            activeIds.map(async (id) => {
+            integrationIds.map(async (id) => {
                 try {
                     return await integrationGetter.getIntegration(id);
                 } catch (error) {
@@ -70,18 +70,15 @@ export async function waitForIntegrationProcessing(
             })
         );
 
-        const results = settled.map(result =>
+        const integrations = settled.map(result =>
             result.status === 'fulfilled' ? result.value : null
         ).filter(Boolean) as Integration[];
 
-        // Remove deleted/failed integrations from active polling
-        activeIds = activeIds.filter((id, idx) => settled[idx].status === 'fulfilled' && settled[idx].value !== null);
-
         // Check if any integration is still pending documentation
-        const pendingIntegrations: string[] = [];
+        const pendingIntegrations: Integration[] = [];
         const readyIntegrations: Integration[] = [];
 
-        for (const integration of results) {
+        for (const integration of integrations) {
             // An integration is considered "not ready" if:
             // 1. documentationPending is explicitly true, OR
             // 2. It has a documentationUrl but no documentation content
@@ -91,20 +88,23 @@ export async function waitForIntegrationProcessing(
                 (!integration.documentation || !integration.documentation.trim());
 
             if (isDocumentationPending || hasUrlButNoContent) {
-                pendingIntegrations.push(integration.id);
+                pendingIntegrations.push(integration);
             } else {
                 readyIntegrations.push(integration);
             }
         }
 
         if (pendingIntegrations.length === 0) {
-            return results;
+            return integrations;
         }
+
+        // Wait before checking again
         await new Promise(resolve => setTimeout(resolve, 4000));
     }
 
-    // Timeout occurred - return empty array (frontend-compatible)
-    // Backend can check if result.length === 0 and handle accordingly
-    return [];
+    // Timeout occurred - just use the integration IDs since we know they exist
+    throw new Error(
+        `Workflow build timed out after ${timeoutMs / 1000} seconds waiting for documentation processing to complete for: ${integrationIds.join(', ')}. Please try again in a few minutes.`
+    );
 }
 

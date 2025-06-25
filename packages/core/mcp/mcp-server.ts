@@ -120,7 +120,7 @@ export const SaveWorkflowInputSchema = {
 // MCP Tool Input Schemas (workflow-centric)
 export const BuildAndRunWorkflowInputSchema = {
   instruction: z.string().describe("Natural language instruction to build a new workflow from scratch."),
-  integrations: z.array(z.string()).describe("Array of integration IDs to use in the workflow."),
+  integrationIds: z.array(z.string()).describe("Array of integration IDs to use in the workflow."),
   payload: z.record(z.unknown()).optional().describe("JSON payload for the workflow execution."),
   credentials: z.record(z.string()).optional().describe("Additional credentials that will be merged with integration credentials."),
   responseSchema: z.record(z.unknown()).optional().describe("JSONSchema for the expected output structure.")
@@ -247,13 +247,13 @@ const validateWorkflowBuilding = (args: any) => {
     errors.push("Instruction must be detailed (minimum 10 characters). Describe what the workflow should do, what integrations it connects to, and expected inputs/outputs.");
   }
 
-  if (!args.integrations || !Array.isArray(args.integrations) || args.integrations.length === 0) {
-    errors.push("integrations array is required with at least one integration ID.");
+  if (!args.integrationIds || !Array.isArray(args.integrationIds) || args.integrationIds.length === 0) {
+    errors.push("integrationIds array is required with at least one integration ID.");
   }
 
   // Validate each integration is a string
-  if (args.integrations) {
-    for (const integration of args.integrations) {
+  if (args.integrationIds) {
+    for (const integration of args.integrationIds) {
       if (typeof integration !== 'string') {
         errors.push("Each integration must be a string ID. Use 'superglue_find_relevant_integrations' to discover available integration IDs.");
       }
@@ -592,7 +592,7 @@ export const toolDefinitions: Record<string, any> = {
     `,
     inputSchema: BuildAndRunWorkflowInputSchema,
     execute: async (args: any & { client: SuperglueClient; orgId: string; }, request) => {
-      const { instruction, integrations, payload, credentials, responseSchema, orgId } = args;
+      const { instruction, integrationIds, payload, credentials, responseSchema, orgId } = args;
       const client = args.client as SuperglueClient;
       try {
         const validationErrors = validateWorkflowBuilding(args);
@@ -602,7 +602,7 @@ export const toolDefinitions: Record<string, any> = {
 
         const builtWorkflow = await client.buildWorkflow({
           instruction,
-          integrations,
+          integrationIds,
           payload,
           responseSchema,
           save: false
@@ -626,7 +626,7 @@ export const toolDefinitions: Record<string, any> = {
           note: "Workflow executed successfully! Use 'superglue_save_workflow' to persist this workflow.",
           success: result.success,
           error: result.error,
-          integrations_used: integrations,
+          integrationIds: integrationIds,
           config: result.config,
           id: result.id,
           data: result.data,
@@ -721,7 +721,7 @@ export const toolDefinitions: Record<string, any> = {
     `,
     inputSchema: CreateIntegrationInputSchema,
     execute: async (args: any & { client: SuperglueClient; orgId: string; }, request) => {
-      const { client, ...integrationInput } = args;
+      const { client, orgId, ...integrationInput } = args;
 
       try {
         const validationErrors = validateIntegrationCreation(integrationInput);
