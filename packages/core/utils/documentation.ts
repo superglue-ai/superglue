@@ -112,7 +112,7 @@ export class Documentation {
     searchTerms.push('securityschemes', 'authorization', 'authentication');
 
     // Split document into chunks
-    const chunks: { content: string; score: number; index: number }[] = [];
+    const chunks: { content: string; score: number; index: number; }[] = [];
 
     for (let i = 0; i < documentation.length; i += CHUNK_SIZE) {
       const chunk = documentation.slice(i, i + CHUNK_SIZE);
@@ -266,7 +266,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       await closedInstance.close();
     }
   }
-  private async fetchPageContentWithPlaywright(urlString: string, config: ApiConfig, metadata: Metadata): Promise<{ content: string; links: Record<string, string> } | null> {
+  private async fetchPageContentWithPlaywright(urlString: string, config: ApiConfig, metadata: Metadata): Promise<{ content: string; links: Record<string, string>; } | null> {
 
     if (!urlString?.startsWith("http")) {
       return null;
@@ -301,7 +301,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
         const allLinks = document.querySelectorAll('a');
         allLinks.forEach(link => {
           const key = link.textContent?.toLowerCase().trim().replace(/[^a-z0-9]/g, ' ');
-          links[key] = link.href;
+          links[key] = link?.href?.split('#')[0];
         });
         return links;
       });
@@ -349,11 +349,11 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     // Expanded keywords to catch more relevant documentation pages
     const requiredKeywords = [
       // Auth related
-      "auth", "authentication", "authorization", "oauth", "api key", "apikey",
+      "authentication", "authorization", "bearer", "basic", "token",
       // Getting started
       "introduction", "getting started", "quickstart", "guide", "tutorial",
       // API specific
-      "rest", "api", "endpoints", "reference", "methods", "operations",
+      "rest", "graphql", "openapi", "endpoints", "reference", "methods", "operations", "objects", "users", "models", "query",
       // HTTP methods
       "get", "post", "put", "delete", "patch",
       // Common API concepts
@@ -362,11 +362,11 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
 
     if (!docResult.links) return docResult.content;
 
-    const rankedLinks: { linkText: string, href: string, priority: number; matchCount: number }[] = [];
+    const rankedLinks: { linkText: string, href: string, matchCount: number; }[] = [];
 
     for (const [linkText, href] of Object.entries(docResult.links)) {
       // Skip obviously non-doc pages
-      if (href.includes('signup') ||
+      if (!linkText || href.includes('signup') ||
         href.includes('pricing') ||
         href.includes('contact') ||
         href.includes('cookie') ||
@@ -389,20 +389,11 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
           matchCount++;
         }
       }
-
-      // Priority levels:
-      // 0: Required keywords (auth/intro)
-      // 1: Everything else
-      let priority = matchCount > 0 ? 0 : 1;
-
-      rankedLinks.push({ linkText, href, priority, matchCount });
+      rankedLinks.push({ linkText, href, matchCount });
     }
 
     // Sort by priority first (highest first), then by match count (highest first)
     rankedLinks.sort((a, b) => {
-      if (a.priority !== b.priority) {
-        return b.priority - a.priority;
-      }
       return b.matchCount - a.matchCount;
     });
 
