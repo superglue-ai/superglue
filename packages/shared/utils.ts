@@ -75,26 +75,9 @@ export async function waitForIntegrationProcessing(
         ).filter(Boolean) as Integration[];
 
         // Check if any integration is still pending documentation
-        const pendingIntegrations: Integration[] = [];
-        const readyIntegrations: Integration[] = [];
+        const hasPendingDocs = integrations.some(integration => integration.documentationPending === true);
 
-        for (const integration of integrations) {
-            // An integration is considered "not ready" if:
-            // 1. documentationPending is explicitly true, OR
-            // 2. It has a documentationUrl but no documentation content
-            const isDocumentationPending = integration.documentationPending === true;
-            const hasUrlButNoContent = integration.documentationUrl &&
-                integration.documentationUrl.trim() &&
-                (!integration.documentation || !integration.documentation.trim());
-
-            if (isDocumentationPending || hasUrlButNoContent) {
-                pendingIntegrations.push(integration);
-            } else {
-                readyIntegrations.push(integration);
-            }
-        }
-
-        if (pendingIntegrations.length === 0) {
+        if (!hasPendingDocs) {
             return integrations;
         }
 

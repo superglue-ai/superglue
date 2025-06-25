@@ -315,16 +315,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         return;
       }
 
-      // Check if any selected integrations are still pending
-      const pendingSelectedIds = selectedIntegrationIds.filter(id => pendingDocIds.has(id));
-      if (pendingSelectedIds.length > 0) {
-        toast({
-          title: 'Documentation Still Processing',
-          description: `Please wait for documentation to finish processing for: ${pendingSelectedIds.join(', ')}`,
-          variant: 'destructive',
-        });
-        return;
-      }
+
 
       setIsGeneratingSuggestions(true);
       try {
@@ -351,19 +342,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       }
       setIsBuilding(true);
       try {
-        // Check if any selected integrations are still pending locally
-        const pendingSelectedIds = selectedIntegrationIds.filter(id => pendingDocIds.has(id));
-        if (pendingSelectedIds.length > 0) {
-          toast({
-            title: 'Documentation Still Processing',
-            description: `Please wait for documentation to finish processing for: ${pendingSelectedIds.join(', ')}`,
-            variant: 'destructive',
-          });
-          return;
-        }
-
-        // Wait for docs to be ready
-        await waitForIntegrationReady(selectedIntegrationIds);
         const freshIntegrations = integrations; // Use the updated integrations from context
         const schema = await client.generateSchema(instruction, "");
         setSchema(JSON.stringify(schema, null, 2));
@@ -1164,8 +1142,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
               isBuilding ||
               isSaving ||
               isGeneratingSuggestions ||
-              (step === 'integrations' && selectedIntegrationIds.length === 0) ||
-              (step === 'integrations' && selectedIntegrationIds.some(id => pendingDocIds.has(id)))
+              (step === 'integrations' && selectedIntegrationIds.length === 0)
             }
           >
             {isBuilding ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Building...</> :
