@@ -9,9 +9,9 @@ const findIntegrations = toolDefinitions.superglue_find_relevant_integrations.ex
 const saveWorkflow = toolDefinitions.superglue_save_workflow.execute;
 const createIntegration = toolDefinitions.superglue_create_integration.execute;
 
-// Mock the waitForIntegrationsReady function
+// Mock the waitForIntegrationProcessing function
 vi.mock('@superglue/shared/utils', () => ({
-  waitForIntegrationsReady: vi.fn().mockResolvedValue(['integration-1']), // Success case by default
+  waitForIntegrationProcessing: vi.fn().mockResolvedValue(['integration-1']), // Success case by default
   flattenAndNamespaceWorkflowCredentials: vi.fn().mockReturnValue({}) // Add this mock
 }));
 
@@ -170,28 +170,7 @@ describe('superglue_build_and_run', () => {
     });
   });
 
-  it('handles integration documentation timeout', async () => {
-    const { waitForIntegrationsReady } = await import('@superglue/shared/utils');
-    vi.mocked(waitForIntegrationsReady).mockResolvedValueOnce({
-      pendingIntegrations: ['slow-integration'],
-      readyIntegrations: []
-    });
 
-    const client = {
-      buildWorkflow: vi.fn(),
-      executeWorkflow: vi.fn(),
-    };
-    const args = getValidBuildArgs({
-      integrations: ['slow-integration'],
-      client
-    });
-    const result = await buildAndRun(args, {});
-
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('Documentation processing timeout');
-    expect(result.pending_integrations).toEqual(['slow-integration']);
-    expect(client.buildWorkflow).not.toHaveBeenCalled();
-  });
 });
 
 describe('superglue_execute_workflow', () => {

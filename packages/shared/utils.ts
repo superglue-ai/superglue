@@ -43,10 +43,14 @@ export async function generateUniqueId({
     }
 }
 
-// Generic integration polling utility
-// Works with any client that has a getIntegration method
-export async function waitForIntegrationProcessing<T extends { getIntegration: (id: string) => Promise<Integration>; }>(
-    client: T,
+// Generic interface for anything that can fetch integrations
+interface IntegrationGetter {
+    getIntegration(id: string): Promise<Integration | null>;
+}
+
+// Generic integration polling utility that works with any integration getter
+export async function waitForIntegrationProcessing(
+    integrationGetter: IntegrationGetter,
     integrationIds: string[],
     timeoutMs: number = 60000
 ): Promise<Integration[]> {
@@ -58,7 +62,7 @@ export async function waitForIntegrationProcessing<T extends { getIntegration: (
         const settled = await Promise.allSettled(
             activeIds.map(async (id) => {
                 try {
-                    return await client.getIntegration(id);
+                    return await integrationGetter.getIntegration(id);
                 } catch (error) {
                     console.warn(`Failed to fetch integration ${id}:`, error);
                     return null;
