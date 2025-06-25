@@ -29,7 +29,9 @@
     "test": "vitest",
     "test-no-watch": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:workflow": "vitest run -t ApiWorkflowOrchestrator-dog"
+    "test:workflow": "vitest run -t ApiWorkflowOrchestrator-dog",
+    "test:integration": "ts-node tests/run-integration-tests.ts",
+    "test:integration-framework": "vitest run -t IntegrationTestingFramework"
   },
   "type": "module",
   "dependencies": {
