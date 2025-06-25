@@ -8,7 +8,7 @@ The Integration Testing Framework provides:
 
 - **Automated Setup**: Programmatically creates all required integrations
 - **Comprehensive Testing**: Runs 10 carefully designed workflows (5 single-system, 5 multi-system)
-- **Performance Metrics**: Tracks build times, execution times, and data quality
+- **Performance Metrics**: Tracks build times, execution times, and success / failure
 - **Automated Cleanup**: Removes all test resources after completion
 - **Detailed Reporting**: Provides comprehensive test results and benchmarks
 
@@ -65,7 +65,7 @@ npm run test:integration
 npm run test:integration-framework
 
 # Run specific test categories
-GRAPHQL_ENDPOINT=http://localhost:4000/graphql AUTH_TOKEN=your-token npm run test:integration
+GRAPHQL_ENDPOINT=http://localhost:3000/graphql AUTH_TOKEN=your-token npm run test:integration
 ```
 
 ### Programmatic Usage
@@ -75,7 +75,7 @@ import { IntegrationTestingFramework } from './integration-testing-framework.js'
 
 // Run the complete test suite
 const testSuite = await IntegrationTestingFramework.runFullTestSuite(
-  'http://localhost:4000/graphql',
+  'http://localhost:3000/graphql',
   'your-api-key'
 );
 
@@ -347,3 +347,229 @@ For issues, questions, or contributions:
 ## License
 
 This integration testing framework is part of the Superglue project and follows the same licensing terms. 
+
+# Integration Testing Framework
+
+Automated testing framework for Superglue workflow building and execution with real integrations.
+
+## Quick Start - First Single System Workflow
+
+### 1. Set Up Environment Variables
+
+Create a `.env.test` file in your project root with the HubSpot credentials:
+
+```bash
+# Required for basic setup
+GRAPHQL_ENDPOINT=http://localhost:3000/graphql
+AUTH_TOKEN=your-superglue-auth-token
+
+# Required for HubSpot workflow
+HUBSPOT_PRIVATE_APP_TOKEN=your-hubspot-private-app-token
+```
+
+### 2. Configure Test Selection
+
+The framework uses `integration-test-config.json` to select which integrations and workflows to test:
+
+**Current config (testing first single system workflow):**
+```json
+{
+  "integrations": {
+    "enabled": ["hubspot-crm"]
+  },
+  "workflows": {
+    "enabled": ["hubspot-lead-qualification"]
+  },
+  "testSuite": {
+    "name": "Single HubSpot Workflow Test",
+    "runCleanupTest": true,
+    "waitForDocumentation": false
+  }
+}
+```
+
+### 3. Run the Test
+
+```bash
+cd packages/core
+npm run test:integration
+```
+
+### 4. Expected Output
+
+```
+🚀 Starting Integration Testing Framework
+Setting up integration: HubSpot CRM
+Building workflow: HubSpot Lead Qualification Pipeline
+Executing workflow...
+✅ Passed: 1/1
+📈 Success Rate: 100.0%
+🧹 Cleanup completed
+```
+
+## Progressive Testing
+
+### Step 1: Test Integration Setup + Cleanup Only
+
+```json
+{
+  "integrations": { "enabled": ["hubspot-crm"] },
+  "workflows": { "enabled": [] },
+  "testSuite": { "runCleanupTest": true }
+}
+```
+
+This will:
+- Create the HubSpot integration
+- Test that credentials work
+- Clean up the integration
+- Skip workflow execution
+
+### Step 2: Add First Workflow
+
+```json
+{
+  "integrations": { "enabled": ["hubspot-crm"] },
+  "workflows": { "enabled": ["hubspot-lead-qualification"] },
+  "testSuite": { "runCleanupTest": true }
+}
+```
+
+### Step 3: Add Second Integration
+
+```json
+{
+  "integrations": { "enabled": ["hubspot-crm", "stripe-pay"] },
+  "workflows": { "enabled": ["hubspot-lead-qualification", "stripe-revenue-analytics"] }
+}
+```
+
+Add to your `.env.test`:
+```bash
+STRIPE_SECRET_KEY=sk_test_your-stripe-secret-key
+STRIPE_PUBLISHABLE_KEY=pk_test_your-stripe-publishable-key
+```
+
+### Step 4: Test Multi-System Workflow
+
+```json
+{
+  "integrations": { "enabled": ["hubspot-crm", "sendgrid-email"] },
+  "workflows": { "enabled": ["crm-to-email-workflow"] }
+}
+```
+
+Add to your `.env.test`:
+```bash
+SENDGRID_API_KEY=your-sendgrid-api-key
+```
+
+## Available Integrations
+
+| ID | Service | Required Env Vars |
+|----|---------|-------------------|
+| `hubspot-crm` | HubSpot CRM | `HUBSPOT_PRIVATE_APP_TOKEN` |
+| `stripe-pay` | Stripe Payments | `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY` |
+| `jira-projects` | JIRA Projects | `JIRA_API_TOKEN` |
+| `attio-crm` | Attio CRM | `ATTIO_API_TOKEN` |
+| `timbuk2-shopify` | Shopify Demo | None (public API) |
+| `postgres-lego` | LEGO Database | None (public) |
+| `supabase-db` | Supabase DB | `SUPABASE_PASSWORD`, `SUPABASE_PUBLIC_API_KEY`, `SUPABASE_SECRET_KEY` |
+| `twilio-comm` | Twilio | `TWILIO_ACCOUNT_SID`, `TWILIO_SID`, `TWILIO_TEST_AUTH_TOKEN`, `TWILIO_SECRET_KEY` |
+| `sendgrid-email` | SendGrid | `SENDGRID_API_KEY` |
+
+## Available Workflows
+
+### Single-System Workflows
+- `hubspot-lead-qualification` - Update lead statuses based on engagement scores
+- `stripe-revenue-analytics` - Calculate MRR and identify churned customers
+- `jira-sprint-health` - Analyze sprint completion and blocked issues
+- `attio-contact-enrichment` - Link contacts to companies by email domain
+- `lego-inventory-analysis` - Analyze LEGO themes by set count
+- `timbuk2-product-analysis` - Get all products with pagination
+
+### Multi-System Workflows
+- `crm-to-email-workflow` - HubSpot leads → SendGrid emails
+- `payment-to-db-sync` - Stripe payments → Supabase storage
+- `project-notification-system` - JIRA tickets → Twilio SMS
+- `customer-lifecycle-automation` - Stripe + HubSpot + SendGrid
+- `comprehensive-analytics-pipeline` - All systems combined
+
+## Running Tests
+
+### Basic Usage
+```bash
+npm run test:integration
+```
+
+### With Custom Config
+```bash
+npm run test:integration -- --config=./my-test-config.json
+```
+
+### Environment Variables
+```bash
+# Use different endpoint
+GRAPHQL_ENDPOINT=https://my-superglue-instance.com/graphql npm run test:integration
+
+# Load from specific env file
+export $(cat .env.test | xargs) && npm run test:integration
+```
+
+## Interpreting Results
+
+### Success Indicators
+- ✅ Integration setup successful
+- ✅ Workflow builds without errors
+- ✅ Workflow executes successfully
+- ✅ Data quality check passes
+- ✅ Cleanup completes
+
+### Common Failure Modes
+- **Setup fails**: Check credentials and network connectivity
+- **Build fails**: Check instruction clarity and integration availability
+- **Execution fails**: Check API quotas and data availability
+- **Data quality fails**: Check expected output keys vs actual output
+
+### Results File
+Each test run creates a timestamped JSON file:
+```
+integration-test-results-2025-01-25T10-30-45-123Z.json
+```
+
+Contains:
+- Individual workflow results
+- Timing metrics
+- Error details
+- Data quality analysis
+
+## Cleanup Testing
+
+The framework automatically tests cleanup after each run. To test cleanup independently:
+
+```json
+{
+  "integrations": { "enabled": ["hubspot-crm"] },
+  "workflows": { "enabled": [] },
+  "testSuite": { "runCleanupTest": true }
+}
+```
+
+This creates integrations and immediately cleans them up without running workflows.
+
+## Debugging
+
+### Enable Verbose Logging
+Check the Superglue server logs for detailed workflow execution info.
+
+### Test Individual Components
+1. **Credentials**: Check if integration setup succeeds
+2. **Workflow Building**: Look for LLM/API errors in build phase
+3. **Workflow Execution**: Check integration-specific error messages
+4. **Data Quality**: Compare `expectedKeys` vs `outputKeys` in results
+
+### Common Issues
+- **Missing credentials**: Check environment variables
+- **API rate limits**: Space out test runs
+- **Network timeouts**: Check firewall/proxy settings
+- **Stale data**: Some workflows expect recent data (adjust payloads) 

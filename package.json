@@ -11,6 +11,8 @@
     "start": "turbo run start",
     "test": "turbo run test",
     "test:coverage": "turbo run test:coverage",
+    "test:integration": "cd packages/core && npm run build && AUTOSTART_SERVER=true node dist/tests/run-integration-tests.js",
+    "test:integration:core": "cd packages/core && npm run build && node dist/tests/run-integration-tests.js",
     "lint": "turbo run lint",
     "clean": "turbo run clean"
   },

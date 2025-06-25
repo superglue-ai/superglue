@@ -1,0 +1,42 @@
+{
+    "integrations": {
+        "enabled": [
+            "hubspot-crm"
+        ],
+        "available": [
+            "hubspot-crm",
+            "stripe-pay",
+            "timbuk2-shopify",
+            "postgres-lego",
+            "shopify-hydrogen",
+            "jira-projects",
+            "attio-crm",
+            "supabase-db",
+            "twilio-comm",
+            "sendgrid-email"
+        ]
+    },
+    "workflows": {
+        "enabled": [
+            "hubspot-lead-qualification"
+        ],
+        "available": [
+            "hubspot-lead-qualification",
+            "stripe-revenue-analytics",
+            "jira-sprint-health",
+            "attio-contact-enrichment",
+            "lego-inventory-analysis",
+            "timbuk2-product-analysis",
+            "crm-to-email-workflow",
+            "payment-to-db-sync",
+            "project-notification-system",
+            "customer-lifecycle-automation",
+            "comprehensive-analytics-pipeline"
+        ]
+    },
+    "testSuite": {
+        "name": "Incremental Integration Test",
+        "runCleanupTest": true,
+        "waitForDocumentation": false
+    }
+}

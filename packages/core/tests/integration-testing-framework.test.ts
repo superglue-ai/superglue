@@ -240,6 +240,8 @@ describe('Integration Test Configuration', () => {
 
         // Check complexity levels
         const complexityLevels = testWorkflows.map((w: any) => w.complexityLevel);
-        expect(complexityLevels).toContain('low', 'medium', 'high');
+        expect(complexityLevels).toContain('low');
+        expect(complexityLevels).toContain('medium'); 
+        expect(complexityLevels).toContain('high');
     });
 }); 
