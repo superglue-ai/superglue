@@ -1,13 +1,12 @@
 import { useConfig } from '@/src/app/config-context';
 import { useIntegrations } from '@/src/app/integrations-context';
 import { IntegrationForm } from '@/src/components/integrations/IntegrationForm';
-import { useIntegrationPolling } from '@/src/hooks/use-integration-polling';
 import { useToast } from '@/src/hooks/use-toast';
 import { inputErrorStyles, needsUIToTriggerDocFetch, parseCredentialsHelper } from '@/src/lib/client-utils';
 import { findMatchingIntegration, integrations as integrationTemplates } from '@/src/lib/integrations';
 import { cn, composeUrl } from '@/src/lib/utils';
 import { Integration, IntegrationInput, SuperglueClient, UpsertMode, Workflow, WorkflowResult } from '@superglue/client';
-import { flattenAndNamespaceWorkflowCredentials } from '@superglue/shared/utils';
+import { flattenAndNamespaceWorkflowCredentials, waitForIntegrationProcessing } from '@superglue/shared/utils';
 import { ArrowRight, Check, ChevronRight, FileText, Globe, Loader2, Pencil, Play, Plus, Workflow as WorkflowIcon, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Prism from 'prismjs';
@@ -105,7 +104,10 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     apiKey: superglueConfig.superglueApiKey,
   }), [superglueConfig.superglueEndpoint, superglueConfig.superglueApiKey]);
 
-  const { waitForIntegrationReady } = useIntegrationPolling(client);
+  const { waitForIntegrationReady } = useMemo(() => ({
+    waitForIntegrationReady: (integrationIds: string[], timeoutMs: number = 60000) =>
+      waitForIntegrationProcessing(client, integrationIds, timeoutMs)
+  }), [client]);
 
   // Track previous pending IDs to detect completion
   const previousPendingIdsRef = useRef<Set<string>>(new Set());

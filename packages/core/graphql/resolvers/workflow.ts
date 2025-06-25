@@ -1,6 +1,6 @@
 import { Integration, RequestOptions, Workflow, WorkflowResult } from "@superglue/client";
 import { Context, Metadata } from "@superglue/shared";
-import { flattenAndNamespaceWorkflowCredentials } from "@superglue/shared/utils";
+import { flattenAndNamespaceWorkflowCredentials, waitForIntegrationProcessing } from "@superglue/shared/utils";
 import type { GraphQLResolveInfo } from "graphql";
 import { WorkflowExecutor } from "../../workflow/workflow-executor.js";
 
@@ -258,19 +258,38 @@ export const buildWorkflowResolver = async (
       })
     );
 
-    const blocked = resolvedIntegrations.find(
-      i => i.documentationPending === true
-    );
-    if (blocked) {
+    // Wait for any pending documentation to be processed
+    const integrationIds = resolvedIntegrations.map(i => i.id);
+    const datastoreClient = {
+      getIntegration: async (id: string): Promise<Integration> => {
+        const integration = await context.datastore.getIntegration(id, context.orgId);
+        if (!integration) {
+          throw new Error(`Integration with id "${id}" not found during polling`);
+        }
+        return integration;
+      }
+    };
+
+    const result = await waitForIntegrationProcessing(datastoreClient, integrationIds, 60000); // 60 second timeout
+
+    if (result.length === 0) {
+      const pendingIntegrationNames = integrationIds.map(id =>
+        resolvedIntegrations.find(i => i.id === id)?.name || id
+      ).join(', ');
+
       logMessage(
         'warn',
-        `Workflow build blocked: documentation is still being fetched for integration "${blocked.id}"`,
+        `Workflow build timed out waiting for documentation processing on integrations: ${pendingIntegrationNames}`,
         metadata
       );
       throw new Error(
-        `Cannot build workflow: documentation is still being fetched for integration "${blocked.id}".`
+        `Workflow build timed out after 60 seconds waiting for documentation processing to complete for: ${pendingIntegrationNames}. Please try again in a few minutes.`
       );
     }
+
+    // Update resolvedIntegrations with the latest data (documentation should now be ready)
+    const updatedIntegrations = result;
+    resolvedIntegrations.splice(0, resolvedIntegrations.length, ...updatedIntegrations);
 
     const builder = new WorkflowBuilder(instruction, resolvedIntegrations, payload, responseSchema, metadata);
     const workflow = await builder.build();

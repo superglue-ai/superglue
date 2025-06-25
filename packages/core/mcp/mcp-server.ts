@@ -8,12 +8,11 @@ import {
 import { SuperglueClient, WorkflowResult } from '@superglue/client';
 import { LogEntry } from "@superglue/shared";
 import { getSDKCode } from '@superglue/shared/templates';
-import { waitForIntegrationsReady } from '@superglue/shared/utils';
 import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { validateToken } from '../auth/auth.js';
-import { logEmitter } from '../utils/logs.js';
+import { logEmitter, logMessage } from '../utils/logs.js';
 
 // Enums
 export const CacheModeEnum = z.enum(["ENABLED", "READONLY", "WRITEONLY", "DISABLED"]);
@@ -597,26 +596,7 @@ export const toolDefinitions: Record<string, any> = {
           throw new Error(`Validation failed:\n${validationErrors.join('\n')}`);
         }
 
-        // Wait for integrations to be ready (using existing pattern)
-        logEmitter.emit('log', { level: 'info', message: `Checking integration documentation status...` });
-
-        const integrationsResult = await waitForIntegrationsReady(client, integrations, 60000);
-
-        if (Array.isArray(integrationsResult)) {
-          // Success - all integrations ready
-          logEmitter.emit('log', { level: 'info', message: `All ${integrations.length} integration(s) ready. Proceeding with workflow build...` });
-        } else {
-          // Timeout - some integrations still pending
-          const pendingList = integrationsResult.pendingIntegrations.join(', ');
-          return {
-            success: false,
-            error: `Documentation processing timeout. Integration(s) still pending: ${pendingList}`,
-            suggestion: `Documentation processing is taking longer than expected. Try again in a few minutes, or check if the integrations have valid documentation URLs.`,
-            pending_integrations: integrationsResult.pendingIntegrations
-          };
-        }
-
-        logEmitter.emit('log', { level: 'info', message: `Building workflow from instruction...` });
+        logMessage('info', 'Building workflow from instruction...');
 
         const builtWorkflow = await client.buildWorkflow({
           instruction,
@@ -625,8 +605,6 @@ export const toolDefinitions: Record<string, any> = {
           responseSchema,
           save: false
         });
-
-        logEmitter.emit('log', { level: 'info', message: `Executing workflow ${builtWorkflow.id}...` });
 
         const result = await client.executeWorkflow({
           workflow: builtWorkflow,
@@ -650,7 +628,7 @@ export const toolDefinitions: Record<string, any> = {
         };
 
       } catch (error: any) {
-        logEmitter.emit('log', { level: 'error', message: `Build and run process failed: ${error.message}` });
+        logMessage('error', `Build and run process failed: ${error.message}`);
         return {
           success: false,
           error: error.message,
@@ -692,7 +670,7 @@ export const toolDefinitions: Record<string, any> = {
         const { cleanedWorkflow, errors } = validateWorkflowSaving({ id, workflow });
 
         if (errors.length > 0) {
-          logEmitter.emit('log', { level: 'warn', message: `Validation warnings: ${errors.join(', ')}` });
+          logMessage('warn', `Validation warnings: ${errors.join(', ')}`);
         }
 
         if (!cleanedWorkflow || typeof cleanedWorkflow !== 'object') {
@@ -701,8 +679,8 @@ export const toolDefinitions: Record<string, any> = {
 
         workflow = cleanedWorkflow;
 
-        logEmitter.emit('log', { level: 'info', message: `Saving workflow ${id}...` });
-        logEmitter.emit('log', { level: 'debug', message: `Cleaned workflow: ${JSON.stringify(workflow, null, 2)}` });
+        logMessage('info', `Saving workflow ${id}...`);
+        logMessage('debug', `Cleaned workflow: ${JSON.stringify(workflow, null, 2)}`);
 
         const savedWorkflow = await client.upsertWorkflow(id, workflow);
 
@@ -713,7 +691,7 @@ export const toolDefinitions: Record<string, any> = {
         };
 
       } catch (error: any) {
-        logEmitter.emit('log', { level: 'error', message: `Workflow save failed: ${error.message}` });
+        logMessage('error', `Workflow save failed: ${error.message}`);
         return {
           success: false,
           error: error.message,

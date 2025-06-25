@@ -45,30 +45,63 @@ export async function generateUniqueId({
 
 // Generic integration polling utility
 // Works with any client that has a getIntegration method
-export async function waitForIntegrationsReady<T extends { getIntegration: (id: string) => Promise<Integration>; }>(
+export async function waitForIntegrationProcessing<T extends { getIntegration: (id: string) => Promise<Integration>; }>(
     client: T,
     integrationIds: string[],
     timeoutMs: number = 60000
-): Promise<Integration[] | { timeout: true; pendingIntegrations: string[]; }> {
+): Promise<Integration[]> {
     const start = Date.now();
     let activeIds = [...integrationIds];
-    let integrations: Integration[] = [];
-    let pendingIntegrations: string[] = [];
+
     while (Date.now() - start < timeoutMs && activeIds.length > 0) {
-        integrations = [];
-        pendingIntegrations = [];
-        for (const id of activeIds) {
-            const integration = await client.getIntegration(id);
-            if (integration.documentationPending === true) {
-                pendingIntegrations.push(id);
+        // Use Promise.allSettled for better error handling and parallel requests
+        const settled = await Promise.allSettled(
+            activeIds.map(async (id) => {
+                try {
+                    return await client.getIntegration(id);
+                } catch (error) {
+                    console.warn(`Failed to fetch integration ${id}:`, error);
+                    return null;
+                }
+            })
+        );
+
+        const results = settled.map(result =>
+            result.status === 'fulfilled' ? result.value : null
+        ).filter(Boolean) as Integration[];
+
+        // Remove deleted/failed integrations from active polling
+        activeIds = activeIds.filter((id, idx) => settled[idx].status === 'fulfilled' && settled[idx].value !== null);
+
+        // Check if any integration is still pending documentation
+        const pendingIntegrations: string[] = [];
+        const readyIntegrations: Integration[] = [];
+
+        for (const integration of results) {
+            // An integration is considered "not ready" if:
+            // 1. documentationPending is explicitly true, OR
+            // 2. It has a documentationUrl but no documentation content
+            const isDocumentationPending = integration.documentationPending === true;
+            const hasUrlButNoContent = integration.documentationUrl &&
+                integration.documentationUrl.trim() &&
+                (!integration.documentation || !integration.documentation.trim());
+
+            if (isDocumentationPending || hasUrlButNoContent) {
+                pendingIntegrations.push(integration.id);
+            } else {
+                readyIntegrations.push(integration);
             }
-            integrations.push(integration);
         }
+
         if (pendingIntegrations.length === 0) {
-            return integrations;
+            return results;
         }
-        // Simple 4-second wait (matching existing pattern)
-        await new Promise(res => setTimeout(res, 4000));
+        await new Promise(resolve => setTimeout(resolve, 4000));
     }
-    return { timeout: true, pendingIntegrations };
-} 
+
+    // Timeout occurred - return empty array (frontend-compatible)
+    // Backend can check if result.length === 0 and handle accordingly
+    return [];
+}
+
+
