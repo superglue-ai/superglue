@@ -470,7 +470,7 @@ export const toolDefinitions: Record<string, any> = {
     </use_case>
 
     <important_notes>
-      - This tool returns a list of suggested integration IDs, a reason for each suggestion, and the available credentials for each integration.
+      - This tool returns a list of suggested integration IDs, a reason for each suggestion, and the names of the available credentials for each integration.
       - If no instruction is provided, returns all available integrations with their IDs and the names of the credentials saved in the integration.
       - If no integrations exist, it returns an empty list. If no specific matches are found, it returns all existing integrations.
       - Use this list to make a final decision on which integrations to use for building a workflow. 
