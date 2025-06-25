@@ -18,7 +18,7 @@ vi.mock('@superglue/shared/utils', () => ({
 function getValidBuildArgs(overrides = {}) {
   return {
     instruction: 'Fetch all users from CRM and enrich with orders',
-    integrations: ['test-integration-id'],
+    integrationIds: ['test-integration-id'],
     payload: { userId: 123 },
     client: {
       buildWorkflow: vi.fn().mockResolvedValue({ id: 'workflow-1', steps: [] }),
@@ -67,14 +67,14 @@ describe('superglue_build_and_run', () => {
   });
 
   it('returns error if integrations array is empty', async () => {
-    const result = await buildAndRun(getValidBuildArgs({ integrations: [] }), {});
+    const result = await buildAndRun(getValidBuildArgs({ integrationIds: [] }), {});
     expect(result.success).toBe(false);
-    expect(result.error).toMatch(/integrations array is required/);
+    expect(result.error).toMatch(/integrationIds array is required/);
   });
 
   it('returns error if integration is not a string', async () => {
     const result = await buildAndRun(getValidBuildArgs({
-      integrations: [{ id: 'test-integration' }]
+      integrationIds: [{ id: 'test-integration' }]
     }), {});
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/Each integration must be a string ID/);
@@ -99,14 +99,14 @@ describe('superglue_build_and_run', () => {
       }),
     };
     const args = getValidBuildArgs({
-      integrations: ['integration-1', 'integration-2'],
+      integrationIds: ['integration-1', 'integration-2'],
       client
     });
     const result = await buildAndRun(args, {});
     expect(result.success).toBe(true);
     expect(client.buildWorkflow).toHaveBeenCalledWith({
       instruction: args.instruction,
-      integrations: ['integration-1', 'integration-2'],
+      integrationIds: ['integration-1', 'integration-2'],
       payload: args.payload,
       responseSchema: undefined,
       save: false
@@ -142,7 +142,7 @@ describe('superglue_build_and_run', () => {
     const result = await buildAndRun(args, {});
     expect(result.success).toBe(true);
     expect(result.config).toBeDefined();
-    expect(result.integrations_used).toBeDefined();
+    expect(result.integrationIds).toBeDefined();
     expect(result.note).toContain('superglue_save_workflow');
   });
 
@@ -157,7 +157,7 @@ describe('superglue_build_and_run', () => {
       }),
     };
     const args = getValidBuildArgs({
-      integrations: ['integration-1'],
+      integrationIds: ['integration-1'],
       credentials: { apiKey: 'test-key' },
       client
     });
