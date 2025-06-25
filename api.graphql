@@ -289,6 +289,7 @@ type Log {
 type SuggestedIntegration {
   id: String!
   reason: String!
+  savedCredentials: [String!]!
 }
 
 type Query {
@@ -298,7 +299,7 @@ type Query {
   listExtracts(limit: Int = 10, offset: Int = 0): ExtractList!
   listWorkflows(limit: Int = 10, offset: Int = 0): WorkflowList!
   listIntegrations(limit: Int = 10, offset: Int = 0): IntegrationList!
-  findRelevantIntegrations(instruction: String, limit: Int = 10, offset: Int = 0): [SuggestedIntegration!]
+  findRelevantIntegrations(instruction: String): [SuggestedIntegration!]
 
   getRun(id: ID!): RunResult
   getApi(id: ID!): ApiConfig

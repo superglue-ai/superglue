@@ -470,11 +470,11 @@ export const toolDefinitions: Record<string, any> = {
     </use_case>
 
     <important_notes>
-      - If no instruction is provided, returns all available integrations with their IDs.
-      - If an instruction is provided but no integrations exist, returns an empty list.
-      - If an instruction is provided but no specific matches are found, returns all available integrations as fallback options.
-      - This tool returns a list of suggested integration IDs and a reason for each suggestion.
-      - Use this list to make a final decision on which integrations to use for building a workflow.
+      - This tool returns a list of suggested integration IDs, a reason for each suggestion, and the names of the available credentials for each integration.
+      - If no instruction is provided, returns all available integrations with their IDs and the names of the credentials saved in the integration.
+      - If no integrations exist, it returns an empty list. If no specific matches are found, it returns all existing integrations.
+      - Use this list to make a final decision on which integrations to use for building a workflow. 
+      - If relevant integrations are missing credentials, you can decide based on the user instruction whether workflow building requires new integrations or not.
     </important_notes>
     `,
 
@@ -787,6 +787,7 @@ AGENT WORKFLOW:
 BEST PRACTICES:
 - Always start with 'superglue_find_relevant_integrations' for discovery.
 - Create integrations and store credentials in integrations using 'superglue_create_integration'. Ask users for credentials if needed.
+- If you get authentication errors during build_and_run despite using integrations with saved credentials, the integrations may have placeholder values instead of actual credentials. Check with the user if they provided the correct credentials.
 - Ask user before saving workflows.
 - When saving workflows, NEVER set fields to null - omit optional fields if no value available.
 - Copy actual values from build_and_run results, don't assume fields are empty.
