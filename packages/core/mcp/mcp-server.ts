@@ -7,12 +7,13 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { SuperglueClient, WorkflowResult } from '@superglue/client';
 import { LogEntry } from "@superglue/shared";
+import { flattenAndNamespaceWorkflowCredentials, waitForIntegrationsReady } from "@superglue/shared/utils";
 import { getSDKCode } from '@superglue/shared/templates';
 import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { validateToken } from '../auth/auth.js';
-import { logEmitter, logMessage } from '../utils/logs.js';
+import { logMessage } from '../utils/logs.js';
 
 // Enums
 export const CacheModeEnum = z.enum(["ENABLED", "READONLY", "WRITEONLY", "DISABLED"]);
@@ -126,7 +127,7 @@ export const BuildAndRunWorkflowInputSchema = {
 };
 
 export const ListWorkflowsInputSchema = {
-  limit: z.number().int().optional().default(10).describe("Number of workflows to return (default: 10)"),
+  limit: z.number().int().optional().default(100).describe("Number of workflows to return (default: 100)"),
   offset: z.number().int().optional().default(0).describe("Offset for pagination (default: 0)"),
 };
 
@@ -151,7 +152,7 @@ export const FindRelevantIntegrationsInputSchema = {
 };
 
 export const ListIntegrationsInputSchema = {
-  limit: z.number().int().optional().default(10).describe("Number of integrations to return (default: 10)"),
+  limit: z.number().int().optional().default(100).describe("Number of integrations to return (default: 100)"),
   offset: z.number().int().optional().default(0).describe("Offset for pagination (default: 0)"),
 };
 
@@ -384,33 +385,36 @@ export const toolDefinitions: Record<string, any> = {
     <important_notes>
       - Returns paginated list of workflows with their IDs, names, and descriptions
       - Use the workflow IDs with superglue_execute_workflow to run specific workflows
-      - Default returns 10 workflows, use limit/offset for pagination
+      - Default returns 100 workflows, use limit/offset for pagination
     </important_notes>
     `,
     inputSchema: ListWorkflowsInputSchema,
-    execute: async (args: any & { client: SuperglueClient; }, request) => {
-      const { client, limit = 10, offset = 0 } = args;
+    execute: async (args: any & { client: SuperglueClient; orgId: string; }, request) => {
+      const { client, limit = 100, offset = 0 }: { client: SuperglueClient; limit: number; offset: number; } = args;
       try {
         const result = await client.listWorkflows(limit, offset);
-        const staticWorkflows = Object.keys(toolDefinitions).map(id => ({
-          id,
-          name: id,
-          instruction: toolDefinitions[id].description.split('<use_case>')[1].split('</use_case>')[0].trim(),
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }));
-
-        const allWorkflows = [...staticWorkflows, ...result.items.map(workflow => ({
-          id: workflow.id,
-          name: workflow.name || workflow.id,
-          instruction: workflow.instruction,
-          created_at: workflow.createdAt,
-          updated_at: workflow.updatedAt
-        }))];
+        const integrations = await client.listIntegrations(100, 0);
+        const allWorkflows =
+          [...result.items.map(workflow => {
+            const currentIntegrations = Array.from(new Set(
+              workflow.steps.map(step =>
+                integrations.items.find(integration => integration.id === step.integrationId)
+              )
+            )).filter(Boolean);
+            const credentials = Object.keys(flattenAndNamespaceWorkflowCredentials(currentIntegrations));
+            return {
+              id: workflow.id,
+              instruction: workflow.instruction,
+              created_at: workflow.createdAt,
+              updated_at: workflow.updatedAt,
+              credentials_saved: credentials
+            };
+          }
+          )];
 
         return {
           success: true,
-          workflows: allWorkflows.slice(offset, offset + limit),
+          workflows: allWorkflows,
           total: allWorkflows.length,
           limit,
           offset,
@@ -439,7 +443,7 @@ export const toolDefinitions: Record<string, any> = {
     </important_notes>
     `,
     inputSchema: ExecuteWorkflowInputSchema,
-    execute: async (args, request) => {
+    execute: async (args: any & { client: SuperglueClient; orgId: string; }, request) => {
       const validationErrors = validateWorkflowExecution(args);
       if (validationErrors.length > 0) {
         throw new Error(`Validation failed:\n${validationErrors.join('\n')}`);
@@ -478,7 +482,7 @@ export const toolDefinitions: Record<string, any> = {
     `,
 
     inputSchema: FindRelevantIntegrationsInputSchema,
-    execute: async (args: any & { client: SuperglueClient; }, request) => {
+    execute: async (args: any & { client: SuperglueClient; orgId: string; }, request) => {
       const { client, instruction } = args;
       try {
         const result = await client.findRelevantIntegrations(instruction);
@@ -534,7 +538,7 @@ export const toolDefinitions: Record<string, any> = {
     </important_notes>
     `,
     inputSchema: GenerateCodeInputSchema,
-    execute: async (args: any & { client: SuperglueClient; }, request) => {
+    execute: async (args: any & { client: SuperglueClient; orgId: string; }, request) => {
       const { client, workflowId, language } = args;
 
       try {
@@ -587,15 +591,14 @@ export const toolDefinitions: Record<string, any> = {
     </important_notes>
     `,
     inputSchema: BuildAndRunWorkflowInputSchema,
-    execute: async (args: any & { client: SuperglueClient; }, request) => {
-      const { client, instruction, integrations, payload, credentials, responseSchema } = args;
-
+    execute: async (args: any & { client: SuperglueClient; orgId: string; }, request) => {
+      const { instruction, integrations, payload, credentials, responseSchema, orgId } = args;
+      const client = args.client as SuperglueClient;
       try {
         const validationErrors = validateWorkflowBuilding(args);
         if (validationErrors.length > 0) {
           throw new Error(`Validation failed:\n${validationErrors.join('\n')}`);
         }
-
         logMessage('info', 'Building workflow from instruction...');
 
         const builtWorkflow = await client.buildWorkflow({
@@ -614,17 +617,20 @@ export const toolDefinitions: Record<string, any> = {
 
         if (!result.success) {
           return {
-            ...result,
-            note: "Execution failed. Refine your instruction or integrations and try again."
+            note: "Execution failed. Refine your instruction or integrations and try again.",
+            ...result
           };
         }
 
         // Return successful run result with the workflow ready for saving
         return {
-          ...result,
-          workflow_ready_to_save: result.config,
+          note: "Workflow executed successfully! Use 'superglue_save_workflow' to persist this workflow.",
+          success: result.success,
+          error: result.error,
           integrations_used: integrations,
-          note: "Workflow executed successfully! Use 'superglue_save_workflow' to persist this workflow if desired."
+          config: result.config,
+          id: result.id,
+          data: result.data,
         };
 
       } catch (error: any) {
@@ -652,9 +658,9 @@ export const toolDefinitions: Record<string, any> = {
     </important_notes>
     `,
     inputSchema: SaveWorkflowInputSchema,
-    execute: async (args: any & { client: SuperglueClient; }, request) => {
+    execute: async (args: any & { client: SuperglueClient; orgId: string; }, request) => {
       const { client, id, integrations } = args;
-      let { workflow } = args;
+      let { workflow, orgId } = args;
 
       try {
         // Basic validation first
@@ -670,7 +676,7 @@ export const toolDefinitions: Record<string, any> = {
         const { cleanedWorkflow, errors } = validateWorkflowSaving({ id, workflow });
 
         if (errors.length > 0) {
-          logMessage('warn', `Validation warnings: ${errors.join(', ')}`);
+          logMessage('warn', `Validation warnings: ${errors.join(', ')}`, { orgId: orgId });
         }
 
         if (!cleanedWorkflow || typeof cleanedWorkflow !== 'object') {
@@ -679,19 +685,15 @@ export const toolDefinitions: Record<string, any> = {
 
         workflow = cleanedWorkflow;
 
-        logMessage('info', `Saving workflow ${id}...`);
-        logMessage('debug', `Cleaned workflow: ${JSON.stringify(workflow, null, 2)}`);
-
         const savedWorkflow = await client.upsertWorkflow(id, workflow);
 
         return {
+          note: `Workflow ${savedWorkflow.id} has been saved successfully.`,
           success: true,
           saved_workflow: savedWorkflow,
-          note: `Workflow ${savedWorkflow.id} has been saved successfully.`
         };
 
       } catch (error: any) {
-        logMessage('error', `Workflow save failed: ${error.message}`);
         return {
           success: false,
           error: error.message,
@@ -720,7 +722,7 @@ export const toolDefinitions: Record<string, any> = {
     </important_notes>
     `,
     inputSchema: CreateIntegrationInputSchema,
-    execute: async (args: any & { client: SuperglueClient; }, request) => {
+    execute: async (args: any & { client: SuperglueClient; orgId: string; }, request) => {
       const { client, ...integrationInput } = args;
 
       try {
@@ -731,11 +733,11 @@ export const toolDefinitions: Record<string, any> = {
 
         const result = await client.upsertIntegration(integrationInput.id, integrationInput, 'CREATE');
         return {
-          success: true,
-          integration: result,
           note: result.documentationPending
             ? "Integration created. Documentation is being processed in the background."
-            : "Integration created successfully."
+            : "Integration created successfully.",
+          success: true,
+          integration: result
         };
       } catch (error: any) {
         return {
@@ -796,17 +798,6 @@ BEST PRACTICES:
     }
   };
 
-  // Start listening to log events
-  logEmitter.on('log', logHandler);
-
-  // Clean up log subscription when server closes
-  mcpServer.server.onerror = (error) => {
-    logEmitter.removeListener('log', logHandler);
-  };
-  mcpServer.server.onclose = () => {
-    logEmitter.removeListener('log', logHandler);
-  };
-
   // Register static tools only
   for (const toolName of Object.keys(toolDefinitions)) {
     const tool = toolDefinitions[toolName];
@@ -815,7 +806,7 @@ BEST PRACTICES:
       tool.description,
       tool.inputSchema,
       async (args, extra) => {
-        const result = await tool.execute({ ...args, client }, extra);
+        const result = await tool.execute({ ...args, client, orgId }, extra);
 
         return {
           content: [
@@ -880,16 +871,3 @@ export const mcpHandler = async (req: Request, res: Response) => {
   // Handle the request
   await transport.handleRequest(req, res, req.body);
 };
-
-// Reusable handler for GET and DELETE requests
-export const handleMcpSessionRequest = async (req: Request, res: Response) => {
-  const sessionId = req.headers['mcp-session-id'] as string | undefined;
-  if (!sessionId || !transports[sessionId]) {
-    res.status(400).send('Invalid or missing session ID');
-    return;
-  }
-
-  const transport = transports[sessionId];
-  await transport.handleRequest(req, res);
-};
-
