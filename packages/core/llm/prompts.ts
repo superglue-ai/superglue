@@ -306,12 +306,19 @@ Each step should be a single API call. Adhere to the documentation to understand
 Output the plan as a JSON object adhering to the specified schema.
 
 <STEP_CREATION>
-- Create steps that follow a logical progression to fulfill the user's overall request
+1. [Important] Fetch ALL prerequisites like available projects you can query, available entities / object types you can access, available categories you can filter on, etc. 
+2. Plan the actual steps to fulfill the instruction.
+
+Further:
+- Never make assumptions or guesses about the data you need to fetch. Always fetch all prerequisites first - this is the most common failure mode.
+- Be acutely aware that the user might not be specific about the data they want to fetch. E.g. they might say "get all leads" but they might mean "get all people in my crm that have a certain status".
+- Make sure you really really understand the structure of the available data, and fetch prerequisites first.
 - Each step must correspond to a single API call (no compound operations)
 - Choose the appropriate integration for each step based on the provided documentation
 - Assign descriptive stepIds in camelCase that indicate the purpose of the step
 - Make absolutely sure that each step can be achieved with a single API call (or a loop of the same call)
 - Aggregation, grouping, sorting, filtering is covered by a separate final transformation and does not need to be added as a dedicated step. However, if the API supports e.g. filtering when retrieving, this should be part of the retrieval step, just do not add an extra one.
+- Each generated step instruction should be specific based on your understanding of the API capabilities and contain information about what a successful response looks like / what the response should contain.
 </STEP_CREATION>
 
 <EXECUTION_MODES>
@@ -358,13 +365,13 @@ Credentials available: api_key, api_password
     {
       "stepId": "getShopifyProducts",
       "integrationId": "shopify",
-      "instruction": "Get a list of all products from Shopify store",
+      "instruction": "Get a list of all products from Shopify store. Each product has a name, price, and category.",
       "mode": "DIRECT"
     },
     {
       "stepId": "createInventoryItems",
       "integrationId": "inventory",
-      "instruction": "Create inventory items for each Shopify product",
+      "instruction": "Create inventory items for each Shopify product. Each inventory item has a productId, inventoryId, and status.",
       "mode": "LOOP"
     }
   ],
