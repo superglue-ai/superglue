@@ -13,7 +13,7 @@ import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { validateToken } from '../auth/auth.js';
-import { logMessage } from '../utils/logs.js';
+import { logEmitter, logMessage } from '../utils/logs.js';
 
 // Enums
 export const CacheModeEnum = z.enum(["ENABLED", "READONLY", "WRITEONLY", "DISABLED"]);
@@ -676,7 +676,7 @@ export const toolDefinitions: Record<string, any> = {
         const { cleanedWorkflow, errors } = validateWorkflowSaving({ id, workflow });
 
         if (errors.length > 0) {
-          logMessage('warn', `Validation warnings: ${errors.join(', ')}`, { orgId: orgId });
+          logMessage('warn', `Validation warnings: ${errors.join(', ')}`);
         }
 
         if (!cleanedWorkflow || typeof cleanedWorkflow !== 'object') {
