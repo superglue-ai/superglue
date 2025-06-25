@@ -199,34 +199,8 @@ export const findRelevantIntegrationsResolver = async (
     const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
     const allIntegrations = await context.datastore.listIntegrations(1000, 0, context.orgId);
 
-    if (!allIntegrations || allIntegrations.items?.length === 0) {
-      logMessage('info', `No integrations found for organization.`, metadata);
-      return []; // No integrations exist for this user
-    }
-
-    // Handle empty/undefined instruction - return all available integrations
-    if (!instruction || instruction.trim() === '') {
-      logMessage('info', `No instruction provided, returning all available integrations.`, metadata);
-      return allIntegrations.items.map(int => ({
-        id: int.id,
-        reason: "Available integration (no specific instruction provided)",
-        credentials: int.credentials || {}
-      }));
-    }
-
     const selector = new IntegrationSelector(metadata);
-    let suggestedIntegrations = await selector.select(instruction, allIntegrations.items);
-
-    if (!suggestedIntegrations || suggestedIntegrations.length === 0) {
-      logMessage('info', `Integration selector returned no specific integrations. Returning all available integrations as a fallback.`, metadata);
-      return allIntegrations.items.map(int => ({
-        id: int.id,
-        reason: "No specific match found for your request, but this integration is available for use",
-        credentials: int.credentials || {}
-      }));
-    }
-
-    return suggestedIntegrations;
+    return await selector.select(instruction, allIntegrations.items || []);
   } catch (error) {
     logMessage('error', `Error finding relevant integrations: ${String(error)}`, { orgId: context.orgId });
     return [];
