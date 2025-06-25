@@ -1,9 +1,8 @@
-'use client'
+'use client';
 
 import { useConfig } from '@/src/app/config-context';
 import ApiConfigIdEditModal from '@/src/components/api/ApiConfigIdEditModal';
 import { ApiPlayground } from '@/src/components/api/ApiPlayground';
-import JsonSchemaEditor from "@/src/components/utils/JsonSchemaEditor";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -51,21 +50,22 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/src/components/ui/tooltip";
+import JsonSchemaEditor from "@/src/components/utils/JsonSchemaEditor";
 import { useToast } from "@/src/hooks/use-toast";
 import { isJsonEmpty } from '@/src/lib/client-utils';
 import { ApiConfig, AuthType, CacheMode, HttpMethod, PaginationType, SuperglueClient } from '@superglue/client';
 import { ArrowLeft, Info } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import React from 'react';
-import Editor from 'react-simple-code-editor';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
+import React from 'react';
+import Editor from 'react-simple-code-editor';
 
 const HTTP_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'];
 const AUTH_TYPES = ['NONE', 'HEADER', 'QUERY_PARAM', 'OAUTH2'];
 const PAGINATION_TYPES = ['OFFSET_BASED', 'PAGE_BASED', 'CURSOR_BASED', 'DISABLED'];
 
-const InfoTooltip = ({ text }: { text: string }) => (
+const InfoTooltip = ({ text }: { text: string; }) => (
   <TooltipProvider delayDuration={100}>
     <Tooltip>
       <TooltipTrigger type="button">
@@ -87,11 +87,11 @@ const highlightJson = (code: string) => {
   }
 };
 
-const ApiConfigForm = ({ id }: { id?: string }) => {
+const ApiConfigForm = ({ id }: { id?: string; }) => {
   const router = useRouter();
   const [searchParamsChecked, setSearchParamsChecked] = React.useState(false);
   const { toast } = useToast();
-  
+
   const [formData, setFormData] = React.useState({
     id: '',
     urlHost: '',
@@ -128,7 +128,7 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if(!formData.urlHost || !formData.instruction) {
+    if (!formData.urlHost || !formData.instruction) {
       toast({
         title: "Missing Required Fields",
         description: "Please provide both Host and Instruction before saving",
@@ -166,11 +166,11 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
       return;
     }
 
-    if(!formData.id) {
+    if (!formData.id) {
       formData.id = formData.urlHost
         .replace(/^https?:\/\//, '')  // Remove http:// or https://
         .replace(/\//g, '')           // Remove all slashes
-        + (formData.urlPath ? formData.urlPath.split('/').pop() : '') 
+        + (formData.urlPath ? formData.urlPath.split('/').pop() : '')
         + '-' + Math.floor(1000 + Math.random() * 9000);
     }
 
@@ -185,17 +185,17 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
       const superglueClient = new SuperglueClient({
         endpoint: superglueConfig.superglueEndpoint,
         apiKey: superglueConfig.superglueApiKey
-      })  
+      });
       const response = await superglueClient.upsertApi(formData.id, payload);
-      if(!response) {
+      if (!response) {
         throw new Error("Failed to save configuration");
       }
       setHasUnsavedChanges(false);
       router.push(`/configs/${response.id}/edit`);
-    
+
       // Add refetch after successful save
       await fetchConfig();
-    
+
       toast({
         title: "Configuration Saved",
         description: "Configuration saved successfully",
@@ -218,14 +218,11 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
     const value = typeof e === 'string' ? e : e.target.value;
     setFormData(prev => {
       const newState = { ...prev, [field]: value };
-      if (field === 'instruction' || field === 'responseSchema') {
-        newState.responseMapping = ''; // Reset responseMapping
-      }
       return newState;
     });
     setHasUnsavedChanges(true);
 
-    if(field === 'id') {
+    if (field === 'id') {
       setEditingId(value);
     }
   };
@@ -261,7 +258,7 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
       const superglueClient = new SuperglueClient({
         endpoint: superglueConfig.superglueEndpoint,
         apiKey: superglueConfig.superglueApiKey
-      })
+      });
       const data = await superglueClient.getApi(editingId);
       setFormData({
         id: data.id,
@@ -280,7 +277,7 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
         paginationType: data.pagination?.type || 'auto',
         pageSize: String(data.pagination?.pageSize || "")
       });
-      
+
       setSearchParamsChecked(true);
     } catch (error) {
       console.error('Error fetching config:', error);
@@ -320,10 +317,10 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
       return;
     }
     setIsAutofilling(true);
-    
+
     try {
       let parsedCredentials = {};
-      
+
       try {
         parsedCredentials = JSON.parse(autofillCredentials);
       } catch (e) {
@@ -337,7 +334,7 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
       const superglueClient = new SuperglueClient({
         endpoint: superglueConfig.superglueEndpoint,
         apiKey: superglueConfig.superglueApiKey
-      })  
+      });
 
       const response = await superglueClient.call({
         endpoint: buildEndpointConfig(formData),
@@ -349,7 +346,7 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
       if (response.error) {
         throw new Error(response.error);
       }
-      
+
       // Apply the returned config to the form
       const config = response.config as ApiConfig;
       if (config) {
@@ -371,7 +368,7 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
           pageSize: String(config.pagination?.pageSize || '')
         });
       }
-      
+
       setIsAutofillDialogOpen(false);
     } catch (error: any) {
       console.error('Error during autofill:', error);
@@ -406,7 +403,7 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
       const superglueClient = new SuperglueClient({
         endpoint: superglueConfig.superglueEndpoint,
         apiKey: superglueConfig.superglueApiKey
-      })  
+      });
       await superglueClient.upsertApi(formData.id, payload);
       setHasUnsavedChanges(false);
       setShowUnsavedChangesDialog(false);
@@ -761,8 +758,8 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
                         Please save your changes before running the configuration.
                       </div>
                     ) : (
-                      <ApiPlayground 
-                        configId={editingId} 
+                      <ApiPlayground
+                        configId={editingId}
                         onRunApi={handleApiRun} // <-- Pass the handler here
                       />
                     )}
@@ -882,8 +879,8 @@ const ApiConfigForm = ({ id }: { id?: string }) => {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog 
-        open={showUnsavedChangesDialog} 
+      <AlertDialog
+        open={showUnsavedChangesDialog}
         onOpenChange={setShowUnsavedChangesDialog}
       >
         <AlertDialogContent>
