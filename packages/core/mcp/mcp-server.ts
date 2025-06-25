@@ -735,7 +735,7 @@ export const toolDefinitions: Record<string, any> = {
     `,
     inputSchema: CreateIntegrationInputSchema,
     execute: async (args: any & { client: SuperglueClient; orgId: string; }, request) => {
-      const { client, ...integrationInput } = args;
+      const { client, orgId, ...integrationInput } = args;
 
       try {
         const validationErrors = validateIntegrationCreation(integrationInput);
