@@ -105,12 +105,12 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   }), [superglueConfig.superglueEndpoint, superglueConfig.superglueApiKey]);
 
   const { waitForIntegrationReady } = useMemo(() => ({
-    waitForIntegrationReady: (integrationIds: string[], timeoutMs: number = 60000) => {
+    waitForIntegrationReady: (integrationIds: string[]) => {
       // Create adapter for SuperglueClient to work with shared utility
       const clientAdapter = {
         getIntegration: (id: string) => client.getIntegration(id)
       };
-      return waitForIntegrationProcessing(clientAdapter, integrationIds, timeoutMs);
+      return waitForIntegrationProcessing(clientAdapter, integrationIds);
     }
   }), [client]);
 
@@ -212,7 +212,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       await client.upsertIntegration(integrationId, upsertData, UpsertMode.UPDATE);
 
       // Use proper polling to wait for docs to be ready
-      const results = await waitForIntegrationReady([integrationId], 60000);
+      const results = await waitForIntegrationReady([integrationId]);
 
       if (results.length > 0 && results[0]?.documentation) {
         // Success - docs are ready
@@ -268,7 +268,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         setPendingDocIds(prev => new Set([...prev, savedIntegration.id]));
 
         // Wait for docs to be ready in background - no toast needed since UI shows spinner
-        waitForIntegrationReady([savedIntegration.id], 60000).then(() => {
+        waitForIntegrationReady([savedIntegration.id]).then(() => {
           // Remove from pending when done
           setPendingDocIds(prev => new Set([...prev].filter(id => id !== savedIntegration.id)));
         }).catch((error) => {
@@ -363,7 +363,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         }
 
         // Wait for docs to be ready
-        await waitForIntegrationReady(selectedIntegrationIds, 60000);
+        await waitForIntegrationReady(selectedIntegrationIds);
         const freshIntegrations = integrations; // Use the updated integrations from context
         const schema = await client.generateSchema(instruction, "");
         setSchema(JSON.stringify(schema, null, 2));
@@ -371,7 +371,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         const response = await client.buildWorkflow({
           instruction: instruction,
           payload: parsedPayload,
-          integrations: selectedIntegrationIds,
+          integrationIds: selectedIntegrationIds,
           responseSchema: schema,
           save: false
         });

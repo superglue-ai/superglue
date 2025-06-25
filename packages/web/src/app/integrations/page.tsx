@@ -37,12 +37,12 @@ export default function IntegrationsPage() {
     }), [config.superglueEndpoint, config.superglueApiKey]);
 
     const { waitForIntegrationReady } = useMemo(() => ({
-        waitForIntegrationReady: (integrationIds: string[], timeoutMs: number = 60000) => {
+        waitForIntegrationReady: (integrationIds: string[]) => {
             // Create adapter for SuperglueClient to work with shared utility
             const clientAdapter = {
                 getIntegration: (id: string) => client.getIntegration(id)
             };
-            return waitForIntegrationProcessing(clientAdapter, integrationIds, timeoutMs);
+            return waitForIntegrationProcessing(clientAdapter, integrationIds);
         }
     }), [client]);
 
@@ -124,7 +124,7 @@ export default function IntegrationsPage() {
                     setPendingDocIds(prev => new Set([...prev, savedIntegration.id]));
 
                     // Fire-and-forget poller for background doc fetch
-                    waitForIntegrationReady([savedIntegration.id], 60000).then(() => {
+                    waitForIntegrationReady([savedIntegration.id]).then(() => {
                         // Remove from pending when done
                         setPendingDocIds(prev => new Set([...prev].filter(id => id !== savedIntegration.id)));
                     }).catch((error) => {
@@ -172,7 +172,7 @@ export default function IntegrationsPage() {
             await client.upsertIntegration(integrationId, upsertData, UpsertMode.UPDATE);
 
             // Use proper polling to wait for docs to be ready
-            const results = await waitForIntegrationReady([integrationId], 60000);
+            const results = await waitForIntegrationReady([integrationId]);
 
             if (results.length > 0 && results[0]?.documentation) {
                 // Success - docs are ready
