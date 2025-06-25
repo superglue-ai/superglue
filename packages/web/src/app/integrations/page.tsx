@@ -14,13 +14,13 @@ import {
 } from "@/src/components/ui/alert-dialog";
 import { Button } from '@/src/components/ui/button';
 import { DocStatus } from '@/src/components/utils/DocStatusSpinner';
-import { useIntegrationPolling } from '@/src/hooks/use-integration-polling';
 import { useToast } from '@/src/hooks/use-toast';
 import { needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
 import { integrations as integrationTemplates } from '@/src/lib/integrations';
 import { composeUrl } from '@/src/lib/utils';
 import type { Integration } from '@superglue/client';
 import { SuperglueClient, UpsertMode } from '@superglue/client';
+import { waitForIntegrationProcessing } from '@superglue/shared/utils';
 import { FileDown, Globe, Pencil, Plus, RotateCw, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { SimpleIcon } from 'simple-icons';
@@ -36,7 +36,10 @@ export default function IntegrationsPage() {
         apiKey: config.superglueApiKey,
     }), [config.superglueEndpoint, config.superglueApiKey]);
 
-    const { waitForIntegrationReady } = useIntegrationPolling(client);
+    const { waitForIntegrationReady } = useMemo(() => ({
+        waitForIntegrationReady: (integrationIds: string[], timeoutMs: number = 60000) =>
+            waitForIntegrationProcessing(client, integrationIds, timeoutMs)
+    }), [client]);
 
     const [editingIntegration, setEditingIntegration] = useState<Integration | null>(null);
 
