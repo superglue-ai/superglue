@@ -106,7 +106,7 @@ describe('superglue_build_and_run', () => {
     expect(result.success).toBe(true);
     expect(client.buildWorkflow).toHaveBeenCalledWith({
       instruction: args.instruction,
-      integrations: [{ id: 'integration-1' }, { id: 'integration-2' }],
+      integrations: ['integration-1', 'integration-2'],
       payload: args.payload,
       responseSchema: undefined,
       save: false

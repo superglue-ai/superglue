@@ -26,7 +26,7 @@ interface ExecuteWorkflowArgs {
 interface BuildWorkflowArgs {
   instruction: string;
   payload?: Record<string, unknown>;
-  integrations: ({ integration: Integration; id?: never } | { integration?: never; id: string })[];
+  integrations: string[];
   responseSchema?: JSONSchema;
 }
 
@@ -232,28 +232,16 @@ export const buildWorkflowResolver = async (
 ): Promise<Workflow> => {
   try {
     const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
-    const { instruction, payload = {}, integrations, responseSchema } = args;
+    const { instruction, payload = {}, integrations: integrationIds, responseSchema } = args;
 
     if (!instruction || instruction.trim() === "") {
       throw new Error("Instruction is required to build a workflow.");
     }
-    if (!integrations || integrations.length === 0) {
+    if (!integrationIds || integrationIds.length === 0) {
       throw new Error("At least one integration is required.");
     }
 
-    // Extract integration IDs directly from input
-    const integrationIds = integrations.map((item, index) => {
-      if ("id" in item && item.id) {
-        return item.id;
-      } else if ("integration" in item && item.integration) {
-        return item.integration.id;
-      } else {
-        throw new Error(`Invalid integration input at index ${index}: must provide either id or integration`);
-      }
-    });
-
-    // Wait for any pending documentation to be processed
-    // Create adapter for datastore to work with shared utility
+    // Wait for documentation processing for all integration IDs
     const datastoreAdapter = {
       getIntegration: async (id: string): Promise<Integration | null> => {
         const integration = await context.datastore.getIntegration(id, context.orgId);
@@ -261,9 +249,9 @@ export const buildWorkflowResolver = async (
       }
     };
 
-    const readyIntegrations = await waitForIntegrationProcessing(datastoreAdapter, integrationIds, 60000);
+    const resolvedIntegrations = await waitForIntegrationProcessing(datastoreAdapter, integrationIds, 60000);
 
-    if (readyIntegrations.length === 0) {
+    if (resolvedIntegrations.length === 0) {
       const integrationNames = integrationIds.join(', ');
       logMessage(
         'warn',
@@ -276,13 +264,13 @@ export const buildWorkflowResolver = async (
     }
 
     // Validate that we got all requested integrations
-    if (readyIntegrations.length !== integrationIds.length) {
-      const foundIds = readyIntegrations.map(i => i.id);
+    if (resolvedIntegrations.length !== integrationIds.length) {
+      const foundIds = resolvedIntegrations.map(i => i.id);
       const missingIds = integrationIds.filter(id => !foundIds.includes(id));
       throw new Error(`Integration(s) not found: ${missingIds.join(', ')}`);
     }
 
-    const builder = new WorkflowBuilder(instruction, readyIntegrations, payload, responseSchema, metadata);
+    const builder = new WorkflowBuilder(instruction, resolvedIntegrations, payload, responseSchema, metadata);
     const workflow = await builder.build();
 
     // prevent collisions with existing workflows
