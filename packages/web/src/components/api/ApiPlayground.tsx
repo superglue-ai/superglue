@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 import { useConfig } from "@/src/app/config-context";
 import { Badge } from "@/src/components/ui/badge";
@@ -12,7 +12,7 @@ import { useParams } from "next/navigation";
 import React, { useCallback, useEffect, useState } from "react";
 
 // Add this new type and state
-type Credential = { id: string; key: string; value: string; isManual?: boolean };
+type Credential = { id: string; key: string; value: string; isManual?: boolean; };
 
 // Define the props for the component including the new callback
 type ApiPlaygroundProps = {
@@ -111,7 +111,7 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
         const superglueClient = new SuperglueClient({
           endpoint: superglueConfig.superglueEndpoint,
           apiKey: superglueConfig.superglueApiKey
-        })
+        });
         const data = await superglueClient.getApi(id);
         setConfig(data);
 
@@ -189,14 +189,14 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
       const superglue = new SuperglueClient({
         apiKey: superglueConfig.superglueApiKey,
         endpoint: superglueConfig.superglueEndpoint
-      })
+      });
       const response = await superglue.call({
         id: config.id,
         credentials: credentialsObj,
         options: {
-          cacheMode: CacheMode.ENABLED
+          cacheMode: CacheMode.READONLY
         }
-      })
+      });
       // Call the callback if it exists
       if (onRunApi) {
         onRunApi(response.config as ApiConfig);
