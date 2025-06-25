@@ -289,7 +289,7 @@ type Log {
 type SuggestedIntegration {
   id: String!
   reason: String!
-  credentials: JSON
+  savedCredentials: [String!]!
 }
 
 type Query {
