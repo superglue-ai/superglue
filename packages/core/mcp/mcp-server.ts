@@ -600,20 +600,6 @@ export const toolDefinitions: Record<string, any> = {
           throw new Error(`Validation failed:\n${validationErrors.join('\n')}`);
         }
 
-        const integrationsResult = await waitForIntegrationsReady(client, integrations, 60000);
-
-        if (Array.isArray(integrationsResult)) {
-        } else {
-          // Timeout - some integrations still pending
-          const pendingList = integrationsResult.pendingIntegrations.join(', ');
-          return {
-            success: false,
-            error: `Documentation processing timeout. Integration(s) still pending: ${pendingList}`,
-            suggestion: `Documentation processing is taking longer than expected. Try again in a few minutes, or check if the integrations have valid documentation URLs.`,
-            pending_integrations: integrationsResult.pendingIntegrations
-          };
-        }
-
         const builtWorkflow = await client.buildWorkflow({
           instruction,
           integrations: integrations.map(id => ({ id })),

@@ -9,11 +9,11 @@ import { CredentialsManager } from '@/src/components/utils/CredentialManager';
 import { DocumentationField } from '@/src/components/utils/DocumentationField';
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import { URLField } from '@/src/components/utils/URLField';
-import { useIntegrationPolling } from '@/src/hooks/use-integration-polling';
 import { useToast } from '@/src/hooks/use-toast';
 import { cn, composeUrl } from '@/src/lib/utils';
 import type { Integration } from '@superglue/client';
 import { SuperglueClient } from '@superglue/client';
+import { waitForIntegrationProcessing } from '@superglue/shared/utils';
 import { Check, ChevronsUpDown, Globe } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 
@@ -75,7 +75,10 @@ export function IntegrationForm({
         apiKey: config.superglueApiKey,
     }), [config.superglueEndpoint, config.superglueApiKey]);
 
-    const { waitForIntegrationReady } = useIntegrationPolling(client);
+    const { waitForIntegrationReady } = useMemo(() => ({
+        waitForIntegrationReady: (integrationIds: string[], timeoutMs: number = 60000) =>
+            waitForIntegrationProcessing(client, integrationIds, timeoutMs)
+    }), [client]);
 
     // Function to immediately save integration when file is uploaded
     const handleFileUpload = async (extractedText: string) => {
