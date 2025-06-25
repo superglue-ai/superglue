@@ -241,58 +241,50 @@ export const buildWorkflowResolver = async (
       throw new Error("At least one integration is required.");
     }
 
-    // Resolve integrations: fetch by id or use provided object
-    const resolvedIntegrations: Integration[] = await Promise.all(
-      integrations.map(async (item, index) => {
-        if ("id" in item && item.id) {
-          const integration = await context.datastore.getIntegration(item.id, context.orgId);
-          if (!integration) {
-            throw new Error(`Integration with id "${item.id}" not found (index ${index})`);
-          }
-          return integration;
-        } else if ("integration" in item && item.integration) {
-          return item.integration;
-        } else {
-          throw new Error(`Invalid integration input at index ${index}: must provide either id or integration`);
-        }
-      })
-    );
+    // Extract integration IDs directly from input
+    const integrationIds = integrations.map((item, index) => {
+      if ("id" in item && item.id) {
+        return item.id;
+      } else if ("integration" in item && item.integration) {
+        return item.integration.id;
+      } else {
+        throw new Error(`Invalid integration input at index ${index}: must provide either id or integration`);
+      }
+    });
 
     // Wait for any pending documentation to be processed
-    const integrationIds = resolvedIntegrations.map(i => i.id);
-    const datastoreClient = {
-      getIntegration: async (id: string): Promise<Integration> => {
+    // Create adapter for datastore to work with shared utility
+    const datastoreAdapter = {
+      getIntegration: async (id: string): Promise<Integration | null> => {
         const integration = await context.datastore.getIntegration(id, context.orgId);
-        if (!integration) {
-          throw new Error(`Integration with id "${id}" not found during polling`);
-        }
         return integration;
       }
     };
 
-    const result = await waitForIntegrationProcessing(datastoreClient, integrationIds, 60000); // 60 second timeout
+    const readyIntegrations = await waitForIntegrationProcessing(datastoreAdapter, integrationIds, 60000);
 
-    if (result.length === 0) {
-      const pendingIntegrationNames = integrationIds.map(id =>
-        resolvedIntegrations.find(i => i.id === id)?.name || id
-      ).join(', ');
-
+    if (readyIntegrations.length === 0) {
+      const integrationNames = integrationIds.join(', ');
       logMessage(
         'warn',
-        `Workflow build timed out waiting for documentation processing on integrations: ${pendingIntegrationNames}`,
+        `Workflow build timed out waiting for documentation processing on integrations: ${integrationNames}`,
         metadata
       );
       throw new Error(
-        `Workflow build timed out after 60 seconds waiting for documentation processing to complete for: ${pendingIntegrationNames}. Please try again in a few minutes.`
+        `Workflow build timed out after 60 seconds waiting for documentation processing to complete for: ${integrationNames}. Please try again in a few minutes.`
       );
     }
 
-    // Update resolvedIntegrations with the latest data (documentation should now be ready)
-    const updatedIntegrations = result;
-    resolvedIntegrations.splice(0, resolvedIntegrations.length, ...updatedIntegrations);
+    // Validate that we got all requested integrations
+    if (readyIntegrations.length !== integrationIds.length) {
+      const foundIds = readyIntegrations.map(i => i.id);
+      const missingIds = integrationIds.filter(id => !foundIds.includes(id));
+      throw new Error(`Integration(s) not found: ${missingIds.join(', ')}`);
+    }
 
-    const builder = new WorkflowBuilder(instruction, resolvedIntegrations, payload, responseSchema, metadata);
+    const builder = new WorkflowBuilder(instruction, readyIntegrations, payload, responseSchema, metadata);
     const workflow = await builder.build();
+
     // prevent collisions with existing workflows
     workflow.id = await generateUniqueId({
       baseId: workflow.id,
@@ -302,7 +294,6 @@ export const buildWorkflowResolver = async (
     return workflow;
   } catch (error) {
     logMessage('error', "Workflow building error: " + String(error), { orgId: context.orgId });
-    // Rethrow or return a structured error for GraphQL
     throw new Error(`Failed to build workflow: ${error}`);
   }
 };

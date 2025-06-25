@@ -37,8 +37,13 @@ export default function IntegrationsPage() {
     }), [config.superglueEndpoint, config.superglueApiKey]);
 
     const { waitForIntegrationReady } = useMemo(() => ({
-        waitForIntegrationReady: (integrationIds: string[], timeoutMs: number = 60000) =>
-            waitForIntegrationProcessing(client, integrationIds, timeoutMs)
+        waitForIntegrationReady: (integrationIds: string[], timeoutMs: number = 60000) => {
+            // Create adapter for SuperglueClient to work with shared utility
+            const clientAdapter = {
+                getIntegration: (id: string) => client.getIntegration(id)
+            };
+            return waitForIntegrationProcessing(clientAdapter, integrationIds, timeoutMs);
+        }
     }), [client]);
 
     const [editingIntegration, setEditingIntegration] = useState<Integration | null>(null);

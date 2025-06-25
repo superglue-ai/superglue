@@ -8,7 +8,7 @@ import {
 import { SuperglueClient, WorkflowResult } from '@superglue/client';
 import { LogEntry } from "@superglue/shared";
 import { getSDKCode } from '@superglue/shared/templates';
-import { flattenAndNamespaceWorkflowCredentials, waitForIntegrationsReady } from "@superglue/shared/utils";
+import { flattenAndNamespaceWorkflowCredentials } from "@superglue/shared/utils";
 import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import { z } from 'zod';
