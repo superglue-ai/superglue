@@ -602,7 +602,7 @@ export const toolDefinitions: Record<string, any> = {
 
         const builtWorkflow = await client.buildWorkflow({
           instruction,
-          integrations: integrations.map(id => ({ id })),
+          integrations,
           payload,
           responseSchema,
           save: false

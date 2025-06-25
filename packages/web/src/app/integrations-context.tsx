@@ -1,4 +1,3 @@
-"use client"
 import { Integration, SuperglueClient } from '@superglue/client'
 import { createContext, ReactNode, useContext, useEffect, useState } from 'react'
 import { useConfig } from './config-context'

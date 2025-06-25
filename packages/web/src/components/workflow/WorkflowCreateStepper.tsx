@@ -368,14 +368,10 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         const schema = await client.generateSchema(instruction, "");
         setSchema(JSON.stringify(schema, null, 2));
         const parsedPayload = JSON.parse(payload || '{}');
-        const integrationInputRequests = selectedIntegrationIds
-          .map(id => freshIntegrations.find(i => i.id === id))
-          .filter(Boolean)
-          .map(i => ({ integration: toIntegrationInput(i) }));
         const response = await client.buildWorkflow({
           instruction: instruction,
           payload: parsedPayload,
-          integrations: integrationInputRequests,
+          integrations: selectedIntegrationIds,
           responseSchema: schema,
           save: false
         });
@@ -562,7 +558,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     credentials: i.credentials,
   });
 
-  // Modify handleGenerateInstructions
   const handleGenerateInstructions = async () => {
     if (selectedIntegrationIds.length === 0) {
       toast({

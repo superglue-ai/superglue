@@ -262,11 +262,6 @@ input WorkflowInputRequest @oneOf {
   id: ID
 }
 
-input IntegrationInputRequest @oneOf {
-  integration: IntegrationInput
-  id: ID
-}
-
 input IntegrationInput {
   id: ID!
   name: String
@@ -421,7 +416,7 @@ type Mutation {
   buildWorkflow(
     instruction: String!
     payload: JSON
-    integrations: [IntegrationInputRequest!]!
+    integrations: [ID!]!
     responseSchema: JSONSchema
   ): Workflow!
 
