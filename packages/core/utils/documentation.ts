@@ -8,6 +8,7 @@ import { LanguageModel } from "../llm/llm.js";
 import { logMessage } from "./logs.js";
 import { callPostgres } from './postgres.js';
 import { composeUrl } from "./tools.js";
+import { convertHTMLToMarkdown } from "./go-html-to-markdown.js";
 
 const DOC_AXIOS_TIMEOUT_MS = 30000;
 const DOC_PLAYWRIGHT_TIMEOUT_MS = 15000;
@@ -608,11 +609,23 @@ class HtmlMarkdownStrategy implements ProcessingStrategy {
     }
 
     try {
-      const markdown = NodeHtmlMarkdown.translate(content);
-      logMessage('info', "Successfully converted HTML to Markdown.", metadata);
+      // First try Go converter
+      const markdown = await convertHTMLToMarkdown(content);
+      logMessage('info', `✅ Go converter success - generated ${markdown.length} characters`, metadata);
       return markdown;
-    } catch (translateError) {
-      return null; // Failed translation, let RawPageContentStrategy handle it
+    } catch (goError) {
+      logMessage('warn', `❌ Go converter failed: ${goError?.message}`, metadata);
+      logMessage('info', `🔄 Falling back to NodeHtmlMarkdown converter`, metadata);
+      
+      try {
+        // Fallback to NodeHtmlMarkdown
+        const markdown = NodeHtmlMarkdown.translate(content);
+        logMessage('info', `✅ NodeHtmlMarkdown fallback success - generated ${markdown.length} characters`, metadata);
+        return markdown;
+      } catch (translateError) {
+        logMessage('error', `❌ Both converters failed - Go: ${goError?.message} | NodeHtml: ${translateError?.message}`, metadata);
+        return null; // Failed translation, let RawPageContentStrategy handle it
+      }
     }
   }
 }
