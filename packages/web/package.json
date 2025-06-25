@@ -3,7 +3,7 @@
     "version": "0.1.0",
     "private": true,
     "scripts": {
-        "dev": "next dev --port 3001",
+        "dev": "next dev --turbopack --port 3001",
         "build": "next build",
         "start": "next start -p $WEB_PORT",
         "lint": "next lint"
