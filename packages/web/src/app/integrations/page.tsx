@@ -14,13 +14,13 @@ import {
 } from "@/src/components/ui/alert-dialog";
 import { Button } from '@/src/components/ui/button';
 import { DocStatus } from '@/src/components/utils/DocStatusSpinner';
-import { useIntegrationPolling } from '@/src/hooks/use-integration-polling';
 import { useToast } from '@/src/hooks/use-toast';
 import { needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
 import { integrations as integrationTemplates } from '@/src/lib/integrations';
 import { composeUrl } from '@/src/lib/utils';
 import type { Integration } from '@superglue/client';
 import { SuperglueClient, UpsertMode } from '@superglue/client';
+import { waitForIntegrationProcessing } from '@superglue/shared/utils';
 import { FileDown, Globe, Pencil, Plus, RotateCw, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { SimpleIcon } from 'simple-icons';
@@ -36,7 +36,15 @@ export default function IntegrationsPage() {
         apiKey: config.superglueApiKey,
     }), [config.superglueEndpoint, config.superglueApiKey]);
 
-    const { waitForIntegrationReady } = useIntegrationPolling(client);
+    const { waitForIntegrationReady } = useMemo(() => ({
+        waitForIntegrationReady: (integrationIds: string[]) => {
+            // Create adapter for SuperglueClient to work with shared utility
+            const clientAdapter = {
+                getIntegration: (id: string) => client.getIntegration(id)
+            };
+            return waitForIntegrationProcessing(clientAdapter, integrationIds);
+        }
+    }), [client]);
 
     const [editingIntegration, setEditingIntegration] = useState<Integration | null>(null);
 
@@ -116,7 +124,7 @@ export default function IntegrationsPage() {
                     setPendingDocIds(prev => new Set([...prev, savedIntegration.id]));
 
                     // Fire-and-forget poller for background doc fetch
-                    waitForIntegrationReady([savedIntegration.id], 60000).then(() => {
+                    waitForIntegrationReady([savedIntegration.id]).then(() => {
                         // Remove from pending when done
                         setPendingDocIds(prev => new Set([...prev].filter(id => id !== savedIntegration.id)));
                     }).catch((error) => {
@@ -164,7 +172,7 @@ export default function IntegrationsPage() {
             await client.upsertIntegration(integrationId, upsertData, UpsertMode.UPDATE);
 
             // Use proper polling to wait for docs to be ready
-            const results = await waitForIntegrationReady([integrationId], 60000);
+            const results = await waitForIntegrationReady([integrationId]);
 
             if (results.length > 0 && results[0]?.documentation) {
                 // Success - docs are ready

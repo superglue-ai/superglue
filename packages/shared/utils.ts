@@ -43,32 +43,51 @@ export async function generateUniqueId({
     }
 }
 
-// Generic integration polling utility
-// Works with any client that has a getIntegration method
-export async function waitForIntegrationsReady<T extends { getIntegration: (id: string) => Promise<Integration>; }>(
-    client: T,
+// Generic interface for anything that can fetch integrations
+interface IntegrationGetter {
+    getIntegration(id: string): Promise<Integration | null>;
+}
+
+// Generic integration polling utility that works with any integration getter
+// Assumes all integrationIds are valid and exist
+export async function waitForIntegrationProcessing(
+    integrationGetter: IntegrationGetter,
     integrationIds: string[],
-    timeoutMs: number = 60000
-): Promise<Integration[] | { timeout: true; pendingIntegrations: string[]; }> {
+    timeoutMs: number = 90000
+): Promise<Integration[]> {
     const start = Date.now();
-    let activeIds = [...integrationIds];
-    let integrations: Integration[] = [];
-    let pendingIntegrations: string[] = [];
-    while (Date.now() - start < timeoutMs && activeIds.length > 0) {
-        integrations = [];
-        pendingIntegrations = [];
-        for (const id of activeIds) {
-            const integration = await client.getIntegration(id);
-            if (integration.documentationPending === true) {
-                pendingIntegrations.push(id);
-            }
-            integrations.push(integration);
-        }
-        if (pendingIntegrations.length === 0) {
+
+    while (Date.now() - start < timeoutMs) {
+        // Fetch all integrations
+        const settled = await Promise.allSettled(
+            integrationIds.map(async (id) => {
+                try {
+                    return await integrationGetter.getIntegration(id);
+                } catch (error) {
+                    console.warn(`Failed to fetch integration ${id}:`, error);
+                    return null;
+                }
+            })
+        );
+
+        const integrations = settled.map(result =>
+            result.status === 'fulfilled' ? result.value : null
+        ).filter(Boolean) as Integration[];
+
+        // Check if any integration is still pending documentation
+        const hasPendingDocs = integrations.some(integration => integration.documentationPending === true);
+
+        if (!hasPendingDocs) {
             return integrations;
         }
-        // Simple 4-second wait (matching existing pattern)
-        await new Promise(res => setTimeout(res, 4000));
+
+        // Wait before checking again
+        await new Promise(resolve => setTimeout(resolve, 4000));
     }
-    return { timeout: true, pendingIntegrations };
-} 
+
+    // Timeout occurred - just use the integration IDs since we know they exist
+    throw new Error(
+        `Workflow build timed out after ${timeoutMs / 1000} seconds waiting for documentation processing to complete for: ${integrationIds.join(', ')}. Please try again in a few minutes.`
+    );
+}
+
