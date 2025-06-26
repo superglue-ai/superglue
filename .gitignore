@@ -13,3 +13,4 @@ diff.sh
 packages/web/public/test/*
 packages/core/.superglue/superglue_logs.json
 packages/core/.superglue/superglue_logs.jsonl
+integration-test-results**

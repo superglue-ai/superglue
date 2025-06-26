@@ -241,7 +241,7 @@ export async function generateApiConfig(
     pagination: z.object({
       type: z.enum(Object.values(PaginationType) as [string, ...string[]]),
       pageSize: z.string().describe("Number of items per page. Set this to a number. Once you set it here as a number, you can access it using <<limit>> in headers, params, body, or url path."),
-      cursorPath: z.string().optional().describe("If cursor_based: The path to the cursor in the response. E.g. cursor.current or next_cursor")
+      cursorPath: z.string().describe("If cursor_based: The path to the cursor in the response. E.g. cursor.current or next_cursor")
     }).optional()
   }));
   const availableVariables = [

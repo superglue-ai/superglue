@@ -1,7 +1,11 @@
 {
     "integrations": {
         "enabled": [
-            "hubspot-crm"
+            "hubspot-crm",
+            "timbuk2-shopify",
+            "postgres-lego",
+            "stripe-pay",
+            "supabase-db"
         ],
         "available": [
             "hubspot-crm",
@@ -18,7 +22,11 @@
     },
     "workflows": {
         "enabled": [
-            "hubspot-lead-qualification"
+            "hubspot-lead-qualification",
+            "lego-inventory-analysis",
+            "timbuk2-product-analysis",
+            "stripe-revenue-analytics",
+            "supabase-db-to-stripe-user-sync"
         ],
         "available": [
             "hubspot-lead-qualification",
@@ -35,8 +43,8 @@
         ]
     },
     "testSuite": {
-        "name": "Incremental Integration Test",
+        "name": "Integration Test",
         "runCleanupTest": true,
-        "waitForDocumentation": false
+        "waitForDocumentation": true
     }
 }
