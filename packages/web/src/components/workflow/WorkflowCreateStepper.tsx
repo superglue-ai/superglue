@@ -1,13 +1,12 @@
 import { useConfig } from '@/src/app/config-context';
 import { useIntegrations } from '@/src/app/integrations-context';
 import { IntegrationForm } from '@/src/components/integrations/IntegrationForm';
-import { useIntegrationPolling } from '@/src/hooks/use-integration-polling';
 import { useToast } from '@/src/hooks/use-toast';
 import { inputErrorStyles, needsUIToTriggerDocFetch, parseCredentialsHelper } from '@/src/lib/client-utils';
 import { findMatchingIntegration, integrations as integrationTemplates } from '@/src/lib/integrations';
 import { cn, composeUrl } from '@/src/lib/utils';
 import { Integration, IntegrationInput, SuperglueClient, UpsertMode, Workflow, WorkflowResult } from '@superglue/client';
-import { flattenAndNamespaceWorkflowCredentials } from '@superglue/shared/utils';
+import { flattenAndNamespaceWorkflowCredentials, waitForIntegrationProcessing } from '@superglue/shared/utils';
 import { ArrowRight, Check, ChevronRight, FileText, Globe, Loader2, Pencil, Play, Plus, Workflow as WorkflowIcon, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Prism from 'prismjs';
@@ -105,7 +104,15 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     apiKey: superglueConfig.superglueApiKey,
   }), [superglueConfig.superglueEndpoint, superglueConfig.superglueApiKey]);
 
-  const { waitForIntegrationReady } = useIntegrationPolling(client);
+  const { waitForIntegrationReady } = useMemo(() => ({
+    waitForIntegrationReady: (integrationIds: string[]) => {
+      // Create adapter for SuperglueClient to work with shared utility
+      const clientAdapter = {
+        getIntegration: (id: string) => client.getIntegration(id)
+      };
+      return waitForIntegrationProcessing(clientAdapter, integrationIds);
+    }
+  }), [client]);
 
   // Track previous pending IDs to detect completion
   const previousPendingIdsRef = useRef<Set<string>>(new Set());
@@ -205,7 +212,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       await client.upsertIntegration(integrationId, upsertData, UpsertMode.UPDATE);
 
       // Use proper polling to wait for docs to be ready
-      const results = await waitForIntegrationReady([integrationId], 60000);
+      const results = await waitForIntegrationReady([integrationId]);
 
       if (results.length > 0 && results[0]?.documentation) {
         // Success - docs are ready
@@ -261,7 +268,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         setPendingDocIds(prev => new Set([...prev, savedIntegration.id]));
 
         // Wait for docs to be ready in background - no toast needed since UI shows spinner
-        waitForIntegrationReady([savedIntegration.id], 60000).then(() => {
+        waitForIntegrationReady([savedIntegration.id]).then(() => {
           // Remove from pending when done
           setPendingDocIds(prev => new Set([...prev].filter(id => id !== savedIntegration.id)));
         }).catch((error) => {
@@ -308,16 +315,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         return;
       }
 
-      // Check if any selected integrations are still pending
-      const pendingSelectedIds = selectedIntegrationIds.filter(id => pendingDocIds.has(id));
-      if (pendingSelectedIds.length > 0) {
-        toast({
-          title: 'Documentation Still Processing',
-          description: `Please wait for documentation to finish processing for: ${pendingSelectedIds.join(', ')}`,
-          variant: 'destructive',
-        });
-        return;
-      }
+
 
       setIsGeneratingSuggestions(true);
       try {
@@ -344,31 +342,14 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       }
       setIsBuilding(true);
       try {
-        // Check if any selected integrations are still pending locally
-        const pendingSelectedIds = selectedIntegrationIds.filter(id => pendingDocIds.has(id));
-        if (pendingSelectedIds.length > 0) {
-          toast({
-            title: 'Documentation Still Processing',
-            description: `Please wait for documentation to finish processing for: ${pendingSelectedIds.join(', ')}`,
-            variant: 'destructive',
-          });
-          return;
-        }
-
-        // Wait for docs to be ready
-        await waitForIntegrationReady(selectedIntegrationIds, 60000);
         const freshIntegrations = integrations; // Use the updated integrations from context
         const schema = await client.generateSchema(instruction, "");
         setSchema(JSON.stringify(schema, null, 2));
         const parsedPayload = JSON.parse(payload || '{}');
-        const integrationInputRequests = selectedIntegrationIds
-          .map(id => freshIntegrations.find(i => i.id === id))
-          .filter(Boolean)
-          .map(i => ({ integration: toIntegrationInput(i) }));
         const response = await client.buildWorkflow({
           instruction: instruction,
           payload: parsedPayload,
-          integrations: integrationInputRequests,
+          integrationIds: selectedIntegrationIds,
           responseSchema: schema,
           save: false
         });
@@ -555,7 +536,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     credentials: i.credentials,
   });
 
-  // Modify handleGenerateInstructions
   const handleGenerateInstructions = async () => {
     if (selectedIntegrationIds.length === 0) {
       toast({
@@ -1162,8 +1142,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
               isBuilding ||
               isSaving ||
               isGeneratingSuggestions ||
-              (step === 'integrations' && selectedIntegrationIds.length === 0) ||
-              (step === 'integrations' && selectedIntegrationIds.some(id => pendingDocIds.has(id)))
+              (step === 'integrations' && selectedIntegrationIds.length === 0)
             }
           >
             {isBuilding ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Building...</> :

@@ -1,6 +1,6 @@
 import { Integration, RequestOptions, Workflow, WorkflowResult } from "@superglue/client";
 import { Context, Metadata } from "@superglue/shared";
-import { flattenAndNamespaceWorkflowCredentials } from "@superglue/shared/utils";
+import { flattenAndNamespaceWorkflowCredentials, waitForIntegrationProcessing } from "@superglue/shared/utils";
 import type { GraphQLResolveInfo } from "graphql";
 import { WorkflowExecutor } from "../../workflow/workflow-executor.js";
 
@@ -26,7 +26,7 @@ interface ExecuteWorkflowArgs {
 interface BuildWorkflowArgs {
   instruction: string;
   payload?: Record<string, unknown>;
-  integrations: ({ integration: Integration; id?: never } | { integration?: never; id: string })[];
+  integrationIds: string[];
   responseSchema?: JSONSchema;
 }
 
@@ -232,48 +232,39 @@ export const buildWorkflowResolver = async (
 ): Promise<Workflow> => {
   try {
     const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
-    const { instruction, payload = {}, integrations, responseSchema } = args;
+    const { instruction, payload = {}, integrationIds, responseSchema } = args;
 
     if (!instruction || instruction.trim() === "") {
       throw new Error("Instruction is required to build a workflow.");
     }
-    if (!integrations || integrations.length === 0) {
+    if (!integrationIds || integrationIds.length === 0) {
       throw new Error("At least one integration is required.");
     }
 
-    // Resolve integrations: fetch by id or use provided object
-    const resolvedIntegrations: Integration[] = await Promise.all(
-      integrations.map(async (item, index) => {
-        if ("id" in item && item.id) {
-          const integration = await context.datastore.getIntegration(item.id, context.orgId);
-          if (!integration) {
-            throw new Error(`Integration with id "${item.id}" not found (index ${index})`);
-          }
-          return integration;
-        } else if ("integration" in item && item.integration) {
-          return item.integration;
-        } else {
-          throw new Error(`Invalid integration input at index ${index}: must provide either id or integration`);
+    // Validate that all integration IDs exist
+    const fetchedIntegrations = await Promise.all(
+      integrationIds.map(async (id) => {
+        const integration = await context.datastore.getIntegration(id, context.orgId);
+        if (!integration) {
+          throw new Error(`Integration not found: ${id}`);
         }
+        return integration;
       })
     );
 
-    const blocked = resolvedIntegrations.find(
-      i => i.documentationPending === true
-    );
-    if (blocked) {
-      logMessage(
-        'warn',
-        `Workflow build blocked: documentation is still being fetched for integration "${blocked.id}"`,
-        metadata
-      );
-      throw new Error(
-        `Cannot build workflow: documentation is still being fetched for integration "${blocked.id}".`
-      );
-    }
+    // Wait for documentation processing for existing integrations
+    const datastoreAdapter = {
+      getIntegration: async (id: string): Promise<Integration | null> => {
+        const integration = await context.datastore.getIntegration(id, context.orgId);
+        return integration;
+      }
+    };
+
+    const resolvedIntegrations = await waitForIntegrationProcessing(datastoreAdapter, integrationIds);
 
     const builder = new WorkflowBuilder(instruction, resolvedIntegrations, payload, responseSchema, metadata);
     const workflow = await builder.build();
+
     // prevent collisions with existing workflows
     workflow.id = await generateUniqueId({
       baseId: workflow.id,
@@ -283,8 +274,6 @@ export const buildWorkflowResolver = async (
     return workflow;
   } catch (error) {
     logMessage('error', "Workflow building error: " + String(error), { orgId: context.orgId });
-    // Rethrow or return a structured error for GraphQL
     throw new Error(`Failed to build workflow: ${error}`);
   }
 };
-
