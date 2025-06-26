@@ -17,7 +17,7 @@ import { Label } from "../ui/label";
 import { WorkflowResultsView } from "./WorkflowResultsView";
 import { WorkflowStepsView } from "./WorkflowStepsView";
 
-export default function WorkflowPlayground({ id }: { id?: string }) {
+export default function WorkflowPlayground({ id }: { id?: string; }) {
   const router = useRouter();
   const { toast } = useToast();
   const config = useConfig();
@@ -355,6 +355,8 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
       // Validate JSON before execution
       try {
         JSON.parse(credentials || '{}');
+        JSON.parse(responseSchema || '{}');
+        JSON.parse(inputSchema || '{}');
       } catch (e) {
         throw new Error("Invalid credentials JSON format");
       }
@@ -734,8 +736,20 @@ export default function WorkflowPlayground({ id }: { id?: string }) {
                   pagination: step.apiConfig.pagination || null
                 }
               })),
-              responseSchema: responseSchema ? JSON.parse(responseSchema) : null,
-              inputSchema: inputSchema ? JSON.parse(inputSchema) : { type: "object" },
+              responseSchema: (() => {
+                try {
+                  return responseSchema ? JSON.parse(responseSchema) : null;
+                } catch {
+                  return null;
+                }
+              })(),
+              inputSchema: (() => {
+                try {
+                  return inputSchema ? JSON.parse(inputSchema) : { type: "object" };
+                } catch {
+                  return { type: "object" };
+                }
+              })(),
               finalTransform
             }}
             credentials={parseCredentialsHelper(credentials)}
