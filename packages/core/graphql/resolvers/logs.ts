@@ -11,6 +11,11 @@ export const logsResolver = {
 
                 // Handler for new logs
                 const logHandler = (log: LogEntry) => {
+                    // Skip log streaming during integration tests to avoid duplicate logging
+                    if (process.env.INTEGRATION_TEST_MODE === 'true') {
+                        return;
+                    }
+
                     if (log.orgId === orgId || (!orgId)) {
                         // Add small delay to ensure subscription is ready
                         setTimeout(() => {

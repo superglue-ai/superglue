@@ -1,0 +1,239 @@
+{
+    "integrations": {
+        "enabled": [
+            "hubspot-crm",
+            "attio-crm",
+            "sendgrid-email",
+            "stripe-pay",
+            "supabase-db",
+            "jira-projects",
+            "timbuk2-shopify",
+            "postgres-lego",
+            "twilio-comm"
+        ],
+        "definitions": {
+            "hubspot-crm": {
+                "id": "hubspot-crm",
+                "name": "HubSpot CRM",
+                "urlHost": "https://api.hubapi.com",
+                "urlPath": "/crm/v3",
+                "documentationUrl": "https://developers.hubspot.com/docs/api/overview",
+                "credentials": {
+                    "private_app_token": ""
+                },
+                "description": "Customer relationship management API"
+            },
+            "stripe-pay": {
+                "id": "stripe-pay",
+                "name": "Stripe Payments",
+                "urlHost": "https://api.stripe.com",
+                "urlPath": "/v1",
+                "documentationUrl": "https://stripe.com/docs/api",
+                "credentials": {
+                    "secret_key": "",
+                    "publishable_key": ""
+                },
+                "description": "Payment processing and subscription management"
+            },
+            "timbuk2-shopify": {
+                "id": "timbuk2-shopify",
+                "name": "Timbuk2 Shopify Demo",
+                "urlHost": "https://www.timbuk2.com",
+                "urlPath": "/products.json",
+                "documentationUrl": "https://shopify.dev/docs/api/ajax/reference/product",
+                "credentials": {},
+                "description": "Public Shopify API demo"
+            },
+            "postgres-lego": {
+                "id": "postgres-lego",
+                "name": "LEGO Database",
+                "urlHost": "postgres://superglue:superglue@database-1.c01e6ms2cdvl.us-east-1.rds.amazonaws.com:5432",
+                "urlPath": "/lego",
+                "documentationUrl": "",
+                "credentials": {},
+                "description": "PostgreSQL LEGO database for testing"
+            },
+            "jira-projects": {
+                "id": "jira-projects",
+                "name": "JIRA Projects",
+                "urlHost": "https://superglue-team-test.atlassian.net",
+                "urlPath": "/rest/api/3",
+                "documentationUrl": "https://developer.atlassian.com/cloud/jira/platform/rest/v3",
+                "credentials": {
+                    "email": "michael@superglue.ai",
+                    "api_token": ""
+                },
+                "description": "JIRA project management API"
+            },
+            "attio-crm": {
+                "id": "attio-crm",
+                "name": "Attio CRM",
+                "urlHost": "https://api.attio.com/v2",
+                "urlPath": "",
+                "documentationUrl": "https://api.attio.com/openapi/api",
+                "credentials": {
+                    "api_token": ""
+                },
+                "description": "Modern CRM with OpenAPI specification"
+            },
+            "supabase-db": {
+                "id": "supabase-db",
+                "name": "Supabase Database",
+                "urlHost": "https://fmcghdcrnnsdbtdriycm.supabase.co",
+                "urlPath": "/rest/v1",
+                "documentationUrl": "https://supabase.com/dashboard/project/fmcghdcrnnsdbtdriycm/api",
+                "credentials": {
+                    "password": "",
+                    "public_api_key": "",
+                    "secret_key": ""
+                },
+                "description": "Backend database for multi-workflow setups"
+            },
+            "twilio-comm": {
+                "id": "twilio-comm",
+                "name": "Twilio Communications",
+                "urlHost": "https://api.twilio.com/",
+                "urlPath": "/2010-04-01",
+                "documentationUrl": "https://www.twilio.com/docs/api",
+                "credentials": {
+                    "account_sid": "",
+                    "sid": "",
+                    "test_auth_token": "",
+                    "secret_key": ""
+                },
+                "description": "Phone and SMS communications API"
+            },
+            "sendgrid-email": {
+                "id": "sendgrid-email",
+                "name": "SendGrid Email",
+                "urlHost": "https://api.sendgrid.com/",
+                "urlPath": "/v3",
+                "documentationUrl": "https://docs.sendgrid.com/api-reference",
+                "credentials": {
+                    "api_key": ""
+                },
+                "description": "Email delivery and marketing API"
+            }
+        }
+    },
+    "workflows": {
+        "enabled": [
+            "attio-contact-enrichment",
+            "crm-to-email-workflow",
+            "payment-to-db-sync",
+            "jira-sprint-health",
+            "stripe-revenue-analytics",
+            "lego-inventory-analysis",
+            "timbuk2-product-analysis",
+            "hubspot-lead-qualification"
+        ],
+        "definitions": {
+            "hubspot-lead-qualification": {
+                "id": "hubspot-lead-qualification",
+                "name": "HubSpot Lead Qualification Pipeline",
+                "instruction": "Get all HubSpot contacts created in the 30 days after the payload date, filter out contacts working at the companies in the payload company list, and update the lead status of remaining contacts to In Progress",
+                "integrationIds": [
+                    "hubspot-crm"
+                ],
+                "payload": {
+                    "date": "2025-06-01",
+                    "companies": [
+                        "COMPANY A",
+                        "COMPANY B"
+                    ]
+                },
+                "complexityLevel": "medium",
+                "category": "single-system"
+            },
+            "stripe-revenue-analytics": {
+                "id": "stripe-revenue-analytics",
+                "name": "Stripe Revenue Analytics Dashboard",
+                "instruction": "Fetch all Stripe charges in the 3 months following the payload date, group by customer and calculate my monthly recurring revenue",
+                "integrationIds": [
+                    "stripe-pay"
+                ],
+                "payload": {
+                    "date": "2025-06-01"
+                },
+                "complexityLevel": "high",
+                "category": "single-system"
+            },
+            "jira-sprint-health": {
+                "id": "jira-sprint-health",
+                "name": "JIRA Sprint Health Check",
+                "instruction": "Get all issues from the current active sprint, categorize them by status, calculate completion percentage, and identify any issues marked as Blocked or High Priority that are still in progress",
+                "integrationIds": [
+                    "jira-projects"
+                ],
+                "payload": {},
+                "complexityLevel": "medium",
+                "category": "single-system"
+            },
+            "attio-contact-enrichment": {
+                "id": "attio-contact-enrichment",
+                "name": "Attio Contact Enrichment",
+                "instruction": "Retrieve all people records from Attio CRM that do NOT have a company field set or where the company field is empty / null. Give me the names and email addresses of those people. I want the final output to be a JSON object with the following structure: { \"people\": [ { \"name\": \"John Doe\", \"email\": \"john.doe@example.com\" } ]",
+                "integrationIds": [
+                    "attio-crm"
+                ],
+                "payload": {},
+                "complexityLevel": "medium",
+                "category": "single-system"
+            },
+            "lego-inventory-analysis": {
+                "id": "lego-inventory-analysis",
+                "name": "LEGO Database Inventory Analysis",
+                "instruction": "Query the LEGO database to find the most popular LEGO themes by number of sets.",
+                "integrationIds": [
+                    "postgres-lego"
+                ],
+                "payload": {},
+                "complexityLevel": "low",
+                "category": "single-system"
+            },
+            "timbuk2-product-analysis": {
+                "id": "timbuk2-product-analysis",
+                "name": "Timbuk2 Product Analysis",
+                "instruction": "Get all products from Timbuk2 with automatic pagination. This is a public endpoint.",
+                "integrationIds": [
+                    "timbuk2-shopify"
+                ],
+                "payload": {},
+                "complexityLevel": "low",
+                "category": "single-system"
+            },
+            "crm-to-email-workflow": {
+                "id": "crm-to-email-workflow",
+                "name": "CRM to Email Marketing Workflow",
+                "instruction": "Get all contacts with lifecycle stage: Marketing Qualified Lead from HubSpot. Filter them to only include contacts created between the input payload date and the payload date + 100 days. I want the final output to be a JSON object with the following structure: { \"contacts\": [ { \"name\": \"John Doe\", \"email\": \"john.doe@example.com\" } ]",
+                "integrationIds": [
+                    "hubspot-crm",
+                    "sendgrid-email"
+                ],
+                "payload": {
+                    "date": "2025-06-01"
+                },
+                "complexityLevel": "high",
+                "category": "multi-system"
+            },
+            "payment-to-db-sync": {
+                "id": "payment-to-db-sync",
+                "name": "Payment to Database Sync",
+                "instruction": "Fetch all current subscriptions from Stripe, including the customer name, the product name and the subscription creation. Write the data into my supabase database into the subscription_table_test table. The table has the following columns: customer_name, product, subscription_creation",
+                "integrationIds": [
+                    "stripe-pay",
+                    "supabase-db"
+                ],
+                "payload": {},
+                "complexityLevel": "medium",
+                "category": "multi-system"
+            }
+        }
+    },
+    "testSuite": {
+        "name": "Integration Test",
+        "runCleanupTest": true,
+        "waitForDocumentation": true,
+        "attemptsPerWorkflow": 3
+    }
+}
