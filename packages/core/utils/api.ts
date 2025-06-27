@@ -25,7 +25,7 @@ export function convertBasicAuthToBase64(headerValue: string) {
   return headerValue;
 }
 
-export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions): Promise<{ data: any; }> {
+export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions): Promise<{ data: any }> {
   if (endpoint.urlHost.startsWith("postgres")) {
     return { data: await callPostgres(endpoint, payload, credentials, options) };
   }
@@ -222,7 +222,7 @@ export async function generateApiConfig(
   credentials: Record<string, any>,
   retryCount = 0,
   messages: OpenAI.Chat.ChatCompletionMessageParam[] = []
-): Promise<{ config: ApiConfig; messages: OpenAI.Chat.ChatCompletionMessageParam[]; }> {
+): Promise<{ config: ApiConfig; messages: OpenAI.Chat.ChatCompletionMessageParam[] }> {
   const schema = zodToJsonSchema(z.object({
     urlHost: z.string(),
     urlPath: z.string(),
@@ -241,7 +241,7 @@ export async function generateApiConfig(
     pagination: z.object({
       type: z.enum(Object.values(PaginationType) as [string, ...string[]]),
       pageSize: z.string().describe("Number of items per page. Set this to a number. Once you set it here as a number, you can access it using <<limit>> in headers, params, body, or url path."),
-      cursorPath: z.string().describe("If cursor_based: The path to the cursor in the response. E.g. cursor.current or next_cursor. If pagination is not cursor_based, set this to \"\"")
+      cursorPath: z.string().describe("If cursor_based: The path to the cursor in the response. E.g. cursor.current or next_cursor")
     }).optional()
   }));
   const availableVariables = [
@@ -304,7 +304,7 @@ Documentation: ${String(documentation)}`;
   };
 }
 
-export async function evaluateResponse(data: any, responseSchema: JSONSchema, instruction: string): Promise<{ success: boolean, refactorNeeded: boolean, shortReason: string; }> {
+export async function evaluateResponse(data: any, responseSchema: JSONSchema, instruction: string): Promise<{ success: boolean, refactorNeeded: boolean, shortReason: string }> {
   let content = JSON.stringify(data);
   if (content.length > LanguageModel.contextLength / 2) {
     content = JSON.stringify(sample(data, 10)) + "\n\n...truncated...";

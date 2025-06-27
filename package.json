@@ -10,7 +10,11 @@
     "dev": "turbo run dev",
     "start": "turbo run start",
     "test": "turbo run test",
+    "test:unit": "turbo run test",
     "test:coverage": "turbo run test:coverage",
+    "test:integration": "cd packages/core && npm run build && npm run test:integration",
+    "test:integration:legacy": "lsof -ti:3000 | xargs kill -9 && dotenv -e .env -- bash -c 'cd packages/core && npm run build && npm run dev & (sleep 10 && node packages/core/dist/tests/run-integration-tests.js); kill %1'",
+    "test:all": "npm run test:unit && npm run test:integration",
     "lint": "turbo run lint",
     "clean": "turbo run clean"
   },
