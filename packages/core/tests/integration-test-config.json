@@ -1,11 +1,7 @@
 {
     "integrations": {
         "enabled": [
-            "hubspot-crm",
-            "timbuk2-shopify",
-            "postgres-lego",
-            "stripe-pay",
-            "supabase-db"
+            "hubspot-crm"
         ],
         "available": [
             "hubspot-crm",
@@ -22,11 +18,7 @@
     },
     "workflows": {
         "enabled": [
-            "hubspot-lead-qualification",
-            "lego-inventory-analysis",
-            "timbuk2-product-analysis",
-            "stripe-revenue-analytics",
-            "supabase-db-to-stripe-user-sync"
+            "hubspot-lead-qualification"
         ],
         "available": [
             "hubspot-lead-qualification",

@@ -30,9 +30,7 @@
     "test-no-watch": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:workflow": "vitest run -t ApiWorkflowOrchestrator-dog",
-    "test:integration": "cd ../.. && npm run test:integration:core",
-    "test:integration-client": "node dist/tests/run-integration-tests.js",
-    "test:integration-framework": "vitest run -t IntegrationTestingFramework"
+    "test:integration": "vitest run tests/integration.test.ts"
   },
   "type": "module",
   "dependencies": {

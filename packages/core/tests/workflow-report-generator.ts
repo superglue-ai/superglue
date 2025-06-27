@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { LanguageModel } from '../llm/llm.js';
 import { logMessage } from "../utils/logs.js";
 
@@ -39,33 +40,28 @@ interface WorkflowExecutionReport {
     overallSuccess: boolean;
     totalAttempts: number;
 
-    // Performance breakdown
-    planning: {
-        status: 'excellent' | 'good' | 'problematic' | 'failed';
-        issues: string[];
-        description: string;
-    };
-    apiUnderstanding: {
-        status: 'excellent' | 'good' | 'problematic' | 'failed';
-        issues: string[];
-        description: string;
-    };
-    integrationConfig: {
-        status: 'excellent' | 'good' | 'problematic' | 'failed';
-        issues: string[];
-        description: string;
-    };
-    schemaMapping: {
-        status: 'excellent' | 'good' | 'problematic' | 'failed';
-        issues: string[];
-        description: string;
-    };
+    // Simplified analysis - just the key insights, no artificial status categories
+    planningIssues: string[];
+    apiIssues: string[];
+    integrationIssues: string[];
+    dataIssues: string[];
 
     // Summary and recommendations
-    primaryFailureCategory?: 'planning' | 'api_understanding' | 'integration_config' | 'schema_mapping' | 'execution_environment';
+    primaryFailureCategory?: 'planning' | 'api_understanding' | 'integration_config' | 'data_mapping' | 'execution_environment';
     recommendations: string[];
     executionSummary: string;
 }
+
+// Zod schema for structured LLM output
+const WorkflowExecutionReportSchema = z.object({
+    planningIssues: z.array(z.string()).describe("Specific issues with workflow planning and step generation"),
+    apiIssues: z.array(z.string()).describe("Specific issues with API calls, endpoints, or responses"),
+    integrationIssues: z.array(z.string()).describe("Specific issues with authentication, credentials, or integration setup"),
+    dataIssues: z.array(z.string()).describe("Specific issues with data mapping, transformations, or schema problems"),
+    primaryFailureCategory: z.enum(['planning', 'api_understanding', 'integration_config', 'data_mapping', 'execution_environment']).nullable().describe("The main category that caused the failure, or null if successful"),
+    recommendations: z.array(z.string()).describe("Specific actionable recommendations to fix the issues"),
+    executionSummary: z.string().describe("A concise 2-3 sentence summary of what happened and the outcome")
+});
 
 interface ErrorAnalysisInput {
     workflowId: string;
@@ -121,9 +117,16 @@ export class WorkflowReportGenerator {
             return response.response;
         } catch (error) {
             const errorMessage = String(error);
-            if (errorMessage.includes('401') || errorMessage.includes('API key')) {
-                logMessage('warn', `❌ LLM API credentials missing for workflow ${input.workflowId}. Error analysis will use fallback mode.`);
-                return `AI analysis unavailable: LLM API credentials not configured. Error count: ${allErrors.length} (${buildErrors.length} build, ${execErrors.length} execution)`;
+            logMessage('warn', `🔍 WorkflowReportGenerator Debug - Error in generateErrorSummary for ${input.workflowId}:`);
+            logMessage('warn', `   LLM_PROVIDER: "${process.env.LLM_PROVIDER || 'not set'}"`);
+            logMessage('warn', `   OPENAI_API_KEY: ${process.env.OPENAI_API_KEY ? `SET (length: ${process.env.OPENAI_API_KEY.length}, starts: ${process.env.OPENAI_API_KEY.substring(0, 7)}...)` : 'NOT SET'}`);
+            logMessage('warn', `   OPENAI_MODEL: "${process.env.OPENAI_MODEL || 'not set'}"`);
+            logMessage('warn', `   Error message: "${errorMessage}"`);
+            logMessage('warn', `   Full error: ${JSON.stringify(error, null, 2)}`);
+
+            if (errorMessage.includes('401') || errorMessage.includes('API key') || errorMessage.includes('Unauthorized')) {
+                logMessage('warn', `❌ LLM API credentials issue for workflow ${input.workflowId}. Using fallback mode.`);
+                return `AI analysis unavailable: LLM API authentication failed. Error count: ${allErrors.length} (${buildErrors.length} build, ${execErrors.length} execution)`;
             }
             logMessage('warn', `Failed to generate error summary for workflow ${input.workflowId}: ${error}`);
             return undefined;
@@ -295,7 +298,7 @@ Provide 2-3 sentences highlighting the most important patterns and recommendatio
             return `ATTEMPT ${attemptNumber} (${outcome}): ${planSummary}`;
         }).join('\n\n') || 'No workflow plans available';
 
-        const prompt = `Analyze this Superglue workflow execution and provide a detailed performance breakdown:
+        const prompt = `Analyze this Superglue workflow execution and identify specific issues:
 
 WORKFLOW: "${workflowName}"
 INSTRUCTION: "${originalInstruction}"
@@ -314,59 +317,46 @@ ${buildErrors.map((e, i) => `${i + 1}. ${e}`).join('\n') || 'None'}
 EXECUTION ERRORS (${execErrors.length}):
 ${execErrors.map((e, i) => `${i + 1}. ${e}`).join('\n') || 'None'}
 
-Provide a detailed analysis of Superglue's performance in these categories:
+Analyze the workflow execution and identify specific issues in these categories:
 
-1. PLANNING: How well did Superglue understand the instruction and create logical workflow steps?
-2. API_UNDERSTANDING: How well did Superglue understand API endpoints, request structures, and data formats?
-3. INTEGRATION_CONFIG: How well were credentials, authentication, and integration setup handled?
-4. SCHEMA_MAPPING: How well did JSONata transformations, data mapping, and validation work?
+1. PLANNING ISSUES: Problems with understanding the instruction or generating appropriate workflow steps
+2. API ISSUES: Problems with API calls, endpoints, HTTP methods, request/response handling
+3. INTEGRATION ISSUES: Problems with authentication, credentials, or integration configuration
+4. DATA ISSUES: Problems with data mapping, JSONata transformations, schema mismatches, or data format issues
 
-For each category, determine:
-- status: 'excellent' (no issues), 'good' (minor issues), 'problematic' (significant issues), or 'failed' (major failures)
-- issues: Array of specific problems found
-- description: 2-3 sentence explanation of performance in this area
-
-Also provide:
-- primaryFailureCategory: The main area that caused failure (if any): 'planning', 'api_understanding', 'integration_config', 'schema_mapping', or 'execution_environment'
-- recommendations: Array of specific actions to improve performance
-- executionSummary: 2-3 sentence overall assessment
-
-Respond with a valid JSON object matching this structure:
-{
-    "planning": {"status": "...", "issues": [...], "description": "..."},
-    "apiUnderstanding": {"status": "...", "issues": [...], "description": "..."},
-    "integrationConfig": {"status": "...", "issues": [...], "description": "..."},
-    "schemaMapping": {"status": "...", "issues": [...], "description": "..."},
-    "primaryFailureCategory": "..." (or null if successful),
-    "recommendations": [...],
-    "executionSummary": "..."
-}`;
+For each category, list specific concrete issues found (empty array if no issues).
+Provide actionable recommendations to fix the problems.
+Summarize what happened in 2-3 sentences.`;
 
         try {
-            const response = await LanguageModel.generateText([
+            const response = await LanguageModel.generateObject([
                 { role: 'user', content: prompt }
-            ], 0.2);
-
-            // Parse the JSON response
-            const analysisResult = JSON.parse(response.response);
+            ], WorkflowExecutionReportSchema, 0.2);
 
             return {
                 workflowId,
                 workflowName,
                 overallSuccess,
                 totalAttempts,
-                planning: analysisResult.planning,
-                apiUnderstanding: analysisResult.apiUnderstanding,
-                integrationConfig: analysisResult.integrationConfig,
-                schemaMapping: analysisResult.schemaMapping,
-                primaryFailureCategory: analysisResult.primaryFailureCategory,
-                recommendations: analysisResult.recommendations,
-                executionSummary: analysisResult.executionSummary
+                planningIssues: response.response.planningIssues,
+                apiIssues: response.response.apiIssues,
+                integrationIssues: response.response.integrationIssues,
+                dataIssues: response.response.dataIssues,
+                primaryFailureCategory: response.response.primaryFailureCategory,
+                recommendations: response.response.recommendations,
+                executionSummary: response.response.executionSummary
             };
         } catch (error) {
             const errorMessage = String(error);
+            logMessage('warn', `🔍 WorkflowReportGenerator Debug - Error in generateWorkflowExecutionReport for ${workflowId}:`);
+            logMessage('warn', `   LLM_PROVIDER: "${process.env.LLM_PROVIDER || 'not set'}"`);
+            logMessage('warn', `   OPENAI_API_KEY: ${process.env.OPENAI_API_KEY ? `SET (length: ${process.env.OPENAI_API_KEY.length}, starts: ${process.env.OPENAI_API_KEY.substring(0, 7)}...)` : 'NOT SET'}`);
+            logMessage('warn', `   OPENAI_MODEL: "${process.env.OPENAI_MODEL || 'not set'}"`);
+            logMessage('warn', `   Error message: "${errorMessage}"`);
+            logMessage('warn', `   Full error: ${JSON.stringify(error, null, 2)}`);
+
             if (errorMessage.includes('401') || errorMessage.includes('API key')) {
-                logMessage('warn', `❌ LLM API credentials missing for workflow ${workflowId}. Execution report will use fallback mode.`);
+                logMessage('warn', `❌ LLM API credentials issue for workflow ${workflowId}. Using fallback mode.`);
 
                 // Return a more informative fallback report
                 return {
@@ -374,26 +364,11 @@ Respond with a valid JSON object matching this structure:
                     workflowName,
                     overallSuccess,
                     totalAttempts,
-                    planning: {
-                        status: 'good',
-                        issues: [],
-                        description: 'AI analysis unavailable: LLM API credentials not configured. Manual review needed.'
-                    },
-                    apiUnderstanding: {
-                        status: 'good',
-                        issues: [],
-                        description: 'AI analysis unavailable: LLM API credentials not configured. Manual review needed.'
-                    },
-                    integrationConfig: {
-                        status: 'good',
-                        issues: [],
-                        description: 'AI analysis unavailable: LLM API credentials not configured. Manual review needed.'
-                    },
-                    schemaMapping: {
-                        status: 'good',
-                        issues: [],
-                        description: 'AI analysis unavailable: LLM API credentials not configured. Manual review needed.'
-                    },
+                    planningIssues: [],
+                    apiIssues: [],
+                    integrationIssues: [],
+                    dataIssues: [],
+                    primaryFailureCategory: null,
                     recommendations: [
                         'Set OPENAI_API_KEY or GEMINI_API_KEY environment variable for AI-powered analysis',
                         'Manual review needed due to missing LLM credentials'
@@ -410,10 +385,11 @@ Respond with a valid JSON object matching this structure:
                 workflowName,
                 overallSuccess,
                 totalAttempts,
-                planning: { status: 'good', issues: [], description: 'Analysis unavailable due to processing error.' },
-                apiUnderstanding: { status: 'good', issues: [], description: 'Analysis unavailable due to processing error.' },
-                integrationConfig: { status: 'good', issues: [], description: 'Analysis unavailable due to processing error.' },
-                schemaMapping: { status: 'good', issues: [], description: 'Analysis unavailable due to processing error.' },
+                planningIssues: [],
+                apiIssues: [],
+                integrationIssues: [],
+                dataIssues: [],
+                primaryFailureCategory: null,
                 recommendations: ['Manual review needed due to analysis error'],
                 executionSummary: 'Detailed analysis could not be completed due to a processing error.'
             };
