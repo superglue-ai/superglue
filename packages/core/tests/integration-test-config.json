@@ -118,14 +118,7 @@
     },
     "workflows": {
         "enabled": [
-            "attio-contact-enrichment",
-            "crm-to-email-workflow",
-            "payment-to-db-sync",
-            "jira-sprint-health",
-            "stripe-revenue-analytics",
-            "lego-inventory-analysis",
-            "timbuk2-product-analysis",
-            "hubspot-lead-qualification"
+            "attio-contact-enrichment"
         ],
         "definitions": {
             "hubspot-lead-qualification": {

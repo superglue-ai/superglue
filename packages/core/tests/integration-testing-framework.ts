@@ -2,7 +2,6 @@ import { Workflow, WorkflowResult } from '@superglue/client';
 import { generateUniqueId, waitForIntegrationProcessing } from '@superglue/shared/utils';
 import fs from 'fs';
 import path from 'path';
-import { toJsonSchema } from '../external/json-schema.js';
 import { logMessage } from '../utils/logs.js';
 
 import { Integration } from '@superglue/client';
@@ -78,6 +77,13 @@ interface TestResult {
     totalAttempts: number;
     successfulAttempts: number;
     successRate: number; // Success rate for this specific workflow
+    // Store workflow plans for batch analysis
+    workflowPlans?: Array<{
+        plan: any;
+        buildSuccess: boolean;
+        executionSuccess: boolean;
+        attemptNumber: number;
+    }>;
 }
 
 interface IntegrationSetupResult {
@@ -241,8 +247,6 @@ export class IntegrationTestingFramework {
             .map(id => definitions[id])
             .filter((workflow): workflow is TestWorkflow => workflow !== undefined);
     }
-
-
 
     async setupIntegrations(): Promise<{ setupTime: number; results: IntegrationSetupResult[]; documentationProcessingTime: number }> {
         const startTime = Date.now();
@@ -574,43 +578,9 @@ export class IntegrationTestingFramework {
             if (attempt < maxRetries) await new Promise(res => setTimeout(res, Math.pow(2, attempt - 1) * 1000));
         }
 
-        // Generate error summary and execution report using the debugger with workflow plans
+        // Don't generate analysis here - we'll batch analyze all attempts together later
         let errorSummary: string | undefined = undefined;
         let executionReport: any | undefined = undefined;
-        try {
-            const { WorkflowReportGenerator } = await import('./workflow-report-generator.js');
-            const workflowReportGenerator = new WorkflowReportGenerator();
-
-            // Generate error summary
-            errorSummary = await workflowReportGenerator.generateErrorSummary({
-                workflowId: testWorkflow.id,
-                workflowName: testWorkflow.name,
-                originalInstruction: testWorkflow.instruction,
-                buildAttempts,
-                executionAttempts,
-                workflowPlans,
-                integrationIds: testWorkflow.integrationIds,
-                payload: testWorkflow.payload,
-                expectedKeys: testWorkflow.expectedKeys,
-                actualData
-            });
-
-            // Generate detailed execution report
-            executionReport = await workflowReportGenerator.generateWorkflowExecutionReport({
-                workflowId: testWorkflow.id,
-                workflowName: testWorkflow.name,
-                originalInstruction: testWorkflow.instruction,
-                buildAttempts,
-                executionAttempts,
-                workflowPlans,
-                integrationIds: testWorkflow.integrationIds,
-                payload: testWorkflow.payload,
-                expectedKeys: testWorkflow.expectedKeys,
-                actualData
-            });
-        } catch (error) {
-            logMessage('warn', `Failed to generate workflow analysis for ${testWorkflow.name}: ${error}`, this.metadata);
-        }
 
         logMessage('info', `🏁 Completed buildAndTestWorkflow for ${testWorkflow.name}`, this.metadata);
 
@@ -631,7 +601,8 @@ export class IntegrationTestingFramework {
             // These will be properly set in runTestSuite after all attempts
             totalAttempts: 1,
             successfulAttempts: succeededOnAttempt ? 1 : 0,
-            successRate: succeededOnAttempt ? 1 : 0
+            successRate: succeededOnAttempt ? 1 : 0,
+            workflowPlans
         };
     }
 
@@ -671,50 +642,28 @@ export class IntegrationTestingFramework {
      * Generate a compact schema representation with example values
      */
     private generateDataSchema(data: any): any {
-        // Use the existing toJsonSchema utility
-        const schema = toJsonSchema(data, { arrays: { mode: 'first' } });
+        if (!data) return { type: 'null' };
 
-        // Add examples for arrays
-        if (Array.isArray(data) && data.length > 0) {
+        // For arrays, just show type and count
+        if (Array.isArray(data)) {
             return {
                 type: 'array',
-                length: data.length,
-                itemSchema: schema.items,
-                examples: data.slice(0, 2) // Show first 2 items as examples
+                count: data.length,
+                firstItemType: data.length > 0 ? typeof data[0] : 'unknown'
             };
         }
 
-        // For objects, add the schema and show sample values
-        if (data && typeof data === 'object' && !Array.isArray(data)) {
+        // For objects, just show top-level keys
+        if (data && typeof data === 'object') {
             const keys = Object.keys(data);
-            const sampleData: any = {};
-
-            // Include up to 5 sample fields
-            keys.slice(0, 5).forEach(key => {
-                const value = data[key];
-                if (typeof value === 'string' && value.length > 50) {
-                    sampleData[key] = value.substring(0, 50) + '...';
-                } else if (Array.isArray(value)) {
-                    sampleData[key] = `Array(${value.length})`;
-                } else if (value && typeof value === 'object') {
-                    sampleData[key] = '{...}';
-                } else {
-                    sampleData[key] = value;
-                }
-            });
-
-            if (keys.length > 5) {
-                sampleData['...'] = `${keys.length - 5} more fields`;
-            }
-
             return {
-                schema: schema,
-                sample: sampleData
+                type: 'object',
+                keys: keys.length > 10 ? [...keys.slice(0, 10), `...${keys.length - 10} more`] : keys
             };
         }
 
-        // For primitive values, just return the schema
-        return schema;
+        // For primitives, just return type
+        return { type: typeof data };
     }
 
     async cleanup(): Promise<number> {
@@ -852,13 +801,53 @@ export class IntegrationTestingFramework {
 
             // Generate error summaries for workflows that encountered errors
             logMessage('info', '🤖 Generating AI error analysis...', this.metadata);
-            // Error summaries are now generated in buildAndTestWorkflow method
+            const { WorkflowReportGenerator } = await import('./workflow-report-generator.js');
+            const reportGenerator = new WorkflowReportGenerator();
+
+            // Batch analyze each workflow's attempts
+            for (const result of results) {
+                if (result.workflowPlans && result.workflowPlans.length > 0) {
+                    try {
+                        // Only analyze if there were failures
+                        const hasFailures = result.buildAttempts.some(b => !b.success) || result.executionAttempts.some(e => !e.success);
+                        if (hasFailures) {
+                            const errorSummary = await reportGenerator.generateBatchErrorSummary({
+                                workflowId: result.workflowId,
+                                workflowName: result.workflowName,
+                                originalInstruction: enabledWorkflows.find(w => w.id === result.workflowId)?.instruction || '',
+                                buildAttempts: result.buildAttempts,
+                                executionAttempts: result.executionAttempts,
+                                workflowPlans: result.workflowPlans,
+                                integrationIds: enabledWorkflows.find(w => w.id === result.workflowId)?.integrationIds || [],
+                                payload: enabledWorkflows.find(w => w.id === result.workflowId)?.payload,
+                                expectedKeys: result.expectedKeys,
+                                actualData: result.actualData
+                            });
+                            result.errorSummary = errorSummary;
+
+                            const executionReport = await reportGenerator.generateBatchWorkflowExecutionReport({
+                                workflowId: result.workflowId,
+                                workflowName: result.workflowName,
+                                originalInstruction: enabledWorkflows.find(w => w.id === result.workflowId)?.instruction || '',
+                                buildAttempts: result.buildAttempts,
+                                executionAttempts: result.executionAttempts,
+                                workflowPlans: result.workflowPlans,
+                                integrationIds: enabledWorkflows.find(w => w.id === result.workflowId)?.integrationIds || [],
+                                payload: enabledWorkflows.find(w => w.id === result.workflowId)?.payload,
+                                expectedKeys: result.expectedKeys,
+                                actualData: result.actualData
+                            });
+                            result.executionReport = executionReport;
+                        }
+                    } catch (error) {
+                        logMessage('warn', `Failed to generate batch analysis for workflow ${result.workflowName}: ${error}`, this.metadata);
+                    }
+                }
+            }
 
             // Generate suite-level analysis
             logMessage('info', '🔍 Generating suite-level analysis...', this.metadata);
-            const { WorkflowReportGenerator } = await import('./workflow-report-generator.js');
-            const analyzer = new WorkflowReportGenerator();
-            const suiteAnalysis = await analyzer.generateSuiteAnalysis(
+            const suiteAnalysis = await reportGenerator.generateSuiteAnalysis(
                 results.map(r => ({
                     workflowName: r.workflowName,
                     succeeded: r.succeededOnAttempt !== undefined,
@@ -876,9 +865,15 @@ export class IntegrationTestingFramework {
 
             // Calculate retry statistics
             const totalRetries = results.reduce((sum, r) => sum + (r.buildAttempts.length - 1), 0);
-            const averageAttempts = results.reduce((sum, r) => sum + r.buildAttempts.length, 0) / results.length;
+
+            // Calculate average attempts until first success (only for workflows that eventually succeeded)
+            const successfulWorkflows = results.filter(r => r.succeededOnAttempt !== undefined);
+            const averageAttempts = successfulWorkflows.length > 0
+                ? successfulWorkflows.reduce((sum, r) => sum + (r.succeededOnAttempt || 0), 0) / successfulWorkflows.length
+                : 0;
+
             const firstTrySuccesses = results.filter(r => r.succeededOnAttempt === 1).length;
-            const maxAttemptsNeeded = Math.max(...results.map(r => r.buildAttempts.length));
+            const maxAttemptsNeeded = Math.max(...results.filter(r => r.succeededOnAttempt !== undefined).map(r => r.succeededOnAttempt || 0), 0);
 
             // Calculate new global metrics
             const totalWorkflowAttempts = results.reduce((sum, r) => sum + r.totalAttempts, 0);
@@ -967,8 +962,7 @@ export class IntegrationTestingFramework {
             // Add data schema instead of full data
             if (r.actualData) {
                 const schema = this.generateDataSchema(r.actualData);
-                const schemaStr = JSON.stringify(schema, null, 2);
-                result += `\n    Data Schema: ${schemaStr}`;
+                result += `\n    Data: ${JSON.stringify(schema)}`;
             }
 
             if (r.errorSummary) {
@@ -1110,7 +1104,7 @@ export class IntegrationTestingFramework {
                 averageWorkflowBuildTime: `${testSuite.averageBuildTime.toFixed(0)}ms`,
                 averageWorkflowExecutionTime: `${testSuite.averageExecutionTime.toFixed(0)}ms`,
                 overallSuccessRate: `${((testSuite.passed / testSuite.totalTests) * 100).toFixed(1)}%`,
-                averageAttemptsRequired: testSuite.retryStatistics.averageAttempts.toFixed(2),
+                averageAttemptsUntilSuccess: testSuite.retryStatistics.averageAttempts > 0 ? testSuite.retryStatistics.averageAttempts.toFixed(2) : 'N/A',
                 firstTrySuccessRate: `${((testSuite.retryStatistics.firstTrySuccesses / testSuite.totalTests) * 100).toFixed(1)}%`,
                 maxAttemptsNeeded: testSuite.retryStatistics.maxAttemptsNeeded,
                 // New global metrics
@@ -1233,7 +1227,7 @@ export class IntegrationTestingFramework {
 | **Overall Success Rate** | ${keyMetrics.overallSuccessRate} |
 | **Average Workflow Build Time** | ${keyMetrics.averageWorkflowBuildTime} |
 | **Average Workflow Execution Time** | ${keyMetrics.averageWorkflowExecutionTime} |
-| **Average Attempts Required** | ${keyMetrics.averageAttemptsRequired} |
+| **Average Attempts Until Success** | ${keyMetrics.averageAttemptsUntilSuccess} |
 | **First Try Success Rate** | ${keyMetrics.firstTrySuccessRate} |
 | **Max Attempts Needed** | ${keyMetrics.maxAttemptsNeeded} |
 
