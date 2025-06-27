@@ -149,7 +149,7 @@
             "stripe-revenue-analytics": {
                 "id": "stripe-revenue-analytics",
                 "name": "Stripe Revenue Analytics Dashboard",
-                "instruction": "Fetch all Stripe charges in the 3 months following the payload date, group by customer and calculate my monthly recurring revenue",
+                "instruction": "Fetch all Stripe subscriptions createdin the 3 months following the payload date, group by customer and calculate my monthly recurring revenue",
                 "integrationIds": [
                     "stripe-pay"
                 ],
@@ -170,9 +170,9 @@
                 "complexityLevel": "medium",
                 "category": "single-system"
             },
-            "attio-contact-enrichment": {
-                "id": "attio-contact-enrichment",
-                "name": "Attio Contact Enrichment",
+            "attio-people-retrieval": {
+                "id": "attio-people-retrieval",
+                "name": "Attio People Retrieval",
                 "instruction": "Retrieve all people records from Attio CRM that do NOT have a company field set or where the company field is empty / null. Give me the names and email addresses of those people. I want the final output to be a JSON object with the following structure: { \"people\": [ { \"name\": \"John Doe\", \"email\": \"john.doe@example.com\" } ]",
                 "integrationIds": [
                     "attio-crm"
@@ -203,24 +203,23 @@
                 "complexityLevel": "low",
                 "category": "single-system"
             },
-            "crm-to-email-workflow": {
-                "id": "crm-to-email-workflow",
-                "name": "CRM to Email Marketing Workflow",
+            "crm-workflow": {
+                "id": "crm-workflow",
+                "name": "CRM Workflow",
                 "instruction": "Get all contacts with lifecycle stage: Marketing Qualified Lead from HubSpot. Filter them to only include contacts created between the input payload date and the payload date + 100 days. I want the final output to be a JSON object with the following structure: { \"contacts\": [ { \"name\": \"John Doe\", \"email\": \"john.doe@example.com\" } ]",
                 "integrationIds": [
-                    "hubspot-crm",
-                    "sendgrid-email"
+                    "hubspot-crm"
                 ],
                 "payload": {
                     "date": "2025-06-01"
                 },
                 "complexityLevel": "high",
-                "category": "multi-system"
+                "category": "single-system"
             },
-            "payment-to-db-sync": {
-                "id": "payment-to-db-sync",
-                "name": "Payment to Database Sync",
-                "instruction": "Fetch all current subscriptions from Stripe, including the customer name, the product name and the subscription creation. Write the data into my supabase database into the subscription_table_test table. The table has the following columns: customer_name, product, subscription_creation",
+            "subscription-to-db-sync": {
+                "id": "subscription-to-db-sync",
+                "name": "Subscription to Database Sync",
+                "instruction": "Fetch all current subscriptions from Stripe, including the customer name, the product/subscription name and the subscription creation time. Note that these may have other names in the api. Write the data into my supabase database into the subscription_table_test table. The table has the following columns: customer_name, product, subscription_creation",
                 "integrationIds": [
                     "stripe-pay",
                     "supabase-db"

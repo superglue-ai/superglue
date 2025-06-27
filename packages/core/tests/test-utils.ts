@@ -1,14 +1,12 @@
-import { ApolloServer } from '@apollo/server';
 import type { DataStore } from "@superglue/shared";
 import express from "express";
-import { graphqlUploadExpress } from 'graphql-upload-minimal';
-import http from 'http';
 import fs from "node:fs";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
 import { afterAll, beforeAll } from "vitest";
 import { FileStore } from "../datastore/filestore.js";
 import { MemoryStore } from "../datastore/memory.js";
+
 /**
  * Creates and manages a mock HTTP server for integration tests
  */
