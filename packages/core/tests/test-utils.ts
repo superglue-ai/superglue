@@ -9,22 +9,6 @@ import path from "node:path";
 import { afterAll, beforeAll } from "vitest";
 import { FileStore } from "../datastore/filestore.js";
 import { MemoryStore } from "../datastore/memory.js";
-import { mcpHandler } from '../mcp/mcp-server.js';
-import { logMessage } from '../utils/logs.js';
-import { createTelemetryPlugin, telemetryMiddleware } from '../utils/telemetry.js';
-
-const DEFAULT_QUERY = `
-query Query {
-  listRuns(limit: 10) {
-    items {
-      id
-      status
-      createdAt
-    }
-    total
-  }
-}`;
-
 /**
  * Creates and manages a mock HTTP server for integration tests
  */

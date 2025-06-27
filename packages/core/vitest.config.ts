@@ -18,15 +18,6 @@ export default defineConfig({
         '**/*.spec.ts',
       ],
     },
-    // Separate unit and integration tests
-    include: [
-      '**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'
-    ],
-    exclude: [
-      '**/node_modules/**',
-      '**/dist/**',
-      '**/.{idea,git,cache,output,temp}/**'
-    ]
   },
   envDir: '../../',
   build: {

@@ -233,6 +233,6 @@
     },
     "testSuite": {
         "name": "Integration Test",
-        "attemptsPerWorkflow": 3
+        "attemptsPerWorkflow": 2
     }
 }
