@@ -968,6 +968,13 @@ export class IntegrationTestingFramework {
         if (sendgridConfig && process.env.SENDGRID_API_KEY) {
             sendgridConfig.credentials.api_key = process.env.SENDGRID_API_KEY;
         }
+
+        // PostgreSQL LEGO Database
+        const postgresConfig = definitions['postgres-lego'];
+        if (postgresConfig && process.env.POSTGRES_LEGO_CONNECTION_STRING) {
+            postgresConfig.urlHost = process.env.POSTGRES_LEGO_CONNECTION_STRING;
+            postgresConfig.credentials.connection_string = process.env.POSTGRES_LEGO_CONNECTION_STRING;
+        }
     }
 
     /**

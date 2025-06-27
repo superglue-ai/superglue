@@ -78,6 +78,7 @@ STRIPE_PUBLISHABLE_KEY=pk_test_...
 JIRA_API_TOKEN=ATATT3xFfGF0...
 ATTIO_API_TOKEN=...
 SENDGRID_API_KEY=SG...
+POSTGRES_LEGO_CONNECTION_STRING=postgres://user:pass@host:port/db
 # etc.
 ```
 
@@ -127,7 +128,7 @@ Tests are controlled via `packages/core/tests/integration-test-config.json`:
 | `stripe-pay` | Stripe Payments | `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY` | ✅ Working |
 | `jira-projects` | JIRA | `JIRA_API_TOKEN` | ✅ Working |
 | `attio-crm` | Attio CRM | `ATTIO_API_TOKEN` | ✅ Working |
-| `postgres-lego` | LEGO Database | None (public) | ✅ Working |
+| `postgres-lego` | LEGO Database | `POSTGRES_LEGO_CONNECTION_STRING` | ✅ Working |
 | `timbuk2-shopify` | Shopify Demo | None (public) | ✅ Working |
 | `supabase-db` | Supabase | Multiple keys required | ✅ Working |
 | `twilio-comm` | Twilio | Multiple keys required | ❓ Untested |

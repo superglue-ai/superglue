@@ -47,10 +47,12 @@
             "postgres-lego": {
                 "id": "postgres-lego",
                 "name": "LEGO Database",
-                "urlHost": "postgres://REDACTED",
+                "urlHost": "",
                 "urlPath": "/lego",
                 "documentationUrl": "",
-                "credentials": {},
+                "credentials": {
+                    "connection_string": ""
+                },
                 "description": "PostgreSQL LEGO database for testing"
             },
             "jira-projects": {
@@ -232,6 +234,6 @@
     },
     "testSuite": {
         "name": "Integration Test",
-        "attemptsPerWorkflow": 2
+        "attemptsPerWorkflow": 3
     }
 }
