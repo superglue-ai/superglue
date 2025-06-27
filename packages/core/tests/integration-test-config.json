@@ -118,7 +118,15 @@
     },
     "workflows": {
         "enabled": [
-            "attio-contact-enrichment"
+            "attio-contact-enrichment",
+            "hubspot-lead-qualification",
+            "attio-contact-enrichment",
+            "jira-sprint-health",
+            "stripe-revenue-analytics",
+            "lego-inventory-analysis",
+            "timbuk2-product-analysis",
+            "crm-to-email-workflow",
+            "payment-to-db-sync"
         ],
         "definitions": {
             "hubspot-lead-qualification": {
@@ -225,8 +233,6 @@
     },
     "testSuite": {
         "name": "Integration Test",
-        "runCleanupTest": true,
-        "waitForDocumentation": true,
         "attemptsPerWorkflow": 3
     }
 }

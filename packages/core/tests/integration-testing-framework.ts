@@ -41,9 +41,7 @@ interface TestConfiguration {
     };
     testSuite: {
         name: string;
-        runCleanupTest: boolean;
-        waitForDocumentation: boolean;
-        attemptsPerWorkflow?: number; // Number of times to build/execute each workflow
+        attemptsPerWorkflow?: number;
     };
 }
 
@@ -127,8 +125,6 @@ interface TestSuite {
 
 export class IntegrationTestingFramework {
     private datastore: DataStore;
-    private createdIntegrations: string[] = [];
-    private createdWorkflows: string[] = [];
     private config: TestConfiguration;
     private metadata = { orgId: 'integration-test', userId: 'system' };
     private testDir = './.test-integration-data';
@@ -141,9 +137,6 @@ export class IntegrationTestingFramework {
         this.datastore = new FileStore(this.testDir);
         this.config = this.loadConfiguration(configPath);
         this.loadCredentialsFromEnv();
-
-        // Validate workflow configuration
-        this.validateWorkflowConfiguration();
     }
 
     private validateEnvironment(): void {
@@ -164,31 +157,7 @@ export class IntegrationTestingFramework {
         logMessage('info', `🔐 Environment validated. LLM Provider: ${process.env.LLM_PROVIDER}`, this.metadata);
     }
 
-    private validateWorkflowConfiguration(): void {
-        const enabledWorkflows = this.getEnabledWorkflows();
-        const enabledIntegrations = this.getEnabledIntegrations();
-        const enabledIntegrationIds = new Set(enabledIntegrations.map(i => i.id));
 
-        const validationErrors: string[] = [];
-
-        for (const workflow of enabledWorkflows) {
-            const missingIntegrations = workflow.integrationIds.filter(id => !enabledIntegrationIds.has(id));
-
-            if (missingIntegrations.length > 0) {
-                validationErrors.push(
-                    `Workflow "${workflow.name}" (${workflow.id}) requires integrations that are not enabled: ${missingIntegrations.join(', ')}`
-                );
-            }
-        }
-
-        if (validationErrors.length > 0) {
-            const errorMessage = `\n❌ Workflow configuration validation failed:\n${validationErrors.map(e => `  - ${e}`).join('\n')}\n\nPlease update your integration-test-config.json to enable the required integrations or disable the affected workflows.`;
-            logMessage('error', errorMessage, this.metadata);
-            throw new Error(errorMessage);
-        }
-
-        logMessage('info', `🔍 Workflow configuration validated. ${enabledWorkflows.length} workflows ready with all required integrations.`, this.metadata);
-    }
 
     private loadConfiguration(configPath?: string): TestConfiguration {
         const __dirname = path.dirname(new URL(import.meta.url).pathname);
@@ -225,7 +194,7 @@ export class IntegrationTestingFramework {
             return {
                 integrations: { enabled: [], definitions: {} },
                 workflows: { enabled: [], definitions: {} },
-                testSuite: { name: 'Default Test Suite', runCleanupTest: true, waitForDocumentation: false }
+                testSuite: { name: 'Default Test Suite' }
             };
         }
     }
@@ -331,11 +300,7 @@ export class IntegrationTestingFramework {
                         }
                     })();
                 }
-
-                // Save integration to datastore
                 const result = await this.datastore.upsertIntegration(integration.id, integrationData, this.metadata.orgId);
-
-                this.createdIntegrations.push(integration.id);
                 const integrationSetupTime = Date.now() - integrationStartTime;
 
                 setupResults.push({
@@ -364,9 +329,9 @@ export class IntegrationTestingFramework {
             }
         }
 
-        // Wait for documentation processing to complete if configured
+        // Always wait for documentation processing to complete
         let documentationProcessingTime = 0;
-        if (this.config?.testSuite?.waitForDocumentation && pendingIntegrations.length > 0) {
+        if (pendingIntegrations.length > 0) {
             logMessage('info', `⏳ Waiting for documentation processing to complete for ${pendingIntegrations.length} integrations...`, this.metadata);
 
             const docStartTime = Date.now();
@@ -468,17 +433,7 @@ export class IntegrationTestingFramework {
                 logMessage('info', `🔨 Build successful for ${testWorkflow.name} in ${Date.now() - buildStart}ms`, this.metadata);
             } catch (error) {
                 buildError = String(error);
-
-                // Log full error details
                 logMessage('error', `❌ Build failed for ${testWorkflow.name}: ${buildError}`, this.metadata);
-
-                // Log stack trace if available
-                if (error instanceof Error && error.stack) {
-                    logMessage('error', `Stack trace for ${testWorkflow.name} build failure:\n${error.stack}`, this.metadata);
-                }
-
-                // Log additional context
-                logMessage('error', `Build context - Workflow: ${testWorkflow.id}, Integrations: ${testWorkflow.integrationIds.join(', ')}`, this.metadata);
             }
             const buildTime = Date.now() - buildStart;
             buildAttempts.push({ buildTime, success: buildSuccess, error: buildError });
@@ -542,19 +497,7 @@ export class IntegrationTestingFramework {
                     }
                 } catch (error) {
                     execError = String(error);
-
-                    // Log full error details
                     logMessage('error', `❌ Execution failed for ${testWorkflow.name}: ${execError}`, this.metadata);
-
-                    // Log stack trace if available
-                    if (error instanceof Error && error.stack) {
-                        logMessage('error', `Stack trace for ${testWorkflow.name} execution failure:\n${error.stack}`, this.metadata);
-                    }
-
-                    // Log workflow details
-                    if (currentWorkflow) {
-                        logMessage('error', `Execution context - Workflow ID: ${currentWorkflow.id}, Steps: ${currentWorkflow.steps.length}`, this.metadata);
-                    }
                 }
                 executionTime = Date.now() - execStart;
                 executionAttempts.push({ executionTime, success: execSuccess, error: execError });
@@ -668,43 +611,9 @@ export class IntegrationTestingFramework {
 
     async cleanup(): Promise<number> {
         const startTime = Date.now();
-        logMessage('info', '🧹 Starting cleanup...', this.metadata);
+        logMessage('info', '🧹 Cleaning up test directory...', this.metadata);
 
-        // Clean up workflows
-        for (const workflowId of this.createdWorkflows) {
-            try {
-                await this.datastore.deleteWorkflow(workflowId, this.metadata.orgId);
-                // Verify deletion
-                try {
-                    const deletedWorkflow = await this.datastore.getWorkflow(workflowId, this.metadata.orgId);
-                    if (deletedWorkflow) {
-                        logMessage('warn', `⚠️  Workflow ${workflowId} still exists after deletion attempt`, this.metadata);
-                    }
-                } catch (error) {
-                    // Expected - workflow should not be found
-                }
-                logMessage('info', `🗑️  Deleted workflow: ${workflowId}`, this.metadata);
-            } catch (error) {
-                logMessage('warn', `⚠️  Failed to delete workflow ${workflowId}: ${String(error)}`, this.metadata);
-            }
-        }
-
-        // Clean up integrations
-        for (const integrationId of this.createdIntegrations) {
-            try {
-                await this.datastore.deleteIntegration(integrationId, this.metadata.orgId);
-                logMessage('info', `🗑️  Deleted integration: ${integrationId}`, this.metadata);
-            } catch (error) {
-                logMessage('warn', `⚠️  Failed to delete integration ${integrationId}: ${String(error)}`, this.metadata);
-            }
-        }
-
-        // Clean up test directory
         try {
-            // Clean up all runs
-            await this.datastore.deleteAllRuns(this.metadata.orgId);
-
-            // Remove the test directory if it exists
             const fs = await import('fs');
             if (fs.existsSync(this.testDir)) {
                 fs.rmSync(this.testDir, { recursive: true, force: true });
@@ -715,7 +624,6 @@ export class IntegrationTestingFramework {
         }
 
         const cleanupTime = Date.now() - startTime;
-        logMessage('info', `🧹 Cleanup completed in ${cleanupTime}ms`, this.metadata);
         return cleanupTime;
     }
 
@@ -1187,24 +1095,16 @@ export class IntegrationTestingFramework {
     }
 
     /**
-     * Calculate timing statistics (min, max, avg, p50, p95)
+     * Calculate timing statistics
      */
     private calculateTimingStats(times: number[]): Record<string, string> {
         if (times.length === 0) {
-            return { min: '0ms', max: '0ms', avg: '0ms', p50: '0ms', p95: '0ms' };
+            return { avg: '0ms' };
         }
 
-        const sorted = [...times].sort((a, b) => a - b);
         const avg = times.reduce((sum, t) => sum + t, 0) / times.length;
-        const p50Index = Math.floor(sorted.length * 0.5);
-        const p95Index = Math.floor(sorted.length * 0.95);
-
         return {
-            min: `${Math.min(...times)}ms`,
-            max: `${Math.max(...times)}ms`,
-            avg: `${avg.toFixed(0)}ms`,
-            p50: `${sorted[p50Index]}ms`,
-            p95: `${sorted[p95Index] || sorted[sorted.length - 1]}ms`
+            avg: `${avg.toFixed(0)}ms`
         };
     }
 
@@ -1238,21 +1138,10 @@ export class IntegrationTestingFramework {
 - **Documentation Processing:** ${performanceBreakdown.integrationSetup.documentationProcessing}
 - **Average per Integration:** ${performanceBreakdown.integrationSetup.averagePerIntegration}
 
-### Workflow Timing Distribution
+### Workflow Timing
 
-**Build Times (Successful)**
-- Min: ${performanceBreakdown.workflowTiming.buildTimes.min}
-- Max: ${performanceBreakdown.workflowTiming.buildTimes.max}
-- Average: ${performanceBreakdown.workflowTiming.buildTimes.avg}
-- P50: ${performanceBreakdown.workflowTiming.buildTimes.p50}
-- P95: ${performanceBreakdown.workflowTiming.buildTimes.p95}
-
-**Execution Times (Successful)**
-- Min: ${performanceBreakdown.workflowTiming.executionTimes.min}
-- Max: ${performanceBreakdown.workflowTiming.executionTimes.max}
-- Average: ${performanceBreakdown.workflowTiming.executionTimes.avg}
-- P50: ${performanceBreakdown.workflowTiming.executionTimes.p50}
-- P95: ${performanceBreakdown.workflowTiming.executionTimes.p95}
+**Build Times (Successful):** ${performanceBreakdown.workflowTiming.buildTimes.avg}  
+**Execution Times (Successful):** ${performanceBreakdown.workflowTiming.executionTimes.avg}
 
 ## 📋 Workflow Results Summary
 
@@ -1315,11 +1204,6 @@ export class IntegrationTestingFramework {
         return report;
     }
 
-    // Static method for easy script execution
-    static async runFullTestSuite(configPath?: string): Promise<TestSuite> {
-        const framework = new IntegrationTestingFramework(configPath);
-        return await framework.runTestSuite();
-    }
 }
 
 export { TestResult, TestSuite };

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The integration testing framework is designed to test Superglue's workflow building and execution capabilities across multiple integrations in an automated, repeatable manner.
+The integration testing framework is designed to test Superglue's workflow building and execution capabilities across multiple integrations in an automated, repeatable manner. It includes AI-powered analysis to diagnose failures and provide actionable insights.
 
 ## Architecture
 
@@ -11,6 +11,7 @@ The framework bypasses the GraphQL layer and directly uses backend functions for
 1. **Direct Backend Access**: Uses `WorkflowBuilder` and `WorkflowExecutor` directly instead of going through GraphQL
 2. **Isolated FileStore**: Creates a test-specific FileStore instance in `./.test-integration-data` directory
 3. **No Server Required**: Tests run without starting a GraphQL server, making them faster and more reliable
+4. **AI-Powered Analysis**: Uses LLM to analyze failures and provide recommendations
 
 ## Key Components
 
@@ -18,12 +19,27 @@ The framework bypasses the GraphQL layer and directly uses backend functions for
 - Main orchestrator class that manages the entire test lifecycle
 - Creates its own FileStore instance for isolation
 - Directly calls backend functions for integration creation, workflow building, and execution
+- Runs each workflow multiple times to measure reliability
+
+### WorkflowReportGenerator
+The report generator provides AI-powered analysis of workflow execution:
+
+- **Batch Analysis**: Analyzes all attempts for a workflow together to identify patterns
+- **Error Deduplication**: Groups similar errors to avoid redundant analysis
+- **Categorized Issues**: Breaks down problems into:
+  - Planning Issues (workflow generation problems)
+  - API Issues (endpoint/method problems)
+  - Integration Issues (auth/credential problems)
+  - Data Issues (mapping/transformation problems)
+- **Actionable Recommendations**: Provides specific fixes for identified issues
+- **Suite-Level Analysis**: Identifies systemic patterns across all workflows
 
 ### Test Workflow
 1. **Setup**: Creates integrations directly in the FileStore
 2. **Build**: Uses `WorkflowBuilder` to build workflows
 3. **Execute**: Uses `WorkflowExecutor` to run workflows
-4. **Cleanup**: Removes all test data and cleans up the test directory
+4. **Analyze**: Uses `WorkflowReportGenerator` for AI-powered diagnostics
+5. **Cleanup**: Removes entire test directory
 
 ## Running Tests
 
@@ -31,8 +47,11 @@ The framework bypasses the GraphQL layer and directly uses backend functions for
 # Run integration tests
 npm run test:integration
 
-# Run with specific config
-npm run test:integration -- --config ./custom-config.json
+# Run all tests except integration tests
+npm run test
+
+# Run tests with coverage
+npm run test:coverage
 ```
 
 ## Configuration
@@ -40,14 +59,7 @@ npm run test:integration -- --config ./custom-config.json
 The test configuration file (`integration-test-config.json`) controls:
 - Which integrations to enable
 - Which workflows to test
-- Test suite settings
-
-## Benefits of Direct Backend Approach
-
-1. **Performance**: ~3-5x faster by eliminating GraphQL overhead
-2. **Reliability**: No server startup/shutdown issues
-3. **Isolation**: Each test run uses its own FileStore instance
-4. **Simplicity**: Fewer moving parts means fewer things can go wrong
+- Number of attempts per workflow (default: 3)
 
 ## Quick Start
 
@@ -55,9 +67,9 @@ The test configuration file (`integration-test-config.json`) controls:
 
 1. **Environment Variables** - Create a `.env` file in the project root with your API credentials:
 ```bash
-# Required
+# Required for AI analysis
 OPENAI_API_KEY=sk-...  # or GEMINI_API_KEY for Gemini
-AUTH_TOKEN=your-superglue-auth-token
+LLM_PROVIDER=OPENAI    # or GEMINI
 
 # Integration-specific (add as needed)
 HUBSPOT_PRIVATE_APP_TOKEN=pat-...
@@ -72,15 +84,15 @@ SENDGRID_API_KEY=SG...
 2. **Running the Test Suite** 
 
 ```bash
-cd packages/core
 npm run test:integration
 ```
 
 The test will:
 1. Set up configured integrations
-2. Build and execute enabled workflows
-3. Generate detailed reports in `test-reports/`
-4. Clean up all created resources
+2. Build and execute each workflow multiple times
+3. Generate AI-powered analysis for failures
+4. Save detailed reports in `test-reports/`
+5. Clean up by removing the test directory
 
 ## Configuration
 
@@ -89,15 +101,20 @@ Tests are controlled via `packages/core/tests/integration-test-config.json`:
 ```json
 {
   "integrations": {
-    "enabled": ["hubspot-crm", "stripe-pay"]  // Which integrations to set up
+    "enabled": ["hubspot-crm", "stripe-pay"],  // Which integrations to set up
+    "definitions": {
+      // Integration configurations with credentials
+    }
   },
   "workflows": {
-    "enabled": ["hubspot-lead-qualification", "stripe-revenue-analytics"]  // Which workflows to test
+    "enabled": ["hubspot-lead-qualification"],  // Which workflows to test
+    "definitions": {
+      // Workflow definitions with instructions and expected outputs
+    }
   },
   "testSuite": {
     "name": "Integration Test",
-    "runCleanupTest": true,          // Clean up resources after test
-    "waitForDocumentation": true     // Wait for API docs to process
+    "attemptsPerWorkflow": 3  // How many times to run each workflow
   }
 }
 ```
@@ -108,11 +125,11 @@ Tests are controlled via `packages/core/tests/integration-test-config.json`:
 |----|---------|-------------------|--------|
 | `hubspot-crm` | HubSpot CRM | `HUBSPOT_PRIVATE_APP_TOKEN` | ✅ Working |
 | `stripe-pay` | Stripe Payments | `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY` | ✅ Working |
-| `jira-projects` | JIRA | `JIRA_API_TOKEN` | ⚠️ Auth issues - token may be expired |
-| `attio-crm` | Attio CRM | `ATTIO_API_TOKEN` | ❓ Untested |
+| `jira-projects` | JIRA | `JIRA_API_TOKEN` | ✅ Working |
+| `attio-crm` | Attio CRM | `ATTIO_API_TOKEN` | ✅ Working |
 | `postgres-lego` | LEGO Database | None (public) | ✅ Working |
 | `timbuk2-shopify` | Shopify Demo | None (public) | ✅ Working |
-| `supabase-db` | Supabase | Multiple keys required | ❓ Untested |
+| `supabase-db` | Supabase | Multiple keys required | ✅ Working |
 | `twilio-comm` | Twilio | Multiple keys required | ❓ Untested |
 | `sendgrid-email` | SendGrid | `SENDGRID_API_KEY` | ❓ Untested |
 
@@ -120,134 +137,146 @@ Tests are controlled via `packages/core/tests/integration-test-config.json`:
 
 **Single-System:**
 - `hubspot-lead-qualification` - Update lead statuses
-- `stripe-revenue-analytics` - Calculate MRR and churn
+- `stripe-revenue-analytics` - Calculate MRR
 - `jira-sprint-health` - Sprint progress analysis
-- `attio-contact-enrichment` - Link contacts to companies
+- `attio-contact-enrichment` - Find contacts without companies
 - `lego-inventory-analysis` - Database queries
 - `timbuk2-product-analysis` - Product catalog with pagination
 
 **Multi-System:**
 - `crm-to-email-workflow` - HubSpot → SendGrid
 - `payment-to-db-sync` - Stripe → Supabase
-- `project-notification-system` - JIRA → Twilio
-- `customer-lifecycle-automation` - 4-system workflow
-- `comprehensive-analytics-pipeline` - 5-system workflow
-
-## Adding New Tests
-
-### Add a New Integration
-
-1. Add to `INTEGRATION_CONFIGS` in `integration-testing-framework.ts`:
-```typescript
-{
-  id: 'new-api',
-  name: 'New API',
-  urlHost: 'https://api.example.com',
-  urlPath: '/v1',
-  documentationUrl: 'https://docs.example.com',
-  credentials: { api_key: '' },  // Will be loaded from env
-  description: 'Description'
-}
-```
-
-2. Add credential loading in `loadCredentialsFromEnv()`:
-```typescript
-const newApiConfig = this.INTEGRATION_CONFIGS.find(c => c.id === 'new-api');
-if (newApiConfig && process.env.NEW_API_KEY) {
-  newApiConfig.credentials.api_key = process.env.NEW_API_KEY;
-}
-```
-
-3. Add to `integration-test-config.json`:
-```json
-"enabled": ["new-api"]
-```
-
-### Add a New Workflow
-
-Add to `TEST_WORKFLOWS` in `integration-testing-framework.ts`:
-```typescript
-{
-  id: 'new-workflow',
-  name: 'New Workflow Test',
-  instruction: 'Natural language instruction',
-  integrationIds: ['new-api'],
-  payload: { /* test data */ },
-  expectedKeys: ['expected', 'output', 'keys'],
-  complexityLevel: 'medium',
-  category: 'single-system'
-}
-```
 
 ## Test Reports
 
 Reports are saved to `test-reports/` directory:
 
 ### Files Generated
-- `integration-test-{timestamp}.json` - Complete test data
+- `integration-test-{timestamp}.json` - Complete test data with AI analysis
 - `integration-test-{timestamp}.md` - Human-readable summary
-- `latest.json` / `latest.md` - Symlinks to most recent reports
+- `latest.json` / `latest.md` - Copies of most recent reports
 
 ### Key Metrics Tracked
 
 | Metric | Description |
 |--------|-------------|
 | **Overall Success Rate** | % of workflows that eventually succeeded |
+| **Global Success Rate** | % of all workflow attempts that succeeded |
 | **Avg Workflow Build Time** | Time to generate workflow from instruction |
 | **Avg Workflow Execution Time** | Time to run the workflow |
-| **Avg Attempts Required** | How many retries needed for success |
+| **Avg Attempts Until Success** | How many tries successful workflows needed |
 | **First Try Success Rate** | % that worked on first attempt |
 
 ### Report Contents
-- Detailed timing breakdowns (min/max/avg/p50/p95)
-- Per-workflow results with error analysis
-- AI-generated failure diagnostics
-- Integration setup performance
-- Recommendations for improvements
+- Per-workflow success rates across multiple attempts
+- AI-generated failure analysis with categorized issues
+- Specific recommendations for fixing problems
+- Integration setup performance metrics
+- Suite-level pattern analysis
+
+### AI Analysis Categories
+
+The WorkflowReportGenerator categorizes issues into:
+
+1. **Planning Issues**: Problems understanding instructions or generating appropriate steps
+2. **API Issues**: Incorrect endpoints, methods, or request formatting
+3. **Integration Issues**: Authentication failures or credential problems
+4. **Data Issues**: Mapping errors, transformation problems, or schema mismatches
+
+## Adding New Tests
+
+### Add a New Integration
+
+1. Add to `integration-test-config.json` under `integrations.definitions`:
+```json
+"new-api": {
+  "id": "new-api",
+  "name": "New API",
+  "urlHost": "https://api.example.com",
+  "urlPath": "/v1",
+  "documentationUrl": "https://docs.example.com",
+  "credentials": {
+    "api_key": ""  // Will be loaded from env
+  },
+  "description": "Description"
+}
+```
+
+2. Add credential loading in `loadCredentialsFromEnv()`:
+```typescript
+const newApiConfig = definitions['new-api'];
+if (newApiConfig && process.env.NEW_API_KEY) {
+  newApiConfig.credentials.api_key = process.env.NEW_API_KEY;
+}
+```
+
+3. Enable it in the config:
+```json
+"enabled": ["new-api"]
+```
+
+### Add a New Workflow
+
+Add to `integration-test-config.json` under `workflows.definitions`:
+```json
+"new-workflow": {
+  "id": "new-workflow",
+  "name": "New Workflow Test",
+  "instruction": "Natural language instruction",
+  "integrationIds": ["new-api"],
+  "payload": { /* test data */ },
+  "expectedKeys": ["expected", "output", "keys"],
+  "complexityLevel": "medium",
+  "category": "single-system"
+}
+```
 
 ## Maintenance Notes
 
+### Performance Optimizations
+
+1. **Batch LLM Analysis**: All attempts for a workflow are analyzed together
+2. **Error Deduplication**: Similar errors are grouped to reduce LLM calls
+3. **Simplified Prompts**: Workflow plans are truncated to essential information
+4. **Direct Backend Access**: Bypasses GraphQL for faster execution
+
 ### Known Issues
 
-1. **JIRA Authentication** - Current test account tokens frequently expire. You'll see:
+1. **JIRA Authentication** - Tokens frequently expire
    ```
    API call failed with status 401. Response: "Client must be authenticated to access this resource."
    ```
-   Solution: Update `JIRA_API_TOKEN` with fresh token from Atlassian
+   Solution: Update `JIRA_API_TOKEN` with fresh token
 
 2. **Test Data Dependencies** - Some workflows expect specific data:
    - HubSpot: Requires contacts created after specific dates
    - Stripe: Needs recent payment data
    - JIRA: Requires active sprint
 
-3. **Rate Limits** - Running full test suite may hit API limits
-   - Space out test runs
-   - Use test/sandbox accounts when possible
-
-4. **Long Test Duration** - Full suite can take 5+ minutes
-   - Use `waitForDocumentation: false` for faster runs
-   - Test specific workflows by editing config
+3. **LLM API Limits** - Full test suite makes ~20-40 LLM calls
+   - Monitor API usage and costs
+   - Tests gracefully degrade if LLM fails
 
 ### Troubleshooting
 
-**Connection Issues (ECONNRESET)**
-- Server may be overwhelmed
-- Try running fewer workflows at once
-- Check server logs for crashes
+**Missing LLM Credentials**
+- Tests will run but without AI analysis
+- Set `OPENAI_API_KEY` or `GEMINI_API_KEY` for full functionality
 
 **Timeout Errors**
-- Increase test timeout in vitest config
 - Some workflows legitimately take 30+ seconds
+- Documentation processing can take 2+ minutes
+- Test timeout is set to 120 minutes
 
-**Missing Credentials**
-- Check `.env` file has all required keys
-- Verify keys are valid and not expired
-- Use test/sandbox API keys when available
+**Cleanup Issues**
+- Test directory `.test-integration-data` is automatically removed
+- Manual cleanup: `rm -rf ./.test-integration-data`
 
 ## Best Practices
 
 1. **Start Small** - Test one integration/workflow at a time
 2. **Use Test Accounts** - Don't run against production data
-3. **Monitor Costs** - Some APIs charge per request
-4. **Review Reports** - Check `test-reports/latest.md` for insights
-5. **Update Config** - Disable failing integrations until fixed 
+3. **Monitor Costs** - LLM analysis and API calls have costs
+4. **Review AI Analysis** - Check error categorization in reports
+5. **Update Credentials** - Keep API tokens fresh
+6. **Run Regularly** - Catch regressions early 
