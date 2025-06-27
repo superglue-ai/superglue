@@ -34,11 +34,11 @@ interface TestWorkflow {
 interface TestConfiguration {
     integrations: {
         enabled: string[];
-        available: string[];
+        definitions: Record<string, IntegrationConfig>;
     };
     workflows: {
         enabled: string[];
-        available: string[];
+        definitions: Record<string, TestWorkflow>;
     };
     testSuite: {
         name: string;
@@ -217,8 +217,8 @@ export class IntegrationTestingFramework {
         } catch (error) {
             logMessage('warn', `⚠️  Could not load config from ${finalConfigPath}, using defaults: ${String(error)}`, this.metadata);
             return {
-                integrations: { enabled: [], available: [] },
-                workflows: { enabled: [], available: [] },
+                integrations: { enabled: [], definitions: {} },
+                workflows: { enabled: [], definitions: {} },
                 testSuite: { name: 'Default Test Suite', runCleanupTest: true, waitForDocumentation: false }
             };
         }
@@ -226,218 +226,23 @@ export class IntegrationTestingFramework {
 
     private getEnabledIntegrations(): IntegrationConfig[] {
         const enabledIds = this.config?.integrations?.enabled || [];
-        return this.INTEGRATION_CONFIGS.filter(config =>
-            enabledIds.includes(config.id)
-        );
+        const definitions = this.config?.integrations?.definitions || {};
+
+        return enabledIds
+            .map(id => definitions[id])
+            .filter((config): config is IntegrationConfig => config !== undefined);
     }
 
     private getEnabledWorkflows(): TestWorkflow[] {
         const enabledIds = this.config?.workflows?.enabled || [];
-        return this.TEST_WORKFLOWS.filter(workflow =>
-            enabledIds.includes(workflow.id)
-        );
+        const definitions = this.config?.workflows?.definitions || {};
+
+        return enabledIds
+            .map(id => definitions[id])
+            .filter((workflow): workflow is TestWorkflow => workflow !== undefined);
     }
 
-    private readonly INTEGRATION_CONFIGS: IntegrationConfig[] = [
-        {
-            id: 'hubspot-crm',
-            name: 'HubSpot CRM',
-            urlHost: 'https://api.hubapi.com',
-            urlPath: '/crm/v3',
-            documentationUrl: 'https://developers.hubspot.com/docs/api/overview',
-            credentials: { private_app_token: '' },
-            description: 'Customer relationship management API'
-        },
-        {
-            id: 'stripe-pay',
-            name: 'Stripe Payments',
-            urlHost: 'https://api.stripe.com',
-            urlPath: '/v1',
-            documentationUrl: 'https://stripe.com/docs/api',
-            credentials: {
-                secret_key: '',
-                publishable_key: ''
-            },
-            description: 'Payment processing and subscription management'
-        },
-        {
-            id: 'timbuk2-shopify',
-            name: 'Timbuk2 Shopify Demo',
-            urlHost: 'https://www.timbuk2.com',
-            urlPath: '/products.json',
-            documentationUrl: 'https://shopify.dev/docs/api/ajax/reference/product',
-            credentials: {},
-            description: 'Public Shopify API demo'
-        },
-        {
-            id: 'postgres-lego',
-            name: 'LEGO Database',
-            urlHost: 'postgres://superglue:superglue@database-1.c01e6ms2cdvl.us-east-1.rds.amazonaws.com:5432',
-            urlPath: '/lego',
-            documentationUrl: '',
-            credentials: {},
-            description: 'PostgreSQL LEGO database for testing'
-        },
-        {
-            id: 'jira-projects',
-            name: 'JIRA Projects',
-            urlHost: 'https://superglue-team-test.atlassian.net',
-            urlPath: '/rest/api/3',
-            documentationUrl: 'https://developer.atlassian.com/cloud/jira/platform/rest/v3',
-            credentials: {
-                email: 'michael@superglue.ai', // Add your Atlassian account email here
-                api_token: ''
-            },
-            description: 'JIRA project management API'
-        },
-        {
-            id: 'attio-crm',
-            name: 'Attio CRM',
-            urlHost: 'https://api.attio.com/v2',
-            urlPath: '',
-            documentationUrl: 'https://api.attio.com/openapi/api',
-            credentials: { api_token: '' },
-            description: 'Modern CRM with OpenAPI specification'
-        },
-        {
-            id: 'supabase-db',
-            name: 'Supabase Database',
-            urlHost: 'https://fmcghdcrnnsdbtdriycm.supabase.co',
-            urlPath: '/rest/v1',
-            documentationUrl: 'https://supabase.com/dashboard/project/fmcghdcrnnsdbtdriycm/api',
-            credentials: {
-                password: '',
-                public_api_key: '',
-                secret_key: ''
-            },
-            description: 'Backend database for multi-workflow setups'
-        },
-        {
-            id: 'twilio-comm',
-            name: 'Twilio Communications',
-            urlHost: 'https://api.twilio.com/',
-            urlPath: '/2010-04-01',
-            documentationUrl: 'https://www.twilio.com/docs/api',
-            credentials: {
-                account_sid: '',
-                sid: '',
-                test_auth_token: '',
-                secret_key: ''
-            },
-            description: 'Phone and SMS communications API'
-        },
-        {
-            id: 'sendgrid-email',
-            name: 'SendGrid Email',
-            urlHost: 'https://api.sendgrid.com/',
-            urlPath: '/v3',
-            documentationUrl: 'https://docs.sendgrid.com/api-reference',
-            credentials: { api_key: '' },
-            description: 'Email delivery and marketing API'
-        }
-    ];
 
-    private readonly TEST_WORKFLOWS: TestWorkflow[] = [
-        {
-            id: 'hubspot-lead-qualification',
-            name: 'HubSpot Lead Qualification Pipeline',
-            instruction: 'Get all HubSpot contacts created in the 30 days after the payload date, filter out contacts working at the companies in the payload company list, and update the lead status of remaining contacts to In Progress',
-            integrationIds: ['hubspot-crm'],
-            payload: { date: '2025-06-01', companies: ['COMPANY A', 'COMPANY B'] },
-            complexityLevel: 'medium',
-            category: 'single-system'
-        },
-        {
-            id: 'stripe-revenue-analytics',
-            name: 'Stripe Revenue Analytics Dashboard',
-            instruction: 'Fetch all Stripe charges in the 3 months following the payload date, group by customer and calculate my monthly recurring revenue',
-            integrationIds: ['stripe-pay'],
-            payload: { date: '2025-06-01' },
-            complexityLevel: 'high',
-            category: 'single-system'
-        },
-        {
-            id: 'jira-sprint-health',
-            name: 'JIRA Sprint Health Check',
-            instruction: 'Get all issues from the current active sprint, categorize them by status, calculate completion percentage, and identify any issues marked as Blocked or High Priority that are still in progress',
-            integrationIds: ['jira-projects'],
-            payload: {},
-            complexityLevel: 'medium',
-            category: 'single-system'
-        },
-        {
-            id: 'attio-contact-enrichment',
-            name: 'Attio Contact Enrichment',
-            instruction: 'Find all Attio contacts that dont have a company assigned, check if their email domain matches any existing companies in the system, and automatically link them to the matching company record',
-            integrationIds: ['attio-crm'],
-            payload: {},
-            complexityLevel: 'medium',
-            category: 'single-system'
-        },
-        {
-            id: 'lego-inventory-analysis',
-            name: 'LEGO Database Inventory Analysis',
-            instruction: 'Query the LEGO database to find the most popular LEGO themes by number of sets.',
-            integrationIds: ['postgres-lego'],
-            payload: {},
-            complexityLevel: 'low',
-            category: 'single-system'
-        },
-        {
-            id: 'timbuk2-product-analysis',
-            name: 'Timbuk2 Product Analysis',
-            instruction: 'Get all products from Timbuk2 with automatic pagination. This is a public endpoint.',
-            integrationIds: ['timbuk2-shopify'],
-            payload: {},
-            complexityLevel: 'low',
-            category: 'single-system'
-        },
-        {
-            id: 'crm-to-email-workflow',
-            name: 'CRM to Email Marketing Workflow',
-            instruction: 'Get all lifecycle status: marketing qualified leads from HubSpot created in the last 100 days after the payload date, create an email saying "Hello [name]", and send them a welcome email via my SendGrid using sender michael@superglue.ai',
-            integrationIds: ['hubspot-crm', 'sendgrid-email'],
-            payload: { date: '2025-06-01' },
-            complexityLevel: 'high',
-            category: 'multi-system'
-        },
-        {
-            id: 'payment-to-db-sync',
-            name: 'Payment to Database Sync',
-            instruction: 'Fetch all successful Stripe payments from the last 24 hours, transform the data to match the database schema, and insert the records into Supabase for analytics',
-            integrationIds: ['stripe-pay', 'supabase-db'],
-            payload: { hours: 24 },
-            complexityLevel: 'medium',
-            category: 'multi-system'
-        },
-        {
-            id: 'project-notification-system',
-            name: 'Project Status Notification System',
-            instruction: 'Monitor JIRA for overdue high-priority tickets, check if they have been updated in the last 48 hours, and send SMS notifications to project managers via Twilio for any stale tickets',
-            integrationIds: ['jira-projects', 'twilio-comm'],
-            payload: { hours: 48 },
-            complexityLevel: 'medium',
-            category: 'multi-system'
-        },
-        {
-            id: 'customer-lifecycle-automation',
-            name: 'Customer Lifecycle Automation',
-            instruction: 'Identify customers who have not made a purchase in Stripe in the 90 days since the payload date, check their engagement score in HubSpot, and send re-engagement emails via SendGrid',
-            integrationIds: ['stripe-pay', 'hubspot-crm', 'sendgrid-email'],
-            payload: { date: '2025-05-01' },
-            complexityLevel: 'medium',
-            category: 'multi-system'
-        },
-        {
-            id: 'comprehensive-analytics-pipeline',
-            name: 'Comprehensive Analytics Pipeline',
-            instruction: 'Collect sales data from Stripe, customer data from HubSpot, project data from JIRA, combine all data sources, generate weekly analytics report, store results in Supabase, and email the report to stakeholders via SendGrid',
-            integrationIds: ['stripe-pay', 'hubspot-crm', 'jira-projects', 'supabase-db', 'sendgrid-email'],
-            payload: { period: 'weekly' },
-            complexityLevel: 'high',
-            category: 'multi-system'
-        }
-    ];
 
     async setupIntegrations(): Promise<{ setupTime: number; results: IntegrationSetupResult[]; documentationProcessingTime: number }> {
         const startTime = Date.now();
@@ -834,7 +639,7 @@ export class IntegrationTestingFramework {
         const credentials: Record<string, string> = {};
 
         for (const integrationId of integrationIds) {
-            const config = this.INTEGRATION_CONFIGS.find(c => c.id === integrationId);
+            const config = this.config?.integrations?.definitions?.[integrationId];
             if (config) {
                 Object.entries(config.credentials).forEach(([key, value]) => {
                     credentials[`${integrationId}_${key}`] = value;
@@ -1211,33 +1016,36 @@ export class IntegrationTestingFramework {
     }
 
     private loadCredentialsFromEnv(): void {
+        const definitions = this.config?.integrations?.definitions;
+        if (!definitions) return;
+
         // HubSpot CRM
-        const hubspotConfig = this.INTEGRATION_CONFIGS.find(c => c.id === 'hubspot-crm');
+        const hubspotConfig = definitions['hubspot-crm'];
         if (hubspotConfig && process.env.HUBSPOT_PRIVATE_APP_TOKEN) {
             hubspotConfig.credentials.private_app_token = process.env.HUBSPOT_PRIVATE_APP_TOKEN;
         }
 
         // Stripe
-        const stripeConfig = this.INTEGRATION_CONFIGS.find(c => c.id === 'stripe-pay');
+        const stripeConfig = definitions['stripe-pay'];
         if (stripeConfig) {
             if (process.env.STRIPE_SECRET_KEY) stripeConfig.credentials.secret_key = process.env.STRIPE_SECRET_KEY;
             if (process.env.STRIPE_PUBLISHABLE_KEY) stripeConfig.credentials.publishable_key = process.env.STRIPE_PUBLISHABLE_KEY;
         }
 
         // JIRA
-        const jiraConfig = this.INTEGRATION_CONFIGS.find(c => c.id === 'jira-projects');
+        const jiraConfig = definitions['jira-projects'];
         if (jiraConfig && process.env.JIRA_API_TOKEN) {
             jiraConfig.credentials.api_token = process.env.JIRA_API_TOKEN;
         }
 
         // Attio CRM
-        const attioConfig = this.INTEGRATION_CONFIGS.find(c => c.id === 'attio-crm');
+        const attioConfig = definitions['attio-crm'];
         if (attioConfig && process.env.ATTIO_API_TOKEN) {
             attioConfig.credentials.api_token = process.env.ATTIO_API_TOKEN;
         }
 
         // Supabase
-        const supabaseConfig = this.INTEGRATION_CONFIGS.find(c => c.id === 'supabase-db');
+        const supabaseConfig = definitions['supabase-db'];
         if (supabaseConfig) {
             if (process.env.SUPABASE_PASSWORD) supabaseConfig.credentials.password = process.env.SUPABASE_PASSWORD;
             if (process.env.SUPABASE_PUBLIC_API_KEY) supabaseConfig.credentials.public_api_key = process.env.SUPABASE_PUBLIC_API_KEY;
@@ -1245,7 +1053,7 @@ export class IntegrationTestingFramework {
         }
 
         // Twilio
-        const twilioConfig = this.INTEGRATION_CONFIGS.find(c => c.id === 'twilio-comm');
+        const twilioConfig = definitions['twilio-comm'];
         if (twilioConfig) {
             if (process.env.TWILIO_ACCOUNT_SID) twilioConfig.credentials.account_sid = process.env.TWILIO_ACCOUNT_SID;
             if (process.env.TWILIO_SID) twilioConfig.credentials.sid = process.env.TWILIO_SID;
@@ -1254,7 +1062,7 @@ export class IntegrationTestingFramework {
         }
 
         // SendGrid
-        const sendgridConfig = this.INTEGRATION_CONFIGS.find(c => c.id === 'sendgrid-email');
+        const sendgridConfig = definitions['sendgrid-email'];
         if (sendgridConfig && process.env.SENDGRID_API_KEY) {
             sendgridConfig.credentials.api_key = process.env.SENDGRID_API_KEY;
         }
