@@ -31,9 +31,9 @@ export async function executeApiCall(
   let isSelfHealing = isSelfHealingEnabled(options);
 
   let documentationString = "";
-  if (!integration) {
+  if (!integration && isSelfHealing) {
     logMessage('warn', `No integration provided. Proceeding without documentation.`, metadata);
-  } else if (integration.documentationPending) {
+  } else if (integration && integration.documentationPending) {
     logMessage('warn', `Documentation for integration ${integration.id} is still being fetched. Proceeding without documentation.`, metadata);
   } else if (integration.documentation) {
     documentationString = Documentation.postProcess(integration.documentation, endpoint.instruction || "");
