@@ -18,3 +18,4 @@ integration-test-results**
 # Integration test artifacts
 **/.test-data/
 **/.test-results/
+**/test-reports/

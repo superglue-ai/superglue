@@ -4,7 +4,8 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    testTimeout: 300000, // 5 minutes for integration tests
+    testTimeout: 12000000, // 120 minutes for integration tests
+    hookTimeout: 180000,   // 3 minutes for setup/teardown hooks
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

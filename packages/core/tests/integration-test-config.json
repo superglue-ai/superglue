@@ -1,7 +1,14 @@
 {
     "integrations": {
         "enabled": [
-            "hubspot-crm"
+            "hubspot-crm",
+            "stripe-pay",
+            "jira-projects",
+            "attio-crm",
+            "supabase-db",
+            "postgres-lego",
+            "timbuk2-shopify",
+            "sendgrid-email"
         ],
         "available": [
             "hubspot-crm",
@@ -18,7 +25,14 @@
     },
     "workflows": {
         "enabled": [
-            "hubspot-lead-qualification"
+            "jira-sprint-health",
+            "hubspot-lead-qualification",
+            "stripe-revenue-analytics",
+            "attio-contact-enrichment",
+            "lego-inventory-analysis",
+            "timbuk2-product-analysis",
+            "payment-to-db-sync",
+            "crm-to-email-workflow"
         ],
         "available": [
             "hubspot-lead-qualification",
@@ -37,6 +51,7 @@
     "testSuite": {
         "name": "Integration Test",
         "runCleanupTest": true,
-        "waitForDocumentation": true
+        "waitForDocumentation": true,
+        "attemptsPerWorkflow": 3
     }
 }

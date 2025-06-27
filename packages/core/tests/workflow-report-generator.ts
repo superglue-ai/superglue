@@ -1,6 +1,7 @@
 import { z } from 'zod';
-import { LanguageModel } from '../llm/llm.js';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 import { logMessage } from "../utils/logs.js";
+// LanguageModel will be imported dynamically to ensure env vars are loaded first
 
 interface BuildAttempt {
     buildTime: number;
@@ -78,6 +79,7 @@ interface ErrorAnalysisInput {
     integrationIds: string[];
     payload?: Record<string, any>;
     expectedKeys?: string[];
+    actualData?: any; // The actual data returned by the workflow
 }
 
 /**
@@ -110,6 +112,7 @@ export class WorkflowReportGenerator {
         try {
             const prompt = this.buildAnalysisPrompt(input, allErrors);
 
+            const { LanguageModel } = await import('../llm/llm.js');
             const response = await LanguageModel.generateText([
                 { role: 'user', content: prompt }
             ], 0.3);
@@ -248,6 +251,7 @@ Identify any patterns across failures:
 Provide 2-3 sentences highlighting the most important patterns and recommendations.`;
 
         try {
+            const { LanguageModel } = await import('../llm/llm.js');
             const response = await LanguageModel.generateText([
                 { role: 'user', content: prompt }
             ], 0.3);
@@ -305,6 +309,7 @@ INSTRUCTION: "${originalInstruction}"
 INTEGRATION IDS: [${integrationIds.join(', ')}]
 PAYLOAD: ${JSON.stringify(payload || {}, null, 2)}
 EXPECTED OUTPUT: [${expectedKeys?.join(', ') || 'none specified'}]
+ACTUAL OUTPUT: ${input.actualData ? JSON.stringify(Object.keys(input.actualData), null, 2) : 'No data returned'}
 OVERALL SUCCESS: ${overallSuccess}
 TOTAL ATTEMPTS: ${totalAttempts}
 
@@ -329,9 +334,10 @@ Provide actionable recommendations to fix the problems.
 Summarize what happened in 2-3 sentences.`;
 
         try {
+            const { LanguageModel } = await import('../llm/llm.js');
             const response = await LanguageModel.generateObject([
                 { role: 'user', content: prompt }
-            ], WorkflowExecutionReportSchema, 0.2);
+            ], zodToJsonSchema(WorkflowExecutionReportSchema), 0.2);
 
             return {
                 workflowId,
