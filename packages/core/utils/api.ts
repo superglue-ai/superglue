@@ -178,26 +178,53 @@ config: ${JSON.stringify(axiosConfig)}`;
     }
 
     // update pagination
-    if (endpoint.pagination?.type === PaginationType.PAGE_BASED) {
-      page++;
-    }
-    else if (endpoint.pagination?.type === PaginationType.OFFSET_BASED) {
-      offset += parseInt(endpoint.pagination?.pageSize || "50");
-    }
-    else if (endpoint.pagination?.type === PaginationType.CURSOR_BASED) {
-      const cursorParts = (endpoint.pagination?.cursorPath || 'next_cursor').split('.');
-      let nextCursor = response.data;
-      for (const part of cursorParts) {
-        nextCursor = nextCursor?.[part];
+    try {
+      if (endpoint.pagination?.type === PaginationType.PAGE_BASED) {
+        page++;
       }
-      cursor = nextCursor;
-      if (!cursor) {
+      else if (endpoint.pagination?.type === PaginationType.OFFSET_BASED) {
+        const parsedPageSize = parseInt(endpoint.pagination?.pageSize || "50");
+        if (isNaN(parsedPageSize)) {
+          console.warn(`Invalid pageSize value: ${endpoint.pagination?.pageSize}. Using default of 50.`);
+          offset += 50;
+        } else {
+          offset += parsedPageSize;
+        }
+      }
+      else if (endpoint.pagination?.type === PaginationType.CURSOR_BASED) {
+        if (!endpoint.pagination?.cursorPath) {
+          console.warn("Cursor-based pagination specified but no cursorPath provided. Using 'next_cursor' as default.");
+        }
+        
+        const cursorParts = (endpoint.pagination?.cursorPath || 'next_cursor').split('.');
+        let nextCursor = response.data;
+        let cursorFound = true;
+        
+        for (const part of cursorParts) {
+          if (nextCursor === undefined || nextCursor === null) {
+            cursorFound = false;
+            break;
+          }
+          nextCursor = nextCursor[part];
+        }
+        
+        if (cursorFound) {
+          cursor = nextCursor;
+        }
+        
+        // If no cursor value found or cursor is empty/null/undefined, end pagination
+        if (!cursor || (typeof cursor === 'string' && cursor.trim() === '')) {
+          hasMore = false;
+        }
+      }
+      else {
         hasMore = false;
       }
-    }
-    else {
+    } catch (error) {
+      console.error(`Pagination error: ${error.message}. Stopping pagination.`);
       hasMore = false;
     }
+    
     loopCounter++;
   }
 
