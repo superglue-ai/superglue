@@ -66,14 +66,20 @@ export class RedisService implements DataStore {
     const pattern = this.getPattern(this.API_PREFIX, orgId);
     const keys = await this.redis.keys(pattern);
     const slicedKeys = keys.slice(offset, offset + limit);
-
-    const configs = await Promise.all(
-      slicedKeys.map(async (key) => {
-        const data = await this.redis.get(key);
-        const id = key.split(':').pop()!.replace(this.API_PREFIX, '');
-        return parseWithId(data, id);
-      })
-    );
+    
+    if (slicedKeys.length === 0) {
+      return { items: [], total: keys.length };
+    }
+    
+    // Use MGET to fetch all values in a single command
+    const dataList = await this.redis.mGet(slicedKeys);
+    
+    const configs = dataList.map((data: string | null, index: number) => {
+      const key = slicedKeys[index];
+      const id = key.split(':').pop()!.replace(this.API_PREFIX, '');
+      return parseWithId(data, id);
+    });
+    
     return { items: configs.filter((config): config is ApiConfig => config !== null), total: keys.length };
   }
 
@@ -101,14 +107,20 @@ export class RedisService implements DataStore {
     const pattern = this.getPattern(this.EXTRACT_PREFIX, orgId);
     const keys = await this.redis.keys(pattern);
     const slicedKeys = keys.slice(offset, offset + limit);
-
-    const configs = await Promise.all(
-      slicedKeys.map(async (key) => {
-        const data = await this.redis.get(key);
-        const id = key.split(':').pop()!.replace(this.EXTRACT_PREFIX, '');
-        return parseWithId(data, id);
-      })
-    );
+    
+    if (slicedKeys.length === 0) {
+      return { items: [], total: keys.length };
+    }
+    
+    // Use MGET to fetch all values in a single command
+    const dataList = await this.redis.mGet(slicedKeys);
+    
+    const configs = dataList.map((data: string | null, index: number) => {
+      const key = slicedKeys[index];
+      const id = key.split(':').pop()!.replace(this.EXTRACT_PREFIX, '');
+      return parseWithId(data, id);
+    });
+    
     return { items: configs.filter((config): config is ExtractConfig => config !== null), total: keys.length };
   }
 
@@ -136,14 +148,20 @@ export class RedisService implements DataStore {
     const pattern = this.getPattern(this.TRANSFORM_PREFIX, orgId);
     const keys = await this.redis.keys(pattern);
     const slicedKeys = keys.slice(offset, offset + limit);
-
-    const configs = await Promise.all(
-      slicedKeys.map(async (key) => {
-        const data = await this.redis.get(key);
-        const id = key.split(':').pop()!.replace(this.TRANSFORM_PREFIX, '');
-        return parseWithId(data, id);
-      })
-    );
+    
+    if (slicedKeys.length === 0) {
+      return { items: [], total: keys.length };
+    }
+    
+    // Use MGET to fetch all values in a single command
+    const dataList = await this.redis.mGet(slicedKeys);
+    
+    const configs = dataList.map((data: string | null, index: number) => {
+      const key = slicedKeys[index];
+      const id = key.split(':').pop()!.replace(this.TRANSFORM_PREFIX, '');
+      return parseWithId(data, id);
+    });
+    
     return { items: configs.filter((config): config is TransformConfig => config !== null), total: keys.length };
   }
 
@@ -182,14 +200,15 @@ export class RedisService implements DataStore {
     if (total === 0) {
       return { items: [], total: 0 };
     }
-
-    const runs = await Promise.all(
-      keys.map(async (key) => {
-        const data = await this.redis.get(key);
-        const runId = key.split(':').pop()!;
-        return parseWithId(data, runId);
-      })
-    );
+    
+    // Use MGET to fetch all values in a single command
+    const dataList = await this.redis.mGet(keys);
+    
+    const runs = dataList.map((data: string | null, index: number) => {
+      const key = keys[index];
+      const runId = key.split(':').pop()!;
+      return parseWithId(data, runId);
+    });
 
     const validRuns = runs
       .filter((run): run is RunResult =>
@@ -314,14 +333,19 @@ export class RedisService implements DataStore {
       const pattern = this.getPattern(this.WORKFLOW_PREFIX, orgId);
       const keys = await this.redis.keys(pattern);
       const slicedKeys = keys.slice(offset, offset + limit);
-
-      const workflows = await Promise.all(
-        slicedKeys.map(async (key) => {
-          const data = await this.redis.get(key);
-          const id = key.split(':').pop()?.replace(this.WORKFLOW_PREFIX, '');
-          return parseWithId(data, id);
-        })
-      );
+      
+      if (slicedKeys.length === 0) {
+        return { items: [], total: keys.length };
+      }
+      
+      // Use MGET to fetch all values in a single command
+      const dataList = await this.redis.mGet(slicedKeys);
+      
+      const workflows = dataList.map((data: string | null, index: number) => {
+        const key = slicedKeys[index];
+        const id = key.split(':').pop()?.replace(this.WORKFLOW_PREFIX, '');
+        return parseWithId(data, id);
+      });
 
       return {
         items: workflows.filter((workflow): workflow is Workflow => workflow !== null),
@@ -371,14 +395,20 @@ export class RedisService implements DataStore {
     const pattern = this.getPattern(this.INTEGRATION_PREFIX, orgId);
     const keys = await this.redis.keys(pattern);
     const slicedKeys = keys.slice(offset, offset + limit);
-
-    const integrations = await Promise.all(
-      slicedKeys.map(async (key) => {
-        const data = await this.redis.get(key);
-        const id = key.split(':').pop()!.replace(this.INTEGRATION_PREFIX, '');
-        return parseWithId(data, id);
-      })
-    );
+    
+    if (slicedKeys.length === 0) {
+      return { items: [], total: keys.length };
+    }
+    
+    // Use MGET to fetch all values in a single command
+    const dataList = await this.redis.mGet(slicedKeys);
+    
+    const integrations = dataList.map((data: string | null, index: number) => {
+      const key = slicedKeys[index];
+      const id = key.split(':').pop()!.replace(this.INTEGRATION_PREFIX, '');
+      return parseWithId(data, id);
+    });
+    
     return { items: integrations.filter((i): i is Integration => i !== null), total: keys.length };
   }
 

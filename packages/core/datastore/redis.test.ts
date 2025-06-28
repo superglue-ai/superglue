@@ -1,5 +1,5 @@
 import { ApiConfig, ExtractConfig, HttpMethod, RunResult, TransformConfig } from '@superglue/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RedisService } from './redis.js';
 
 // Mock Redis client configuration
@@ -39,6 +39,9 @@ if (!testConfig.host || !testConfig.port || !testConfig.username || !testConfig.
     });
 
     describe('API Config', () => {
+      const testSpy = vi.spyOn(RedisService.prototype as any, 'redis', 'get').mockImplementation(function() {
+        return this._redis;
+      });
       const testConfig: ApiConfig = {
         id: 'test-id',
         createdAt: new Date(),
@@ -62,6 +65,35 @@ if (!testConfig.host || !testConfig.port || !testConfig.username || !testConfig.
         expect(items).toHaveLength(1);
         expect(total).toBe(1);
         expect(items[0]).toEqual(testConfig);
+      });
+      
+      it('should use MGET for batch retrieval of multiple API configs', async () => {
+        // Create multiple configs
+        const configs = Array.from({ length: 5 }, (_, i) => ({
+          ...testConfig,
+          id: `test-id-${i}`,
+          urlHost: `https://test${i}.com`
+        }));
+        
+        // Insert configs
+        await Promise.all(
+          configs.map(config => store.upsertApiConfig(config.id, config, testOrgId))
+        );
+        
+        // Spy on redis methods
+        const mgetSpy = vi.spyOn(store['redis'], 'mGet');
+        const getSpy = vi.spyOn(store['redis'], 'get');
+        
+        // List configs
+        const { items, total } = await store.listApiConfigs(10, 0, testOrgId);
+        
+        // Verify results
+        expect(items).toHaveLength(5);
+        expect(total).toBe(5);
+        
+        // Verify MGET was called once and GET was not called
+        expect(mgetSpy).toHaveBeenCalledTimes(1);
+        expect(getSpy).not.toHaveBeenCalled();
       });
 
       it('should delete API configs', async () => {
