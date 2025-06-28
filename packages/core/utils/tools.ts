@@ -307,6 +307,7 @@ export function composeUrl(host: string, path: string) {
 
 export async function replaceVariables(template: string, payload: Record<string, any>): Promise<string> {
   if (!template) return "";
+  if (!payload) payload = {};
 
   const pattern = /<<([\s\S]*?)>>/g;
 
@@ -316,18 +317,27 @@ export async function replaceVariables(template: string, payload: Record<string,
   for (const match of matches) {
     const path = match[1];
     let value: any;
-    if (payload[path]) {
-      value = payload[path];
-    }
-    else {
-      value = await applyJsonata(payload, path);
-    }
+    
+    try {
+      if (payload.hasOwnProperty(path)) {
+        value = payload[path];
+      } else {
+        value = await applyJsonata(payload, path);
+      }
 
-    if (Array.isArray(value) || typeof value === 'object') {
-      value = JSON.stringify(value);
+      // Handle nullish values
+      if (value === undefined || value === null) {
+        value = "";
+      } else if (Array.isArray(value) || typeof value === 'object') {
+        value = JSON.stringify(value);
+      }
+      
+      result = result.replace(match[0], String(value));
+    } catch (error) {
+      // Log error but continue with empty string to prevent breaking the whole transformation
+      console.warn(`Error replacing variable ${path}: ${error.message}`);
+      result = result.replace(match[0], "");
     }
-
-    result = result.replace(match[0], String(value));
   }
 
   return oldReplaceVariables(result, payload);
@@ -335,34 +345,47 @@ export async function replaceVariables(template: string, payload: Record<string,
 
 function oldReplaceVariables(template: string, variables: Record<string, any>): string {
   if (!template) return "";
+  if (!variables || Object.keys(variables).length === 0) return template;
 
-  const variableNames = Object.keys(variables);
-  const pattern = new RegExp(`\\{(${variableNames.join('|')})(?:\\.(\\w+))*\\}`, 'g');
+  try {
+    const variableNames = Object.keys(variables);
+    if (variableNames.length === 0) return template;
 
-  return String(template).replace(pattern, (match, path) => {
-    const parts = path.split('.');
-    let value = variables;
+    const pattern = new RegExp(`\\{(${variableNames.map(name => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})(?:\\.(\\w+))*\\}`, 'g');
 
-    for (const part of parts) {
-      if (value === undefined || value === null) {
-        return match; // Keep original if path is invalid
+    return String(template).replace(pattern, (match, path) => {
+      try {
+        const parts = path.split('.');
+        let value = variables;
+
+        for (const part of parts) {
+          if (value === undefined || value === null) {
+            return match; // Keep original if path is invalid
+          }
+          value = value[part];
+        }
+
+        if (value === undefined || value === null) {
+          if (path == 'cursor') {
+            return "";
+          }
+          return match; // Keep original if final value is invalid
+        }
+
+        if (Array.isArray(value) || typeof value === 'object') {
+          return JSON.stringify(value);
+        }
+
+        return String(value);
+      } catch (error) {
+        console.warn(`Error in oldReplaceVariables for pattern ${match}: ${error.message}`);
+        return match; // Keep original on error
       }
-      value = value[part];
-    }
-
-    if (value === undefined || value === null) {
-      if (path == 'cursor') {
-        return "";
-      }
-      return match; // Keep original if final value is invalid
-    }
-
-    if (Array.isArray(value) || typeof value === 'object') {
-      return JSON.stringify(value);
-    }
-
-    return String(value);
-  });
+    });
+  } catch (error) {
+    console.error(`Failed to process variables in template: ${error.message}`);
+    return template; // Return original template on critical error
+  }
 }
 
 
