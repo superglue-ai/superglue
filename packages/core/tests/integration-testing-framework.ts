@@ -71,11 +71,10 @@ interface TestResult {
     errorSummary?: string;
     executionReport?: any;
     actualData?: any;
-    // New fields for tracking multiple attempts
+    dataPreview?: string;
     totalAttempts: number;
     successfulAttempts: number;
-    successRate: number; // Success rate for this specific workflow
-    // Store workflow plans for batch analysis
+    successRate: number; 
     workflowPlans?: Array<{
         plan: any;
         buildSuccess: boolean;
@@ -541,7 +540,7 @@ export class IntegrationTestingFramework {
             errorSummary,
             executionReport,
             actualData,
-            // These will be properly set in runTestSuite after all attempts
+            dataPreview: actualData ? this.generateDataPreview(actualData) : undefined,
             totalAttempts: 1,
             successfulAttempts: succeededOnAttempt ? 1 : 0,
             successRate: succeededOnAttempt ? 1 : 0,
@@ -607,6 +606,31 @@ export class IntegrationTestingFramework {
 
         // For primitives, just return type
         return { type: typeof data };
+    }
+
+    /**
+     * Generate a preview of the data (first 100 characters)
+     */
+    private generateDataPreview(data: any): string {
+        if (data === null || data === undefined) {
+            return 'null/undefined';
+        }
+
+        let stringified: string;
+        try {
+            // Pretty print for better readability
+            stringified = JSON.stringify(data, null, 2);
+        } catch (error) {
+            // Fallback for circular references or other issues
+            stringified = String(data);
+        }
+
+        // Take first 100 characters and add ellipsis if truncated
+        if (stringified.length <= 100) {
+            return stringified;
+        }
+
+        return stringified.substring(0, 100) + '...';
     }
 
     async cleanup(): Promise<number> {
@@ -700,6 +724,7 @@ export class IntegrationTestingFramework {
                     executionAttempts: allExecutionAttempts,
                     succeededOnAttempt: firstSuccessAttempt,
                     actualData: finalData,
+                    dataPreview: finalData ? this.generateDataPreview(finalData) : lastResult?.dataPreview,
                     // New fields
                     totalAttempts: ATTEMPTS_PER_WORKFLOW,
                     successfulAttempts,
@@ -873,6 +898,11 @@ export class IntegrationTestingFramework {
                 result += `\n    Data: ${JSON.stringify(schema)}`;
             }
 
+            // Add data preview
+            if (r.dataPreview) {
+                result += `\n    Data Preview: ${r.dataPreview}`;
+            }
+
             if (r.errorSummary) {
                 result += `\n    🤖 AI Analysis: ${r.errorSummary}`;
             }
@@ -921,60 +951,51 @@ export class IntegrationTestingFramework {
         const definitions = this.config?.integrations?.definitions;
         if (!definitions) return;
 
-        // HubSpot CRM
-        const hubspotConfig = definitions['hubspot-crm'];
-        if (hubspotConfig && process.env.HUBSPOT_PRIVATE_APP_TOKEN) {
-            hubspotConfig.credentials.private_app_token = process.env.HUBSPOT_PRIVATE_APP_TOKEN;
+        const enabledIntegrations = this.config.integrations.enabled || [];
+        const missingEnvVars: string[] = [];
+
+        for (const integrationId of enabledIntegrations) {
+            const integrationConfig = definitions[integrationId];
+            if (!integrationConfig) {
+                logMessage('warn', `Integration ${integrationId} is enabled but not defined in definitions`, this.metadata);
+                continue;
+            }
+
+            if (!integrationConfig.credentials || Object.keys(integrationConfig.credentials).length === 0) {
+                logMessage('info', `Integration ${integrationId} requires no credentials`, this.metadata);
+                continue;
+            }
+
+            // Process each credential key for this integration
+            for (const credentialKey of Object.keys(integrationConfig.credentials)) {
+                // Generate the expected environment variable name
+                const envVarName = `${integrationId.toUpperCase().replace(/-/g, '_')}_${credentialKey.toUpperCase()}`;
+                const envValue = process.env[envVarName];
+
+                if (envValue) {
+                    // Map the environment variable to the credential
+                    integrationConfig.credentials[credentialKey] = envValue;
+                    logMessage('info', `✓ Mapped ${envVarName} to ${integrationId}.credentials.${credentialKey}`, this.metadata);
+                } else {
+                    // Track missing environment variables
+                    missingEnvVars.push(envVarName);
+                }
+            }
+
+            // Special handling for postgres connection strings that also set urlHost
+            if (integrationId === 'postgres-lego' && integrationConfig.credentials.connection_string) {
+                integrationConfig.urlHost = integrationConfig.credentials.connection_string;
+            }
         }
 
-        // Stripe
-        const stripeConfig = definitions['stripe-pay'];
-        if (stripeConfig) {
-            if (process.env.STRIPE_SECRET_KEY) stripeConfig.credentials.secret_key = process.env.STRIPE_SECRET_KEY;
-            if (process.env.STRIPE_PUBLISHABLE_KEY) stripeConfig.credentials.publishable_key = process.env.STRIPE_PUBLISHABLE_KEY;
+        // Report any missing environment variables
+        if (missingEnvVars.length > 0) {
+            const errorMessage = `Missing required environment variables for enabled integrations:\n${missingEnvVars.map(v => `  - ${v}`).join('\n')}`;
+            logMessage('error', errorMessage, this.metadata);
+            throw new Error(errorMessage);
         }
 
-        // JIRA
-        const jiraConfig = definitions['jira-projects'];
-        if (jiraConfig && process.env.JIRA_API_TOKEN) {
-            jiraConfig.credentials.api_token = process.env.JIRA_API_TOKEN;
-        }
-
-        // Attio CRM
-        const attioConfig = definitions['attio-crm'];
-        if (attioConfig && process.env.ATTIO_API_TOKEN) {
-            attioConfig.credentials.api_token = process.env.ATTIO_API_TOKEN;
-        }
-
-        // Supabase
-        const supabaseConfig = definitions['supabase-db'];
-        if (supabaseConfig) {
-            if (process.env.SUPABASE_PASSWORD) supabaseConfig.credentials.password = process.env.SUPABASE_PASSWORD;
-            if (process.env.SUPABASE_PUBLIC_API_KEY) supabaseConfig.credentials.public_api_key = process.env.SUPABASE_PUBLIC_API_KEY;
-            if (process.env.SUPABASE_SECRET_KEY) supabaseConfig.credentials.secret_key = process.env.SUPABASE_SECRET_KEY;
-        }
-
-        // Twilio
-        const twilioConfig = definitions['twilio-comm'];
-        if (twilioConfig) {
-            if (process.env.TWILIO_ACCOUNT_SID) twilioConfig.credentials.account_sid = process.env.TWILIO_ACCOUNT_SID;
-            if (process.env.TWILIO_SID) twilioConfig.credentials.sid = process.env.TWILIO_SID;
-            if (process.env.TWILIO_TEST_AUTH_TOKEN) twilioConfig.credentials.test_auth_token = process.env.TWILIO_TEST_AUTH_TOKEN;
-            if (process.env.TWILIO_SECRET_KEY) twilioConfig.credentials.secret_key = process.env.TWILIO_SECRET_KEY;
-        }
-
-        // SendGrid
-        const sendgridConfig = definitions['sendgrid-email'];
-        if (sendgridConfig && process.env.SENDGRID_API_KEY) {
-            sendgridConfig.credentials.api_key = process.env.SENDGRID_API_KEY;
-        }
-
-        // PostgreSQL LEGO Database
-        const postgresConfig = definitions['postgres-lego'];
-        if (postgresConfig && process.env.POSTGRES_LEGO_CONNECTION_STRING) {
-            postgresConfig.urlHost = process.env.POSTGRES_LEGO_CONNECTION_STRING;
-            postgresConfig.credentials.connection_string = process.env.POSTGRES_LEGO_CONNECTION_STRING;
-        }
+        logMessage('info', `✅ Successfully loaded credentials for ${enabledIntegrations.length} integrations`, this.metadata);
     }
 
     /**
@@ -1164,6 +1185,19 @@ export class IntegrationTestingFramework {
             report += `| ${result.workflowName} | ${result.success ? '✅' : '❌'} | ${result.buildAttempts}/${result.executionAttempts} | ${buildTime}ms | ${execTime}ms | ${result.category} | ${result.complexity} |\n`;
         }
 
+        // Add successful workflow details with data preview
+        const successfulWorkflows = jsonReport.workflowResults.filter((r: any) => r.success);
+        if (successfulWorkflows.length > 0) {
+            report += `\n## ✅ Successful Workflows - Data Preview\n\n`;
+
+            for (const success of successfulWorkflows) {
+                const originalResult = testSuite.results.find(r => r.workflowId === success.workflowId);
+                if (originalResult?.dataPreview) {
+                    report += `**${success.workflowName}:** ${originalResult.dataPreview}\n\n`;
+                }
+            }
+        }
+
         // Add failed workflow details
         const failedWorkflows = jsonReport.workflowResults.filter((r: any) => !r.success);
         if (failedWorkflows.length > 0) {
@@ -1171,6 +1205,12 @@ export class IntegrationTestingFramework {
 
             for (const failed of failedWorkflows) {
                 report += `### ${failed.workflowName}\n\n`;
+
+                // Add data preview if available
+                const originalResult = testSuite.results.find(r => r.workflowId === failed.workflowId);
+                if (originalResult?.dataPreview) {
+                    report += `**Data Preview:** ${originalResult.dataPreview}\n\n`;
+                }
 
                 if (failed.errorSummary) {
                     report += `**AI Analysis:** ${failed.errorSummary}\n\n`;

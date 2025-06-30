@@ -30,7 +30,7 @@ export async function executeApiCall(
   let success = false;
   let isSelfHealing = isSelfHealingEnabled(options);
 
-  let documentationString = "";
+  let documentationString = "No documentation provided";
   if (!integration && isSelfHealing) {
     logMessage('debug', `Self-healing enabled but no integration provided; skipping documentation-based healing.`, metadata);
   } else if (integration && integration.documentationPending) {
@@ -56,7 +56,7 @@ export async function executeApiCall(
 
       // Check if response is valid
       if (retryCount > 0 && isSelfHealing) {
-        const result = await evaluateResponse(response.data, endpoint.responseSchema, endpoint.instruction);
+        const result = await evaluateResponse(response.data, endpoint.responseSchema, endpoint.instruction, documentationString);
         success = result.success;
         if (!result.success) throw new Error(result.shortReason + " " + JSON.stringify(response.data).slice(0, 1000));
         if (result.refactorNeeded) {

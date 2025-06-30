@@ -1,20 +1,12 @@
 {
     "integrations": {
         "enabled": [
-            "hubspot-crm",
-            "attio-crm",
-            "sendgrid-email",
-            "stripe-pay",
-            "supabase-db",
-            "jira-projects",
-            "timbuk2-shopify",
-            "postgres-lego",
-            "twilio-comm"
+            "bitbucket"
         ],
         "definitions": {
-            "hubspot-crm": {
-                "id": "hubspot-crm",
-                "name": "HubSpot CRM",
+            "hubspot": {
+                "id": "hubspot",
+                "name": "HubSpot",
                 "urlHost": "https://api.hubapi.com",
                 "urlPath": "/crm/v3",
                 "documentationUrl": "https://developers.hubspot.com/docs/api/overview",
@@ -23,9 +15,9 @@
                 },
                 "description": "Customer relationship management API"
             },
-            "stripe-pay": {
-                "id": "stripe-pay",
-                "name": "Stripe Payments",
+            "stripe": {
+                "id": "stripe",
+                "name": "stripe",
                 "urlHost": "https://api.stripe.com",
                 "urlPath": "/v1",
                 "documentationUrl": "https://stripe.com/docs/api",
@@ -37,7 +29,7 @@
             },
             "timbuk2-shopify": {
                 "id": "timbuk2-shopify",
-                "name": "Timbuk2 Shopify Demo",
+                "name": "Timbuk2-shopify",
                 "urlHost": "https://www.timbuk2.com",
                 "urlPath": "/products.json",
                 "documentationUrl": "https://shopify.dev/docs/api/ajax/reference/product",
@@ -55,9 +47,9 @@
                 },
                 "description": "PostgreSQL LEGO database for testing"
             },
-            "jira-projects": {
-                "id": "jira-projects",
-                "name": "JIRA Projects",
+            "jira": {
+                "id": "jira",
+                "name": "JIRA",
                 "urlHost": "https://superglue-team-test.atlassian.net",
                 "urlPath": "/rest/api/3",
                 "documentationUrl": "https://developer.atlassian.com/cloud/jira/platform/rest/v3",
@@ -67,9 +59,9 @@
                 },
                 "description": "JIRA project management API"
             },
-            "attio-crm": {
-                "id": "attio-crm",
-                "name": "Attio CRM",
+            "attio": {
+                "id": "attio",
+                "name": "Attio",
                 "urlHost": "https://api.attio.com/v2",
                 "urlPath": "",
                 "documentationUrl": "https://api.attio.com/openapi/api",
@@ -78,9 +70,9 @@
                 },
                 "description": "Modern CRM with OpenAPI specification"
             },
-            "supabase-db": {
-                "id": "supabase-db",
-                "name": "Supabase Database",
+            "supabase": {
+                "id": "supabase",
+                "name": "Supabase",
                 "urlHost": "https://fmcghdcrnnsdbtdriycm.supabase.co",
                 "urlPath": "/rest/v1",
                 "documentationUrl": "https://supabase.com/dashboard/project/fmcghdcrnnsdbtdriycm/api",
@@ -91,23 +83,21 @@
                 },
                 "description": "Backend database for multi-workflow setups"
             },
-            "twilio-comm": {
-                "id": "twilio-comm",
-                "name": "Twilio Communications",
+            "twilio": {
+                "id": "twilio",
+                "name": "Twilio",
                 "urlHost": "https://api.twilio.com/",
                 "urlPath": "/2010-04-01",
                 "documentationUrl": "https://www.twilio.com/docs/api",
                 "credentials": {
                     "account_sid": "",
-                    "sid": "",
-                    "test_auth_token": "",
-                    "secret_key": ""
+                    "auth_token": ""
                 },
                 "description": "Phone and SMS communications API"
             },
-            "sendgrid-email": {
-                "id": "sendgrid-email",
-                "name": "SendGrid Email",
+            "sendgrid": {
+                "id": "sendgrid",
+                "name": "SendGrid",
                 "urlHost": "https://api.sendgrid.com/",
                 "urlPath": "/v3",
                 "documentationUrl": "https://docs.sendgrid.com/api-reference",
@@ -115,16 +105,147 @@
                     "api_key": ""
                 },
                 "description": "Email delivery and marketing API"
+            },
+            "posthog": {
+                "id": "posthog",
+                "name": "PostHog",
+                "urlHost": "https://us.posthog.com/",
+                "urlPath": "/",
+                "documentationUrl": "https://posthog.com/docs/api",
+                "credentials": {
+                    "api_key": ""
+                },
+                "description": "User Analytics API"
+            },
+            "github": {
+                "id": "github",
+                "name": "GitHub",
+                "urlHost": "https://api.github.com",
+                "urlPath": "/",
+                "documentationUrl": "https://docs.github.com/en/rest",
+                "credentials": {
+                    "api_key": ""
+                },
+                "description": "GitHub API"
+            },
+            "gitlab": {
+                "id": "gitlab",
+                "name": "GitLab",
+                "urlHost": "https://gitlab.com/api/v4",
+                "urlPath": "/",
+                "documentationUrl": "https://docs.gitlab.com/ee/api/rest/index.html",
+                "credentials": {
+                    "api_key": ""
+                },
+                "description": "GitLab API"
+            },
+            "slack": {
+                "id": "slack",
+                "name": "Slack",
+                "urlHost": "https://api.slack.com",
+                "urlPath": "/",
+                "documentationUrl": "https://api.slack.com/docs",
+                "credentials": {
+                    "bot_token": ""
+                },
+                "description": "Slack API"
+            },
+            "bitbucket": {
+                "id": "bitbucket",
+                "name": "Bitbucket",
+                "urlHost": "https://api.bitbucket.org",
+                "urlPath": "/2.0",
+                "documentationUrl": "https://developer.atlassian.com/cloud/bitbucket/rest",
+                "credentials": {
+                    "api_token": "",
+                    "email": ""
+                },
+                "description": "Bitbucket API"
+            },
+            "discord": {
+                "id": "discord",
+                "name": "Discord",
+                "urlHost": "https://discord.com/api",
+                "urlPath": "/",
+                "documentationUrl": "https://discord.com/developers/docs/reference",
+                "credentials": {
+                    "bot_token": "",
+                    "guild_id": ""
+                },
+                "description": "Discord API"
+            },
+            "asana": {
+                "id": "asana",
+                "name": "Asana",
+                "urlHost": "https://app.asana.com/api",
+                "urlPath": "/",
+                "documentationUrl": "https://developers.asana.com/docs",
+                "credentials": {
+                    "client_secret": "",
+                    "client_id": ""
+                },
+                "description": "Asana API"
+            },
+            "notion": {
+                "id": "notion",
+                "name": "Notion",
+                "urlHost": "https://api.notion.com",
+                "urlPath": "/",
+                "documentationUrl": "https://developers.notion.com",
+                "credentials": {
+                    "internal_integration_secret": ""
+                },
+                "description": "Notion API"
+            },
+            "huggingface": {
+                "id": "huggingface",
+                "name": "Huggingface",
+                "urlHost": "https://api-inference.huggingface.co",
+                "urlPath": "/",
+                "documentationUrl": "https://huggingface.co/docs/api-inference/en/index",
+                "credentials": {
+                    "access_token": ""
+                },
+                "description": "Huggingface API"
             }
+        },
+        "monday": {
+            "id": "monday",
+            "name": "Monday",
+            "urlHost": "https://api.monday.com/v2",
+            "urlPath": "/",
+            "documentationUrl": "https://developer.monday.com/api-reference/docs",
+            "credentials": {
+                "personal_api_token": ""
+            },
+            "description": "Monday API"
+        },
+        "square": {
+            "id": "square",
+            "name": "Square",
+            "urlHost": "https://connect.squareup.com",
+            "urlPath": "/",
+            "documentationUrl": "https://developer.squareup.com/reference/square",
+            "credentials": {
+                "sandbox_access_token": ""
+            },
+            "description": "Square API"
+        },
+        "zendesk": {
+            "id": "zendesk",
+            "name": "Zendesk",
+            "urlHost": "https://api.zendesk.com",
+            "urlPath": "/",
+            "documentationUrl": "https://developer.zendesk.com/api-reference",
+            "credentials": {
+                "api_token": ""
+            },
+            "description": "Zendesk API"
         }
     },
     "workflows": {
         "enabled": [
-            "hubspot-lead-qualification",
-            "jira-sprint-health",
-            "stripe-revenue-analytics",
-            "lego-inventory-analysis",
-            "timbuk2-product-analysis"
+            "bitbucket-repos"
         ],
         "definitions": {
             "hubspot-lead-qualification": {
@@ -201,9 +322,9 @@
                 "complexityLevel": "low",
                 "category": "single-system"
             },
-            "crm-workflow": {
-                "id": "crm-workflow",
-                "name": "CRM Workflow",
+            "hubspot-crm-workflow": {
+                "id": "hubspot-crm-workflow",
+                "name": "HubSpotCRM Workflow",
                 "instruction": "Get all contacts with lifecycle stage: Marketing Qualified Lead from HubSpot. Filter them to only include contacts created between the input payload date and the payload date + 100 days. I want the final output to be a JSON object with the following structure: { \"contacts\": [ { \"name\": \"John Doe\", \"email\": \"john.doe@example.com\" } ]",
                 "integrationIds": [
                     "hubspot-crm"
@@ -225,11 +346,97 @@
                 "payload": {},
                 "complexityLevel": "medium",
                 "category": "multi-system"
+            },
+            "posthog-analytics": {
+                "id": "posthog-analytics",
+                "name": "PostHog Analytics",
+                "instruction": "Get the project IDs of all projects in my posthog account. For the first project, count the number of events in the last 30 days. Use the posthog query api. I want the final output to be a JSON object with the following structure: { \"project_id\": \"123\", \"event_count\": 100 }",
+                "integrationIds": [
+                    "posthog"
+                ],
+                "payload": {},
+                "complexityLevel": "medium",
+                "category": "single-system"
+            },
+            "twilio-sms-analysis": {
+                "id": "twilio-sms-analysis",
+                "name": "Twilio SMS Communication Analysis",
+                "instruction": "Get all SMS messages sent from my Twilio account, count how many were delivered vs failed vs pending by analyzing the status field, and calculate the success rate percentage. Return the results as a JSON object with total_messages, delivered_count, failed_count, pending_count, and success_rate_percent",
+                "integrationIds": [
+                    "twilio"
+                ],
+                "payload": {},
+                "complexityLevel": "medium",
+                "category": "single-system"
+            },
+            "sendgrid-test-email": {
+                "id": "sendgrid-test-email",
+                "name": "SendGrid Test Email Send",
+                "instruction": "Send a test email via SendGrid to verify the integration is working. Use the email address, subject, and message content from the payload to send a personalized test email and return confirmation of successful delivery",
+                "integrationIds": [
+                    "sendgrid"
+                ],
+                "payload": {
+                    "to_email": "michael@superglue.ai",
+                    "from_email": "michael@superglue.ai",
+                    "subject": "Testing Integrations with Sendgrid ABC",
+                    "message_content": "This is test email 1",
+                    "content_type": "text/plain"
+                },
+                "complexityLevel": "low",
+                "category": "single-system"
+            },
+            "github-list-repos": {
+                "id": "github-list-repos",
+                "name": "GitHub List Repos",
+                "instruction": "List all repositories in my GitHub account. Return the results as a JSON object with the following structure: { \"repos\": [ { \"name\": \"repo1\", \"description\": \"description1\" } ]",
+                "integrationIds": [
+                    "github"
+                ],
+                "payload": {},
+                "complexityLevel": "low",
+                "category": "single-system"
+            },
+            "gitlab-list-projects": {
+                "id": "gitlab-list-projects",
+                "name": "GitLab List Projects",
+                "instruction": "List all projects in my GitLab account. Return the results as a JSON object with the following structure: { \"projects\": [ { \"name\": \"project1\", \"description\": \"description1\" } ]",
+                "integrationIds": [
+                    "gitlab"
+                ],
+                "payload": {},
+                "complexityLevel": "low",
+                "category": "single-system"
+            },
+            "slack-dm-workflow": {
+                "id": "slack-dm-workflow",
+                "name": "Slack DM Test Workflow",
+                "instruction": "Find the Slack user ID for the email address in the payload, then send them a direct message with the specified content.",
+                "integrationIds": [
+                    "slack"
+                ],
+                "payload": {
+                    "email": "michael@superglue.ai",
+                    "message": "Hi, this is superglue-bot testing Slack workflows!"
+                },
+                "complexityLevel": "medium",
+                "category": "single-system"
+            },
+            "bitbucket-repos": {
+                "id": "bitbucket-repos",
+                "name": "Bitbucket Repository Analysis",
+                "instruction": "List all projects in my Bitbucket account. Return the results as a JSON object with the following structure: { \"projects\": [ { \"name\": \"project1\", \"description\": \"description1\" } ]",
+                "integrationIds": [
+                    "bitbucket"
+                ],
+                "payload": {},
+                "complexityLevel": "low",
+                "category": "single-system"
             }
         }
     },
     "testSuite": {
         "name": "Integration Test",
-        "attemptsPerWorkflow": 3
+        "attemptsPerWorkflow": 1
     }
 }
