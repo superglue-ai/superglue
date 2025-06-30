@@ -124,7 +124,7 @@
             "jira-sprint-health",
             "stripe-revenue-analytics",
             "lego-inventory-analysis",
-            "timbuk2-product-analysis",
+            "timbuk2-product-analysis"
         ],
         "definitions": {
             "hubspot-lead-qualification": {
