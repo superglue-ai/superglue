@@ -1,7 +1,7 @@
 {
     "integrations": {
         "enabled": [
-            "bitbucket"
+            "zendesk"
         ],
         "definitions": {
             "hubspot": {
@@ -181,8 +181,7 @@
                 "urlPath": "/",
                 "documentationUrl": "https://developers.asana.com/docs",
                 "credentials": {
-                    "client_secret": "",
-                    "client_id": ""
+                    "personal_access_token": ""
                 },
                 "description": "Asana API"
             },
@@ -200,52 +199,53 @@
             "huggingface": {
                 "id": "huggingface",
                 "name": "Huggingface",
-                "urlHost": "https://api-inference.huggingface.co",
+                "urlHost": "https://huggingface.co",
                 "urlPath": "/",
-                "documentationUrl": "https://huggingface.co/docs/api-inference/en/index",
+                "documentationUrl": "https://huggingface.co/docs/hub/en/api",
                 "credentials": {
                     "access_token": ""
                 },
                 "description": "Huggingface API"
+            },
+            "monday": {
+                "id": "monday",
+                "name": "Monday",
+                "urlHost": "https://api.monday.com",
+                "urlPath": "/v2",
+                "documentationUrl": "https://developer.monday.com/api-reference/docs",
+                "credentials": {
+                    "personal_api_token": ""
+                },
+                "description": "Monday API"
+            },
+            "square": {
+                "id": "square",
+                "name": "Square",
+                "urlHost": "https://connect.squareup.com",
+                "urlPath": "/",
+                "documentationUrl": "https://developer.squareup.com/reference/square",
+                "credentials": {
+                    "sandbox_access_token": ""
+                },
+                "description": "Square API"
+            },
+            "zendesk": {
+                "id": "zendesk",
+                "name": "Zendesk",
+                "urlHost": "https://superglue.zendesk.com",
+                "urlPath": "/",
+                "documentationUrl": "https://developer.zendesk.com/api-reference",
+                "credentials": {
+                    "api_token": "",
+                    "email": ""
+                },
+                "description": "Zendesk API"
             }
-        },
-        "monday": {
-            "id": "monday",
-            "name": "Monday",
-            "urlHost": "https://api.monday.com/v2",
-            "urlPath": "/",
-            "documentationUrl": "https://developer.monday.com/api-reference/docs",
-            "credentials": {
-                "personal_api_token": ""
-            },
-            "description": "Monday API"
-        },
-        "square": {
-            "id": "square",
-            "name": "Square",
-            "urlHost": "https://connect.squareup.com",
-            "urlPath": "/",
-            "documentationUrl": "https://developer.squareup.com/reference/square",
-            "credentials": {
-                "sandbox_access_token": ""
-            },
-            "description": "Square API"
-        },
-        "zendesk": {
-            "id": "zendesk",
-            "name": "Zendesk",
-            "urlHost": "https://api.zendesk.com",
-            "urlPath": "/",
-            "documentationUrl": "https://developer.zendesk.com/api-reference",
-            "credentials": {
-                "api_token": ""
-            },
-            "description": "Zendesk API"
         }
     },
     "workflows": {
         "enabled": [
-            "bitbucket-repos"
+            "zendesk-ticket-analysis"
         ],
         "definitions": {
             "hubspot-lead-qualification": {
@@ -432,11 +432,97 @@
                 "payload": {},
                 "complexityLevel": "low",
                 "category": "single-system"
+            },
+            "discord-server-analysis-dm": {
+                "id": "discord-server-analysis-dm",
+                "name": "Discord Server Analysis and DM",
+                "instruction": "Get all channels from my Discord server, analyze the channel structure, then find the user 'michaelfuest_89135' and send them a direct message with a summary of the server channels found. Return both the channel list and confirmation of the DM sent",
+                "integrationIds": [
+                    "discord"
+                ],
+                "payload": {
+                    "guild_id": "1389218511934722080",
+                    "target_username": "michaelfuest_89135",
+                    "dm_message": "Hi! I just analyzed your Discord server and found the following channels. This is a test from the Superglue Discord integration bot!"
+                },
+                "complexityLevel": "medium",
+                "category": "single-system"
+            },
+            "asana-tasks": {
+                "id": "asana-tasks",
+                "name": "Asana Tasks",
+                "instruction": "First, find the project ID by searching for the project name in the payload across all my workspaces. Then get all tasks assigned to me in that project, analyze my workload by completion status and return a summary of my current tasks including completion percentages.",
+                "integrationIds": [
+                    "asana"
+                ],
+                "payload": {
+                    "project_name": "Product Feature Roadmap"
+                },
+                "complexityLevel": "medium",
+                "category": "single-system"
+            },
+            "notion-duplicate-email-analysis": {
+                "id": "notion-duplicate-email-analysis",
+                "name": "Notion Duplicate Email Analysis",
+                "instruction": "Query the Superglue Database in Notion to retrieve all records with email data, analyze the email column to identify duplicate email addresses, count the total number of duplicates, and return a list of the duplicate emails along with how many times each appears",
+                "integrationIds": [
+                    "notion"
+                ],
+                "payload": {
+                    "database_name": "Superglue Database"
+                },
+                "complexityLevel": "medium",
+                "category": "single-system"
+            },
+            "huggingface-model-metadata": {
+                "id": "huggingface-model-metadata",
+                "name": "Hugging Face Model Metadata",
+                "instruction": "Retrieve the metadata and file content from the payload user's model and return a summary with the model name and available files",
+                "integrationIds": [
+                    "huggingface"
+                ],
+                "payload": {
+                    "user_name": "michael-fuest",
+                    "model_name": "my-testing-model"
+                },
+                "complexityLevel": "medium",
+                "category": "single-system"
+            },
+            "monday-sprint-analysis": {
+                "id": "monday-sprint-analysis",
+                "name": "Monday.com Sprint Analysis",
+                "instruction": "Retrieve all tasks belonging to the sprint specified in the payload and group them by their status columns and calculate the total number of tasks that are completed, in progress and not started. Return the results as a JSON object with the following structure and no further properties: { \"completed\": 10, \"in_progress\": 20, \"not_started\": 30 }",
+                "integrationIds": [
+                    "monday"
+                ],
+                "payload": {
+                    "sprint_board_name": "Sprint 1"
+                },
+                "complexityLevel": "high",
+                "category": "single-system"
+            },
+            "square-customer-directory": {
+                "id": "square-customer-directory",
+                "name": "Square Customer Directory Export",
+                "instruction": "Retrieve all customers from my Square customer directory, extract their names and email addresses, and return a clean JSON object with only two properties: customerNames as an array of customer names and customer_emails as an array of corresponding email addresses",
+                "integrationIds": ["square"],
+                "payload": {},
+                "complexityLevel": "medium",
+                "category": "single-system"
+            },
+            "zendesk-ticket-analysis": {
+                "id": "zendesk-ticket-analysis",
+                "name": "Zendesk Ticket Analysis",
+                "instruction": "Retrieve all tickets from my Zendesk account, analyze their statuses, and return a summary of the total number of tickets in each status category",
+                "integrationIds": ["zendesk"],
+                "payload": {},
+                "complexityLevel": "medium",
+                "category": "single-system"
             }
         }
     },
     "testSuite": {
         "name": "Integration Test",
-        "attemptsPerWorkflow": 1
+        "attemptsPerWorkflow": 2
     }
 }

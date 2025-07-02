@@ -74,7 +74,8 @@ export async function executeApiCall(
     }
     catch (error) {
       const rawErrorString = error?.message || JSON.stringify(error || {});
-      lastError = maskCredentials(rawErrorString, credentials).slice(0, 1000);
+      lastError = maskCredentials(rawErrorString, credentials).slice(0, 1000);  
+
       if (retryCount === 0) {
         logMessage('info', `The initial configuration is not valid. Generating a new configuration. If you are creating a new configuration, this is expected.\n${lastError}`, metadata);
       }

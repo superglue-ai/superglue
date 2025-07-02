@@ -2,7 +2,7 @@ import { Workflow, WorkflowResult } from '@superglue/client';
 import { generateUniqueId, waitForIntegrationProcessing } from '@superglue/shared/utils';
 import fs from 'fs';
 import path from 'path';
-import { logMessage } from '../utils/logs.js';
+import { logEmitter, logMessage } from '../utils/logs.js';
 
 import { Integration } from '@superglue/client';
 import { FileStore } from '../datastore/filestore.js';
@@ -74,7 +74,7 @@ interface TestResult {
     dataPreview?: string;
     totalAttempts: number;
     successfulAttempts: number;
-    successRate: number; 
+    successRate: number;
     workflowPlans?: Array<{
         plan: any;
         buildSuccess: boolean;
@@ -111,7 +111,6 @@ interface TestSuite {
         firstTrySuccesses: number;
         maxAttemptsNeeded: number;
     };
-    suiteAnalysis?: string;
     // New metrics
     globalMetrics?: {
         totalWorkflowAttempts: number;
@@ -120,6 +119,18 @@ interface TestSuite {
         workflowLevelSuccessRate: number;
         averageWorkflowSuccessRate: number;
     };
+    workflowMetaReports?: Array<{
+        workflowId: string;
+        workflowName: string;
+        successRate: number;
+        totalAttempts: number;
+        successfulAttempts: number;
+        summaries: string[];
+        primaryIssues: string[];
+        authenticationIssues: string[];
+        errorPatterns: string[];
+        recommendations: string[];
+    }>;
 }
 
 export class IntegrationTestingFramework {
@@ -129,34 +140,10 @@ export class IntegrationTestingFramework {
     private testDir = './.test-integration-data';
 
     constructor(configPath?: string) {
-        // Validate environment variables are loaded
-        this.validateEnvironment();
-
-        // Create a test-specific FileStore instance
         this.datastore = new FileStore(this.testDir);
         this.config = this.loadConfiguration(configPath);
         this.loadCredentialsFromEnv();
     }
-
-    private validateEnvironment(): void {
-        // Check if LLM provider is configured
-        if (!process.env.LLM_PROVIDER) {
-            process.env.LLM_PROVIDER = 'OPENAI'; // Default to OpenAI
-        }
-
-        // Validate API keys based on provider
-        if (process.env.LLM_PROVIDER === 'OPENAI' && !process.env.OPENAI_API_KEY) {
-            throw new Error('OPENAI_API_KEY is not set. Please ensure environment variables are loaded before running tests.');
-        }
-
-        if (process.env.LLM_PROVIDER === 'GEMINI' && !process.env.GEMINI_API_KEY) {
-            throw new Error('GEMINI_API_KEY is not set. Please ensure environment variables are loaded before running tests.');
-        }
-
-        logMessage('info', `🔐 Environment validated. LLM Provider: ${process.env.LLM_PROVIDER}`, this.metadata);
-    }
-
-
 
     private loadConfiguration(configPath?: string): TestConfiguration {
         const __dirname = path.dirname(new URL(import.meta.url).pathname);
@@ -377,12 +364,11 @@ export class IntegrationTestingFramework {
         let succeededOnAttempt: number | undefined = undefined;
         const buildAttempts: BuildAttempt[] = [];
         const executionAttempts: ExecutionAttempt[] = [];
-        let workflow: Workflow | undefined;
         let outputKeys: string[] | undefined;
         let dataQuality: 'pass' | 'fail' | 'unknown' = 'fail';
-        let actualData: any | undefined; // Store the actual workflow data
-
-        // Track workflow plans locally for debugger analysis (not saved to JSON)
+        let actualData: any | undefined;
+        let workflow: Workflow | undefined;
+        const workflowLogs: any[] = [];
         const workflowPlans: Array<{
             plan: any;
             buildSuccess: boolean;
@@ -390,6 +376,12 @@ export class IntegrationTestingFramework {
             attemptNumber: number;
         }> = [];
 
+        const workflowLogListener = (entry: any) => {
+            if ((entry.workflowId === testWorkflow.id) && (entry.level === 'WARN' || entry.level === 'ERROR')) {
+                workflowLogs.push(entry);
+            }
+        };
+        logEmitter.on('log', workflowLogListener);
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             const buildStart = Date.now();
             let buildSuccess = false;
@@ -410,7 +402,6 @@ export class IntegrationTestingFramework {
                     })
                 );
 
-                // Build workflow using WorkflowBuilder directly
                 const { WorkflowBuilder } = await import('../workflow/workflow-builder.js');
                 const builder = new WorkflowBuilder(
                     testWorkflow.instruction,
@@ -421,8 +412,6 @@ export class IntegrationTestingFramework {
                 );
 
                 currentWorkflow = await builder.build();
-
-                // Generate unique ID for the workflow to prevent collisions
                 currentWorkflow.id = await generateUniqueId({
                     baseId: currentWorkflow.id,
                     exists: async (id) => !!(await this.datastore.getWorkflow(id, this.metadata.orgId))
@@ -459,14 +448,13 @@ export class IntegrationTestingFramework {
                         })
                     );
 
-                    // Execute workflow using WorkflowExecutor directly
                     const { WorkflowExecutor } = await import('../workflow/workflow-executor.js');
+                    const metadataWithWorkflowId = { ...this.metadata, workflowId: testWorkflow.id, runId: testWorkflow.id };
                     const executor = new WorkflowExecutor(
                         currentWorkflow,
-                        this.metadata,
+                        metadataWithWorkflowId,
                         integrations
                     );
-
                     const workflowResult = await executor.execute(
                         testWorkflow.payload || {},
                         this.gatherCredentials(testWorkflow.integrationIds),
@@ -492,10 +480,38 @@ export class IntegrationTestingFramework {
                         actualData = workflowResult.data;
                         logMessage('info', `✅ Execution successful for ${testWorkflow.name} in ${Date.now() - execStart}ms`, this.metadata);
                     } else {
-                        logMessage('warn', `❌ Execution failed for ${testWorkflow.name}: Workflow returned success=false`, this.metadata);
+                        // Capture the error from the workflow result
+                        if (workflowResult.error) {
+                            const errorObj = workflowResult.error as any;
+                            execError = typeof errorObj === 'string'
+                                ? errorObj
+                                : errorObj.message || JSON.stringify(errorObj);
+                            logMessage('debug', `📝 Captured workflow error: ${execError}`, this.metadata);
+                        }
+                        logMessage('warn', `❌ Execution failed for ${testWorkflow.name}: Workflow returned success=false${execError ? ` - ${execError}` : ''}`, this.metadata);
                     }
                 } catch (error) {
-                    execError = String(error);
+                    // Capture full error details including status codes and response data
+                    if (error instanceof Error && error.message) {
+                        execError = error.message;
+                        // Try to extract more details if available
+                        if ('response' in error && error.response) {
+                            const response = error.response as any;
+                            execError = JSON.stringify({
+                                message: error.message,
+                                status: response.status,
+                                statusText: response.statusText,
+                                data: response.data,
+                                config: response.config ? {
+                                    method: response.config.method,
+                                    url: response.config.url,
+                                    headers: response.config.headers
+                                } : undefined
+                            }, null, 2);
+                        }
+                    } else {
+                        execError = String(error);
+                    }
                     logMessage('error', `❌ Execution failed for ${testWorkflow.name}: ${execError}`, this.metadata);
                 }
                 executionTime = Date.now() - execStart;
@@ -519,13 +535,28 @@ export class IntegrationTestingFramework {
 
             if (attempt < maxRetries) await new Promise(res => setTimeout(res, Math.pow(2, attempt - 1) * 1000));
         }
-
-        // Don't generate analysis here - we'll batch analyze all attempts together later
+        logEmitter.off('log', workflowLogListener);
         let errorSummary: string | undefined = undefined;
         let executionReport: any | undefined = undefined;
-
+        try {
+            const { WorkflowReportGenerator } = await import('./workflow-report-generator.js');
+            const reportGenerator = new WorkflowReportGenerator();
+            const analysis = await reportGenerator.analyzeWorkflowExecution({
+                workflowId: testWorkflow.id,
+                workflowName: testWorkflow.name,
+                originalInstruction: testWorkflow.instruction,
+                buildAttempts,
+                executionAttempts,
+                workflowPlans,
+                integrationIds: testWorkflow.integrationIds,
+                logs: workflowLogs
+            });
+            errorSummary = analysis.summary;
+            executionReport = analysis.report;
+        } catch (err) {
+            logMessage('warn', `Failed to generate workflow analysis for ${testWorkflow.name}: ${err}`, this.metadata);
+        }
         logMessage('info', `🏁 Completed buildAndTestWorkflow for ${testWorkflow.name}`, this.metadata);
-
         return {
             workflowId: testWorkflow.id,
             workflowName: testWorkflow.name,
@@ -734,61 +765,27 @@ export class IntegrationTestingFramework {
 
             // Generate error summaries for workflows that encountered errors
             logMessage('info', '🤖 Generating AI error analysis...', this.metadata);
-            const { WorkflowReportGenerator } = await import('./workflow-report-generator.js');
-            const reportGenerator = new WorkflowReportGenerator();
+            // No longer need WorkflowReportGenerator for batch analysis
 
-            // Batch analyze each workflow's attempts
+            // Build workflow-level meta report from individual execution reports
             for (const result of results) {
-                if (result.workflowPlans && result.workflowPlans.length > 0) {
-                    try {
-                        // Only analyze if there were failures
-                        const hasFailures = result.buildAttempts.some(b => !b.success) || result.executionAttempts.some(e => !e.success);
-                        if (hasFailures) {
-                            const errorSummary = await reportGenerator.generateBatchErrorSummary({
-                                workflowId: result.workflowId,
-                                workflowName: result.workflowName,
-                                originalInstruction: enabledWorkflows.find(w => w.id === result.workflowId)?.instruction || '',
-                                buildAttempts: result.buildAttempts,
-                                executionAttempts: result.executionAttempts,
-                                workflowPlans: result.workflowPlans,
-                                integrationIds: enabledWorkflows.find(w => w.id === result.workflowId)?.integrationIds || [],
-                                payload: enabledWorkflows.find(w => w.id === result.workflowId)?.payload,
-                                expectedKeys: result.expectedKeys,
-                                actualData: result.actualData
-                            });
-                            result.errorSummary = errorSummary;
-
-                            const executionReport = await reportGenerator.generateBatchWorkflowExecutionReport({
-                                workflowId: result.workflowId,
-                                workflowName: result.workflowName,
-                                originalInstruction: enabledWorkflows.find(w => w.id === result.workflowId)?.instruction || '',
-                                buildAttempts: result.buildAttempts,
-                                executionAttempts: result.executionAttempts,
-                                workflowPlans: result.workflowPlans,
-                                integrationIds: enabledWorkflows.find(w => w.id === result.workflowId)?.integrationIds || [],
-                                payload: enabledWorkflows.find(w => w.id === result.workflowId)?.payload,
-                                expectedKeys: result.expectedKeys,
-                                actualData: result.actualData
-                            });
-                            result.executionReport = executionReport;
-                        }
-                    } catch (error) {
-                        logMessage('warn', `Failed to generate batch analysis for workflow ${result.workflowName}: ${error}`, this.metadata);
-                    }
-                }
+                // Already have per-execution errorSummary and executionReport
+                // Nothing to do here
             }
 
-            // Generate suite-level analysis
-            logMessage('info', '🔍 Generating suite-level analysis...', this.metadata);
-            const suiteAnalysis = await reportGenerator.generateSuiteAnalysis(
-                results.map(r => ({
-                    workflowName: r.workflowName,
-                    succeeded: r.succeededOnAttempt !== undefined,
-                    errorSummary: r.errorSummary,
-                    complexity: r.complexity,
-                    category: r.category
-                }))
-            );
+            // Generate workflow-level meta reports
+            const workflowMetaReports = results.map(r => ({
+                workflowId: r.workflowId,
+                workflowName: r.workflowName,
+                successRate: r.successRate,
+                totalAttempts: r.totalAttempts,
+                successfulAttempts: r.successfulAttempts,
+                summaries: r.executionReport ? [r.executionReport.executionSummary] : [],
+                primaryIssues: r.executionReport ? r.executionReport.primaryIssues : [],
+                authenticationIssues: r.executionReport ? r.executionReport.authenticationIssues : [],
+                errorPatterns: r.executionReport ? r.executionReport.errorPatterns : [],
+                recommendations: r.executionReport ? r.executionReport.recommendations : []
+            }));
 
             // Calculate metrics (cleanup will happen in finally block)
             const passed = results.filter(r => r.succeededOnAttempt !== undefined).length;
@@ -836,14 +833,14 @@ export class IntegrationTestingFramework {
                     firstTrySuccesses,
                     maxAttemptsNeeded
                 },
-                suiteAnalysis,
                 globalMetrics: {
                     totalWorkflowAttempts,
                     totalSuccessfulAttempts,
                     globalSuccessRate,
                     workflowLevelSuccessRate,
                     averageWorkflowSuccessRate
-                }
+                },
+                workflowMetaReports // new field
             };
 
             this.logTestSummary(testSuite);
@@ -882,6 +879,32 @@ export class IntegrationTestingFramework {
         const passed = testSuite.results.filter(r => r.succeededOnAttempt !== undefined).length;
         const failed = testSuite.results.length - passed;
 
+        // --- NEW: Workflow-level meta summary ---
+        let metaSummary = '';
+        if (testSuite.workflowMetaReports && testSuite.workflowMetaReports.length > 0) {
+            metaSummary += '\n=== WORKFLOW META REPORTS ===\n';
+            for (const meta of testSuite.workflowMetaReports) {
+                metaSummary += `Workflow: ${meta.workflowName}\n`;
+                metaSummary += `  Success Rate: ${(meta.successRate * 100).toFixed(1)}% (${meta.successfulAttempts}/${meta.totalAttempts})\n`;
+                if (meta.primaryIssues.length > 0) {
+                    metaSummary += `  Primary Issues: ${meta.primaryIssues.join('; ')}\n`;
+                }
+                if (meta.authenticationIssues.length > 0) {
+                    metaSummary += `  Auth Issues: ${meta.authenticationIssues.join('; ')}\n`;
+                }
+                if (meta.errorPatterns.length > 0) {
+                    metaSummary += `  Error Patterns: ${meta.errorPatterns.join('; ')}\n`;
+                }
+                if (meta.recommendations.length > 0) {
+                    metaSummary += `  Recommendations: ${meta.recommendations.join('; ')}\n`;
+                }
+                if (meta.summaries.length > 0) {
+                    metaSummary += `  Summary: ${meta.summaries.join(' | ')}\n`;
+                }
+                metaSummary += '\n';
+            }
+        }
+
         const detailedResults = testSuite.results.map(r => {
             let result = `${r.succeededOnAttempt !== undefined ? '✓' : '✗'} ${r.workflowName} (${r.complexity}/${r.category})
     Build Attempts: ${r.buildAttempts.length} | Times: [${r.buildAttempts.map(b => b.buildTime).join(', ')}] | Success: ${r.buildAttempts.some(b => b.success)}
@@ -909,24 +932,21 @@ export class IntegrationTestingFramework {
 
             if (r.executionReport) {
                 const execReport = r.executionReport;
-                result += `\n    📊 Performance Breakdown:`;
-                if (execReport.planningIssues?.length > 0) {
-                    result += `\n       Planning Issues: ${execReport.planningIssues.join('; ')}`;
+                result += `\n    📊 Detailed Analysis:`;
+                if (execReport.primaryIssues?.length > 0) {
+                    result += `\n       Primary Issues: ${execReport.primaryIssues.join('; ')}`;
                 }
-                if (execReport.apiIssues?.length > 0) {
-                    result += `\n       API Issues: ${execReport.apiIssues.join('; ')}`;
+                if (execReport.authenticationIssues?.length > 0) {
+                    result += `\n       🔐 Auth Issues: ${execReport.authenticationIssues.join('; ')}`;
                 }
-                if (execReport.integrationIssues?.length > 0) {
-                    result += `\n       Integration Issues: ${execReport.integrationIssues.join('; ')}`;
-                }
-                if (execReport.dataIssues?.length > 0) {
-                    result += `\n       Data Issues: ${execReport.dataIssues.join('; ')}`;
-                }
-                if (execReport.primaryFailureCategory) {
-                    result += `\n       Primary Issue: ${execReport.primaryFailureCategory}`;
+                if (execReport.errorPatterns?.length > 0) {
+                    result += `\n       🔄 Error Patterns: ${execReport.errorPatterns.join('; ')}`;
                 }
                 if (execReport.recommendations?.length > 0) {
-                    result += `\n       Recommendations: ${execReport.recommendations.join('; ')}`;
+                    result += `\n       💡 Recommendations: ${execReport.recommendations.join('; ')}`;
+                }
+                if (execReport.executionSummary) {
+                    result += `\n       📝 Summary: ${execReport.executionSummary}`;
                 }
             }
 
@@ -944,7 +964,7 @@ export class IntegrationTestingFramework {
         const globalMetrics = testSuite.globalMetrics;
         const globalMetricsStr = globalMetrics ? `\n\n=== GLOBAL METRICS ===\nTotal Workflow Attempts: ${globalMetrics.totalWorkflowAttempts}\nTotal Successful Attempts: ${globalMetrics.totalSuccessfulAttempts}\nGlobal Success Rate: ${(globalMetrics.globalSuccessRate * 100).toFixed(1)}%\nWorkflow-Level Success Rate: ${(globalMetrics.workflowLevelSuccessRate * 100).toFixed(1)}% (${passed}/${testSuite.totalTests} workflows had at least one success)\nAverage Per-Workflow Success Rate: ${(globalMetrics.averageWorkflowSuccessRate * 100).toFixed(1)}%` : '';
 
-        logMessage('info', `\n=== TEST SUITE SUMMARY ===\nSuite: ${testSuite.suiteName}\nTimestamp: ${testSuite.timestamp.toISOString()}\nTotal Tests: ${testSuite.totalTests}\nPassed: ${passed}\nFailed: ${failed}\nSuccess Rate: ${((passed / testSuite.totalTests) * 100).toFixed(1)}%${globalMetricsStr}\n\n=== INTEGRATION SETUP ===\nTotal Setup Time: ${testSuite.integrationSetupTime}ms\nDocumentation Processing: ${testSuite.documentationProcessingTime}ms\nAvg Integration Setup: ${avgIntegrationSetup.toFixed(0)}ms\nAvg Documentation Processing: ${avgDocProcessing.toFixed(0)}ms\n${integrationBreakdown}\n\n=== BUILD TIME (SUCCESSFUL) ===\nAvg: ${avg(buildSuccessTimes).toFixed(0)}ms | Min: ${min(buildSuccessTimes)}ms | Max: ${max(buildSuccessTimes)}ms\n=== BUILD TIME (FAILED) ===\nAvg: ${avg(buildFailTimes).toFixed(0)}ms | Min: ${min(buildFailTimes)}ms | Max: ${max(buildFailTimes)}ms\n=== EXECUTION TIME (SUCCESSFUL) ===\nAvg: ${avg(execSuccessTimes).toFixed(0)}ms | Min: ${min(execSuccessTimes)}ms | Max: ${max(execSuccessTimes)}ms\n=== EXECUTION TIME (FAILED) ===\nAvg: ${avg(execFailTimes).toFixed(0)}ms | Min: ${min(execFailTimes)}ms | Max: ${max(execFailTimes)}ms\n\nCleanup Time: ${testSuite.cleanupTime}ms\n\n=== DETAILED RESULTS ===\n${detailedResults}${testSuite.suiteAnalysis ? `\n\n=== SUITE ANALYSIS ===\n🤖 ${testSuite.suiteAnalysis}` : ''}\n=========================`, this.metadata);
+        logMessage('info', `\n=== TEST SUITE SUMMARY ===\nSuite: ${testSuite.suiteName}\nTimestamp: ${testSuite.timestamp.toISOString()}\nTotal Tests: ${testSuite.totalTests}\nPassed: ${passed}\nFailed: ${failed}\nSuccess Rate: ${((passed / testSuite.totalTests) * 100).toFixed(1)}%${globalMetricsStr}${metaSummary}\n\n=== INTEGRATION SETUP ===\nTotal Setup Time: ${testSuite.integrationSetupTime}ms\nDocumentation Processing: ${testSuite.documentationProcessingTime}ms\nAvg Integration Setup: ${avgIntegrationSetup.toFixed(0)}ms\nAvg Documentation Processing: ${avgDocProcessing.toFixed(0)}ms\n${integrationBreakdown}\n\n=== BUILD TIME (SUCCESSFUL) ===\nAvg: ${avg(buildSuccessTimes).toFixed(0)}ms | Min: ${min(buildSuccessTimes)}ms | Max: ${max(buildSuccessTimes)}ms\n=== BUILD TIME (FAILED) ===\nAvg: ${avg(buildFailTimes).toFixed(0)}ms | Min: ${min(buildFailTimes)}ms | Max: ${max(buildFailTimes)}ms\n=== EXECUTION TIME (SUCCESSFUL) ===\nAvg: ${avg(execSuccessTimes).toFixed(0)}ms | Min: ${min(execSuccessTimes)}ms | Max: ${max(execSuccessTimes)}ms\n=== EXECUTION TIME (FAILED) ===\nAvg: ${avg(execFailTimes).toFixed(0)}ms | Min: ${min(execFailTimes)}ms | Max: ${max(execFailTimes)}ms\n\nCleanup Time: ${testSuite.cleanupTime}ms\n\n=== DETAILED RESULTS ===\n${detailedResults}\n=========================`, this.metadata);
     }
 
     private loadCredentialsFromEnv(): void {
@@ -1086,103 +1106,121 @@ export class IntegrationTestingFramework {
                 successRate: (r.successRate * 100).toFixed(1) + '%'
             })),
             integrationSetupResults: testSuite.integrationSetupResults,
-            suiteAnalysis: testSuite.suiteAnalysis
+            retryStatistics: testSuite.retryStatistics,
+            integrationSetup: {
+                totalTime: testSuite.integrationSetupTime,
+                documentationProcessingTime: testSuite.documentationProcessingTime,
+                results: testSuite.integrationSetupResults
+            },
+            workflowMetaReports: testSuite.workflowMetaReports
         };
 
-        try {
-            await fs.promises.writeFile(jsonReportPath, JSON.stringify(jsonReport, null, 2));
-            logMessage('info', `📄 JSON report saved to: ${jsonReportPath}`, this.metadata);
-        } catch (error) {
-            logMessage('error', `Failed to save JSON report: ${error}`, this.metadata);
-        }
+        // Save JSON report
+        await fs.promises.writeFile(jsonReportPath, JSON.stringify(jsonReport, null, 2));
+        logMessage('info', `📄 JSON report saved to: ${jsonReportPath}`, this.metadata);
 
-        // Save Markdown summary for easy reading
+        // Save Markdown report
         const markdownReportPath = path.join(reportDir, `integration-test-${timestamp}.md`);
         const markdownReport = this.generateMarkdownReport(testSuite, jsonReport);
+        await fs.promises.writeFile(markdownReportPath, markdownReport);
+        logMessage('info', `📄 Markdown report saved to: ${markdownReportPath}`, this.metadata);
 
-        try {
-            await fs.promises.writeFile(markdownReportPath, markdownReport);
-            logMessage('info', `📄 Markdown report saved to: ${markdownReportPath}`, this.metadata);
-        } catch (error) {
-            logMessage('error', `Failed to save Markdown report: ${error}`, this.metadata);
-        }
-
-        // Save latest files for easy access (copy instead of symlink for better compatibility)
+        // Create symlinks to latest reports for easy access
         try {
             const latestJsonPath = path.join(reportDir, 'latest.json');
-            const latestMarkdownPath = path.join(reportDir, 'latest.md');
+            const latestMdPath = path.join(reportDir, 'latest.md');
 
-            // Copy the reports to latest.json and latest.md
-            await fs.promises.copyFile(jsonReportPath, latestJsonPath);
-            await fs.promises.copyFile(markdownReportPath, latestMarkdownPath);
+            // Remove existing files if they exist
+            try {
+                await fs.promises.unlink(latestJsonPath);
+            } catch (e) {
+                // Ignore error if file doesn't exist
+            }
+            try {
+                await fs.promises.unlink(latestMdPath);
+            } catch (e) {
+                // Ignore error if file doesn't exist
+            }
+
+            // Try to create symlinks first
+            try {
+                await fs.promises.symlink(path.basename(jsonReportPath), latestJsonPath);
+                await fs.promises.symlink(path.basename(markdownReportPath), latestMdPath);
+            } catch (symlinkError) {
+                // Fall back to copying if symlinks aren't supported
+                await fs.promises.copyFile(jsonReportPath, latestJsonPath);
+                await fs.promises.copyFile(markdownReportPath, latestMdPath);
+            }
 
             logMessage('info', `📄 Latest reports available at: ${reportDir}/latest.{json,md}`, this.metadata);
         } catch (error) {
-            logMessage('warn', `Failed to create latest report files: ${error}`, this.metadata);
+            logMessage('debug', `Could not create latest report links: ${error}`, this.metadata);
         }
     }
 
-    /**
-     * Calculate timing statistics
-     */
-    private calculateTimingStats(times: number[]): Record<string, string> {
-        if (times.length === 0) {
-            return { avg: '0ms' };
-        }
-
-        const avg = times.reduce((sum, t) => sum + t, 0) / times.length;
-        return {
-            avg: `${avg.toFixed(0)}ms`
-        };
+    private calculateTimingStats(times: number[]): { avg: number; min: number; max: number } {
+        const avg = times.reduce((sum, time) => sum + time, 0) / times.length;
+        const min = Math.min(...times);
+        const max = Math.max(...times);
+        return { avg, min, max };
     }
 
-    /**
-     * Generate a markdown report for easy reading
-     */
     private generateMarkdownReport(testSuite: TestSuite, jsonReport: any): string {
-        const { keyMetrics, performanceBreakdown } = jsonReport;
+        let report = `# Integration Test Report\n\n`;
+        report += `**Suite:** ${testSuite.suiteName}\n`;
+        report += `**Date:** ${testSuite.timestamp.toISOString()}\n`;
+        report += `**Environment:** ${process.env.LLM_PROVIDER || 'OPENAI'}\n\n`;
 
-        let report = `# Integration Test Report
+        // Summary
+        report += `## Summary\n\n`;
+        report += `- **Total Tests:** ${testSuite.totalTests}\n`;
+        report += `- **Passed:** ${testSuite.passed} (${((testSuite.passed / testSuite.totalTests) * 100).toFixed(1)}%)\n`;
+        report += `- **Failed:** ${testSuite.failed}\n`;
 
-**Suite:** ${testSuite.suiteName}  
-**Date:** ${testSuite.timestamp.toISOString()}  
-**Environment:** ${process.env.LLM_PROVIDER || 'OPENAI'} / ${process.env.DATA_STORE_TYPE || 'default'}
+        if (testSuite.globalMetrics) {
+            report += `\n### Global Success Metrics\n`;
+            report += `- **Total Attempts:** ${testSuite.globalMetrics.totalWorkflowAttempts}\n`;
+            report += `- **Successful Attempts:** ${testSuite.globalMetrics.totalSuccessfulAttempts}\n`;
+            report += `- **Global Success Rate:** ${(testSuite.globalMetrics.globalSuccessRate * 100).toFixed(1)}%\n`;
+            report += `- **Workflow Success Rate:** ${(testSuite.globalMetrics.workflowLevelSuccessRate * 100).toFixed(1)}%\n`;
+        }
 
-## 🎯 Key Metrics
+        // --- NEW: Workflow-level meta summary ---
+        if (testSuite.workflowMetaReports && testSuite.workflowMetaReports.length > 0) {
+            report += `\n## Workflow Meta Reports\n`;
+            for (const meta of testSuite.workflowMetaReports) {
+                report += `### ${meta.workflowName}\n`;
+                report += `- Success Rate: ${(meta.successRate * 100).toFixed(1)}% (${meta.successfulAttempts}/${meta.totalAttempts})\n`;
+                if (meta.primaryIssues.length > 0) {
+                    report += `- Primary Issues: ${meta.primaryIssues.join('; ')}\n`;
+                }
+                if (meta.authenticationIssues.length > 0) {
+                    report += `- Auth Issues: ${meta.authenticationIssues.join('; ')}\n`;
+                }
+                if (meta.errorPatterns.length > 0) {
+                    report += `- Error Patterns: ${meta.errorPatterns.join('; ')}\n`;
+                }
+                if (meta.recommendations.length > 0) {
+                    report += `- Recommendations: ${meta.recommendations.join('; ')}\n`;
+                }
+                if (meta.summaries.length > 0) {
+                    report += `- Summary: ${meta.summaries.join(' | ')}\n`;
+                }
+                report += '\n';
+            }
+        }
 
-| Metric | Value |
-|--------|-------|
-| **Overall Success Rate** | ${keyMetrics.overallSuccessRate} |
-| **Average Workflow Build Time** | ${keyMetrics.averageWorkflowBuildTime} |
-| **Average Workflow Execution Time** | ${keyMetrics.averageWorkflowExecutionTime} |
-| **Average Attempts Until Success** | ${keyMetrics.averageAttemptsUntilSuccess} |
-| **First Try Success Rate** | ${keyMetrics.firstTrySuccessRate} |
-| **Max Attempts Needed** | ${keyMetrics.maxAttemptsNeeded} |
+        // Results Table
+        report += `\n## Workflow Results\n\n`;
+        report += `| Workflow | Status | Success Rate | Build Time | Exec Time | Category | Complexity |\n`;
+        report += `|----------|--------|--------------|------------|-----------|----------|------------|\n`;
 
-## 📊 Performance Breakdown
-
-### Integration Setup
-- **Total Setup Time:** ${performanceBreakdown.integrationSetup.totalTime}
-- **Documentation Processing:** ${performanceBreakdown.integrationSetup.documentationProcessing}
-- **Average per Integration:** ${performanceBreakdown.integrationSetup.averagePerIntegration}
-
-### Workflow Timing
-
-**Build Times (Successful):** ${performanceBreakdown.workflowTiming.buildTimes.avg}  
-**Execution Times (Successful):** ${performanceBreakdown.workflowTiming.executionTimes.avg}
-
-## 📋 Workflow Results Summary
-
-| Workflow | Success | Attempts | Build Time | Exec Time | Category | Complexity |
-|----------|---------|----------|------------|-----------|----------|------------|
-`;
-
-        // Add workflow results table
         for (const result of jsonReport.workflowResults) {
+            const status = result.success ? '✅' : '❌';
             const buildTime = testSuite.results.find(r => r.workflowId === result.workflowId)?.buildAttempts.reduce((sum, b) => sum + b.buildTime, 0) || 0;
             const execTime = testSuite.results.find(r => r.workflowId === result.workflowId)?.executionAttempts.reduce((sum, e) => sum + e.executionTime, 0) || 0;
 
-            report += `| ${result.workflowName} | ${result.success ? '✅' : '❌'} | ${result.buildAttempts}/${result.executionAttempts} | ${buildTime}ms | ${execTime}ms | ${result.category} | ${result.complexity} |\n`;
+            report += `| ${result.workflowName} | ${status} | ${result.successRate} | ${buildTime}ms | ${execTime}ms | ${result.category} | ${result.complexity} |\n`;
         }
 
         // Add successful workflow details with data preview
@@ -1193,7 +1231,7 @@ export class IntegrationTestingFramework {
             for (const success of successfulWorkflows) {
                 const originalResult = testSuite.results.find(r => r.workflowId === success.workflowId);
                 if (originalResult?.dataPreview) {
-                    report += `**${success.workflowName}:** ${originalResult.dataPreview}\n\n`;
+                    report += `**${success.workflowName}:** \`${originalResult.dataPreview}\`\n\n`;
                 }
             }
         }
@@ -1218,39 +1256,41 @@ export class IntegrationTestingFramework {
 
                 if (failed.executionReport) {
                     const execReport = failed.executionReport;
-                    if (execReport.planningIssues?.length > 0) {
-                        report += `**Planning Issues:**\n${execReport.planningIssues.map((i: string) => `- ${i}`).join('\n')}\n\n`;
+                    if (execReport.primaryIssues?.length > 0) {
+                        report += `**Primary Issues:**\n`;
+                        execReport.primaryIssues.forEach((issue: string) => {
+                            report += `- ${issue}\n`;
+                        });
+                        report += `\n`;
                     }
-                    if (execReport.apiIssues?.length > 0) {
-                        report += `**API Issues:**\n${execReport.apiIssues.map((i: string) => `- ${i}`).join('\n')}\n\n`;
+
+                    if (execReport.authenticationIssues?.length > 0) {
+                        report += `**🔐 Authentication Issues:**\n`;
+                        execReport.authenticationIssues.forEach((issue: string) => {
+                            report += `- ${issue}\n`;
+                        });
+                        report += `\n`;
                     }
-                    if (execReport.integrationIssues?.length > 0) {
-                        report += `**Integration Issues:**\n${execReport.integrationIssues.map((i: string) => `- ${i}`).join('\n')}\n\n`;
+
+                    if (execReport.errorPatterns?.length > 0) {
+                        report += `**🔄 Error Patterns:**\n`;
+                        execReport.errorPatterns.forEach((pattern: string) => {
+                            report += `- ${pattern}\n`;
+                        });
+                        report += `\n`;
                     }
+
                     if (execReport.recommendations?.length > 0) {
-                        report += `**Recommendations:**\n${execReport.recommendations.map((r: string) => `- ${r}`).join('\n')}\n\n`;
+                        report += `**💡 Recommendations:**\n`;
+                        execReport.recommendations.forEach((rec: string) => {
+                            report += `- ${rec}\n`;
+                        });
+                        report += `\n`;
                     }
                 }
             }
         }
 
-        // Add suite analysis
-        if (testSuite.suiteAnalysis) {
-            report += `\n## 🤖 Suite Analysis\n\n${testSuite.suiteAnalysis}\n`;
-        }
-
-        // Add integration setup details
-        report += `\n## 🔧 Integration Setup Details\n\n`;
-        report += `| Integration | Success | Setup Time | Doc Processing |\n`;
-        report += `|-------------|---------|------------|----------------|\n`;
-
-        for (const integration of testSuite.integrationSetupResults) {
-            report += `| ${integration.name} | ${integration.success ? '✅' : '❌'} | ${integration.setupTime}ms | ${integration.documentationProcessingTime ? integration.documentationProcessingTime + 'ms' : 'N/A'} |\n`;
-        }
-
         return report;
     }
-
 }
-
-export { TestResult, TestSuite };

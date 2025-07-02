@@ -84,7 +84,8 @@ describe('Call Resolver', () => {
 
       expect(result).toEqual({
         data: { result: 'success' },
-        endpoint: testInput.endpoint
+        endpoint: testInput.endpoint,
+        errorHistory: []
       });
       expect(mockedApi.callEndpoint).toHaveBeenCalledWith(
         testInput.endpoint,
@@ -121,7 +122,10 @@ describe('Call Resolver', () => {
 
       expect(result).toEqual({
         data: { result: 'success after retry' },
-        endpoint: { ...testInput.endpoint }
+        endpoint: { ...testInput.endpoint },
+        errorHistory: [
+          'Attempt 1: API call failed'
+        ]
       });
       expect(mockedApi.callEndpoint).toHaveBeenCalledTimes(2);
       expect(mockedApi.generateApiConfig).toHaveBeenCalledTimes(1);
