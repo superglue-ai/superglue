@@ -1,7 +1,25 @@
 {
     "integrations": {
         "enabled": [
-            "zendesk"
+            "zendesk",
+            "slack",
+            "github",
+            "gitlab",
+            "timbuk2-shopify",
+            "bitbucket",
+            "discord",
+            "asana",
+            "notion",
+            "huggingface",
+            "hubspot",
+            "stripe",
+            "jira",
+            "attio",
+            "posthog",
+            "twilio",
+            "sendgrid",
+            "monday",
+            "square"
         ],
         "definitions": {
             "hubspot": {
@@ -245,7 +263,8 @@
     },
     "workflows": {
         "enabled": [
-            "zendesk-ticket-analysis"
+            "posthog-analytics",
+            "twilio-sms-analysis"
         ],
         "definitions": {
             "hubspot-lead-qualification": {
@@ -253,7 +272,7 @@
                 "name": "HubSpot Lead Qualification Pipeline",
                 "instruction": "Get all HubSpot contacts created in the 30 days after the payload date, filter out contacts working at the companies in the payload company list, and update the lead status of remaining contacts to In Progress",
                 "integrationIds": [
-                    "hubspot-crm"
+                    "hubspot"
                 ],
                 "payload": {
                     "date": "2025-06-01",
@@ -270,7 +289,7 @@
                 "name": "Stripe Revenue Analytics Dashboard",
                 "instruction": "Fetch all Stripe subscriptions createdin the 3 months following the payload date, group by customer and calculate my monthly recurring revenue",
                 "integrationIds": [
-                    "stripe-pay"
+                    "stripe"
                 ],
                 "payload": {
                     "date": "2025-06-01"
@@ -283,7 +302,7 @@
                 "name": "JIRA Sprint Health Check",
                 "instruction": "Get all issues from the current active sprint, categorize them by status, calculate completion percentage, and identify any issues marked as Blocked or High Priority that are still in progress",
                 "integrationIds": [
-                    "jira-projects"
+                    "jira"
                 ],
                 "payload": {},
                 "complexityLevel": "medium",
@@ -294,7 +313,7 @@
                 "name": "Attio People Retrieval",
                 "instruction": "Retrieve all people records from Attio CRM that do NOT have a company field set or where the company field is empty / null. Give me the names and email addresses of those people. I want the final output to be a JSON object with the following structure: { \"people\": [ { \"name\": \"John Doe\", \"email\": \"john.doe@example.com\" } ]",
                 "integrationIds": [
-                    "attio-crm"
+                    "attio"
                 ],
                 "payload": {},
                 "complexityLevel": "medium",
@@ -327,7 +346,7 @@
                 "name": "HubSpotCRM Workflow",
                 "instruction": "Get all contacts with lifecycle stage: Marketing Qualified Lead from HubSpot. Filter them to only include contacts created between the input payload date and the payload date + 100 days. I want the final output to be a JSON object with the following structure: { \"contacts\": [ { \"name\": \"John Doe\", \"email\": \"john.doe@example.com\" } ]",
                 "integrationIds": [
-                    "hubspot-crm"
+                    "hubspot"
                 ],
                 "payload": {
                     "date": "2025-06-01"
@@ -340,8 +359,8 @@
                 "name": "Subscription to Database Sync",
                 "instruction": "Fetch all current subscriptions from Stripe, including the customer name, the product/subscription name and the subscription creation time. Note that these may have other names in the api. Write the data into my supabase database into the subscription_table_test table. The table has the following columns: customer_name, product, subscription_creation",
                 "integrationIds": [
-                    "stripe-pay",
-                    "supabase-db"
+                    "stripe",
+                    "supabase"
                 ],
                 "payload": {},
                 "complexityLevel": "medium",
@@ -505,7 +524,9 @@
                 "id": "square-customer-directory",
                 "name": "Square Customer Directory Export",
                 "instruction": "Retrieve all customers from my Square customer directory, extract their names and email addresses, and return a clean JSON object with only two properties: customerNames as an array of customer names and customer_emails as an array of corresponding email addresses",
-                "integrationIds": ["square"],
+                "integrationIds": [
+                    "square"
+                ],
                 "payload": {},
                 "complexityLevel": "medium",
                 "category": "single-system"
@@ -514,15 +535,41 @@
                 "id": "zendesk-ticket-analysis",
                 "name": "Zendesk Ticket Analysis",
                 "instruction": "Retrieve all tickets from my Zendesk account, analyze their statuses, and return a summary of the total number of tickets in each status category",
-                "integrationIds": ["zendesk"],
+                "integrationIds": [
+                    "zendesk"
+                ],
                 "payload": {},
                 "complexityLevel": "medium",
                 "category": "single-system"
             }
         }
     },
+    "apiRankingWorkflowIds": [
+        "zendesk-ticket-analysis",
+        "slack-dm-workflow",
+        "github-list-repos",
+        "hubspot-lead-qualification",
+        "stripe-revenue-analytics",
+        "jira-sprint-health",
+        "attio-people-retrieval",
+        "timbuk2-product-analysis",
+        "posthog-analytics",
+        "twilio-sms-analysis",
+        "sendgrid-test-email",
+        "gitlab-list-projects",
+        "github-list-repos",
+        "slack-dm-workflow",
+        "bitbucket-repos",
+        "discord-server-analysis-dm",
+        "asana-tasks",
+        "notion-duplicate-email-analysis",
+        "huggingface-model-metadata",
+        "monday-sprint-analysis",
+        "square-customer-directory"
+    ],
     "testSuite": {
         "name": "Integration Test",
-        "attemptsPerWorkflow": 2
+        "attemptsPerWorkflow": 2,
+        "enableApiRanking": true
     }
 }

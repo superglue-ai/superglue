@@ -42,7 +42,9 @@ interface TestConfiguration {
     testSuite: {
         name: string;
         attemptsPerWorkflow?: number;
+        enableApiRanking?: boolean;
     };
+    apiRankingWorkflowIds?: string[];
 }
 
 interface BuildAttempt {
@@ -81,6 +83,8 @@ interface TestResult {
         executionSuccess: boolean;
         attemptNumber: number;
     }>;
+    integrationIds?: string[];
+    collectedLogs?: any[];
 }
 
 interface IntegrationSetupResult {
@@ -111,7 +115,6 @@ interface TestSuite {
         firstTrySuccesses: number;
         maxAttemptsNeeded: number;
     };
-    // New metrics
     globalMetrics?: {
         totalWorkflowAttempts: number;
         totalSuccessfulAttempts: number;
@@ -131,6 +134,8 @@ interface TestSuite {
         errorPatterns: string[];
         recommendations: string[];
     }>;
+    apiRankingResults?: any[];
+    apiRankingMarkdown?: string;
 }
 
 export class IntegrationTestingFramework {
@@ -377,7 +382,7 @@ export class IntegrationTestingFramework {
         }> = [];
 
         const workflowLogListener = (entry: any) => {
-            if ((entry.workflowId === testWorkflow.id) && (entry.level === 'WARN' || entry.level === 'ERROR')) {
+            if (entry.level === 'WARN' || entry.level === 'ERROR' || entry.level === 'DEBUG') {
                 workflowLogs.push(entry);
             }
         };
@@ -575,7 +580,8 @@ export class IntegrationTestingFramework {
             totalAttempts: 1,
             successfulAttempts: succeededOnAttempt ? 1 : 0,
             successRate: succeededOnAttempt ? 1 : 0,
-            workflowPlans
+            workflowPlans,
+            collectedLogs: workflowLogs
         };
     }
 
@@ -707,6 +713,7 @@ export class IntegrationTestingFramework {
                 let firstSuccessAttempt: number | undefined = undefined;
                 let lastResult: TestResult | undefined = undefined;
                 let actualDataSamples: any[] = [];
+                let allWorkflowLogs: any[] = []; // Aggregate logs across all attempts
 
                 // Run the workflow the configured number of times
                 for (let attempt = 1; attempt <= ATTEMPTS_PER_WORKFLOW; attempt++) {
@@ -715,6 +722,11 @@ export class IntegrationTestingFramework {
                     const result = await this.buildAndTestWorkflow(testWorkflow, 1); // Only 1 inner retry per build attempt
                     allBuildAttempts = allBuildAttempts.concat(result.buildAttempts);
                     allExecutionAttempts = allExecutionAttempts.concat(result.executionAttempts);
+
+                    // Aggregate logs from this attempt
+                    if (result.collectedLogs) {
+                        allWorkflowLogs = allWorkflowLogs.concat(result.collectedLogs);
+                    }
 
                     // Success means both build AND execution succeeded
                     const attemptSucceeded = result.succeededOnAttempt && result.executionAttempts.length > 0 && result.executionAttempts.some(e => e.success);
@@ -759,8 +771,82 @@ export class IntegrationTestingFramework {
                     // New fields
                     totalAttempts: ATTEMPTS_PER_WORKFLOW,
                     successfulAttempts,
-                    successRate: successRate / 100
+                    successRate: successRate / 100,
+                    collectedLogs: allWorkflowLogs // Store aggregated logs
                 });
+            }
+
+            // --- API RANKING LOGIC ---
+            const enableApiRanking = this.config?.testSuite?.enableApiRanking;
+            const apiRankingWorkflowIds = this.config?.apiRankingWorkflowIds || [];
+            let apiRankingResults: any[] = [];
+            let apiRankingWarnings: string[] = [];
+            let apiRankingMarkdown: string | undefined = undefined;
+            if (enableApiRanking && apiRankingWorkflowIds.length > 0) {
+                const integrationStats: Array<{
+                    integrationId: string;
+                    workflowId: string;
+                    workflowName: string;
+                    workflowDescription: string;
+                    successRate: number;
+                    avgExecutionTime: number;
+                    totalRetries: number;
+                    combinedScore: number;
+                }> = [];
+                const enabledWorkflowIds = new Set(this.config?.workflows?.enabled || []);
+                for (const wfId of apiRankingWorkflowIds) {
+                    if (!enabledWorkflowIds.has(wfId)) {
+                        apiRankingWarnings.push(`⚠️ Workflow '${wfId}' is listed in apiRankingWorkflowIds but is not enabled. It will not be ranked.`);
+                        continue;
+                    }
+                    const result = results.find(r => r.workflowId === wfId);
+                    if (!result) continue;
+                    const integrationId = result.integrationIds?.[0] || result.workflowId;
+                    const totalAttempts = result.totalAttempts || 1;
+                    const successfulAttempts = result.successfulAttempts || 0;
+                    const allExecTimes = result.executionAttempts.map(e => e.executionTime);
+                    const avgExecutionTime = allExecTimes.length ? allExecTimes.reduce((a, b) => a + b, 0) / allExecTimes.length : 0;
+                    // Count actual API call failures from the collected logs
+                    let totalRetries = 0;
+                    if (result.collectedLogs) {
+                        const apiFailureLogs = result.collectedLogs.filter((log: any) =>
+                            log.level === 'WARN' &&
+                            log.message &&
+                            log.message.includes('API call failed')
+                        );
+                        totalRetries = apiFailureLogs.length;
+                    }
+                    const workflowDef = this.config?.workflows?.definitions?.[wfId];
+                    integrationStats.push({
+                        integrationId,
+                        workflowId: result.workflowId,
+                        workflowName: result.workflowName,
+                        workflowDescription: workflowDef?.instruction || '',
+                        successRate: (successfulAttempts / totalAttempts) * 100,
+                        avgExecutionTime,
+                        totalRetries,
+                        combinedScore: 0 // placeholder
+                    });
+                }
+                // Normalize for combined score
+                const maxExecTime = Math.max(...integrationStats.map(s => s.avgExecutionTime), 1);
+                const maxRetries = Math.max(...integrationStats.map(s => s.totalRetries), 1);
+                for (const stat of integrationStats) {
+                    const normExec = 1 - (stat.avgExecutionTime / maxExecTime); // higher is better
+                    const normRetries = 1 - (stat.totalRetries / maxRetries); // higher is better
+                    stat.combinedScore = 0.6 * (stat.successRate / 100) + 0.3 * normExec + 0.1 * normRetries;
+                }
+                apiRankingResults = integrationStats.sort((a, b) => b.combinedScore - a.combinedScore);
+                let rankingTable = '| Rank | Integration | Workflow | Success % | Avg. Exec Time (ms) | Total Retries | Combined Score |\n';
+                rankingTable += '|------|-------------|----------|-----------|---------------------|---------------|---------------|\n';
+                apiRankingResults.forEach((r, i) => {
+                    rankingTable += `| ${i + 1} | ${r.integrationId} | ${r.workflowName} | ${r.successRate.toFixed(0)}% | ${r.avgExecutionTime.toFixed(0)} | ${r.totalRetries} | ${r.combinedScore.toFixed(2)} |\n`;
+                });
+                if (apiRankingWarnings.length > 0) {
+                    rankingTable = apiRankingWarnings.join('\n') + '\n' + rankingTable;
+                }
+                logMessage('info', `\n=== API RANKING ===\n${rankingTable}`, this.metadata);
+                apiRankingMarkdown = rankingTable;
             }
 
             // Generate error summaries for workflows that encountered errors
@@ -840,7 +926,9 @@ export class IntegrationTestingFramework {
                     workflowLevelSuccessRate,
                     averageWorkflowSuccessRate
                 },
-                workflowMetaReports // new field
+                workflowMetaReports,
+                apiRankingResults,
+                apiRankingMarkdown
             };
 
             this.logTestSummary(testSuite);
@@ -1112,7 +1200,9 @@ export class IntegrationTestingFramework {
                 documentationProcessingTime: testSuite.documentationProcessingTime,
                 results: testSuite.integrationSetupResults
             },
-            workflowMetaReports: testSuite.workflowMetaReports
+            workflowMetaReports: testSuite.workflowMetaReports,
+            apiRankingResults: testSuite.apiRankingResults,
+            apiRankingMarkdown: testSuite.apiRankingMarkdown
         };
 
         // Save JSON report
@@ -1170,7 +1260,11 @@ export class IntegrationTestingFramework {
         report += `**Suite:** ${testSuite.suiteName}\n`;
         report += `**Date:** ${testSuite.timestamp.toISOString()}\n`;
         report += `**Environment:** ${process.env.LLM_PROVIDER || 'OPENAI'}\n\n`;
-
+        // --- API RANKING ---
+        if (testSuite.apiRankingMarkdown) {
+            report += `## API Ranking\n\n`;
+            report += testSuite.apiRankingMarkdown + '\n';
+        }
         // Summary
         report += `## Summary\n\n`;
         report += `- **Total Tests:** ${testSuite.totalTests}\n`;
