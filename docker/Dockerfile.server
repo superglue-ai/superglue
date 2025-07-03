@@ -25,7 +25,7 @@ RUN npm install && \
 COPY . .
 
 # After copying files but before building
-RUN npm run build
+RUN npx turbo run build --filter=@superglue/core
     
 
 # Production stage
