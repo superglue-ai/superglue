@@ -202,7 +202,7 @@ export async function executeAndValidateMappingCode(input: any, mappingCode: str
   }
 }
 
-export async function callAxios(config: AxiosRequestConfig, options: RequestOptions) {
+export async function callAxios(config: AxiosRequestConfig, options: RequestOptions): Promise<{ data?: any; status: number; headers?: any; statusText?: string; }> {
   let retryCount = 0;
   const maxRetries = options?.retries || 0;
   const delay = options?.retryDelay || 1000;
@@ -264,7 +264,7 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
 
       return response;
     } catch (error) {
-      if (retryCount >= maxRetries) throw error;
+      if (retryCount >= maxRetries) return { data: { error: error?.message || error }, status: error?.status || 500, headers: {} };
       retryCount++;
       await new Promise(resolve => setTimeout(resolve, delay * retryCount));
     }

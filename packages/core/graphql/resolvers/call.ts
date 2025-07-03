@@ -4,12 +4,10 @@ import { GraphQLResolveInfo } from "graphql";
 import OpenAI from "openai";
 import { PROMPT_MAPPING } from "../../llm/prompts.js";
 import { callEndpoint, evaluateResponse, generateApiConfig } from "../../utils/api.js";
-import { Documentation } from "../../utils/documentation.js";
 import { logMessage } from "../../utils/logs.js";
-import { generateSchema } from "../../utils/schema.js";
 import { telemetryClient } from "../../utils/telemetry.js";
 import { maskCredentials } from "../../utils/tools.js";
-import { executeTransform, generateTransformCode } from "../../utils/transform.js";
+import { executeTransform } from "../../utils/transform.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 
 export async function executeApiCall(
@@ -35,10 +33,9 @@ export async function executeApiCall(
     logMessage('debug', `Self-healing enabled but no integration provided; skipping documentation-based healing.`, metadata);
   } else if (integration && integration.documentationPending) {
     logMessage('warn', `Documentation for integration ${integration.id} is still being fetched. Proceeding without documentation.`, metadata);
-  } else if (integration && integration.documentation) {
-    documentationString = Documentation.postProcess(integration.documentation, endpoint.instruction || "");
+  } else if (integration.documentation) {
+    documentationString = integration.documentation;
   }
-
   do {
     try {
       if (retryCount > 0 && isSelfHealing) {
@@ -59,13 +56,13 @@ export async function executeApiCall(
         const result = await evaluateResponse(response.data, endpoint.responseSchema, endpoint.instruction);
         success = result.success;
         if (!result.success) throw new Error(result.shortReason + " " + JSON.stringify(response.data).slice(0, 1000));
-        if (result.refactorNeeded) {
+        /*if (result.refactorNeeded) { // disabled for now
           logMessage('info', `Refactoring the API response.`, metadata);
           const responseSchema = await generateSchema(endpoint.instruction, JSON.stringify(response.data).slice(0, 1000), metadata);
           const transformation = await generateTransformCode(responseSchema, response.data, endpoint.instruction, metadata);
           endpoint.responseMapping = transformation.mappingCode;
           response.data = transformation.data;
-        }
+        }*/
       }
       else {
         success = true;

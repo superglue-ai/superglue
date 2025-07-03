@@ -94,13 +94,18 @@ export class Documentation {
     return "";
   }
 
-  public static postProcess(documentation: string, instruction: string): string {
+  public static postProcess(
+    documentation: string,
+    instruction: string,
+    max_chunks: number = 10,
+    chunk_size: number = 0
+  ): string {
     if (documentation.length <= Documentation.MAX_LENGTH) {
       return documentation;
     }
-
-    const CHUNK_SIZE = Documentation.MAX_LENGTH / 10;
-    const MAX_CHUNKS = 10; // Limit number of chunks to return
+    if (chunk_size <= 0) {
+      chunk_size = Documentation.MAX_LENGTH / 10;
+    }
     const MIN_SEARCH_TERM_LENGTH = 4;
 
     // Extract search terms from instruction
@@ -114,8 +119,8 @@ export class Documentation {
     // Split document into chunks
     const chunks: { content: string; score: number; index: number; }[] = [];
 
-    for (let i = 0; i < documentation.length; i += CHUNK_SIZE) {
-      const chunk = documentation.slice(i, i + CHUNK_SIZE);
+    for (let i = 0; i < documentation.length; i += chunk_size) {
+      const chunk = documentation.slice(i, i + chunk_size);
       const chunkLower = chunk.toLowerCase();
 
       // Score chunk based on search term matches
@@ -135,7 +140,7 @@ export class Documentation {
     // Sort by score (highest first) and take top chunks
     const topChunks = chunks
       .sort((a, b) => b.score - a.score)
-      .slice(0, MAX_CHUNKS);
+      .slice(0, max_chunks);
 
     // If no chunks have matches, return first chunk
     if (topChunks.every(chunk => chunk.score === 0)) {
@@ -300,8 +305,13 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
         const links = {};
         const allLinks = document.querySelectorAll('a');
         allLinks.forEach(link => {
-          const key = link.textContent?.toLowerCase().trim().replace(/[^a-z0-9]/g, ' ');
-          links[key] = link?.href?.split('#')[0];
+          try {
+            const url = new URL(link?.href);
+            const key = `${link.textContent} ${url.pathname}`?.toLowerCase()?.replace(/[^a-z0-9]/g, ' ').trim();
+            links[key] = link?.href?.split('#')[0]?.trim();
+          } catch (e) {
+            // ignore
+          }
         });
         return links;
       });
@@ -340,11 +350,10 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
   }
 
   async tryFetch(config: ApiConfig, metadata: Metadata): Promise<string | null> {
-    const docResult = await this.fetchPageContentWithPlaywright(config?.documentationUrl, config, metadata);
-    let fetchedLinks = new Set<string>();
-    if (!docResult?.content) return null;
+    if (!config?.documentationUrl) return null;
 
-    fetchedLinks.add(config.documentationUrl);
+    const fetchedLinks = new Set<string>();
+    let combinedContent = "";
 
     // Expanded keywords to catch more relevant documentation pages
     const requiredKeywords = [
@@ -353,67 +362,88 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       // Getting started
       "introduction", "getting started", "quickstart", "guide", "tutorial",
       // API specific
-      "rest", "graphql", "openapi", "endpoints", "reference", "methods", "operations", "objects", "users", "models", "query",
+      "rest", "graphql", "openapi", "endpoints", "reference",
+      "methods", "operations", "objects", "records", "users", "models", "query",
       // HTTP methods
       "get", "post", "put", "delete", "patch",
       // Common API concepts
       "rate limit", "pagination", "webhook", "callback", "error", "response"
     ];
 
-    if (!docResult.links) return docResult.content;
+    // Pool of all discovered links (array allows duplicates with different text)
+    const linkPool: { linkText: string, href: string; }[] = [];
 
+    // Add documentation URL with high priority score
+    linkPool.push({
+      linkText: "documentation",
+      href: config.documentationUrl,
+    });
+
+    while (fetchedLinks.size < PlaywrightFetchingStrategy.MAX_FETCHED_LINKS && linkPool.length > 0) {
+      const rankedLinks = this.rankLinks(linkPool, requiredKeywords, fetchedLinks);
+
+      if (rankedLinks.length === 0) break;
+      const nextLink = rankedLinks[0];
+
+      try {
+        const linkResult = await this.fetchPageContentWithPlaywright(nextLink.href, config, metadata);
+        if (linkResult?.content) {
+          combinedContent += combinedContent ? `\n\n${linkResult.content}` : linkResult.content;
+          fetchedLinks.add(nextLink.href);
+
+          // Add newly discovered links to the pool (allow duplicates with different text)
+          if (linkResult.links) {
+            for (const [linkText, href] of Object.entries(linkResult.links)) {
+              if (this.shouldSkipLink(linkText, href)) continue;
+              linkPool.push({ linkText, href });
+            }
+          }
+        }
+      } catch (error) {
+        logMessage('warn', `Failed to fetch link ${nextLink.href}: ${error?.message}`, metadata);
+      }
+    }
+
+    return combinedContent;
+  }
+
+  private shouldSkipLink(linkText: string, href: string): boolean {
+    return !linkText || href.includes('signup') ||
+      href.includes('login') ||
+      href.includes('pricing') ||
+      href.includes('oauth') ||
+      href.includes('contact') ||
+      href.includes('support') ||
+      href.includes('cookie') ||
+      href.includes('privacy') ||
+      href.includes('terms') ||
+      href.includes('legal') ||
+      href.includes('policy') ||
+      href.includes('status') ||
+      href.includes('help');
+  }
+
+  private rankLinks(links: { linkText: string, href: string; }[], keywords: string[], fetchedLinks: Set<string>): { linkText: string, href: string, matchCount: number; }[] {
     const rankedLinks: { linkText: string, href: string, matchCount: number; }[] = [];
 
-    for (const [linkText, href] of Object.entries(docResult.links)) {
-      // Skip obviously non-doc pages
-      if (!linkText || href.includes('signup') ||
-        href.includes('pricing') ||
-        href.includes('contact') ||
-        href.includes('cookie') ||
-        href.includes('privacy') ||
-        href.includes('terms') ||
-        href.includes('legal') ||
-        href.includes('policy') ||
-        href.includes('status') ||
-        href.includes('help')) {
-        continue;
-      }
+    for (const link of links) {
+      if (fetchedLinks.has(link.href)) continue;
 
       // Count keyword matches
       let matchCount = 0;
-      const linkTextLower = linkText.toLowerCase();
-      const hrefLower = href.toLowerCase();
+      const linkTextLower = link.linkText.toLowerCase();
+      const hrefLower = link.href.toLowerCase();
 
-      for (const keyword of requiredKeywords) {
+      for (const keyword of keywords) {
         if (linkTextLower.includes(keyword) || hrefLower.includes(keyword)) {
           matchCount++;
         }
       }
-      rankedLinks.push({ linkText, href, matchCount });
+      rankedLinks.push({ linkText: link.linkText, href: link.href, matchCount });
     }
 
-    // Sort by priority first (highest first), then by match count (highest first)
-    rankedLinks.sort((a, b) => {
-      return b.matchCount - a.matchCount;
-    });
-
-    // Fetch links up to MAX_FETCHED_LINKS, prioritizing higher priority ones
-    for (const link of rankedLinks) {
-      if (fetchedLinks.size >= PlaywrightFetchingStrategy.MAX_FETCHED_LINKS) break;
-      if (fetchedLinks.has(link.href)) continue;
-
-      try {
-        const linkResult = await this.fetchPageContentWithPlaywright(link.href, config, metadata);
-        if (linkResult?.content) {
-          docResult.content += `\n\n${linkResult.content}`;
-          fetchedLinks.add(link.href);
-        }
-      } catch (error) {
-        logMessage('warn', `Failed to fetch link ${link.href}: ${error?.message}`, metadata);
-      }
-    }
-
-    return docResult.content;
+    // Sort by match count (highest first)
+    return rankedLinks.sort((a, b) => b.matchCount - a.matchCount);
   }
 }
 

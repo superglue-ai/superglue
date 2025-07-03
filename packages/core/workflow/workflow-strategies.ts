@@ -2,7 +2,7 @@ import type { ExecutionStep, RequestOptions, WorkflowStepResult } from "@supergl
 import { Integration, Metadata } from "@superglue/shared";
 import { executeApiCall } from "../graphql/resolvers/call.js";
 import { logMessage } from "../utils/logs.js";
-import { applyJsonata } from "../utils/tools.js";
+import { applyJsonata, applyTransformationWithValidation } from "../utils/tools.js";
 import { generateTransformJsonata } from "../utils/transform.js";
 
 export interface ExecutionStrategy {
@@ -36,7 +36,7 @@ const directStrategy: ExecutionStrategy = {
       stepId: step.id,
       success: false,
       config: step.apiConfig
-    }
+    };
     try {
       const apiResponse = await executeApiCall(
         step.apiConfig,
@@ -78,7 +78,7 @@ const loopStrategy: ExecutionStrategy = {
       stepId: step.id,
       success: false,
       config: step.apiConfig
-    }
+    };
 
     try {
       if (!step.loopSelector) {
@@ -108,6 +108,7 @@ const loopStrategy: ExecutionStrategy = {
         logMessage("debug", `Executing for ${JSON.stringify(currentItem).slice(0, 100)} (${i + 1}/${loopItems.length})`, metadata);
 
         const loopPayload = {
+          ...currentItem,
           ...payload,
           currentItem: currentItem,
         };
@@ -122,7 +123,7 @@ const loopStrategy: ExecutionStrategy = {
             integration
           );
           const rawData = { currentItem: currentItem, ...(typeof apiResponse.data === 'object' ? apiResponse.data : { data: apiResponse.data }) };
-          const transformedData = await applyJsonata(rawData, step.responseMapping);
+          const transformedData = await applyTransformationWithValidation(rawData, step.responseMapping, null);
           stepResults.push({
             stepId: step.id,
             success: true,
@@ -135,7 +136,7 @@ const loopStrategy: ExecutionStrategy = {
           step.apiConfig = apiResponse.endpoint;
 
         } catch (callError) {
-          const errorMessage = `Error processing '${currentItem}': ${String(callError)}`;
+          const errorMessage = `Error processing '${JSON.stringify(currentItem)}': ${String(callError)}`;
           logMessage("error", errorMessage, metadata);
           throw errorMessage;
         }

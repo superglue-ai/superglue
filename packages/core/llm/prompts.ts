@@ -128,7 +128,8 @@ Use \n where appropriate for readability.
   - Specifically, the computed result / input might be wrapped in array brackets. In this case, the array brackets set in the mapping are in the wrong place.
   - If you get an error like \"is not of a type(s) string/number/object\", try to convert the source field, but also consider that the original field or one of its parent might be null. In this case, add a default value.
   - If an object is optional but its fields required, you can add a test and default to {}, but do not set the inner fields to default null.
-Remember: The goal is to create valid JSONata expressions that accurately transform the source data structure into the required target structure. Follow all of these guidelines or I will lose my job.`;
+Remember: The goal is to create valid JSONata expressions that accurately transform the source data structure into the required target structure. Follow all of these guidelines or I will lose my job.
+Output the final jsonata expression with the submit tool.`;
 
 export const API_PROMPT = `You are an API configuration assistant. Generate API details based on instructions and documentation and available variables in a valid JSON format.
 
@@ -203,7 +204,7 @@ Make sure to try a fix before generating a new configuration. I will loose my jo
 - Think hard before producing a response, and be aware that the response is not checked for validity if the response is not an error, so only suggest endpoints that you are sure are valid.
 - If this is a store / e-commerce site, try products.json, collections.json, categories.json, etc.
 - If the user asks for "everything" or "all you can get", keep the query concise still and don't build extremely complex queries if not strictly necessary.
-- Important: Your model output must be just the valid JSON without line breaks and tabs, nothing else.
+- Important: Output the final configuration with the submit tool.
 </GENERAL_GUIDELINES>`;
 
 export const PROMPT_JS_TRANSFORM = `
@@ -230,7 +231,7 @@ Requirements:
 - do not use function(sourceData) { ... } syntax, use (sourceData) => { ... } instead.
 - THE FUNCTION MUST BE VALID JS. OTHERWISE I WILL LOSE MY JOB.
 
-Return your answer in the following JSON format:
+Return your answer in the following JSON format with the submit tool:
 {
   "mappingCode": "(sourceData) => { return { id: sourceData.id, name: sourceData.name }; }",
   "confidence": <number between 0 and 100>
@@ -256,12 +257,12 @@ Then your output should be:
   "confidence": 100
 }
 
-Important: Your model output must be just the valid JSON without line breaks and tabs, nothing else.
+Important: Output the final mapping code with the submit tool when you are done.
 `;
 
 
 export const GENERATE_SCHEMA_PROMPT = `You are a json schema generator assistant. Generate a JSON schema based on instructions and response data.
-If the response data is an array, make the schema an array of objects and name the array object "results".
+If the response data is an array, make the schema an array of objects and name the array object "results". Output the final schema with the submit tool.
 
 Make the schema as simple as possible. No need to include every possible field, just the ones relevant to the query.
 
@@ -295,7 +296,7 @@ Schema:
 }
 
 Make this fast and do not think too hard, this is just an approximation.
-Important: Your model output must be just the valid JSON, nothing else.
+Output the final schema with the submit tool.
 `;
 
 
@@ -303,7 +304,7 @@ export const PLANNING_PROMPT =
   `You are an expert AI assistant responsible for planning the execution steps needed to fulfill a user's request by orchestrating API calls. 
 Your goal is to create a clear, step-by-step plan based on the provided integration documentation and the user's overall instruction. 
 Each step should be a single API call. Adhere to the documentation to understand how to call the API.
-Output the plan as a JSON object adhering to the specified schema.
+Output the final plan with the submit tool.
 
 <STEP_CREATION>
 1. [Important] Fetch ALL prerequisites like available projects you can query, available entities / object types you can access, available categories you can filter on, etc. 
@@ -318,7 +319,7 @@ Further:
 - Assign descriptive stepIds in camelCase that indicate the purpose of the step
 - Make absolutely sure that each step can be achieved with a single API call (or a loop of the same call)
 - Aggregation, grouping, sorting, filtering is covered by a separate final transformation and does not need to be added as a dedicated step. However, if the API supports e.g. filtering when retrieving, this should be part of the retrieval step, just do not add an extra one.
-- Each generated step instruction should be specific based on your understanding of the API capabilities and contain information about what a successful response looks like / what the response should contain.
+- Each generated step instruction should be as close as possible to the API capabilities and contain information about what a successful response looks like / what the response should contain.
 </STEP_CREATION>
 
 <EXECUTION_MODES>
@@ -380,7 +381,7 @@ Credentials available: api_key, api_password
 </EXAMPLE_OUTPUT>
 
 <OUTPUT_FORMAT>
-Important: Your model output must be just the valid JSON without line breaks and tabs, nothing else.
+Important: Output the final plan with the submit tool.
 </OUTPUT_FORMAT>
 `;
 
@@ -439,6 +440,6 @@ CRM platform for managing contacts, deals, and companies. Endpoints: GET /crm/v3
 </EXAMPLE_OUTPUT>
 
 <OUTPUT_FORMAT>
-Important: Your model output must be just the valid JSON without line breaks and tabs, nothing else. The JSON object must strictly adhere to the provided schema.
+Important: Output the final plan with the submit tool.
 </OUTPUT_FORMAT>
 `; 

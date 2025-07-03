@@ -6,6 +6,7 @@ import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { LanguageModel } from "../llm/llm.js";
 import { API_PROMPT } from "../llm/prompts.js";
+import { Documentation } from "./documentation.js";
 import { parseFile } from "./file.js";
 import { callPostgres } from "./postgres.js";
 import { callAxios, composeUrl, generateId, replaceVariables, sample } from "./tools.js";
@@ -244,10 +245,44 @@ export async function generateApiConfig(
       cursorPath: z.string().describe("If cursor_based: The path to the cursor in the response. E.g. cursor.current or next_cursor. If pagination is not cursor_based, set this to \"\"")
     }).optional()
   }));
+
+  // Create custom tools for the LLM
+  const customTools = [
+    {
+      type: "function" as const,
+      name: "search_documentation",
+      description: "Search through the API documentation for specific information. Use this when you need to find details about endpoints, authentication, parameters, or any other API-related information.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description: "The search query to find relevant information in the documentation"
+          },
+          max_chunks: {
+            type: "integer",
+            description: "Maximum number of relevant chunks to return (default: 10)",
+            default: 10
+          }
+        },
+        required: ["query"],
+      },
+      execute: async (args: { query: string; max_chunks: number; }) => {
+        const chunks = await Documentation.postProcess(documentation, args.query, 5, 5000);
+        return chunks;
+      }
+    }
+  ];
+
+  // If the model calls the search_documentation tool, we need to handle it
+  // Since we're using the Responses API in OpenAIModel, it will handle multiple tool calls
+  // But we need to make the documentation available to the model
+
   const availableVariables = [
     ...Object.keys(credentials || {}),
     ...Object.keys(payload || {}),
   ].map(v => `<<${v}>>`).join(", ");
+
   if (messages.length === 0) {
     const userPrompt = `Generate API configuration for the following:
 
@@ -264,11 +299,14 @@ ${apiConfig.dataPath ? `Data Path: ${apiConfig.dataPath}` : ''}
 ${apiConfig.pagination ? `Pagination: ${JSON.stringify(apiConfig.pagination)}` : ''}
 ${apiConfig.method ? `Method: ${apiConfig.method}` : ''}
 
+Documentation: ${Documentation.postProcess(documentation, apiConfig.instruction || "", 5, 5000)}
+
 Available variables: ${availableVariables}
 Available pagination variables (if pagination is enabled): page, pageSize, offset, cursor, limit
 Example payload: ${JSON.stringify(payload || {}).slice(0, LanguageModel.contextLength / 10)}
 
-Documentation: ${String(documentation)}`;
+You have access to a search_documentation tool if you need to find specific information in the documentation.`;
+
     messages.push({
       role: "system",
       content: API_PROMPT
@@ -278,8 +316,14 @@ Documentation: ${String(documentation)}`;
       content: userPrompt
     });
   }
+
   const temperature = Math.min(retryCount * 0.1, 1);
-  const { response: generatedConfig, messages: updatedMessages } = await LanguageModel.generateObject(messages, schema, temperature);
+  const { response: generatedConfig, messages: updatedMessages } = await LanguageModel.generateObject(
+    messages,
+    schema,
+    temperature,
+    customTools
+  );
 
   return {
     config: {

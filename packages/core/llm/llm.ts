@@ -6,7 +6,7 @@ import { OpenAIModel } from "./openai-model.js";
 export interface LLM {
     contextLength: number;
     generateText(messages: OpenAI.Chat.ChatCompletionMessageParam[], temperature?: number): Promise<LLMResponse>;
-    generateObject(messages: OpenAI.Chat.ChatCompletionMessageParam[], schema: any, temperature?: number): Promise<LLMObjectResponse>;
+    generateObject(messages: OpenAI.Chat.ChatCompletionMessageParam[], schema: any, temperature?: number, customTools?: any[]): Promise<LLMObjectResponse>;
 }
 
 export interface LLMResponse {
