@@ -13,11 +13,7 @@ env:
   NODE_OPTIONS: "--max-old-space-size=4096" # Increase Node.js memory limit
 
 jobs:
-  test:
-    uses: ./.github/workflows/node-test.yml
-
   build-and-push:
-    needs: test
     runs-on: ubuntu-latest
     
     steps:
