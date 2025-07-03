@@ -36,7 +36,6 @@ WORKDIR /usr/src/app
 COPY package*.json ./
 COPY turbo.json ./
 COPY api.graphql ./
-COPY packages/core/package*.json ./packages/core/
 COPY packages/web/package*.json ./packages/web/
 COPY packages/shared/package*.json ./packages/shared/
 
