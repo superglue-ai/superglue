@@ -611,7 +611,10 @@ export const toolDefinitions: Record<string, any> = {
         const result = await client.executeWorkflow({
           workflow: builtWorkflow,
           payload: payload,
-          credentials: credentials
+          credentials: credentials,
+          options: {
+            testMode: true
+          }
         });
 
         if (!result.success) {
