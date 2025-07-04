@@ -1,6 +1,5 @@
 import OpenAI from "openai";
 import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
-import { logMessage } from "../utils/logs.js";
 import { addNullableToOptional } from "../utils/tools.js";
 import { LLM, LLMObjectResponse, LLMResponse } from "./llm.js";
 
@@ -151,7 +150,7 @@ export class OpenAIModel implements LLM {
             }
             conversationMessages.push({
               type: "function_call_output",
-              call_id: item.id,
+              call_id: item.call_id || item.id,
               output: "Done"
             });
             break;
@@ -162,7 +161,7 @@ export class OpenAIModel implements LLM {
               const toolResult = await tool.execute(item.arguments);
               conversationMessages.push({
                 type: "function_call_output",
-                call_id: item.id,
+                call_id: item.call_id || item.id,
                 output: JSON.stringify(toolResult || {})
               });
             }
@@ -178,7 +177,7 @@ export class OpenAIModel implements LLM {
                 }
                 conversationMessages.push({
                   type: "function_call_output",
-                  call_id: toolCall.id,
+                  call_id: toolCall.call_id || toolCall.id,
                   output: "Done"
                 });
                 break;
@@ -188,7 +187,7 @@ export class OpenAIModel implements LLM {
                 const toolResult = await tool?.execute(item.arguments);
                 conversationMessages.push({
                   type: "function_call_output",
-                  call_id: item.id,
+                  call_id: toolCall.call_id || toolCall.id,
                   output: JSON.stringify(toolResult || {})
                 });
               }
@@ -216,47 +215,13 @@ export class OpenAIModel implements LLM {
       } as LLMObjectResponse;
 
     } catch (error) {
-      // If Responses API is not available, fall back to Chat Completions API
-      logMessage('warn', `Responses API error: ${error.message}. Falling back to Chat Completions API`);
+      const updatedMessages = [...messages, {
+        role: "assistant",
+        content: "Error: " + error.message
+      }];
 
-      // Original Chat Completions implementation without web search
-      const result = await this.model.chat.completions.create({
-        messages: [dateMessage, ...messages],
-        model: process.env.OPENAI_MODEL || "gpt-4o",
-        temperature: temperature,
-        tools: [{
-          type: "function",
-          function: {
-            name: "submit",
-            description: "Submit the final result",
-            parameters: schema
-          }
-        }],
-        tool_choice: "auto"
-      });
-
-      const message = result.choices[0].message;
-      let finalResult = null;
-
-      if (message.tool_calls) {
-        for (const toolCall of message.tool_calls) {
-          if (toolCall.function.name === "submit") {
-            finalResult = JSON.parse(toolCall.function.arguments);
-            if (finalResult.___results) {
-              finalResult = finalResult.___results;
-            }
-            break;
-          }
-        }
-      }
-
-      if (!finalResult) {
-        throw new Error("Model did not call the submit tool");
-      }
-
-      const updatedMessages = [...messages, message];
       return {
-        response: finalResult,
+        response: "Error: " + error.message,
         messages: updatedMessages
       } as LLMObjectResponse;
     }
