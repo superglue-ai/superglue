@@ -1,25 +1,7 @@
 {
     "integrations": {
         "enabled": [
-            "zendesk",
-            "slack",
-            "github",
-            "gitlab",
-            "timbuk2-shopify",
-            "bitbucket",
-            "discord",
-            "asana",
-            "notion",
-            "huggingface",
-            "hubspot",
-            "stripe",
-            "jira",
-            "attio",
-            "posthog",
-            "twilio",
-            "sendgrid",
-            "monday",
-            "square"
+            "twilio"
         ],
         "definitions": {
             "hubspot": {
@@ -105,7 +87,7 @@
                 "id": "twilio",
                 "name": "Twilio",
                 "urlHost": "https://api.twilio.com/",
-                "urlPath": "/2010-04-01",
+                "urlPath": "",
                 "documentationUrl": "https://www.twilio.com/docs/api",
                 "credentials": {
                     "account_sid": "",
@@ -128,7 +110,7 @@
                 "id": "posthog",
                 "name": "PostHog",
                 "urlHost": "https://us.posthog.com/",
-                "urlPath": "/",
+                "urlPath": "",
                 "documentationUrl": "https://posthog.com/docs/api",
                 "credentials": {
                     "api_key": ""
@@ -139,7 +121,7 @@
                 "id": "github",
                 "name": "GitHub",
                 "urlHost": "https://api.github.com",
-                "urlPath": "/",
+                "urlPath": "",
                 "documentationUrl": "https://docs.github.com/en/rest",
                 "credentials": {
                     "api_key": ""
@@ -150,7 +132,7 @@
                 "id": "gitlab",
                 "name": "GitLab",
                 "urlHost": "https://gitlab.com/api/v4",
-                "urlPath": "/",
+                "urlPath": "",
                 "documentationUrl": "https://docs.gitlab.com/ee/api/rest/index.html",
                 "credentials": {
                     "api_key": ""
@@ -161,7 +143,7 @@
                 "id": "slack",
                 "name": "Slack",
                 "urlHost": "https://api.slack.com",
-                "urlPath": "/",
+                "urlPath": "",
                 "documentationUrl": "https://api.slack.com/docs",
                 "credentials": {
                     "bot_token": ""
@@ -184,7 +166,7 @@
                 "id": "discord",
                 "name": "Discord",
                 "urlHost": "https://discord.com/api",
-                "urlPath": "/",
+                "urlPath": "",
                 "documentationUrl": "https://discord.com/developers/docs/reference",
                 "credentials": {
                     "bot_token": "",
@@ -196,7 +178,7 @@
                 "id": "asana",
                 "name": "Asana",
                 "urlHost": "https://app.asana.com/api",
-                "urlPath": "/",
+                "urlPath": "",
                 "documentationUrl": "https://developers.asana.com/docs",
                 "credentials": {
                     "personal_access_token": ""
@@ -207,7 +189,7 @@
                 "id": "notion",
                 "name": "Notion",
                 "urlHost": "https://api.notion.com",
-                "urlPath": "/",
+                "urlPath": "",
                 "documentationUrl": "https://developers.notion.com",
                 "credentials": {
                     "internal_integration_secret": ""
@@ -218,7 +200,7 @@
                 "id": "huggingface",
                 "name": "Huggingface",
                 "urlHost": "https://huggingface.co",
-                "urlPath": "/",
+                "urlPath": "",
                 "documentationUrl": "https://huggingface.co/docs/hub/en/api",
                 "credentials": {
                     "access_token": ""
@@ -240,7 +222,7 @@
                 "id": "square",
                 "name": "Square",
                 "urlHost": "https://connect.squareup.com",
-                "urlPath": "/",
+                "urlPath": "",
                 "documentationUrl": "https://developer.squareup.com/reference/square",
                 "credentials": {
                     "sandbox_access_token": ""
@@ -251,7 +233,7 @@
                 "id": "zendesk",
                 "name": "Zendesk",
                 "urlHost": "https://superglue.zendesk.com",
-                "urlPath": "/",
+                "urlPath": "",
                 "documentationUrl": "https://developer.zendesk.com/api-reference",
                 "credentials": {
                     "api_token": "",
@@ -263,7 +245,6 @@
     },
     "workflows": {
         "enabled": [
-            "posthog-analytics",
             "twilio-sms-analysis"
         ],
         "definitions": {

@@ -337,7 +337,7 @@ export class IntegrationTestingFramework {
                 await waitForIntegrationProcessing(
                     datastoreAdapter,
                     pendingIntegrations,
-                    120000 // 120 seconds timeout (doubled from 60)
+                    120000
                 );
                 documentationProcessingTime = Date.now() - docStartTime;
                 logMessage('info', `📚 All documentation processing completed in ${documentationProcessingTime}ms`, this.metadata);
@@ -382,7 +382,7 @@ export class IntegrationTestingFramework {
         }> = [];
 
         const workflowLogListener = (entry: any) => {
-            if (entry.level === 'WARN' || entry.level === 'ERROR' || entry.level === 'DEBUG') {
+            if (entry.level !== 'INFO') {
                 workflowLogs.push(entry);
             }
         };
@@ -556,6 +556,7 @@ export class IntegrationTestingFramework {
                 integrationIds: testWorkflow.integrationIds,
                 logs: workflowLogs
             });
+            logMessage('info', `Collected ${workflowLogs.length} logs for ${testWorkflow.name}`, this.metadata);
             errorSummary = analysis.summary;
             executionReport = analysis.report;
         } catch (err) {
