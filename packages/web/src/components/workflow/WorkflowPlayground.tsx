@@ -133,9 +133,26 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
       const stepIntegrationIds = Array.isArray(workflow.steps)
         ? Array.from(new Set(workflow.steps.map((step: any) => step.integrationId).filter(Boolean)))
         : [];
+      let missingIntegrations: string[] = [];
       const relevantIntegrations = (await Promise.all(
-        stepIntegrationIds.map(id => client.getIntegration(id))
+        stepIntegrationIds.map(async id => {
+          try {
+            const integ = await client.getIntegration(id);
+            if (!integ) missingIntegrations.push(id);
+            return integ;
+          } catch (err: any) {
+            missingIntegrations.push(id);
+            return null;
+          }
+        })
       )).filter(Boolean);
+      if (missingIntegrations.length > 0) {
+        toast({
+          title: `Some integrations missing`,
+          description: `Could not load integrations: ${missingIntegrations.join(", ")}`,
+          variant: "destructive",
+        });
+      }
       const flattenedCreds = flattenAndNamespaceWorkflowCredentials(relevantIntegrations);
       setIntegrationCredentials(flattenedCreds);
       constructFromInputSchemaWithCreds(inputSchemaStr, flattenedCreds);
