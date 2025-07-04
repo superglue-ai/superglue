@@ -1,7 +1,27 @@
 {
     "integrations": {
         "enabled": [
-            "twilio"
+            "hubspot",
+            "stripe",
+            "jira",
+            "attio",
+            "supabase",
+            "twilio",
+            "sendgrid",
+            "posthog",
+            "github",
+            "gitlab",
+            "slack",
+            "bitbucket",
+            "discord",
+            "asana",
+            "notion",
+            "huggingface",
+            "monday",
+            "square",
+            "zendesk",
+            "airtable",
+            "snowflake"
         ],
         "definitions": {
             "hubspot": {
@@ -255,9 +275,9 @@
                 "snowflake": {
             "id": "snowflake",
             "name": "Snowflake",
-            "urlHost": "https://api.snowflake.com",
-            "urlPath": "/v2",
-            "documentationUrl": "https://docs.snowflake.com/en/developer-guide/sql-api/index.html",
+            "urlHost": "https://gv46582.eu-central-2.aws.snowflakecomputing.com",
+            "urlPath": "",
+            "documentationUrl": "https://docs.snowflake.com/en/developer-guide/snowflake-rest-api/snowflake-rest-api",
             "credentials": {
                 "personal_access_token": ""
             },
@@ -267,7 +287,29 @@
     },
     "workflows": {
         "enabled": [
-            "twilio-sms-analysis"
+            "hubspot-lead-qualification",
+            "stripe-revenue-analytics",
+            "jira-sprint-health",
+            "attio-people-retrieval",
+            "lego-inventory-analysis",
+            "timbuk2-product-analysis",
+            "hubspot-crm-workflow",
+            "subscription-to-db-sync",
+            "posthog-analytics",
+            "twilio-sms-analysis",
+            "sendgrid-test-email",
+            "github-list-repos",
+            "gitlab-list-projects",
+            "slack-dm-workflow",
+            "bitbucket-repos",
+            "discord-server-analysis-dm",
+            "asana-tasks",
+            "notion-duplicate-email-analysis",
+            "huggingface-model-metadata",
+            "monday-sprint-analysis",
+            "square-customer-directory",
+            "zendesk-ticket-analysis",
+            "snowflake-list-tables"
         ],
         "definitions": {
             "hubspot-lead-qualification": {
@@ -561,7 +603,7 @@
             "snowflake-list-tables": {
                 "id": "snowflake-list-tables",
                 "name": "Snowflake List All Tables",
-                "instruction": "Execute a SQL query to list all available table names in my Snowflake database. Use the SHOW TABLES command or query the INFORMATION_SCHEMA to get a comprehensive list of all tables across all schemas and databases I have access to. Return the results as a JSON object with table names, schema names, and database names.",
+                "instruction": "Execute a SQL query to list all tables in the snowflake database. Return the results as a JSON object with table names, schema names, and database names.",
                 "integrationIds": [
                     "snowflake"
                 ],
@@ -572,19 +614,15 @@
         }
     },
     "apiRankingWorkflowIds": [
-        "zendesk-ticket-analysis",
-        "slack-dm-workflow",
-        "github-list-repos",
-        "hubspot-lead-qualification",
+        "hubspot-crm-workflow",
         "stripe-revenue-analytics",
         "jira-sprint-health",
         "attio-people-retrieval",
-        "timbuk2-product-analysis",
         "posthog-analytics",
         "twilio-sms-analysis",
         "sendgrid-test-email",
-        "gitlab-list-projects",
         "github-list-repos",
+        "gitlab-list-projects",
         "slack-dm-workflow",
         "bitbucket-repos",
         "discord-server-analysis-dm",
@@ -592,11 +630,14 @@
         "notion-duplicate-email-analysis",
         "huggingface-model-metadata",
         "monday-sprint-analysis",
-        "square-customer-directory"
+        "square-customer-directory",
+        "zendesk-ticket-analysis",
+        "airtable-test-data-retrieval",
+        "snowflake-list-tables"
     ],
     "testSuite": {
         "name": "Integration Test",
-        "attemptsPerWorkflow": 2,
+        "attemptsPerWorkflow": 3,
         "enableApiRanking": true
     }
 }

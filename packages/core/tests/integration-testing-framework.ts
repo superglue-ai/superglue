@@ -395,17 +395,18 @@ export class IntegrationTestingFramework {
 
             logMessage('info', `📝 Building workflow ${testWorkflow.name} (attempt ${attempt}/${maxRetries})...`, this.metadata);
 
+            // Get integrations for the workflow
+            const integrations = await Promise.all(
+                testWorkflow.integrationIds.map(async (id) => {
+                    const integration = await this.datastore.getIntegration(id, this.metadata.orgId);
+                    if (!integration) {
+                        throw new Error(`Integration not found: ${id}`);
+                    }
+                    return integration;
+                })
+            );
+
             try {
-                // Get integrations for the workflow
-                const integrations = await Promise.all(
-                    testWorkflow.integrationIds.map(async (id) => {
-                        const integration = await this.datastore.getIntegration(id, this.metadata.orgId);
-                        if (!integration) {
-                            throw new Error(`Integration not found: ${id}`);
-                        }
-                        return integration;
-                    })
-                );
 
                 const { WorkflowBuilder } = await import('../workflow/workflow-builder.js');
                 const builder = new WorkflowBuilder(
@@ -442,17 +443,6 @@ export class IntegrationTestingFramework {
                 logMessage('info', `🚀 Executing workflow ${testWorkflow.name}...`, this.metadata);
 
                 try {
-                    // Get integrations again for executor (they might have been updated)
-                    const integrations = await Promise.all(
-                        testWorkflow.integrationIds.map(async (id) => {
-                            const integration = await this.datastore.getIntegration(id, this.metadata.orgId);
-                            if (!integration) {
-                                throw new Error(`Integration not found: ${id}`);
-                            }
-                            return integration;
-                        })
-                    );
-
                     const { WorkflowExecutor } = await import('../workflow/workflow-executor.js');
                     const metadataWithWorkflowId = { ...this.metadata, workflowId: testWorkflow.id, runId: testWorkflow.id };
                     const executor = new WorkflowExecutor(
@@ -640,7 +630,7 @@ export class IntegrationTestingFramework {
     }
 
     /**
-     * Generate a preview of the data (first 100 characters)
+     * Generate a preview of the data (first 1000 characters)
      */
     private generateDataPreview(data: any): string {
         if (data === null || data === undefined) {
@@ -656,12 +646,12 @@ export class IntegrationTestingFramework {
             stringified = String(data);
         }
 
-        // Take first 100 characters and add ellipsis if truncated
-        if (stringified.length <= 100) {
+        // Take first 1000 characters and add ellipsis if truncated
+        if (stringified.length <= 1000) {
             return stringified;
         }
 
-        return stringified.substring(0, 100) + '...';
+        return stringified.substring(0, 1000) + '...';
     }
 
     async cleanup(): Promise<number> {
