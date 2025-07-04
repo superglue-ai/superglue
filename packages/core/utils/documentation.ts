@@ -387,9 +387,9 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
 
       try {
         const linkResult = await this.fetchPageContentWithPlaywright(nextLink.href, config, metadata);
+        fetchedLinks.add(nextLink.href);
         if (linkResult?.content) {
           combinedContent += combinedContent ? `\n\n${linkResult.content}` : linkResult.content;
-          fetchedLinks.add(nextLink.href);
 
           // Add newly discovered links to the pool (allow duplicates with different text)
           if (linkResult.links) {
