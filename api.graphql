@@ -232,6 +232,7 @@ input RequestOptions {
   retries: Int
   retryDelay: Int
   webhookUrl: String
+  testMode: Boolean
 }
 
 enum SelfHealingMode {
