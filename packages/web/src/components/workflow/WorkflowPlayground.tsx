@@ -117,47 +117,49 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
       updateWorkflowId(workflow.id || '');
       setSteps(workflow?.steps?.map(step => ({ ...step, apiConfig: { ...step.apiConfig, id: step.apiConfig.id || step.id } })) || []);
       setFinalTransform(workflow.finalTransform || `(sourceData) => {
-  return {
-    result: sourceData
-  }
-}`);
+        return {
+          result: sourceData
+        }
+      }`);
 
-      // Add instructions loading
       setInstructions(workflow.instruction || '');
-
-      // Handle response schema
       setResponseSchema(workflow.responseSchema ? JSON.stringify(workflow.responseSchema, null, 2) : null);
 
-      // Handle input schema
-      const inputSchemaStr = workflow.inputSchema ? JSON.stringify(workflow.inputSchema, null, 2) : `{"type": "object", "properties": {"payload": {"type": "object"}, "credentials": {"type": "object"}}}`;
+      const inputSchemaStr = workflow.inputSchema
+        ? JSON.stringify(workflow.inputSchema, null, 2)
+        : `{"type": "object", "properties": {"payload": {"type": "object"}, "credentials": {"type": "object"}}}`;
       setInputSchema(inputSchemaStr);
 
-      const integrations = await loadIntegrations();
-      if (workflow.integrationIds?.length > 0 || workflow.steps?.some((step: ExecutionStep) => step.integrationId)) {
-        try {
-          // Flatten and namespace integration credentials
-          const flattenedCreds = flattenAndNamespaceWorkflowCredentials(
-            integrations.filter(Boolean)
-          );
-
-          // Set integration credentials first, then construct from schema
-          setIntegrationCredentials(flattenedCreds);
-
-          // Construct from schema using the integration credentials
-          constructFromInputSchemaWithCreds(inputSchemaStr, flattenedCreds);
-
-        } catch (error) {
-          console.warn('Failed to load integration credentials:', error);
-          // Fallback to schema-only construction
-          constructFromInputSchemaWithCreds(inputSchemaStr, {});
-        }
-      } else {
-        // No integration IDs, just use schema
-        constructFromInputSchemaWithCreds(inputSchemaStr, {});
+      const stepIntegrationIds = Array.isArray(workflow.steps)
+        ? Array.from(new Set(workflow.steps.map((step: any) => step.integrationId).filter(Boolean)))
+        : [];
+      let missingIntegrations: string[] = [];
+      const relevantIntegrations = (await Promise.all(
+        stepIntegrationIds.map(async id => {
+          try {
+            const integ = await client.getIntegration(id);
+            if (!integ) missingIntegrations.push(id);
+            return integ;
+          } catch (err: any) {
+            missingIntegrations.push(id);
+            return null;
+          }
+        })
+      )).filter(Boolean);
+      if (missingIntegrations.length > 0) {
+        toast({
+          title: `Some integrations missing`,
+          description: `Could not load integrations: ${missingIntegrations.join(", ")}`,
+          variant: "destructive",
+        });
       }
+      const flattenedCreds = flattenAndNamespaceWorkflowCredentials(relevantIntegrations);
+      setIntegrationCredentials(flattenedCreds);
+      constructFromInputSchemaWithCreds(inputSchemaStr, flattenedCreds);
+
       toast({
         title: "Workflow loaded",
-        description: `Loaded "${workflow.id}" successfully`,
+        description: `Loaded \"${workflow.id}\" successfully`,
       });
     } catch (error: any) {
       console.error("Error loading workflow:", error);
