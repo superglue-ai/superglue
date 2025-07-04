@@ -240,6 +240,28 @@
                     "email": ""
                 },
                 "description": "Zendesk API"
+            },
+            "airtable": {
+                "id": "airtable",
+                "name": "Airtable",
+                "urlHost": "https://api.airtable.com",
+                "urlPath": "/v0",
+                "documentationUrl": "https://airtable.com/developers/web/api/introduction",
+                "credentials": {
+                    "personal_access_token": ""
+                },
+                "description": "Airtable database and spreadsheet API"
+                },
+                "snowflake": {
+            "id": "snowflake",
+            "name": "Snowflake",
+            "urlHost": "https://api.snowflake.com",
+            "urlPath": "/v2",
+            "documentationUrl": "https://docs.snowflake.com/en/developer-guide/sql-api/index.html",
+            "credentials": {
+                "personal_access_token": ""
+            },
+            "description": "Snowflake cloud data platform SQL API"
             }
         }
     },
@@ -522,7 +544,31 @@
                 "payload": {},
                 "complexityLevel": "medium",
                 "category": "single-system"
-            }
+            },
+            "airtable-test-data-retrieval": {
+                "id": "airtable-test-data-retrieval",
+                "name": "Airtable Test Data Management Records",
+                "instruction": "Retrieve all tables in the Test Data Management workspace. Return the table names and their field names in a structured format.",
+                "integrationIds": [
+                    "airtable"
+                ],
+                "payload": {
+                    "workspace_name": "Test Data Management"
+                },
+                "complexityLevel": "low",
+                "category": "single-system"
+            },
+            "snowflake-list-tables": {
+                "id": "snowflake-list-tables",
+                "name": "Snowflake List All Tables",
+                "instruction": "Execute a SQL query to list all available table names in my Snowflake database. Use the SHOW TABLES command or query the INFORMATION_SCHEMA to get a comprehensive list of all tables across all schemas and databases I have access to. Return the results as a JSON object with table names, schema names, and database names.",
+                "integrationIds": [
+                    "snowflake"
+                ],
+                "payload": {},
+                "complexityLevel": "low",
+                "category": "single-system"
+                }
         }
     },
     "apiRankingWorkflowIds": [

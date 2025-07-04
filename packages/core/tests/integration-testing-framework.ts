@@ -412,7 +412,7 @@ export class IntegrationTestingFramework {
                     testWorkflow.instruction,
                     integrations,
                     testWorkflow.payload || {},
-                    {}, // responseSchema
+                    {},
                     this.metadata
                 );
 
@@ -460,9 +460,17 @@ export class IntegrationTestingFramework {
                         metadataWithWorkflowId,
                         integrations
                     );
+                    const allCredentials = integrations.reduce((acc, integ) => {
+                        if (integ.credentials && typeof integ.credentials === 'object') {
+                            for (const [key, value] of Object.entries(integ.credentials)) {
+                                acc[`${integ.id}_${key}`] = value;
+                            }
+                        }
+                        return acc;
+                    }, {} as Record<string, string>);
                     const workflowResult = await executor.execute(
                         testWorkflow.payload || {},
-                        this.gatherCredentials(testWorkflow.integrationIds),
+                        allCredentials,
                         {} // options
                     );
 
@@ -584,21 +592,6 @@ export class IntegrationTestingFramework {
             workflowPlans,
             collectedLogs: workflowLogs
         };
-    }
-
-    private gatherCredentials(integrationIds: string[]): Record<string, string> {
-        const credentials: Record<string, string> = {};
-
-        for (const integrationId of integrationIds) {
-            const config = this.config?.integrations?.definitions?.[integrationId];
-            if (config) {
-                Object.entries(config.credentials).forEach(([key, value]) => {
-                    credentials[`${integrationId}_${key}`] = value;
-                });
-            }
-        }
-
-        return credentials;
     }
 
     private evaluateDataQuality(result: WorkflowResult, expectedKeys?: string[]): 'pass' | 'fail' | 'unknown' {
