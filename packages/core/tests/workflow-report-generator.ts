@@ -1,13 +1,13 @@
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 
-interface BuildAttempt {
+export interface BuildAttempt {
     buildTime: number;
     success: boolean;
     error?: string;
 }
 
-interface ExecutionAttempt {
+export interface ExecutionAttempt {
     executionTime: number;
     success: boolean;
     error?: string;

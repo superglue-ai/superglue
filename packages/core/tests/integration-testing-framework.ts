@@ -7,6 +7,7 @@ import { logEmitter, logMessage } from '../utils/logs.js';
 import { Integration } from '@superglue/client';
 import { FileStore } from '../datastore/filestore.js';
 import { DataStore } from '../datastore/types.js';
+import type { BuildAttempt, ExecutionAttempt } from './workflow-report-generator.js';
 // Documentation will be imported dynamically to ensure env vars are loaded first
 
 interface IntegrationConfig {
@@ -45,18 +46,6 @@ interface TestConfiguration {
         enableApiRanking?: boolean;
     };
     apiRankingWorkflowIds?: string[];
-}
-
-interface BuildAttempt {
-    buildTime: number;
-    success: boolean;
-    error?: string;
-}
-
-interface ExecutionAttempt {
-    executionTime: number;
-    success: boolean;
-    error?: string;
 }
 
 interface TestResult {
@@ -208,6 +197,23 @@ export class IntegrationTestingFramework {
             .filter((workflow): workflow is TestWorkflow => workflow !== undefined);
     }
 
+    // Helper to construct Integration from IntegrationConfig
+    private makeIntegrationObject(config: IntegrationConfig): Integration {
+        const now = new Date();
+        return {
+            id: config.id,
+            name: config.name,
+            urlHost: config.urlHost,
+            urlPath: config.urlPath || '',
+            documentationUrl: config.documentationUrl || '',
+            documentation: '',
+            documentationPending: !!config.documentationUrl,
+            credentials: config.credentials || {},
+            createdAt: now,
+            updatedAt: now
+        };
+    }
+
     async setupIntegrations(): Promise<{ setupTime: number; results: IntegrationSetupResult[]; documentationProcessingTime: number }> {
         const startTime = Date.now();
         const enabledIntegrations = this.getEnabledIntegrations();
@@ -220,103 +226,51 @@ export class IntegrationTestingFramework {
             const integrationStartTime = Date.now();
             logMessage('info', `⚙️  Setting up integration: ${integration.name}`, this.metadata);
 
-            try {
-                const now = new Date();
-                const shouldFetchDoc = !!integration.documentationUrl;
+            const integrationData = this.makeIntegrationObject(integration);
 
-                // Create integration object matching the resolver logic
-                const integrationData: Integration = {
-                    id: integration.id,
-                    name: integration.name,
-                    urlHost: integration.urlHost,
-                    urlPath: integration.urlPath || '',
-                    documentationUrl: integration.documentationUrl || '',
-                    documentation: '',
-                    documentationPending: shouldFetchDoc,
-                    credentials: integration.credentials || {},
-                    createdAt: now,
-                    updatedAt: now
-                };
+            if (integrationData.documentationUrl) {
+                pendingIntegrations.push(integration.id);
+                (async () => {
+                    logMessage('info', `Starting async documentation fetch for integration ${integration.id}`, this.metadata);
+                    const { Documentation } = await import('../utils/documentation.js');
+                    const docFetcher = new Documentation(
+                        {
+                            urlHost: integration.urlHost,
+                            urlPath: integration.urlPath,
+                            documentationUrl: integration.documentationUrl,
+                        },
+                        integration.credentials || {},
+                        this.metadata
+                    );
+                    const docString = await docFetcher.fetchAndProcess();
+                    const stillExists = await this.datastore.getIntegration(integration.id, this.metadata.orgId);
+                    if (!stillExists) {
+                        logMessage('warn', `Integration ${integration.id} was deleted while fetching documentation. Skipping update.`, this.metadata);
+                        return;
+                    }
+                    await this.datastore.upsertIntegration(integration.id, {
+                        ...integrationData,
+                        documentation: docString,
+                        documentationPending: false,
+                        updatedAt: new Date()
+                    }, this.metadata.orgId);
+                    logMessage('info', `Completed documentation fetch for integration ${integration.id}`, this.metadata);
+                })();
+            }
+            const result = await this.datastore.upsertIntegration(integration.id, integrationData, this.metadata.orgId);
+            const integrationSetupTime = Date.now() - integrationStartTime;
 
-                // Handle async documentation fetch if needed
-                if (shouldFetchDoc) {
-                    pendingIntegrations.push(integration.id);
+            setupResults.push({
+                integrationId: integration.id,
+                name: integration.name,
+                setupTime: integrationSetupTime,
+                success: true
+            });
 
-                    // Fire-and-forget async doc fetch (same as resolver)
-                    (async () => {
-                        try {
-                            logMessage('info', `Starting async documentation fetch for integration ${integration.id}`, this.metadata);
-                            const { Documentation } = await import('../utils/documentation.js');
-                            const docFetcher = new Documentation(
-                                {
-                                    urlHost: integration.urlHost,
-                                    urlPath: integration.urlPath,
-                                    documentationUrl: integration.documentationUrl,
-                                },
-                                integration.credentials || {},
-                                this.metadata
-                            );
-                            const docString = await docFetcher.fetchAndProcess();
+            logMessage('info', `⚙️  Successfully created integration: ${integration.name} (setup: ${integrationSetupTime}ms, pending: ${result.documentationPending})`, this.metadata);
 
-                            // Check if integration still exists before updating
-                            const stillExists = await this.datastore.getIntegration(integration.id, this.metadata.orgId);
-                            if (!stillExists) {
-                                logMessage('warn', `Integration ${integration.id} was deleted while fetching documentation. Skipping update.`, this.metadata);
-                                return;
-                            }
-
-                            await this.datastore.upsertIntegration(integration.id, {
-                                ...integrationData,
-                                documentation: docString,
-                                documentationPending: false,
-                                updatedAt: new Date()
-                            }, this.metadata.orgId);
-
-                            logMessage('info', `Completed documentation fetch for integration ${integration.id}`, this.metadata);
-                        } catch (err) {
-                            logMessage('error', `Documentation fetch failed for integration ${integration.id}: ${String(err)}`, this.metadata);
-                            // Reset documentationPending to false on failure
-                            try {
-                                const stillExists = await this.datastore.getIntegration(integration.id, this.metadata.orgId);
-                                if (stillExists) {
-                                    await this.datastore.upsertIntegration(integration.id, {
-                                        ...integrationData,
-                                        documentationPending: false,
-                                        updatedAt: new Date()
-                                    }, this.metadata.orgId);
-                                }
-                            } catch (resetError) {
-                                logMessage('error', `Failed to reset documentationPending for integration ${integration.id}: ${String(resetError)}`, this.metadata);
-                            }
-                        }
-                    })();
-                }
-                const result = await this.datastore.upsertIntegration(integration.id, integrationData, this.metadata.orgId);
-                const integrationSetupTime = Date.now() - integrationStartTime;
-
-                setupResults.push({
-                    integrationId: integration.id,
-                    name: integration.name,
-                    setupTime: integrationSetupTime,
-                    success: true
-                });
-
-                logMessage('info', `⚙️  Successfully created integration: ${integration.name} (setup: ${integrationSetupTime}ms, pending: ${result.documentationPending})`, this.metadata);
-
-                if (result.documentationPending) {
-                    pendingIntegrations.push(integration.id);
-                }
-            } catch (error) {
-                const integrationSetupTime = Date.now() - integrationStartTime;
-                setupResults.push({
-                    integrationId: integration.id,
-                    name: integration.name,
-                    setupTime: integrationSetupTime,
-                    success: false,
-                    error: String(error)
-                });
-                logMessage('error', `❌ Failed to create integration ${integration.name}: ${String(error)}`, this.metadata);
-                throw error;
+            if (result.documentationPending) {
+                pendingIntegrations.push(integration.id);
             }
         }
 
@@ -390,14 +344,13 @@ export class IntegrationTestingFramework {
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             const buildStart = Date.now();
             let buildSuccess = false;
-            let buildError: string | undefined = undefined;
             let currentWorkflow: Workflow | undefined = undefined;
 
             logMessage('info', `📝 Building workflow ${testWorkflow.name} (attempt ${attempt}/${maxRetries})...`, this.metadata);
 
             // Get integrations for the workflow
             const integrations = await Promise.all(
-                testWorkflow.integrationIds.map(async (id) => {
+                testWorkflow.integrationIds.map(async (id: string) => {
                     const integration = await this.datastore.getIntegration(id, this.metadata.orgId);
                     if (!integration) {
                         throw new Error(`Integration not found: ${id}`);
@@ -406,31 +359,24 @@ export class IntegrationTestingFramework {
                 })
             );
 
-            try {
+            const { WorkflowBuilder } = await import('../workflow/workflow-builder.js');
+            const builder = new WorkflowBuilder(
+                testWorkflow.instruction,
+                integrations,
+                testWorkflow.payload || {},
+                {},
+                this.metadata
+            );
 
-                const { WorkflowBuilder } = await import('../workflow/workflow-builder.js');
-                const builder = new WorkflowBuilder(
-                    testWorkflow.instruction,
-                    integrations,
-                    testWorkflow.payload || {},
-                    {},
-                    this.metadata
-                );
+            currentWorkflow = await builder.build();
+            currentWorkflow.id = await generateUniqueId({
+                baseId: currentWorkflow.id,
+                exists: async (id) => !!(await this.datastore.getWorkflow(id, this.metadata.orgId))
+            });
 
-                currentWorkflow = await builder.build();
-                currentWorkflow.id = await generateUniqueId({
-                    baseId: currentWorkflow.id,
-                    exists: async (id) => !!(await this.datastore.getWorkflow(id, this.metadata.orgId))
-                });
-
-                buildSuccess = true;
-                logMessage('info', `🔨 Build successful for ${testWorkflow.name} in ${Date.now() - buildStart}ms`, this.metadata);
-            } catch (error) {
-                buildError = String(error);
-                logMessage('error', `❌ Build failed for ${testWorkflow.name}: ${buildError}`, this.metadata);
-            }
-            const buildTime = Date.now() - buildStart;
-            buildAttempts.push({ buildTime, success: buildSuccess, error: buildError });
+            buildSuccess = true;
+            logMessage('info', `🔨 Build successful for ${testWorkflow.name} in ${Date.now() - buildStart}ms`, this.metadata);
+            buildAttempts.push({ buildTime: Date.now() - buildStart, success: buildSuccess, error: undefined });
 
             // Track execution if build succeeded
             let execSuccess = false;
