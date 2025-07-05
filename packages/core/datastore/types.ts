@@ -30,6 +30,7 @@ export interface DataStore {
   listWorkflows(limit?: number, offset?: number, orgId?: string): Promise<{ items: Workflow[], total: number }>;
   upsertWorkflow(id: string, workflow: Workflow, orgId?: string): Promise<Workflow>;
   deleteWorkflow(id: string, orgId?: string): Promise<boolean>;
+  getManyWorkflows(ids: string[], orgId?: string): Promise<Workflow[]>;
 
   // Tenant Information Methods
   getTenantInfo(): Promise<{ email: string | null, emailEntrySkipped: boolean }>;
@@ -40,4 +41,5 @@ export interface DataStore {
   listIntegrations(limit?: number, offset?: number, orgId?: string): Promise<{ items: Integration[], total: number }>;
   upsertIntegration(id: string, integration: Integration, orgId?: string): Promise<Integration>;
   deleteIntegration(id: string, orgId?: string): Promise<boolean>;
+  getManyIntegrations(ids: string[], orgId?: string): Promise<Integration[]>;
 }

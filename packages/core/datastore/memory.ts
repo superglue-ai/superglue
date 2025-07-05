@@ -256,6 +256,16 @@ export class MemoryStore implements DataStore {
     return { items, total };
   }
 
+  async getManyWorkflows(ids: string[], orgId?: string): Promise<Workflow[]> {
+    return ids
+      .map(id => {
+        const key = this.getKey('workflow', id, orgId);
+        const workflow = this.storage.workflows.get(key);
+        return workflow ? { ...workflow, id } : null;
+      })
+      .filter((w): w is Workflow => w !== null);
+  }
+
   async upsertWorkflow(id: string, workflow: Workflow, orgId?: string): Promise<Workflow> {
     if (!id || !workflow) return null;
     const key = this.getKey('workflow', id, orgId);
@@ -283,6 +293,16 @@ export class MemoryStore implements DataStore {
     const items = orgItems.slice(offset, offset + limit);
     const total = orgItems.length;
     return { items, total };
+  }
+
+  async getManyIntegrations(ids: string[], orgId?: string): Promise<Integration[]> {
+    return ids
+      .map(id => {
+        const key = this.getKey('integration', id, orgId);
+        const integration = this.storage.integrations.get(key);
+        return integration ? { ...integration, id } : null;
+      })
+      .filter((i): i is Integration => i !== null);
   }
 
   async upsertIntegration(id: string, integration: Integration, orgId?: string): Promise<Integration> {
