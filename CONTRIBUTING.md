@@ -13,7 +13,7 @@ The best ways to contribute to superglue:
 
 We welcome contributions through GitHub pull requests. This document outlines our conventions regarding contributions, areas where we actively encourage contributions, development workflow and other resources. Our goal is to engage with the open-source community and to ensure that your contributions are accepted quickly, while ensuring high quality of contributions.
 
-We gratefully welcome improvements to [documentation](https://docs.superglue.cloud/introduction), the core application (this repo) and our [SDK](https://github.com/superglue-ai/superglue-js).
+We gratefully welcome improvements to [documentation](https://docs.superglue.cloud/introduction), the core application (this repo) and our [SDK](https://github.com/superglue-ai/superglue-js). We especially encourage contributions that address bugs and/or improve performance in the core application. We discourage contributions to the web package that are purely cosmetic, unless this contribution references an approved open issue.
 
 In case you have any questions, feel free to join our [discord]((https://discord.gg/vUKnuhHtfW)) and come talk to us
 
@@ -133,6 +133,6 @@ We use GitHub Actions for CI/CD, the configuration is in [`.github/workflows/nod
 
 ## License
 
-Superglue uses a GNU-v3 License. See [LICENSE](https://github.com/superglue-ai/superglue/blob/main/LICENSE) and [docs](https://docs.superglue.cloud/introduction) for more details.
+Superglue uses a GNU License. See [LICENSE](https://github.com/superglue-ai/superglue/blob/main/LICENSE) and [docs](https://docs.superglue.cloud/introduction) for more details.
 
 When contributing to the superglue codebase, you need to agree to the [Contributor License Agreement](https://cla-assistant.io/superglue-ai/superglue). You only need to do this once and the CLA bot will remind you if you haven't signed it yet.
