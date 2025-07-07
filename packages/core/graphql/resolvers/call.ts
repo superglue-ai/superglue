@@ -6,10 +6,9 @@ import { PROMPT_MAPPING } from "../../llm/prompts.js";
 import { callEndpoint, evaluateResponse, generateApiConfig } from "../../utils/api.js";
 import { Documentation } from "../../utils/documentation.js";
 import { logMessage } from "../../utils/logs.js";
-import { generateSchema } from "../../utils/schema.js";
 import { telemetryClient } from "../../utils/telemetry.js";
 import { maskCredentials } from "../../utils/tools.js";
-import { executeTransform, generateTransformCode } from "../../utils/transform.js";
+import { executeTransform } from "../../utils/transform.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 
 export async function executeApiCall(
@@ -29,6 +28,7 @@ export async function executeApiCall(
   let messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
   let success = false;
   let isSelfHealing = isSelfHealingEnabled(options);
+  let isTestMode = options?.testMode || false;
 
   let documentationString = "No documentation provided";
   if (!integration && isSelfHealing) {
@@ -55,17 +55,20 @@ export async function executeApiCall(
       }
 
       // Check if response is valid
-      if (retryCount > 0 && isSelfHealing) {
+      if ((retryCount > 0 && isSelfHealing) || isTestMode) {
+        logMessage('info', `Evaluating response for ${endpoint?.urlHost}`, metadata);
         const result = await evaluateResponse(response.data, endpoint.responseSchema, endpoint.instruction, documentationString);
         success = result.success;
         if (!result.success) throw new Error(result.shortReason + " " + JSON.stringify(response.data).slice(0, 1000));
-        if (result.refactorNeeded) {
-          logMessage('info', `Refactoring the API response.`, metadata);
-          const responseSchema = await generateSchema(endpoint.instruction, JSON.stringify(response.data).slice(0, 1000), metadata);
-          const transformation = await generateTransformCode(responseSchema, response.data, endpoint.instruction, metadata);
-          endpoint.responseMapping = transformation.mappingCode;
-          response.data = transformation.data;
-        }
+        /*
+          if (result.refactorNeeded) {
+            logMessage('info', `Refactoring the API response.`, metadata);
+            const responseSchema = await generateSchema(endpoint.instruction, JSON.stringify(response.data).slice(0, 1000), metadata);
+            const transformation = await generateTransformCode(responseSchema, response.data, endpoint.instruction, metadata);
+            endpoint.responseMapping = transformation.mappingCode;
+            response.data = transformation.data;
+          }
+        */
       }
       else {
         success = true;
