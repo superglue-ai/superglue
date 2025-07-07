@@ -334,6 +334,40 @@ describe('FileStore', () => {
       expect(retrieved).toBeNull();
     });
 
+    it('should get many integrations by ids, skipping missing ones', async () => {
+      const int2 = { ...testIntegration, id: 'test-int-id-2', name: 'Integration 2' };
+      await store.upsertIntegration(testIntegration.id, testIntegration, testOrgId);
+      await store.upsertIntegration(int2.id, int2, testOrgId);
+      const result = await store.getManyIntegrations([
+        testIntegration.id,
+        int2.id,
+        'missing-id'
+      ], testOrgId);
+      expect(result).toHaveLength(2);
+      expect(result.map(i => i.id).sort()).toEqual([testIntegration.id, int2.id].sort());
+    });
+  });
+
+  describe('Workflow', () => {
+    const testWorkflow = {
+      id: 'test-workflow-id',
+      steps: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    it('should get many workflows by ids, skipping missing ones', async () => {
+      const wf2 = { ...testWorkflow, id: 'test-workflow-id-2' };
+      await store.upsertWorkflow(testWorkflow.id, testWorkflow, testOrgId);
+      await store.upsertWorkflow(wf2.id, wf2, testOrgId);
+      const result = await store.getManyWorkflows([
+        testWorkflow.id,
+        wf2.id,
+        'missing-id'
+      ], testOrgId);
+      expect(result).toHaveLength(2);
+      expect(result.map(w => w.id).sort()).toEqual([testWorkflow.id, wf2.id].sort());
+    });
   });
 
   describe('Clear All', () => {
