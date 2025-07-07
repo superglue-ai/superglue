@@ -1,11 +1,10 @@
 import { Metadata } from "@playwright/test";
 import { ExecutionStep, Integration, RequestOptions, Workflow, WorkflowResult, WorkflowStepResult } from "@superglue/client";
-import { Context } from "@superglue/shared";
 import { Validator } from "jsonschema";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { logMessage } from "../utils/logs.js";
 import { addNullableToOptional, applyJsonata, applyTransformationWithValidation } from "../utils/tools.js";
-import { generateTransformCode } from "../utils/transform.js";
+import { evaluateMapping, generateTransformCode } from "../utils/transform.js";
 import { selectStrategy } from "./workflow-strategies.js";
 
 export class WorkflowExecutor implements Workflow {
@@ -119,6 +118,21 @@ export class WorkflowExecutor implements Workflow {
           if (!finalResult.success) {
             throw new Error(finalResult.error);
           }
+
+          if (options?.testMode) {
+            const testResult = await evaluateMapping(
+              finalResult.data,
+              currentFinalTransform,
+              rawStepData,
+              this.responseSchema,
+              this.instruction,
+              this.metadata
+            );
+            if (!testResult.success) {
+              throw new Error(testResult.reason);
+            }
+          }
+
           this.result.data = finalResult.data as Record<string, unknown> || {};
           this.result.config = {
             id: this.id,
@@ -140,11 +154,7 @@ export class WorkflowExecutor implements Workflow {
           if (!newTransformConfig) {
             throw new Error("Failed to generate new final transform");
           }
-          const finalResult = await applyTransformationWithValidation(rawStepData, newTransformConfig.mappingCode, this.responseSchema);
-          if (!finalResult.success) {
-            throw new Error(finalResult.error);
-          }
-          this.result.data = finalResult.data as Record<string, unknown> || {};
+          this.result.data = newTransformConfig.data as Record<string, unknown> || {};
           this.result.config = {
             id: this.id,
             steps: this.steps,
