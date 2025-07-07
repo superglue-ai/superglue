@@ -274,43 +274,22 @@
                 },
                 "description": "Airtable database and spreadsheet API"
                 },
-                "snowflake": {
-            "id": "snowflake",
-            "name": "Snowflake",
-            "urlHost": "https://gv46582.eu-central-2.aws.snowflakecomputing.com",
-            "urlPath": "",
-            "documentationUrl": "https://docs.snowflake.com/en/developer-guide/snowflake-rest-api/snowflake-rest-api",
-            "credentials": {
-                "personal_access_token": ""
-            },
-            "description": "Snowflake cloud data platform SQL API"
+            "snowflake": {
+                "id": "snowflake",
+                "name": "Snowflake",
+                "urlHost": "https://hq27033.snowflakecomputing.com/api",
+                "urlPath": "/v2",
+                "documentationUrl": "https://docs.snowflake.com/en/developer-guide/sql-api/index",
+                "credentials": {
+                    "personal_access_token": ""
+                },
+                "description": "Snowflake cloud data platform SQL API"
             }
         }
     },
     "workflows": {
         "enabled": [
-            "hubspot-lead-qualification",
-            "stripe-revenue-analytics",
-            "jira-sprint-health",
-            "attio-people-retrieval",
-            "timbuk2-product-analysis",
-            "lego-inventory-analysis",
-            "hubspot-crm-workflow",
-            "subscription-to-db-sync",
-            "posthog-analytics",
-            "twilio-sms-analysis",
-            "sendgrid-test-email",
-            "github-list-repos",
-            "gitlab-list-projects",
-            "slack-dm-workflow",
-            "bitbucket-repos",
-            "discord-server-analysis-dm",
-            "asana-tasks",
-            "notion-duplicate-email-analysis",
             "huggingface-model-metadata",
-            "monday-sprint-analysis",
-            "square-customer-directory",
-            "zendesk-ticket-analysis",
             "snowflake-list-tables"
         ],
         "definitions": {
@@ -542,14 +521,13 @@
             },
             "huggingface-model-metadata": {
                 "id": "huggingface-model-metadata",
-                "name": "Hugging Face Model Metadata",
-                "instruction": "Retrieve the metadata and file content from the payload user's model and return a summary with the model name and available files",
+                "name": "Hugging Face Model Names",
+                "instruction": "Retrieve all models created/authored by the user specified in the payload under user_name specifically. Limit the output to 10 models. For each model, extract the model name and the list of file names available in that model. Return the results as a JSON object in the following format: { \"models\": [ { \"model_name\": \"...\", \"file_names\": [\"file1\", \"file2\", ...] }, ... ] }",
                 "integrationIds": [
                     "huggingface"
                 ],
                 "payload": {
-                    "user_name": "michael-fuest",
-                    "model_name": "my-testing-model"
+                    "user_name": "michael-fuest"
                 },
                 "complexityLevel": "medium",
                 "category": "single-system"
