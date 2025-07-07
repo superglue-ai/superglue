@@ -9,7 +9,7 @@ import { logMessage } from "./logs.js";
 import { callPostgres } from './postgres.js';
 import { composeUrl } from "./tools.js";
 
-const DOC_AXIOS_TIMEOUT_MS = 30000;
+const DOC_AXIOS_TIMEOUT_MS = 60000;
 const DOC_PLAYWRIGHT_TIMEOUT_MS = 15000;
 
 // Strategy Interface

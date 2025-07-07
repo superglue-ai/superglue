@@ -80,7 +80,7 @@ export async function waitForIntegrationProcessing(
     }
 
     throw new Error(
-        `Workflow build timed out after ${timeoutMs / 1000} seconds waiting for documentation processing to complete for: ${integrationIds.join(', ')}. Please try again in a few minutes.`
+        `Waiting for documentation processing to complete timed out after ${timeoutMs / 1000} seconds for: ${integrationIds.join(', ')}. Please try again in a few minutes.`
     );
 }
 

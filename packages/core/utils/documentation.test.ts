@@ -145,7 +145,7 @@ describe('Documentation Class', () => {
       expect(mockedAxios.post).toHaveBeenCalledWith(
         docUrl,
         expect.objectContaining({ operationName: 'IntrospectionQuery' }),
-        { headers, params, timeout: 30000 }
+        { headers, params, timeout: 60000 }
       );
       expect(result).toBe(JSON.stringify(mockSchema.__schema));
       expect(playwright.chromium.launch).not.toHaveBeenCalled();
@@ -205,7 +205,7 @@ describe('Documentation Class', () => {
       // Verify Axios fetch for OpenAPI spec (relative URL resolved correctly)
       expect(mockedAxios.get).toHaveBeenCalledWith('https://base.example.com/api/v1/openapi.json', {
         headers: undefined,
-        timeout: 30000
+        timeout: 60000
       });
       // Verify result is the OpenAPI spec
       expect(result).toContain(JSON.stringify(openApiJson));
@@ -226,7 +226,7 @@ describe('Documentation Class', () => {
       expect(mockPage.content).toHaveBeenCalledTimes(1);
       expect(mockedAxios.get).toHaveBeenCalledWith('https://absolute.com/openapi.yaml', {
         headers: undefined,
-        timeout: 30000
+        timeout: 60000
       });
       expect(result).toContain(openApiYaml);
     });
@@ -270,7 +270,7 @@ describe('Documentation Class', () => {
       expect(playwright.chromium.launch).toHaveBeenCalledTimes(1);
       expect(mockedAxios.get).toHaveBeenCalledWith('https://api.example.com/missing.json', {
         headers,
-        timeout: 30000
+        timeout: 60000
       });
       // Result should be the Markdown conversion of the original HTML
       expect(result).toContain('Content');
