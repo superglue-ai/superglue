@@ -252,13 +252,13 @@ Builds a workflow automatically based on instructions and available integrations
     mutation BuildWorkflow(
       $instruction: String!,
       $payload: JSON,
-      $integrations: [IntegrationInputRequest!]!,
+      $integrationIds: [ID!]!,
       $responseSchema: JSONSchema
     ) {
       buildWorkflow(
         instruction: $instruction,
         payload: $payload,
-        integrations: $integrations,
+        integrationIds: $integrationIds,
         responseSchema: $responseSchema
       ) {
         id
@@ -290,10 +290,7 @@ Builds a workflow automatically based on instructions and available integrations
     const workflow = await client.buildWorkflow({
       instruction: "Get user profile and their recent posts",
       payload: { userId: "123" },
-      integrations: [
-        { id: "user-api" },
-        { id: "posts-api" }
-      ],
+      integrationIds: ["user-api", "posts-api"],
       responseSchema: {
         type: "object",
         properties: {

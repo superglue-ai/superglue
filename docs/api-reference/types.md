@@ -95,6 +95,7 @@ type Workflow implements BaseConfig {
   updatedAt: DateTime
   
   steps: [ExecutionStep!]           # Workflow execution steps
+  integrationIds: [ID]              # Integration IDs used in workflow
   instruction: String               # Natural language description
   finalTransform: JSONata           # Final data transformation
   responseSchema: JSONSchema        # Expected final output format
@@ -138,6 +139,18 @@ type Integration {
   version: String                   # Integration version
   createdAt: DateTime
   updatedAt: DateTime
+}
+```
+
+### SuggestedIntegration
+
+AI-suggested integration based on natural language instruction.
+
+```graphql
+type SuggestedIntegration {
+  id: String!                       # Integration identifier
+  reason: String!                   # Why this integration is relevant
+  savedCredentials: [String!]!      # Available credential keys
 }
 ```
 
