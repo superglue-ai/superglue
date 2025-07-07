@@ -1,25 +1,25 @@
 ---
 title: "Intro to MCP"
-description: "Instant reliable tools for your agents"
+description: "Instant reliable workflows for your agents"
 ---
 
-Turn any API into tools so your agents can get things done reliably.
+Turn any API into workflows so your agents can get things done reliably.
 
-**superglue MCP** provides a general tool that lets agents build reliable, validated tools for any app, database or API, simply by requesting them in natural language.
+**superglue MCP** provides a general tool that lets agents build reliable, validated workflows for any app, database or API, simply by requesting them in natural language.
 
 ## How superglue MCP Works
 
 superglue MCP is a lightweight API-wrapper available via MCP that:
 
-1. **Merges multiple endpoints and APIs into custom tools** 
+1. **Merges multiple endpoints and APIs into custom workflows** 
 2. **Exposes them via one server** that abstracts away endpoints and API calls
 3. **Acts like a repository pattern** that stays stable even as upstream APIs or mappings change
 
 ### Key Benefits
 
-- **Merge Multiple APIs**: Combine endpoints and APIs into custom capabilities. No more juggling dozens of specific tools - create unified capabilities that work across multiple services.
+- **Merge Multiple APIs**: Combine endpoints and APIs into custom workflows. No more juggling dozens of specific tools - create unified workflows that work across multiple services.
 - **Production Ready**: Secure, fast, and guaranteed to work. Built for production deployments with stability guarantees even as upstream APIs change.
-- **Bespoke Agent Tools**: Custom tools that agents actually need. Stop building generic tools - create purpose-built capabilities that match your specific workflows and business logic.
+- **Bespoke Agent Workflows**: Custom workflows that agents actually need. Stop building generic tools - create purpose-built workflows that match your specific business logic.
 
 ## Use superglue MCP to:
 
@@ -27,7 +27,7 @@ superglue MCP is a lightweight API-wrapper available via MCP that:
 
 **Create Ambient Agents**: Build agents that react to app triggers and events. Create agents that monitor your systems and respond automatically to events, triggers and webhooks.
 
-**Wrap your own APIs**: Make your own APIs accessible by any agent. Turn your internal APIs and services into agent-friendly capabilities with built-in validation and error handling.
+**Wrap your own APIs**: Make your own APIs accessible by any agent. Turn your internal APIs and services into agent-friendly workflows with built-in validation and error handling.
 
 ## Connecting to the MCP Server
 
@@ -61,7 +61,7 @@ The reason this request is structured in an odd way (AUTH_HEADER instead of AUTH
 
 ## Using superglueMCP Tools
 
-Switch to the agent mode of your LLM interface and prompt to build or execute a superglue tool. All superglue tools are exposed through MCP. For the video example to work, you need to share your HubSpot API key when running the tool.
+Switch to the agent mode of your LLM interface and prompt to build or execute a superglue workflow. All superglue tools are exposed through MCP. For the video example to work, you need to share your HubSpot API key when running the workflow.
 
 <video autoPlay muted loop playsInline className="w-full aspect-video" src="https://superglue.cloud/files/mcp-short.mp4" />
 
