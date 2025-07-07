@@ -731,7 +731,11 @@ export class IntegrationTestingFramework {
                     }
                     const result = results.find(r => r.workflowId === wfId);
                     if (!result) continue;
-                    const integrationId = result.integrationIds?.[0] || result.workflowId;
+
+                    // Get workflow definition and its first integration ID
+                    const workflowDef = this.config?.workflows?.definitions?.[wfId];
+                    const integrationId = workflowDef?.integrationIds?.[0] || '';
+
                     const totalAttempts = result.totalAttempts || 1;
                     const successfulAttempts = result.successfulAttempts || 0;
                     const allExecTimes = result.executionAttempts.map(e => e.executionTime);
@@ -746,7 +750,6 @@ export class IntegrationTestingFramework {
                         );
                         totalRetries = apiFailureLogs.length;
                     }
-                    const workflowDef = this.config?.workflows?.definitions?.[wfId];
                     integrationStats.push({
                         integrationId,
                         workflowId: result.workflowId,

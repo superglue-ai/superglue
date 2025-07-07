@@ -273,12 +273,12 @@
                     "personal_access_token": ""
                 },
                 "description": "Airtable database and spreadsheet API"
-                },
+            },
             "snowflake": {
                 "id": "snowflake",
                 "name": "Snowflake",
-                "urlHost": "https://hq27033.snowflakecomputing.com/api",
-                "urlPath": "/v2",
+                "urlHost": "https://IUESJWF-HQ27033.snowflakecomputing.com",
+                "urlPath": "/api/v2",
                 "documentationUrl": "https://docs.snowflake.com/en/developer-guide/sql-api/index",
                 "credentials": {
                     "personal_access_token": ""
@@ -289,7 +289,29 @@
     },
     "workflows": {
         "enabled": [
+            "hubspot-lead-qualification",
+            "stripe-revenue-analytics",
+            "jira-sprint-health",
+            "attio-people-retrieval",
+            "lego-inventory-analysis",
+            "timbuk2-product-analysis",
+            "hubspot-crm-workflow",
+            "subscription-to-db-sync",
+            "posthog-analytics",
+            "twilio-sms-analysis",
+            "sendgrid-test-email",
+            "github-list-repos",
+            "gitlab-list-projects",
+            "slack-dm-workflow",
+            "bitbucket-repos",
+            "discord-server-analysis-dm",
+            "asana-tasks",
+            "notion-duplicate-email-analysis",
             "huggingface-model-metadata",
+            "monday-sprint-analysis",
+            "square-customer-directory",
+            "zendesk-ticket-analysis",
+            "airtable-test-data-retrieval",
             "snowflake-list-tables"
         ],
         "definitions": {
@@ -406,7 +428,7 @@
             "twilio-sms-analysis": {
                 "id": "twilio-sms-analysis",
                 "name": "Twilio SMS Communication Analysis",
-                "instruction": "Get all SMS messages sent from my Twilio account, count how many were delivered vs failed vs pending by analyzing the status field, and calculate the success rate percentage. Return the results as a JSON object with total_messages, delivered_count, failed_count, pending_count, and success_rate_percent",
+                "instruction": "Make sure you add a proper authorization request header that includes my SID and auth token. Get all SMS messages sent from my Twilio account, count how many were delivered vs failed vs pending by analyzing the status field, and calculate the success rate percentage. Return the results as a JSON object with total_messages, delivered_count, failed_count, pending_count, and success_rate_percent",
                 "integrationIds": [
                     "twilio"
                 ],
@@ -522,13 +544,11 @@
             "huggingface-model-metadata": {
                 "id": "huggingface-model-metadata",
                 "name": "Hugging Face Model Names",
-                "instruction": "Retrieve all models created/authored by the user specified in the payload under user_name specifically. Limit the output to 10 models. For each model, extract the model name and the list of file names available in that model. Return the results as a JSON object in the following format: { \"models\": [ { \"model_name\": \"...\", \"file_names\": [\"file1\", \"file2\", ...] }, ... ] }",
+                "instruction": "Retrieve ONLY the top 10 most popular public models from Hugging Face. For each model, extract the model name and the list of file names available in that model. Return the results as a JSON object in the following format: { \"models\": [ { \"model_name\": \"...\", \"file_names\": [\"file1\", \"file2\", ...] }, ... ] }",
                 "integrationIds": [
                     "huggingface"
                 ],
-                "payload": {
-                    "user_name": "michael-fuest"
-                },
+                "payload": {},
                 "complexityLevel": "medium",
                 "category": "single-system"
             },
@@ -590,7 +610,7 @@
                 "payload": {},
                 "complexityLevel": "low",
                 "category": "single-system"
-                }
+            }
         }
     },
     "apiRankingWorkflowIds": [
