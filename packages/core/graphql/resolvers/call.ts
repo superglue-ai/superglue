@@ -56,6 +56,7 @@ export async function executeApiCall(
 
       // Check if response is valid
       if ((retryCount > 0 && isSelfHealing) || isTestMode) {
+        logMessage('info', `Evaluating response for ${endpoint?.urlHost}`, metadata);
         const result = await evaluateResponse(response.data, endpoint.responseSchema, endpoint.instruction);
         success = result.success;
         if (!result.success) throw new Error(result.shortReason + " " + JSON.stringify(response.data).slice(0, 1000));
