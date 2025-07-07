@@ -397,14 +397,14 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations,
           ) : (
             <>
               <div>
-                <div className="font-mono text-xs bg-background/50 p-2 rounded mt-1">
+                <div className="font-mono text-xs bg-background/50 p-2 rounded mt-1 overflow-x-auto">
                   <div>{editedStep.apiConfig.method || 'GET'} {editedStep.apiConfig.urlHost}{editedStep.apiConfig.urlPath}</div>
                 </div>
               </div>
               {editedStep.executionMode === 'LOOP' && editedStep.loopSelector && (
                 <div>
                   <Label className="text-xs text-muted-foreground">Loop Over</Label>
-                  <div className="font-mono text-xs bg-background/50 p-2 rounded mt-1">
+                  <div className="font-mono text-xs bg-background/50 p-2 rounded mt-1 overflow-x-auto">
                     {editedStep.loopSelector}
                     {editedStep.loopMaxIters && ` (max ${editedStep.loopMaxIters} iterations)`}
                   </div>
