@@ -372,7 +372,10 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
           finalTransform: finalTransform,
         },
         payload: JSON.parse(payload || '{}'),
-        credentials: JSON.parse(credentials || '{}')
+        credentials: JSON.parse(credentials || '{}'),
+        options: {
+          testMode: true
+        }
       });
 
       if (workflowResult.error) {

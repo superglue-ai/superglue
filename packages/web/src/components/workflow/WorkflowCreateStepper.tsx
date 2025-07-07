@@ -507,7 +507,10 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
           instruction: currentWorkflow.instruction
         },
         payload: JSON.parse(payload || '{}'),
-        credentials: parseCredentialsHelper(reviewCredentials)
+        credentials: parseCredentialsHelper(reviewCredentials),
+        options: {
+          testMode: true
+        }
       });
       setExecutionResult(result);
       setCurrentWorkflow(result.config);
