@@ -166,7 +166,10 @@ describe('superglue_build_and_run', () => {
     expect(client.executeWorkflow).toHaveBeenCalledWith({
       workflow: { id: 'workflow-1', steps: [] },
       payload: args.payload,
-      credentials: { apiKey: 'test-key' }
+      credentials: { apiKey: 'test-key' },
+      options: {
+        testMode: true
+      }
     });
   });
 
