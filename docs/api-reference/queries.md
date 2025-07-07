@@ -557,3 +557,34 @@ Retrieves tenant account information.
     ```
   </Tab>
 </Tabs>
+
+### findRelevantIntegrations
+
+Finds integrations relevant to a given natural language instruction.
+
+<Tabs>
+  <Tab title="GraphQL">
+    ```graphql
+    query FindRelevantIntegrations($instruction: String) {
+      findRelevantIntegrations(instruction: $instruction) {
+        id
+        reason
+        savedCredentials
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Client">
+    ```typescript
+    const suggestions = await client.findRelevantIntegrations(
+      "I need to send emails and track analytics"
+    );
+    // Returns integrations like SendGrid, PostHog, etc. with reasons
+    ```
+  </Tab>
+</Tabs>
+
+#### Fields
+
+- `instruction`: String (optional) - Natural language description of what you want to do
+- Returns: Array of `SuggestedIntegration` objects

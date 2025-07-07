@@ -86,18 +86,14 @@ export const executeWorkflowResolver = async (
     }
 
     if (allIntegrationIds.size > 0) {
-      integrations = (
-        await Promise.all(
-          Array.from(allIntegrationIds).map(async (id) => {
-            const integration = await context.datastore.getIntegration(id, context.orgId);
-            if (!integration) {
-              logMessage('warn', `Integration with id "${id}" not found, skipping.`, metadata);
-            }
-            return integration;
-          })
-        )
-      ).filter(Boolean);
-
+      const requestedIds = Array.from(allIntegrationIds);
+      integrations = await context.datastore.getManyIntegrations(requestedIds, context.orgId);
+      const foundIds = new Set(integrations.map(i => i.id));
+      requestedIds.forEach(id => {
+        if (!foundIds.has(id)) {
+          logMessage('warn', `Integration with id "${id}" not found, skipping.`, metadata);
+        }
+      });
       const integrationCreds = flattenAndNamespaceWorkflowCredentials(integrations);
       mergedCredentials = { ...integrationCreds, ...(args.credentials || {}) };
     }
@@ -242,21 +238,9 @@ export const buildWorkflowResolver = async (
     }
 
     // Validate that all integration IDs exist
-    const fetchedIntegrations = await Promise.all(
-      integrationIds.map(async (id) => {
-        const integration = await context.datastore.getIntegration(id, context.orgId);
-        if (!integration) {
-          throw new Error(`Integration not found: ${id}`);
-        }
-        return integration;
-      })
-    );
-
-    // Wait for documentation processing for existing integrations
     const datastoreAdapter = {
-      getIntegration: async (id: string): Promise<Integration | null> => {
-        const integration = await context.datastore.getIntegration(id, context.orgId);
-        return integration;
+      getManyIntegrations: async (ids: string[]): Promise<Integration[]> => {
+        return await context.datastore.getManyIntegrations(ids, context.orgId);
       }
     };
 

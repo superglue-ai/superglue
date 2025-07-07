@@ -30,7 +30,7 @@ export async function executeApiCall(
   let isSelfHealing = isSelfHealingEnabled(options);
   let isTestMode = options?.testMode || false;
 
-  let documentationString = "";
+  let documentationString = "No documentation provided";
   if (!integration && isSelfHealing) {
     logMessage('debug', `Self-healing enabled but no integration provided; skipping documentation-based healing.`, metadata);
   } else if (integration && integration.documentationPending) {
@@ -57,7 +57,7 @@ export async function executeApiCall(
       // Check if response is valid
       if ((retryCount > 0 && isSelfHealing) || isTestMode) {
         logMessage('info', `Evaluating response for ${endpoint?.urlHost}`, metadata);
-        const result = await evaluateResponse(response.data, endpoint.responseSchema, endpoint.instruction);
+        const result = await evaluateResponse(response.data, endpoint.responseSchema, endpoint.instruction, documentationString);
         success = result.success;
         if (!result.success) throw new Error(result.shortReason + " " + JSON.stringify(response.data).slice(0, 1000));
         /*
@@ -77,7 +77,8 @@ export async function executeApiCall(
     }
     catch (error) {
       const rawErrorString = error?.message || JSON.stringify(error || {});
-      lastError = maskCredentials(rawErrorString, credentials).slice(0, 1000);
+      lastError = maskCredentials(rawErrorString, credentials).slice(0, 1000);  
+
       if (retryCount === 0) {
         logMessage('info', `The initial configuration is not valid. Generating a new configuration. If you are creating a new configuration, this is expected.\n${lastError}`, metadata);
       }
