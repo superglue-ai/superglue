@@ -26,18 +26,10 @@ function needsDocFetch(input: Integration, oldIntegration?: Integration): boolea
   // 1. No old integration exists
   // 2. URL/path has changed
   // 3. Documentation URL has changed
-  // 4. Manual refresh: input has documentationUrl but no documentation field (refresh case)
   if (!oldIntegration) return true;
   if (input.urlHost !== oldIntegration.urlHost) return true;
   if (input.urlPath !== oldIntegration.urlPath) return true;
   if (input.documentationUrl !== oldIntegration.documentationUrl) return true;
-
-  // Manual refresh detection: if input has URL but no documentation, and old integration has same URL
-  if (input.documentationUrl === oldIntegration.documentationUrl &&
-    (!input.documentation || !input.documentation.trim()) &&
-    oldIntegration.documentationUrl && oldIntegration.documentationUrl.trim()) {
-    return true;
-  }
 
   return false;
 }
@@ -128,6 +120,7 @@ export const upsertIntegrationResolver = async (
             ...input,
             documentation: docString,
             documentationPending: false,
+            specificInstructions: input.specificInstructions?.trim() || oldIntegration?.specificInstructions || '',
             createdAt: oldIntegration?.createdAt || now,
             updatedAt: new Date(),
           }, context.orgId);
@@ -141,6 +134,7 @@ export const upsertIntegrationResolver = async (
               await context.datastore.upsertIntegration(input.id, {
                 ...input,
                 documentationPending: false,
+                specificInstructions: input.specificInstructions?.trim() || oldIntegration?.specificInstructions || '',
                 createdAt: oldIntegration?.createdAt || now,
                 updatedAt: new Date(),
               }, context.orgId);
@@ -161,6 +155,7 @@ export const upsertIntegrationResolver = async (
       documentation: resolveField(input.documentation, oldIntegration?.documentation, ''),
       documentationPending: shouldFetchDoc,
       credentials: resolveField(input.credentials, oldIntegration?.credentials, {}),
+      specificInstructions: resolveField(input.specificInstructions?.trim(), oldIntegration?.specificInstructions, ''),
       createdAt: oldIntegration?.createdAt || now,
       updatedAt: now
     };

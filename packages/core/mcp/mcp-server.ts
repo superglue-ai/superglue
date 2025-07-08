@@ -96,6 +96,7 @@ export const CreateIntegrationInputSchema = {
   urlPath: z.string().optional().describe("Path component of the URL. For postgres, use db name as the path."),
   documentationUrl: z.string().optional().describe("URL to the API documentation."),
   documentation: z.string().optional().describe("API documentation content, if provided directly."),
+  specificInstructions: z.string().optional().describe("Specific guidance on how to use this integration (e.g., rate limits, special endpoints, authentication details). Max 2000 characters."),
   credentials: z.record(z.string()).describe("Credentials for accessing the integration. Provide an empty object if no credentials are needed / given. Can be referenced by brackets: <<{integration_id}_{credential_name}>>. "),
 };
 
@@ -720,6 +721,7 @@ export const toolDefinitions: Record<string, any> = {
       - if no credentials are given, ask the user for them. If no credentials are needed or the user explicitly says no, provide an empty object.
       - Always split information clearly: urlHost (without secrets), urlPath, credentials (with secrets), etc.
       - Providing a documentationUrl will trigger asynchronous API documentation processing.
+      - When users mention API constraints (rate limits, special endpoints, auth requirements, etc.), capture them in 'specificInstructions' to guide workflow building.
     </important_notes>
     `,
     inputSchema: CreateIntegrationInputSchema,
@@ -768,6 +770,7 @@ AGENT WORKFLOW:
 BEST PRACTICES:
 - Always start with 'superglue_find_relevant_integrations' for discovery.
 - Create integrations and store credentials in integrations using 'superglue_create_integration'. Ask users for credentials if needed.
+- When creating integrations, capture any user-provided guidance about rate limits, special endpoints, or usage requirements in the 'specificInstructions' field.
 - If you get authentication errors during build_and_run despite using integrations with saved credentials, the integrations may have placeholder values instead of actual credentials. Check with the user if they provided the correct credentials.
 - Ask user before saving workflows.
 - When saving workflows, NEVER set fields to null - omit optional fields if no value available.

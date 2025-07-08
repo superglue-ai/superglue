@@ -55,6 +55,7 @@ export class IntegrationSelector {
 ---
 Integration ID: ${int.id}
 Documentation Summary: ${int.documentation?.slice(0, 1000)}
+${int.specificInstructions ? `User Instructions for this integration: ${int.specificInstructions}\n` : ''}
 `;
         }).join("\n");
 

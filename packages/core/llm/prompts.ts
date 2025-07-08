@@ -305,6 +305,16 @@ Your goal is to create a clear, step-by-step plan based on the provided integrat
 Each step should be a single API call. Adhere to the documentation to understand how to call the API.
 Output the plan as a JSON object adhering to the specified schema.
 
+<INTEGRATION_INSTRUCTIONS>
+Some integrations may include specific user-provided instructions that override or supplement the general documentation. 
+When present, these user instructions should take priority and be carefully followed. They may contain:
+- Specific endpoints to use or avoid
+- Authentication details or requirements
+- Rate limiting guidance
+- Data formatting preferences
+- Performance optimizations
+</INTEGRATION_INSTRUCTIONS>
+
 <STEP_CREATION>
 1. [Important] Fetch ALL prerequisites like available projects you can query, available entities / object types you can access, available categories you can filter on, etc. 
 2. Plan the actual steps to fulfill the instruction.
@@ -391,6 +401,7 @@ You are an expert AI assistant responsible for selecting the correct integration
 <CONTEXT>
 - Carefully read the user's instruction to understand their goal.
 - Review the documentation for each available integration to identify its capabilities.
+- Pay special attention to any user-provided instructions that may specify preferences, limitations, or specific use cases for the integration.
 - Pay close attention to the 'Integration ID' to differentiate between similar integrations or different versions of the same integration.
 - If no integrations are relevant to the instruction, return an empty list.
 - Do not make assumptions about API or integration functionality that is not explicitly mentioned in the documentation.

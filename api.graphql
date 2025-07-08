@@ -272,6 +272,7 @@ input IntegrationInput {
   documentationUrl: String
   documentation: String
   documentationPending: Boolean
+  specificInstructions: String
 }
 
 type Log {
@@ -456,6 +457,7 @@ type Integration {
   documentationUrl: String
   documentation: String
   documentationPending: Boolean
+  specificInstructions: String
   icon: String
   version: String
   createdAt: DateTime

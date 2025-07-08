@@ -5,6 +5,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '
 import { Input } from '@/src/components/ui/input';
 import { Label } from '@/src/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/src/components/ui/popover';
+import { Textarea } from '@/src/components/ui/textarea';
 import { CredentialsManager } from '@/src/components/utils/CredentialManager';
 import { DocumentationField } from '@/src/components/utils/DocumentationField';
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
@@ -60,6 +61,7 @@ export function IntegrationForm({
     const [urlPath, setUrlPath] = useState(integration?.urlPath || '');
     const [documentationUrl, setDocumentationUrl] = useState(integration?.documentationUrl || '');
     const [documentation, setDocumentation] = useState(integration?.documentation || '');
+    const [specificInstructions, setSpecificInstructions] = useState(integration?.specificInstructions || '');
     const [credentials, setCredentials] = useState(
         integration?.credentials ? JSON.stringify(integration.credentials, null, 2) : '{}'
     );
@@ -102,6 +104,7 @@ export function IntegrationForm({
             setUrlPath('');
             setDocumentationUrl('');
             setDocumentation('');
+            setSpecificInstructions('');
             return;
         }
 
@@ -123,6 +126,7 @@ export function IntegrationForm({
             setUrlPath(urlPath);
             setDocumentationUrl(integrationTemplate.docsUrl || '');
             setDocumentation('');
+            setSpecificInstructions('');
             // Only set ID for new integrations, preserve existing ID when editing
             if (!isEditing) {
                 setId(sanitizeIntegrationId(urlHost));
@@ -142,6 +146,7 @@ export function IntegrationForm({
         const errors: Record<string, boolean> = {};
         if (!id.trim()) errors.id = true;
         if (!urlHost.trim()) errors.urlHost = true;
+        if (specificInstructions.length > 2000) errors.specificInstructions = true;
         setValidationErrors(errors);
         if (Object.keys(errors).length > 0) return;
         let creds = {};
@@ -160,6 +165,7 @@ export function IntegrationForm({
             urlPath: urlPath.trim(),
             documentationUrl: documentationUrl.trim(),
             documentation: documentation.trim(),
+            specificInstructions: specificInstructions.trim(),
             credentials: creds,
         };
         onSave(integrationData);
@@ -297,6 +303,31 @@ export function IntegrationForm({
                         onFileUpload={handleFileUpload}
                         hasUploadedFile={hasUploadedFile}
                     />
+                </div>
+                <div>
+                    <Label htmlFor="specificInstructions">Specific Instructions</Label>
+                    <HelpTooltip text="Provide specific guidance on how to use this integration (e.g., rate limits, special endpoints, authentication details). Max 2000 characters." />
+                    <div className="relative">
+                        <Textarea
+                            id="specificInstructions"
+                            value={specificInstructions}
+                            onChange={e => setSpecificInstructions(e.target.value)}
+                            placeholder="e.g. always use pagination with max 50 items per page"
+                            className={cn(
+                                'min-h-[100px] pr-16',
+                                validationErrors.specificInstructions && inputErrorStyles
+                            )}
+                            maxLength={2000}
+                        />
+                        <div className="absolute bottom-2 right-2 text-xs text-muted-foreground">
+                            {specificInstructions.length}/2000
+                        </div>
+                    </div>
+                    {validationErrors.specificInstructions && (
+                        <p className="text-sm text-destructive mt-1">
+                            Specific instructions must be 2000 characters or less.
+                        </p>
+                    )}
                 </div>
                 <div>
                     <Label htmlFor="credentials">Credentials</Label>
