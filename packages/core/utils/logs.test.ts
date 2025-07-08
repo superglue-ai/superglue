@@ -1,6 +1,6 @@
-import { LogEntry } from '@superglue/shared'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { logEmitter, logger, logMessage } from './logs.js'
+import { LogEntry } from '@superglue/shared';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { logEmitter, logger, logMessage } from './logs.js';
 
 describe('Logging Module', () => {
   beforeEach(() => {
@@ -18,17 +18,17 @@ describe('Logging Module', () => {
 
   describe('logMessage', () => {
     it('logs messages with correct level', () => {
-      logMessage('info', 'test info message')
-      expect(logger.info).toHaveBeenCalledWith('test info message', {})
+      logMessage('info', 'test info message', { orgId: 'test' })
+      expect(logger.info).toHaveBeenCalledWith('test info message', { orgId: 'test' })
 
-      logMessage('error', 'test error message')
-      expect(logger.error).toHaveBeenCalledWith('test error message', {})
+      logMessage('error', 'test error message', { orgId: 'test' })
+      expect(logger.error).toHaveBeenCalledWith('test error message', { orgId: 'test' })
 
-      logMessage('warn', 'test warn message')
-      expect(logger.warn).toHaveBeenCalledWith('test warn message', {})
+      logMessage('warn', 'test warn message', { orgId: 'test' })
+      expect(logger.warn).toHaveBeenCalledWith('test warn message', { orgId: 'test' })
 
-      logMessage('debug', 'test debug message')
-      expect(logger.debug).toHaveBeenCalledWith('test debug message', {})
+      logMessage('debug', 'test debug message', { orgId: 'test' })
+      expect(logger.debug).toHaveBeenCalledWith('test debug message', { orgId: 'test' })
     })
 
     it('includes metadata in log message', () => {
@@ -66,7 +66,7 @@ describe('Logging Module', () => {
 
       // Generate multiple logs
       for (let i = 0; i < 3; i++) {
-        logMessage('info', `message ${i}`)
+        logMessage('info', `message ${i}`, { orgId: 'test' })
       }
 
       logEmitter.removeListener('log', listener)
@@ -84,8 +84,8 @@ describe('Logging Module', () => {
       ]
 
       levelTests.forEach(test => {
-        logMessage(test.level as any, test.message)
-        expect(logger[test.level]).toHaveBeenCalledWith(test.message, {})
+        logMessage(test.level as any, test.message, { orgId: 'test' })
+        expect(logger[test.level]).toHaveBeenCalledWith(test.message, { orgId: 'test' })
       })
     })
   })

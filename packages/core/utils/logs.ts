@@ -47,6 +47,6 @@ export const logger = pino({
 });
 
 // Helper function for easier logging
-export function logMessage(level: 'info' | 'error' | 'warn' | 'debug', message: string, metadata: Metadata = {}) {
+export function logMessage(level: 'info' | 'error' | 'warn' | 'debug', message: string, metadata: Metadata = { orgId: '' }) {
   logger[level](message, metadata);
 }
