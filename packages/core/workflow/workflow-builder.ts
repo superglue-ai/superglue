@@ -96,6 +96,7 @@ export class WorkflowBuilder {
   <${int.id}>
     Base URL: ${composeUrl(int.urlHost, int.urlPath)}
     Credentials available: ${JSON.stringify(Object.entries(int.credentials || {}).reduce((obj, [name, value]) => ({ ...obj, [`${int.id}_${name}`]: value }), {}) || 'None')}
+    ${int.specificInstructions ? `\n    User Instructions for this integration:\n    ${int.specificInstructions}\n` : ''}
     Documentation:
     \`\`\`
     ${processedDoc || 'No documentation content available.'}

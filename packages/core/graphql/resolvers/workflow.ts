@@ -240,11 +240,15 @@ export const buildWorkflowResolver = async (
     // Validate that all integration IDs exist
     const datastoreAdapter = {
       getManyIntegrations: async (ids: string[]): Promise<Integration[]> => {
-        return await context.datastore.getManyIntegrations(ids, context.orgId);
+        console.log('[buildWorkflowResolver] Fetching integrations:', { ids, orgId: context.orgId });
+        const result = await context.datastore.getManyIntegrations(ids, context.orgId);
+        console.log('[buildWorkflowResolver] Retrieved integrations:', result.map(i => i.id));
+        return result;
       }
     };
 
     const resolvedIntegrations = await waitForIntegrationProcessing(datastoreAdapter, integrationIds);
+    console.log('[buildWorkflowResolver] After waitForIntegrationProcessing:', resolvedIntegrations.map(i => i.id));
 
     const builder = new WorkflowBuilder(instruction, resolvedIntegrations, payload, responseSchema, metadata);
     const workflow = await builder.build();
