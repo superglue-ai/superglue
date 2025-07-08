@@ -312,7 +312,7 @@ export function IntegrationForm({
                             id="specificInstructions"
                             value={specificInstructions}
                             onChange={e => setSpecificInstructions(e.target.value)}
-                            placeholder="e.g. Always use pagination with max 50 items per page"
+                            placeholder="e.g. always use pagination with max 50 items per page"
                             className={cn(
                                 'min-h-[100px] pr-16',
                                 validationErrors.specificInstructions && inputErrorStyles
