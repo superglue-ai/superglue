@@ -11,7 +11,7 @@ export const logsResolver = {
 
                 // Handler for new logs
                 const logHandler = (log: LogEntry) => {
-                    if (log.orgId === orgId || (!orgId)) {
+                    if (log.orgId === orgId) {
                         // Add small delay to ensure subscription is ready
                         setTimeout(() => {
                             emitter.emit('data', { logs: log });

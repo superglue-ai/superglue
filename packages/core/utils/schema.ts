@@ -21,16 +21,16 @@ export async function generateSchema(instruction: string, responseData: string, 
 
   while (retryCount <= MAX_RETRIES) {
     try {
-      logMessage('info', `Generating schema${retryCount ? `: (retry ${retryCount})` : ""}`);
+      logMessage('info', `Generating schema${retryCount ? `: (retry ${retryCount})` : ""}`, metadata);
       const schema = await attemptSchemaGeneration(messages, retryCount);
       return schema;
     } catch (error) {
       retryCount++;
       if (retryCount > MAX_RETRIES) {
-        logMessage('error', `Schema generation failed after ${MAX_RETRIES} retries. Last error: ${error.message}`);
+        logMessage('error', `Schema generation failed after ${MAX_RETRIES} retries. Last error: ${error.message}`, metadata);
         throw error;
       }
-      logMessage('warn', `Schema generation failed. Retrying...`);
+      logMessage('warn', `Schema generation failed. Retrying...`, metadata);
       messages.push({
         role: "user",
         content: `The previous attempt failed with error: ${error.message}. Please try again.`

@@ -1,4 +1,5 @@
 import { Integration } from "@superglue/client";
+import { Metadata } from "@superglue/shared";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { LanguageModel } from "../llm/llm.js";
 import { logMessage } from "./logs.js";
@@ -43,7 +44,7 @@ Remember these important rules: The output MUST be a JSON array of strings, with
   while (retryCount <= MAX_RETRIES) {
     try {
       logMessage('info', `Generating instructions${retryCount ? `: (retry ${retryCount})` : ""}`, metadata);
-      const instructions = await attemptInstructionGeneration(messages, retryCount);
+      const instructions = await attemptInstructionGeneration(messages, retryCount, metadata);
       return instructions;
     } catch (error) {
       retryCount++;
@@ -63,7 +64,8 @@ Remember these important rules: The output MUST be a JSON array of strings, with
 
 async function attemptInstructionGeneration(
   messages: ChatCompletionMessageParam[],
-  retry: number
+  retry: number,
+  metadata: Metadata
 ): Promise<string[]> {
   let temperature = Math.min(0.3 * retry, 1.0);
   const schema = {
@@ -85,7 +87,7 @@ async function attemptInstructionGeneration(
     }
     return sanitized;
   } catch (err) {
-    logMessage('error', `Sanitization failed: ${err.message}`);
+    logMessage('error', `Sanitization failed: ${err.message}`, metadata);
     return [];
   }
 }
