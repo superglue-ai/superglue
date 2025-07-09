@@ -2,6 +2,7 @@ import { ApiConfig, ApiInputRequest, CacheMode, Integration, RequestOptions, Sel
 import type { Context, Metadata } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import OpenAI from "openai";
+import { config } from "../../default.js";
 import { PROMPT_MAPPING } from "../../llm/prompts.js";
 import { callEndpoint, evaluateResponse, generateApiConfig } from "../../utils/api.js";
 import { Documentation } from "../../utils/documentation.js";
@@ -91,7 +92,7 @@ export async function executeApiCall(
       }
     }
     retryCount++;
-  } while (retryCount < (options?.retries !== undefined ? options.retries : 8));
+  } while (retryCount < (options?.retries !== undefined ? options.retries : config.MAX_CALL_RETRIES));
   if (!success) {
     telemetryClient?.captureException(new Error(`API call failed after ${retryCount} retries. Last error: ${lastError}`), metadata.orgId, {
       endpoint: endpoint,
