@@ -2,6 +2,7 @@ import { RequestOptions, SelfHealingMode, TransformConfig, TransformInputRequest
 import type { DataStore, Metadata } from "@superglue/shared";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import prettier from "prettier";
+import { config } from "../default.js";
 import { LanguageModel } from "../llm/llm.js";
 import { PROMPT_JS_TRANSFORM, PROMPT_MAPPING } from "../llm/prompts.js";
 import { logMessage } from "./logs.js";
@@ -205,7 +206,7 @@ ${JSON.stringify(sample(payload, 2), null, 2).slice(0, 50000)}
     logMessage('info', `Mapping generated successfully with ${response.confidence}% confidence`, metadata);
     return response;
   } catch (error) {
-    if (retry < 10) {
+    if (retry < config.MAX_TRANSFORMATION_RETRIES) {
       const errorMessage = String(error.message);
       logMessage('warn', "Error generating JS mapping: " + errorMessage.slice(0, 1000), metadata);
       messages?.push({ role: "user", content: errorMessage });
