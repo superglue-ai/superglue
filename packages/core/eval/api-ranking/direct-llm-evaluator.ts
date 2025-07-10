@@ -1,11 +1,9 @@
 import { Integration } from '@superglue/client';
 import OpenAI from 'openai';
-import { AnthropicModel } from '../../llm/anthropic-model.js';
-import { OpenAIModel } from '../../llm/openai-model.js';
-import { evaluateResponse } from '../../utils/api.js';
 import { logMessage } from '../../utils/logs.js';
 import { BaseWorkflowConfig } from '../utils/config-loader.js';
 
+// Types are safe to import
 export interface DirectLLMResult {
     provider: 'chatgpt' | 'claude';
     workflowId: string;
@@ -26,14 +24,29 @@ export interface DirectLLMAttempt {
 }
 
 export class DirectLLMEvaluator {
-    private openaiModel: OpenAIModel;
-    private anthropicModel: AnthropicModel;
+    private openaiModel: any = null;
+    private anthropicModel: any = null;
     private metadata: { orgId: string; userId: string };
 
     constructor(orgId: string = 'competitor-eval', userId: string = 'system') {
-        this.openaiModel = new OpenAIModel();
-        this.anthropicModel = new AnthropicModel();
+        // Don't initialize models in constructor - wait until they're needed
         this.metadata = { orgId, userId };
+    }
+
+    private async getOpenAIModel() {
+        if (!this.openaiModel) {
+            const { OpenAIModel } = await import('../../llm/openai-model.js');
+            this.openaiModel = new OpenAIModel();
+        }
+        return this.openaiModel;
+    }
+
+    private async getAnthropicModel() {
+        if (!this.anthropicModel) {
+            const { AnthropicModel } = await import('../../llm/anthropic-model.js');
+            this.anthropicModel = new AnthropicModel();
+        }
+        return this.anthropicModel;
     }
 
     /**
@@ -130,9 +143,11 @@ export class DirectLLMEvaluator {
                 { role: 'user', content: prompt }
             ];
 
-            const llmResponse = provider === 'chatgpt'
-                ? await this.openaiModel.generateText(messages, 0.1)
-                : await this.anthropicModel.generateText(messages, 0.1);
+            const model = provider === 'chatgpt'
+                ? await this.getOpenAIModel()
+                : await this.getAnthropicModel();
+
+            const llmResponse = await model.generateText(messages, 0.1);
 
             // Extract code from response
             const code = this.extractCode(llmResponse.response);
@@ -169,43 +184,80 @@ export class DirectLLMEvaluator {
      */
     private generatePrompt(workflow: BaseWorkflowConfig, integrations: Integration[]): string {
         const integrationDetails = integrations.map(integration => {
-            const credentials = Object.entries(integration.credentials || {})
-                .map(([key, value]) => `${key}: "${value}"`)
-                .join(', ');
+            // Build credentials object with actual values
+            const credentialEntries = Object.entries(integration.credentials || {});
+            const credentialPairs = credentialEntries.map(([key, value]) => {
+                // Make sure we have actual values
+                if (!value || value === '') {
+                    logMessage('warn',
+                        `Missing credential ${key} for integration ${integration.id}`,
+                        this.metadata
+                    );
+                    return `    const ${key} = "MISSING_CREDENTIAL";`;
+                }
+                // Show the actual value in the prompt
+                return `    const ${key} = "${value}";`;
+            });
 
-            const configExample = `{
-    id: "${integration.id}",
-    name: "${integration.name}",
-    urlHost: "${integration.urlHost}",
-    documentationUrl: "${integration.documentationUrl || 'Not provided'}",
-    credentials: { ${credentials} }
-}`;
+            // Create a ready-to-use code snippet for this integration
+            const codeSnippet = `// ${integration.name} Configuration
+const ${integration.id}_config = {
+    baseUrl: "${integration.urlHost}"
+};
+${credentialPairs.join('\n')};`;
 
             return `Integration: ${integration.name}
-Configuration: ${configExample}
-Documentation Summary: ${integration.documentation ? integration.documentation.slice(0, 2000) + '...' : 'No documentation available'}`;
-        }).join('\n\n');
+Base URL: ${integration.urlHost}
+
+Ready-to-use configuration:
+${codeSnippet}
+
+Documentation Summary: ${integration.documentation ? integration.documentation.slice(0, 1500) + '...' : 'No documentation available'}`;
+        }).join('\n\n---\n\n');
 
         return `Task: ${workflow.instruction}
 
 Available Integrations:
 ${integrationDetails}
 
-Input Payload:
-${JSON.stringify(workflow.payload || {}, null, 2)}
+Input Payload (already defined as 'payload'):
+const payload = ${JSON.stringify(workflow.payload || {}, null, 2)};
 
-Please write JavaScript code that:
-1. Makes the necessary API calls to fulfill the task
-2. Processes the responses as needed
-3. Returns the final result in the format requested by the instruction
-4. Uses only vanilla JavaScript with fetch() for HTTP requests
-5. Wraps all code in <<CODE>> tags
+INSTRUCTIONS:
+Write JavaScript code that fulfills the task above. The code should:
+1. Use the EXACT configuration values shown above (copy them directly)
+2. Make API calls using fetch()
+3. Process the responses as needed
+4. Return the final result matching the requested format
+5. Wrap all code between <<CODE>> and <</CODE>> tags (note the / in the closing tag)
 
-Important:
-- The code will be executed in a sandboxed environment with access to fetch()
-- Return the final result, don't console.log it
-- Handle errors appropriately
-- The payload is available as a global 'payload' variable`;
+CRITICAL - Use the EXACT values shown above. For example:
+- If you see: const secret_key = "sk_test_123"; then use EXACTLY "sk_test_123"
+- DO NOT write <<secret_key>> or \${secret_key} or any template syntax
+- Copy the credential values EXACTLY as shown
+
+Example structure:
+<<CODE>>
+async function executeTask() {
+    // Copy the configuration exactly as shown above
+    const stripe_config = {
+        baseUrl: "https://api.stripe.com"
+    };
+    const secret_key = "sk_test_123"; // Define credentials OUTSIDE the config object
+    
+    const response = await fetch(stripe_config.baseUrl + '/v1/subscriptions', {
+        headers: {
+            'Authorization': 'Bearer ' + secret_key,
+            'Content-Type': 'application/json'
+        }
+    });
+    
+    const data = await response.json();
+    // Process data and return result
+    return { result: data };
+}
+return executeTask();
+<</CODE>>`;
     }
 
     /**
@@ -215,28 +267,43 @@ Important:
         return `You are an expert JavaScript developer tasked with writing code to integrate with APIs.
 Generate clean, working JavaScript code that fulfills the given task using the provided API integrations.
 The code should be self-contained and return the requested data.
-Always wrap your code in <<CODE>> tags.`;
+Always wrap your code in <<CODE>> and <</CODE>> tags (note the closing tag has a forward slash).`;
     }
 
     /**
      * Extract code from LLM response
      */
     private extractCode(response: string): string | null {
-        // Try to extract code between <<CODE>> tags first
-        const codeMatch = response.match(/<<CODE>>([\s\S]*?)<<\/CODE>>/);
+        // Remove surrounding backticks if present
+        let cleanResponse = response.trim();
+        if (cleanResponse.startsWith('`') && cleanResponse.endsWith('`')) {
+            cleanResponse = cleanResponse.slice(1, -1).trim();
+        }
+
+        // Try to extract code between <<CODE>> tags (with or without closing slash)
+        // First try with proper closing tag
+        let codeMatch = cleanResponse.match(/<<CODE>>([\s\S]*?)<<\/CODE>>/);
+        if (codeMatch) {
+            return codeMatch[1].trim();
+        }
+
+        // Then try with <<CODE>> as both opening and closing
+        codeMatch = cleanResponse.match(/<<CODE>>([\s\S]*?)<<CODE>>/);
         if (codeMatch) {
             return codeMatch[1].trim();
         }
 
         // Try to extract code between ```javascript blocks
-        const jsMatch = response.match(/```(?:javascript|js)?\n([\s\S]*?)```/);
+        const jsMatch = cleanResponse.match(/```(?:javascript|js)?\n?([\s\S]*?)```/);
         if (jsMatch) {
             return jsMatch[1].trim();
         }
 
         // Last resort: if the entire response looks like code
-        if (response.includes('fetch(') || response.includes('async function')) {
-            return response.trim();
+        if (cleanResponse.includes('fetch(') || cleanResponse.includes('async function')) {
+            // Check if it still has <<CODE>> tags at the beginning/end and remove them
+            cleanResponse = cleanResponse.replace(/^<<CODE>>/, '').replace(/<<CODE>>$/, '').trim();
+            return cleanResponse;
         }
 
         return null;
@@ -272,7 +339,8 @@ Always wrap your code in <<CODE>> tags.`;
         integrations: Integration[]
     ): Promise<{ success: boolean; reason?: string }> {
         try {
-            // Use the existing evaluateResponse function
+            // Load evaluateResponse dynamically
+            const { evaluateResponse } = await import('../../utils/api.js');
             const documentation = integrations[0]?.documentation || '';
             const evaluation = await evaluateResponse(result, undefined, instruction, documentation);
 

@@ -1,6 +1,3 @@
-#!/usr/bin/env node
-// API Ranking Generator - Generates performance rankings for various APIs
-
 import { config } from 'dotenv';
 import fs from 'fs';
 import path from 'path';

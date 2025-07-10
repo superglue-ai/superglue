@@ -466,10 +466,32 @@
         }
     },
     "workflowsToRank": [
+        "hubspot-lead-qualification",
+        "stripe-revenue-analytics",
+        "jira-sprint-health",
+        "attio-people-retrieval",
+        "lego-inventory-analysis",
+        "timbuk2-product-analysis",
         "hubspot-crm-workflow",
-        "stripe-revenue-analytics"
+        "subscription-to-db-sync",
+        "posthog-analytics",
+        "twilio-sms-analysis",
+        "sendgrid-test-email",
+        "github-list-repos",
+        "gitlab-list-projects",
+        "slack-dm-workflow",
+        "bitbucket-repos",
+        "discord-server-analysis-dm",
+        "asana-tasks",
+        "notion-duplicate-email-analysis",
+        "huggingface-model-metadata",
+        "monday-sprint-analysis",
+        "square-customer-directory",
+        "zendesk-ticket-analysis",
+        "airtable-test-data-retrieval",
+        "snowflake-list-tables"
     ],
     "settings": {
-        "attemptsPerWorkflow": 2
+        "attemptsPerWorkflow": 3
     }
 }

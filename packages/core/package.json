@@ -32,7 +32,8 @@
     "test:coverage": "vitest run --coverage --exclude '**/tests/integration.test.ts'",
     "test:workflow": "vitest run -t ApiWorkflowOrchestrator-dog",
     "test:integration": "vitest run eval/integration-testing/integration.test.ts",
-    "generate-ranking": "npm run build && node dist/eval/api-ranking/generate-api-ranking.js"
+    "generate-ranking": "npm run build && node dist/eval/api-ranking/generate-api-ranking.js",
+    "generate-ranking:dev": "nodemon --watch 'eval/**/*.ts' --watch 'utils/**/*.ts' --watch 'llm/**/*.ts' --exec 'npm run generate-ranking'"
   },
   "type": "module",
   "dependencies": {
