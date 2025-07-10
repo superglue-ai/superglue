@@ -28,7 +28,17 @@ COPY . .
 
 # After copying files but before building
 RUN npm run build
-    
+
+# Go build stage for HTML-to-Markdown shared library
+FROM golang:1.24 AS go-builder
+WORKDIR /app
+COPY packages/core/sharedLibs/go-html-to-md ./sharedLibs/go-html-to-md
+
+# Install Go dependencies and build parser lib
+RUN cd sharedLibs/go-html-to-md && \
+    go mod tidy && \
+    go build -o html-to-markdown.so -buildmode=c-shared html-to-markdown.go && \
+    chmod +x html-to-markdown.so
 
 # Production stage
 FROM node:22-slim
@@ -56,6 +66,9 @@ COPY --from=builder /usr/src/app/packages/core/dist ./packages/core/dist
 COPY --from=builder /usr/src/app/packages/web/.next ./packages/web/.next
 COPY --from=builder /usr/src/app/packages/web/public ./packages/web/public
 COPY --from=builder /usr/src/app/packages/shared/dist ./packages/shared/dist
+
+# Copy Go shared library from go-builder stage
+COPY --from=go-builder /app/sharedLibs/go-html-to-md/html-to-markdown.so ./packages/core/sharedLibs/go-html-to-md/html-to-markdown.so
 
 # Expose ports for both servers
 EXPOSE 3000 3001
