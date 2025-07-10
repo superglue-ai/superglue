@@ -156,7 +156,7 @@ ANALYSIS INSTRUCTIONS:
 - Provide both a concise summary AND detailed analysis.`;
 
         try {
-            const { LanguageModel } = await import('../llm/llm.js');
+            const { LanguageModel } = await import('../../llm/llm.js');
 
             // Get structured analysis
             const analysisResponse = await LanguageModel.generateObject([

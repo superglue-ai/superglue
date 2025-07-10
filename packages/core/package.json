@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "devDependencies": {
     "@types/cors": "^2.8.17",
+    "@types/form-data": "^2.5.1",
     "@types/jsonpath": "^0.2.4",
     "@types/lodash.isequal": "^4.5.8",
     "@types/lodash.keys": "^4.2.9",
@@ -30,10 +31,12 @@
     "test-no-watch": "vitest run --exclude '**/tests/integration.test.ts'",
     "test:coverage": "vitest run --coverage --exclude '**/tests/integration.test.ts'",
     "test:workflow": "vitest run -t ApiWorkflowOrchestrator-dog",
-    "test:integration": "vitest run tests/integration.test.ts"
+    "test:integration": "vitest run eval/integration-testing/integration.test.ts",
+    "generate-ranking": "npm run build && node dist/eval/api-ranking/generate-api-ranking.js"
   },
   "type": "module",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
     "@apollo/server": "^4.11.3",
     "@google/generative-ai": "^0.24.1",
     "@modelcontextprotocol/sdk": "1.12.1",
@@ -44,6 +47,7 @@
     "date-fns": "^4.1.0",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "form-data": "^4.0.0",
     "graphql": "^16.10.0",
     "graphql-scalars": "^1.24.1",
     "graphql-type-json": "^0.3.2",

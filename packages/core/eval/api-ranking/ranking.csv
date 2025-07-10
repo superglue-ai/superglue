@@ -1,0 +1,3 @@
+Rank,API,Superglue Score,Superglue Success %,ChatGPT Success %,Claude Success %,Instruction Prompt
+1,HubSpot,0.90,100%,0%,0%,"Get all contacts with lifecycle stage: Marketing Qualified Lead from HubSpot. Filter them to only include contacts created between the input payload date and the payload date + 100 days. I want the final output to be a JSON object with the following structure: { ""contacts"": [ { ""name"": ""John Doe"", ""email"": ""john.doe@example.com"" } ]"
+2,stripe,0.90,100%,0%,0%,"Fetch all Stripe subscriptions createdin the 3 months following the payload date, group by customer and calculate my monthly recurring revenue"

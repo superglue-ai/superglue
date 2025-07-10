@@ -11,8 +11,8 @@ process.env.DATA_STORE_FILE_PATH = './tests/test-data';
 
 describe('Integration Tests', () => {
     it('should run integration tests successfully', async () => {
-        const framework = new IntegrationTestingFramework(
-            './tests/integration-test-config.json'
+        const framework = await IntegrationTestingFramework.create(
+            './eval/integration-testing/integration-test-config.json'
         );
 
         const results = await framework.runTestSuite();
