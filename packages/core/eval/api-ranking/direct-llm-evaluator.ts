@@ -6,17 +6,17 @@ import { evaluateResponse } from '../../utils/api.js';
 import { logMessage } from '../../utils/logs.js';
 import { BaseWorkflowConfig } from '../utils/config-loader.js';
 
-export interface CompetitorResult {
+export interface DirectLLMResult {
     provider: 'chatgpt' | 'claude';
     workflowId: string;
     workflowName: string;
     successRate: number;
     totalAttempts: number;
     successfulAttempts: number;
-    attempts: CompetitorAttempt[];
+    attempts: DirectLLMAttempt[];
 }
 
-export interface CompetitorAttempt {
+export interface DirectLLMAttempt {
     attemptNumber: number;
     success: boolean;
     generatedCode?: string;
@@ -25,7 +25,7 @@ export interface CompetitorAttempt {
     executionTime: number;
 }
 
-export class CompetitorEvaluator {
+export class DirectLLMEvaluator {
     private openaiModel: OpenAIModel;
     private anthropicModel: AnthropicModel;
     private metadata: { orgId: string; userId: string };
@@ -43,7 +43,7 @@ export class CompetitorEvaluator {
         workflow: BaseWorkflowConfig,
         integrations: Integration[],
         maxAttempts: number
-    ): Promise<{ chatgpt: CompetitorResult; claude: CompetitorResult }> {
+    ): Promise<{ chatgpt: DirectLLMResult; claude: DirectLLMResult }> {
         logMessage('info', `🤖 Evaluating workflow ${workflow.name} with ChatGPT and Claude`, this.metadata);
 
         const [chatgptResult, claudeResult] = await Promise.all([
@@ -62,13 +62,13 @@ export class CompetitorEvaluator {
         workflow: BaseWorkflowConfig,
         integrations: Integration[],
         maxAttempts: number
-    ): Promise<CompetitorResult> {
-        const attempts: CompetitorAttempt[] = [];
+    ): Promise<DirectLLMResult> {
+        const attempts: DirectLLMAttempt[] = [];
         let successfulAttempts = 0;
 
         for (let attemptNum = 1; attemptNum <= maxAttempts; attemptNum++) {
-            logMessage('info', 
-                `📝 ${provider} attempt ${attemptNum}/${maxAttempts} for ${workflow.name}`, 
+            logMessage('info',
+                `📝 ${provider} attempt ${attemptNum}/${maxAttempts} for ${workflow.name}`,
                 this.metadata
             );
 
@@ -79,8 +79,8 @@ export class CompetitorEvaluator {
                 successfulAttempts++;
                 logMessage('info', `✅ ${provider} succeeded on attempt ${attemptNum}`, this.metadata);
             } else {
-                logMessage('warn', 
-                    `❌ ${provider} failed on attempt ${attemptNum}: ${attempt.error}`, 
+                logMessage('warn',
+                    `❌ ${provider} failed on attempt ${attemptNum}: ${attempt.error}`,
                     this.metadata
                 );
             }
@@ -112,9 +112,9 @@ export class CompetitorEvaluator {
         workflow: BaseWorkflowConfig,
         integrations: Integration[],
         attemptNumber: number
-    ): Promise<CompetitorAttempt> {
+    ): Promise<DirectLLMAttempt> {
         const startTime = Date.now();
-        const attempt: CompetitorAttempt = {
+        const attempt: DirectLLMAttempt = {
             attemptNumber,
             success: false,
             executionTime: 0
@@ -130,7 +130,7 @@ export class CompetitorEvaluator {
                 { role: 'user', content: prompt }
             ];
 
-            const llmResponse = provider === 'chatgpt' 
+            const llmResponse = provider === 'chatgpt'
                 ? await this.openaiModel.generateText(messages, 0.1)
                 : await this.anthropicModel.generateText(messages, 0.1);
 
@@ -148,7 +148,7 @@ export class CompetitorEvaluator {
 
             // Evaluate if the result matches the instruction
             const evaluation = await this.evaluateResult(result, workflow.instruction, integrations);
-            
+
             if (!evaluation.success) {
                 throw new Error(evaluation.reason);
             }
@@ -267,15 +267,15 @@ Always wrap your code in <<CODE>> tags.`;
      * Evaluate if the result matches the instruction
      */
     private async evaluateResult(
-        result: any, 
-        instruction: string, 
+        result: any,
+        instruction: string,
         integrations: Integration[]
     ): Promise<{ success: boolean; reason?: string }> {
         try {
             // Use the existing evaluateResponse function
             const documentation = integrations[0]?.documentation || '';
             const evaluation = await evaluateResponse(result, undefined, instruction, documentation);
-            
+
             return {
                 success: evaluation.success,
                 reason: evaluation.shortReason
@@ -293,11 +293,11 @@ Always wrap your code in <<CODE>> tags.`;
      */
     static validateApiKeys(): { isValid: boolean; missing: string[] } {
         const missing: string[] = [];
-        
+
         if (!process.env.OPENAI_API_KEY) {
             missing.push('OPENAI_API_KEY');
         }
-        
+
         if (!process.env.ANTHROPIC_API_KEY) {
             missing.push('ANTHROPIC_API_KEY');
         }

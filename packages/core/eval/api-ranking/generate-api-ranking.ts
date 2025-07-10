@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import { logMessage } from '../../utils/logs.js';
 import { ConfigLoader, SetupManager, WorkflowRunner } from '../utils/index.js';
-import { CompetitorEvaluator } from './competitor-evaluator.js';
+import { DirectLLMEvaluator } from './direct-llm-evaluator.js';
 
 // Load environment variables
 const envPath = process.cwd().endsWith('packages/core')
@@ -50,16 +50,16 @@ async function generateApiRanking(configPath?: string): Promise<void> {
         }
 
         // Check competitor API keys
-        const competitorKeys = CompetitorEvaluator.validateApiKeys();
-        const runCompetitorEval = competitorKeys.isValid;
+        const directLLMKeys = DirectLLMEvaluator.validateApiKeys();
+        const runDirectLLMEval = directLLMKeys.isValid;
 
-        if (!runCompetitorEval) {
+        if (!runDirectLLMEval) {
             logMessage('warn',
-                `⚠️  Competitor evaluation disabled. Missing API keys: ${competitorKeys.missing.join(', ')}`,
+                `⚠️  Direct LLM evaluation disabled. Missing API keys: ${directLLMKeys.missing.join(', ')}`,
                 metadata
             );
         } else {
-            logMessage('info', '✅ Competitor evaluation enabled (ChatGPT & Claude)', metadata);
+            logMessage('info', '✅ Direct LLM evaluation enabled (ChatGPT & Claude)', metadata);
         }
 
         // Apply credentials
@@ -72,7 +72,7 @@ async function generateApiRanking(configPath?: string): Promise<void> {
 
         // 3. Initialize evaluators
         const workflowRunner = new WorkflowRunner(setupResult.datastore, 'api-ranking', 'system');
-        const competitorEvaluator = runCompetitorEval ? new CompetitorEvaluator() : null;
+        const directLLMEvaluator = runDirectLLMEval ? new DirectLLMEvaluator() : null;
 
         // 4. Run workflows and collect results
         const results: ApiRankingResult[] = [];
@@ -113,26 +113,26 @@ async function generateApiRanking(configPath?: string): Promise<void> {
             let chatgptSuccessRate = 0;
             let claudeSuccessRate = 0;
 
-            if (competitorEvaluator) {
-                logMessage('info', `🤖 Running competitor evaluation for ${workflow.name}...`, metadata);
+            if (directLLMEvaluator) {
+                logMessage('info', `🤖 Running direct LLM evaluation for ${workflow.name}...`, metadata);
 
                 try {
-                    const competitorResults = await competitorEvaluator.evaluateWorkflow(
+                    const directLLMResults = await directLLMEvaluator.evaluateWorkflow(
                         workflow,
                         workflowIntegrations,
                         config.settings.attemptsPerWorkflow
                     );
 
-                    chatgptSuccessRate = competitorResults.chatgpt.successRate;
-                    claudeSuccessRate = competitorResults.claude.successRate;
+                    chatgptSuccessRate = directLLMResults.chatgpt.successRate;
+                    claudeSuccessRate = directLLMResults.claude.successRate;
 
                     logMessage('info',
-                        `📊 Competitor results - ChatGPT: ${(chatgptSuccessRate * 100).toFixed(0)}%, Claude: ${(claudeSuccessRate * 100).toFixed(0)}%`,
+                        `📊 Direct LLM results - ChatGPT: ${(chatgptSuccessRate * 100).toFixed(0)}%, Claude: ${(claudeSuccessRate * 100).toFixed(0)}%`,
                         metadata
                     );
                 } catch (error) {
                     logMessage('error',
-                        `❌ Competitor evaluation failed for ${workflow.name}: ${error}`,
+                        `❌ Direct LLM evaluation failed for ${workflow.name}: ${error}`,
                         metadata
                     );
                 }
