@@ -77,11 +77,15 @@ Workflows that never succeed get minimal scores:
 
 ## Configuration
 
-The ranking is configured in `api-ranking-config.json`:
-- `integrations`: API configurations with credentials
-- `workflows`: Workflow definitions to test
-- `workflowsToRank`: List of workflow IDs to include in ranking
-- `settings.attemptsPerWorkflow`: Number of times to run each workflow
+The API ranking system is configured through `api-ranking-config.json`. Key settings include:
+
+- **`settings.attemptsPerWorkflow`**: Number of times to run each workflow (default: 5)
+- **`settings.delayBetweenAttempts`**: Milliseconds to wait between retry attempts (default: 0)
+  - Set to 0 for fast evaluation during development
+  - Use 1000-2000ms when testing against production APIs to avoid rate limiting
+- **`workflowsToRank`**: Array of workflow IDs to include in the ranking
+- **`integrations`**: API configurations with credentials and documentation URLs
+- **`workflows`**: Workflow definitions with instructions and expected inputs
 
 ## Usage
 

@@ -31,7 +31,7 @@ export interface WorkflowRunnerOptions {
     maxAttemptsPerWorkflow: number;
     collectLogs?: boolean;
     saveRuns?: boolean;
-    delayBetweenAttempts?: number;
+    delayBetweenAttempts?: number;  // Set to 0 for testing, use 1000-2000ms for production APIs to avoid rate limiting
     onAttemptComplete?: (attempt: WorkflowRunAttempt) => void;
 }
 

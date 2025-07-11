@@ -84,6 +84,7 @@ async function generateApiRanking(configPath?: string): Promise<void> {
                 workflow.integrationIds.includes(i.id)
             );
 
+            // Run Superglue evaluation
             const runResult = await workflowRunner.runWorkflow(
                 workflow,
                 workflowIntegrations,
@@ -91,7 +92,7 @@ async function generateApiRanking(configPath?: string): Promise<void> {
                     maxAttemptsPerWorkflow: config.settings.attemptsPerWorkflow,
                     collectLogs: true,  // Enable log collection
                     saveRuns: false,
-                    delayBetweenAttempts: 1000
+                    delayBetweenAttempts: config.settings.delayBetweenAttempts || 0  // Use config value, default to 0
                 }
             );
 

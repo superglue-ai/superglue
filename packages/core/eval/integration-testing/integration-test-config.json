@@ -592,6 +592,7 @@
 },
 "testSuite": {
     "name": "Integration Test",
-    "attemptsPerWorkflow": 3
+    "attemptsPerWorkflow": 3,
+    "delayBetweenAttempts": 0
     }
 }

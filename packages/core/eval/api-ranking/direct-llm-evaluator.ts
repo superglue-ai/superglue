@@ -96,11 +96,6 @@ export class DirectLLMEvaluator {
                     this.metadata
                 );
             }
-
-            // Add delay between attempts
-            if (attemptNum < maxAttempts) {
-                await new Promise(resolve => setTimeout(resolve, 1000));
-            }
         }
 
         const successRate = successfulAttempts / maxAttempts;

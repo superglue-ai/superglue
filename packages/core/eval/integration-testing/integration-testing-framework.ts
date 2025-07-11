@@ -302,7 +302,7 @@ export class IntegrationTestingFramework {
                         maxAttemptsPerWorkflow: ATTEMPTS_PER_WORKFLOW,
                         collectLogs: true,
                         saveRuns: true,
-                        delayBetweenAttempts: 2000, // 2 second delay between attempts
+                        delayBetweenAttempts: this.config?.testSuite?.delayBetweenAttempts || 0, // Use config value, default to 0
                         onAttemptComplete: (attempt) => {
                             logMessage('info',
                                 `🔍 Attempt ${attempt.attemptNumber} result: buildSuccess=${attempt.buildSuccess}, executionSuccess=${attempt.executionSuccess}`,

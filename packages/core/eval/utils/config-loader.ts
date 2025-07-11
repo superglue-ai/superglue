@@ -40,6 +40,7 @@ export interface IntegrationTestConfig {
     testSuite: {
         name: string;
         attemptsPerWorkflow?: number;
+        delayBetweenAttempts?: number;  // Milliseconds to wait between retry attempts (default: 0)
     };
 }
 
@@ -54,6 +55,7 @@ export interface ApiRankingConfig {
     workflowsToRank: string[];  // Changed from apiRankingWorkflowIds
     settings: {
         attemptsPerWorkflow: number;
+        delayBetweenAttempts?: number;  // Milliseconds to wait between retry attempts (default: 0)
     };
 }
 
