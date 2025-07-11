@@ -29,7 +29,7 @@ query Query {
     total
   }
 }`;
-const datastore = createDataStore({ type: process.env.DATASTORE_TYPE as any });
+const datastore = createDataStore({ type: String(process.env.DATASTORE_TYPE).toLowerCase() as 'redis' | 'memory' | 'file' | 'postgres' });
 
 // Create the schema, which will be used separately by ApolloServer and useServer
 const schema = makeExecutableSchema({ typeDefs, resolvers });
