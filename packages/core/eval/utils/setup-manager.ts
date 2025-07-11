@@ -104,8 +104,8 @@ export class SetupManager {
             try {
                 const integration = this.makeIntegrationObject(config);
 
-                // Start async documentation fetch if URL provided
-                if (integration.documentationUrl) {
+                // Start async documentation fetch if documentation is pending
+                if (integration.documentationPending) {
                     this.startDocumentationFetch(
                         datastore,
                         integration,
@@ -163,6 +163,18 @@ export class SetupManager {
             );
         }
 
+        // Refresh integrations to get the latest state after documentation processing
+        const refreshedIntegrations: Integration[] = [];
+        for (const integration of integrations) {
+            const updated = await datastore.getIntegration(integration.id, this.metadata.orgId);
+            if (updated) {
+                refreshedIntegrations.push(updated);
+            } else {
+                // If integration was deleted, keep the original
+                refreshedIntegrations.push(integration);
+            }
+        }
+
         const totalSetupTime = Date.now() - startTime;
         logMessage('info',
             `🔧 Integration setup completed in ${totalSetupTime}ms ` +
@@ -171,7 +183,7 @@ export class SetupManager {
         );
 
         return {
-            integrations,
+            integrations: refreshedIntegrations,
             setupResults,
             documentationProcessingTime
         };
@@ -227,6 +239,25 @@ export class SetupManager {
                     `❌ Failed to fetch documentation for ${integration.id}: ${error}`,
                     this.metadata
                 );
+
+                // Always update documentationPending to false even on failure
+                try {
+                    const stillExists = await datastore.getIntegration(integration.id, this.metadata.orgId);
+                    if (stillExists) {
+                        await datastore.upsertIntegration(integration.id, {
+                            ...integration,
+                            documentation: '',
+                            documentationPending: false,
+                            updatedAt: new Date()
+                        }, this.metadata.orgId);
+                        logMessage('info', `📝 Marked documentation as processed (failed) for ${integration.id}`, this.metadata);
+                    }
+                } catch (updateError) {
+                    logMessage('error',
+                        `❌ Failed to update documentationPending status for ${integration.id}: ${updateError}`,
+                        this.metadata
+                    );
+                }
             }
         })();
     }
@@ -256,7 +287,7 @@ export class SetupManager {
             await waitForIntegrationProcessing(
                 datastoreAdapter,
                 pendingIntegrations,
-                120000 // 2 minute timeout
+                240000
             );
 
             const documentationProcessingTime = Date.now() - docStartTime;
@@ -279,9 +310,34 @@ export class SetupManager {
         } catch (error) {
             const documentationProcessingTime = Date.now() - docStartTime;
             logMessage('warn',
-                `⚠️  Documentation processing timeout after ${documentationProcessingTime}ms: ${String(error)}`,
+                `⚠️  Documentation processing timeout after ${documentationProcessingTime}ms (4 minute limit): ${String(error)}`,
                 this.metadata
             );
+
+            // Update all pending integrations to have documentationPending: false
+            // to prevent "still being fetched" warnings later
+            for (const integrationId of pendingIntegrations) {
+                try {
+                    const integration = await datastore.getIntegration(integrationId, this.metadata.orgId);
+                    if (integration && integration.documentationPending) {
+                        await datastore.upsertIntegration(integrationId, {
+                            ...integration,
+                            documentationPending: false,
+                            updatedAt: new Date()
+                        }, this.metadata.orgId);
+                        logMessage('info',
+                            `📝 Marked documentation as processed (timeout) for ${integrationId}`,
+                            this.metadata
+                        );
+                    }
+                } catch (updateError) {
+                    logMessage('error',
+                        `❌ Failed to update documentationPending status for ${integrationId}: ${updateError}`,
+                        this.metadata
+                    );
+                }
+            }
+
             return documentationProcessingTime;
         }
     }
@@ -298,7 +354,7 @@ export class SetupManager {
             urlPath: config.urlPath || '',
             documentationUrl: config.documentationUrl || '',
             documentation: '',
-            documentationPending: !!config.documentationUrl,
+            documentationPending: !!(config.documentationUrl && config.documentationUrl.trim() !== ''),
             credentials: config.credentials || {},
             createdAt: now,
             updatedAt: now

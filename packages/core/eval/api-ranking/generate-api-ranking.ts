@@ -2,7 +2,7 @@ import { config } from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import { logMessage } from '../../utils/logs.js';
-import { ConfigLoader, SetupManager, WorkflowRunner } from '../utils/index.js';
+import { ConfigLoader, SetupManager, WorkflowRunner, countApiFailures } from '../utils/index.js';
 import { DirectLLMEvaluator } from './direct-llm-evaluator.js';
 
 // Load environment variables
@@ -24,6 +24,7 @@ interface ApiRankingResult {
     avgBuildTime: number;
     totalAttempts: number;
     successfulAttempts: number;
+    apiFailureCount: number;
     superglueScore: number;
     chatgptSuccessRate: number;
     claudeSuccessRate: number;
@@ -93,10 +94,18 @@ async function generateApiRanking(configPath?: string): Promise<void> {
                 workflowIntegrations,
                 {
                     maxAttemptsPerWorkflow: config.settings.attemptsPerWorkflow,
-                    collectLogs: false,
+                    collectLogs: true,  // Enable log collection
                     saveRuns: false,
                     delayBetweenAttempts: 1000
                 }
+            );
+
+            // Count API failures from logs
+            const apiFailureCount = countApiFailures(runResult.collectedLogs);
+
+            logMessage('info',
+                `📊 Workflow ${workflow.name} - API failures: ${apiFailureCount}, Success rate: ${(runResult.successRate * 100).toFixed(0)}%`,
+                metadata
             );
 
             // Calculate Superglue metrics
@@ -148,7 +157,8 @@ async function generateApiRanking(configPath?: string): Promise<void> {
                 avgBuildTime,
                 totalAttempts: runResult.totalAttempts,
                 successfulAttempts: runResult.successfulAttempts,
-                superglueScore: calculateSuperglueScore(runResult.successRate, avgExecutionTime, avgBuildTime),
+                apiFailureCount,
+                superglueScore: calculateSuperglueScore(runResult.successRate, avgExecutionTime, apiFailureCount),
                 chatgptSuccessRate,
                 claudeSuccessRate
             });
@@ -175,27 +185,33 @@ async function generateApiRanking(configPath?: string): Promise<void> {
 }
 
 /**
- * Calculate Superglue Score based on success rate and performance
+ * Calculate Superglue Score based on success rate, execution time, and API reliability
  */
 function calculateSuperglueScore(
     successRate: number,
     avgExecutionTime: number,
-    avgBuildTime: number
+    apiFailureCount: number
 ): number {
     // Base score is success rate (0-1)
     let score = successRate;
 
-    // Apply time penalties (normalized to reduce score by up to 0.1)
-    const totalTime = avgExecutionTime + avgBuildTime;
+    // Apply penalties only if there was some success
+    if (successRate > 0) {
+        // API failure penalty: each failed API call reduces score by 0.02 (max penalty: 0.2)
+        const apiFailurePenalty = Math.min(0.2, apiFailureCount * 0.02);
+        score -= apiFailurePenalty;
 
-    if (successRate > 0 && totalTime < Infinity) {
-        // Fast workflows (< 1s) get no penalty
-        // Slow workflows (> 10s) get max penalty
-        const timePenalty = Math.min(0.1, Math.max(0, (totalTime - 1000) / 90000));
-        score -= timePenalty;
-    } else if (successRate === 0) {
-        // Failed workflows get a base score based on how far they got
-        score = avgBuildTime > 0 ? 0.2 : 0.1; // Built but failed execution vs didn't build
+        // Time penalty for execution (not build time)
+        if (avgExecutionTime < Infinity) {
+            // Fast workflows (< 1s) get no penalty
+            // Slow workflows (> 10s) get max penalty of 0.1
+            const timePenalty = Math.min(0.1, Math.max(0, (avgExecutionTime - 1000) / 90000));
+            score -= timePenalty;
+        }
+    } else {
+        // Failed workflows get minimal scores
+        // Base score of 0.1 or 0.2 depending on whether they got far enough to make API calls
+        score = apiFailureCount > 0 ? 0.2 : 0.1;
     }
 
     // Ensure score is between 0 and 1
@@ -206,7 +222,7 @@ function calculateSuperglueScore(
  * Generate the ranking CSV file
  */
 async function generateRankingCsv(results: ApiRankingResult[], outputPath: string): Promise<void> {
-    const headers = ['Rank', 'API', 'Superglue Score', 'Superglue Success %', 'ChatGPT Success %', 'Claude Success %', 'Instruction Prompt'];
+    const headers = ['Rank', 'API', 'Superglue Score', 'Superglue Success %', 'API Failures', 'ChatGPT Success %', 'Claude Success %', 'Instruction Prompt'];
 
     const rows = results.map((result, index) => {
         return [
@@ -214,6 +230,7 @@ async function generateRankingCsv(results: ApiRankingResult[], outputPath: strin
             result.api, // API name
             result.superglueScore.toFixed(2), // Score
             `${(result.successRate * 100).toFixed(0)}%`, // Superglue Success %
+            result.apiFailureCount, // API Failures
             `${(result.chatgptSuccessRate * 100).toFixed(0)}%`, // ChatGPT Success %
             `${(result.claudeSuccessRate * 100).toFixed(0)}%`, // Claude Success %
             `"${result.instruction.replace(/"/g, '""')}"` // Escape quotes in instruction

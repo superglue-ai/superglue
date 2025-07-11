@@ -23,9 +23,9 @@
             },
             "description": "Payment processing and subscription management"
         },
-        "timbuk2-shopify": {
-            "id": "timbuk2-shopify",
-            "name": "Timbuk2-shopify",
+        "shopify": {
+            "id": "shopify",
+            "name": "Shopify",
             "urlHost": "https://www.timbuk2.com",
             "urlPath": "/products.json",
             "documentationUrl": "https://shopify.dev/docs/api/ajax/reference/product",
@@ -49,7 +49,7 @@
             "name": "Attio",
             "urlHost": "https://api.attio.com/v2",
             "urlPath": "",
-            "documentationUrl": "https://api.attio.com/openapi/api",
+            "documentationUrl": "https://docs.attio.com/rest-api/overview",
             "credentials": {
                 "api_token": ""
             },
@@ -197,7 +197,7 @@
             "name": "Monday",
             "urlHost": "https://api.monday.com",
             "urlPath": "/v2",
-            "documentationUrl": "https://developer.monday.com/api-reference/docs",
+            "documentationUrl": "https://developer.monday.com/api-reference/docs/basics",
             "credentials": {
                 "personal_api_token": ""
             },
@@ -208,7 +208,7 @@
             "name": "Square",
             "urlHost": "https://connect.squareup.com",
             "urlPath": "",
-            "documentationUrl": "https://developer.squareup.com/reference/square",
+            "documentationUrl": "https://developer.squareup.com/docs",
             "credentials": {
                 "sandbox_access_token": ""
             },
@@ -284,7 +284,7 @@
         "attio-people-retrieval": {
             "id": "attio-people-retrieval",
             "name": "Attio People Retrieval",
-            "instruction": "Retrieve all people records from Attio CRM that do NOT have a company field set or where the company field is empty / null. Give me the names and email addresses of those people. I want the final output to be a JSON object with the following structure: { \"people\": [ { \"name\": \"John Doe\", \"email\": \"john.doe@example.com\" } ]",
+            "instruction": "Retrieve all people records from Attio CRM that have a non-empty email address. Return their names, email addresses and descriptions. I want the final output to be a JSON object with the following structure: { \"people\": [ { \"name\": \"John Doe\", \"email\": \"john.doe@example.com\", \"description\": \"John Doe is a software engineer at Example Inc.\" } ]",
             "integrationIds": [
                 "attio"
             ],
@@ -295,7 +295,7 @@
             "name": "Timbuk2 Product Analysis",
             "instruction": "Get all products from Timbuk2 with automatic pagination. This is a public endpoint.",
             "integrationIds": [
-                "timbuk2-shopify"
+                "shopify"
             ],
             "payload": {}
         },
@@ -409,7 +409,7 @@
         "huggingface-model-metadata": {
             "id": "huggingface-model-metadata",
             "name": "Hugging Face Model Names",
-            "instruction": "Retrieve ONLY the top 10 most popular public models from Hugging Face. For each model, extract the model name and the list of file names available in that model. Return the results as a JSON object in the following format: { \"models\": [ { \"model_name\": \"...\", \"file_names\": [\"file1\", \"file2\", ...] }, ... ] }",
+            "instruction": "I want to retrieve popular public models from Hugging Face. Add a limit query parameter to limit the number of models to no more than 10. For each model, extract the model name and the list of file names available in that model. Return the results as a JSON object in the following format: { \"models\": [ { \"model_name\": \"...\", \"file_names\": [\"file1\", \"file2\", ...] }, ... ] }",
             "integrationIds": [
                 "huggingface"
             ],
@@ -418,12 +418,12 @@
         "monday-sprint-analysis": {
             "id": "monday-sprint-analysis",
             "name": "Monday.com Sprint Analysis",
-            "instruction": "Retrieve all tasks belonging to the sprint specified in the payload and group them by their status columns and calculate the total number of tasks that are completed, in progress and not started. Return the results as a JSON object with the following structure and no further properties: { \"completed\": 10, \"in_progress\": 20, \"not_started\": 30 }",
+            "instruction": "Retrieve all tasks that are part of the sprint board specified in the payload input. Calculate the total number of tasks belonging to each status. Return the results as a JSON object with the following structure: { \"completed\": 10, \"in_progress\": 20, \"ready_to_start\": 30 }",
             "integrationIds": [
                 "monday"
             ],
             "payload": {
-                "sprint_board_name": "Sprint 1"
+                "sprint_board_name": "TestSprint"
             }
         },
         "square-customer-directory": {
@@ -466,13 +466,11 @@
         }
     },
     "workflowsToRank": [
-        "hubspot-lead-qualification",
+        "hubspot-crm-workflow",
         "stripe-revenue-analytics",
         "jira-sprint-health",
         "attio-people-retrieval",
-        "lego-inventory-analysis",
         "timbuk2-product-analysis",
-        "hubspot-crm-workflow",
         "subscription-to-db-sync",
         "posthog-analytics",
         "twilio-sms-analysis",
@@ -492,6 +490,6 @@
         "snowflake-list-tables"
     ],
     "settings": {
-        "attemptsPerWorkflow": 3
+        "attemptsPerWorkflow": 5
     }
 }

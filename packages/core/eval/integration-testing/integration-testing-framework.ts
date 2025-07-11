@@ -356,7 +356,8 @@ export class IntegrationTestingFramework {
                 let errorSummary: string | undefined = undefined;
                 let executionReport: any | undefined = undefined;
 
-                if (!runResult.finalResult?.success && runResult.collectedLogs && runResult.collectedLogs.length > 0) {
+                // Always generate execution report for all workflows
+                if (runResult.collectedLogs && runResult.collectedLogs.length > 0) {
                     try {
                         const { WorkflowReportGenerator } = await import('../utils/workflow-report-generator.js');
                         const reportGenerator = new WorkflowReportGenerator();
@@ -370,7 +371,7 @@ export class IntegrationTestingFramework {
                             integrationIds: testWorkflow.integrationIds,
                             logs: runResult.collectedLogs
                         });
-                        logMessage('info', `Collected ${runResult.collectedLogs.length} logs for ${testWorkflow.name}`, this.metadata);
+                        logMessage('info', `📊 Generated execution report for ${testWorkflow.name} (${runResult.collectedLogs.length} logs analyzed)`, this.metadata);
                         errorSummary = analysis.summary;
                         executionReport = analysis.report;
                     } catch (err) {
@@ -407,7 +408,7 @@ export class IntegrationTestingFramework {
 
 
             // Generate error summaries for workflows that encountered errors
-            logMessage('info', '🤖 Generating AI error analysis...', this.metadata);
+            logMessage('info', '🤖 Generating execution reports for all workflows...', this.metadata);
             // No longer need WorkflowReportGenerator for batch analysis
 
             // Build workflow-level meta report from individual execution reports
@@ -681,8 +682,25 @@ export class IntegrationTestingFramework {
 
             for (const success of successfulWorkflows) {
                 const originalResult = testSuite.results.find(r => r.workflowId === success.workflowId);
+                report += `### ${success.workflowName}\n\n`;
+
                 if (originalResult?.dataPreview) {
-                    report += `**${success.workflowName}:** \`${originalResult.dataPreview}\`\n\n`;
+                    report += `**Data Preview:** \`${originalResult.dataPreview}\`\n\n`;
+                }
+
+                if (success.executionReport) {
+                    report += `**Execution Analysis:**\n`;
+                    report += `- **Summary:** ${success.executionReport.executionSummary}\n`;
+
+                    if (success.executionReport.primaryIssues?.length > 0) {
+                        report += `- **Notable Points:** ${success.executionReport.primaryIssues.join('; ')}\n`;
+                    }
+
+                    if (success.executionReport.recommendations?.length > 0) {
+                        report += `- **Optimization Suggestions:** ${success.executionReport.recommendations.join('; ')}\n`;
+                    }
+
+                    report += '\n';
                 }
             }
         }

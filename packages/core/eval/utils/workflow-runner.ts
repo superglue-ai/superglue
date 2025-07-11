@@ -35,6 +35,15 @@ export interface WorkflowRunnerOptions {
     onAttemptComplete?: (attempt: WorkflowRunAttempt) => void;
 }
 
+/**
+ * Count API call failures from collected logs
+ */
+export function countApiFailures(logs: any[] = []): number {
+    return logs.filter(log =>
+        log.level === 'WARN' && log.message?.includes('API call failed')
+    ).length;
+}
+
 export class WorkflowRunner {
     private metadata: { orgId: string; userId: string };
 

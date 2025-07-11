@@ -12,7 +12,7 @@ export type {
     IntegrationSetupResult, SetupResult
 } from './setup-manager.js';
 
-export { WorkflowRunner } from './workflow-runner.js';
+export { countApiFailures, WorkflowRunner } from './workflow-runner.js';
 export type {
     WorkflowRunAttempt, WorkflowRunnerOptions, WorkflowRunResult
 } from './workflow-runner.js';
