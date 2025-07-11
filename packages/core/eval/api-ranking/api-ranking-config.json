@@ -491,6 +491,6 @@
     ],
     "settings": {
         "attemptsPerWorkflow": 5,
-        "delayBetweenAttempts": 0
+        "delayBetweenAttempts": 1000
     }
 }
