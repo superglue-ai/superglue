@@ -12,9 +12,6 @@ const envPath = process.cwd().endsWith('packages/core')
     : path.join(process.cwd(), '.env');
 config({ path: envPath });
 
-process.env.DATA_STORE_TYPE = 'FILE';
-process.env.DATA_STORE_FILE_PATH = './.api-ranking-data';
-
 interface ApiRankingResult {
     api: string;
     workflowId: string;
@@ -31,6 +28,13 @@ interface ApiRankingResult {
 }
 
 async function generateApiRanking(configPath?: string): Promise<void> {
+    // Set environment variables only within this function scope
+    const originalDataStoreType = process.env.DATA_STORE_TYPE;
+    const originalDataStorePath = process.env.DATA_STORE_FILE_PATH;
+
+    process.env.DATA_STORE_TYPE = 'FILE';
+    process.env.DATA_STORE_FILE_PATH = './.api-ranking-data';
+
     const metadata = { orgId: 'api-ranking', userId: 'system' };
     const startTime = Date.now();
 
@@ -104,7 +108,7 @@ async function generateApiRanking(configPath?: string): Promise<void> {
                 : Infinity;
             const avgBuildTime = runResult.attempts.reduce((sum, a) => sum + a.buildTime, 0) / runResult.attempts.length;
 
-            
+
             let chatgptSuccessRate = 0;
             let claudeSuccessRate = 0;
 
@@ -166,6 +170,19 @@ async function generateApiRanking(configPath?: string): Promise<void> {
     } catch (error) {
         logMessage('error', `❌ API Ranking failed: ${error}`, metadata);
         throw error;
+    } finally {
+        // Restore original environment variables
+        if (originalDataStoreType !== undefined) {
+            process.env.DATA_STORE_TYPE = originalDataStoreType;
+        } else {
+            delete process.env.DATA_STORE_TYPE;
+        }
+
+        if (originalDataStorePath !== undefined) {
+            process.env.DATA_STORE_FILE_PATH = originalDataStorePath;
+        } else {
+            delete process.env.DATA_STORE_FILE_PATH;
+        }
     }
 }
 

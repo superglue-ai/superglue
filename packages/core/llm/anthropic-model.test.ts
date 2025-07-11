@@ -211,7 +211,7 @@ describe('AnthropicModel', () => {
       const schema = { type: 'object', properties: { test: { type: 'string' } } };
 
       mockCreate.mockResolvedValue({
-        content: [{ type: 'text', text: '{"test": "value"}' }]
+        content: [{ type: 'text', text: '<json>{"test": "value"}</json>' }]
       });
 
       const messages: ChatCompletionMessageParam[] = [
@@ -223,19 +223,20 @@ describe('AnthropicModel', () => {
 
       await model.generateObject(messages, schema);
 
-      expect(mockCreate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          system: 'You are a JSON generator\n\nThe current date and time is ' + MOCK_DATE,
-          messages: [
-            { role: 'user', content: 'First request' },
-            { role: 'assistant', content: 'First response' },
-            { 
-              role: 'user', 
-              content: 'Generate JSON\n\nPlease respond with a JSON object that matches this schema:\n' + JSON.stringify(schema, null, 2)
-            }
-          ]
-        })
-      );
+      expect(mockCreate).toHaveBeenCalledWith({
+        model: 'claude-3-5-sonnet-20241022',
+        system: 'You are a JSON generator\n\nThe current date and time is ' + MOCK_DATE,
+        messages: [
+          { role: 'user', content: 'First request' },
+          { role: 'assistant', content: 'First response' },
+          { 
+            role: 'user', 
+            content: 'Generate JSON\n\nPlease respond with a JSON object that matches this schema, wrapped in <json> tags:\n<json>\n' + JSON.stringify(schema, null, 2) + '\n</json>\n\nYour response must contain ONLY the JSON object within the <json> tags, with no additional text or explanation.'
+          }
+        ],
+        temperature: 0,
+        max_tokens: 8192
+      });
     });
 
     it('should throw error when no valid JSON found', async () => {
