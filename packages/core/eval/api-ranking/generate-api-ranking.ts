@@ -2,16 +2,16 @@ import { config } from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import { logMessage } from '../../utils/logs.js';
-import { ConfigLoader, SetupManager, WorkflowRunner, countApiFailures } from '../utils/index.js';
+import { ConfigLoader } from '../utils/config-loader.js';
+import { SetupManager } from '../utils/setup-manager.js';
+import { WorkflowRunner, countApiFailures } from '../utils/workflow-runner.js';
 import { DirectLLMEvaluator } from './direct-llm-evaluator.js';
 
-// Load environment variables
 const envPath = process.cwd().endsWith('packages/core')
     ? path.join(process.cwd(), '../../.env')
     : path.join(process.cwd(), '.env');
 config({ path: envPath });
 
-// Set file-based datastore
 process.env.DATA_STORE_TYPE = 'FILE';
 process.env.DATA_STORE_FILE_PATH = './.api-ranking-data';
 
@@ -37,17 +37,14 @@ async function generateApiRanking(configPath?: string): Promise<void> {
     logMessage('info', '🚀 Starting API Ranking Generator', metadata);
 
     try {
-        // 1. Load configuration
         const configLoader = new ConfigLoader();
         const config = await configLoader.loadApiRankingConfig(configPath);
 
-        // Validate credentials
         const credentialResult = configLoader.validateApiRankingCredentials(config);
         if (!credentialResult.isValid) {
             throw new Error(`Missing credentials: ${credentialResult.missingEnvVars.join(', ')}`);
         }
 
-        // Check competitor API keys
         const directLLMKeys = DirectLLMEvaluator.validateApiKeys();
         const runDirectLLMEval = directLLMKeys.isValid;
 
@@ -60,22 +57,17 @@ async function generateApiRanking(configPath?: string): Promise<void> {
             logMessage('info', '✅ Direct LLM evaluation enabled (ChatGPT & Claude)', metadata);
         }
 
-        // Apply credentials
         const integrations = Object.values(config.integrations);
         configLoader.applyCredentials(integrations, credentialResult.loadedCredentials);
 
-        // 2. Setup test environment
         const setupManager = new SetupManager('./.api-ranking-data', 'api-ranking', 'system');
         const setupResult = await setupManager.setupTestEnvironment(integrations);
 
-        // 3. Initialize evaluators
         const workflowRunner = new WorkflowRunner(setupResult.datastore, 'api-ranking', 'system');
         const directLLMEvaluator = runDirectLLMEval ? new DirectLLMEvaluator() : null;
 
-        // 4. Run workflows and collect results
         const results: ApiRankingResult[] = [];
 
-        // Get workflows to rank
         const workflows = config.workflowsToRank
             .map(id => config.workflows[id])
             .filter(Boolean);
@@ -88,7 +80,6 @@ async function generateApiRanking(configPath?: string): Promise<void> {
                 workflow.integrationIds.includes(i.id)
             );
 
-            // Run Superglue evaluation
             const runResult = await workflowRunner.runWorkflow(
                 workflow,
                 workflowIntegrations,
@@ -100,7 +91,6 @@ async function generateApiRanking(configPath?: string): Promise<void> {
                 }
             );
 
-            // Count API failures from logs
             const apiFailureCount = countApiFailures(runResult.collectedLogs);
 
             logMessage('info',
@@ -108,14 +98,13 @@ async function generateApiRanking(configPath?: string): Promise<void> {
                 metadata
             );
 
-            // Calculate Superglue metrics
             const successfulAttempts = runResult.attempts.filter(a => a.executionSuccess);
             const avgExecutionTime = successfulAttempts.length > 0
                 ? successfulAttempts.reduce((sum, a) => sum + a.executionTime, 0) / successfulAttempts.length
                 : Infinity;
             const avgBuildTime = runResult.attempts.reduce((sum, a) => sum + a.buildTime, 0) / runResult.attempts.length;
 
-            // Run competitor evaluations if API keys are available
+            
             let chatgptSuccessRate = 0;
             let claudeSuccessRate = 0;
 
@@ -144,7 +133,6 @@ async function generateApiRanking(configPath?: string): Promise<void> {
                 }
             }
 
-            // Get the primary integration (first one)
             const primaryIntegration = workflowIntegrations[0];
             const apiName = primaryIntegration?.name || workflow.integrationIds[0];
 
@@ -164,14 +152,11 @@ async function generateApiRanking(configPath?: string): Promise<void> {
             });
         }
 
-        // 5. Sort by score and generate rankings
         results.sort((a, b) => b.superglueScore - a.superglueScore);
 
-        // 6. Generate CSV
         const csvPath = path.join(process.cwd(), 'eval/api-ranking/ranking.csv');
         await generateRankingCsv(results, csvPath);
 
-        // 7. Cleanup
         await setupResult.cleanupFunction();
 
         const totalTime = Date.now() - startTime;

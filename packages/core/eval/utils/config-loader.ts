@@ -170,23 +170,17 @@ export class ConfigLoader {
         defaultFileName: string,
         additionalPaths: string[]
     ): Promise<T> {
-        const __dirname = path.dirname(new URL(import.meta.url).pathname);
+        // Determine which eval type based on the filename
+        const evalType = defaultFileName.includes('api-ranking') ? 'api-ranking' : 'integration-testing';
 
         // Try multiple possible paths for the config file
         const possiblePaths = [
             providedPath,
-            // Source eval directory (where configs actually live)
-            path.join(process.cwd(), 'eval/api-ranking', defaultFileName),
-            path.join(process.cwd(), 'eval/integration-testing', defaultFileName),
-            // When running from compiled dist folder
-            path.join(__dirname, '../../eval/api-ranking', defaultFileName),
-            path.join(__dirname, '../../eval/integration-testing', defaultFileName),
-            path.join(__dirname, '../api-ranking', defaultFileName),
-            path.join(__dirname, '../integration-testing', defaultFileName),
-            path.join(__dirname, defaultFileName),
-            // When running from project root
-            path.join(process.cwd(), ...additionalPaths),
-        ].filter(Boolean) as string[];
+            // When running from root directory
+            path.join(process.cwd(), 'packages/core/eval', evalType, defaultFileName),
+            // When running from core directory
+            path.join(process.cwd(), 'eval', evalType, defaultFileName),
+        ];
 
         let finalConfigPath: string | null = null;
         for (const testPath of possiblePaths) {

@@ -47,7 +47,7 @@ export class AnthropicModel implements LLM {
     async generateObject(messages: ChatCompletionMessageParam[], schema: any, temperature: number = 0): Promise<LLMObjectResponse> {
         const { system, anthropicMessages } = this.convertToAnthropicFormat(messages);
         
-        // Add schema instruction to the last user message
+        // Add schema instruction to the last user message with XML tags for better extraction
         let lastUserIdx = -1;
         for (let i = anthropicMessages.length - 1; i >= 0; i--) {
             if (anthropicMessages[i].role === 'user') {
@@ -57,7 +57,12 @@ export class AnthropicModel implements LLM {
         }
         
         if (lastUserIdx !== -1) {
-            const schemaInstruction = `\n\nPlease respond with a JSON object that matches this schema:\n${JSON.stringify(schema, null, 2)}`;
+            const schemaInstruction = `\n\nPlease respond with a JSON object that matches this schema, wrapped in <json> tags:
+<json>
+${JSON.stringify(schema, null, 2)}
+</json>
+
+Your response must contain ONLY the JSON object within the <json> tags, with no additional text or explanation.`;
             anthropicMessages[lastUserIdx].content += schemaInstruction;
         }
 
@@ -77,13 +82,79 @@ export class AnthropicModel implements LLM {
             .map(block => block.text)
             .join('\n');
 
-        // Extract JSON from the response
-        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) {
-            throw new Error("No valid JSON found in response");
+        // Try multiple extraction strategies
+        let generatedObject: any = null;
+        let extractionError: string | null = null;
+
+        // Strategy 1: Extract from XML tags
+        const xmlMatch = responseText.match(/<json>\s*([\s\S]*?)\s*<\/json>/);
+        if (xmlMatch) {
+            try {
+                generatedObject = JSON.parse(xmlMatch[1]);
+            } catch (e) {
+                extractionError = `Failed to parse JSON from XML tags: ${e}`;
+            }
         }
 
-        const generatedObject = JSON.parse(jsonMatch[0]);
+        // Strategy 2: Extract from code blocks
+        if (!generatedObject) {
+            const codeBlockMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
+            if (codeBlockMatch) {
+                try {
+                    generatedObject = JSON.parse(codeBlockMatch[1]);
+                } catch (e) {
+                    extractionError = `Failed to parse JSON from code block: ${e}`;
+                }
+            }
+        }
+
+        // Strategy 3: Extract largest valid JSON object
+        if (!generatedObject) {
+            // Find all potential JSON objects
+            const jsonMatches = responseText.matchAll(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g);
+            let largestJson: any = null;
+            let largestSize = 0;
+            
+            for (const match of jsonMatches) {
+                try {
+                    const parsed = JSON.parse(match[0]);
+                    const size = JSON.stringify(parsed).length;
+                    if (size > largestSize) {
+                        largestJson = parsed;
+                        largestSize = size;
+                    }
+                } catch (e) {
+                    // Continue trying other matches
+                }
+            }
+            
+            if (largestJson) {
+                generatedObject = largestJson;
+            } else {
+                extractionError = extractionError || "No valid JSON object found in response";
+            }
+        }
+
+        if (!generatedObject) {
+            throw new Error(`JSON extraction failed: ${extractionError}\nResponse: ${responseText.slice(0, 500)}...`);
+        }
+
+        // Validate against schema if provided
+        if (schema) {
+            try {
+                // Basic validation - check required fields
+                if (schema.properties) {
+                    const required = schema.required || [];
+                    for (const field of required) {
+                        if (!(field in generatedObject)) {
+                            throw new Error(`Missing required field: ${field}`);
+                        }
+                    }
+                }
+            } catch (validationError) {
+                throw new Error(`Schema validation failed: ${validationError}`);
+            }
+        }
 
         // Add response to messages history
         const updatedMessages = [...messages, {

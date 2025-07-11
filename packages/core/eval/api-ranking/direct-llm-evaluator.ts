@@ -29,7 +29,6 @@ export class DirectLLMEvaluator {
     private metadata: { orgId: string; userId: string };
 
     constructor(orgId: string = 'competitor-eval', userId: string = 'system') {
-        // Don't initialize models in constructor - wait until they're needed
         this.metadata = { orgId, userId };
     }
 

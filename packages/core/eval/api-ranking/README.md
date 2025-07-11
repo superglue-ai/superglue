@@ -99,13 +99,6 @@ This will:
 6. Calculate scores and generate `ranking.csv`
 7. Clean up the temporary datastore
 
-### Upload Rankings (Optional)
-```bash
-npm run upload-ranking
-```
-
-Uploads the generated `ranking.csv` to the public ranking site.
-
 ## Output
 
 The generated `ranking.csv` contains:
@@ -151,5 +144,3 @@ The system tracks:
 - API call failures (via log analysis)
 - Detailed error messages for debugging
 - LLM code generation success rates
-
-All metrics contribute to understanding the real-world performance of API integrations. 
