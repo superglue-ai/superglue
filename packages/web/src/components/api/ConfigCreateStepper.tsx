@@ -2,24 +2,24 @@
 
 import { useConfig } from '@/src/app/config-context'
 import { useToast } from '@/src/hooks/use-toast'
+import { inputErrorStyles, parseCredentialsHelper, splitUrl } from '@/src/lib/client-utils'
+import { integrations } from '@/src/lib/integrations'
 import { cn, composeUrl } from '@/src/lib/utils'
+import { ApolloClient, gql, InMemoryCache, useSubscription } from '@apollo/client'
+import { GraphQLWsLink } from '@apollo/client/link/subscriptions'
+import { Label } from '@radix-ui/react-label'
 import { ApiConfig, AuthType, CacheMode, SuperglueClient } from '@superglue/client'
+import { createClient } from 'graphql-ws'
 import { Copy, Loader2, Terminal, Upload, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
-import { InteractiveApiPlayground } from './InteractiveApiPlayground'
 import { Button } from '../ui/button'
-import { API_CREATE_STEPS, StepIndicator, type StepperStep } from '../utils/StepIndicator'
-import { Label } from '@radix-ui/react-label'
+import { Input } from '../ui/input'
 import { Textarea } from '../ui/textarea'
 import { HelpTooltip } from '../utils/HelpTooltip'
-import { Input } from '../ui/input'
-import { ApolloClient, gql, InMemoryCache, useSubscription } from '@apollo/client'
-import { createClient } from 'graphql-ws'
-import { GraphQLWsLink } from '@apollo/client/link/subscriptions'
-import { inputErrorStyles, parseCredentialsHelper, splitUrl } from '@/src/lib/client-utils'
-import { integrations } from '@/src/lib/integrations'
+import { API_CREATE_STEPS, StepIndicator, type StepperStep } from '../utils/StepIndicator'
 import { URLField } from '../utils/URLField'
+import { InteractiveApiPlayground } from './InteractiveApiPlayground'
 
 interface ConfigCreateStepperProps {
   configId?: string
@@ -67,11 +67,11 @@ export function ConfigCreateStepper({ configId: initialConfigId, mode = 'create'
       runId
     }
   }
-`  
+`
   const config = useConfig();
 
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({})
-  
+
   const [docFile, setDocFile] = useState<File | null>(null)
   const [isDraggingDoc, setIsDraggingDoc] = useState(false)
 
@@ -120,7 +120,7 @@ export function ConfigCreateStepper({ configId: initialConfigId, mode = 'create'
       }
     }
   })
-  
+
   const handleChange = (field: string) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | string
   ) => {
@@ -129,7 +129,7 @@ export function ConfigCreateStepper({ configId: initialConfigId, mode = 'create'
       ...prev,
       [field]: value
     }))
-    
+
     // Reset hasMappedResponse and mappedResponseData when schema or instruction changes
     if (field === 'responseSchema' || field === 'instruction') {
       setHasMappedResponse(false)
@@ -151,7 +151,7 @@ export function ConfigCreateStepper({ configId: initialConfigId, mode = 'create'
   const handleNext = async () => {
     if (step === 'basic') {
       const errors: Record<string, boolean> = {}
-      
+
       if (!formData.fullUrl) {
         errors.fullUrl = true
       }
@@ -171,10 +171,10 @@ export function ConfigCreateStepper({ configId: initialConfigId, mode = 'create'
         return
       }
       setValidationErrors({})
-      
+
       // Parse the URL when moving to the next step
       const url = splitUrl(formData.fullUrl)
-    
+
       setIsAutofilling(true)
       try {
         const superglueClient = new SuperglueClient({
@@ -207,7 +207,7 @@ export function ConfigCreateStepper({ configId: initialConfigId, mode = 'create'
         setInitialRawResponse(response.data)
 
         // Generate schema based on the raw response
-        
+
         const generatedSchema = await superglueClient.generateSchema(formData.instruction, JSON.stringify(response.data))
         if (generatedSchema) {
           setFormData(prev => ({
@@ -328,12 +328,12 @@ export function ConfigCreateStepper({ configId: initialConfigId, mode = 'create'
         credentials
       }
     }
-    
+
     const command = `curl -X POST "${superglueConfig.superglueEndpoint}/graphql" \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer ${superglueConfig.superglueApiKey}" \\
   -d '${JSON.stringify(graphqlQuery)}'`
-    
+
     return command
   }
 
@@ -423,10 +423,10 @@ const result = await superglue.call({
       const pdfjsLib = await import('pdfjs-dist');
       // Update worker path to use .mjs extension
       pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
-      
+
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      
+
       let fullText = '';
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
@@ -444,10 +444,10 @@ const result = await superglue.call({
   const handleDocDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDraggingDoc(false);
-    
+
     const file = e.dataTransfer.files[0];
     if (!file) return;
-    
+
     try {
       const extractedText = await extractTextFromFile(file);
       setDocFile(file);
@@ -469,7 +469,7 @@ const result = await superglue.call({
   const handleDocFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
     try {
       const extractedText = await extractTextFromFile(file);
       setDocFile(file);
@@ -516,12 +516,12 @@ const result = await superglue.call({
   // Add a new function to handle URL changes from URLField
   const handleUrlChange = (urlHost: string, urlPath: string, queryParams: Record<string, string>) => {
     const fullUrl = urlHost + (urlPath || '')
-    
+
     setFormData(prev => ({
       ...prev,
       fullUrl
     }))
-    
+
     // Auto-fill documentation URL if it's empty
     if (!formData.documentationUrl && urlHost) {
       // Check if URL matches any pattern in integrations
@@ -594,13 +594,13 @@ const result = await superglue.call({
                 <p className="text-sm text-destructive mt-1">API endpoint URL is required</p>
               )}
             </div>
-            
+
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <Label htmlFor="documentationUrl">API Documentation</Label>
                 <HelpTooltip text="Link to the API's documentation or upload a documentation file" />
               </div>
-              
+
               {docFile ? (
                 <div className="flex items-center gap-2">
                   <div className="flex-1 flex items-center gap-3 bg-blue-500/10 px-4 py-2 rounded-lg max-w-[calc(100%-5.5rem)]">
@@ -628,7 +628,7 @@ const result = await superglue.call({
                     placeholder="https://docs.example.com"
                     className="flex-1"
                   />
-                  <div 
+                  <div
                     className={cn(
                       "relative shrink-0",
                       isDraggingDoc && "after:absolute after:inset-0 after:bg-primary/5 after:backdrop-blur-[1px] after:rounded-lg after:border-2 after:border-primary"
@@ -655,7 +655,7 @@ const result = await superglue.call({
                 </div>
               )}
             </div>
-            
+
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <Label htmlFor="auth">API Key or Token (Optional)</Label>
@@ -668,7 +668,7 @@ const result = await superglue.call({
                 placeholder="Enter your API key or token"
               />
             </div>
-            
+
             <div className="mt-6">
               <div className="flex items-center gap-2 mb-1">
                 <Label htmlFor="instruction">What do you want to get from this API?</Label>
@@ -700,7 +700,7 @@ const result = await superglue.call({
 
         {step === 'try_and_output' && configId && (
           <div className="space-y-2 h-full">
-            <InteractiveApiPlayground 
+            <InteractiveApiPlayground
               configId={configId}
               instruction={formData.instruction}
               onInstructionChange={handleChange('instruction')}
@@ -728,7 +728,7 @@ const result = await superglue.call({
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-medium">Try the endpoint locally with curl: </p>
                     <Button
-                      variant="ghost" 
+                      variant="ghost"
                       size="icon"
                       className="h-8 w-8 flex-none"
                       onClick={() => {
@@ -746,7 +746,7 @@ const result = await superglue.call({
                 </div>
               </div>
             </div>
-            
+
             <div className="rounded-md bg-muted p-4">
               <div className="flex items-start space-x-2">
                 <Terminal className="mt-0.5 h-5 w-5 text-muted-foreground shrink-0" />
@@ -754,7 +754,7 @@ const result = await superglue.call({
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-medium">Or use the TypeScript SDK in your application: </p>
                     <Button
-                      variant="ghost" 
+                      variant="ghost"
                       size="icon"
                       className="h-8 w-8 flex-none"
                       onClick={() => {
@@ -810,7 +810,7 @@ const result = await superglue.call({
             </div>
           </>
         ) : (
-          <>  
+          <>
             <Button
               variant="outline"
               onClick={handleBack}
@@ -819,39 +819,39 @@ const result = await superglue.call({
               Back
             </Button>
             <div className='flex gap-2'>
-            { step === 'basic' && 
-                      <Button
-                      variant="outline"
-                      onClick={handleManualCreate}
-                    >
-                      Manual Configuration
-                    </Button>
-            }
-            <Button
-              onClick={step === 'try_and_output' && !mappedResponseData ? handleRun : handleNext}
-              disabled={isAutofilling || (step === 'try_and_output' && !mappedResponseData && isRunning)}
-              className="animate-pulse"
-            >
-              {isAutofilling ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {latestLog ? latestLog?.split(' ').slice(0,4).join(' ').slice(0,30) + '...' : 'Creating configuration...'}
-                </>
-              ) : (
-                step === 'try_and_output' ? 
-                  (isRunning ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {latestLog ? latestLog?.split(' ').slice(0,4).join(' ').slice(0,30) + '...' : 'Creating transformation...'}
-                    </>
-                  ) : (!mappedResponseData ? (
-                    <>
-                      <span>✨ Run</span>
-                    </>
-                  ) : 'Complete')) : 
-                  'Next'
-              )}
-            </Button>
+              {step === 'basic' &&
+                <Button
+                  variant="outline"
+                  onClick={handleManualCreate}
+                >
+                  Manual Configuration
+                </Button>
+              }
+              <Button
+                onClick={step === 'try_and_output' && !mappedResponseData ? handleRun : handleNext}
+                disabled={isAutofilling || (step === 'try_and_output' && !mappedResponseData && isRunning)}
+                className="animate-pulse"
+              >
+                {isAutofilling ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {latestLog ? latestLog?.split(' ').slice(0, 4).join(' ').slice(0, 30) + '...' : 'Creating configuration...'}
+                  </>
+                ) : (
+                  step === 'try_and_output' ?
+                    (isRunning ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        {latestLog ? latestLog?.split(' ').slice(0, 4).join(' ').slice(0, 30) + '...' : 'Creating transformation...'}
+                      </>
+                    ) : (!mappedResponseData ? (
+                      <>
+                        <span>✨ Run</span>
+                      </>
+                    ) : 'Complete')) :
+                    'Next'
+                )}
+              </Button>
             </div>
           </>
         )}

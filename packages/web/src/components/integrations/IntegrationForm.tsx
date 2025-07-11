@@ -15,7 +15,7 @@ import { cn, composeUrl } from '@/src/lib/utils';
 import type { Integration } from '@superglue/client';
 import { SuperglueClient } from '@superglue/client';
 import { waitForIntegrationProcessing } from '@superglue/shared/utils';
-import { Check, ChevronsUpDown, Globe } from 'lucide-react';
+import { Check, ChevronRight, ChevronsUpDown, Globe } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 
 export interface IntegrationFormProps {
@@ -56,7 +56,7 @@ export function IntegrationForm({
         : 'custom';
     const [selectedIntegration, setSelectedIntegration] = useState<string>(initialSelected);
     const [integrationDropdownOpen, setIntegrationDropdownOpen] = useState(false);
-    const [id, setId] = useState(integration?.id || '');
+    const [id, setId] = useState(integration?.id || initialSelected);
     const [urlHost, setUrlHost] = useState(integration?.urlHost || '');
     const [urlPath, setUrlPath] = useState(integration?.urlPath || '');
     const [documentationUrl, setDocumentationUrl] = useState(integration?.documentationUrl || '');
@@ -66,7 +66,7 @@ export function IntegrationForm({
         integration?.credentials ? JSON.stringify(integration.credentials, null, 2) : '{}'
     );
     const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
-    const [hasUploadedFile, setHasUploadedFile] = useState(false);
+    const [showAdvanced, setShowAdvanced] = useState(false);
     const urlFieldRef = useRef<any>(null);
     const isEditing = !!integration;
     const config = useConfig();
@@ -77,27 +77,10 @@ export function IntegrationForm({
         apiKey: config.superglueApiKey,
     }), [config.superglueEndpoint, config.superglueApiKey]);
 
-    const { waitForIntegrationReady } = useMemo(() => ({
-        waitForIntegrationReady: (integrationIds: string[]) => {
-            // Create adapter for SuperglueClient to work with shared utility
-            const clientAdapter = {
-                getIntegration: (id: string) => client.getIntegration(id)
-            };
-            return waitForIntegrationProcessing(clientAdapter, integrationIds);
-        }
-    }), [client]);
-
-    // Function to immediately save integration when file is uploaded
-    const handleFileUpload = async (extractedText: string) => {
-        // Update local form state immediately
-        setDocumentation(extractedText);
-        setDocumentationUrl(''); // Clear URL when uploading file
-        setHasUploadedFile(true);
-    };
+    
 
     const handleIntegrationSelect = (value: string) => {
         setSelectedIntegration(value);
-        setHasUploadedFile(false); // Reset uploaded file state
 
         if (value === 'custom') {
             setUrlHost('');
@@ -105,6 +88,10 @@ export function IntegrationForm({
             setDocumentationUrl('');
             setDocumentation('');
             setSpecificInstructions('');
+            // Set custom as ID if not editing
+            if (!isEditing) {
+                setId('custom');
+            }
             return;
         }
 
@@ -127,9 +114,9 @@ export function IntegrationForm({
             setDocumentationUrl(integrationTemplate.docsUrl || '');
             setDocumentation('');
             setSpecificInstructions('');
-            // Only set ID for new integrations, preserve existing ID when editing
+            // Always set ID to dropdown value for new integrations
             if (!isEditing) {
-                setId(sanitizeIntegrationId(urlHost));
+                setId(value);
             }
         }
     };
@@ -137,9 +124,7 @@ export function IntegrationForm({
     const handleUrlChange = (host: string, path: string) => {
         setUrlHost(host);
         setUrlPath(path);
-        if (!id) {
-            setId(sanitizeIntegrationId(host));
-        }
+        // Don't auto-update ID anymore - user should manually change if needed
     };
 
     const handleSubmit = async () => {
@@ -147,6 +132,16 @@ export function IntegrationForm({
         if (!id.trim()) errors.id = true;
         if (!urlHost.trim()) errors.urlHost = true;
         if (specificInstructions.length > 2000) errors.specificInstructions = true;
+
+        // Validate documentation URL if provided
+        if (documentationUrl.trim()) {
+            try {
+                new URL(documentationUrl.trim());
+            } catch {
+                errors.documentationUrl = true;
+            }
+        }
+
         setValidationErrors(errors);
         if (Object.keys(errors).length > 0) return;
         let creds = {};
@@ -178,7 +173,7 @@ export function IntegrationForm({
             </CardHeader>
             <CardContent className={modal ? "p-6 space-y-3 border-0" : "p-4 space-y-3"}>
                 <div>
-                    <Label htmlFor="integrationSelect">Integration</Label>
+                    <Label htmlFor="integrationSelect">Integration Type</Label>
                     <HelpTooltip text="Select from known integrations or choose custom for any other API." />
                     <Popover open={integrationDropdownOpen} onOpenChange={setIntegrationDropdownOpen}>
                         <PopoverTrigger asChild>
@@ -276,58 +271,9 @@ export function IntegrationForm({
                         ref={urlFieldRef}
                         url={composeUrl(urlHost, urlPath) || ''}
                         onUrlChange={handleUrlChange}
+                        error={validationErrors.urlHost}
                     />
                     {validationErrors.urlHost && <p className="text-sm text-destructive mt-1">API Endpoint is required.</p>}
-                </div>
-                <div>
-                    <Label htmlFor="integrationId">Integration ID*</Label>
-                    <HelpTooltip text="A unique identifier for this integration within the workflow (e.g., 'crm', 'productApi')." />
-                    <Input
-                        id="integrationId"
-                        value={id || ''}
-                        onChange={e => setId(e.target.value)}
-                        placeholder="e.g., crm-api"
-                        className={cn(validationErrors.id && inputErrorStyles)}
-                        disabled={isEditing}
-                    />
-                    {validationErrors.id && <p className="text-sm text-destructive mt-1">Integration ID is required and must be unique.</p>}
-                </div>
-                <div>
-                    <Label htmlFor="documentation">Documentation</Label>
-                    <HelpTooltip text="You can either paste a documentation URL, paste relevant parts of the documentation manually or upload a file." />
-                    <DocumentationField
-                        url={documentationUrl || ''}
-                        content={documentation || ''}
-                        onUrlChange={setDocumentationUrl}
-                        onContentChange={setDocumentation}
-                        onFileUpload={handleFileUpload}
-                        hasUploadedFile={hasUploadedFile}
-                    />
-                </div>
-                <div>
-                    <Label htmlFor="specificInstructions">Specific Instructions</Label>
-                    <HelpTooltip text="Provide specific guidance on how to use this integration (e.g., rate limits, special endpoints, authentication details). Max 2000 characters." />
-                    <div className="relative">
-                        <Textarea
-                            id="specificInstructions"
-                            value={specificInstructions}
-                            onChange={e => setSpecificInstructions(e.target.value)}
-                            placeholder="e.g. always use pagination with max 50 items per page"
-                            className={cn(
-                                'min-h-[100px] pr-16',
-                                validationErrors.specificInstructions && inputErrorStyles
-                            )}
-                            maxLength={2000}
-                        />
-                        <div className="absolute bottom-2 right-2 text-xs text-muted-foreground">
-                            {specificInstructions.length}/2000
-                        </div>
-                    </div>
-                    {validationErrors.specificInstructions && (
-                        <p className="text-sm text-destructive mt-1">
-                            Specific instructions must be 2000 characters or less.
-                        </p>
-                    )}
                 </div>
                 <div>
                     <Label htmlFor="credentials">Credentials</Label>
@@ -341,6 +287,77 @@ export function IntegrationForm({
                     </div>
                     {validationErrors.credentials && <p className="text-sm text-destructive mt-1">Credentials must be valid JSON.</p>}
                 </div>
+                <div>
+                    <button
+                        type="button"
+                        onClick={() => setShowAdvanced(!showAdvanced)}
+                        className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                        <ChevronRight
+                            className={cn(
+                                "h-4 w-4 transition-transform",
+                                showAdvanced && "rotate-90"
+                            )}
+                        />
+                        Advanced Options
+                    </button>
+                </div>
+                {showAdvanced && (
+                    <>
+                        {!isEditing && (
+                            <div>
+                                <Label htmlFor="integrationId">Custom Integration ID*</Label>
+                                <HelpTooltip text="A unique identifier for this integration within the workflow (e.g., 'crm', 'productApi')." />
+                                <Input
+                                    id="integrationId"
+                                    value={id || ''}
+                                    onChange={e => setId(e.target.value)}
+                                    placeholder="e.g., crm-api"
+                                    className={cn(validationErrors.id && inputErrorStyles)}
+                                />
+                                {validationErrors.id && <p className="text-sm text-destructive mt-1">Integration ID is required and must be unique.</p>}
+                            </div>
+                        )}
+                        <div>
+                            <Label htmlFor="documentation">Documentation URL</Label>
+                            <HelpTooltip text="Link to the API's documentation (e.g., https://docs.example.com/api)" />
+                            <DocumentationField
+                                url={documentationUrl || ''}
+                                onUrlChange={setDocumentationUrl}
+                                placeholder="https://docs.example.com/api"
+                                error={validationErrors.documentationUrl}
+                            />
+                            {validationErrors.documentationUrl && (
+                                <p className="text-sm text-destructive mt-1">Please enter a valid URL</p>
+                            )}
+                        </div>
+                        <div>
+                            <Label htmlFor="specificInstructions">Instructions</Label>
+                            <HelpTooltip text="Provide specific guidance on how to use this integration (e.g., rate limits, special endpoints, authentication details). Max 2000 characters." />
+                            <div className="relative">
+                                <Textarea
+                                    id="specificInstructions"
+                                    value={specificInstructions}
+                                    onChange={e => setSpecificInstructions(e.target.value)}
+                                    placeholder="e.g. always use pagination with max 50 items per page"
+                                    className={cn(
+                                        'min-h-[100px] pr-16',
+                                        validationErrors.specificInstructions && inputErrorStyles
+                                    )}
+                                    maxLength={2000}
+                                />
+                                <div className="absolute bottom-2 right-2 text-xs text-muted-foreground">
+                                    {specificInstructions.length}/2000
+                                </div>
+                            </div>
+                            {validationErrors.specificInstructions && (
+                                <p className="text-sm text-destructive mt-1">
+                                    Specific instructions must be 2000 characters or less.
+                                </p>
+                            )}
+                        </div>
+                    </>
+                )}
                 <div className="flex justify-end gap-2 pt-2">
                     <Button variant="outline" onClick={onCancel}>Cancel</Button>
                     <Button onClick={handleSubmit}>

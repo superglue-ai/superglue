@@ -1,6 +1,6 @@
-"use client" 
+"use client"
 
-import React from 'react';
+import { useConfig } from '@/src/app/config-context';
 import {
   Table,
   TableBody,
@@ -9,9 +9,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/src/components/ui/table";
-import { RunResult } from '@superglue/client';
-import { useConfig } from '@/src/app/config-context';
-import { SuperglueClient } from '@superglue/client';
+import { RunResult, SuperglueClient } from '@superglue/client';
+import React from 'react';
 
 const RunsTable = ({ id }: { id?: string }) => {
   const [runs, setRuns] = React.useState<RunResult[]>([]);
@@ -22,7 +21,7 @@ const RunsTable = ({ id }: { id?: string }) => {
 
   React.useEffect(() => {
     const getRuns = async () => {
-      try { 
+      try {
         const superglueClient = new SuperglueClient({
           endpoint: config.superglueEndpoint,
           apiKey: config.superglueApiKey
@@ -46,14 +45,14 @@ const RunsTable = ({ id }: { id?: string }) => {
   return (
     <div className="flex-1 overflow-auto">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">API Runs</h1>
+        <h1 className="text-2xl font-bold">Workflow Runs</h1>
       </div>
 
       <div className="border rounded-lg">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>API Id</TableHead>
+              <TableHead>Workflow Id</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Started At</TableHead>
               <TableHead>Completed At</TableHead>
@@ -65,9 +64,8 @@ const RunsTable = ({ id }: { id?: string }) => {
               <TableRow key={run.id}>
                 <TableCell className="font-medium">{run.config?.id ?? "undefined"}</TableCell>
                 <TableCell>
-                  <span className={`px-2 py-1 rounded-full text-sm ${
-                    run.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                  }`}>
+                  <span className={`px-2 py-1 rounded-full text-sm font-medium ${run.success ? 'bg-emerald-500 text-white' : 'bg-red-600 text-white'
+                    }`}>
                     {run.success ? 'Success' : 'Failed'}
                   </span>
                 </TableCell>

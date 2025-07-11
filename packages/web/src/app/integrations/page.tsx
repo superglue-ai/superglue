@@ -93,16 +93,30 @@ export default function IntegrationsPage() {
         } catch (error) {
             console.error('Error deleting integration:', error);
             toast({
-                title: 'Error Deleting Integration',
-                description: error instanceof Error ? error.message : 'Failed to delete integration',
+                title: 'Error',
+                description: 'Failed to delete integration',
                 variant: 'destructive',
             });
         }
     };
 
-    const handleEdit = (integration: Integration) => {
-        setEditingIntegration(integration);
-        setAddFormOpen(true);
+    const handleEdit = async (integration: Integration) => {
+        try {
+            // Show loading state with partial data first
+            setEditingIntegration(integration);
+            setAddFormOpen(true);
+
+            // Fetch full integration with documentation
+            const fullIntegration = await client.getIntegration(integration.id);
+            setEditingIntegration(fullIntegration);
+        } catch (error) {
+            console.error('Error fetching integration details:', error);
+            toast({
+                title: 'Error',
+                description: 'Failed to load integration details',
+                variant: 'destructive',
+            });
+        }
     };
     const handleAdd = () => {
         setEditingIntegration(null);
@@ -120,7 +134,6 @@ export default function IntegrationsPage() {
                 const needsDocFetch = needsUIToTriggerDocFetch(savedIntegration, editingIntegration);
 
                 if (needsDocFetch) {
-                    // Set pending state for new integrations with doc URLs
                     setPendingDocIds(prev => new Set([...prev, savedIntegration.id]));
 
                     // Fire-and-forget poller for background doc fetch
@@ -134,18 +147,17 @@ export default function IntegrationsPage() {
                     });
                 }
 
-                // Refresh integrations to ensure UI is updated
+                setEditingIntegration(null);
+                setAddFormOpen(false);
                 await refreshIntegrations();
             }
         } catch (error) {
             console.error('Error saving integration:', error);
             toast({
-                title: 'Error Saving Integration',
-                description: error instanceof Error ? error.message : 'Failed to save integration',
+                title: 'Error',
+                description: 'Failed to save integration',
                 variant: 'destructive',
             });
-        } finally {
-            handleModalClose();
         }
     };
 
@@ -191,12 +203,6 @@ export default function IntegrationsPage() {
                 }, UpsertMode.UPDATE);
 
                 setPendingDocIds(prev => new Set([...prev].filter(id => id !== integrationId)));
-
-                toast({
-                    title: 'Refresh Failed',
-                    description: `Failed to refresh documentation for "${integrationId}".`,
-                    variant: 'destructive',
-                });
             }
 
         } catch (error) {
@@ -220,32 +226,13 @@ export default function IntegrationsPage() {
             }
 
             setPendingDocIds(prev => new Set([...prev].filter(id => id !== integrationId)));
-
-            toast({
-                title: 'Refresh Failed',
-                description: `Failed to refresh documentation for "${integrationId}".`,
-                variant: 'destructive',
-            });
         }
     };
 
     // Helper function to determine if integration has documentation
     const hasDocumentation = (integration: Integration) => {
-        // Check for direct documentation content or URL
-        const hasDirectDocs = !!(integration.documentation || integration.documentationUrl);
-
-        // For direct doc upload scenarios, if there's documentation content, consider it available
-        // even if documentationPending might be true (since it's already uploaded)
-        if (integration.documentation && integration.documentation.trim()) {
-            return true;
-        }
-
-        // For URL-based docs, check if not pending and has URL
-        if (integration.documentationUrl && !pendingDocIds.has(integration.id)) {
-            return true;
-        }
-
-        return hasDirectDocs;
+        // Check if integration has documentation URL and is not pending
+        return !!(integration.documentationUrl?.trim() && !pendingDocIds.has(integration.id));
     };
 
     // Helper to get icon for integration
@@ -256,6 +243,7 @@ export default function IntegrationsPage() {
         );
         return match ? getSimpleIcon(match.icon) : null;
     }
+
 
     const handleRefresh = async () => {
         setIsRefreshing(true);

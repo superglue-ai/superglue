@@ -79,14 +79,25 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations,
 
   // Find matching integration based on integrationId or urlHost
   const linkedIntegration = integrations?.find(integration => {
-    // First try direct ID match
-    if (editedStep.integrationId && integration.id === editedStep.integrationId) {
+    // First try direct ID match from both editedStep and original step
+    if ((editedStep.integrationId && integration.id === editedStep.integrationId) ||
+      (step.integrationId && integration.id === step.integrationId)) {
       return true;
     }
     // Fallback to URL host matching
     return step.apiConfig?.urlHost && integration.urlHost &&
       step.apiConfig.urlHost.includes(integration.urlHost.replace(/^https?:\/\//, ''));
   });
+
+  // Sync integrationId with linked integration
+  useEffect(() => {
+    if (linkedIntegration && !editedStep.integrationId) {
+      setEditedStep(prev => ({
+        ...prev,
+        integrationId: linkedIntegration.id
+      }));
+    }
+  }, [linkedIntegration, editedStep.integrationId, step.integrationId]);
   return (
     <div className="flex flex-col items-center">
       <Card className={cn("w-full", isEditing ? "border-primary" : "bg-muted/50")}>
@@ -169,11 +180,21 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations,
               <div className="space-y-2">
                 <div>
                   <Label className="text-xs flex items-center gap-1">
+                    Step Instruction
+                    <HelpTooltip text="AI-generated instruction for this step. This describes what the step does and how it should behave." />
+                  </Label>
+                  <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded mt-1">
+                    {editedStep.apiConfig.instruction || <span className="italic">No instruction provided</span>}
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="text-xs flex items-center gap-1">
                     Integration
                     <HelpTooltip text="Link this step to an integration to reuse authentication credentials and base URLs. Leave empty to use manual API configuration." />
                   </Label>
                   <Select
-                    value={editedStep.integrationId || "none"}
+                    value={linkedIntegration?.id || editedStep.integrationId || step.integrationId || "none"}
                     onValueChange={(value) => {
                       if (value === "CREATE_NEW") {
                         onCreateIntegration?.();
