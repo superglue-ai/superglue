@@ -11,14 +11,13 @@ import { ArrowRight, Check, ChevronRight, FileText, Globe, Loader2, Pencil, Play
 import { useRouter } from 'next/navigation';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Editor from 'react-simple-code-editor';
 import type { SimpleIcon } from 'simple-icons';
 import * as simpleIcons from 'simple-icons';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { Switch } from '../ui/switch';
 import { Textarea } from '../ui/textarea';
 import { DocStatus } from '../utils/DocStatusSpinner';
 import { HelpTooltip } from '../utils/HelpTooltip';
@@ -114,8 +113,16 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     }
   }), [client]);
 
-  // Track previous pending IDs to detect completion
-  const previousPendingIdsRef = useRef<Set<string>>(new Set());
+  // Clear execution results when navigating away from review step
+  useEffect(() => {
+    // Don't clear on initial mount or when entering review
+    if (step !== 'review') {
+      setExecutionResult(null);
+      setFinalResult(null);
+      setExecutionError(null);
+      setActiveTab('results'); // Reset to default tab
+    }
+  }, [step]);
 
   // Create integration options array with custom option first
   const integrationOptions = [
@@ -171,21 +178,8 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
 
   // Helper function to determine if integration has documentation
   const hasDocumentation = (integration: Integration) => {
-    // Check for direct documentation content or URL
-    const hasDirectDocs = !!(integration.documentation || integration.documentationUrl);
-
-    // For direct doc upload scenarios, if there's documentation content, consider it available
-    // even if documentationPending might be true (since it's already uploaded)
-    if (integration.documentation && integration.documentation.trim()) {
-      return true;
-    }
-
-    // For URL-based docs, check if not pending and has URL
-    if (integration.documentationUrl && !pendingDocIds.has(integration.id)) {
-      return true;
-    }
-
-    return hasDirectDocs;
+    // Check if integration has documentation URL and is not pending
+    return !!(integration.documentationUrl?.trim() && !pendingDocIds.has(integration.id));
   };
 
   // Function to refresh documentation for a specific integration
@@ -300,6 +294,26 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     setIntegrationFormEdit(null);
   };
 
+  // Function to fetch full integration data before editing
+  const handleEditIntegration = async (integration: Integration) => {
+    try {
+      // Fetch full integration with documentation
+      const fullIntegration = await client.getIntegration(integration.id);
+      setIntegrationFormEdit(fullIntegration);
+      setShowIntegrationForm(true);
+    } catch (error) {
+      console.error('Error fetching integration:', error);
+      toast({
+        title: 'Error Loading Integration',
+        description: 'Failed to load integration details. Please try again.',
+        variant: 'destructive',
+      });
+      // Fall back to using the partial integration data
+      setIntegrationFormEdit(integration);
+      setShowIntegrationForm(true);
+    }
+  };
+
   // --- Step Navigation ---
   const handleNext = async () => {
     const steps: WorkflowCreateStep[] = ['integrations', 'prompt', 'review', 'success'];
@@ -369,7 +383,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         if (response.inputSchema) {
           try {
             const defaultValues = generateDefaultFromSchema(response.inputSchema);
-            if (defaultValues.payload !== undefined) {
+            if (defaultValues.payload !== undefined && defaultValues.payload !== null) {
               setPayload(JSON.stringify(defaultValues.payload, null, 2));
             } else {
               setPayload('{}');
@@ -451,12 +465,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     if (step === 'integrations') {
       router.push('/configs');
       return;
-    }
-
-    if (step === 'review') {
-      setExecutionResult(null);
-      setFinalResult(null);
-      setExecutionError(null);
     }
 
     if (currentIndex > 0) {
@@ -622,19 +630,11 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
           {/* Step 1: Integrations */}
           {step === 'integrations' && (
             <div className="space-y-4">
-              <div className="mb-4">
-                <h3 className="mb-2 font-medium">
+              <div className="mb-4 flex items-center justify-between gap-4 px-4">
+                <h3 className="font-medium">
                   Select one or more integrations to use in your workflow. You can add new integrations as needed.
                 </h3>
-              </div>
-              <div className="mb-2 flex gap-2 items-center">
-                <Input
-                  placeholder="Search integrations..."
-                  value={integrationSearch}
-                  onChange={e => setIntegrationSearch(e.target.value)}
-                  className="w-full"
-                />
-                <Button variant="outline" size="sm" className="h-9" onClick={() => setShowIntegrationForm(true)}>
+                <Button variant="outline" size="sm" className="h-9 shrink-0" onClick={() => setShowIntegrationForm(true)}>
                   <Plus className="mr-2 h-4 w-4" /> Add Integration
                 </Button>
               </div>
@@ -650,14 +650,52 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                 ) : (
                   <div className="gap-2 flex flex-col">
                     {/* Header row */}
-                    <div className="flex items-center justify-between px-2 py-2 text-sm font-medium text-foreground border-b">
-                      <span>Integration</span>
+                    <div className="flex items-center justify-between px-4 py-2 text-sm font-medium text-foreground border-b gap-4">
+                      <Input
+                        placeholder="Search integrations..."
+                        value={integrationSearch}
+                        onChange={e => setIntegrationSearch(e.target.value)}
+                        className="h-8 text-sm flex-1"
+                      />
                       <div className="flex items-center gap-2">
-                        <span>Selected</span>
-                        <Button
-                          variant="default"
-                          size="icon"
-                          className="h-4 w-4 p-0"
+                        {(() => {
+                          const filteredIntegrations = integrations.filter(sys =>
+                            integrationSearch === '' ||
+                            sys.id.toLowerCase().includes(integrationSearch.toLowerCase()) ||
+                            sys.urlHost.toLowerCase().includes(integrationSearch.toLowerCase()) ||
+                            sys.urlPath.toLowerCase().includes(integrationSearch.toLowerCase())
+                          );
+                          const filteredIds = filteredIntegrations.map(i => i.id);
+                          const selectedCount = filteredIds.filter(id => selectedIntegrationIds.includes(id)).length;
+                          const allSelected = filteredIds.length > 0 && selectedCount === filteredIds.length;
+
+                          return (
+                            <span className="text-xs text-muted-foreground">
+                              {allSelected || selectedCount > 0 ? 'Unselect all' : 'Select all'}
+                            </span>
+                          );
+                        })()}
+                        <button
+                          className={cn(
+                            "h-5 w-5 rounded border-2 transition-all duration-200 flex items-center justify-center",
+                            (() => {
+                              const filteredIntegrations = integrations.filter(sys =>
+                                integrationSearch === '' ||
+                                sys.id.toLowerCase().includes(integrationSearch.toLowerCase()) ||
+                                sys.urlHost.toLowerCase().includes(integrationSearch.toLowerCase()) ||
+                                sys.urlPath.toLowerCase().includes(integrationSearch.toLowerCase())
+                              );
+                              const filteredIds = filteredIntegrations.map(i => i.id);
+                              const selectedCount = filteredIds.filter(id => selectedIntegrationIds.includes(id)).length;
+                              const allSelected = filteredIds.length > 0 && selectedCount === filteredIds.length;
+                              const someSelected = selectedCount > 0 && selectedCount < filteredIds.length;
+
+                              if (allSelected || someSelected) {
+                                return "bg-primary border-primary";
+                              }
+                              return "bg-background border-input hover:border-primary/50";
+                            })()
+                          )}
                           onClick={() => {
                             const filteredIntegrations = integrations.filter(sys =>
                               integrationSearch === '' ||
@@ -666,9 +704,10 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                               sys.urlPath.toLowerCase().includes(integrationSearch.toLowerCase())
                             );
                             const filteredIds = filteredIntegrations.map(i => i.id);
-                            const allSelected = filteredIds.length > 0 && filteredIds.every(id => selectedIntegrationIds.includes(id));
+                            const selectedCount = filteredIds.filter(id => selectedIntegrationIds.includes(id)).length;
+                            const allSelected = filteredIds.length > 0 && selectedCount === filteredIds.length;
 
-                            if (allSelected) {
+                            if (allSelected || selectedCount > 0) {
                               // Unselect all filtered
                               setSelectedIntegrationIds(ids => ids.filter(id => !filteredIds.includes(id)));
                             } else {
@@ -685,20 +724,30 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                               sys.urlPath.toLowerCase().includes(integrationSearch.toLowerCase())
                             );
                             const filteredIds = filteredIntegrations.map(i => i.id);
-                            const allSelected = filteredIds.length > 0 && filteredIds.every(id => selectedIntegrationIds.includes(id));
-                            return allSelected ? <Check className="h-2 w-2" /> : <div className="h-2 w-2" />;
+                            const selectedCount = filteredIds.filter(id => selectedIntegrationIds.includes(id)).length;
+                            const allSelected = filteredIds.length > 0 && selectedCount === filteredIds.length;
+                            const someSelected = selectedCount > 0 && selectedCount < filteredIds.length;
+
+                            if (allSelected) {
+                              return <Check className="h-3 w-3 text-primary-foreground" />;
+                            } else if (someSelected) {
+                              return <div className="h-0.5 w-2.5 bg-primary-foreground" />;
+                            }
+                            return null;
                           })()}
-                        </Button>
+                        </button>
                       </div>
                     </div>
                     {selectedIntegrationIds.length === 0 && integrations.length > 0 && (
-                      <div className="text-xs text-amber-800 dark:text-amber-300 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded whitespace-nowrap mx-4 mt-2">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                          <line x1="12" y1="9" x2="12" y2="13" />
-                          <line x1="12" y1="17" x2="12.01" y2="17" />
-                        </svg>
-                        Select at least one integration
+                      <div className="mx-4">
+                        <div className="text-xs text-amber-800 dark:text-amber-300 flex items-center gap-1.5 bg-amber-500/10 py-2 px-4 rounded-md">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                            <line x1="12" y1="9" x2="12" y2="13" />
+                            <line x1="12" y1="17" x2="12.01" y2="17" />
+                          </svg>
+                          Select at least one integration to continue
+                        </div>
                       </div>
                     )}
                     {integrations
@@ -714,11 +763,18 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                           <div
                             key={sys.id}
                             className={cn(
-                              "flex items-center justify-between rounded-md px-4 py-3 transition-colors",
+                              "flex items-center justify-between rounded-md px-4 py-3 transition-all duration-200 cursor-pointer",
                               selected
-                                ? "hover:bg-accent/50 border border-[#ffffff/10]"
-                                : "hover:bg-accent/50 border border-transparent"
+                                ? "bg-primary/10 dark:bg-primary/40 border border-primary/50 dark:border-primary/60 hover:bg-primary/15 dark:hover:bg-primary/25"
+                                : "bg-background border border-transparent hover:bg-accent/50 hover:border-border"
                             )}
+                            onClick={() => {
+                              if (selected) {
+                                setSelectedIntegrationIds(ids => ids.filter(i => i !== sys.id));
+                              } else {
+                                setSelectedIntegrationIds(ids => [...ids, sys.id]);
+                              }
+                            }}
                           >
                             <div className="flex items-center gap-3 flex-1 min-w-0">
                               {(() => {
@@ -740,7 +796,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                               })()}
                               <div className="flex flex-col min-w-0">
                                 <span className="font-medium truncate max-w-[200px]">{sys.id}</span>
-                                <span className="text-xs text-foreground truncate max-w-[240px]">
+                                <span className="text-xs text-muted-foreground truncate max-w-[240px]">
                                   {composeUrl(sys.urlHost, sys.urlPath)}
                                 </span>
                               </div>
@@ -763,25 +819,31 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                                 className="h-8 w-8 text-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
                                 onClick={e => {
                                   e.stopPropagation();
-                                  setIntegrationFormEdit(sys);
-                                  setShowIntegrationForm(true);
+                                  handleEditIntegration(sys);
                                 }}
                                 disabled={pendingDocIds.has(sys.id)}
                                 title={pendingDocIds.has(sys.id) ? "Documentation is being processed" : "Edit integration"}
                               >
                                 <Pencil className="h-4 w-4" />
                               </Button>
-                              <Switch
-                                className="custom-switch"
-                                checked={selected}
-                                onCheckedChange={(checked) => {
-                                  if (checked) {
-                                    setSelectedIntegrationIds(ids => [...ids, sys.id]);
-                                  } else {
+                              <button
+                                className={cn(
+                                  "h-5 w-5 rounded border-2 transition-all duration-200 flex items-center justify-center",
+                                  selected
+                                    ? "bg-primary border-primary"
+                                    : "bg-background border-input hover:border-primary/50"
+                                )}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (selected) {
                                     setSelectedIntegrationIds(ids => ids.filter(i => i !== sys.id));
+                                  } else {
+                                    setSelectedIntegrationIds(ids => [...ids, sys.id]);
                                   }
                                 }}
-                              />
+                              >
+                                {selected && <Check className="h-3 w-3 text-primary-foreground" />}
+                              </button>
                             </div>
                           </div>
                         );

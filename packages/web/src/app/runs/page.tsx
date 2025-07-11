@@ -1,7 +1,6 @@
 "use client"
 
-import React from 'react';
-import { useRouter } from 'next/navigation';
+import { Button } from '@/src/components/ui/button';
 import {
   Table,
   TableBody,
@@ -10,10 +9,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/src/components/ui/table";
-import { RunResult } from '@superglue/client';
+import { RunResult, SuperglueClient } from '@superglue/client';
+import { useRouter } from 'next/navigation';
+import React from 'react';
 import { useConfig } from '../config-context';
-import { SuperglueClient } from '@superglue/client';
-import { Button } from '@/src/components/ui/button';
 
 const RunsTable = () => {
   const router = useRouter();
@@ -25,7 +24,7 @@ const RunsTable = () => {
 
   React.useEffect(() => {
     const getRuns = async () => {
-      try { 
+      try {
         const superglueClient = new SuperglueClient({
           endpoint: config.superglueEndpoint,
           apiKey: config.superglueApiKey
@@ -50,14 +49,14 @@ const RunsTable = () => {
     <div className="flex-1 overflow-auto">
       <div className="p-8">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">API Runs</h1>
+          <h1 className="text-2xl font-bold">Workflow Runs</h1>
         </div>
 
         <div className="border rounded-lg">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>API Id</TableHead>
+                <TableHead>Workflow Id</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Started At</TableHead>
                 <TableHead>Completed At</TableHead>
@@ -69,9 +68,8 @@ const RunsTable = () => {
                 <TableRow key={run.id}>
                   <TableCell className="font-medium">{run.config?.id ?? "undefined"}</TableCell>
                   <TableCell>
-                    <span className={`px-2 py-1 rounded-full text-sm ${
-                      run.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                    }`}>
+                    <span className={`px-2 py-1 rounded-full text-sm font-medium ${run.success ? 'bg-emerald-500 text-white' : 'bg-red-600 text-white'
+                      }`}>
                       {run.success ? 'Success' : 'Failed'}
                     </span>
                   </TableCell>
@@ -91,7 +89,7 @@ const RunsTable = () => {
             onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
             disabled={currentPage === 0}
             variant="outline"
-            >
+          >
             Previous
           </Button>
           <div className="text-sm">
@@ -101,7 +99,7 @@ const RunsTable = () => {
             onClick={() => setCurrentPage(p => p + 1)}
             disabled={runs.length < pageSize}
             variant="outline"
-            >
+          >
             Next
           </Button>
         </div>

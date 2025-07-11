@@ -201,7 +201,7 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
       }
 
       // Handle payload from schema
-      if (defaultValues.payload !== undefined) {
+      if (defaultValues.payload !== undefined && defaultValues.payload !== null) {
         setPayload(JSON.stringify(defaultValues.payload, null, 1));
       } else {
         setPayload('{}');
@@ -215,6 +215,11 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
   const constructFromInputSchema = (schema: string | null) => {
     constructFromInputSchemaWithCreds(schema, integrationCredentials);
   };
+
+  useEffect(() => {
+    // Load integrations on component mount
+    loadIntegrations();
+  }, []);
 
   useEffect(() => {
     if (id) {
@@ -543,7 +548,7 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
                   if (!parsed) {
                     return null;
                   }
-                  if (Object.values(parsed).some(value => value === '' || value === null || value === undefined)) {
+                  if (Object.values(parsed).every(value => value === '' || value === null || value === undefined)) {
                     return (
                       <div className="text-xs text-amber-800 dark:text-amber-300 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded mt-2">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
