@@ -1,3 +1,4 @@
+import path from 'path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { IntegrationTestingFramework } from './integration-testing-framework.js';
 
@@ -6,6 +7,12 @@ describe('Integration Tests', () => {
     let originalDataStorePath: string | undefined;
 
     beforeAll(async () => {
+        // Load environment variables from .env file
+        const envPath = process.cwd().endsWith('packages/core')
+            ? path.join(process.cwd(), '../../.env')
+            : path.join(process.cwd(), '.env');
+        require('dotenv').config({ path: envPath });
+
         // Save original environment variables
         originalDataStoreType = process.env.DATA_STORE_TYPE;
         originalDataStorePath = process.env.DATA_STORE_FILE_PATH;

@@ -225,7 +225,7 @@ function calculateSuperglueScore(
  * Generate the ranking CSV file
  */
 async function generateRankingCsv(results: ApiRankingResult[], outputPath: string): Promise<void> {
-    const headers = ['Rank', 'API', 'Superglue Score', 'Superglue Success %', 'API Failures', 'ChatGPT Success %', 'Claude Success %', 'Instruction Prompt'];
+    const headers = ['Rank', 'API', 'Superglue Score', 'Superglue Success %', 'ChatGPT Success %', 'Claude Success %', 'Instruction Prompt'];
 
     const rows = results.map((result, index) => {
         return [
@@ -233,7 +233,6 @@ async function generateRankingCsv(results: ApiRankingResult[], outputPath: strin
             result.api, // API name
             result.superglueScore.toFixed(2), // Score
             `${(result.successRate * 100).toFixed(0)}%`, // Superglue Success %
-            result.apiFailureCount, // API Failures
             `${(result.chatgptSuccessRate * 100).toFixed(0)}%`, // ChatGPT Success %
             `${(result.claudeSuccessRate * 100).toFixed(0)}%`, // Claude Success %
             `"${result.instruction.replace(/"/g, '""')}"` // Escape quotes in instruction
