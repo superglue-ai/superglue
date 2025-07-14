@@ -3,7 +3,6 @@ import OpenAI from 'openai';
 import { logMessage } from '../../utils/logs.js';
 import { BaseWorkflowConfig } from '../utils/config-loader.js';
 
-// Types are safe to import
 export interface DirectLLMResult {
     provider: 'chatgpt' | 'claude';
     workflowId: string;
@@ -316,7 +315,6 @@ Always wrap your code in <<CODE>> and <</CODE>> tags (note the closing tag has a
         `;
 
         try {
-            // Use eval in a try-catch (in production, use a proper sandbox like VM2 or isolated-vm)
             const result = await eval(wrappedCode);
             return result;
         } catch (error) {

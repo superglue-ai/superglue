@@ -28,7 +28,6 @@ interface ApiRankingResult {
 }
 
 async function generateApiRanking(configPath?: string): Promise<void> {
-    // Set environment variables only within this function scope
     const originalDataStoreType = process.env.DATA_STORE_TYPE;
     const originalDataStorePath = process.env.DATA_STORE_FILE_PATH;
 
@@ -90,9 +89,9 @@ async function generateApiRanking(configPath?: string): Promise<void> {
                 workflowIntegrations,
                 {
                     maxAttemptsPerWorkflow: config.settings.attemptsPerWorkflow,
-                    collectLogs: true,  // Enable log collection
+                    collectLogs: true,
                     saveRuns: false,
-                    delayBetweenAttempts: config.settings.delayBetweenAttempts || 0  // Use config value, default to 0
+                    delayBetweenAttempts: config.settings.delayBetweenAttempts || 0 
                 }
             );
 
