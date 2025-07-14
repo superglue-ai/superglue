@@ -1,9 +1,11 @@
+import { useConfig } from '@/src/app/config-context';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/src/components/ui/select";
+import { useToast } from '@/src/hooks/use-toast';
 import { integrations as integrationTemplates } from '@/src/lib/integrations';
 import { cn } from '@/src/lib/utils';
-import { Integration } from "@superglue/client";
+import { Integration, SuperglueClient } from "@superglue/client";
 import { ArrowDown, Check, Globe, Pencil, RotateCw, Trash2, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { SimpleIcon } from 'simple-icons';
 import * as simpleIcons from 'simple-icons';
 import { Badge } from "../ui/badge";
@@ -23,9 +25,48 @@ interface WorkflowStepCardProps {
   onCreateIntegration?: () => void;
 }
 
-export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations, onCreateIntegration }: WorkflowStepCardProps) {
+export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations: propIntegrations, onCreateIntegration }: WorkflowStepCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedStep, setEditedStep] = useState(step);
+  const [localIntegrations, setLocalIntegrations] = useState<Integration[]>([]);
+  const [loadingIntegrations, setLoadingIntegrations] = useState(false);
+
+  const config = useConfig();
+  const { toast } = useToast();
+
+  const client = useMemo(() => new SuperglueClient({
+    endpoint: config.superglueEndpoint,
+    apiKey: config.superglueApiKey,
+  }), [config.superglueEndpoint, config.superglueApiKey]);
+
+  const loadIntegrations = async () => {
+    if (localIntegrations.length > 0) return; // Already loaded
+
+    try {
+      setLoadingIntegrations(true);
+      const result = await client.listIntegrations(100, 0);
+      setLocalIntegrations(result.items);
+    } catch (error: any) {
+      console.error("Error loading integrations:", error);
+      toast({
+        title: "Error loading integrations",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingIntegrations(false);
+    }
+  };
+
+  // Load integrations when editing starts
+  useEffect(() => {
+    if (isEditing) {
+      loadIntegrations();
+    }
+  }, [isEditing]);
+
+  // Use prop integrations if provided, otherwise use locally loaded ones
+  const integrations = propIntegrations || localIntegrations;
 
   // Helper function for icon handling
   const getSimpleIcon = (name: string): SimpleIcon | null => {
