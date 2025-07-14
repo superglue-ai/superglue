@@ -2,6 +2,7 @@ import { ApiInputRequest, CacheMode, RequestOptions } from "@superglue/client";
 import { Context, Metadata } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mocked } from 'vitest';
+import { config } from "../../default.js";
 import * as api from "../../utils/api.js";
 import { Documentation } from "../../utils/documentation.js";
 import * as logs from "../../utils/logs.js";
@@ -157,9 +158,9 @@ describe('Call Resolver', () => {
       )).rejects.toThrow(/API call failed after \d+ retries.*Last error: Eval failed/);
 
       // callEndpoint is called once for the initial attempt, then 7 more times for retries where evaluateResponse fails.
-      expect(mockedApi.callEndpoint).toHaveBeenCalledTimes(8);
+      expect(mockedApi.callEndpoint). toHaveBeenCalledTimes(config.MAX_CALL_RETRIES);
       // evaluateResponse is called for each of the 7 retries after the first callEndpoint failure.
-      expect(mockedApi.evaluateResponse).toHaveBeenCalledTimes(7);
+      expect(mockedApi.evaluateResponse).toHaveBeenCalledTimes(config.MAX_CALL_RETRIES - 1);
       expect(mockedTelemetry.telemetryClient?.captureException).toHaveBeenCalled();
     });
 
@@ -227,7 +228,7 @@ describe('Call Resolver', () => {
         mockContext
       )).rejects.toThrow(/API call failed after \d+ retries/);
 
-      expect(mockedApi.callEndpoint).toHaveBeenCalledTimes(8);
+      expect(mockedApi.callEndpoint).toHaveBeenCalledTimes(config.MAX_CALL_RETRIES);
     });
   });
 
