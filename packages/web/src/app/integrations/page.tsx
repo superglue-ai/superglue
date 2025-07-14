@@ -152,27 +152,6 @@ export default function IntegrationsPage() {
         // Get current integration
         const integration = integrations.find(i => i.id === integrationId);
         if (!integration) return;
-
-        // Don't refresh file uploads
-        if (integration.documentationUrl?.startsWith('file://')) {
-            toast({
-                title: 'Cannot Refresh',
-                description: 'Cannot refresh documentation for file uploads.',
-                variant: 'destructive',
-            });
-            return;
-        }
-
-        // Validate that we have a URL to refresh
-        if (!integration.documentationUrl || !integration.documentationUrl.trim()) {
-            toast({
-                title: 'No URL to Refresh',
-                description: 'No documentation URL available to refresh.',
-                variant: 'destructive',
-            });
-            return;
-        }
-
         // Set pending state immediately
         setPendingDocIds(prev => new Set([...prev, integrationId]));
 

@@ -92,8 +92,6 @@ export function IntegrationForm({
         setHasUploadedFile(false);
     };
 
-
-
     const handleIntegrationSelect = (value: string) => {
         setSelectedIntegration(value);
 
@@ -126,8 +124,11 @@ export function IntegrationForm({
             }
             setUrlHost(urlHost);
             setUrlPath(urlPath);
-            setDocumentationUrl(integrationTemplate.docsUrl || '');
-            setDocumentation('');
+            // Only set documentation URL if no file is uploaded
+            if (!hasUploadedFile) {
+                setDocumentationUrl(integrationTemplate.docsUrl || '');
+                setDocumentation('');
+            }
             setSpecificInstructions('');
             // Always set ID to dropdown value for new integrations
             if (!isEditing) {
@@ -336,7 +337,7 @@ export function IntegrationForm({
                             </div>
                         )}
                         <div>
-                            <Label htmlFor="specificInstructions">Instructions</Label>
+                            <Label htmlFor="specificInstructions">Specific Instructions</Label>
                             <HelpTooltip text="Provide specific guidance on how to use this integration (e.g., rate limits, special endpoints, authentication details). Max 2000 characters." />
                             <div className="relative">
                                 <Textarea
