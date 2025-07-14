@@ -13,8 +13,8 @@ interface DocumentationFieldProps {
   onContentChange?: (content: string) => void
   className?: string
   placeholder?: string
-  error?: boolean
   onFileUpload?: (extractedText: string) => void
+  onFileRemove?: () => void
   hasUploadedFile?: boolean
 }
 
@@ -25,12 +25,21 @@ export function DocumentationField({
   onContentChange,
   className,
   placeholder = "https://docs.example.com/api",
-  error = false,
   onFileUpload,
+  onFileRemove,
   hasUploadedFile = false
 }: DocumentationFieldProps) {
   const [localUrl, setLocalUrl] = useState(url)
   const [docFile, setDocFile] = useState<File | null>(null)
+  const [urlError, setUrlError] = useState(false)
+
+  // Extract filename from file:// URL for display
+  const getFileNameFromUrl = (fileUrl: string): string | null => {
+    if (fileUrl.startsWith('file://')) {
+      return fileUrl.replace('file://', '')
+    }
+    return null
+  }
 
   useEffect(() => {
     setLocalUrl(url)
@@ -38,6 +47,7 @@ export function DocumentationField({
 
   const isValidUrl = (urlString: string): boolean => {
     if (!urlString) return true // Empty is valid
+    if (urlString.startsWith('file://')) return true // File uploads are valid
     try {
       new URL(urlString)
       return true
@@ -46,7 +56,7 @@ export function DocumentationField({
     }
   }
 
-  const activeType = url ? 'url' : content ? (hasUploadedFile ? 'file' : 'content') : 'empty'
+  const activeType = hasUploadedFile ? 'file' : (url ? 'url' : content ? 'content' : 'empty')
 
   // Derived state for display purposes only
   const displayValue = url || (content ? (
@@ -90,70 +100,110 @@ export function DocumentationField({
     }
   }
 
+  const handleRemoveFile = () => {
+    setDocFile(null)
+    if (onContentChange) onContentChange('')
+    onUrlChange('')
+    setLocalUrl('')
+    setUrlError(false)
+    // Reset the file input so it can be used again
+    const fileInput = document.getElementById('doc-file-upload') as HTMLInputElement
+    if (fileInput) {
+      fileInput.value = ''
+    }
+    // Notify parent component that file was removed
+    if (onFileRemove) {
+      onFileRemove()
+    }
+  }
+
   const handleUrlChange = useCallback((urlHost: string, urlPath: string, queryParams: Record<string, string>) => {
     const fullUrl = urlHost + (urlPath || '')
     setLocalUrl(fullUrl)
+
+    // Check if URL is valid
+    const isValid = isValidUrl(fullUrl) || fullUrl === ''
+    setUrlError(fullUrl !== '' && !isValid)
+
     // Only propagate valid URLs or empty string
-    if (isValidUrl(fullUrl) || fullUrl === '') {
+    if (isValid) {
       onUrlChange(fullUrl)
-      // If switching from file upload to URL, clear the file state
-      if (hasUploadedFile && !fullUrl.startsWith('file://')) {
-        setDocFile(null)
-        if (onContentChange) onContentChange('')
-      }
     }
-  }, [onUrlChange, hasUploadedFile, onContentChange])
+    // If invalid, don't propagate the change but keep local state for display
+  }, [onUrlChange, isValidUrl])
 
   const handleBlur = useCallback(() => {
     // On blur, ensure we have a valid URL or empty string
-    if (!isValidUrl(localUrl)) {
+    if (!isValidUrl(localUrl) && localUrl !== '') {
       setLocalUrl(url) // Revert to last valid URL
+      setUrlError(false)
     }
-  }, [localUrl, url])
+  }, [localUrl, url, isValidUrl])
 
   return (
     <div className={className}>
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1">
-          <URLField
-            url={localUrl}
-            onUrlChange={handleUrlChange}
-            placeholder={placeholder}
-            error={error}
-          />
-          <Badge variant="outline" className="absolute right-2 top-1/2 -translate-y-1/2 bg-background border">
-            {hasUploadedFile ? (
-              <><Upload className="h-3 w-3 mr-1 text-green-600" /> File Uploaded</>
-            ) : activeType === 'url' ? (
-              <><Link className="h-3 w-3 mr-1" /> URL</>
-            ) : activeType === 'content' ? (
-              <><FileText className="h-3 w-3 mr-1" /> Manual Content</>
-            ) : (
-              <><FileQuestion className="h-3 w-3 mr-1" /> None</>
-            )}
-          </Badge>
+      {hasUploadedFile ? (
+        // Show file info when file is uploaded
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <div className="flex items-center gap-2 p-3 border rounded-md bg-muted/50">
+              <Upload className="h-4 w-4 text-green-600" />
+              <span className="text-sm font-medium">{docFile?.name || getFileNameFromUrl(url) || 'Uploaded file'}</span>
+            </div>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="shrink-0"
+            onClick={handleRemoveFile}
+          >
+            Remove
+          </Button>
         </div>
+      ) : (
+        // Show URL field when no file is uploaded
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <URLField
+              url={localUrl}
+              onUrlChange={handleUrlChange}
+              placeholder={placeholder}
+              error={urlError}
+            />
+            <Badge variant="outline" className="absolute right-2 top-1/2 -translate-y-1/2 bg-background border">
+              {activeType === 'url' ? (
+                <><Link className="h-3 w-3 mr-1" /> URL</>
+              ) : activeType === 'content' ? (
+                <><FileText className="h-3 w-3 mr-1" /> Manual Content</>
+              ) : (
+                <><FileQuestion className="h-3 w-3 mr-1" /> None</>
+              )}
+            </Badge>
+          </div>
 
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="shrink-0"
-          onClick={() => document.getElementById('doc-file-upload')?.click()}
-        >
-          Upload
-        </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="shrink-0"
+            onClick={() => document.getElementById('doc-file-upload')?.click()}
+          >
+            Upload
+          </Button>
+        </div>
+      )}
 
-        <input
-          type="file"
-          id="doc-file-upload"
-          hidden
-          onChange={handleDocFileUpload}
-          accept=".pdf,.txt,.md,.doc,.docx"
-        />
-      </div>
-      {localUrl && !isValidUrl(localUrl) && (
-        <p className="text-sm text-destructive mt-1">Please enter a valid URL</p>
+      <input
+        type="file"
+        id="doc-file-upload"
+        hidden
+        onChange={handleDocFileUpload}
+        accept=".pdf,.txt,.md,.doc,.docx"
+      />
+
+      {urlError && !hasUploadedFile && (
+        <p className="text-sm text-destructive mt-1">Please enter a valid URL or upload a file</p>
       )}
     </div>
   )

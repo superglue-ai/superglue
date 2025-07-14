@@ -86,6 +86,12 @@ export function IntegrationForm({
         setHasUploadedFile(true);
     };
 
+    // Function to handle file removal
+    const handleFileRemove = () => {
+        setDocumentation('');
+        setHasUploadedFile(false);
+    };
+
 
 
     const handleIntegrationSelect = (value: string) => {
@@ -142,14 +148,7 @@ export function IntegrationForm({
         if (!urlHost.trim()) errors.urlHost = true;
         if (specificInstructions.length > 2000) errors.specificInstructions = true;
 
-        // Validate documentation URL if provided
-        if (documentationUrl.trim()) {
-            try {
-                new URL(documentationUrl.trim());
-            } catch {
-                errors.documentationUrl = true;
-            }
-        }
+
 
         setValidationErrors(errors);
         if (Object.keys(errors).length > 0) return;
@@ -293,6 +292,7 @@ export function IntegrationForm({
                         onUrlChange={setDocumentationUrl}
                         onContentChange={setDocumentation}
                         onFileUpload={handleFileUpload}
+                        onFileRemove={handleFileRemove}
                         hasUploadedFile={hasUploadedFile}
                     />
                 </div>

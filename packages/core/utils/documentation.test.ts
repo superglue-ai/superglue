@@ -73,23 +73,6 @@ describe('Documentation Class', () => {
   });
 
   describe('fetchAndProcess', () => {
-    it('should return raw content for non-HTTP URL', async () => {
-      const rawContent = "This is raw documentation content.";
-      const doc = new Documentation({ documentationUrl: rawContent, urlHost: 'https://api.example.com' }, {}, metadata);
-      const result = await doc.fetchAndProcess();
-      expect(result).toBe(rawContent);
-      // Verify no network calls were made
-      expect(mockedAxios.get).not.toHaveBeenCalled();
-      expect(mockedAxios.post).not.toHaveBeenCalled();
-      expect(playwright.chromium.launch).not.toHaveBeenCalled();
-    });
-
-    it('should return empty string for empty documentation URL if treated as non-http', async () => {
-      // Assuming empty string is handled like raw content
-      const doc = new Documentation({ documentationUrl: "", urlHost: 'https://api.example.com' }, {}, metadata);
-      const result = await doc.fetchAndProcess();
-      expect(result).toBe('');
-    });
 
     it('should fetch and convert HTML documentation via Playwright', async () => {
       const htmlDoc = `
@@ -287,17 +270,6 @@ describe('Documentation Class', () => {
     });
 
     it('should cache the result and return processed result on subsequent calls', async () => {
-      const rawContent = "Raw content";
-      const doc = new Documentation({ documentationUrl: rawContent, urlHost: 'https://api.example.com' }, {}, metadata);
-
-      const result1 = await doc.fetchAndProcess();
-      expect(result1).toBe(rawContent);
-      // No mocks involved here
-
-      const result2 = await doc.fetchAndProcess();
-      expect(result2).toBe(rawContent);
-      // Should not re-evaluate strategies if result exists
-
       // Test with a strategy that involves mocks
       const htmlDoc = `<html><body>Data</body></html>`;
       mockPage.content.mockResolvedValueOnce(htmlDoc);

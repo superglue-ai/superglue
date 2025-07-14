@@ -101,22 +101,8 @@ export default function IntegrationsPage() {
     };
 
     const handleEdit = async (integration: Integration) => {
-        try {
-            // Show loading state with partial data first
-            setEditingIntegration(integration);
-            setAddFormOpen(true);
-
-            // Fetch full integration with documentation
-            const fullIntegration = await client.getIntegration(integration.id);
-            setEditingIntegration(fullIntegration);
-        } catch (error) {
-            console.error('Error fetching integration details:', error);
-            toast({
-                title: 'Error',
-                description: 'Failed to load integration details',
-                variant: 'destructive',
-            });
-        }
+        setEditingIntegration(integration);
+        setAddFormOpen(true);
     };
     const handleAdd = () => {
         setEditingIntegration(null);
