@@ -3,7 +3,7 @@
   <img src="https://github.com/user-attachments/assets/be0e65d4-dcd8-4133-9841-b08799e087e7" width="350" alt="superglue_logo_white">
 </p>
 
-<h2 align="center">Automate workflows with natural language.</h2>
+<h2 align="center">Integrate & Orchestrate APIs with natural language.</h2>
 <div align="center">
   
  [![GitHub](https://img.shields.io/github/license/superglue-ai/superglue?style=flat-square)](https://github.com/superglue-ai/superglue/blob/main/LICENSE)
