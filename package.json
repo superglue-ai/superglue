@@ -15,7 +15,8 @@
     "test:integration": "cd packages/core && npm run build && npm run test:integration",
     "test:all": "npm run test:unit && npm run test:integration",
     "lint": "turbo run lint",
-    "clean": "turbo run clean"
+    "clean": "turbo run clean",
+    "generate-ranking": "cd packages/core && npm run generate-ranking"
   },
   "dependencies": {
     "@playwright/test": "^1.50.1",
