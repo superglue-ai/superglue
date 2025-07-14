@@ -14,7 +14,6 @@ import { useToast } from '@/src/hooks/use-toast';
 import { cn, composeUrl } from '@/src/lib/utils';
 import type { Integration } from '@superglue/client';
 import { SuperglueClient } from '@superglue/client';
-import { waitForIntegrationProcessing } from '@superglue/shared/utils';
 import { Check, ChevronRight, ChevronsUpDown, Globe } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 
@@ -67,6 +66,10 @@ export function IntegrationForm({
     );
     const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
     const [showAdvanced, setShowAdvanced] = useState(false);
+    const [hasUploadedFile, setHasUploadedFile] = useState(
+        // Check if existing integration has file upload
+        integration?.documentationUrl?.startsWith('file://') || false
+    );
     const urlFieldRef = useRef<any>(null);
     const isEditing = !!integration;
     const config = useConfig();
@@ -77,7 +80,13 @@ export function IntegrationForm({
         apiKey: config.superglueApiKey,
     }), [config.superglueEndpoint, config.superglueApiKey]);
 
-    
+    // Function to handle file upload
+    const handleFileUpload = (extractedText: string) => {
+        setDocumentation(extractedText);
+        setHasUploadedFile(true);
+    };
+
+
 
     const handleIntegrationSelect = (value: string) => {
         setSelectedIntegration(value);
@@ -276,18 +285,30 @@ export function IntegrationForm({
                     {validationErrors.urlHost && <p className="text-sm text-destructive mt-1">API Endpoint is required.</p>}
                 </div>
                 <div>
-                    <Label htmlFor="credentials">Credentials</Label>
-                    <HelpTooltip text='API keys or tokens needed for this specific integration. Enter without any prefix like Bearer.' />
-                    <div className="w-full max-w-full">
-                        <CredentialsManager
-                            value={credentials}
-                            onChange={setCredentials}
-                            className={cn('min-h-20 font-mono text-xs', validationErrors.credentials && inputErrorStyles)}
-                        />
-                    </div>
-                    {validationErrors.credentials && <p className="text-sm text-destructive mt-1">Credentials must be valid JSON.</p>}
+                    <Label htmlFor="documentation">Documentation</Label>
+                    <HelpTooltip text="You can either paste a documentation URL or upload a file. You can add manual documentation to the instructions in the advanced options below." />
+                    <DocumentationField
+                        url={documentationUrl || ''}
+                        content={documentation || ''}
+                        onUrlChange={setDocumentationUrl}
+                        onContentChange={setDocumentation}
+                        onFileUpload={handleFileUpload}
+                        hasUploadedFile={hasUploadedFile}
+                    />
                 </div>
                 <div>
+                    <div>
+                        <Label htmlFor="credentials">Credentials</Label>
+                        <HelpTooltip text='API keys or tokens needed for this specific integration. Enter without any prefix like Bearer.' />
+                        <div className="w-full max-w-full">
+                            <CredentialsManager
+                                value={credentials}
+                                onChange={setCredentials}
+                                className={cn('min-h-20 font-mono text-xs', validationErrors.credentials && inputErrorStyles)}
+                            />
+                        </div>
+                        {validationErrors.credentials && <p className="text-sm text-destructive mt-1">Credentials must be valid JSON.</p>}
+                    </div>
                     <button
                         type="button"
                         onClick={() => setShowAdvanced(!showAdvanced)}
@@ -318,19 +339,6 @@ export function IntegrationForm({
                                 {validationErrors.id && <p className="text-sm text-destructive mt-1">Integration ID is required and must be unique.</p>}
                             </div>
                         )}
-                        <div>
-                            <Label htmlFor="documentation">Documentation URL</Label>
-                            <HelpTooltip text="Link to the API's documentation (e.g., https://docs.example.com/api)" />
-                            <DocumentationField
-                                url={documentationUrl || ''}
-                                onUrlChange={setDocumentationUrl}
-                                placeholder="https://docs.example.com/api"
-                                error={validationErrors.documentationUrl}
-                            />
-                            {validationErrors.documentationUrl && (
-                                <p className="text-sm text-destructive mt-1">Please enter a valid URL</p>
-                            )}
-                        </div>
                         <div>
                             <Label htmlFor="specificInstructions">Instructions</Label>
                             <HelpTooltip text="Provide specific guidance on how to use this integration (e.g., rate limits, special endpoints, authentication details). Max 2000 characters." />
