@@ -20,7 +20,7 @@ interface DocumentationFieldProps {
 
 export function DocumentationField({
   url,
-  content = '',
+  content,
   onUrlChange,
   onContentChange,
   className,
@@ -120,25 +120,8 @@ export function DocumentationField({
   const handleUrlChange = useCallback((urlHost: string, urlPath: string, queryParams: Record<string, string>) => {
     const fullUrl = urlHost + (urlPath || '')
     setLocalUrl(fullUrl)
-
-    // Check if URL is valid
-    const isValid = isValidUrl(fullUrl) || fullUrl === ''
-    setUrlError(fullUrl !== '' && !isValid)
-
-    // Only propagate valid URLs or empty string
-    if (isValid) {
-      onUrlChange(fullUrl)
-    }
-    // If invalid, don't propagate the change but keep local state for display
-  }, [onUrlChange, isValidUrl])
-
-  const handleBlur = useCallback(() => {
-    // On blur, ensure we have a valid URL or empty string
-    if (!isValidUrl(localUrl) && localUrl !== '') {
-      setLocalUrl(url) // Revert to last valid URL
-      setUrlError(false)
-    }
-  }, [localUrl, url, isValidUrl])
+    onUrlChange(fullUrl)
+  }, [onUrlChange])
 
   return (
     <div className={className}>

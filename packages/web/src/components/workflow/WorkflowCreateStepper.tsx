@@ -181,70 +181,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     // Check if integration has documentation URL and is not pending
     return !!(integration.documentationUrl?.trim() && !pendingDocIds.has(integration.id));
   };
-
-  // Function to refresh documentation for a specific integration
-  const handleRefreshDocs = async (integrationId: string) => {
-    // Set pending state immediately
-    setPendingDocIds(prev => new Set([...prev, integrationId]));
-
-    try {
-      // Get current integration to upsert with documentationPending=true
-      const integration = integrations.find(i => i.id === integrationId);
-      if (!integration) return;
-
-      // Use documentationPending flag to trigger backend refresh
-      const upsertData = {
-        id: integration.id,
-        urlHost: integration.urlHost,
-        urlPath: integration.urlPath,
-        documentationUrl: integration.documentationUrl,
-        credentials: integration.credentials || {},
-        documentation: integration.documentation || '', // Keep existing docs
-        documentationPending: true // Trigger refresh
-      };
-
-      await client.upsertIntegration(integrationId, upsertData, UpsertMode.UPDATE);
-
-      // Use proper polling to wait for docs to be ready
-      const results = await waitForIntegrationReady([integrationId]);
-
-      if (results.length > 0 && results[0]?.documentation) {
-        // Success - docs are ready
-        setPendingDocIds(prev => new Set([...prev].filter(id => id !== integrationId)));
-      } else {
-        // Polling failed - reset documentationPending to false
-        await client.upsertIntegration(integrationId, {
-          ...upsertData,
-          documentationPending: false
-        }, UpsertMode.UPDATE);
-
-        setPendingDocIds(prev => new Set([...prev].filter(id => id !== integrationId)));
-      }
-
-    } catch (error) {
-      console.error('Error refreshing docs:', error);
-      // Reset documentationPending to false on error
-      try {
-        const integration = integrations.find(i => i.id === integrationId);
-        if (integration) {
-          await client.upsertIntegration(integrationId, {
-            id: integration.id,
-            urlHost: integration.urlHost,
-            urlPath: integration.urlPath,
-            documentationUrl: integration.documentationUrl,
-            credentials: integration.credentials || {},
-            documentation: integration.documentation || '',
-            documentationPending: false
-          }, UpsertMode.UPDATE);
-        }
-      } catch (resetError) {
-        console.error('Error resetting documentationPending:', resetError);
-      }
-
-      setPendingDocIds(prev => new Set([...prev].filter(id => id !== integrationId)));
-    }
-  };
-
   // --- Integration Management (add/edit) ---
   const handleIntegrationFormSave = async (integration: Integration) => {
     // Close form immediately
@@ -294,25 +230,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     setIntegrationFormEdit(null);
   };
 
-  // Function to fetch full integration data before editing
-  const handleEditIntegration = async (integration: Integration) => {
-    try {
-      // Fetch full integration with documentation
-      const fullIntegration = await client.getIntegration(integration.id);
-      setIntegrationFormEdit(fullIntegration);
-      setShowIntegrationForm(true);
-    } catch (error) {
-      console.error('Error fetching integration:', error);
-      toast({
-        title: 'Error Loading Integration',
-        description: 'Failed to load integration details. Please try again.',
-        variant: 'destructive',
-      });
-      // Fall back to using the partial integration data
-      setIntegrationFormEdit(integration);
-      setShowIntegrationForm(true);
-    }
-  };
 
   // --- Step Navigation ---
   const handleNext = async () => {
@@ -819,7 +736,8 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                                 className="h-8 w-8 text-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
                                 onClick={e => {
                                   e.stopPropagation();
-                                  handleEditIntegration(sys);
+                                  setIntegrationFormEdit(sys);
+                                  setShowIntegrationForm(true);
                                 }}
                                 disabled={pendingDocIds.has(sys.id)}
                                 title={pendingDocIds.has(sys.id) ? "Documentation is being processed" : "Edit integration"}
