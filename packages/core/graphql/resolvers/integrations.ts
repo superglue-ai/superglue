@@ -18,6 +18,8 @@ function needsDocFetch(input: Integration, oldIntegration?: Integration): boolea
   if (input.documentationUrl.startsWith('file://')) return false;
   // If there's no documentation URL, no need to fetch
   if (!input.documentationUrl || !input.documentationUrl.trim()) return false;
+  // If documentationPending is explicitly set to true, always fetch
+  if (input.documentationPending === true) return true;
   // For URL-based docs, fetch if:
   // 1. No old integration exists
   // 2. URL/path has changed
@@ -90,6 +92,7 @@ export const upsertIntegrationResolver = async (
     }
 
     const shouldFetchDoc = needsDocFetch(input, oldIntegration);
+    logMessage('info', `Integration ${input.id}: shouldFetchDoc=${shouldFetchDoc}, documentationPending=${input.documentationPending}`, { orgId: context.orgId });
 
     if (shouldFetchDoc) {
       // Fire-and-forget async doc fetch

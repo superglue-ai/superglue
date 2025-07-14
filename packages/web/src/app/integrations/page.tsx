@@ -149,14 +149,34 @@ export default function IntegrationsPage() {
 
     // Function to refresh documentation for a specific integration
     const handleRefreshDocs = async (integrationId: string) => {
+        // Get current integration
+        const integration = integrations.find(i => i.id === integrationId);
+        if (!integration) return;
+
+        // Don't refresh file uploads
+        if (integration.documentationUrl?.startsWith('file://')) {
+            toast({
+                title: 'Cannot Refresh',
+                description: 'Cannot refresh documentation for file uploads.',
+                variant: 'destructive',
+            });
+            return;
+        }
+
+        // Validate that we have a URL to refresh
+        if (!integration.documentationUrl || !integration.documentationUrl.trim()) {
+            toast({
+                title: 'No URL to Refresh',
+                description: 'No documentation URL available to refresh.',
+                variant: 'destructive',
+            });
+            return;
+        }
+
         // Set pending state immediately
         setPendingDocIds(prev => new Set([...prev, integrationId]));
 
         try {
-            // Get current integration to upsert with documentationPending=true
-            const integration = integrations.find(i => i.id === integrationId);
-            if (!integration) return;
-
             // Use documentationPending flag to trigger backend refresh
             const upsertData = {
                 id: integration.id,
@@ -189,6 +209,12 @@ export default function IntegrationsPage() {
                 }, UpsertMode.UPDATE);
 
                 setPendingDocIds(prev => new Set([...prev].filter(id => id !== integrationId)));
+
+                toast({
+                    title: 'Refresh Failed',
+                    description: `Failed to refresh documentation for "${integrationId}".`,
+                    variant: 'destructive',
+                });
             }
 
         } catch (error) {
@@ -212,6 +238,12 @@ export default function IntegrationsPage() {
             }
 
             setPendingDocIds(prev => new Set([...prev].filter(id => id !== integrationId)));
+
+            toast({
+                title: 'Refresh Failed',
+                description: `Failed to refresh documentation for "${integrationId}".`,
+                variant: 'destructive',
+            });
         }
     };
 
@@ -332,8 +364,19 @@ export default function IntegrationsPage() {
                                                 size="icon"
                                                 className="h-8 w-8 text-muted-foreground hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
                                                 onClick={() => handleRefreshDocs(integration.id)}
-                                                disabled={!integration.documentationUrl || !integration.documentationUrl.trim() || pendingDocIds.has(integration.id)}
-                                                title={integration.documentationUrl && integration.documentationUrl.trim() ? "Refresh documentation from URL" : "No documentation URL to refresh"}
+                                                disabled={
+                                                    !integration.documentationUrl ||
+                                                    !integration.documentationUrl.trim() ||
+                                                    integration.documentationUrl.startsWith('file://') ||
+                                                    pendingDocIds.has(integration.id)
+                                                }
+                                                title={
+                                                    integration.documentationUrl?.startsWith('file://')
+                                                        ? "Cannot refresh file uploads"
+                                                        : !integration.documentationUrl || !integration.documentationUrl.trim()
+                                                            ? "No documentation URL to refresh"
+                                                            : "Refresh documentation from URL"
+                                                }
                                             >
                                                 <FileDown className="h-4 w-4" />
                                             </Button>
