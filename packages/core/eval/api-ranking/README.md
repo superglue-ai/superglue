@@ -27,7 +27,7 @@ The API Ranking Generator evaluates APIs across multiple dimensions:
 ### Direct LLM Evaluation
 To compare Superglue's performance with direct LLM usage:
 
-1. **ChatGPT (GPT-4o)** and **Claude (Claude 3.5 Sonnet)** are given:
+1. **ChatGPT (GPT-4.1)** and **Claude (Claude 3.5 Sonnet)** are given:
    - The same workflow instruction
    - Integration details (API endpoints, credentials)
    - A request to generate executable JavaScript code
@@ -43,7 +43,7 @@ To compare Superglue's performance with direct LLM usage:
    - Completes within the timeout
 
 **Models Used:**
-- **ChatGPT**: `gpt-4o` (configurable via `OPENAI_MODEL` env var)
+- **ChatGPT**: `gpt-4.1` (configurable via `OPENAI_MODEL` env var)
 - **Claude**: `claude-3-5-sonnet-20241022` (configurable via `ANTHROPIC_MODEL` env var)
 
 This provides a fair comparison of how well different approaches handle the same API integration tasks.
@@ -68,7 +68,7 @@ Final Score = Base Score - API Failure Penalty - Time Penalty
 - **API Failures**: Each failed API call reduces score by 0.02 (max penalty: 0.2)
 - **Execution Time**: Fast workflows (<1s) get no penalty, slow workflows (>10s) get up to -0.1
 
-**Note on Time Penalty**: Execution time is heavily dependent on the API's response time, data volume, and instruction complexity. This penalty ensures efficient workflows are rewarded while recognizing that some APIs are inherently slower.
+**Note on Time Penalty**: Execution time is also dependent on the API's response time, data volume, and instruction complexity. This penalty favors simpler workflows but is mainly designed to capture API call failures, transformation failures and failling response evaluations.
 
 ### Failed Workflows
 Workflows that never succeed get minimal scores:

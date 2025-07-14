@@ -429,7 +429,7 @@
         "square-customer-directory": {
             "id": "square-customer-directory",
             "name": "Square Customer Directory Export",
-            "instruction": "Retrieve all customers from my Square customer directory, extract their names and email addresses, and return a clean JSON object with only two properties: customerNames as an array of customer names and customer_emails as an array of corresponding email addresses",
+            "instruction": "Retrieve all customers from my Square customer directory. Extract their names and email addresses, and return a JSON object with only two properties: customerNames as an array of customer names and customer_emails as an array of corresponding email addresses",
             "integrationIds": [
                 "square"
             ],
