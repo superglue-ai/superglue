@@ -19,7 +19,6 @@
     "generate-ranking": "cd packages/core && npm run generate-ranking"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.56.0",
     "@playwright/test": "^1.50.1",
     "@superglue/client": "^2.3.43",
     "dotenv": "^16.4.7",
