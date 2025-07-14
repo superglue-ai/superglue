@@ -335,7 +335,7 @@ Further:
 Set the execution mode to either:
 - DIRECT: For steps that execute once with specific data. Important: Except if the user explicitly provides an array of items to loop over or a previous step gives you a list of items to loop, direct should be used, particularly for the FIRST STEP. If you use loop on the first step without a source array, it will fail.
 - LOOP: For steps that need to iterate over a collection of items. Use this ONLY if there is a payload to iterate over, e.g. a user / a previous step gives you a list of ids to loop.
-IMPORTANT: Avoid using LOOP mode for potentially very large datasets. If you need to process many items (e.g., thousands of records), prefer batch operations or APIs that can handle multiple items in a single call. Individual loops over large datasets can result in performance issues and API rate limits.
+Important: Avoid using LOOP mode for potentially very large data objects. If you need to process many items (e.g., thousands of records), prefer batch operations or APIs that can handle multiple items in a single call. Individual loops over large datasets can result in performance issues and API rate limits.
 </EXECUTION_MODES>
 
 <DATA_DEPENDENCIES>

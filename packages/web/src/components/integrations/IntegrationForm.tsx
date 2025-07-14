@@ -139,7 +139,6 @@ export function IntegrationForm({
     const handleUrlChange = (host: string, path: string) => {
         setUrlHost(host);
         setUrlPath(path);
-        // Don't auto-update ID anymore - user should manually change if needed
     };
 
     const handleSubmit = async () => {
@@ -147,9 +146,6 @@ export function IntegrationForm({
         if (!id.trim()) errors.id = true;
         if (!urlHost.trim()) errors.urlHost = true;
         if (specificInstructions.length > 2000) errors.specificInstructions = true;
-
-
-
         setValidationErrors(errors);
         if (Object.keys(errors).length > 0) return;
         let creds = {};
