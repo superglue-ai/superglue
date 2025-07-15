@@ -8,6 +8,65 @@ export interface LLM {
     contextLength: number;
     generateText(messages: OpenAI.Chat.ChatCompletionMessageParam[], temperature?: number): Promise<LLMResponse>;
     generateObject(messages: OpenAI.Chat.ChatCompletionMessageParam[], schema: any, temperature?: number): Promise<LLMObjectResponse>;
+
+    executeTool?(
+        messages: OpenAI.Chat.ChatCompletionMessageParam[],
+        tools: ToolDefinition[],
+        temperature?: number,
+        forceToolUse?: boolean,
+        previousResponseId?: string
+    ): Promise<LLMToolResponse>;
+
+    executeTaskWithTools?(
+        messages: OpenAI.Chat.ChatCompletionMessageParam[],
+        tools: ToolDefinition[],
+        toolExecutor: (toolCall: ToolCall) => Promise<ToolResult>,
+        options?: {
+            maxIterations?: number;
+            temperature?: number;
+            previousResponseId?: string;
+        }
+    ): Promise<LLMAutonomousResponse>;
+}
+
+export interface ToolDefinition {
+    name: string;
+    description: string;
+    parameters: {
+        type: "object";
+        properties: Record<string, any>;
+        required?: string[];
+    };
+}
+
+export interface ToolCall {
+    id: string;
+    name: string;
+    arguments: Record<string, any>;
+}
+
+export interface ToolResult {
+    toolCallId: string;
+    result: any;
+    error?: string;
+}
+
+export interface LLMToolResponse {
+    toolCall: ToolCall | null;
+    textResponse?: string;
+    messages: OpenAI.Chat.ChatCompletionMessageParam[];
+    responseId?: string;  // For OpenAI conversation continuity
+}
+
+export interface LLMAutonomousResponse {
+    finalResult: any;
+    toolCalls: ToolCall[];
+    executionTrace: Array<{
+        toolCall: ToolCall;
+        result: ToolResult;
+    }>;
+    messages: OpenAI.Chat.ChatCompletionMessageParam[];
+    responseId?: string;  // For OpenAI conversation continuity
 }
 
 export interface LLMResponse {

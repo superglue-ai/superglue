@@ -13,7 +13,6 @@ import { composeUrl, safeHttpMethod } from "../utils/tools.js"; // Assuming path
 
 type ChatMessage = OpenAI.Chat.ChatCompletionMessageParam;
 
-// Define the structure for the output of the planning step
 interface WorkflowPlanStep {
   stepId: string;
   integrationId?: string;
@@ -156,6 +155,118 @@ The plan should also include a \`finalTransform\` field, which is a JSONata expr
     };
 
     return { plan, messages: updatedMessagesFromLLM };
+  }
+
+  public async buildWithTools(): Promise<Workflow> {
+    const { createToolExecutor, getToolDefinitions } = await import('../tools/tools.js');
+
+    const MAX_BUILD_ATTEMPTS = 3;
+    let lastError: string | null = null;
+
+    for (let attempt = 1; attempt <= MAX_BUILD_ATTEMPTS; attempt++) {
+      logMessage('info',
+        `Building workflow with tools${attempt > 1 ? ` (attempt ${attempt}/${MAX_BUILD_ATTEMPTS})` : ''}`,
+        this.metadata
+      );
+
+      try {
+        const toolMetadata = {
+          ...this.metadata,
+          integrations: Object.values(this.integrations),
+          instruction: this.instruction
+        };
+
+        const toolExecutor = createToolExecutor(toolMetadata);
+
+        const tools = getToolDefinitions(['search_documentation', 'plan_workflow', 'build_workflow']);
+
+        const messages: ChatMessage[] = [
+          {
+            role: "system",
+            content: `You are an expert workflow architect. Your task is to create a complete workflow by:
+1. First searching documentation to understand API capabilities
+2. Creating a detailed plan using plan_workflow
+3. Building the complete workflow with build_workflow
+
+The workflow should fulfill this instruction: ${this.instruction}
+
+Available integrations: ${Object.keys(this.integrations).join(', ')}
+
+Be thorough in your documentation searches. Look for:
+- Authentication patterns
+- Available endpoints
+- Request/response formats
+- Rate limits or special requirements
+
+After planning, build a complete workflow with all necessary API configurations.`
+          },
+          {
+            role: "user",
+            content: `Create a workflow for: "${this.instruction}"
+          
+Initial payload structure: ${JSON.stringify(this.initialPayload, null, 2)}
+Expected output schema: ${JSON.stringify(this.responseSchema, null, 2)}
+
+Start by searching documentation for the integrations, then create a plan, and finally build the workflow.`
+          }
+        ];
+
+        if (lastError && attempt > 1) {
+          messages.push({
+            role: "user",
+            content: `The previous attempt failed with error: ${lastError}
+
+Please try again, making sure to:
+1. Search documentation more thoroughly for the specific requirements
+2. Adjust the plan based on what you learned
+3. Build a workflow that addresses the error`
+          });
+        }
+
+        const result = await LanguageModel.executeTaskWithTools(
+          messages,
+          tools,
+          toolExecutor,
+          {
+            maxIterations: 15,
+            temperature: Math.min(0.2 + (attempt - 1) * 0.1, 0.5)
+          }
+        );
+
+        let builtWorkflow = null;
+        for (const step of result.executionTrace.reverse()) {
+          if (step.toolCall.name === 'build_workflow' &&
+            step.result.result?.success &&
+            step.result.result?.workflow) {
+            builtWorkflow = step.result.result.workflow;
+            break;
+          }
+        }
+
+        if (!builtWorkflow) {
+          throw new Error("No successful build_workflow call found in execution trace");
+        }
+
+        logMessage('info',
+          `Workflow built successfully using tools: ${builtWorkflow.id} with ${builtWorkflow.steps.length} steps`,
+          this.metadata
+        );
+
+        return builtWorkflow;
+
+      } catch (error) {
+        lastError = error instanceof Error ? error.message : String(error);
+        logMessage('warn',
+          `Workflow build attempt ${attempt} failed: ${lastError}`,
+          this.metadata
+        );
+
+        if (attempt === MAX_BUILD_ATTEMPTS) {
+          throw new Error(`Failed to build workflow after ${MAX_BUILD_ATTEMPTS} attempts. Last error: ${lastError}`);
+        }
+      }
+    }
+    throw new Error(`Failed to build workflow: ${lastError}`);
   }
 
   public async build(): Promise<Workflow> {

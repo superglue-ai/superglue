@@ -1,4 +1,4 @@
-import { Metadata } from "@playwright/test";
+import { Metadata } from "@superglue/shared";
 import { Validator } from "jsonschema";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { LanguageModel } from "../llm/llm.js";

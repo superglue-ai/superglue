@@ -1,10 +1,13 @@
 import { Context, Metadata } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
-import { generateInstructions } from "../../utils/instructions.js";
+import { generateInstructionsDefinition, generateInstructionsImplementation } from "../../utils/instructions.js";
+import { executeTool } from "../../tools/tools.js";
+import { ToolCall } from "../../llm/llm.js";
 import { generateSchema } from "../../utils/schema.js";
 import { telemetryClient } from "../../utils/telemetry.js";
 import { getSchemaFromData } from "../../utils/tools.js";
 import { Integration } from "@superglue/client";
+
 export const generateSchemaResolver = async (
   _: any,
   { instruction, responseData }: { instruction: string; responseData?: string; },
@@ -41,7 +44,24 @@ export const generateInstructionsResolver = async (
   info: GraphQLResolveInfo
 ) => {
   try {
-    return generateInstructions(integrations, { orgId: context.orgId });
+    
+    const toolCall: ToolCall = {
+      id: crypto.randomUUID(),
+      name: "generate_instructions",
+      arguments: { integrations }
+    };
+    
+    const result = await executeTool(toolCall, { orgId: context.orgId });
+    
+    if (result.error) {
+      throw new Error(result.error);
+    }
+    
+    if (result.result?.success && Array.isArray(result.result.instructions)) {
+      return result.result.instructions;
+    }
+    
+    throw new Error("Failed to generate instructions");
   } catch (error) {
     telemetryClient?.captureException(error, context.orgId, {
       integrations: integrations
