@@ -99,7 +99,6 @@ export function ExtractCreateStepper({ open, onOpenChange, extractId: initialExt
       if (!formData.instruction) {
         errors.instruction = true
       }
-      console.log('errors', errors)
       if (Object.keys(errors).length > 0) {
         setValidationErrors(errors)
         // Find first error field and scroll to it

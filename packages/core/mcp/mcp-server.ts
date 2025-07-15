@@ -14,6 +14,7 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { validateToken } from '../auth/auth.js';
 import { logMessage } from "../utils/logs.js";
+import { sessionId, telemetryClient } from "../utils/telemetry.js";
 
 // Enums
 export const CacheModeEnum = z.enum(["ENABLED", "READONLY", "WRITEONLY", "DISABLED"]);
@@ -811,7 +812,19 @@ BEST PRACTICES:
       tool.inputSchema,
       async (args, extra) => {
         const result = await tool.execute({ ...args, client, orgId }, extra);
-
+        logMessage('info', `${toolName} executed via MCP`, { orgId: orgId });
+        telemetryClient?.capture({
+          distinctId: orgId || sessionId,
+          event: "mcp_" + toolName,
+          properties: {
+            toolName: toolName,
+            orgId: orgId,
+            args: { 
+              instruction: args?.instruction, 
+              integrationIds: args?.integrationIds
+            }
+          }
+        });      
         return {
           content: [
             {
