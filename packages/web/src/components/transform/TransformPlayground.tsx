@@ -164,7 +164,6 @@ export default function TransformPlayground({ id }: { id?: string }) {
                 throw new Error(`Transform with ID "${idToLoad}" not found.`);
             }
 
-            console.log(transformConfig);
             setTransformId(transformConfig.id);
             setInstruction(transformConfig.instruction || '');
             setTransform(transformConfig.responseMapping || '');
