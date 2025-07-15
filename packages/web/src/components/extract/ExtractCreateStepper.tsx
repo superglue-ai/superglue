@@ -69,7 +69,7 @@ export function ExtractCreateStepper({ open, onOpenChange, extractId: initialExt
       ...prev,
       [field]: value
     }))
-    
+
     // Reset hasMappedResponse and mappedResponseData when schema or instruction changes
     if (field === 'responseSchema' || field === 'instruction') {
       setHasMappedResponse(false)
@@ -90,10 +90,10 @@ export function ExtractCreateStepper({ open, onOpenChange, extractId: initialExt
   const handleNext = async () => {
     if (step === 'basic') {
       const errors: Record<string, boolean> = {}
-      if(activeSourceTab === 'url' && !formData.urlHost) {
+      if (activeSourceTab === 'url' && !formData.urlHost) {
         errors.urlHost = true
       }
-      if(activeSourceTab === 'upload' && !file) {
+      if (activeSourceTab === 'upload' && !file) {
         errors.file = true
       }
       if (!formData.instruction) {
@@ -113,7 +113,7 @@ export function ExtractCreateStepper({ open, onOpenChange, extractId: initialExt
       }
       setValidationErrors({})
 
-      if(file) {
+      if (file) {
         try {
           setIsAutofilling(true)
           await fetchFromFile()
@@ -130,9 +130,9 @@ export function ExtractCreateStepper({ open, onOpenChange, extractId: initialExt
           return
         }
       }
-      
+
       // If URL is selected, fetch from config
-      if(activeSourceTab === 'url') {
+      if (activeSourceTab === 'url') {
         setIsAutofilling(true)
         try {
           await fetchFromConfig()
@@ -164,7 +164,7 @@ export function ExtractCreateStepper({ open, onOpenChange, extractId: initialExt
           instruction: formData.instruction,
           documentationUrl: formData.documentationUrl || undefined,
         } as ExtractConfig)
-        
+
         const savedTransformation = await superglueClient.upsertTransformation(extractId, {
           id: extractId,
           responseSchema: JSON.parse(formData.responseSchema),
@@ -314,14 +314,14 @@ if (transformResult?.success) {
         cacheMode: CacheMode.DISABLED
       }
     })
-  
+
     if (response.error) {
       throw new Error(response.error)
     }
-  
+
     // Store the raw response for the try step
     setInitialRawResponse(response.data)
-  
+
     // Generate schema based on the raw response
     const generatedSchema = await superglueClient.generateSchema(formData.instruction, JSON.stringify(response.data))
     if (generatedSchema) {
@@ -330,13 +330,13 @@ if (transformResult?.success) {
         responseSchema: JSON.stringify(generatedSchema, null, 2)
       }))
     }
-  
+
     // Apply the returned config
     const config = response.config as ApiConfig
     if (config) {
       const id = formData.urlHost.replace(/^https?:\/\//, '').replace(/\//g, '') + '-' + Math.floor(1000 + Math.random() * 9000)
       setExtractId(id)
-  
+
       // Save the configuration with the generated schema
       const savedConfig = await superglueClient.upsertApi(id, {
         id,
@@ -345,7 +345,7 @@ if (transformResult?.success) {
         createdAt: new Date(),
         updatedAt: new Date()
       } as ApiConfig)
-  
+
       if (!savedConfig) {
         throw new Error('Failed to save configuration')
       }
@@ -399,24 +399,24 @@ if (transformResult?.success) {
 
       let mappedData = initialRawResponse;
       let responseMapping = null;
-      if(formData.responseSchema && Object.keys(JSON.parse(formData.responseSchema)).length > 0) {
+      if (formData.responseSchema && Object.keys(JSON.parse(formData.responseSchema)).length > 0) {
         await superglueClient.upsertTransformation(extractId, {
           responseSchema: JSON.parse(formData.responseSchema),
           instruction: formData.instruction
         });
-        
+
         const mappedResult = await superglueClient.transform({
           id: extractId,
           data: initialRawResponse
         });
-        
+
         if (mappedResult.error) {
           throw new Error(mappedResult.error);
         }
         mappedData = mappedResult.data;
         responseMapping = (mappedResult.config as TransformConfig).responseMapping;
       }
-      
+
       setInitialRawResponse(initialRawResponse);
       setMappedResponseData(mappedData);
       setResponseMapping(responseMapping);
@@ -448,7 +448,7 @@ if (transformResult?.success) {
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault()
     setIsDragging(false)
-    
+
     const file = e.dataTransfer.files[0]
     if (!file) return
     setFile(file)
@@ -485,7 +485,7 @@ if (transformResult?.success) {
         const header = Object.keys(items[0] || {});
         const csv = [
           header.join(','),
-          ...items.map(row => header.map(field => 
+          ...items.map(row => header.map(field =>
             JSON.stringify(row[field], replacer)).join(','))
         ].join('\r\n');
 
@@ -504,7 +504,7 @@ if (transformResult?.success) {
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent 
+      <DialogContent
         className="h-[100vh] w-[100vw] max-w-[100vw] p-3 sm:p-6 lg:p-12 gap-0 rounded-none border-none flex flex-col"
         onPointerDownOutside={e => e.preventDefault()}
       >
@@ -560,8 +560,8 @@ if (transformResult?.success) {
                 )}
               </div>
 
-              <Tabs 
-                defaultValue="upload" 
+              <Tabs
+                defaultValue="upload"
                 className="w-full"
                 value={activeSourceTab}
                 onValueChange={(value) => setActiveSourceTab(value as 'upload' | 'url')}
@@ -570,9 +570,9 @@ if (transformResult?.success) {
                   <TabsTrigger value="upload">Upload File</TabsTrigger>
                   <TabsTrigger value="url">Configure from URL</TabsTrigger>
                 </TabsList>
-                
+
                 <TabsContent value="upload">
-                  <div 
+                  <div
                     className={cn(
                       "relative rounded-lg border-2 border-dashed p-8",
                       isDragging ? "border-primary bg-primary/5" : "border-muted-foreground/25",
@@ -674,17 +674,17 @@ if (transformResult?.success) {
                     />
                   </div>
                   <div>
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <Label htmlFor="auth">API Key or Token for Target API (Optional)</Label>
-                    <HelpTooltip text="Enter API key/token here, superglue figures out where to put it. Do not include prefixes like Bearer or Basic in the field." />
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <Label htmlFor="auth">API Key or Token for Target API (Optional)</Label>
+                      <HelpTooltip text="Enter API key/token here, superglue figures out where to put it. Do not include prefixes like Bearer or Basic in the field." />
+                    </div>
+                    <Input
+                      id="auth"
+                      value={formData.auth.value}
+                      onChange={(e) => handleAuthChange(e.target.value)}
+                      placeholder="Enter your API key or token"
+                    />
                   </div>
-                  <Input
-                    id="auth"
-                    value={formData.auth.value}
-                    onChange={(e) => handleAuthChange(e.target.value)}
-                    placeholder="Enter your API key or token"
-                  />
-                </div>
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <Label htmlFor="documentationUrl">API Documentation (Optional)</Label>
@@ -704,11 +704,11 @@ if (transformResult?.success) {
                           variant="outline"
                           onClick={() => setFormData(prev => ({
                             ...prev,
-                            inputPayload: prev.inputPayload === '{}' ? 
+                            inputPayload: prev.inputPayload === '{}' ?
                               JSON.stringify({
                                 query: "",
                                 filters: {}
-                              }, null, 2) : 
+                              }, null, 2) :
                               '{}'
                           }))}
                           className="w-full h-full"
@@ -740,7 +740,7 @@ if (transformResult?.success) {
 
           {step === 'try_and_output' && (
             <div className="space-y-2 h-full">
-              <InteractiveExtractPlayground 
+              <InteractiveExtractPlayground
                 configId={extractId}
                 instruction={formData.instruction}
                 onInstructionChange={handleChange('instruction')}
@@ -763,14 +763,14 @@ if (transformResult?.success) {
             <div className="space-y-4 h-full">
               <p className="text-m font-medium">Done!</p>
               <p className="text-sm font-medium">Your extraction is complete. You can now download the results or use the code examples below.</p>
-              
+
               <Tabs defaultValue="download" className="w-full">
                 <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="download">Download Result</TabsTrigger>
                   <TabsTrigger value="curl">cURL</TabsTrigger>
                   <TabsTrigger value="sdk">TypeScript SDK</TabsTrigger>
                 </TabsList>
-                
+
                 <TabsContent value="download">
                   <div className="rounded-md bg-muted p-4">
                     <div className="flex items-start space-x-2">
@@ -803,7 +803,7 @@ if (transformResult?.success) {
                     </div>
                   </div>
                 </TabsContent>
-                
+
                 <TabsContent value="curl">
                   <div className="rounded-md bg-muted p-4">
                     <div className="flex items-start space-x-2">
@@ -812,7 +812,7 @@ if (transformResult?.success) {
                         <div className="flex items-center justify-between">
                           <p className="text-sm font-medium">Try the endpoint locally with curl: </p>
                           <Button
-                            variant="ghost" 
+                            variant="ghost"
                             size="icon"
                             className="h-8 w-8 shrink-0"
                             onClick={() => {
@@ -831,7 +831,7 @@ if (transformResult?.success) {
                     </div>
                   </div>
                 </TabsContent>
-                
+
                 <TabsContent value="sdk">
                   <div className="rounded-md bg-muted p-4">
                     <div className="flex items-start space-x-2">
@@ -840,7 +840,7 @@ if (transformResult?.success) {
                         <div className="flex items-center justify-between">
                           <p className="text-sm font-medium">Or use the TypeScript SDK in your application: </p>
                           <Button
-                            variant="ghost" 
+                            variant="ghost"
                             size="icon"
                             className="h-8 w-8 shrink-0"
                             onClick={() => {
@@ -914,7 +914,7 @@ if (transformResult?.success) {
                     {step as StepperStep === 'basic' ? 'superglue extracts file...' : 'Configuring...'}
                   </>
                 ) : (
-                  step === 'try_and_output' ? 
+                  step === 'try_and_output' ?
                     (isRunning ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -924,7 +924,7 @@ if (transformResult?.success) {
                       <>
                         ✨ Run
                       </>
-                    ) : 'Complete')) : 
+                    ) : 'Complete')) :
                     'Next'
                 )}
               </Button>

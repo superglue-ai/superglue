@@ -1,9 +1,11 @@
+import { useConfig } from '@/src/app/config-context';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/src/components/ui/select";
+import { useToast } from '@/src/hooks/use-toast';
 import { integrations as integrationTemplates } from '@/src/lib/integrations';
 import { cn } from '@/src/lib/utils';
-import { Integration } from "@superglue/client";
+import { Integration, SuperglueClient } from "@superglue/client";
 import { ArrowDown, Check, Globe, Pencil, RotateCw, Trash2, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { SimpleIcon } from 'simple-icons';
 import * as simpleIcons from 'simple-icons';
 import { Badge } from "../ui/badge";
@@ -23,9 +25,48 @@ interface WorkflowStepCardProps {
   onCreateIntegration?: () => void;
 }
 
-export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations, onCreateIntegration }: WorkflowStepCardProps) {
+export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations: propIntegrations, onCreateIntegration }: WorkflowStepCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedStep, setEditedStep] = useState(step);
+  const [localIntegrations, setLocalIntegrations] = useState<Integration[]>([]);
+  const [loadingIntegrations, setLoadingIntegrations] = useState(false);
+
+  const config = useConfig();
+  const { toast } = useToast();
+
+  const client = useMemo(() => new SuperglueClient({
+    endpoint: config.superglueEndpoint,
+    apiKey: config.superglueApiKey,
+  }), [config.superglueEndpoint, config.superglueApiKey]);
+
+  const loadIntegrations = async () => {
+    if (localIntegrations.length > 0) return; // Already loaded
+
+    try {
+      setLoadingIntegrations(true);
+      const result = await client.listIntegrations(100, 0);
+      setLocalIntegrations(result.items);
+    } catch (error: any) {
+      console.error("Error loading integrations:", error);
+      toast({
+        title: "Error loading integrations",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingIntegrations(false);
+    }
+  };
+
+  // Load integrations when editing starts
+  useEffect(() => {
+    if (isEditing) {
+      loadIntegrations();
+    }
+  }, [isEditing]);
+
+  // Use prop integrations if provided, otherwise use locally loaded ones
+  const integrations = propIntegrations || localIntegrations;
 
   // Helper function for icon handling
   const getSimpleIcon = (name: string): SimpleIcon | null => {
@@ -79,27 +120,38 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations,
 
   // Find matching integration based on integrationId or urlHost
   const linkedIntegration = integrations?.find(integration => {
-    // First try direct ID match
-    if (editedStep.integrationId && integration.id === editedStep.integrationId) {
+    // First try direct ID match from both editedStep and original step
+    if ((editedStep.integrationId && integration.id === editedStep.integrationId) ||
+      (step.integrationId && integration.id === step.integrationId)) {
       return true;
     }
     // Fallback to URL host matching
     return step.apiConfig?.urlHost && integration.urlHost &&
       step.apiConfig.urlHost.includes(integration.urlHost.replace(/^https?:\/\//, ''));
   });
+
+  // Sync integrationId with linked integration
+  useEffect(() => {
+    if (linkedIntegration && !editedStep.integrationId) {
+      setEditedStep(prev => ({
+        ...prev,
+        integrationId: linkedIntegration.id
+      }));
+    }
+  }, [linkedIntegration, editedStep.integrationId, step.integrationId]);
   return (
     <div className="flex flex-col items-center">
       <Card className={cn("w-full", isEditing ? "border-primary" : "bg-muted/50")}>
         <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              {editedStep.executionMode === 'LOOP' && (
-                <RotateCw className="h-4 w-4 text-muted-foreground" />
-              )}
-              <span className="font-mono">{step.id}</span>
-              {linkedIntegration && !isEditing && (
-                <Badge variant="outline" className="text-xs">
-                  {linkedIntegration && (
+          <div className="flex items-center justify-between min-w-0">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <CardTitle className="text-sm font-medium flex items-center gap-2 min-w-0">
+                {editedStep.executionMode === 'LOOP' && (
+                  <RotateCw className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                )}
+                <span className="font-mono truncate">{step.id}</span>
+                {linkedIntegration && !isEditing && (
+                  <Badge variant="outline" className="text-xs flex-shrink-0">
                     <div className="text-xs flex items-center gap-1">
                       {getIntegrationIcon(linkedIntegration) ? (
                         <svg
@@ -114,22 +166,22 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations,
                       ) : (
                         <Globe className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
                       )}
-                      <span>{linkedIntegration.id}</span>
+                      <span className="truncate">{linkedIntegration.id}</span>
                     </div>
-                  )}
-                </Badge>
-              )}
-            </CardTitle>
-            <div className="flex items-center gap-2">
+                  </Badge>
+                )}
+              </CardTitle>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
               {isEditing && (
-                <div className="flex items-center gap-1">
-                  <Label className="text-xs">Mode</Label>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <Label className="text-xs whitespace-nowrap">Mode</Label>
                   <HelpTooltip text="DIRECT: Execute once with input data. LOOP: Execute multiple times iterating over an array from previous steps." />
                   <Select
                     value={editedStep.executionMode}
                     onValueChange={(value) => setEditedStep(prev => ({ ...prev, executionMode: value }))}
                   >
-                    <SelectTrigger className="h-7 w-24">
+                    <SelectTrigger className="h-7 w-24 flex-shrink-0">
                       <SelectValue placeholder="Mode" />
                     </SelectTrigger>
                     <SelectContent>
@@ -139,22 +191,22 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations,
                   </Select>
                 </div>
               )}
-              <div className="flex gap-1">
+              <div className="flex gap-1 flex-shrink-0">
                 {isEditing ? (
                   <>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={handleRemove}>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive flex-shrink-0" onClick={handleRemove}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleCancel}>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={handleCancel}>
                       <X className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleSave}>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={handleSave}>
                       <Check className="h-4 w-4" />
                     </Button>
                   </>
                 ) : (
                   <>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsEditing(true)}>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={() => setIsEditing(true)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
                   </>
@@ -169,27 +221,48 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations,
               <div className="space-y-2">
                 <div>
                   <Label className="text-xs flex items-center gap-1">
+                    Step Instruction
+                    <HelpTooltip text="AI-generated instruction for this step. This describes what the step does and how it should behave." />
+                  </Label>
+                  <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded mt-1">
+                    {editedStep.apiConfig.instruction || <span className="italic">No instruction provided</span>}
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="text-xs flex items-center gap-1">
                     Integration
-                    <HelpTooltip text="Link this step to an integration to reuse authentication credentials and base URLs. Leave empty to use manual API configuration." />
+                    <HelpTooltip text="Select an integration to link this step to. This will pre-fill the API configuration with the integration's base URL and credentials." />
                   </Label>
                   <Select
-                    value={editedStep.integrationId || "none"}
+                    value={editedStep.integrationId || step.integrationId}
                     onValueChange={(value) => {
                       if (value === "CREATE_NEW") {
                         onCreateIntegration?.();
                       } else {
+                        const selectedIntegration = integrations?.find(integration => integration.id === value);
                         setEditedStep(prev => ({
                           ...prev,
-                          integrationId: value === "none" ? undefined : value
+                          integrationId: value,
+                          apiConfig: {
+                            ...prev.apiConfig,
+                            // Pre-fill API config from selected integration
+                            urlHost: selectedIntegration?.urlHost || prev.apiConfig.urlHost,
+                            urlPath: selectedIntegration?.urlPath || prev.apiConfig.urlPath,
+                            headers: selectedIntegration?.credentials ?
+                              Object.entries(selectedIntegration.credentials).reduce((acc, [key, value]) => ({
+                                ...acc,
+                                [key]: value
+                              }), {}) : prev.apiConfig.headers
+                          }
                         }));
                       }
                     }}
                   >
                     <SelectTrigger className="h-9 mt-1">
-                      <SelectValue placeholder="Select integration (optional)" />
+                      <SelectValue placeholder="Select integration" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
                       {integrations?.map(integration => (
                         <SelectItem key={integration.id} value={integration.id}>
                           <div className="flex items-center gap-2 w-full">

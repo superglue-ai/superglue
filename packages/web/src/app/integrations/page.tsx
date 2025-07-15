@@ -93,14 +93,14 @@ export default function IntegrationsPage() {
         } catch (error) {
             console.error('Error deleting integration:', error);
             toast({
-                title: 'Error Deleting Integration',
-                description: error instanceof Error ? error.message : 'Failed to delete integration',
+                title: 'Error',
+                description: 'Failed to delete integration',
                 variant: 'destructive',
             });
         }
     };
 
-    const handleEdit = (integration: Integration) => {
+    const handleEdit = async (integration: Integration) => {
         setEditingIntegration(integration);
         setAddFormOpen(true);
     };
@@ -120,7 +120,6 @@ export default function IntegrationsPage() {
                 const needsDocFetch = needsUIToTriggerDocFetch(savedIntegration, editingIntegration);
 
                 if (needsDocFetch) {
-                    // Set pending state for new integrations with doc URLs
                     setPendingDocIds(prev => new Set([...prev, savedIntegration.id]));
 
                     // Fire-and-forget poller for background doc fetch
@@ -134,31 +133,29 @@ export default function IntegrationsPage() {
                     });
                 }
 
-                // Refresh integrations to ensure UI is updated
+                setEditingIntegration(null);
+                setAddFormOpen(false);
                 await refreshIntegrations();
             }
         } catch (error) {
             console.error('Error saving integration:', error);
             toast({
-                title: 'Error Saving Integration',
-                description: error instanceof Error ? error.message : 'Failed to save integration',
+                title: 'Error',
+                description: 'Failed to save integration',
                 variant: 'destructive',
             });
-        } finally {
-            handleModalClose();
         }
     };
 
     // Function to refresh documentation for a specific integration
     const handleRefreshDocs = async (integrationId: string) => {
+        // Get current integration
+        const integration = integrations.find(i => i.id === integrationId);
+        if (!integration) return;
         // Set pending state immediately
         setPendingDocIds(prev => new Set([...prev, integrationId]));
 
         try {
-            // Get current integration to upsert with documentationPending=true
-            const integration = integrations.find(i => i.id === integrationId);
-            if (!integration) return;
-
             // Use documentationPending flag to trigger backend refresh
             const upsertData = {
                 id: integration.id,
@@ -231,21 +228,8 @@ export default function IntegrationsPage() {
 
     // Helper function to determine if integration has documentation
     const hasDocumentation = (integration: Integration) => {
-        // Check for direct documentation content or URL
-        const hasDirectDocs = !!(integration.documentation || integration.documentationUrl);
-
-        // For direct doc upload scenarios, if there's documentation content, consider it available
-        // even if documentationPending might be true (since it's already uploaded)
-        if (integration.documentation && integration.documentation.trim()) {
-            return true;
-        }
-
-        // For URL-based docs, check if not pending and has URL
-        if (integration.documentationUrl && !pendingDocIds.has(integration.id)) {
-            return true;
-        }
-
-        return hasDirectDocs;
+        // Check if integration has documentation URL and is not pending
+        return !!(integration.documentationUrl?.trim() && !pendingDocIds.has(integration.id));
     };
 
     // Helper to get icon for integration
@@ -256,6 +240,7 @@ export default function IntegrationsPage() {
         );
         return match ? getSimpleIcon(match.icon) : null;
     }
+
 
     const handleRefresh = async () => {
         setIsRefreshing(true);
@@ -358,8 +343,19 @@ export default function IntegrationsPage() {
                                                 size="icon"
                                                 className="h-8 w-8 text-muted-foreground hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
                                                 onClick={() => handleRefreshDocs(integration.id)}
-                                                disabled={!integration.documentationUrl || !integration.documentationUrl.trim() || pendingDocIds.has(integration.id)}
-                                                title={integration.documentationUrl && integration.documentationUrl.trim() ? "Refresh documentation from URL" : "No documentation URL to refresh"}
+                                                disabled={
+                                                    !integration.documentationUrl ||
+                                                    !integration.documentationUrl.trim() ||
+                                                    integration.documentationUrl.startsWith('file://') ||
+                                                    pendingDocIds.has(integration.id)
+                                                }
+                                                title={
+                                                    integration.documentationUrl?.startsWith('file://')
+                                                        ? "Cannot refresh file uploads"
+                                                        : !integration.documentationUrl || !integration.documentationUrl.trim()
+                                                            ? "No documentation URL to refresh"
+                                                            : "Refresh documentation from URL"
+                                                }
                                             >
                                                 <FileDown className="h-4 w-4" />
                                             </Button>
