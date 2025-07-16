@@ -21,7 +21,7 @@ type ApiConfig implements BaseConfig {
   updatedAt: DateTime
 
   # Specific implementation
-  urlHost: String!
+  urlHost: String
   urlPath: String
   instruction: String
   method: HttpMethod
@@ -44,7 +44,7 @@ type ExtractConfig implements BaseConfig {
   updatedAt: DateTime
 
   # Specific implementation
-  urlHost: String!
+  urlHost: String
   urlPath: String
   queryParams: JSON
   instruction: String
@@ -170,6 +170,12 @@ enum LogLevel {
   ERROR
 }
 
+enum UpsertMode {
+  CREATE
+  UPDATE
+  UPSERT
+}
+
 input PaginationInput {
   type: PaginationType!
   pageSize: String
@@ -178,7 +184,7 @@ input PaginationInput {
 
 input ApiInput {
   id: ID!
-  urlHost: String!
+  urlHost: String
   urlPath: String
   instruction: String
   queryParams: JSON
@@ -196,7 +202,7 @@ input ApiInput {
 
 input ExtractInput {
   id: ID!
-  urlHost: String!
+  urlHost: String
   urlPath: String
   queryParams: JSON
   instruction: String
@@ -226,6 +232,7 @@ input RequestOptions {
   retries: Int
   retryDelay: Int
   webhookUrl: String
+  testMode: Boolean
 }
 
 enum SelfHealingMode {
@@ -256,13 +263,16 @@ input WorkflowInputRequest @oneOf {
   id: ID
 }
 
-input SystemInput {
-  id: String!
-  urlHost: String!
+input IntegrationInput {
+  id: ID!
+  name: String
+  urlHost: String
   urlPath: String
+  credentials: JSON
   documentationUrl: String
   documentation: String
-  credentials: JSON
+  documentationPending: Boolean
+  specificInstructions: String
 }
 
 type Log {
@@ -273,6 +283,12 @@ type Log {
   runId: ID
 }
 
+type SuggestedIntegration {
+  id: String!
+  reason: String!
+  savedCredentials: [String!]!
+}
+
 type Query {
   listRuns(limit: Int = 10, offset: Int = 0, configId: ID): RunList!
   listApis(limit: Int = 10, offset: Int = 0): ApiList!
@@ -280,6 +296,7 @@ type Query {
   listExtracts(limit: Int = 10, offset: Int = 0): ExtractList!
   listWorkflows(limit: Int = 10, offset: Int = 0): WorkflowList!
   listIntegrations(limit: Int = 10, offset: Int = 0): IntegrationList!
+  findRelevantIntegrations(instruction: String): [SuggestedIntegration!]
 
   getRun(id: ID!): RunResult
   getApi(id: ID!): ApiConfig
@@ -289,7 +306,7 @@ type Query {
   getIntegration(id: ID!): Integration
 
   generateSchema(instruction: String!, responseData: String): JSONSchema!
-  generateInstructions(systems: [SystemInput!]!): [String!]!
+  generateInstructions(integrations: [IntegrationInput!]!): [String!]!
   getTenantInfo: TenantInfo
   
   # Workflow queries
@@ -303,6 +320,7 @@ type TenantInfo {
 type ExecutionStep {
   id: String!
   apiConfig: ApiConfig!
+  integrationId: ID
   executionMode: String  # DIRECT | LOOP
   loopSelector: JSONata
   loopMaxIters: Int
@@ -313,6 +331,7 @@ type ExecutionStep {
 input ExecutionStepInput {
   id: String!
   apiConfig: ApiInput!
+  integrationId: ID
   executionMode: String  # DIRECT | LOOP
   loopSelector: JSONata
   loopMaxIters: Int
@@ -329,6 +348,7 @@ type Workflow implements BaseConfig {
 
   # Specific implementation
   steps: [ExecutionStep!]
+  integrationIds: [ID]
   instruction: String
   finalTransform: JSONata
   responseSchema: JSONSchema
@@ -357,6 +377,7 @@ type WorkflowResult {
 input WorkflowInput {
   id: String!
   steps: [ExecutionStepInput!]
+  integrationIds: [ID!]
   finalTransform: JSONata
   inputSchema: JSONSchema
   responseSchema: JSONSchema
@@ -397,7 +418,7 @@ type Mutation {
   buildWorkflow(
     instruction: String!
     payload: JSON
-    systems: [SystemInput!]!
+    integrationIds: [ID!]!
     responseSchema: JSONSchema
   ): Workflow!
 
@@ -415,7 +436,10 @@ type Mutation {
   upsertTransformation(id: ID!, input: JSON!): TransformConfig!
   deleteTransformation(id: ID!): Boolean!
 
-  upsertIntegration(input: IntegrationInput!): Integration!
+  upsertIntegration(
+    input: IntegrationInput!
+    mode: UpsertMode = UPSERT
+  ): Integration!
   deleteIntegration(id: ID!): Boolean!
 }
 
@@ -427,28 +451,15 @@ type Integration {
   id: ID!
   name: String
   type: String
-  urlHost: String!
+  urlHost: String
   urlPath: String
   credentials: JSON
   documentationUrl: String
   documentation: String
+  documentationPending: Boolean
+  specificInstructions: String
   icon: String
-  orgId: String
   version: String
   createdAt: DateTime
   updatedAt: DateTime
-}
-
-input IntegrationInput {
-  id: ID!
-  name: String
-  type: String
-  urlHost: String!
-  urlPath: String
-  credentials: JSON
-  documentationUrl: String
-  documentation: String
-  icon: String
-  orgId: String
-  version: String
 }

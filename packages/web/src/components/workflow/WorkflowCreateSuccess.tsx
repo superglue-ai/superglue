@@ -6,7 +6,6 @@ import { useState } from 'react'
 import { getSDKCode } from '@superglue/shared/templates'
 
 type Workflow = any // Replace with your actual Workflow type
-type SystemInput = any // Replace with your actual SystemInput type
 
 interface WorkflowCreateSuccessProps {
   currentWorkflow: Workflow

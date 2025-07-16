@@ -103,7 +103,7 @@ OPENAI_API_KEY=sk-proj-XXXXXXXX
 OPENAI_MODEL=gpt-4.1
 # Optional: Set a custom OpenAI API URL (for self-hosted models or providers like fireworks.ai)
 # for fireworks, use https://api.fireworks.ai/inference/v1
-OPENAI_API_BASE_URL=https://api.openai.com/v1
+OPENAI_BASE_URL=https://api.openai.com/v1
 
 # Disable the welcome/onboarding screen for development
 NEXT_PUBLIC_DISABLE_WELCOME_SCREEN=false

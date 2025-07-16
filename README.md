@@ -3,7 +3,7 @@
   <img src="https://github.com/user-attachments/assets/be0e65d4-dcd8-4133-9841-b08799e087e7" width="350" alt="superglue_logo_white">
 </p>
 
-<h2 align="center">Automate workflows with natural language.</h2>
+<h2 align="center">Integrate & Orchestrate APIs with natural language.</h2>
 <div align="center">
   
  [![GitHub](https://img.shields.io/github/license/superglue-ai/superglue?style=flat-square)](https://github.com/superglue-ai/superglue/blob/main/LICENSE)
@@ -20,7 +20,7 @@ Let's glue.<br>
 
 
 ## what is superglue?
-superglue automates workflows from natural language. Tell it what you want to do in your CRM, ERP and co. and superglue builds, runs and executes the integration pipelines automatically. Comes with automated schema mapping, drift detection, retries and remappings so your workflows keep running no matter what. 
+superglue orchestrates APIs from natural language. Tell it what you want to do in your CRM, ERP and co. and superglue builds, runs and executes the integration pipelines automatically. Comes with automated schema mapping, drift detection, retries and remappings so your API workflows keep running no matter what. 
 superglue makes agents reliable in prod by letting them build deterministic workflows across any SaaS app, API and data source. Use the superglue MCP instead of hard-coding tools and let your agent use APIs the way they want to, not the way they were written. 
 
 - Lightweight proxy: point it at any REST / GraphQL / SQL / postgres / file endpoint.

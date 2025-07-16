@@ -10,13 +10,17 @@
     "dev": "turbo run dev",
     "start": "turbo run start",
     "test": "turbo run test",
+    "test:unit": "turbo run test",
     "test:coverage": "turbo run test:coverage",
+    "test:integration": "cd packages/core && npm run build && npm run test:integration",
+    "test:all": "npm run test:unit && npm run test:integration",
     "lint": "turbo run lint",
-    "clean": "turbo run clean"
+    "clean": "turbo run clean",
+    "generate-ranking": "cd packages/core && npm run generate-ranking"
   },
   "dependencies": {
     "@playwright/test": "^1.50.1",
-    "@superglue/client": "^2.3.32",
+    "@superglue/client": "^2.3.43",
     "dotenv": "^16.4.7",
     "dotenv-cli": "^8.0.0"
   },

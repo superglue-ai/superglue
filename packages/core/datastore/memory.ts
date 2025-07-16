@@ -1,4 +1,4 @@
-import { ApiConfig, ExtractConfig, RunResult, TransformConfig, Workflow, Integration } from "@superglue/client";
+import { ApiConfig, ExtractConfig, Integration, RunResult, TransformConfig, Workflow } from "@superglue/client";
 import { createHash } from 'node:crypto';
 import type { DataStore } from "./types.js";
 
@@ -152,7 +152,7 @@ export class MemoryStore implements DataStore {
     const index = this.storage.runsIndex.get(orgId)!;
     index.push({
       id: run.id,
-      timestamp: run.startedAt.getTime(),
+      timestamp: run.startedAt?.getTime() ?? 0,
       configId: run.config?.id
     });
     index.sort((a, b) => b.timestamp - a.timestamp);
@@ -171,7 +171,15 @@ export class MemoryStore implements DataStore {
       const key = this.getKey('run', id, orgId);
       const run = this.storage.runs.get(key);
       return run ? { ...run, id } : null;
-    }).filter((run): run is RunResult => run !== null);
+    }).filter((run): run is RunResult =>
+      run !== null &&
+      run.config &&
+      run.config.id &&
+      run.startedAt instanceof Date
+    );
+
+    // Sort by startedAt timestamp (most recent first)
+    items.sort((a, b) => (b.startedAt?.getTime() ?? 0) - (a.startedAt?.getTime() ?? 0));
 
     return { items, total: index.length };
   }
@@ -248,6 +256,16 @@ export class MemoryStore implements DataStore {
     return { items, total };
   }
 
+  async getManyWorkflows(ids: string[], orgId?: string): Promise<Workflow[]> {
+    return ids
+      .map(id => {
+        const key = this.getKey('workflow', id, orgId);
+        const workflow = this.storage.workflows.get(key);
+        return workflow ? { ...workflow, id } : null;
+      })
+      .filter((w): w is Workflow => w !== null);
+  }
+
   async upsertWorkflow(id: string, workflow: Workflow, orgId?: string): Promise<Workflow> {
     if (!id || !workflow) return null;
     const key = this.getKey('workflow', id, orgId);
@@ -275,6 +293,16 @@ export class MemoryStore implements DataStore {
     const items = orgItems.slice(offset, offset + limit);
     const total = orgItems.length;
     return { items, total };
+  }
+
+  async getManyIntegrations(ids: string[], orgId?: string): Promise<Integration[]> {
+    return ids
+      .map(id => {
+        const key = this.getKey('integration', id, orgId);
+        const integration = this.storage.integrations.get(key);
+        return integration ? { ...integration, id } : null;
+      })
+      .filter((i): i is Integration => i !== null);
   }
 
   async upsertIntegration(id: string, integration: Integration, orgId?: string): Promise<Integration> {

@@ -9,6 +9,9 @@ import { logMessage } from "./logs.js";
 import { callPostgres } from './postgres.js';
 import { composeUrl } from "./tools.js";
 
+const DOC_AXIOS_TIMEOUT_MS = 60000;
+const DOC_PLAYWRIGHT_TIMEOUT_MS = 15000;
+
 // Strategy Interface
 interface FetchingStrategy {
   tryFetch(config: DocumentationConfig, metadata: Metadata, credentials?: Record<string, any>): Promise<string | null>;
@@ -18,7 +21,7 @@ interface ProcessingStrategy {
 }
 
 export interface DocumentationConfig {
-  urlHost: string;
+  urlHost?: string;
   instruction?: string;
   documentationUrl?: string;
   urlPath?: string;
@@ -42,9 +45,55 @@ export class Documentation {
     this.metadata = metadata;
   }
 
-  // --- Post Processing ---
+  // Main function to fetch and process documentation using strategies
+  public async fetchAndProcess(): Promise<string> {
 
-  private postProcess(documentation: string, instruction: string): string {
+    if (this.lastResult) {
+      return this.lastResult;
+    }
+
+    const fetchingStrategies: FetchingStrategy[] = [
+      new GraphQLStrategy(),
+      new PlaywrightFetchingStrategy(),
+      new AxiosFetchingStrategy()
+    ];
+
+    const processingStrategies: ProcessingStrategy[] = [
+      new OpenApiStrategy(),
+      new PostgreSqlStrategy(),
+      new HtmlMarkdownStrategy(),
+      new RawPageContentStrategy()
+    ];
+
+    let rawResult: string | null = null;
+
+    for (const strategy of fetchingStrategies) {
+      const result = await strategy.tryFetch(this.config, this.metadata, this.credentials);
+      if (result == null || result.length === 0) {
+        continue;
+      }
+      rawResult = result;
+      break;
+    }
+
+    if (!rawResult) {
+      rawResult = "";
+    }
+
+    for (const strategy of processingStrategies) {
+      const result = await strategy.tryProcess(rawResult, this.config, this.metadata, this.credentials);
+      if (result == null || result.length === 0) {
+        continue;
+      }
+      this.lastResult = result;
+      return this.lastResult;
+    }
+
+    logMessage('warn', "No processing strategy could handle the fetched documentation.", this.metadata);
+    return "";
+  }
+
+  public static postProcess(documentation: string, instruction: string): string {
     if (documentation.length <= Documentation.MAX_LENGTH) {
       return documentation;
     }
@@ -62,7 +111,7 @@ export class Documentation {
     searchTerms.push('securityschemes', 'authorization', 'authentication');
 
     // Split document into chunks
-    const chunks: { content: string; score: number; index: number }[] = [];
+    const chunks: { content: string; score: number; index: number; }[] = [];
 
     for (let i = 0; i < documentation.length; i += CHUNK_SIZE) {
       const chunk = documentation.slice(i, i + CHUNK_SIZE);
@@ -102,72 +151,9 @@ export class Documentation {
       ? result.slice(0, Documentation.MAX_LENGTH)
       : result;
   }
-
-
-  // --- Main Method using Strategies ---
-  async fetch(instruction: string = ""): Promise<string> {
-    if (this.lastResult) {
-      return this.postProcess(this.lastResult, instruction);
-    }
-
-    const fetchingStrategies: FetchingStrategy[] = [
-      new RawContentStrategy(),
-      new GraphQLStrategy(),
-      new PlaywrightFetchingStrategy(),
-      new AxiosFetchingStrategy()
-    ];
-
-    const processingStrategies: ProcessingStrategy[] = [
-      new OpenApiStrategy(),
-      new PostgreSqlStrategy(),
-      new HtmlMarkdownStrategy(),
-      new RawPageContentStrategy()
-    ];
-
-    let rawResult: string | null = null;
-
-    for (const strategy of fetchingStrategies) {
-      const result = await strategy.tryFetch(this.config, this.metadata, this.credentials);
-      if (result == null || result.length === 0) {
-        continue;
-      }
-      rawResult = result;
-      break;
-    }
-
-    if (!rawResult) {
-      rawResult = "";
-    }
-
-    for (const strategy of processingStrategies) {
-      const result = await strategy.tryProcess(rawResult, this.config, this.metadata, this.credentials);
-      if (result == null || result.length === 0) {
-        continue;
-      }
-      this.lastResult = this.postProcess(result, instruction);
-      return this.lastResult;
-    }
-
-    logMessage('warn', "No processing strategy could handle the fetched documentation.", this.metadata);
-    return "";
-  }
 }
 
 // --- Concrete Strategy Implementations ---
-
-class RawContentStrategy implements FetchingStrategy {
-  async tryFetch(config: ApiConfig, metadata: Metadata): Promise<string | null> {
-    if (!config.documentationUrl?.startsWith("http")) {
-      // It's raw content passed directly in the URL field
-      if (config.documentationUrl && config.documentationUrl.length > 0) {
-        logMessage('info', "Using raw content provided directly as documentation.", metadata);
-        return config.documentationUrl;
-      }
-      return null;
-    }
-    return null; // Not applicable
-  }
-}
 
 class GraphQLStrategy implements FetchingStrategy {
   private async fetchGraphQLSchema(url: string, config: ApiConfig, metadata: Metadata): Promise<any | null> {
@@ -180,7 +166,7 @@ class GraphQLStrategy implements FetchingStrategy {
           query: introspectionQuery,
           operationName: 'IntrospectionQuery'
         },
-        { headers: config.headers, params: config.queryParams }
+        { headers: config.headers, params: config.queryParams, timeout: DOC_AXIOS_TIMEOUT_MS }
       );
 
       if (response.data.errors) {
@@ -235,7 +221,7 @@ export class AxiosFetchingStrategy implements FetchingStrategy {
         });
       }
 
-      const response = await axios.get(url.toString(), { headers: config.headers });
+      const response = await axios.get(url.toString(), { headers: config.headers, timeout: DOC_AXIOS_TIMEOUT_MS });
       logMessage('info', `Successfully fetched content with axios for ${config.documentationUrl}`, metadata);
       return response.data;
     } catch (error) {
@@ -246,7 +232,7 @@ export class AxiosFetchingStrategy implements FetchingStrategy {
 }
 // Special strategy solely responsible for fetching page content if needed
 export class PlaywrightFetchingStrategy implements FetchingStrategy {
-  // --- Static Helpers (accessible by strategies) ---
+  private static readonly MAX_FETCHED_LINKS = 10;
   private static browserInstance: playwright.Browser | null = null;
 
   private static async getBrowser(): Promise<playwright.Browser> {
@@ -265,7 +251,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       await closedInstance.close();
     }
   }
-  private async fetchPageContentWithPlaywright(urlString: string, config: ApiConfig, metadata: Metadata): Promise<{ content: string; links: Record<string, string> } | null> {
+  private async fetchPageContentWithPlaywright(urlString: string, config: ApiConfig, metadata: Metadata): Promise<{ content: string; links: Record<string, string>; } | null> {
 
     if (!urlString?.startsWith("http")) {
       return null;
@@ -292,7 +278,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       await page.goto(url.toString());
       // Wait for network idle might be better for SPAs, but has risks of timeout
       // Let's stick with domcontentloaded + short timeout
-      await page.waitForLoadState('domcontentloaded', { timeout: 15000 });
+      await page.waitForLoadState('domcontentloaded', { timeout: DOC_PLAYWRIGHT_TIMEOUT_MS });
       await page.waitForTimeout(1000); // Allow JS execution
 
       const links: Record<string, string> = await page.evaluate(() => {
@@ -300,7 +286,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
         const allLinks = document.querySelectorAll('a');
         allLinks.forEach(link => {
           const key = link.textContent?.toLowerCase().trim().replace(/[^a-z0-9]/g, ' ');
-          links[key] = link.href;
+          links[key] = link?.href?.split('#')[0];
         });
         return links;
       });
@@ -339,39 +325,79 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
   }
 
   async tryFetch(config: ApiConfig, metadata: Metadata): Promise<string | null> {
-    // Only fetch if it's an HTTP URL and content hasn't been fetched yet
-    // Pass metadata
     const docResult = await this.fetchPageContentWithPlaywright(config?.documentationUrl, config, metadata);
     let fetchedLinks = new Set<string>();
-    if (!config.instruction && docResult?.content) {
-      return docResult?.content;
-    }
+    if (!docResult?.content) return null;
+
     fetchedLinks.add(config.documentationUrl);
-    const instructions = ["auth", "authentication", "introduction", "authorization", "started"];
-    instructions.push(...(config.instruction?.toLowerCase().split(/[^a-z0-9]/g).filter(i => i.length > 3) || []));
 
-    if (!docResult || !docResult.links) return null;
+    // Expanded keywords to catch more relevant documentation pages
+    const requiredKeywords = [
+      // Auth related
+      "authentication", "authorization", "bearer", "basic", "token",
+      // Getting started
+      "introduction", "getting started", "quickstart", "guide", "tutorial",
+      // API specific
+      "rest", "graphql", "openapi", "endpoints", "reference", "methods", "operations", "objects", "users", "models", "query",
+      // HTTP methods
+      "get", "post", "put", "delete", "patch",
+      // Common API concepts
+      "rate limit", "pagination", "webhook", "callback", "error", "response"
+    ];
 
-    const rankedLinks: { linkText: string, href: string, matchCount: number }[] = [];
+    if (!docResult.links) return docResult.content;
+
+    const rankedLinks: { linkText: string, href: string, matchCount: number; }[] = [];
 
     for (const [linkText, href] of Object.entries(docResult.links)) {
-      const keywords = linkText.split(" ").filter(i => i.length > 3);
-      const matchCount = keywords.filter(k => instructions.some(instr => k.includes(instr) || instr.includes(k))).length;
+      // Skip obviously non-doc pages
+      if (!linkText || href.includes('signup') ||
+        href.includes('pricing') ||
+        href.includes('contact') ||
+        href.includes('cookie') ||
+        href.includes('privacy') ||
+        href.includes('terms') ||
+        href.includes('legal') ||
+        href.includes('policy') ||
+        href.includes('status') ||
+        href.includes('help')) {
+        continue;
+      }
+
+      // Count keyword matches
+      let matchCount = 0;
+      const linkTextLower = linkText.toLowerCase();
+      const hrefLower = href.toLowerCase();
+
+      for (const keyword of requiredKeywords) {
+        if (linkTextLower.includes(keyword) || hrefLower.includes(keyword)) {
+          matchCount++;
+        }
+      }
       rankedLinks.push({ linkText, href, matchCount });
     }
 
-    // Sort links by match count in descending order
-    rankedLinks.sort((a, b) => b.matchCount - a.matchCount);
+    // Sort by priority first (highest first), then by match count (highest first)
+    rankedLinks.sort((a, b) => {
+      return b.matchCount - a.matchCount;
+    });
 
-    for (const rankedLink of rankedLinks) {
-      if (fetchedLinks.size > 3) break;
-      if (fetchedLinks.has(rankedLink.href)) continue;
-      const linkResult = await this.fetchPageContentWithPlaywright(rankedLink.href, config, metadata);
-      if (linkResult && linkResult.content) { // Ensure content exists
-        docResult.content += `\n\n${linkResult.content}`;
-        fetchedLinks.add(rankedLink.href);
+    // Fetch links up to MAX_FETCHED_LINKS, prioritizing higher priority ones
+    for (const link of rankedLinks) {
+      if (fetchedLinks.size >= PlaywrightFetchingStrategy.MAX_FETCHED_LINKS) break;
+      if (fetchedLinks.has(link.href)) continue;
+
+      try {
+        const linkResult = await this.fetchPageContentWithPlaywright(link.href, config, metadata);
+        if (linkResult?.content) {
+          docResult.content += `\n\n${linkResult.content}`;
+          fetchedLinks.add(link.href);
+        }
+      } catch (error) {
+        logMessage('warn', `Failed to fetch link ${link.href}: ${error?.message}`, metadata);
       }
     }
+
     return docResult.content;
   }
 }
@@ -454,7 +480,7 @@ class OpenApiStrategy implements ProcessingStrategy {
         const baseUrl = config.documentationUrl ? new URL(config.documentationUrl).origin : config.urlHost;
         absoluteOpenApiUrl = composeUrl(baseUrl, openApiUrl);
       }
-      const openApiResponse = await axios.get(absoluteOpenApiUrl, { headers: config.headers });
+      const openApiResponse = await axios.get(absoluteOpenApiUrl, { headers: config.headers, timeout: DOC_AXIOS_TIMEOUT_MS });
       const openApiData = openApiResponse.data;
 
       if (!openApiData) return null;
@@ -494,6 +520,9 @@ class OpenApiStrategy implements ProcessingStrategy {
     // Needs page content fetched by PlaywrightFetchingStrategy (or null if fetch failed)
     if (content === undefined || content === null) {
       return null;
+    }
+    if (typeof content !== 'string') {
+      content = JSON.stringify(content, null, 2);
     }
     const trimmedContent = content.trim();
     const isJson = trimmedContent.startsWith('{') && trimmedContent.endsWith('}');
@@ -546,6 +575,9 @@ class HtmlMarkdownStrategy implements ProcessingStrategy {
     if (content === undefined || content === null) {
       return null;
     }
+    if (typeof content !== 'string') {
+      content = JSON.stringify(content, null, 2);
+    }
     // Only apply if content looks like HTML
     if (!content.slice(0, 500).toLowerCase().includes("<html")) {
       return null;
@@ -566,6 +598,9 @@ class RawPageContentStrategy implements ProcessingStrategy {
     // This is the final fallback if content was fetched but not processed by other strategies
     if (content) {
       logMessage('info', "Using raw fetched content as final documentation.", metadata);
+      if (typeof content !== 'string') {
+        content = JSON.stringify(content, null, 2);
+      }
       return content;
     }
     return null; // No content was fetched or available

@@ -43,8 +43,7 @@ describe('OpenAIModel', () => {
           ...messages
         ],
         model: 'gpt-4o',
-        temperature: 0,
-        max_tokens: 65536
+        temperature: 0
       });
       expect(result.response).toBe('test response');
       expect(result.messages).toHaveLength(3);

@@ -1,17 +1,21 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
-import { Button } from '@/src/components/ui/button'
-import { Input } from '@/src/components/ui/input'
-import { Upload, Link, FileText, FileQuestion } from 'lucide-react'
 import { Badge } from '@/src/components/ui/badge'
+import { Button } from '@/src/components/ui/button'
+import { URLField } from '@/src/components/utils/URLField'
+import { FileQuestion, FileText, Link, Upload } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
 
 interface DocumentationFieldProps {
   url: string
-  content: string
+  content?: string
   onUrlChange: (url: string) => void
-  onContentChange: (content: string) => void
+  onContentChange?: (content: string) => void
   className?: string
+  placeholder?: string
+  onFileUpload?: (extractedText: string) => void
+  onFileRemove?: () => void
+  hasUploadedFile?: boolean
 }
 
 export function DocumentationField({
@@ -19,11 +23,41 @@ export function DocumentationField({
   content,
   onUrlChange,
   onContentChange,
-  className
+  className,
+  placeholder = "https://docs.example.com/api",
+  onFileUpload,
+  onFileRemove,
+  hasUploadedFile = false
 }: DocumentationFieldProps) {
+  const [localUrl, setLocalUrl] = useState(url)
   const [docFile, setDocFile] = useState<File | null>(null)
-  const activeType = url ? 'url' : content ? (docFile ? 'file' : 'content') : 'empty'
-  
+  const [urlError, setUrlError] = useState(false)
+
+  // Extract filename from file:// URL for display
+  const getFileNameFromUrl = (fileUrl: string): string | null => {
+    if (fileUrl.startsWith('file://')) {
+      return fileUrl.replace('file://', '')
+    }
+    return null
+  }
+
+  useEffect(() => {
+    setLocalUrl(url)
+  }, [url])
+
+  const isValidUrl = (urlString: string): boolean => {
+    if (!urlString) return true // Empty is valid
+    if (urlString.startsWith('file://')) return true // File uploads are valid
+    try {
+      new URL(urlString)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  const activeType = hasUploadedFile ? 'file' : (url ? 'url' : content ? 'content' : 'empty')
+
   // Derived state for display purposes only
   const displayValue = url || (content ? (
     content.length > 200 ? content.substring(0, 200) + '...' : content
@@ -32,7 +66,7 @@ export function DocumentationField({
   const handleDocFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    
+
     try {
       let text = ''
       if (file.type === 'application/pdf') {
@@ -40,10 +74,10 @@ export function DocumentationField({
         const pdfjsLib = await import('pdfjs-dist');
         // Update worker path to use .mjs extension
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
-        
+
         const arrayBuffer = await file.arrayBuffer();
         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-        
+
         let fullText = '';
         for (let i = 1; i <= pdf.numPages; i++) {
           const page = await pdf.getPage(i);
@@ -57,87 +91,103 @@ export function DocumentationField({
         text = await file.text();
       }
       setDocFile(file)
-      onContentChange(text)
-      onUrlChange('')
+      if (onContentChange) onContentChange(text)
+      // Set file:// pattern for URL
+      onUrlChange(`file://${file.name}`)
+      if (typeof onFileUpload === 'function') onFileUpload(text);
     } catch (error) {
       console.error('Error reading file:', error)
-      // You might want to add user-facing error handling here
-      // e.g., setDocFile(null); onContentChange(''); // Clear state
-      // alert('Failed to read PDF. Please try another file.');
     }
   }
 
-  // Optimize input change handling
-  const handleInputChange = useCallback((value: string) => {
-    // Don't allow changes if a file is uploaded
-    if (docFile) return
-    
-    // Quick check before regex for better performance
-    if (value.startsWith('http://') || value.startsWith('https://')) {
-      onUrlChange(value)
-      if (content) onContentChange('')
-    } else {
-      onContentChange(value)
-      if (url) onUrlChange('')
+  const handleRemoveFile = () => {
+    setDocFile(null)
+    if (onContentChange) onContentChange('')
+    onUrlChange('')
+    setLocalUrl('')
+    setUrlError(false)
+    // Reset the file input so it can be used again
+    const fileInput = document.getElementById('doc-file-upload') as HTMLInputElement
+    if (fileInput) {
+      fileInput.value = ''
     }
-  }, [content, url, docFile, onUrlChange, onContentChange]);
+    // Notify parent component that file was removed
+    if (onFileRemove) {
+      onFileRemove()
+    }
+  }
+
+  const handleUrlChange = useCallback((urlHost: string, urlPath: string, queryParams: Record<string, string>) => {
+    const fullUrl = urlHost + (urlPath || '')
+    setLocalUrl(fullUrl)
+    onUrlChange(fullUrl)
+  }, [onUrlChange])
 
   return (
     <div className={className}>
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1">
-          <Input
-            value={displayValue}
-            onChange={(e) => handleInputChange(e.target.value)}
-            placeholder="Enter URL or documentation content..."
-            className={`pr-20 ${docFile ? 'bg-muted cursor-not-allowed' : ''}`}
-            title={content?.length > 200 ? content : undefined}
-            readOnly={docFile !== null}
-          />
-          <Badge variant="outline" className="absolute right-2 top-1/2 -translate-y-1/2">
-            {activeType === 'url' ? (
-              <><Link className="h-3 w-3 mr-1" /> URL</>
-            ) : activeType === 'file' ? (
-              <><Upload className="h-3 w-3 mr-1" /> File</>
-            ) : activeType === 'content' ? (
-              <><FileText className="h-3 w-3 mr-1" /> Content</>
-            ) : (
-              <><FileQuestion className="h-3 w-3 mr-1" /> None</>
-            )}
-          </Badge>
-        </div>
-
-        <Button
-          variant="outline"
-          size="sm"
-          className="shrink-0"
-          onClick={() => document.getElementById('doc-file-upload')?.click()}
-        >
-          Upload
-        </Button>
-        
-        {(url || content) && (
+      {hasUploadedFile ? (
+        // Show file info when file is uploaded
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <div className="flex items-center gap-2 p-3 border rounded-md bg-muted/50">
+              <Upload className="h-4 w-4 text-green-600" />
+              <span className="text-sm font-medium">{docFile?.name || getFileNameFromUrl(url) || 'Uploaded file'}</span>
+            </div>
+          </div>
           <Button
-            variant="ghost"
+            type="button"
+            variant="outline"
             size="sm"
-            className="shrink-0 text-muted-foreground hover:text-destructive transition-colors"
-            onClick={() => {
-              onContentChange('')
-              onUrlChange('')
-              setDocFile(null)
-            }}
+            className="shrink-0"
+            onClick={handleRemoveFile}
           >
-            Clear
+            Remove
           </Button>
-        )}
-            
-        <input
-          type="file"
-          id="doc-file-upload"
-          hidden
-          onChange={handleDocFileUpload}
-        />
-      </div>
+        </div>
+      ) : (
+        // Show URL field when no file is uploaded
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <URLField
+              url={localUrl}
+              onUrlChange={handleUrlChange}
+              placeholder={placeholder}
+              error={urlError}
+            />
+            <Badge variant="outline" className="absolute right-2 top-1/2 -translate-y-1/2 bg-background border">
+              {activeType === 'url' ? (
+                <><Link className="h-3 w-3 mr-1" /> URL</>
+              ) : activeType === 'content' ? (
+                <><FileText className="h-3 w-3 mr-1" /> Manual Content</>
+              ) : (
+                <><FileQuestion className="h-3 w-3 mr-1" /> None</>
+              )}
+            </Badge>
+          </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="shrink-0"
+            onClick={() => document.getElementById('doc-file-upload')?.click()}
+          >
+            Upload
+          </Button>
+        </div>
+      )}
+
+      <input
+        type="file"
+        id="doc-file-upload"
+        hidden
+        onChange={handleDocFileUpload}
+        accept=".pdf,.txt,.md,.doc,.docx"
+      />
+
+      {urlError && !hasUploadedFile && (
+        <p className="text-sm text-destructive mt-1">Please enter a valid URL or upload a file</p>
+      )}
     </div>
   )
 }

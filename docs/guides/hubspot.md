@@ -83,15 +83,18 @@ We'll use `client.buildWorkflow()` to instruct Superglue to create the necessary
 async function buildHubspotWorkflow() {
   console.log("Building HubSpot Company-Contacts Workflow...");
 
-  const systems = [
+  const integrations = [
     {
-      id: "hubspot_crm",
-      urlHost: "https://api.hubapi.com",
-      // Providing a general documentation URL helps Superglue understand the API structure.
-      // Specific endpoints for companies and contacts will be inferred from the instruction.
-      documentationUrl: "https://developers.hubspot.com/docs/api/crm/overview",
-      // Credentials can be hinted here if they are static, or provided fully at execution time.
-      credentials: { HUBSPOT_ACCESS_TOKEN } 
+      integration: {
+        id: "hubspot_crm",
+        name: "HubSpot CRM",
+        urlHost: "https://api.hubapi.com",
+        // Providing a general documentation URL helps Superglue understand the API structure.
+        // Specific endpoints for companies and contacts will be inferred from the instruction.
+        documentationUrl: "https://developers.hubspot.com/docs/api/crm/overview",
+        // Credentials can be hinted here if they are static, or provided fully at execution time.
+        credentials: { HUBSPOT_ACCESS_TOKEN } 
+      }
     }
   ];
 
@@ -100,10 +103,11 @@ async function buildHubspotWorkflow() {
     2. For each company fetched, retrieve all its associated contacts. 
     3. For each contact, include its ID, email, first name, last name, phone number, and job title.
   `;
+  
   const workflow = await superglue.buildWorkflow(
     instruction,
     {}, // Initial payload, not needed for this read-only workflow
-    systems,
+    integrations,
     zodToJsonSchema(hubspotDataSchema) // The desired final output schema
   );
 
@@ -115,7 +119,7 @@ async function buildHubspotWorkflow() {
 
 When `buildWorkflow` is called:
 
-- Superglue analyzes the `instruction` and the `systems` (HubSpot API documentation).
+- Superglue analyzes the `instruction` and the `integrations` (HubSpot API documentation).
 - It designs a sequence of steps: one to fetch companies, and then a looping mechanism or subsequent steps to fetch contacts for each company using associations.
 - It determines the necessary API endpoints (e.g., `/crm/v3/objects/companies`, `/crm/v3/objects/contacts`, and how to query associations).
 - It generates transformations to fit the data into `hubspotDataSchema`.
@@ -135,7 +139,7 @@ async function executeHubspotWorkflow(workflowToExecute) {
       workflow: workflowToExecute, // Can also use { id: "workflow-id" } if saved
       // Provide the HubSpot Access Token at runtime
       credentials: {
-        hubspot_crm_HUBSPOT_ACCESS_TOKEN: HUBSPOT_ACCESS_TOKEN // Matches the system ID provided during build
+        hubspot_crm_HUBSPOT_ACCESS_TOKEN: HUBSPOT_ACCESS_TOKEN // Matches the integration ID provided during build
       },
       // options: { cacheMode: "DISABLED" } // Optional request options
     });
@@ -206,37 +210,22 @@ The `result.data` from a successful execution would look something like this:
           "jobtitle": "CTO"
         }
       ]
-    },
-    {
-      "id": "2345678901",
-      "name": "Innovate Solutions Ltd.",
-      "domain": "innovatesolutions.com",
-      "industry": "Software",
-      "city": "London",
-      "contacts": [
-        // ... contacts for Innovate Solutions ...
-      ]
     }
-    // ... more companies
   ]
 }
 ```
 
-## Understanding the Workflow Internals (Conceptual)
+## Additional Notes
 
-While Superglue abstracts the complexity, the built workflow conceptually involves:
-
-1. **Step 1: Fetch Companies**: An API call to HubSpot's company endpoint (e.g., `GET /crm/v3/objects/companies`). It handles pagination to retrieve all companies.
-2. **Step 2: Loop/Fetch Associated Contacts**: For each company ID obtained in Step 1, Superglue makes further API calls to HubSpot to get associated contacts. This might involve an endpoint like `GET /crm/v4/objects/companies/<<companyId>>/associations/contacts` or querying the contacts endpoint with filters.
-3. **Step 3: Data Transformation & Aggregation**: The data from these individual calls is transformed and aggregated according to the `instruction` and `responseSchema` to produce the final nested structure.
-
-Superglue determines the most efficient way to perform these associations and transformations based on the API documentation and your instructions.
-
-## Next Steps
-
+- **Error Handling**: The workflow will automatically retry failed steps and provide detailed error information for debugging.
+- **Pagination**: HubSpot APIs are automatically paginated by Superglue when building workflows.
+- **Rate Limiting**: Superglue handles HubSpot's rate limits automatically.
+- **Data Mapping**: The JSONata transformations are automatically generated and cached for performance.
 - **Saving Workflows**: You can save the `builtWorkflow` definition using `client.upsertWorkflow(workflow.id, workflow)` for later execution by ID.
-- **Error Handling**: Implement more robust error handling and retry logic for production scenarios.
-- **Complex Scenarios**: Extend this pattern to include more HubSpot objects (Deals, Tickets), apply more complex transformations, or integrate HubSpot data with other systems in a single workflow.
+
+## Further Exploration
+
+- **Multi-Integration Workflows**: Combine HubSpot data with other services, or integrate HubSpot data with other integrations in a single workflow.
 - Explore the [API Reference for Workflows](/api-reference/mutations#executeworkflow) and [Types](/api-reference/types#workflow) for more details.
 
 This guide illustrates the power of Superglue Workflows for orchestrating complex integrations with APIs like HubSpot, automating data fetching, transformation, and aggregation with simple, natural language instructions.

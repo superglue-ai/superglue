@@ -1,4 +1,4 @@
-import { ApiConfig, ExecutionStep, HttpMethod, Workflow } from "@superglue/client";
+import { ApiConfig, ExecutionStep, HttpMethod, Integration, Workflow } from "@superglue/client";
 import { ExecutionMode, Metadata } from "@superglue/shared";
 import { type OpenAI } from "openai";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
@@ -13,20 +13,10 @@ import { composeUrl, safeHttpMethod } from "../utils/tools.js"; // Assuming path
 
 type ChatMessage = OpenAI.Chat.ChatCompletionMessageParam;
 
-// Define the structure for system input
-export interface SystemDefinition {
-  id: string;
-  urlHost: string;
-  urlPath?: string;
-  credentials: Record<string, any>;
-  documentationUrl?: string;
-  documentation?: string;
-}
-
 // Define the structure for the output of the planning step
 interface WorkflowPlanStep {
   stepId: string;
-  systemId: string;
+  integrationId?: string;
   urlHost?: string;
   urlPath?: string;
   instruction: string;
@@ -42,7 +32,7 @@ interface WorkflowPlan {
 }
 
 export class WorkflowBuilder {
-  private systems: Record<string, SystemDefinition>;
+  private integrations: Record<string, Integration>;
   private instruction: string;
   private initialPayload: Record<string, unknown>;
   private metadata: Metadata;
@@ -50,23 +40,23 @@ export class WorkflowBuilder {
   private inputSchema: JSONSchema;
 
   constructor(
-    systems: SystemDefinition[],
     instruction: string,
+    integrations: Integration[],
     initialPayload: Record<string, unknown>,
     responseSchema: JSONSchema,
     metadata: Metadata
   ) {
-    this.systems = systems.reduce((acc, sys) => {
-      acc[sys.id] = sys;
+    this.integrations = integrations.reduce((acc, int) => {
+      acc[int.id] = int;
       return acc;
-    }, {} as Record<string, SystemDefinition>);
+    }, {} as Record<string, Integration>);
     this.instruction = instruction;
     this.initialPayload = initialPayload || {};
     this.metadata = metadata;
     this.responseSchema = responseSchema;
     try {
-      const credentials = Object.values(systems).reduce((acc, sys) => {
-        return { ...acc, ...Object.entries(sys.credentials || {}).reduce((obj, [name, value]) => ({ ...obj, [`${sys.id}_${name}`]: value }), {}) };
+      const credentials = Object.values(integrations).reduce((acc, int) => {
+        return { ...acc, ...Object.entries(int.credentials || {}).reduce((obj, [name, value]) => ({ ...obj, [`${int.id}_${name}`]: value }), {}) };
       }, {});
       this.inputSchema = toJsonSchema(
         {
@@ -84,49 +74,62 @@ export class WorkflowBuilder {
   private async planWorkflow(
     currentMessages: ChatMessage[],
     lastErrorFromPreviousAttempt: string | null
-  ): Promise<{ plan: WorkflowPlan; messages: ChatMessage[] }> {
+  ): Promise<{ plan: WorkflowPlan; messages: ChatMessage[]; }> {
 
     const planSchema = zodToJsonSchema(z.object({
       id: z.string().describe("Come up with an ID for the workflow e.g. 'stripe-create-order'"),
       steps: z.array(z.object({
         stepId: z.string().describe("Unique camelCase identifier for the step (e.g., 'fetchCustomerDetails', 'updateOrderStatus')."),
-        systemId: z.string().describe("The ID of the system (from the provided list) to use for this step."),
+        integrationId: z.string().describe("The ID of the integration (from the provided list) to use for this step."),
         instruction: z.string().describe("A specific, concise instruction for what this single API call should achieve (e.g., 'Get user profile by email', 'Create a new order')."),
-        mode: z.enum(["DIRECT", "LOOP"]).describe("The mode of execution for this step. Use 'DIRECT' for simple calls executed once or 'LOOP' when the call needs to be executed multiple times over a collection (e.g. payload is a list of customer ids and call is executed for each customer id)."),
-        urlHost: z.string().optional().describe("Optional. Override the system's default host. If not provided, the system's urlHost will be used."),
-        urlPath: z.string().optional().describe("Optional. Specific API path for this step. If not provided, the system's urlPath might be used or the LLM needs to determine it from documentation if the system's base URL is just a host."),
+        mode: z.enum(["DIRECT", "LOOP"]).describe("The mode of execution for this step. Use 'DIRECT' for simple calls executed once or 'LOOP' when the call needs to be executed multiple times over a collection (e.g. payload is a list of customer ids and call is executed for each customer id). Important: Pagination is NOT a reason to use LOOP since pagination is handled by the execution engine itself."),
+        urlHost: z.string().optional().describe("Optional. Override the integration's default host. If not provided, the integration's urlHost will be used."),
+        urlPath: z.string().optional().describe("Optional. Specific API path for this step. If not provided, the integration's urlPath might be used or the LLM needs to determine it from documentation if the integration's base URL is just a host."),
         method: z.enum(["GET", "POST", "PUT", "DELETE", "PATCH"]).optional().describe("Tentative HTTP method for this step, e.g. GET, POST, PUT, DELETE, PATCH. If unsure, default to GET.")
       })).describe("The sequence of steps required to fulfill the overall instruction.")
     }));
 
-    const systemDescriptions = Object.values(this.systems).map(sys => `
---- System ID: ${sys.id} ---
-Base URL: ${composeUrl(sys.urlHost, sys.urlPath)}
-Credentials available: ${JSON.stringify(Object.entries(sys.credentials || {}).reduce((obj, [name, value]) => ({ ...obj, [`${sys.id}_${name}`]: value }), {}) || 'None')}
-Documentation:
-\`\`\`
-${sys.documentation || 'No documentation content available.'}
-\`\`\``
-    ).join("\n");
 
-    const initialPayloadDescription = this.initialPayload ? `Initial Input Payload contains keys: ${Object.keys(this.initialPayload).join(", ") || 'None'}\nPayload example: ${JSON.stringify(this.initialPayload)}` : '';
+    const integrationDescriptions = Object.values(this.integrations).map(int => {
+      const processedDoc = Documentation.postProcess(int.documentation || "", this.instruction);
+      return `
+  <${int.id}>
+    Base URL: ${composeUrl(int.urlHost, int.urlPath)}
+    Credentials available: ${JSON.stringify(Object.entries(int.credentials || {}).reduce((obj, [name, value]) => ({ ...obj, [`${int.id}_${name}`]: value }), {}) || 'None')}
+    ${int.specificInstructions ? `\n    User Instructions for this integration:\n    ${int.specificInstructions}\n` : ''}
+    Documentation:
+    \`\`\`
+    ${processedDoc || 'No documentation content available.'}
+    \`\`\`
+  </${int.id}>`;
+    }).join("\n");
+    const initialPayloadText = JSON.stringify(this.initialPayload);
+    const initialPayloadDescription = this.initialPayload ? `Initial Input Payload contains keys: ${Object.keys(this.initialPayload).join(", ") || 'None'}\nPayload example: ${initialPayloadText.length > 10000 ? initialPayloadText.slice(0, 10000) + '...[truncated]' : initialPayloadText}` : '';
 
     let newMessages = [...currentMessages];
 
     if (newMessages.length === 0) {
       newMessages.push({ role: "system", content: PLANNING_PROMPT });
       const initialUserPrompt = `
-Create a plan to fulfill the user's request by orchestrating single API calls across the available systems.
+Create a plan to fulfill the user's request by orchestrating single API calls across the available integrations.
 
-Overall Instruction:
-"${this.instruction}"
+<instruction>
+${this.instruction}
+</instruction>
 
-Available Systems and their API Documentation:
-${systemDescriptions}
+<available_integrations>
+${integrationDescriptions}
+</available_integrations>
 
+<initial_payload>
 ${initialPayloadDescription}
+</initial_payload>
 
-Output a JSON object conforming to the WorkflowPlan schema. Define the necessary steps, assigning a unique lowercase \`stepId\`, selecting the appropriate \`systemId\`, writing a clear \`instruction\` for that specific API call based on documentation, and setting the execution \`mode\`.  For each step, also include a tentative HTTP \`method\` (GET, POST, etc.)—if unsure, default to GET. Assume data from previous steps is available implicitly for subsequent steps. If a step involves iteration, ensure \`loopSelector\` is appropriately defined. The plan should also include a \`finalTransform\` field, which is a JSONata expression for the final output transformation (default to '$' if no specific transformation is needed).
+<output_schema>
+Output a JSON object conforming to the WorkflowPlan schema. Define the necessary steps, assigning a unique lowercase \`stepId\`, selecting the appropriate \`integrationId\`, writing a clear \`instruction\` for that specific API call based on documentation, and setting the execution \`mode\`. 
+For each step, also include a tentative HTTP \`method\` (GET, POST, etc.)—if unsure, default to GET. Assume data from previous steps is available implicitly for subsequent steps. If a step involves iteration, ensure \`loopSelector\` is appropriately defined. 
+The plan should also include a \`finalTransform\` field, which is a JSONata expression for the final output transformation (default to '$' if no specific transformation is needed).
+</output_schema>
 `;
       newMessages.push({ role: "user", content: initialUserPrompt });
     }
@@ -155,23 +158,7 @@ Output a JSON object conforming to the WorkflowPlan schema. Define the necessary
     return { plan, messages: updatedMessagesFromLLM };
   }
 
-  private async fetchDocumentation(): Promise<void> {
-    for (const system of Object.values(this.systems)) {
-      if (system.documentation) {
-        continue;
-      }
-      const documentation = new Documentation({
-        urlHost: system.urlHost,
-        urlPath: system.urlPath,
-        documentationUrl: system.documentationUrl
-      }, system.credentials, this.metadata);
-      system.documentation = await documentation.fetch(this.instruction);
-    }
-  }
-
-
   public async build(): Promise<Workflow> {
-    await this.fetchDocumentation();
     let success = false;
     let attempts = 0;
     const MAX_ATTEMPTS = 3;
@@ -191,23 +178,24 @@ Output a JSON object conforming to the WorkflowPlan schema. Define the necessary
 
         const executionSteps: ExecutionStep[] = [];
         for (const plannedStep of currentPlan.steps) {
-          const system = this.systems[plannedStep.systemId];
-          if (!system) {
-            const errorMsg = `Configuration error during step setup: System ID "${plannedStep.systemId}" for step "${plannedStep.stepId}" not found.`;
+          const integration = this.integrations[plannedStep.integrationId];
+          if (!integration) {
+            const errorMsg = `Configuration error during step setup: integration ID "${plannedStep.integrationId}" for step "${plannedStep.stepId}" not found.`;
             logMessage('error', errorMsg, this.metadata);
             throw new Error(errorMsg);
           }
           const partialApiConfig: ApiConfig = {
             id: plannedStep.stepId,
             instruction: plannedStep.instruction,
-            urlHost: plannedStep.urlHost || system.urlHost,
-            urlPath: plannedStep.urlPath || system.urlPath,
-            documentationUrl: system.documentationUrl,
+            urlHost: plannedStep.urlHost || integration.urlHost,
+            urlPath: plannedStep.urlPath || integration.urlPath,
+            documentationUrl: integration.documentationUrl,
             method: safeHttpMethod(plannedStep.method)
           };
           const executionStep: ExecutionStep = {
             id: plannedStep.stepId,
             apiConfig: partialApiConfig,
+            integrationId: plannedStep.integrationId,
             executionMode: plannedStep.mode,
             loopSelector: plannedStep.mode === "LOOP" ? "$" : undefined,
             inputMapping: "$",
@@ -242,6 +230,7 @@ Output a JSON object conforming to the WorkflowPlan schema. Define the necessary
     return {
       id: builtWorkflow.id,
       steps: builtWorkflow.steps,
+      integrationIds: Object.keys(this.integrations),
       finalTransform: builtWorkflow.finalTransform,
       responseSchema: builtWorkflow.responseSchema,
       inputSchema: this.inputSchema,

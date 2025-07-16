@@ -72,24 +72,7 @@ describe('Documentation Class', () => {
     await PlaywrightFetchingStrategy.closeBrowser();
   });
 
-  describe('getDocumentation', () => {
-    it('should return raw content for non-HTTP URL', async () => {
-      const rawContent = "This is raw documentation content.";
-      const doc = new Documentation({ documentationUrl: rawContent, urlHost: 'https://api.example.com' }, {}, metadata);
-      const result = await doc.fetch();
-      expect(result).toBe(rawContent);
-      // Verify no network calls were made
-      expect(mockedAxios.get).not.toHaveBeenCalled();
-      expect(mockedAxios.post).not.toHaveBeenCalled();
-      expect(playwright.chromium.launch).not.toHaveBeenCalled();
-    });
-
-    it('should return empty string for empty documentation URL if treated as non-http', async () => {
-      // Assuming empty string is handled like raw content
-      const doc = new Documentation({ documentationUrl: "", urlHost: 'https://api.example.com' }, {}, metadata);
-      const result = await doc.fetch();
-      expect(result).toBe('');
-    });
+  describe('fetchAndProcess', () => {
 
     it('should fetch and convert HTML documentation via Playwright', async () => {
       const htmlDoc = `
@@ -98,7 +81,7 @@ describe('Documentation Class', () => {
       mockPage.content.mockResolvedValueOnce(htmlDoc);
       const docUrl = 'https://api.example.com/docs';
       const doc = new Documentation({ documentationUrl: docUrl, urlHost: 'https://api.example.com' }, {}, metadata);
-      const result = await doc.fetch();
+      const result = await doc.fetchAndProcess();
 
       expect(playwright.chromium.launch).toHaveBeenCalledTimes(1);
       expect(mockBrowser.newContext).toHaveBeenCalledTimes(1);
@@ -118,7 +101,7 @@ describe('Documentation Class', () => {
       const plainDoc = 'Plain text documentation content.';
       mockPage.content.mockResolvedValueOnce(plainDoc);
       const doc = new Documentation({ documentationUrl: 'https://api.example.com/raw', urlHost: 'https://api.example.com' }, {}, metadata);
-      const result = await doc.fetch();
+      const result = await doc.fetchAndProcess();
 
       expect(playwright.chromium.launch).toHaveBeenCalledTimes(1);
       expect(mockPage.content).toHaveBeenCalledTimes(1);
@@ -140,15 +123,14 @@ describe('Documentation Class', () => {
         headers,
         queryParams: params
       }, {}, metadata);
-      const result = await doc.fetch();
+      const result = await doc.fetchAndProcess();
 
       expect(mockedAxios.post).toHaveBeenCalledWith(
         docUrl,
         expect.objectContaining({ operationName: 'IntrospectionQuery' }),
-        { headers, params }
+        { headers, params, timeout: 60000 }
       );
       expect(result).toBe(JSON.stringify(mockSchema.__schema));
-      // Verify Playwright was NOT used
       expect(playwright.chromium.launch).not.toHaveBeenCalled();
     });
 
@@ -159,7 +141,7 @@ describe('Documentation Class', () => {
 
       const docUrl = 'https://api.example.com/graphql'; // Looks like GraphQL
       const doc = new Documentation({ documentationUrl: docUrl, urlHost: 'https://api.example.com' }, {}, metadata);
-      const result = await doc.fetch();
+      const result = await doc.fetchAndProcess();
 
       // Check GraphQL was attempted
       expect(mockedAxios.post).toHaveBeenCalledWith(docUrl, expect.anything(), expect.anything());
@@ -177,7 +159,7 @@ describe('Documentation Class', () => {
 
       const docUrl = 'https://api.example.com/graphql'; // Looks like GraphQL
       const doc = new Documentation({ documentationUrl: docUrl, urlHost: 'https://api.example.com' }, {}, metadata);
-      const result = await doc.fetch();
+      const result = await doc.fetchAndProcess();
 
       // Check GraphQL was attempted
       expect(mockedAxios.post).toHaveBeenCalledWith(docUrl, expect.anything(), expect.anything());
@@ -198,13 +180,16 @@ describe('Documentation Class', () => {
       mockedAxios.get.mockResolvedValueOnce({ data: openApiJson }); // Axios fetches OpenAPI spec
 
       const doc = new Documentation({ documentationUrl: baseUrl, urlHost: 'https://api.example.com' }, {}, metadata);
-      const result = await doc.fetch();
+      const result = await doc.fetchAndProcess();
 
       // Verify Playwright fetch
       expect(playwright.chromium.launch).toHaveBeenCalledTimes(1);
       expect(mockPage.content).toHaveBeenCalledTimes(1);
       // Verify Axios fetch for OpenAPI spec (relative URL resolved correctly)
-      expect(mockedAxios.get).toHaveBeenCalledWith('https://base.example.com/api/v1/openapi.json', { headers: undefined });
+      expect(mockedAxios.get).toHaveBeenCalledWith('https://base.example.com/api/v1/openapi.json', {
+        headers: undefined,
+        timeout: 60000
+      });
       // Verify result is the OpenAPI spec
       expect(result).toContain(JSON.stringify(openApiJson));
     });
@@ -218,11 +203,14 @@ describe('Documentation Class', () => {
       mockedAxios.get.mockResolvedValueOnce({ data: openApiYaml });
 
       const doc = new Documentation({ documentationUrl: docUrl, urlHost: 'https://api.example.com' }, {}, metadata);
-      const result = await doc.fetch();
+      const result = await doc.fetchAndProcess();
 
       expect(playwright.chromium.launch).toHaveBeenCalledTimes(1);
       expect(mockPage.content).toHaveBeenCalledTimes(1);
-      expect(mockedAxios.get).toHaveBeenCalledWith('https://absolute.com/openapi.yaml', { headers: undefined });
+      expect(mockedAxios.get).toHaveBeenCalledWith('https://absolute.com/openapi.yaml', {
+        headers: undefined,
+        timeout: 60000
+      });
       expect(result).toContain(openApiYaml);
     });
 
@@ -231,7 +219,7 @@ describe('Documentation Class', () => {
       mockPage.content.mockResolvedValueOnce(openApiJsonString); // Playwright returns JSON string
       const docUrl = 'https://api.example.com/openapi.json';
       const doc = new Documentation({ documentationUrl: docUrl, urlHost: 'https://api.example.com' }, {}, metadata);
-      const result = await doc.fetch();
+      const result = await doc.fetchAndProcess();
 
       expect(playwright.chromium.launch).toHaveBeenCalledTimes(1);
       expect(mockPage.content).toHaveBeenCalledTimes(1);
@@ -245,7 +233,7 @@ describe('Documentation Class', () => {
       mockPage.content.mockResolvedValueOnce(openApiYaml); // Playwright returns YAML string
       const docUrl = 'https://api.example.com/openapi.yaml';
       const doc = new Documentation({ documentationUrl: docUrl, urlHost: 'https://api.example.com' }, {}, metadata);
-      const result = await doc.fetch();
+      const result = await doc.fetchAndProcess();
 
       expect(playwright.chromium.launch).toHaveBeenCalledTimes(1);
       expect(mockPage.content).toHaveBeenCalledTimes(1);
@@ -260,10 +248,13 @@ describe('Documentation Class', () => {
       const headers = { 'Auth': 'key' };
       const docUrl = 'https://api.example.com/docs';
       const doc = new Documentation({ documentationUrl: docUrl, urlHost: 'https://api.example.com', headers }, {}, metadata);
-      const result = await doc.fetch();
+      const result = await doc.fetchAndProcess();
 
       expect(playwright.chromium.launch).toHaveBeenCalledTimes(1);
-      expect(mockedAxios.get).toHaveBeenCalledWith('https://api.example.com/missing.json', { headers });
+      expect(mockedAxios.get).toHaveBeenCalledWith('https://api.example.com/missing.json', {
+        headers,
+        timeout: 60000
+      });
       // Result should be the Markdown conversion of the original HTML
       expect(result).toContain('Content');
       expect(result).not.toContain('missing.json');
@@ -272,109 +263,116 @@ describe('Documentation Class', () => {
     it('should handle Playwright fetch errors gracefully', async () => {
       vi.mocked(playwright.chromium.launch).mockRejectedValueOnce(new Error('Browser launch failed'));
       const doc = new Documentation({ documentationUrl: 'https://api.example.com/docs', urlHost: 'https://api.example.com' }, {}, metadata);
-      const result = await doc.fetch();
+      const result = await doc.fetchAndProcess();
 
       expect(result).toBe(''); // Should return empty string on complete failure
       expect(mockedAxios.get).toHaveBeenCalled(); // should call axios instead
     });
 
     it('should cache the result and return processed result on subsequent calls', async () => {
-      const rawContent = "Raw content";
-      const doc = new Documentation({ documentationUrl: rawContent, urlHost: 'https://api.example.com' }, {}, metadata);
-
-      const result1 = await doc.fetch();
-      expect(result1).toBe(rawContent);
-      // No mocks involved here
-
-      const result2 = await doc.fetch();
-      expect(result2).toBe(rawContent);
-      // Should not re-evaluate strategies if result exists
-
       // Test with a strategy that involves mocks
       const htmlDoc = `<html><body>Data</body></html>`;
       mockPage.content.mockResolvedValueOnce(htmlDoc);
       const httpDoc = new Documentation({ documentationUrl: 'http://example.com', urlHost: 'https://api.example.com' }, {}, metadata);
 
-      const resHttp1 = await httpDoc.fetch();
+      const resHttp1 = await httpDoc.fetchAndProcess();
       expect(resHttp1).toBe("Data");
       expect(mockPage.content).toHaveBeenCalledTimes(1); // Called once
 
-      const resHttp2 = await httpDoc.fetch();
+      const resHttp2 = await httpDoc.fetchAndProcess();
       expect(resHttp2).toBe("Data");
       expect(mockPage.content).toHaveBeenCalledTimes(1); // Still called only once
     });
 
   });
 
-  describe('postProcess (via getDocumentation)', () => {
+  describe('postProcess', () => {
     // Helper function to create long strings
     const createLongString = (char: string, factor: number) => char.repeat(Math.ceil(DOCUMENTATION_MAX_LENGTH * factor));
 
-    it('should truncate very long raw content if no urlPath is provided', async () => {
-      const longRawContent = createLongString('A', 1.5);
-      const doc = new Documentation({ documentationUrl: longRawContent, urlHost: 'https://api.example.com' }, {}, metadata); // No urlPath
-      const result = await doc.fetch();
-      expect(result.length).toBe(DOCUMENTATION_MAX_LENGTH);
-      expect(result).toBe(longRawContent.slice(0, DOCUMENTATION_MAX_LENGTH));
+    it('should return empty string for empty documentation', () => {
+      const result = Documentation.postProcess("", "some instruction");
+      expect(result).toBe("");
     });
 
-    it('should truncate very long fetched content if no urlPath is provided', async () => {
-      const longHtml = createLongString('B', 2);
-      mockPage.content.mockResolvedValueOnce(longHtml); // Simulate fetch returning long content
-      const doc = new Documentation({ documentationUrl: 'http://example.com', urlHost: 'https://api.example.com' }, {}, metadata); // No urlPath
-      const result = await doc.fetch();
-      expect(result.length).toBe(DOCUMENTATION_MAX_LENGTH);
-      expect(result).toBe(longHtml.slice(0, DOCUMENTATION_MAX_LENGTH));
-      expect(playwright.chromium.launch).toHaveBeenCalledTimes(1); // Ensure fetch happened
+    it('should return documentation as is if no instruction provided', () => {
+      const doc = "Some documentation";
+      const result = Documentation.postProcess(doc, "");
+      expect(result).toBe(doc);
     });
 
-    it('should apply context extraction logic when urlPath is provided', async () => {
+    it('should return documentation as is if within length limits', () => {
+      const doc = "Short documentation";
+      const result = Documentation.postProcess(doc, "some instruction");
+      expect(result).toBe(doc);
+    });
+
+    it('should truncate very long content if no relevant terms found', () => {
+      const longContent = createLongString('A', 1.5);
+      const result = Documentation.postProcess(longContent, "unrelated instruction");
+      expect(result.length).toBe(DOCUMENTATION_MAX_LENGTH);
+      expect(result).toBe(longContent.slice(0, DOCUMENTATION_MAX_LENGTH));
+    });
+
+    it('should extract context around search terms', () => {
       const searchTerm = "findme";
       const prefix = createLongString('P', 0.6);
       const middle = createLongString('M', 0.6);
       const suffix = createLongString('S', 0.6);
       const longContent = `${prefix} context around ${searchTerm} here ${middle} more context ${suffix}`;
-      const urlPath = `/${searchTerm}/details`;
 
-      // Test with RawContentStrategy
-      const docRaw = new Documentation({ documentationUrl: longContent, urlHost: 'https://api.example.com', urlPath }, {}, metadata);
-      const resultRaw = await docRaw.fetch();
+      const result = Documentation.postProcess(longContent, `instruction with ${searchTerm}`);
 
-      expect(resultRaw.length).toBeLessThanOrEqual(DOCUMENTATION_MAX_LENGTH);
-      expect(resultRaw).toContain(searchTerm); // Context should be included
-      // Check if it contains parts of prefix/middle (depending on chunk/context size)
-      expect(resultRaw.startsWith(prefix.slice(0, 10000))).toBe(true); // Initial chunk
-      expect(resultRaw).toContain(`context around ${searchTerm} here`);
+      expect(result.length).toBeLessThanOrEqual(DOCUMENTATION_MAX_LENGTH);
+      expect(result).toContain(searchTerm);
+      // Instead of checking exact prefix, verify we have chunks with the search term
+      const chunks = result.split('\n\n');
+      expect(chunks.length).toBeGreaterThan(1);
+      expect(chunks.some(chunk => chunk.includes(searchTerm))).toBe(true);
+      expect(result).toContain(`context around ${searchTerm} here`);
     });
 
-    it('should include authorization/securitySchemes context', async () => {
+    it('should include authorization/securitySchemes context', () => {
       const searchTerm = "userinfo";
       const prefix = createLongString('X', 0.8);
       const suffix = createLongString('Y', 0.8);
       const authSection = "important securitySchemes definition here";
       const longContent = `${prefix} some data about ${searchTerm} ${suffix} ${authSection}`;
-      const urlPath = `/${searchTerm}`;
 
-      const doc = new Documentation({ documentationUrl: longContent, urlHost: 'https://api.example.com', urlPath }, {}, metadata);
-      const result = await doc.fetch(urlPath);
+      const result = Documentation.postProcess(longContent, `instruction with ${searchTerm}`);
 
       expect(result.length).toBeLessThanOrEqual(DOCUMENTATION_MAX_LENGTH);
       expect(result).toContain(searchTerm);
-      expect(result).toContain("securitySchemes"); // Check the auth context is included
+      expect(result).toContain("securitySchemes");
     });
 
-    it('should handle cases where search term is not found', async () => {
-      const searchTerm = "notfound";
-      const longContent = createLongString('Z', 1.5); // Content doesn't contain searchTerm
-      const urlPath = `/${searchTerm}`;
+    it('should handle multiple search terms', () => {
+      const term1 = "term1";
+      const term2 = "term2";
+      const prefix = createLongString('P', 0.6);
+      const middle = createLongString('M', 0.6);
+      const suffix = createLongString('S', 0.6);
+      const longContent = `${prefix} ${term1} here ${middle} ${term2} there ${suffix}`;
 
-      const doc = new Documentation({ documentationUrl: longContent, urlHost: 'https://api.example.com', urlPath }, {}, metadata);
-      const result = await doc.fetch();
+      const result = Documentation.postProcess(longContent, `instruction with ${term1} and ${term2}`);
 
-      // Should just truncate from the beginning as term isn't found
-      expect(result.length).toBe(DOCUMENTATION_MAX_LENGTH);
-      expect(result).toBe(longContent.slice(0, DOCUMENTATION_MAX_LENGTH));
-      expect(result).not.toContain(searchTerm);
+      expect(result.length).toBeLessThanOrEqual(DOCUMENTATION_MAX_LENGTH);
+      expect(result).toContain(term1);
+      expect(result).toContain(term2);
+    });
+
+    it('should maintain proper chunk separation', () => {
+      const searchTerm = "findme";
+      const prefix = createLongString('P', 0.6);
+      const middle = createLongString('M', 0.6);
+      const suffix = createLongString('S', 0.6);
+      const longContent = `${prefix} ${searchTerm} ${middle} ${searchTerm} ${suffix}`;
+
+      const result = Documentation.postProcess(longContent, `instruction with ${searchTerm}`);
+
+      expect(result.length).toBeLessThanOrEqual(DOCUMENTATION_MAX_LENGTH);
+      expect(result.split("\n\n").length).toBeGreaterThan(1); // Should have multiple chunks
+      expect(result).toContain(searchTerm);
     });
   });
 });

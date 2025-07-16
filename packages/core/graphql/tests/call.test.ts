@@ -2,6 +2,7 @@ import { ApiInputRequest, CacheMode, RequestOptions } from "@superglue/client";
 import { Context, Metadata } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mocked } from 'vitest';
+import { config } from "../../default.js";
 import * as api from "../../utils/api.js";
 import { Documentation } from "../../utils/documentation.js";
 import * as logs from "../../utils/logs.js";
@@ -27,6 +28,18 @@ const mockedTransform = transform as Mocked<typeof transform>;
 const mockedWebhook = webhook as Mocked<typeof webhook>;
 const mockedLogs = logs as Mocked<typeof logs>;
 const mockedTelemetry = telemetry as Mocked<typeof telemetry>;
+const mockContext: Context = {
+  orgId: 'test-org',
+  datastore: {
+    getApiConfig: vi.fn(),
+    upsertApiConfig: vi.fn(),
+    createRun: vi.fn(),
+    getIntegration: vi.fn().mockResolvedValue({
+      id: 'test-integration',
+      documentation: 'test docs'
+    })
+  } as any
+};
 
 describe('Call Resolver', () => {
   beforeEach(() => {
@@ -57,7 +70,6 @@ describe('Call Resolver', () => {
     const testMetadata: Metadata = { runId: 'test-run', orgId: 'test-org' };
 
     it('should successfully execute API call', async () => {
-      // Mock successful API call
       mockedApi.callEndpoint.mockResolvedValueOnce({
         data: { result: 'success' }
       });
@@ -67,7 +79,8 @@ describe('Call Resolver', () => {
         testPayload,
         testCredentials,
         testOptions,
-        testMetadata
+        testMetadata,
+        mockContext
       );
 
       expect(result).toEqual({
@@ -91,7 +104,7 @@ describe('Call Resolver', () => {
         });
 
       // Mock documentation and generateApiConfig
-      vi.mocked(Documentation.prototype.fetch).mockResolvedValue('test docs');
+      vi.mocked(Documentation.prototype.fetchAndProcess).mockResolvedValue('test docs');
       mockedApi.generateApiConfig.mockResolvedValue({
         config: { ...testInput.endpoint },
         messages: []
@@ -103,7 +116,8 @@ describe('Call Resolver', () => {
         testPayload,
         testCredentials,
         testOptions,
-        testMetadata
+        testMetadata,
+        mockContext
       );
 
       expect(result).toEqual({
@@ -126,7 +140,7 @@ describe('Call Resolver', () => {
         .mockRejectedValueOnce(new Error('Initial API call failed to trigger retry logic')) // Fails first time
         .mockResolvedValue({ data: { result: 'success' } }); // Succeeds on retries
 
-      vi.mocked(Documentation.prototype.fetch).mockResolvedValue('test docs');
+      vi.mocked(Documentation.prototype.fetchAndProcess).mockResolvedValue('test docs');
       mockedApi.generateApiConfig.mockResolvedValue({
         config: { ...testInput.endpoint },
         messages: []
@@ -139,13 +153,14 @@ describe('Call Resolver', () => {
         testPayload,
         testCredentials,
         testOptions,
-        testMetadata
+        testMetadata,
+        mockContext
       )).rejects.toThrow(/API call failed after \d+ retries.*Last error: Eval failed/);
 
       // callEndpoint is called once for the initial attempt, then 7 more times for retries where evaluateResponse fails.
-      expect(mockedApi.callEndpoint).toHaveBeenCalledTimes(8);
+      expect(mockedApi.callEndpoint). toHaveBeenCalledTimes(config.MAX_CALL_RETRIES);
       // evaluateResponse is called for each of the 7 retries after the first callEndpoint failure.
-      expect(mockedApi.evaluateResponse).toHaveBeenCalledTimes(7);
+      expect(mockedApi.evaluateResponse).toHaveBeenCalledTimes(config.MAX_CALL_RETRIES - 1);
       expect(mockedTelemetry.telemetryClient?.captureException).toHaveBeenCalled();
     });
 
@@ -155,7 +170,7 @@ describe('Call Resolver', () => {
         .mockRejectedValueOnce(new Error('Initial API call failed to trigger retry logic')) // Fails first time to enter retry
         .mockResolvedValue({ data: { result: 'successful data' } }); // Succeeds on subsequent calls
 
-      vi.mocked(Documentation.prototype.fetch).mockResolvedValue('test docs');
+      vi.mocked(Documentation.prototype.fetchAndProcess).mockResolvedValue('test docs');
       mockedApi.generateApiConfig.mockResolvedValue({
         config: { ...testInput.endpoint, responseSchema: {} }, // ensure responseSchema is present
         messages: []
@@ -171,7 +186,8 @@ describe('Call Resolver', () => {
         testPayload,
         testCredentials,
         testOptions,
-        testMetadata
+        testMetadata,
+        mockContext
       );
 
       expect(result.data).toEqual({ result: 'successful data' });
@@ -197,7 +213,7 @@ describe('Call Resolver', () => {
       mockedApi.callEndpoint.mockResolvedValue({ data: null });
 
       // Add these missing mocks
-      vi.mocked(Documentation.prototype.fetch).mockResolvedValue('test docs');
+      vi.mocked(Documentation.prototype.fetchAndProcess).mockResolvedValue('test docs');
       mockedApi.generateApiConfig.mockResolvedValue({
         config: { ...testInput.endpoint },
         messages: []
@@ -208,10 +224,11 @@ describe('Call Resolver', () => {
         testPayload,
         testCredentials,
         testOptions,
-        testMetadata
+        testMetadata,
+        mockContext
       )).rejects.toThrow(/API call failed after \d+ retries/);
 
-      expect(mockedApi.callEndpoint).toHaveBeenCalledTimes(8);
+      expect(mockedApi.callEndpoint).toHaveBeenCalledTimes(config.MAX_CALL_RETRIES);
     });
   });
 

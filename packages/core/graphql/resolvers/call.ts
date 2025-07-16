@@ -1,15 +1,15 @@
-import { ApiConfig, ApiInputRequest, CacheMode, RequestOptions, SelfHealingMode, TransformConfig } from "@superglue/client";
+import { ApiConfig, ApiInputRequest, CacheMode, Integration, RequestOptions, SelfHealingMode, TransformConfig } from "@superglue/client";
 import type { Context, Metadata } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import OpenAI from "openai";
+import { config } from "../../default.js";
 import { PROMPT_MAPPING } from "../../llm/prompts.js";
 import { callEndpoint, evaluateResponse, generateApiConfig } from "../../utils/api.js";
 import { Documentation } from "../../utils/documentation.js";
 import { logMessage } from "../../utils/logs.js";
-import { generateSchema } from "../../utils/schema.js";
 import { telemetryClient } from "../../utils/telemetry.js";
 import { maskCredentials } from "../../utils/tools.js";
-import { executeTransform, generateTransformCode } from "../../utils/transform.js";
+import { executeTransform } from "../../utils/transform.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 
 export async function executeApiCall(
@@ -18,6 +18,7 @@ export async function executeApiCall(
   credentials: Record<string, string>,
   options: RequestOptions,
   metadata: Metadata,
+  integration?: Integration,
 ): Promise<{
   data: any;
   endpoint: ApiConfig;
@@ -26,17 +27,23 @@ export async function executeApiCall(
   let retryCount = 0;
   let lastError: string | null = null;
   let messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
-  let documentation: Documentation;
   let success = false;
   let isSelfHealing = isSelfHealingEnabled(options);
+  let isTestMode = options?.testMode || false;
+
+  let documentationString = "No documentation provided";
+  if (!integration && isSelfHealing) {
+    logMessage('debug', `Self-healing enabled but no integration provided; skipping documentation-based healing.`, metadata);
+  } else if (integration && integration.documentationPending) {
+    logMessage('warn', `Documentation for integration ${integration.id} is still being fetched. Proceeding without documentation.`, metadata);
+  } else if (integration && integration.documentation) {
+    documentationString = Documentation.postProcess(integration.documentation, endpoint.instruction || "");
+  }
+
   do {
     try {
       if (retryCount > 0 && isSelfHealing) {
         logMessage('info', `Generating API config for ${endpoint?.urlHost}${retryCount > 0 ? ` (${retryCount})` : ""}`, metadata);
-        if (!documentation) {
-          documentation = new Documentation(endpoint, credentials, metadata);
-        }
-        const documentationString = await documentation.fetch(endpoint.instruction);
         const computedApiCallConfig = await generateApiConfig(endpoint, documentationString, payload, credentials, retryCount, messages);
         endpoint = computedApiCallConfig.config;
         messages = computedApiCallConfig.messages;
@@ -49,17 +56,20 @@ export async function executeApiCall(
       }
 
       // Check if response is valid
-      if (retryCount > 0 && isSelfHealing) {
-        const result = await evaluateResponse(response.data, endpoint.responseSchema, endpoint.instruction);
+      if ((retryCount > 0 && isSelfHealing) || isTestMode) {
+        logMessage('info', `Evaluating response for ${endpoint?.urlHost}`, metadata);
+        const result = await evaluateResponse(response.data, endpoint.responseSchema, endpoint.instruction, documentationString);
         success = result.success;
         if (!result.success) throw new Error(result.shortReason + " " + JSON.stringify(response.data).slice(0, 1000));
-        if (result.refactorNeeded) {
-          logMessage('info', `Refactoring the API response.`, metadata);
-          const responseSchema = await generateSchema(endpoint.instruction, JSON.stringify(response.data).slice(0, 1000), metadata);
-          const transformation = await generateTransformCode(responseSchema, response.data, endpoint.instruction, metadata);
-          endpoint.responseMapping = transformation.mappingCode;
-          response.data = transformation.data;
-        }
+        /*
+          if (result.refactorNeeded) {
+            logMessage('info', `Refactoring the API response.`, metadata);
+            const responseSchema = await generateSchema(endpoint.instruction, JSON.stringify(response.data).slice(0, 1000), metadata);
+            const transformation = await generateTransformCode(responseSchema, response.data, endpoint.instruction, metadata);
+            endpoint.responseMapping = transformation.mappingCode;
+            response.data = transformation.data;
+          }
+        */
       }
       else {
         success = true;
@@ -68,7 +78,8 @@ export async function executeApiCall(
     }
     catch (error) {
       const rawErrorString = error?.message || JSON.stringify(error || {});
-      lastError = maskCredentials(rawErrorString, credentials).slice(0, 200);
+      lastError = maskCredentials(rawErrorString, credentials).slice(0, 1000);  
+
       if (retryCount === 0) {
         logMessage('info', `The initial configuration is not valid. Generating a new configuration. If you are creating a new configuration, this is expected.\n${lastError}`, metadata);
       }
@@ -81,7 +92,7 @@ export async function executeApiCall(
       }
     }
     retryCount++;
-  } while (retryCount < (options?.retries !== undefined ? options.retries : 8));
+  } while (retryCount < (options?.retries !== undefined ? options.retries : config.MAX_CALL_RETRIES));
   if (!success) {
     telemetryClient?.captureException(new Error(`API call failed after ${retryCount} retries. Last error: ${lastError}`), metadata.orgId, {
       endpoint: endpoint,

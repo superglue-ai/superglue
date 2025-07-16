@@ -3,15 +3,15 @@ description: "A quick guide on using superglue MCP to build database integration
 title: "Reliable database access"
 ---
 
-In this guide, we will cover how to use superglue MCP to build custom database query tools in Cursor. Working with databases often involves complex multi-table joins, aggregations, and data transformations. Superglue MCP can automate these processes, enabling the creation of sophisticated database queries through natural language prompts.
+In this guide, we will cover how to use superglue MCP to build custom database query workflows in Cursor. Working with databases often involves complex multi-table joins, aggregations, and data transformations. Superglue MCP can automate these processes, enabling the creation of sophisticated database queries through natural language prompts.
 
-This guide demonstrates how to build and run a tool that:
+This guide demonstrates how to build and run a workflow that:
 
 1. Connects to a PostgreSQL database containing LEGO dataset
 2. Executes complex queries across multiple tables
 3. Returns structured data for analysis and reporting
 
-You can use the superglue client SDK to do this, but in this tutorial we will cover how to build this tool using superglue MCP.
+You can use the superglue client SDK to do this, but in this tutorial we will cover how to build this workflow using superglue MCP.
 
 <Note>
   If you want to use this setup to query your Supabase DB: You may need to enable [IPv4 support](https://supabase.com/docs/guides/platform/ipv4-address) in your database settings. Other than that, Supabase works just like any other PostgreSQL database with superglue MCP. Get your Supabase connection string by clicking [Connect](https://supabase.com/dashboard/project/_?showConnect=true) on your Supabase dashboard.
@@ -46,11 +46,11 @@ You can use the superglue client SDK to do this, but in this tutorial we will co
   Make sure to replace the API key placeholder with your own API key after copying.
 </Note>
 
-## Building a Custom Database Query Tool
+## Building a Custom Database Query Workflow
 
-You can find detailed descriptions of all available tools provided by superglue MCP [here](/docs/mcp/mcp-tools). In this tutorial, we will build a custom database integration tool using natural language through your Cursor chat interface.
+You can find detailed descriptions of all available tools provided by superglue MCP [here](/docs/mcp/mcp-tools). In this tutorial, we will build a custom database integration workflow using natural language through your Cursor chat interface.
 
-Here's how to create a tool that analyzes LEGO data:
+Here's how to create a workflow that analyzes LEGO data:
 
 ### Example Prompts:
 
@@ -66,11 +66,12 @@ Always tell superglue your database connection: postgres://superglue:superglue@d
 
 ### What Happened Under the Hood:
 
-- superglue MCP called the from instruction endpoint to build and execute the tool ad-hoc based on your natural language request
-- The tool was created, executed, and returned results without needing to be saved as a persistent workflow
-- This allows for immediate database operations through natural language without the overhead of tool creation and management
+- superglue MCP used `superglue_create_integration` to create a database integration with the provided connection string
+- superglue MCP used `superglue_build_and_run` to build and execute a workflow based on your natural language request
+- The workflow was created, executed, and returned results
+- Optionally, the workflow can be saved using `superglue_save_workflow` for future reuse
 
-## Example: Creating a New Custom LEGO Set
+## Example: Creating a Persistent Database Query Workflow
 
 <Note>
   The database used in this example is readonly. If you want to create your own writable database for testing, you can set up a local PostgreSQL instance:
@@ -85,28 +86,26 @@ Always tell superglue your database connection: postgres://superglue:superglue@d
   ```
 </Note>
 
-Let's say you want to add a new custom LEGO set to the database. Instead of building a persistent tool, you can run a one-time instruction:
+Let's say you want to create a reusable workflow for analyzing LEGO sets by theme:
 
 ```
-Execute this instruction once: Create a new LEGO set in my database with the following details and add it to the inventory:
-- Set number: "CUSTOM-001"
-- Name: "My Custom Castle"
-- Year: 2024
-- Theme: Castle
-- Number of parts: 150
+Build a workflow that:
+1. Takes a theme name as input
+2. Returns all sets in that theme with their piece counts
+3. Calculates the average piece count for the theme
+4. Lists the top 5 largest sets in the theme
 
 Database connection: postgres://postgres:password@localhost:5432/lego
 ```
 
-This will execute immediately and return the results without creating a saved tool. Perfect for:
-- Data entry tasks
-- One-time data migrations
-- Quick database updates
-- Testing database operations
+After building and testing with `superglue_build_and_run`, you can save it for future use:
+- The workflow will be saved with a descriptive ID
+- You can execute it anytime using `superglue_execute_workflow` with different theme names
+- Generate integration code using `superglue_get_workflow_integration_code`
 
 ## Next Steps
 
-- **Reuse Tools**: Execute your database tools anytime using `superglue_execute_tool` with the tool ID, or programmatically using the generated integration code
-- **Complex Analytics**: Build tools for advanced analytics, data mining, or reporting across multiple database tables
-- **Multi-Database**: Create tools that join data across different databases or combine database queries with API calls
-- **Real-time Queries**: Set up tools for live database monitoring and alerting
+- **Reuse Workflows**: Execute your database workflows anytime using `superglue_execute_workflow` with the workflow ID, or programmatically using the generated integration code
+- **Complex Analytics**: Build workflows for advanced analytics, data mining, or reporting across multiple database tables
+- **Multi-Database**: Create workflows that join data across different databases or combine database queries with API calls
+- **Real-time Queries**: Set up workflows for live database monitoring and alerting

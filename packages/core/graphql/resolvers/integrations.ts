@@ -1,6 +1,10 @@
 import { Integration } from '@superglue/client';
-import { Context } from "@superglue/shared";
+
+import { Context, Metadata } from "@superglue/shared";
+import { generateUniqueId } from '@superglue/shared/utils';
 import { GraphQLResolveInfo } from "graphql";
+import { IntegrationSelector } from '../../integrations/integration-selector.js';
+import { Documentation } from '../../utils/documentation.js';
 import { logMessage } from '../../utils/logs.js';
 
 function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined, defaultValue?: T): T | undefined {
@@ -8,6 +12,25 @@ function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined
   if (newValue !== undefined) return newValue;
   if (oldValue !== undefined) return oldValue;
   return defaultValue;
+}
+
+function needsDocFetch(input: Integration, oldIntegration?: Integration): boolean {
+  if (input.documentationUrl.startsWith('file://')) return false;
+  // If there's no documentation URL, no need to fetch
+  if (!input.documentationUrl || !input.documentationUrl.trim()) return false;
+  // If documentationPending is explicitly set to true, always fetch
+  // For URL-based docs, fetch if:
+  // 1. DocumentationPending is explicitly set to true
+  // 2. No old integration exists
+  // 3. URL/path has changed
+  // 4. Documentation URL has changed
+  if (input.documentationPending === true) return true;
+  if (!oldIntegration) return true;
+  if (input.urlHost !== oldIntegration.urlHost) return true;
+  if (input.urlPath !== oldIntegration.urlPath) return true;
+  if (input.documentationUrl !== oldIntegration.documentationUrl) return true;
+
+  return false;
 }
 
 export const listIntegrationsResolver = async (
@@ -47,7 +70,7 @@ export const getIntegrationResolver = async (
 
 export const upsertIntegrationResolver = async (
   _: any,
-  { input }: { input: Integration },
+  { input, mode = 'UPSERT' }: { input: Integration, mode?: 'CREATE' | 'UPDATE' | 'UPSERT' },
   context: Context,
   info: GraphQLResolveInfo
 ) => {
@@ -57,11 +80,81 @@ export const upsertIntegrationResolver = async (
   try {
     const now = new Date();
     const oldIntegration = await context.datastore.getIntegration(input.id, context.orgId);
+
+    if (mode === 'CREATE') {
+      if (oldIntegration) {
+        input.id = await generateUniqueId({
+          baseId: input.id,
+          exists: async (id) => !!(await context.datastore.getIntegration(id, context.orgId))
+        });
+      }
+    } else if (mode === 'UPDATE' && !oldIntegration) {
+      throw new Error(`Integration with ID '${input.id}' not found.`);
+    }
+
+    const shouldFetchDoc = needsDocFetch(input, oldIntegration);
+
+    if (shouldFetchDoc) {
+      // Fire-and-forget async doc fetch
+      (async () => {
+        try {
+          logMessage('info', `Starting async documentation fetch for integration ${input.id}`, { orgId: context.orgId });
+          const docFetcher = new Documentation(
+            {
+              urlHost: input.urlHost,
+              urlPath: input.urlPath,
+              documentationUrl: input.documentationUrl,
+            },
+            input.credentials || {},
+            { orgId: context.orgId }
+          );
+          const docString = await docFetcher.fetchAndProcess();
+          // Check if integration still exists before upserting
+          const stillExists = await context.datastore.getIntegration(input.id, context.orgId);
+          if (!stillExists) {
+            logMessage('warn', `Integration ${input.id} was deleted while fetching documentation. Skipping upsert.`, { orgId: context.orgId });
+            return;
+          }
+          await context.datastore.upsertIntegration(input.id, {
+            ...input,
+            documentation: docString,
+            documentationPending: false,
+            specificInstructions: input.specificInstructions?.trim() || oldIntegration?.specificInstructions || '',
+            createdAt: oldIntegration?.createdAt || now,
+            updatedAt: new Date(),
+          }, context.orgId);
+          logMessage('info', `Completed documentation fetch for integration ${input.id}`, { orgId: context.orgId });
+        } catch (err) {
+          logMessage('error', `Documentation fetch failed for integration ${input.id}: ${String(err)}`, { orgId: context.orgId });
+          // Reset documentationPending to false on failure to prevent corrupted state
+          try {
+            const stillExists = await context.datastore.getIntegration(input.id, context.orgId);
+            if (stillExists) {
+              await context.datastore.upsertIntegration(input.id, {
+                ...input,
+                documentationPending: false,
+                specificInstructions: input.specificInstructions?.trim() || oldIntegration?.specificInstructions || '',
+                createdAt: oldIntegration?.createdAt || now,
+                updatedAt: new Date(),
+              }, context.orgId);
+              logMessage('info', `Reset documentationPending to false for integration ${input.id} after fetch failure`, { orgId: context.orgId });
+            }
+          } catch (resetError) {
+            logMessage('error', `Failed to reset documentationPending for integration ${input.id}: ${String(resetError)}`, { orgId: context.orgId });
+          }
+        }
+      })();
+    }
     const integration = {
       id: input.id,
       name: resolveField(input.name, oldIntegration?.name, ''),
       urlHost: resolveField(input.urlHost, oldIntegration?.urlHost, ''),
+      urlPath: resolveField(input.urlPath, oldIntegration?.urlPath, ''),
+      documentationUrl: resolveField(input.documentationUrl, oldIntegration?.documentationUrl, ''),
+      documentation: resolveField(input.documentation, oldIntegration?.documentation, ''),
+      documentationPending: shouldFetchDoc,
       credentials: resolveField(input.credentials, oldIntegration?.credentials, {}),
+      specificInstructions: resolveField(input.specificInstructions?.trim(), oldIntegration?.specificInstructions, ''),
       createdAt: oldIntegration?.createdAt || now,
       updatedAt: now
     };
@@ -84,5 +177,26 @@ export const deleteIntegrationResolver = async (
   } catch (error) {
     logMessage('error', `Error deleting integration: ${String(error)}`, { orgId: context.orgId });
     throw error;
+  }
+};
+
+export const findRelevantIntegrationsResolver = async (
+  _: any,
+  { instruction }: { instruction?: string },
+  context: Context,
+  info: GraphQLResolveInfo
+) => {
+  const logInstruction = instruction ? `instruction: ${instruction}` : 'no instruction (returning all integrations)';
+  logMessage('info', `Finding relevant integrations for ${logInstruction}`, { orgId: context.orgId });
+
+  try {
+    const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
+    const allIntegrations = await context.datastore.listIntegrations(1000, 0, context.orgId);
+
+    const selector = new IntegrationSelector(metadata);
+    return await selector.select(instruction, allIntegrations.items || []);
+  } catch (error) {
+    logMessage('error', `Error finding relevant integrations: ${String(error)}`, { orgId: context.orgId });
+    return [];
   }
 };

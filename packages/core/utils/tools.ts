@@ -94,6 +94,12 @@ export function superglueJsonata(expr: string) {
       throw new Error(`Invalid date: ${e.message}`);
     }
   });
+
+  expression.registerFunction("now", () => new Date().toISOString());
+
+  expression.registerFunction("seconds", () => Math.floor(Date.now() / 1000));
+  expression.registerFunction("millis", () => Date.now());
+
   expression.registerFunction("dateMax", (dates: string[]) =>
     dates.reduce((max, curr) => new Date(max) > new Date(curr) ? max : curr));
 
@@ -142,7 +148,7 @@ export async function applyJsonataWithValidation(data: any, expr: string, schema
     }
     // if no schema is given, skip validation
     if (!schema) {
-      return { success: true, data: result }
+      return { success: true, data: result };
     }
     const validator = new Validator();
     const optionalSchema = addNullableToOptional(schema);
@@ -207,7 +213,7 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
   config.headers = {
     "Accept": "*/*",
     ...config.headers,
-  }
+  };
 
   // Don't send body for GET, HEAD, DELETE, OPTIONS
   if (["GET", "HEAD", "DELETE", "OPTIONS"].includes(config.method!)) {
@@ -427,7 +433,7 @@ export function addNullableToOptional(schema: any, required: boolean = true): an
   if ((schema.type === 'object' || schema.type?.includes('object')) && schema.properties) {
     newSchema.additionalProperties = false;
     const allRequired = new Set(Array.isArray(schema.required) ? schema.required : []);
-    newSchema.required = Object.keys(schema.properties);
+    newSchema.required = Array.from(allRequired);
     newSchema.properties = Object.entries(schema.properties).reduce((acc, [key, value]) => ({
       ...acc,
       [key]: addNullableToOptional(value, allRequired.has(key))

@@ -4,6 +4,7 @@ import { useConfig } from "@/src/app/config-context";
 import JsonSchemaEditor from "@/src/components/utils/JsonSchemaEditor";
 import { WorkflowResultsView } from "@/src/components/workflow/WorkflowResultsView";
 import { CacheMode, SuperglueClient, TransformResult, WorkflowResult } from "@superglue/client";
+import { X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from "react";
 import { useToast } from "../../hooks/use-toast";
@@ -12,7 +13,6 @@ import { Card, CardContent } from "../ui/card";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Textarea } from "../ui/textarea";
-import { X } from 'lucide-react';
 
 type InputType = 'raw' | 'url' | 'file';
 
@@ -22,6 +22,21 @@ interface SavedInputData {
     inputUrl: string;
     fileName?: string;
 }
+
+// Utility to detect binary file formats that need extraction
+const isBinaryFile = (filename: string): boolean => {
+    const binaryExtensions = [
+        '.xlsx', '.xls', '.xlsm', '.xlsb',  // Excel formats
+        '.docx', '.doc', '.docm',          // Word formats  
+        '.pptx', '.ppt', '.pptm',          // PowerPoint formats
+        '.zip', '.rar', '.7z',             // Archive formats
+        '.pdf',                            // PDF format
+        '.odt', '.ods', '.odp',            // OpenDocument formats
+    ];
+
+    const ext = filename.toLowerCase().split('.').pop();
+    return binaryExtensions.includes(`.${ext}`);
+};
 
 // Cookie utility functions
 const saveInputDataToCookie = (transformId: string, inputData: SavedInputData) => {
@@ -149,7 +164,6 @@ export default function TransformPlayground({ id }: { id?: string }) {
                 throw new Error(`Transform with ID "${idToLoad}" not found.`);
             }
 
-            console.log(transformConfig);
             setTransformId(transformConfig.id);
             setInstruction(transformConfig.instruction || '');
             setTransform(transformConfig.responseMapping || '');
@@ -285,6 +299,11 @@ export default function TransformPlayground({ id }: { id?: string }) {
                 saveInputDataToCookie(transformId, inputDataToSave);
             }
 
+            const superglueClient = new SuperglueClient({
+                endpoint: config.superglueEndpoint,
+                apiKey: config.superglueApiKey,
+            });
+
             // Prepare input based on type
             switch (inputType) {
                 case 'raw':
@@ -306,17 +325,31 @@ export default function TransformPlayground({ id }: { id?: string }) {
                     if (!inputFile) {
                         throw new Error('No file selected');
                     }
-                    const fileContent = await inputFile.text();
-                    inputData = fileContent;
+
+                    if (isBinaryFile(inputFile.name)) {
+                        // Use extract to convert binary files to JSON first
+                        const extractResult = await superglueClient.extract({
+                            file: inputFile,
+                            endpoint: {
+                                id: `extract-${Date.now()}`,
+                                instruction: "Extract structured data from this file"
+                            }
+                        });
+
+                        if (!extractResult.success) {
+                            throw new Error(`Failed to extract data from binary file: ${extractResult.error}`);
+                        }
+
+                        inputData = extractResult.data;
+                    } else {
+                        // Handle text files normally
+                        const fileContent = await inputFile.text();
+                        inputData = fileContent;
+                    }
                     break;
                 default:
                     throw new Error('Invalid input type');
             }
-
-            const superglueClient = new SuperglueClient({
-                endpoint: config.superglueEndpoint,
-                apiKey: config.superglueApiKey,
-            });
 
             // Execute transform
             let transformResult: TransformResult & { data: any };
@@ -503,7 +536,7 @@ export default function TransformPlayground({ id }: { id?: string }) {
                                 className="font-mono text-xs min-h-[200px]"
                             />
                             {!rawData.trim() && (
-                                <div className="text-xs text-amber-500 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded mt-1">
+                                <div className="text-xs text-amber-800 dark:text-amber-300 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded mt-1">
                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
                                         <line x1="12" y1="9" x2="12" y2="13" />
@@ -527,7 +560,7 @@ export default function TransformPlayground({ id }: { id?: string }) {
                                 placeholder="https://api.example.com/data"
                             />
                             {!inputUrl.trim() && (
-                                <div className="text-xs text-amber-500 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded mt-1">
+                                <div className="text-xs text-amber-800 dark:text-amber-300 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded mt-1">
                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
                                         <line x1="12" y1="9" x2="12" y2="13" />
@@ -542,11 +575,11 @@ export default function TransformPlayground({ id }: { id?: string }) {
                 {
                     inputType === 'file' && (
                         <div>
-                            <Label htmlFor="inputFile" className="mb-1 block">Upload File (JSON, XML, CSV)</Label>
+                            <Label htmlFor="inputFile" className="mb-1 block">Upload File (JSON, XML, CSV, Excel)</Label>
                             <Input
                                 id="inputFile"
                                 type="file"
-                                accept=".json,.txt"
+                                accept=".json,.txt,.csv,.xml,.xlsx"
                                 onChange={handleFileChange}
                             />
                             {inputFile && (
@@ -555,7 +588,7 @@ export default function TransformPlayground({ id }: { id?: string }) {
                                 </p>
                             )}
                             {!inputFile && (
-                                <div className="text-xs text-amber-500 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded mt-1">
+                                <div className="text-xs text-amber-800 dark:text-amber-300 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded mt-1">
                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
                                         <line x1="12" y1="9" x2="12" y2="13" />

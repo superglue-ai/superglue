@@ -3,7 +3,7 @@ import { Queue } from './queue.js';
 
 describe('Queue', () => {
   it('should process jobs in order', async () => {
-    const queue = new Queue('test');
+    const queue = new Queue('test', { orgId: '' });
     const results: number[] = [];
 
     const task1 = async () => {
@@ -24,7 +24,7 @@ describe('Queue', () => {
   });
 
   it('should not add duplicate jobs', () => {
-    const queue = new Queue();
+    const queue = new Queue('test', { orgId: '' });
     const task = async () => {
       await new Promise(resolve => setTimeout(resolve, 100000));
     };
@@ -37,7 +37,7 @@ describe('Queue', () => {
   });
 
   it('should handle job errors without stopping the queue', async () => {
-    const queue = new Queue();
+    const queue = new Queue('test', { orgId: '' });
     const results: string[] = [];
 
     const failingTask = async () => {

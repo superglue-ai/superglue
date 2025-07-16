@@ -1,41 +1,28 @@
 import { useConfig } from '@/src/app/config-context';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem
-} from "@/src/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/src/components/ui/popover";
+import { useIntegrations } from '@/src/app/integrations-context';
+import { IntegrationForm } from '@/src/components/integrations/IntegrationForm';
 import { useToast } from '@/src/hooks/use-toast';
-import { inputErrorStyles, splitUrl, flattenWorkflowCredentials } from '@/src/lib/client-utils';
-import { findMatchingIntegration, integrations } from '@/src/lib/integrations';
+import { inputErrorStyles, needsUIToTriggerDocFetch, parseCredentialsHelper } from '@/src/lib/client-utils';
+import { findMatchingIntegration, integrations as integrationTemplates } from '@/src/lib/integrations';
 import { cn, composeUrl } from '@/src/lib/utils';
-import { SuperglueClient, SystemInput, Workflow, WorkflowResult } from '@superglue/client';
-import { ArrowRight, Check, ChevronsUpDown, Globe, Loader2, Pencil, Play, Plus, Trash2, X, ChevronRight } from 'lucide-react';
+import { Integration, IntegrationInput, SuperglueClient, UpsertMode, Workflow, WorkflowResult } from '@superglue/client';
+import { flattenAndNamespaceWorkflowCredentials, waitForIntegrationProcessing } from '@superglue/shared/utils';
+import { ArrowRight, Check, ChevronRight, FileText, Globe, Loader2, Pencil, Play, Plus, Workflow as WorkflowIcon, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
-import { useRef, useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Editor from 'react-simple-code-editor';
 import type { SimpleIcon } from 'simple-icons';
 import * as simpleIcons from 'simple-icons';
 import { Button } from '../ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
-import { CredentialsManager } from '../utils/CredentialManager';
-import { DocumentationField } from '../utils/DocumentationField';
+import { DocStatus } from '../utils/DocStatusSpinner';
 import { HelpTooltip } from '../utils/HelpTooltip';
 import JsonSchemaEditor from '../utils/JsonSchemaEditor';
 import { StepIndicator, WORKFLOW_CREATE_STEPS } from '../utils/StepIndicator';
-import type { URLFieldHandle } from '../utils/URLField';
-import { URLField } from '../utils/URLField';
 import { WorkflowCreateSuccess } from './WorkflowCreateSuccess';
 import { WorkflowResultsView } from './WorkflowResultsView';
 import { WorkflowStepsView } from './WorkflowStepsView';
@@ -49,7 +36,7 @@ interface WorkflowCreateStepperProps {
 
 // Create an extended client class
 class ExtendedSuperglueClient extends SuperglueClient {
-  async generateInstructions(systems: SystemInput[]): Promise<string[]> {
+  async generateInstructions(integrations: IntegrationInput[]): Promise<string[]> {
     const response = await fetch(`${this['endpoint']}/graphql`, {
       method: 'POST',
       headers: {
@@ -58,14 +45,13 @@ class ExtendedSuperglueClient extends SuperglueClient {
       },
       body: JSON.stringify({
         query: `
-          query GenerateInstructions($systems: [SystemInput!]!) {
-            generateInstructions(systems: $systems)
+          query GenerateInstructions($integrations: [IntegrationInput!]!) {
+            generateInstructions(integrations: $integrations)
           }
         `,
-        variables: { systems }
+        variables: { integrations }
       })
     });
-
     const result = await response.json();
     return result.data.generateInstructions;
   }
@@ -79,24 +65,11 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const router = useRouter();
   const superglueConfig = useConfig();
 
-  const [systems, setSystems] = useState<SystemInput[]>([]);
-  const [currentSystem, setCurrentSystem] = useState<SystemInput>({
-    id: '',
-    urlHost: '',
-    urlPath: '',
-    documentationUrl: '',
-    documentation: '',
-    credentials: {},
-  });
+  const { integrations, pendingDocIds, loading, setPendingDocIds, refreshIntegrations } = useIntegrations();
+
   const [instruction, setInstruction] = useState('');
   const [payload, setPayload] = useState('{}');
   const [currentWorkflow, setCurrentWorkflow] = useState<Workflow | null>(null); // To store result from buildWorkflow
-  const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
-  const [systemFormVisible, setSystemFormVisible] = useState(false);
-  const [editingSystemIndex, setEditingSystemIndex] = useState<number | null>(null);
-  const [idManuallyEdited, setIdManuallyEdited] = useState(false);
-  const [selectedIntegration, setSelectedIntegration] = useState<string>("custom");
-  const [integrationDropdownOpen, setIntegrationDropdownOpen] = useState(false);
 
   const [schema, setSchema] = useState<string>('{}');
   const [activeTab, setActiveTab] = useState<'results' | 'transform' | 'final' | 'instructions'>('results');
@@ -116,162 +89,147 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     JSON.stringify((currentWorkflow && (currentWorkflow as any).credentials) || {}, null, 2)
   );
 
+  const [selectedIntegrationIds, setSelectedIntegrationIds] = useState<string[]>([]);
+
+  const [integrationSearch, setIntegrationSearch] = useState('');
+  const [showIntegrationForm, setShowIntegrationForm] = useState(false);
+  const [integrationFormEdit, setIntegrationFormEdit] = useState<Integration | null>(null);
+
+  const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
+
+
+  const client = useMemo(() => new ExtendedSuperglueClient({
+    endpoint: superglueConfig.superglueEndpoint,
+    apiKey: superglueConfig.superglueApiKey,
+  }), [superglueConfig.superglueEndpoint, superglueConfig.superglueApiKey]);
+
+  const { waitForIntegrationReady } = useMemo(() => ({
+    waitForIntegrationReady: (integrationIds: string[]) => {
+      // Create adapter for SuperglueClient to work with shared utility
+      const clientAdapter = {
+        getIntegration: (id: string) => client.getIntegration(id)
+      };
+      return waitForIntegrationProcessing(clientAdapter, integrationIds);
+    }
+  }), [client]);
+
+  // Clear execution results when navigating away from review step
+  useEffect(() => {
+    // Don't clear on initial mount or when entering review
+    if (step !== 'review') {
+      setExecutionResult(null);
+      setFinalResult(null);
+      setExecutionError(null);
+      setActiveTab('results'); // Reset to default tab
+    }
+  }, [step]);
+
   // Create integration options array with custom option first
   const integrationOptions = [
     { value: "custom", label: "Custom", icon: "default" },
-    ...Object.entries(integrations).map(([key, integration]) => ({
+    ...Object.entries(integrationTemplates).map(([key, integration]) => ({
       value: key,
-      label: key.charAt(0).toUpperCase() + key.slice(1), // Capitalize first letter
+      label: key.charAt(0).toUpperCase() + key.slice(1),
       icon: integration.icon || "default"
     }))
   ];
 
-  // Helper function to get SimpleIcon
-  const getSimpleIcon = (name: string): SimpleIcon | null => {
-    if (!name || name === "default") return null;
-
-    // Convert service name to proper format for simple-icons
-    const formatted = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
-    const iconKey = `si${formatted}`;
-    try {
-      // Try the direct lookup
-      // @ts-ignore - The type definitions don't properly handle string indexing
-      let icon = simpleIcons[iconKey];
-      return icon || null;
-    } catch (e) {
-      return null;
-    }
-  };
-
-  // Auto-open system form when no systems exist and we're on the systems step
+  // Auto-open integration form when no integrations exist and we're on the integrations step
   useEffect(() => {
-    if (systems.length === 0 && step === 'integrations') {
-      setSystemFormVisible(true);
+    if (integrations.length === 0) {
+      setShowIntegrationForm(true);
     }
-  }, [systems.length, step]);
+  }, [integrations.length]);
 
-  const handleUrlChange = (urlHost: string, urlPath: string, queryParams?: Record<string, string>) => {
-    const normalizedUrlPath = urlPath === "/" ? "" : urlPath;
-    if (urlHost) {
-      const match = findMatchingIntegration(urlHost);
-      setCurrentSystem(prev => ({
-        ...prev,
-        urlHost,
-        urlPath: normalizedUrlPath,
-        id: idManuallyEdited ? prev.id : sanitizeSystemId(urlHost),
-        documentationUrl: prev.documentationUrl || match?.integration.docsUrl,
-      }));
-    }
-  }
-
-  const sanitizeSystemId = (id: string) => {
-    return id
-      .replace('www.', '')
-      .replace('api.', '')
-      .replace('http://', '')
-      .replace('https://', '')
-      .replace(/\./g, "-") // Replace dots with hyphens
-      .replace(/ /g, "-") // Replace spaces with hyphens
-      .replace(/[^a-zA-Z0-9-]/g, ""); // Remove special characters
+  // Add this helper function near the top of the component
+  const highlightJson = (code: string) => {
+    return Prism.highlight(code, Prism.languages.json, 'json');
   };
 
-  // --- System Management ---
-  const handleSystemInputChange = (field: keyof SystemInput | 'fullUrl') => (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    let newValue = e.target.value;
+  const generateDefaultFromSchema = (schema: any): any => {
+    if (!schema || typeof schema !== 'object') return {};
 
-    // Apply sanitization for the id field
-    if (field === 'id') {
-      newValue = sanitizeSystemId(newValue);
-      setIdManuallyEdited(true); // Track that user manually edited the ID
-    } else if (field === 'credentials') {
-      try {
-        newValue = JSON.parse(newValue);
-      } catch {
-        setValidationErrors(prev => ({ ...prev, credentials: true }));
+    if (schema.type === 'object' && schema.properties) {
+      const result: any = {};
+      for (const [key, propSchema] of Object.entries(schema.properties)) {
+        result[key] = generateDefaultFromSchema(propSchema);
       }
+      return result;
     }
 
-    setCurrentSystem(prev => ({ ...prev, [field]: newValue }));
-    setValidationErrors(prev => ({ ...prev, [field]: false })); // Clear error on change
+    if (schema.type === 'array') {
+      return [];
+    }
+
+    if (schema.type === 'string') {
+      return schema.default || '';
+    }
+
+    if (schema.type === 'number' || schema.type === 'integer') {
+      return schema.default || 0;
+    }
+
+    if (schema.type === 'boolean') {
+      return schema.default || false;
+    }
+
+    return schema.default || null;
   };
 
-  const addSystem = () => {
-    const errors: Record<string, boolean> = {};
+  // Helper function to determine if integration has documentation
+  const hasDocumentation = (integration: Integration) => {
+    // Check if integration has documentation URL and is not pending
+    return !!(integration.documentationUrl?.trim() && !pendingDocIds.has(integration.id));
+  };
+  // --- Integration Management (add/edit) ---
+  const handleIntegrationFormSave = async (integration: Integration) => {
+    // Close form immediately
+    setShowIntegrationForm(false);
+    setIntegrationFormEdit(null);
 
-    // Generate ID if not provided
-    if (!currentSystem.id?.trim()) {
-      // Try to extract domain from URL
-      if (currentSystem.urlHost) {
-        try {
-          const url = new URL(currentSystem.urlHost.startsWith('http') ? currentSystem.urlHost : `https://${currentSystem.urlHost}`);
-          const domain = url.hostname.replace('www.', '').split('.')[0];
-          setCurrentSystem(prev => ({
-            ...prev,
-            id: sanitizeSystemId(domain)
-          }));
-        } catch (e) {
-          errors.id = true;
-        }
-      } else {
-        errors.id = true;
-      }
-    }
-
-    // Check if ID already exists
-    if (systems.some(sys => sys.id === currentSystem.id)) {
-      errors.id = true;
-      errors.duplicateId = true;
-    }
-
-    if (!currentSystem.urlHost?.trim()) errors.urlHost = true;
-
-    // Basic JSON validation for credentials
+    // Handle background operations
     try {
-      if (currentSystem.credentials) {
-        JSON.parse(JSON.stringify(currentSystem.credentials));
+      const mode = integrationFormEdit ? UpsertMode.UPDATE : UpsertMode.CREATE;
+      const savedIntegration = await client.upsertIntegration(integration.id, integration, mode);
+      const needsDocFetch = needsUIToTriggerDocFetch(savedIntegration, integrationFormEdit);
+
+      if (needsDocFetch) {
+        // Set pending state for new integrations with doc URLs
+        setPendingDocIds(prev => new Set([...prev, savedIntegration.id]));
+
+        // Wait for docs to be ready in background - no toast needed since UI shows spinner
+        waitForIntegrationReady([savedIntegration.id]).then(() => {
+          // Remove from pending when done
+          setPendingDocIds(prev => new Set([...prev].filter(id => id !== savedIntegration.id)));
+        }).catch((error) => {
+          console.error('Error waiting for docs:', error);
+          // Remove from pending on error
+          setPendingDocIds(prev => new Set([...prev].filter(id => id !== savedIntegration.id)));
+        });
       }
-    } catch {
-      errors.credentials = true;
-    }
 
-    if (Object.keys(errors).length > 0) {
-      setValidationErrors(errors);
-      return;
-    }
+      setSelectedIntegrationIds(ids => {
+        const newIds = ids.filter(id => id !== (integrationFormEdit?.id || integration.id));
+        newIds.push(savedIntegration.id);
+        return newIds;
+      });
 
-    if (editingSystemIndex !== null) {
-      setSystems(prev => prev.map((sys, i) => i === editingSystemIndex ? currentSystem : sys));
-      setEditingSystemIndex(null);
-    } else {
-      setSystems(prev => [...prev, currentSystem]);
+      // Refresh integrations to ensure UI is updated
+      await refreshIntegrations();
+    } catch (error) {
+      console.error('Error saving integration:', error);
+      toast({
+        title: 'Error Saving Integration',
+        description: error instanceof Error ? error.message : 'Failed to save integration',
+        variant: 'destructive',
+      });
     }
-    setCurrentSystem({ // Reset form
-      id: '',
-      urlHost: '',
-      urlPath: '',
-      documentationUrl: '',
-      documentation: '',
-      credentials: {},
-    });
-    setSelectedIntegration("custom");
-    setValidationErrors({});
-    setSystemFormVisible(false); // Hide form after adding
-    setIdManuallyEdited(false); // Reset when adding system
+  };
+  const handleIntegrationFormCancel = () => {
+    setShowIntegrationForm(false);
+    setIntegrationFormEdit(null);
   };
 
-  const handleEditSystem = (index: number) => {
-    setCurrentSystem(systems[index]);
-    setSystemFormVisible(true);
-    setEditingSystemIndex(index);
-    setInstruction("");
-    setPayload("{}");
-  };
-
-  const removeSystem = (index: number) => {
-    setSystems(prev => prev.filter((_, i) => i !== index));
-  };
 
   // --- Step Navigation ---
   const handleNext = async () => {
@@ -279,7 +237,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     const currentIndex = steps.indexOf(step);
 
     if (step === 'integrations') {
-      if (systems.length === 0) {
+      if (integrations.length === 0) {
         toast({
           title: 'Add Integrations',
           description: 'Please add at least one integration.',
@@ -287,6 +245,8 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         });
         return;
       }
+
+
 
       setIsGeneratingSuggestions(true);
       try {
@@ -303,9 +263,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       } catch {
         errors.payload = true;
       }
-
       if (Object.keys(errors).length > 0) {
-        setValidationErrors(errors);
         toast({
           title: 'Validation Error',
           description: 'Please provide a valid instruction and JSON payload.',
@@ -313,24 +271,16 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         });
         return;
       }
-      setValidationErrors({});
       setIsBuilding(true);
-
       try {
-        const superglueClient = new ExtendedSuperglueClient({
-          endpoint: superglueConfig.superglueEndpoint,
-          apiKey: superglueConfig.superglueApiKey,
-        });
-
-        // Generate schema first
-        const schema = await superglueClient.generateSchema(instruction, "");
+        const freshIntegrations = integrations; // Use the updated integrations from context
+        const schema = await client.generateSchema(instruction, "");
         setSchema(JSON.stringify(schema, null, 2));
         const parsedPayload = JSON.parse(payload || '{}');
-        // Then build workflow
-        const response = await superglueClient.buildWorkflow({
+        const response = await client.buildWorkflow({
           instruction: instruction,
           payload: parsedPayload,
-          systems: systems,
+          integrationIds: selectedIntegrationIds,
           responseSchema: schema,
           save: false
         });
@@ -338,6 +288,31 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
           throw new Error('Failed to build workflow');
         }
         setCurrentWorkflow(response);
+
+        // Populate review credentials from integrations
+        const selectedIntegrations = selectedIntegrationIds
+          .map(id => freshIntegrations.find(i => i.id === id))
+          .filter(Boolean);
+        const credentialsFromIntegrations = flattenAndNamespaceWorkflowCredentials(selectedIntegrations);
+        setReviewCredentials(JSON.stringify(credentialsFromIntegrations, null, 2));
+
+        // Populate payload with required fields from inputSchema
+        if (response.inputSchema) {
+          try {
+            const defaultValues = generateDefaultFromSchema(response.inputSchema);
+            if (defaultValues.payload !== undefined && defaultValues.payload !== null) {
+              setPayload(JSON.stringify(defaultValues.payload, null, 2));
+            } else {
+              setPayload('{}');
+            }
+          } catch (error) {
+            console.warn('Failed to generate payload from schema:', error);
+            setPayload('{}');
+          }
+        } else {
+          setPayload('{}');
+        }
+
         toast({
           title: 'Workflow Built',
           description: `Workflow "${response.id}" generated successfully.`,
@@ -360,34 +335,28 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       try {
         const workflowInput = {
           id: currentWorkflow.id,
-          steps: currentWorkflow.steps.map((step: any) => ({ // Map steps to input format if needed
+          steps: currentWorkflow.steps.map((step: any) => ({
             ...step,
-            // Ensure apiConfig has an ID - use step ID if apiConfig ID is missing
             apiConfig: {
               ...(step.apiConfig || {}),
               id: step.apiConfig?.id || step.id,
             }
           })),
+          integrationIds: selectedIntegrationIds,
           inputSchema: currentWorkflow.inputSchema,
           finalTransform: currentWorkflow.finalTransform,
           responseSchema: JSON.parse(schema),
           instruction: instruction
         };
-        const superglueClient = new ExtendedSuperglueClient({
-          endpoint: superglueConfig.superglueEndpoint,
-          apiKey: superglueConfig.superglueApiKey,
-        });
-        const response = await superglueClient.upsertWorkflow(currentWorkflow.id, workflowInput);
+        const response = await client.upsertWorkflow(currentWorkflow.id, workflowInput);
         if (!response) {
           throw new Error('Failed to save workflow');
         }
-
         toast({
           title: 'Workflow Saved',
           description: `Workflow "${currentWorkflow.id}" saved successfully.`
         });
         setStep(steps[currentIndex + 1]); // Move to success step
-
       } catch (error: any) {
         console.error("Error saving workflow:", error);
         toast({
@@ -399,11 +368,10 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         setIsSaving(false);
       }
     } else if (step === 'success') {
-      // Handle completion
       if (onComplete) {
         onComplete();
       } else {
-        router.push('/'); // Default redirect
+        router.push('/');
       }
     }
   };
@@ -414,12 +382,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     if (step === 'integrations') {
       router.push('/configs');
       return;
-    }
-
-    if (step === 'review') {
-      setExecutionResult(null);
-      setFinalResult(null);
-      setExecutionError(null);
     }
 
     if (currentIndex > 0) {
@@ -433,43 +395,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     } else {
       router.push('/'); // Default redirect
     }
-  };
-
-  const handleIntegrationSelect = (value: string) => {
-    setSelectedIntegration(value);
-
-    if (value === "custom") {
-      // For custom, just reset URL fields but keep other values
-      setCurrentSystem(prev => ({
-        ...prev,
-        urlHost: '',
-        urlPath: '',
-        documentationUrl: ''
-      }));
-      return;
-    }
-
-    // For an existing integration
-    const integration = integrations[value];
-    if (integration) {
-      // Get values from integration
-      const apiUrl = integration.apiUrl || '';
-      const { urlHost, urlPath } = splitUrl(apiUrl);
-      setCurrentSystem(prev => ({
-        ...prev,
-        id: idManuallyEdited ? prev.id : sanitizeSystemId(value),
-        urlHost,
-        urlPath,
-        documentationUrl: integration.docsUrl || '',
-      }));
-
-      handleUrlChange(urlHost, urlPath);
-    }
-  };
-
-  // Add this helper function near the top of the component
-  const highlightJson = (code: string) => {
-    return Prism.highlight(code, Prism.languages.json, 'json');
   };
 
   const handleStepEdit = (stepId: string, updatedStep: any) => {
@@ -492,36 +417,25 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     });
   };
 
-
   const handleExecuteWorkflow = async () => {
     setIsExecuting(true);
     setExecutionError(null);
     try {
-      const superglueClient = new ExtendedSuperglueClient({
-        endpoint: superglueConfig.superglueEndpoint,
-        apiKey: superglueConfig.superglueApiKey,
-      });
-      const credentials = (() => {
-        try {
-          return JSON.parse(reviewCredentials);
-        } catch {
-          return {};
-        }
-      })();
-      console.log(credentials);
-      console.log(payload);
-      console.log(currentWorkflow);
-      const result = await superglueClient.executeWorkflow({
+      const result = await client.executeWorkflow({
         workflow: {
           id: currentWorkflow.id,
           steps: currentWorkflow.steps,
+          integrationIds: selectedIntegrationIds,
           responseSchema: JSON.parse(schema),
           finalTransform: currentWorkflow.finalTransform,
           inputSchema: currentWorkflow.inputSchema,
           instruction: currentWorkflow.instruction
         },
         payload: JSON.parse(payload || '{}'),
-        credentials: credentials
+        credentials: parseCredentialsHelper(reviewCredentials),
+        options: {
+          testMode: true
+        }
       });
       setExecutionResult(result);
       setCurrentWorkflow(result.config);
@@ -540,31 +454,32 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     }
   };
 
-  // Add this helper function near your other helpers
-  const getResponseLines = (response: any) => {
-    return response ? JSON.stringify(response, null, 2).split('\n') : ['No results yet...'];
-  };
+  // Helper to convert Integration to IntegrationInput (strip extra fields)
+  const toIntegrationInput = (i: Integration): IntegrationInput => ({
+    id: i.id,
+    urlHost: i.urlHost,
+    urlPath: i.urlPath,
+    documentationUrl: i.documentationUrl,
+    documentation: i.documentation,
+    credentials: i.credentials,
+  });
 
-  // Modify handleGenerateInstructions
   const handleGenerateInstructions = async () => {
-    if (systems.length === 0) {
+    if (selectedIntegrationIds.length === 0) {
       toast({
-        title: 'No Systems',
-        description: 'Add at least one system to get suggestions.',
+        title: 'No Integrations',
+        description: 'Add at least one integration to get suggestions.',
         variant: 'destructive',
       });
       return;
     }
-
     setIsGeneratingSuggestions(true);
     try {
-      const superglueClient = new ExtendedSuperglueClient({
-        endpoint: superglueConfig.superglueEndpoint,
-        apiKey: superglueConfig.superglueApiKey,
-      });
-
-      const suggestionsText = await superglueClient.generateInstructions(systems);
-      // Split suggestions into array (assuming they're separated by newlines)
+      const selectedIntegrationInputs = selectedIntegrationIds
+        .map(id => integrations.find(i => i.id === id))
+        .filter(Boolean)
+        .map(toIntegrationInput);
+      const suggestionsText = await client.generateInstructions(selectedIntegrationInputs);
       const suggestionsArray = suggestionsText.filter(s => s.trim());
       setSuggestions(suggestionsArray);
     } catch (error: any) {
@@ -578,57 +493,22 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     }
   };
 
-  const urlFieldRef = useRef<URLFieldHandle>(null)
+  // Helper function to get SimpleIcon
+  const getSimpleIcon = (name: string): SimpleIcon | null => {
+    if (!name || name === "default") return null;
 
-  const handleSaveSystemEdit = () => {
-    if (editingSystemIndex !== null) {
-      setSystems(prev => prev.map((sys, i) => i === editingSystemIndex ? currentSystem : sys));
-      setEditingSystemIndex(null);
+    // Convert service name to proper format for simple-icons
+    const formatted = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+    const iconKey = `si${formatted}`;
+    try {
+      // Try the direct lookup
+      // @ts-ignore - The type definitions don't properly handle string indexing
+      let icon = simpleIcons[iconKey];
+      return icon || null;
+    } catch (e) {
+      return null;
     }
-    setSystemFormVisible(false);
-    setValidationErrors({});
-    setIdManuallyEdited(false);
-    setSelectedIntegration("custom");
-    setCurrentSystem({
-      id: '',
-      urlHost: '',
-      urlPath: '',
-      documentationUrl: '',
-      documentation: '',
-      credentials: {},
-    });
   };
-
-  const handleCancelEditOrAdd = () => {
-    setSystemFormVisible(false);
-    setValidationErrors({});
-    setIdManuallyEdited(false);
-    setSelectedIntegration("custom");
-    setCurrentSystem({
-      id: '',
-      urlHost: '',
-      urlPath: '',
-      documentationUrl: '',
-      documentation: '',
-      credentials: {},
-    });
-  };
-
-  const reviewCredentialsRef = useRef<string>(reviewCredentials);
-
-  useEffect(() => {
-    if (step === 'review') {
-      const flatCreds = flattenWorkflowCredentials(
-        systems.map(sys => ({
-          id: sys.id,
-          credentials: sys.credentials || {}
-        }))
-      );
-      setReviewCredentials(JSON.stringify(flatCreds, null, 2));
-      setCurrentWorkflow({ ...(currentWorkflow as any), credentials: flatCreds } as any);
-    }
-    // eslint-disable-next-line
-  }, [step, systems]);
 
   return (
     <div className="flex-1 flex flex-col h-full p-6">
@@ -664,252 +544,245 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       )}>
         {/* Main Content */}
         <div className="overflow-y-auto px-1 min-h-0">
-          {/* Step 1: Systems */}
+          {/* Step 1: Integrations */}
           {step === 'integrations' && (
             <div className="space-y-4">
-              {systems.length === 0 && !systemFormVisible && (
-                <p className="text-sm text-muted-foreground italic text-center py-4">
-                  No integrations added yet. Define the APIs or data sources your workflow will use.
-                </p>
-              )}
-              <div>
-                <div className="space-y-3">
-                  {systems.map((sys, index) => (
-                    <Card key={index} className="bg-muted/50 hover:bg-muted/70 transition-colors">
-                      <CardContent className="flex flex-col gap-2 py-3 px-4">
-                        <div className="flex flex-row items-center justify-between">
-                          <div className="flex flex-row items-center gap-3">
-                            {(() => {
-                              const integration = findMatchingIntegration(sys.urlHost);
-                              const icon = integration?.integration.icon ? getSimpleIcon(integration.integration.icon) : null;
-                              return icon ? (
-                                <svg
-                                  width="20"
-                                  height="20"
-                                  viewBox="0 0 24 24"
-                                  fill={`#${icon.hex}`}
-                                  className="flex-shrink-0"
-                                >
-                                  <path d={icon.path} />
-                                </svg>
-                              ) : (
-                                <Globe className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
-                              );
-                            })()}
-                            <div className="flex flex-col">
-                              <span className="font-medium">{sys.id}</span>
-                              <span className="text-sm text-muted-foreground truncate max-w-[300px]">
-                                {composeUrl(sys.urlHost, sys.urlPath)}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="flex flex-row gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-[hsl(var(--hover))] transition-colors"
-                              onClick={() => handleEditSystem(index)}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              className="text-destructive"
-                              size="icon"
-                              onClick={() => removeSystem(index)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                        {(!sys.credentials || Object.keys(sys.credentials).length === 0) && (
-                          <div className="text-xs text-amber-500 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                              <line x1="12" y1="9" x2="12" y2="13" />
-                              <line x1="12" y1="17" x2="12.01" y2="17" />
-                            </svg>
-                            No credentials added
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+              <div className="mb-4 flex items-center justify-between gap-4 px-4">
+                <h3 className="font-medium">
+                  Select one or more integrations to use in your workflow. You can add new integrations as needed.
+                </h3>
+                <Button variant="outline" size="sm" className="h-9 shrink-0" onClick={() => setShowIntegrationForm(true)}>
+                  <Plus className="mr-2 h-4 w-4" /> Add Integration
+                </Button>
               </div>
-
-              {/* Add System button - always visible if form not showing */}
-              {!systemFormVisible && (
-                <div className="mt-4 flex justify-center">
-                  <Button variant="outline" size="sm" onClick={() => setSystemFormVisible(true)}>
-                    <Plus className="mr-2 h-4 w-4" /> Add Integration
-                  </Button>
-                </div>
-              )}
-
-              {/* Add System Form */}
-              {systemFormVisible && (
-                <Card className="mt-4 border-primary/50">
-                  <CardHeader className="py-3 px-4">
-                    <CardTitle className="text-lg">Add New Integration</CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-4 space-y-3">
-                    <div>
-                      <Label htmlFor="integrationSelect">Integration</Label>
-                      <HelpTooltip text="Select from known integrations or choose custom for any other API." />
-                      <Popover open={integrationDropdownOpen} onOpenChange={setIntegrationDropdownOpen}>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            aria-expanded={integrationDropdownOpen}
-                            className="w-full justify-between"
-                          >
-                            <div className="flex items-center gap-2">
-                              {selectedIntegration ? (
-                                <>
-                                  {(() => {
-                                    const icon = getSimpleIcon(integrationOptions.find(opt => opt.value === selectedIntegration)?.icon || "");
-                                    return icon ? (
-                                      <svg
-                                        width="16"
-                                        height="16"
-                                        viewBox="0 0 24 24"
-                                        fill={`#${icon.hex}`}
-                                        className="flex-shrink-0"
-                                      >
-                                        <path d={icon.path} />
-                                      </svg>
-                                    ) : (
-                                      <Globe className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                                    );
-                                  })()}
-                                  <span>
-                                    {integrationOptions.find(option => option.value === selectedIntegration)?.label}
-                                  </span>
-                                </>
-                              ) : (
-                                <span>Select integration...</span>
-                              )}
-                            </div>
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
-                          <Command className="w-full">
-                            <CommandInput placeholder="Search integrations..." />
-                            <CommandEmpty>No integration found.</CommandEmpty>
-                            <CommandGroup className="max-h-[300px] overflow-y-auto">
-                              {integrationOptions.map((option) => (
-                                <CommandItem
-                                  key={option.value}
-                                  value={option.value}
-                                  onSelect={() => {
-                                    handleIntegrationSelect(option.value);
-                                    setIntegrationDropdownOpen(false);
-                                  }}
-                                  className="flex items-center py-2"
-                                >
-                                  <div className="flex items-center gap-2 w-full">
-                                    <div className="w-6 flex justify-center">
-                                      {(() => {
-                                        const icon = getSimpleIcon(option.icon);
-                                        return icon ? (
-                                          <svg
-                                            width="16"
-                                            height="16"
-                                            viewBox="0 0 24 24"
-                                            fill={`#${icon.hex}`}
-                                            className="flex-shrink-0"
-                                          >
-                                            <path d={icon.path} />
-                                          </svg>
-                                        ) : (
-                                          <Globe className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                                        );
-                                      })()}
-                                    </div>
-                                    <span className="flex-grow">{option.label}</span>
-                                    <Check
-                                      className={cn(
-                                        "h-4 w-4 flex-shrink-0",
-                                        selectedIntegration === option.value ? "opacity-100" : "opacity-0"
-                                      )}
-                                    />
-                                  </div>
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="systemFullUrl">API Endpoint*</Label>
-                      <HelpTooltip text="The base URL of the API (e.g., https://api.example.com/v1)." />
-                      <URLField
-                        ref={urlFieldRef}
-                        url={composeUrl(currentSystem.urlHost, currentSystem.urlPath) || ''}
-                        onUrlChange={handleUrlChange}
-                      />
-                      {validationErrors.urlHost && <p className="text-sm text-destructive mt-1">API Endpoint is required.</p>}
-                    </div>
-
-                    <div>
-                      <Label htmlFor="systemId">Integration ID*</Label>
-                      <HelpTooltip text="A unique identifier for this integration within the workflow (e.g., 'crm', 'productApi')." />
+              <div className="overflow-y-auto">
+                {loading ? (
+                  <div className="h-full bg-background" />
+                ) : integrations.length === 0 ? (
+                  <div className="h-[320px] flex items-center justify-center bg-background">
+                    <p className="text-sm text-muted-foreground italic">
+                      No integrations added yet. Define the APIs or data sources your workflow will use.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="gap-2 flex flex-col">
+                    {/* Header row */}
+                    <div className="flex items-center justify-between px-4 py-2 text-sm font-medium text-foreground border-b gap-4">
                       <Input
-                        id="systemId"
-                        value={currentSystem.id || ''}
-                        onChange={handleSystemInputChange('id')}
-                        placeholder="e.g., crm-api"
-                        className={cn(validationErrors.id && inputErrorStyles)}
+                        placeholder="Search integrations..."
+                        value={integrationSearch}
+                        onChange={e => setIntegrationSearch(e.target.value)}
+                        className="h-8 text-sm flex-1"
                       />
-                      {validationErrors.id && <p className="text-sm text-destructive mt-1">Integration ID is required and must be unique.</p>}
-                    </div>
+                      <div className="flex items-center gap-2">
+                        {(() => {
+                          const filteredIntegrations = integrations.filter(sys =>
+                            integrationSearch === '' ||
+                            sys.id.toLowerCase().includes(integrationSearch.toLowerCase()) ||
+                            sys.urlHost.toLowerCase().includes(integrationSearch.toLowerCase()) ||
+                            sys.urlPath.toLowerCase().includes(integrationSearch.toLowerCase())
+                          );
+                          const filteredIds = filteredIntegrations.map(i => i.id);
+                          const selectedCount = filteredIds.filter(id => selectedIntegrationIds.includes(id)).length;
+                          const allSelected = filteredIds.length > 0 && selectedCount === filteredIds.length;
 
-                    <div>
-                      <Label htmlFor="documentation">Documentation</Label>
-                      <HelpTooltip text="Paste relevant parts of the API documentation here or upload a file." />
-                      <DocumentationField
-                        url={currentSystem.documentationUrl || ''}
-                        content={currentSystem.documentation || ''}
-                        onUrlChange={(url: string) => setCurrentSystem(prev => ({ ...prev, documentationUrl: url }))}
-                        onContentChange={(content: string) => setCurrentSystem(prev => ({ ...prev, documentation: content }))}
-                      />
-                    </div>
+                          return (
+                            <span className="text-xs text-muted-foreground">
+                              {allSelected || selectedCount > 0 ? 'Unselect all' : 'Select all'}
+                            </span>
+                          );
+                        })()}
+                        <button
+                          className={cn(
+                            "h-5 w-5 rounded border-2 transition-all duration-200 flex items-center justify-center",
+                            (() => {
+                              const filteredIntegrations = integrations.filter(sys =>
+                                integrationSearch === '' ||
+                                sys.id.toLowerCase().includes(integrationSearch.toLowerCase()) ||
+                                sys.urlHost.toLowerCase().includes(integrationSearch.toLowerCase()) ||
+                                sys.urlPath.toLowerCase().includes(integrationSearch.toLowerCase())
+                              );
+                              const filteredIds = filteredIntegrations.map(i => i.id);
+                              const selectedCount = filteredIds.filter(id => selectedIntegrationIds.includes(id)).length;
+                              const allSelected = filteredIds.length > 0 && selectedCount === filteredIds.length;
+                              const someSelected = selectedCount > 0 && selectedCount < filteredIds.length;
 
-                    <div>
-                      <Label htmlFor="credentials">Credentials</Label>
-                      <HelpTooltip text='API keys or tokens needed for this specific system. Enter without any prefix like Bearer. Use advanced mode to add multiple credentials.' />
-                      <div className="w-full max-w-full">
-                        <CredentialsManager
-                          value={JSON.stringify(currentSystem.credentials)}
-                          onChange={(value) => {
-                            try {
-                              const parsed = JSON.parse(value);
-                              setCurrentSystem(prev => ({ ...prev, credentials: parsed }));
-                              setValidationErrors(prev => ({ ...prev, credentials: false }));
-                            } catch (e) {
-                              setValidationErrors(prev => ({ ...prev, credentials: true }));
+                              if (allSelected || someSelected) {
+                                return "bg-primary border-primary";
+                              }
+                              return "bg-background border-input hover:border-primary/50";
+                            })()
+                          )}
+                          onClick={() => {
+                            const filteredIntegrations = integrations.filter(sys =>
+                              integrationSearch === '' ||
+                              sys.id.toLowerCase().includes(integrationSearch.toLowerCase()) ||
+                              sys.urlHost.toLowerCase().includes(integrationSearch.toLowerCase()) ||
+                              sys.urlPath.toLowerCase().includes(integrationSearch.toLowerCase())
+                            );
+                            const filteredIds = filteredIntegrations.map(i => i.id);
+                            const selectedCount = filteredIds.filter(id => selectedIntegrationIds.includes(id)).length;
+                            const allSelected = filteredIds.length > 0 && selectedCount === filteredIds.length;
+
+                            if (allSelected || selectedCount > 0) {
+                              // Unselect all filtered
+                              setSelectedIntegrationIds(ids => ids.filter(id => !filteredIds.includes(id)));
+                            } else {
+                              // Select all filtered
+                              setSelectedIntegrationIds(ids => [...new Set([...ids, ...filteredIds])]);
                             }
                           }}
-                          className={cn("min-h-20font-mono text-xs", validationErrors.credentials && inputErrorStyles)}
-                        />
+                        >
+                          {(() => {
+                            const filteredIntegrations = integrations.filter(sys =>
+                              integrationSearch === '' ||
+                              sys.id.toLowerCase().includes(integrationSearch.toLowerCase()) ||
+                              sys.urlHost.toLowerCase().includes(integrationSearch.toLowerCase()) ||
+                              sys.urlPath.toLowerCase().includes(integrationSearch.toLowerCase())
+                            );
+                            const filteredIds = filteredIntegrations.map(i => i.id);
+                            const selectedCount = filteredIds.filter(id => selectedIntegrationIds.includes(id)).length;
+                            const allSelected = filteredIds.length > 0 && selectedCount === filteredIds.length;
+                            const someSelected = selectedCount > 0 && selectedCount < filteredIds.length;
+
+                            if (allSelected) {
+                              return <Check className="h-3 w-3 text-primary-foreground" />;
+                            } else if (someSelected) {
+                              return <div className="h-0.5 w-2.5 bg-primary-foreground" />;
+                            }
+                            return null;
+                          })()}
+                        </button>
                       </div>
-                      {validationErrors.credentials && <p className="text-sm text-destructive mt-1">Credentials must be valid JSON.</p>}
                     </div>
-                    <div className="flex justify-end gap-2 pt-2">
-                      <Button variant="outline" onClick={handleCancelEditOrAdd}>Cancel</Button>
-                      {editingSystemIndex !== null ? (
-                        <Button onClick={handleSaveSystemEdit}>Save Changes</Button>
-                      ) : (
-                        <Button onClick={addSystem}>Add System</Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
+                    {selectedIntegrationIds.length === 0 && integrations.length > 0 && (
+                      <div className="mx-4">
+                        <div className="text-xs text-amber-800 dark:text-amber-300 flex items-center gap-1.5 bg-amber-500/10 py-2 px-4 rounded-md">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                            <line x1="12" y1="9" x2="12" y2="13" />
+                            <line x1="12" y1="17" x2="12.01" y2="17" />
+                          </svg>
+                          Select at least one integration to continue
+                        </div>
+                      </div>
+                    )}
+                    {integrations
+                      .filter(sys =>
+                        integrationSearch === '' ||
+                        sys.id.toLowerCase().includes(integrationSearch.toLowerCase()) ||
+                        sys.urlHost.toLowerCase().includes(integrationSearch.toLowerCase()) ||
+                        sys.urlPath.toLowerCase().includes(integrationSearch.toLowerCase())
+                      )
+                      .map(sys => {
+                        const selected = selectedIntegrationIds.includes(sys.id);
+                        return (
+                          <div
+                            key={sys.id}
+                            className={cn(
+                              "flex items-center justify-between rounded-md px-4 py-3 transition-all duration-200 cursor-pointer",
+                              selected
+                                ? "bg-primary/10 dark:bg-primary/40 border border-primary/50 dark:border-primary/60 hover:bg-primary/15 dark:hover:bg-primary/25"
+                                : "bg-background border border-transparent hover:bg-accent/50 hover:border-border"
+                            )}
+                            onClick={() => {
+                              if (selected) {
+                                setSelectedIntegrationIds(ids => ids.filter(i => i !== sys.id));
+                              } else {
+                                setSelectedIntegrationIds(ids => [...ids, sys.id]);
+                              }
+                            }}
+                          >
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              {(() => {
+                                const integration = findMatchingIntegration(sys.urlHost);
+                                const icon = integration?.integration.icon ? getSimpleIcon(integration.integration.icon) : null;
+                                return icon ? (
+                                  <svg
+                                    width="20"
+                                    height="20"
+                                    viewBox="0 0 24 24"
+                                    fill={`#${icon.hex}`}
+                                    className="flex-shrink-0"
+                                  >
+                                    <path d={icon.path} />
+                                  </svg>
+                                ) : (
+                                  <Globe className="h-5 w-5 flex-shrink-0 text-foreground" />
+                                );
+                              })()}
+                              <div className="flex flex-col min-w-0">
+                                <span className="font-medium truncate max-w-[200px]">{sys.id}</span>
+                                <span className="text-xs text-muted-foreground truncate max-w-[240px]">
+                                  {composeUrl(sys.urlHost, sys.urlPath)}
+                                </span>
+                              </div>
+                              <div className="flex flex-col items-center gap-2">
+                                <div className="flex items-center gap-2">
+                                  <DocStatus
+                                    pending={pendingDocIds.has(sys.id)}
+                                    hasDocumentation={hasDocumentation(sys)}
+                                  />
+                                  {(!sys.credentials || Object.keys(sys.credentials).length === 0) && (
+                                    <span className="text-xs text-amber-800 dark:text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded">No credentials</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex gap-2 items-center">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  setIntegrationFormEdit(sys);
+                                  setShowIntegrationForm(true);
+                                }}
+                                disabled={pendingDocIds.has(sys.id)}
+                                title={pendingDocIds.has(sys.id) ? "Documentation is being processed" : "Edit integration"}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <button
+                                className={cn(
+                                  "h-5 w-5 rounded border-2 transition-all duration-200 flex items-center justify-center",
+                                  selected
+                                    ? "bg-primary border-primary"
+                                    : "bg-background border-input hover:border-primary/50"
+                                )}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (selected) {
+                                    setSelectedIntegrationIds(ids => ids.filter(i => i !== sys.id));
+                                  } else {
+                                    setSelectedIntegrationIds(ids => [...ids, sys.id]);
+                                  }
+                                }}
+                              >
+                                {selected && <Check className="h-3 w-3 text-primary-foreground" />}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+              </div>
+              {showIntegrationForm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+                  <div className="bg-background rounded-xl max-w-2xl w-full p-0">
+                    <IntegrationForm
+                      modal={true}
+                      integration={integrationFormEdit || undefined}
+                      onSave={handleIntegrationFormSave}
+                      onCancel={handleIntegrationFormCancel}
+                      integrationOptions={integrationOptions}
+                      getSimpleIcon={getSimpleIcon}
+                      inputErrorStyles={inputErrorStyles}
+                    />
+                  </div>
+                </div>
               )}
             </div>
           )}
@@ -924,9 +797,9 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                   <Textarea
                     id="instruction"
                     value={instruction}
-                    onChange={(e) => { setInstruction(e.target.value); setValidationErrors(prev => ({ ...prev, instruction: false })); }}
+                    onChange={(e) => { setInstruction(e.target.value); }}
                     placeholder="e.g., 'Fetch customer details from CRM using the input email, then get their recent orders from productApi.'"
-                    className={cn("min-h-80", validationErrors.instruction && inputErrorStyles)}
+                    className={cn("min-h-80")}
                   />
                   {suggestions.length > 0 && !instruction && (
                     <div className="absolute bottom-0 p-3 pointer-events-none w-full">
@@ -946,7 +819,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                     </div>
                   )}
                 </div>
-                {validationErrors.instruction && <p className="text-sm text-destructive mt-1">Instruction is required.</p>}
               </div>
 
               {/* Show loading state */}
@@ -961,7 +833,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                 <HelpTooltip text="Provide dynamic variables for the workflow as a JSON object. Workflow variables are equivalent to your workflow's initial payload and can be referenced in the entire config. You can change them when you use the workflow later." />
                 <div className={cn(
                   "flex-1 min-h-0 code-editor rounded-md border bg-transparent",
-                  validationErrors.payload ? inputErrorStyles : "border-input"
                 )}>
                   <Editor
                     value={payload}
@@ -981,11 +852,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                     className="font-mono text-xs w-full min-h-[60px] bg-transparent"
                   />
                 </div>
-                {validationErrors.payload && (
-                  <div className="bg-red-500/10 text-red-500 p-2 text-xs mt-1 rounded">
-                    Invalid JSON format
-                  </div>
-                )}
               </div>
             </div>
           )}
@@ -1001,29 +867,37 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                   {/* Recap of instruction */}
                   <div className="mb-2">
                     <Label>Instruction</Label>
-                    <div className="font-mono text-xs text-muted-foreground rounded px-2 py-1 mt-1 break-words">
+                    <div className="font-mono text-sm text-foreground rounded py-1 mt-1 break-words flex items-start gap-2">
                       {instruction}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-4 w-4 p-0 text-foreground hover:text-foreground flex-shrink-0"
+                        onClick={() => setStep('prompt')}
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </Button>
                     </div>
                   </div>
 
                   {/* Editable credentials input */}
                   <div className="mb-4">
                     <Label htmlFor="review-credentials">Credentials</Label>
-                    <HelpTooltip text='API keys or tokens needed for this workflow. Enter without any prefix like Bearer. Use advanced mode to add multiple credentials.' />
+                    <HelpTooltip text='API keys or tokens needed for this workflow. Enter without any prefix like Bearer. If you need to add new credentials keys to the JSON, go back and add them to your integrations or add them to the workflow variables.' />
                     <div className="w-full max-w-full">
                       <Input
                         value={reviewCredentials}
                         onChange={(e) => {
                           setReviewCredentials(e.target.value);
                           try {
-                            const parsed = JSON.parse(e.target.value);
-                            setCurrentWorkflow({ ...(currentWorkflow as any), credentials: parsed } as any);
+                            JSON.parse(e.target.value);
+                            setValidationErrors(prev => ({ ...prev, credentials: false }));
                           } catch (e) {
-                            // ignore parse errors for now
+                            setValidationErrors(prev => ({ ...prev, credentials: true }));
                           }
                         }}
                         placeholder="Enter credentials"
-                        className={cn("min-h-10 font-mono text-xs", validationErrors.credentials && inputErrorStyles)}
+                        className={cn("min-h-10 font-mono text-xs")}
                       />
                     </div>
                     {(() => {
@@ -1031,7 +905,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                         const creds = JSON.parse(reviewCredentials);
                         if (!creds || Object.keys(creds).length === 0) {
                           return (
-                            <div className="text-xs text-amber-500 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded mt-2">
+                            <div className="text-xs text-amber-800 dark:text-amber-300 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded mt-2">
                               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
                                 <line x1="12" y1="9" x2="12" y2="13" />
@@ -1063,18 +937,11 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                     <HelpTooltip text="Dynamic variables for the workflow as a JSON object. These are equivalent to your workflow's initial payload and can be referenced in the entire config." />
                     <div className={cn(
                       "w-full max-w-full code-editor rounded-md border bg-transparent",
-                      validationErrors.payload ? inputErrorStyles : "border-input"
                     )}>
                       <Editor
                         value={payload}
                         onValueChange={(code) => {
                           setPayload(code);
-                          try {
-                            JSON.parse(code);
-                            setValidationErrors(prev => ({ ...prev, payload: false }));
-                          } catch (e) {
-                            setValidationErrors(prev => ({ ...prev, payload: true }));
-                          }
                         }}
                         highlight={highlightJson}
                         padding={10}
@@ -1083,11 +950,23 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                         className="font-mono text-xs w-full min-h-[60px] bg-transparent"
                       />
                     </div>
-                    {validationErrors.payload && (
-                      <div className="bg-red-500/10 text-red-500 p-2 text-xs mt-1 rounded">
-                        Invalid JSON format
-                      </div>
-                    )}
+                    {(() => {
+                      try {
+                        JSON.parse(payload);
+                        return null;
+                      } catch {
+                        return (
+                          <div className="text-xs text-red-600 flex items-center gap-1.5 bg-red-500/10 py-1 px-2 rounded mt-2">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <circle cx="12" cy="12" r="10" />
+                              <line x1="12" y1="8" x2="12" y2="12" />
+                              <line x1="12" y1="16" x2="12.01" y2="16" />
+                            </svg>
+                            Invalid JSON format
+                          </div>
+                        );
+                      }
+                    })()}
                   </div>
 
                   <div className="flex flex-col gap-2 mt-2">
@@ -1105,6 +984,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                         )}
                         aria-hidden="true"
                       />
+                      <WorkflowIcon className="h-4 w-4" />
                       <span className="font-medium text-sm">Workflow Steps</span>
                     </div>
                     {showSteps && (
@@ -1113,6 +993,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                           steps={currentWorkflow.steps}
                           onStepsChange={handleStepsChange}
                           onStepEdit={handleStepEdit}
+                          integrations={integrations}
                         />
                       </div>
                     )}
@@ -1130,10 +1011,11 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                         )}
                         aria-hidden="true"
                       />
+                      <FileText className="h-4 w-4" />
                       <span className="font-medium text-sm">Response Schema Editor</span>
                     </div>
                     {showSchemaEditor && (
-                      <div className="bg-background mt-2 mb-4">
+                      <div className="mt-2 mb-4">
                         <JsonSchemaEditor
                           isOptional={true}
                           value={schema}
@@ -1165,14 +1047,14 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
               <WorkflowCreateSuccess
                 currentWorkflow={currentWorkflow}
                 credentials={
-                  Object.values(systems).reduce((acc, sys: any) => {
+                  Object.values(integrations).reduce((acc, sys: any) => {
                     return {
                       ...acc,
                       ...Object.entries(sys.credentials || {}).reduce(
                         (obj, [name, value]) => ({ ...obj, [`${sys.id}_${name}`]: value }),
                         {}
                       ),
-                    }
+                    };
                   }, {})
                 }
                 payload={(() => {
@@ -1217,7 +1099,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
           variant="outline"
           onClick={handleBack}
           disabled={
-            (step === 'integrations' && (systemFormVisible || isBuilding || isSaving)) ||
+            (step === 'integrations' && showIntegrationForm) ||
             isBuilding || isSaving
           }
         >
@@ -1238,15 +1120,12 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
             </Button>
           )}
           <Button
-            onClick={() => {
-              urlFieldRef.current?.commit()
-              handleNext()
-            }}
+            onClick={handleNext}
             disabled={
               isBuilding ||
               isSaving ||
               isGeneratingSuggestions ||
-              (step === 'integrations' && (systemFormVisible || systems.length === 0))
+              (step === 'integrations' && selectedIntegrationIds.length === 0)
             }
           >
             {isBuilding ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Building...</> :

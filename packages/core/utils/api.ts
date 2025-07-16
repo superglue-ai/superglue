@@ -25,7 +25,7 @@ export function convertBasicAuthToBase64(headerValue: string) {
   return headerValue;
 }
 
-export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions): Promise<{ data: any }> {
+export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions): Promise<{ data: any; }> {
   if (endpoint.urlHost.startsWith("postgres")) {
     return { data: await callPostgres(endpoint, payload, credentials, options) };
   }
@@ -41,25 +41,14 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
   let seenResponseHashes = new Set<string>();
 
   while (hasMore && loopCounter < 500) {
-    // Generate pagination variables if enabled
-    let paginationVars = {};
-    switch (endpoint.pagination?.type) {
-      case PaginationType.PAGE_BASED:
-        const pageSize = endpoint.pagination?.pageSize || "50";
-        paginationVars = { page, limit: pageSize, pageSize: pageSize };
-        break;
-      case PaginationType.OFFSET_BASED:
-        const offsetPageSize = endpoint.pagination?.pageSize || "50";
-        paginationVars = { offset, limit: offsetPageSize, pageSize: offsetPageSize };
-        break;
-      case PaginationType.CURSOR_BASED:
-        const cursorPageSize = endpoint.pagination?.pageSize || "50";
-        paginationVars = { cursor: cursor, limit: cursorPageSize, pageSize: cursorPageSize };
-        break;
-      default:
-        hasMore = false;
-        break;
-    }
+    // Generate pagination variables
+    let paginationVars = {
+      page,
+      offset,
+      cursor,
+      limit: endpoint.pagination?.pageSize || "50",
+      pageSize: endpoint.pagination?.pageSize || "50"
+    };
 
     // Combine all variables
     const requestVars = { ...paginationVars, ...allVariables };
@@ -112,7 +101,7 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
 
     const response = await callAxios(axiosConfig, options);
 
-    if (![200, 201, 204].includes(response?.status) ||
+    if (![200, 201, 202, 203, 204, 205].includes(response?.status) ||
       response.data?.error ||
       (Array.isArray(response?.data?.errors) && response?.data?.errors.length > 0)
     ) {
@@ -206,6 +195,9 @@ config: ${JSON.stringify(axiosConfig)}`;
         hasMore = false;
       }
     }
+    else {
+      hasMore = false;
+    }
     loopCounter++;
   }
 
@@ -230,7 +222,7 @@ export async function generateApiConfig(
   credentials: Record<string, any>,
   retryCount = 0,
   messages: OpenAI.Chat.ChatCompletionMessageParam[] = []
-): Promise<{ config: ApiConfig; messages: OpenAI.Chat.ChatCompletionMessageParam[] }> {
+): Promise<{ config: ApiConfig; messages: OpenAI.Chat.ChatCompletionMessageParam[]; }> {
   const schema = zodToJsonSchema(z.object({
     urlHost: z.string(),
     urlPath: z.string(),
@@ -249,13 +241,13 @@ export async function generateApiConfig(
     pagination: z.object({
       type: z.enum(Object.values(PaginationType) as [string, ...string[]]),
       pageSize: z.string().describe("Number of items per page. Set this to a number. Once you set it here as a number, you can access it using <<limit>> in headers, params, body, or url path."),
-      cursorPath: z.string().optional().describe("If cursor_based: The path to the cursor in the response. E.g. cursor.current or next_cursor")
+      cursorPath: z.string().describe("If cursor_based: The path to the cursor in the response. E.g. cursor.current or next_cursor. If pagination is not cursor_based, set this to \"\"")
     }).optional()
   }));
   const availableVariables = [
     ...Object.keys(credentials || {}),
     ...Object.keys(payload || {}),
-  ].map(v => `{${v}}`).join(", ");
+  ].map(v => `<<${v}>>`).join(", ");
   if (messages.length === 0) {
     const userPrompt = `Generate API configuration for the following:
 
@@ -312,17 +304,38 @@ Documentation: ${String(documentation)}`;
   };
 }
 
-export async function evaluateResponse(data: any, responseSchema: JSONSchema, instruction: string): Promise<{ success: boolean, refactorNeeded: boolean, shortReason: string }> {
+export async function evaluateResponse(
+  data: any,
+  responseSchema: JSONSchema,
+  instruction: string,
+  documentation?: string
+): Promise<{ success: boolean, refactorNeeded: boolean, shortReason: string; }> {
   let content = JSON.stringify(data);
   if (content.length > LanguageModel.contextLength / 2) {
     content = JSON.stringify(sample(data, 10)) + "\n\n...truncated...";
   }
+
+  // Include documentation context if available
+  const documentationContext = documentation
+    ? `\n\nAPI DOCUMENTATION CONTEXT:\n=========================\n${documentation}\n=========================\n`
+    : '';
+
   const request = [
     {
       role: "system",
       content: `You are an API response validator. 
 Validate the following api response and return { success: true, shortReason: "", refactorNeeded: false } if the response aligns with the instruction. 
 If the response does not align with the instruction, return { success: false, shortReason: "reason why it does not align", refactorNeeded: false }.
+
+IMPORTANT CONSIDERATIONS:
+- For operations that create, update, delete, or send data (non-retrieval operations), minimal or empty responses with 2xx status codes often indicate success
+- An empty response body (like {}, [], null, or "") can be a valid successful response, especially for:
+  * Resource creation/updates where the API acknowledges receipt without returning data
+  * Deletion operations that return no content
+  * Asynchronous operations that accept requests for processing
+  * Messaging/notification APIs that confirm delivery without response data
+- Always consider the instruction type and consult the API documentation when provided to understand expected response patterns
+- Do not assume empty responses are failures without checking the operation context
 
 Do not make the mistake of thinking that the { success: true, shortReason: "", refactorNeeded: false } is the expected API response format. It is YOUR expected response format.
 Keep in mind that the response can come in any shape or form, just validate that the response aligns with the instruction.
@@ -333,9 +346,9 @@ If the response reads something like [ "12/2", "22.2", "frejgeiorjgrdelo"] that 
 If the response needs to be grouped or sorted or aggregated, this will be handled in a later step, so the appropriate response for you is to return { success: true, refactorNeeded: false, shortReason: "" }.
 Refactoring is NOT needed if the response contains extra fields or needs to be grouped.
 
-Instruction: ${instruction}`
+Instruction: ${instruction}${documentationContext}`
     },
-    { role: "user", content: content }
+    { role: "user", content: `API Response: ${content}` }
   ] as OpenAI.Chat.ChatCompletionMessageParam[];
 
   const response = await LanguageModel.generateObject(

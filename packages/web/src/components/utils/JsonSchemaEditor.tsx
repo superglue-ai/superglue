@@ -16,7 +16,7 @@ import {
   TooltipTrigger,
 } from "@/src/components/ui/tooltip";
 import { cn } from "@/src/lib/utils";
-import { ListPlus, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
 import React from 'react';
@@ -29,17 +29,33 @@ interface JsonSchemaEditorProps {
   title?: string;
 }
 
-const SCHEMA_TYPES = ['object', 'array', 'string', 'number', 'boolean', 'integer'];
+const SCHEMA_TYPES = ['object', 'string', 'number', 'boolean', 'integer', 'any', 'string[]', 'number[]', 'boolean[]', 'integer[]', 'object[]', 'any[]'];
 const SCHEMA_TYPE_DISPLAY = {
   'object': 'object',
-  'array': 'array',
   'string': 'string',
   'number': 'number',
   'boolean': 'bool',
   'integer': 'integer',
+  'any': 'any',
+  'string[]': 'string[]',
+  'number[]': 'number[]',
+  'boolean[]': 'bool[]',
+  'integer[]': 'integer[]',
+  'object[]': 'object[]',
+  'any[]': 'any[]',
 };
 
-const DEFAULT_EMPTY_SCHEMA = `{"type":"object","properties":{}}`;
+const ARRAY_ITEM_TYPES = ['object', 'string', 'number', 'boolean', 'integer', 'any'];
+const ARRAY_ITEM_TYPE_DISPLAY = {
+  'object': 'object[]',
+  'string': 'string[]',
+  'number': 'number[]',
+  'boolean': 'bool[]',
+  'integer': 'integer[]',
+  'any': 'any[]',
+};
+
+const DEFAULT_EMPTY_SCHEMA = `{"type":"any"}`;
 
 const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
   value,
@@ -244,193 +260,240 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
 
     return (
       <div key={fieldName} className="space-y-1 pl-2 border-l-2 border-gray-400 mb-2">
-        {!isRoot && (
-          <div className="flex items-center gap-2">
-            {isEditing && !isArrayChild ? (
-              <Input
-                // Use the temporary state for the input value without updating schema
-                value={tempFieldName}
-                onChange={(e) => {
-                  // Just update the temporary field name for visual display
-                  // WITHOUT modifying the actual schema until editing is complete
-                  setTempFieldName(e.target.value);
+        <div className="flex items-center gap-2">
+          {isEditing && !isArrayChild ? (
+            <Input
+              // Use the temporary state for the input value without updating schema
+              value={tempFieldName}
+              onChange={(e) => {
+                // Just update the temporary field name for visual display
+                // WITHOUT modifying the actual schema until editing is complete
+                setTempFieldName(e.target.value);
 
-                  let current = visualSchema;
-                  for (let i = 0; i < path.length - 2; i++) {
+                let current = visualSchema;
+                for (let i = 0; i < path.length - 2; i++) {
+                  current = current[path[i]];
+                }
+                const properties = current[path[path.length - 2]];
+
+                // it's a duplicate if a property with that name exists and it's not the current field
+                const isDuplicateKey = properties[e.target.value] && fieldName !== e.target.value;
+                setIsDuplicateField(isDuplicateKey);  // for UI highlighting
+                // DO NOT update the schema while typing - only when editing is complete
+              }}
+              className={cn(
+                "w-36 min-h-[32px] text-xs sm:text-sm",
+                isDuplicateField && "border-red-500 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400"
+              )}
+              placeholder="Field name"
+              autoFocus
+              onBlur={finishEditing}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  finishEditing();
+                }
+              }}
+            />
+          ) : (!isArrayChild && !isRoot && (
+            <div
+              className={cn(
+                "w-36 px-2 py-0.5 min-h-[32px] rounded hover:bg-secondary cursor-pointer flex items-center gap-0.5",
+                "text-[11px] xs:text-[12px] sm:text-[14px]"
+              )}
+              onClick={() => {
+                // Initialize the temp field name with the current field name
+                setTempFieldName(fieldName);
+                setEditingField(path.join('.'));
+                // Reset duplicate field indicator when starting to edit
+                setIsDuplicateField(false);
+              }}
+            >
+              {isRoot ? 'root' : fieldName}
+              {isFieldRequired() && (
+                <span className="text-red-500 text-[14px] sm:text-[18px] font-bold" title="Required field">*</span>
+              )}
+            </div>
+          ))}
+          {/* Render non-editable root field */}
+          {isRoot && (
+            <div
+              className={cn(
+                "w-36 px-2 py-0.5 min-h-[32px] rounded flex items-center gap-0.5",
+                "text-[11px] xs:text-[12px] sm:text-[14px] text-muted-foreground"
+              )}
+            >
+              root
+            </div>
+          )}
+          <Select
+            value={
+              isArrayChild
+                ? (typeof schema.type === 'string' ? schema.type : 'any')
+                : schema.type === 'array' && schema.items?.type
+                  ? `${schema.items.type}[]`
+                  : (typeof schema.type === 'string' ? schema.type : 'any')
+            }
+            onValueChange={(value) => {
+              if (isArrayChild) {
+                updateVisualSchema([...path, 'type'], value);
+              } else if (value.endsWith('[]')) {
+                // Handle array types like 'string[]'
+                const itemType = value.slice(0, -2);
+                if (isRoot) {
+                  // Handle root array type specially
+                  const newSchema = {
+                    type: 'array',
+                    items: { type: itemType }
+                  };
+                  setVisualSchema(newSchema);
+                  onChange(JSON.stringify(newSchema, null, 2));
+                } else {
+                  const newSchema = { ...visualSchema };
+                  let current = newSchema;
+                  for (let i = 0; i < path.length - 1; i++) {
                     current = current[path[i]];
                   }
-                  const properties = current[path[path.length - 2]];
+                  current[path[path.length - 1]] = {
+                    type: 'array',
+                    items: { type: itemType }
+                  };
+                  setVisualSchema(newSchema);
+                  onChange(JSON.stringify(newSchema, null, 2));
+                }
+              } else {
+                updateVisualSchema([...path, 'type'], value);
+              }
+            }}
+          >
+            <SelectTrigger className="w-24 h-8 text-xs sm:text-sm">
+              <SelectValue placeholder="Type" />
+            </SelectTrigger>
+            <SelectContent className="text-xs sm:text-sm">
+              {(isArrayChild ? ARRAY_ITEM_TYPES : SCHEMA_TYPES).map(type => (
+                <SelectItem key={type} value={type}>
+                  {isArrayChild ? ARRAY_ITEM_TYPE_DISPLAY[type] : SCHEMA_TYPE_DISPLAY[type]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-                  // it's a duplicate if a property with that name exists and it's not the current field
-                  const isDuplicateKey = properties[e.target.value] && fieldName !== e.target.value;
-                  setIsDuplicateField(isDuplicateKey);  // for UI highlighting
-                  // DO NOT update the schema while typing - only when editing is complete
-                }}
-                className={cn(
-                  "w-36 min-h-[32px] text-xs sm:text-sm",
-                  isDuplicateField && "border-red-500 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400"
-                )}
-                placeholder="Field name"
-                autoFocus
-                onBlur={finishEditing}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    finishEditing();
-                  }
-                }}
-              />
-            ) : (!isArrayChild && (
-              <div
-                className={cn(
-                  "w-36 px-2 py-0.5 min-h-[32px] rounded hover:bg-secondary cursor-pointer flex items-center gap-0.5",
-                  "text-[11px] xs:text-[12px] sm:text-[14px]"
-                )}
-                onClick={() => {
-                  // Initialize the temp field name with the current field name
-                  setTempFieldName(fieldName);
-                  setEditingField(path.join('.'));
-                  // Reset duplicate field indicator when starting to edit
-                  setIsDuplicateField(false);
-                }}
-              >
-                {fieldName}
-                {isFieldRequired() && (
-                  <span className="text-red-500 text-[14px] sm:text-[18px] font-bold" title="Required field">*</span>
-                )}
-              </div>
-            ))}
-            <Select
-              value={typeof schema.type === 'string' ? schema.type : 'string'}
-              onValueChange={(value) => updateVisualSchema([...path, 'type'], value)}
-            >
-              <SelectTrigger className="w-24 h-8 text-xs sm:text-sm">
-                <SelectValue placeholder="Type" />
-              </SelectTrigger>
-              <SelectContent className="text-xs sm:text-sm">
-                {SCHEMA_TYPES.map(type => (
-                  <SelectItem key={type} value={type}>{SCHEMA_TYPE_DISPLAY[type]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <TooltipProvider>
+            <Tooltip open={hoveredDescField === descFieldId}>
+              <TooltipTrigger asChild>
+                <Input
+                  value={schema.description || ''}
+                  onChange={(e) => {
+                    updateVisualSchema([...path, 'description'], e.target.value);
+                    // Clear any pending timeout
+                    if (hoverTimeoutRef.current[descFieldId]) {
+                      clearTimeout(hoverTimeoutRef.current[descFieldId]);
+                      delete hoverTimeoutRef.current[descFieldId];
+                    }
+                    // Hide tooltip when typing
+                    setHoveredDescField(null);
+                  }}
+                  className="w-full min-w-[200px] flex-1 border-muted hover:border-primary/50 focus:border-primary/50 text-xs sm:text-sm focus:ring-inset"
+                  placeholder="Add AI instructions or filters"
+                  onFocus={() => {
+                    // Clear timeout and hide tooltip on focus
+                    if (hoverTimeoutRef.current[descFieldId]) {
+                      clearTimeout(hoverTimeoutRef.current[descFieldId]);
+                      delete hoverTimeoutRef.current[descFieldId];
+                    }
+                    setHoveredDescField(null);
+                  }}
+                  onMouseEnter={() => handleMouseEnter(descFieldId)}
+                  onMouseLeave={() => handleMouseLeave(descFieldId)}
+                />
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <span className="text-xs sm:text-sm">Add instructions to help AI understand how to map data to this field</span>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
 
+          {!isRoot && !isArrayChild && (
             <TooltipProvider>
-              <Tooltip open={hoveredDescField === descFieldId}>
+              <Tooltip>
                 <TooltipTrigger asChild>
-                  <Input
-                    value={schema.description || ''}
-                    onChange={(e) => {
-                      updateVisualSchema([...path, 'description'], e.target.value);
-                      // Clear any pending timeout
-                      if (hoverTimeoutRef.current[descFieldId]) {
-                        clearTimeout(hoverTimeoutRef.current[descFieldId]);
-                        delete hoverTimeoutRef.current[descFieldId];
-                      }
-                      // Hide tooltip when typing
-                      setHoveredDescField(null);
-                    }}
-                    className="w-full min-w-[200px] max-w-[400px] flex-1 border-muted hover:border-primary/50 focus:border-primary text-xs sm:text-sm"
-                    placeholder="Add AI instructions or filters"
-                    onFocus={() => {
-                      // Clear timeout and hide tooltip on focus
-                      if (hoverTimeoutRef.current[descFieldId]) {
-                        clearTimeout(hoverTimeoutRef.current[descFieldId]);
-                        delete hoverTimeoutRef.current[descFieldId];
-                      }
-                      setHoveredDescField(null);
-                    }}
-                    onMouseEnter={() => handleMouseEnter(descFieldId)}
-                    onMouseLeave={() => handleMouseLeave(descFieldId)}
-                  />
+                  <div className="relative z-10">
+                    <Switch
+                      className="custom-switch"
+                      id={`required-${path.join('-')}`}
+                      checked={isFieldRequired()}
+                      onCheckedChange={(checked) => {
+                        const parentPath = path.slice(0, -2);
+                        const newSchema = { ...visualSchema };
+                        let parent = newSchema;
+                        for (const segment of parentPath) {
+                          parent = parent[segment];
+                        }
+
+                        if (checked) {
+                          parent.required = [...(parent.required || []), fieldName];
+                        } else {
+                          parent.required = (parent.required || []).filter((f: string) => f !== fieldName);
+                          if (parent.required.length === 0) {
+                            delete parent.required;
+                          }
+                        }
+
+                        setVisualSchema(newSchema);
+                        onChange(JSON.stringify(newSchema, null, 2));
+                      }}
+                    />
+                    <span className="pointer-events-none absolute flex h-4 w-4 items-center justify-center rounded-full bg-white shadow-lg ring-0 transition-transform peer-data-[state=checked]:translate-x-4 peer-data-[state=unchecked]:translate-x-0 left-[2px] top-[2px]">
+                      {isFieldRequired() ? (
+                        <span className="text-red-500 text-[12px] sm:text-[16px] font-bold leading-none mt-2">*</span>
+                      ) : (
+                        <span className="text-muted-foreground text-[10px] sm:text-[12px] font-semibold leading-none">?</span>
+                      )}
+                    </span>
+                  </div>
                 </TooltipTrigger>
-                <TooltipContent side="top">
-                  <span className="text-xs sm:text-sm">Add instructions to help AI understand how to map data to this field</span>
+                <TooltipContent side="top" className="z-50 text-xs sm:text-sm">
+                  {isFieldRequired() ? 'Make field optional' : 'Make field required'}
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
+          )}
+          {!isRoot && path.length > 0 && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-destructive h-8 w-8 min-w-[2rem] min-h-[2rem]"
+              onClick={() => {
+                const newSchema = { ...visualSchema };
+                let current = newSchema;
 
-            {!isRoot && !isArrayChild && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="relative z-10">
-                      <Switch
-                        className="custom-switch"
-                        id={`required-${path.join('-')}`}
-                        checked={isFieldRequired()}
-                        onCheckedChange={(checked) => {
-                          const parentPath = path.slice(0, -2);
-                          const newSchema = { ...visualSchema };
-                          let parent = newSchema;
-                          for (const segment of parentPath) {
-                            parent = parent[segment];
-                          }
+                // Navigate to the parent to handle required fields
+                const parentPath = path.slice(0, -2);
+                let parent = newSchema;
+                for (const segment of parentPath) {
+                  parent = parent[segment];
+                }
 
-                          if (checked) {
-                            parent.required = [...(parent.required || []), fieldName];
-                          } else {
-                            parent.required = (parent.required || []).filter((f: string) => f !== fieldName);
-                            if (parent.required.length === 0) {
-                              delete parent.required;
-                            }
-                          }
-
-                          setVisualSchema(newSchema);
-                          onChange(JSON.stringify(newSchema, null, 2));
-                        }}
-                      />
-                      <span className="pointer-events-none absolute flex h-4 w-4 items-center justify-center rounded-full bg-white shadow-lg ring-0 transition-transform peer-data-[state=checked]:translate-x-4 peer-data-[state=unchecked]:translate-x-0 left-[2px] top-[2px]">
-                        {isFieldRequired() ? (
-                          <span className="text-red-500 text-[12px] sm:text-[16px] font-bold leading-none mt-2">*</span>
-                        ) : (
-                          <span className="text-muted-foreground text-[10px] sm:text-[12px] font-semibold leading-none">?</span>
-                        )}
-                      </span>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="z-50 text-xs sm:text-sm">
-                    {isFieldRequired() ? 'Make field optional' : 'Make field required'}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-            {path.length > 0 && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-destructive h-8 w-8 min-w-[2rem] min-h-[2rem]"
-                onClick={() => {
-                  const newSchema = { ...visualSchema };
-                  let current = newSchema;
-
-                  // Navigate to the parent to handle required fields
-                  const parentPath = path.slice(0, -2);
-                  let parent = newSchema;
-                  for (const segment of parentPath) {
-                    parent = parent[segment];
+                // If this field was required, remove it from the required array
+                if (parent.required?.includes(fieldName)) {
+                  parent.required = parent.required.filter((f: string) => f !== fieldName);
+                  // Remove the required array if it's empty
+                  if (parent.required.length === 0) {
+                    delete parent.required;
                   }
+                }
 
-                  // If this field was required, remove it from the required array
-                  if (parent.required?.includes(fieldName)) {
-                    parent.required = parent.required.filter((f: string) => f !== fieldName);
-                    // Remove the required array if it's empty
-                    if (parent.required.length === 0) {
-                      delete parent.required;
-                    }
-                  }
+                // Delete the field itself
+                for (let i = 0; i < path.length - 1; i++) current = current[path[i]];
+                delete current[path[path.length - 1] === 'properties' ? fieldName : path[path.length - 1]];
 
-                  // Delete the field itself
-                  for (let i = 0; i < path.length - 1; i++) current = current[path[i]];
-                  delete current[path[path.length - 1] === 'properties' ? fieldName : path[path.length - 1]];
-
-                  setVisualSchema(newSchema);
-                  onChange(JSON.stringify(newSchema, null, 2));
-                }}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-        )}
+                setVisualSchema(newSchema);
+                onChange(JSON.stringify(newSchema, null, 2));
+              }}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
 
         {schema.type === 'object' && (
           <div className={`pl-2 ${!isRoot && 'mt-1'}`}>
@@ -458,37 +521,38 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
           </div>
         )}
 
-        {schema.type === 'array' && (
+        {schema.type === 'array' && schema.items?.type === 'object' && (
           <div className="pl-2 mt-1">
             <div className="overflow-x-auto">
-              {schema.items && renderSchemaField('items', schema.items, [...path, 'items'], true)}
+              {schema.items.properties && Object.entries(schema.items.properties).map(([key, value]) =>
+                renderSchemaField(key, value, [...path, 'items', 'properties', key])
+              )}
             </div>
-            {!schema.items && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="gap-2 text-xs sm:text-sm"
-                onClick={() => updateVisualSchema(
-                  [...path, 'items'],
-                  {
-                    type: 'string',
-                    ...(schema.items || {}),
-                  }
-                )}
-              >
-                <ListPlus className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="text-xs sm:text-sm">Set Item</span>
-              </Button>
-            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-2 text-xs sm:text-sm"
+              onClick={() => updateVisualSchema(
+                [...path, 'items', 'properties'],
+                {
+                  ...(schema.items.properties || {}),
+                  [generateUniqueFieldName(schema.items.properties)]: { type: 'string' }
+                }
+              )}
+            >
+              <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="text-xs sm:text-sm">Add Property</span>
+            </Button>
           </div>
         )}
+
       </div>
     );
   };
 
   const ensureObjectStructure = (schema: any) => {
-    if (!schema.type) schema.type = 'object';
+    if (!schema.type) schema.type = 'any';
     if (!schema.properties) schema.properties = {};
     return schema;
   };
@@ -513,15 +577,14 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
       } else {
         // If enabling and current parent value is null, provide a default
         // This ensures a fresh start if re-enabled
-        onChange(JSON.stringify(ensureObjectStructure({ type: 'object', properties: {} }), null, 2));
+        onChange(JSON.stringify(ensureObjectStructure({ type: 'any' }), null, 2));
       }
     }
   };
 
   return (
     <div className="space-y-1 flex flex-col h-full mb-4 gap-2">
-      <div className="flex justify-between items-center shrink-0">
-        {title && <Label className="text-xs sm:text-sm">{title}</Label>}
+      <div className="flex items-center gap-4 ml-auto shrink-0">
         <div className="flex items-center gap-4"> {/* Increased gap for clarity */}
           {(localIsEnabled || !isOptional) && (
             <div className="flex items-center gap-2">
@@ -588,7 +651,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
                     variant="outline"
                     className="text-xs sm:text-sm"
                     onClick={() => {
-                      const initialSchema = ensureObjectStructure({ type: 'object', properties: {} });
+                      const initialSchema = ensureObjectStructure({ type: 'any' });
                       setVisualSchema(initialSchema);
                       onChange(JSON.stringify(initialSchema, null, 2));
                     }}

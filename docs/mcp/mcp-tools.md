@@ -1,213 +1,243 @@
 ---
 title: "MCP Tool Reference"
-description: "superglue MCP provides tools for workflow creation, execution and integration code generation."
+description: "superglue MCP provides tools for integration setup, workflow execution and integration code generation."
 ---
 
 The following tools are exposed by superglue's MCP server. The input schemas are defined using Zod in `mcp-server.ts`.
 
-#### 1. `superglue_execute_tool`
+## Workflow Discovery & Management
 
-- **Description**: Execute a specific Superglue tool by ID. Use this when you know the exact tool needed for a task.
-- **Input Schema**: `ExecuteToolInputSchema`
-  - `id`: The ID of the tool to execute.
-  - `payload`: (Optional) JSON payload to pass to the tool.
-  - `credentials`: (Optional) JSON credentials for the tool execution.
-  - `options`: (Optional) Request configuration (caching, timeouts, retries, etc.).
+### superglue_list_available_workflows
 
-<Note>
-  **Important Notes**
+Lists all available superglue workflows for the current organization.
 
-  - Tool ID must exist (use dynamic `execute_{tool_id}` tools to find valid IDs)
-  - **CRITICAL**: Include **ALL** required credentials in the credentials object
-  - Payload structure must match the tool's expected input schema
-  - Returns execution results \+ SDK code for integration
-</Note>
+**Input Schema:**
+- `limit`: (Optional) Number of workflows to return (default: 100)
+- `offset`: (Optional) Offset for pagination (default: 0)
 
-- **Example Usage (Conceptual MCP Call)**:
+**Returns:**
+- List of workflows with their IDs, instructions, timestamps, and saved credentials
+- Use the workflow IDs with `superglue_execute_workflow` to run specific workflows
 
-  ```json
-  // MCP callTool params
-  {
-    "toolName": "superglue_execute_tool",
-    "inputs": {
-      "id": "tool-id-123",
-      "payload": { "inputData": "example" },
-      "credentials": { "apiKey": "your-api-key" }
-    }
+**Example Usage:**
+```json
+{
+  "toolName": "superglue_list_available_workflows",
+  "inputs": {
+    "limit": 50,
+    "offset": 0
   }
-  ```
+}
+```
 
-#### 2. `superglue_build_new_tool`
+### superglue_find_relevant_integrations
 
-- **Description**: Build a new integration tool from natural language instructions. Use when existing tools don't meet requirements. Built tools are immediately saved and dynamically made available as new tools.
-- **Input Schema**: `BuildToolInputSchema`
-  - `instruction`: Natural language instruction for building the tool.
-  - `payload`: (Optional) Example JSON payload for the tool. This should be data needed to fulfill the request (e.g. a list of ids to loop over), not settings or filters.
-  - `systems`: Array of `SystemInputSchema` defining the systems the tool can interact with.
-    - `id`: Unique identifier for the system.
-    - `urlHost`: Base URL/hostname for the system.
-    - `urlPath`: (Optional) Base path for API calls.
-    - `documentationUrl`: (Optional) URL to API documentation.
-    - `credentials`: (Optional) Credentials for accessing the system. MAKE SURE YOU INCLUDE ALL OF THEM BEFORE BUILDING THE CAPABILITY, OTHERWISE IT WILL FAIL.
-  - `responseSchema`: (Optional) JSONSchema for the expected response structure.
+Finds integrations relevant to a given natural language instruction. Used as a first step before building a new workflow.
 
-<Note>
-  **Important Notes:**
+**Input Schema:**
+- `instruction`: (Optional) Natural language description of what you want to do. If not provided, returns all available integrations.
 
-  - Gather **ALL** system credentials **BEFORE** building (API keys, tokens, documentation url if the system is less known)
-  - Built workflows are saved, but not immediately executed
-  - Provide detailed, specific instructions
-  - superglue handles pagination for you, so you don't need to worry about it
-  - Tool building may take 30-60 seconds
-</Note>
+**Returns:**
+- List of suggested integration IDs with reasons and available credentials
+- If no integrations exist, returns empty list and sugggests creating new integrations
 
-- **Example Usage (Conceptual MCP Call)**:
-
-  ```json
-  // MCP callTool params
-  {
-    "toolName": "superglue_build_new_tool",
-    "inputs": {
-      "instruction": "Fetch user data from system A and send it to system B.",
-      "systems": [
-        { 
-          "id": "systemA", 
-          "urlHost": "https://api.systema.com",
-          "credentials": { "apiKey": "system-a-key" }
-        },
-        { 
-          "id": "systemB", 
-          "urlHost": "https://api.systemb.com",
-          "credentials": { "token": "system-b-token" }
-        }
-      ]
-    }
+**Example Usage:**
+```json
+{
+  "toolName": "superglue_find_relevant_integrations",
+  "inputs": {
+    "instruction": "I need to sync data between Stripe and HubSpot"
   }
-  ```
+}
+```
 
-#### 3. `superglue_get_integration_code`
+## Workflow Execution
 
-- **Description**: Generate integration code for a specific tool. Use this to show users how to implement a tool in their applications.
-- **Input Schema**: `GenerateCodeInputSchema`
-  - `toolId`: The ID of the tool to generate code for.
-  - `language`: Programming language for the generated code (`typescript`, `python`, or `go`).
+### superglue_execute_workflow
 
-<Note>
-  **Important Notes:**
+Executes a previously saved superglue workflow by its ID.
 
-  - Generates code in TypeScript, Python, or Go
-  - Includes example payload and credentials based on the tool's input schema
-  - Returns ready-to-use SDK code for integration
-</Note>
-
-- **Example Usage (Conceptual MCP Call)**:
-
-  ```json
-  // MCP callTool params
-  {
-    "toolName": "superglue_get_integration_code",
-    "inputs": {
-      "toolId": "tool-id-123",
-      "language": "typescript"
-    }
-  }
-  ```
-
-#### 4. `superglue_run_instruction`
-
-- **Description**: Execute an instruction once without saving it as a persistent tool. Use for ad-hoc tasks that don't need to be reused.
-- **Input Schema**: `RunInstructionInputSchema`
-  - `instruction`: Natural language instruction for the one-time execution.
-  - `payload`: (Optional) Example JSON payload for the execution. This should be data needed to fulfill the request (e.g. a list of ids to loop over), not settings or filters.
-  - `systems`: Array of `SystemInputSchema` defining the systems the execution can interact with.
-    - `id`: Unique identifier for the system.
-    - `urlHost`: Base URL/hostname for the system.
-    - `urlPath`: (Optional) Base path for API calls.
-    - `documentationUrl`: (Optional) URL to API documentation.
-    - `credentials`: (Optional) Credentials for accessing the system.
-  - `responseSchema`: (Optional) JSONSchema for the expected response structure.
-
-<Note>
-  **Important Notes:**
-
-  - Builds and executes immediately without persistence
-  - Requires **ALL** system credentials upfront
-  - Faster than build + execute workflow for one-time tasks
-  - Results are returned but tool definition is discarded
-  - Use this for ad-hoc tasks that don't need to be saved for reuse
-</Note>
-
-- **Example Usage (Conceptual MCP Call)**:
-
-  ```json
-  // MCP callTool params
-  {
-    "toolName": "superglue_run_instruction",
-    "inputs": {
-      "instruction": "Get all active users from system A and create a summary report",
-      "payload": { "includeMetrics": true },
-      "systems": [
-        { 
-          "id": "systemA", 
-          "urlHost": "https://api.systema.com",
-          "credentials": { "apiKey": "system-a-key" }
-        }
-      ],
-      "responseSchema": {
-        "type": "object",
-        "properties": {
-          "totalUsers": { "type": "number" },
-          "summary": { "type": "string" }
-        }
-      }
-    }
-  }
-  ```
-
-### Dynamic Tool Execution
-
-In addition to the static tools above, the MCP server dynamically creates execution tools for each of your existing Superglue workflows. These are named `execute_{tool_id}` and provide direct access to execute existing workflows.
-
-### Dynamic Tool Schema
-
-Each dynamic tool has the following input schema:
-
-- `payload`: (Optional) JSON payload data for the tool
-- `credentials`: (Optional) Authentication credentials for the tool
+**Input Schema:**
+- `id`: **Required** - The ID of the workflow to execute
+- `payload`: (Optional) JSON payload to pass to the workflow
+- `credentials`: (Optional) Additional credentials that will be merged with integration credentials
 - `options`: (Optional) Request configuration (caching, timeouts, retries, etc.)
 
-The exact schema is derived from the tool's `inputSchema` if available, otherwise it falls back to the flexible schema above.
+<Note>
+**Important Notes:**
+- This tool is for running existing, saved workflows only
+- To create a new workflow, use `superglue_build_and_run`
+- Workflow ID must exist (use `superglue_list_available_workflows` to find valid IDs)
+</Note>
 
-### Example Dynamic Tool Usage
-
+**Example Usage:**
 ```json
-// MCP callTool params for a tool with ID "stripe-to-hubspot-sync"
 {
-  "toolName": "execute_stripe-to-hubspot-sync",
+  "toolName": "superglue_execute_workflow",
   "inputs": {
+    "id": "stripe-to-hubspot-sync",
     "payload": { "customerId": "cus_123" },
     "credentials": { 
-      "stripeKey": "sk_test_...",
-      "hubspotToken": "pat-na1-..."
+      "additionalApiKey": "sk_test_..."
     }
   }
 }
 ```
 
-### Agent Workflow
+## Workflow Building & Testing
+
+### superglue_build_and_run
+
+Builds and executes workflows. This is the primary tool for creating and iteratively testing workflows.
+
+**Input Schema:**
+- `instruction`: **Required** - Natural language instruction to build a new workflow from scratch
+- `integrationIds`: **Required** - Array of integration IDs to use in the workflow
+- `payload`: (Optional) JSON payload for the workflow execution
+- `credentials`: (Optional) Additional credentials that will be merged with integration credentials
+- `responseSchema`: (Optional) JSONSchema for the expected output structure
+
+<Note>
+**Important Notes:**
+- This tool only builds and tests workflows - it does NOT save them
+- Building and testing can take up to 1 minute
+- Use `superglue_find_relevant_integrations` first to discover available integration IDs
+- After successful execution, use `superglue_save_workflow` to persist the workflow
+</Note>
+
+**Example Usage:**
+```json
+{
+  "toolName": "superglue_build_and_run",
+  "inputs": {
+    "instruction": "Fetch customer data from Stripe and create or update contact in HubSpot",
+    "integrationIds": ["stripe", "hubspot"],
+    "payload": { "customerId": "cus_123" },
+    "responseSchema": {
+      "type": "object",
+      "properties": {
+        "hubspotContactId": { "type": "string" },
+        "status": { "type": "string" }
+      }
+    }
+  }
+}
+```
+
+### superglue_save_workflow
+
+Saves a previously built and tested workflow. Use this after successful execution of `superglue_build_and_run`.
+
+**Input Schema:**
+- `id`: **Required** - Unique identifier for the workflow to save
+- `workflow`: **Required** - Workflow configuration object from build_and_run result
+
+<Note>
+**Important Notes:**
+- Take the workflow data from build_and_run result's `config` field
+- DO NOT set any fields to null - omit optional fields entirely
+- Each step MUST have an integrationId field
+- Workflow MUST have integrationIds array
+</Note>
+
+**Example Usage:**
+```json
+{
+  "toolName": "superglue_save_workflow",
+  "inputs": {
+    "id": "stripe-to-hubspot-sync",
+    "workflow": {
+      "steps": [...],
+      "integrationIds": ["stripe", "hubspot"],
+      "instruction": "Sync Stripe customers to HubSpot",
+      "finalTransform": "$",
+      "responseSchema": {...}
+    }
+  }
+}
+```
+
+## Integration Management
+
+### superglue_create_integration
+
+Creates and immediately saves a new integration. Integrations are building blocks for workflows and contain the credentials for accessing APIs.
+
+**Input Schema:**
+- `id`: **Required** - A unique identifier for the new integration
+- `name`: (Optional) Human-readable name for the integration
+- `urlHost`: (Optional) Base URL/hostname for the API including protocol
+- `urlPath`: (Optional) Path component of the URL
+- `documentationUrl`: (Optional) URL to the API documentation
+- `documentation`: (Optional) API documentation content, if provided directly
+- `credentials`: **Required** - Credentials object (can be empty {} if no credentials needed)
+
+<Note>
+**Important Notes:**
+- Most APIs require authentication (API keys, tokens, etc.)
+- Always store credentials in the credentials field
+- Use placeholder references: `<<{integration_id}_{credential_name}>>`
+- Split information clearly: urlHost (without secrets), credentials (with secrets)
+- Providing a documentationUrl triggers async documentation processing
+</Note>
+
+**Example Usage:**
+```json
+{
+  "toolName": "superglue_create_integration",
+  "inputs": {
+    "id": "my-api",
+    "name": "My Custom API",
+    "urlHost": "https://api.example.com",
+    "credentials": {
+      "apiKey": "sk_live_abc123"
+    },
+    "documentationUrl": "https://api.example.com/docs"
+  }
+}
+```
+
+## Code Generation
+
+### superglue_get_workflow_integration_code
+
+Generate integration code for a specific workflow. Use this to show users how to implement a workflow in their applications.
+
+**Input Schema:**
+- `workflowId`: **Required** - The ID of the workflow to generate code for
+- `language`: **Required** - Programming language: `typescript`, `python`, or `go`
+
+**Returns:**
+- Ready-to-use SDK code for the specified language
+- Includes example payload and credentials based on the workflow's input schema
+
+**Example Usage:**
+```json
+{
+  "toolName": "superglue_get_workflow_integration_code",
+  "inputs": {
+    "workflowId": "stripe-to-hubspot-sync",
+    "language": "typescript"
+  }
+}
+```
+
+## Agent Workflow
 
 The recommended workflow for agents using the Superglue MCP server:
 
-1. **DISCOVER**: List available tools using the dynamic `execute_{tool_id}` tools or by calling `superglue_execute_tool` with known IDs
-2. **EXECUTE**: Use `superglue_execute_tool` for existing tools, `superglue_build_new_tool` for new integrations, OR `superglue_run_instruction` for one-time ad-hoc tasks
-3. **INTEGRATE**: Use `superglue_get_integration_code` to show users how to implement tools in their applications
+1. **DISCOVER**: Use `superglue_find_relevant_integrations` to find available integrations for your task
+2. **BUILD & TEST**: Use `superglue_build_and_run` with instruction and integrations. Iterate until successful
+3. **SAVE** (Optional): Ask user if they want to save the workflow, then use `superglue_save_workflow` with the workflow data
+4. **EXECUTE**: Use `superglue_execute_workflow` for saved workflows
+5. **INTEGRATE**: Use `superglue_get_workflow_integration_code` to generate SDK code
 
 <Info>
-  **Best Practices**
-
-  - Always gather all credentials before building or executing tools
-  - Use descriptive instructions when building new tools
-  - Validate tool IDs exist before execution
-  - Provide integration code when users ask \"how do I use this?\"
-  - The server handles authentication, pagination, retries, and error handling automatically
+**Best Practices**
+- Always start with `superglue_find_relevant_integrations` for discovery
+- Create integrations and store credentials using `superglue_create_integration`
+- Ask users for credentials if needed
+- Ask user before saving workflows
+- When saving workflows, NEVER set fields to null - omit optional fields if no value available
+- Copy actual values from build_and_run results, don't assume fields are empty
 </Info>

@@ -6,9 +6,17 @@ node_modules
 .DS_Store
 **/.next
 build.sh
+publish.sh
 diff.txt
 diff.sh
 **/superglue_data.json
 packages/web/public/test/*
 packages/core/.superglue/superglue_logs.json
 packages/core/.superglue/superglue_logs.jsonl
+
+# Testing/evaluation artifacts
+**/.test-integration-data/
+**/test-reports/
+**/.api-ranking-data/
+packages/core/eval/api-ranking/upload-api-ranking.ts
+packages/core/eval/api-ranking/ranking.csv

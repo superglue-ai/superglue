@@ -234,6 +234,68 @@ describe('FileStore', () => {
       expect(retrieved).toBeNull();
     });
 
+    it('should filter out corrupted runs and continue listing valid ones', async () => {
+      // Create a valid run
+      const validRun = { ...testRun, id: 'valid-run' };
+      await store.createRun(validRun, testOrgId);
+
+      // Manually append corrupted JSON lines to the logs file to simulate corruption
+      const corruptedLines = [
+        '{"id":"corrupted-run-1","config":null,"startedAt":null}\n',
+        '{"id":"corrupted-run-2","config":{"id":"config-id"},"startedAt":null}\n',
+        '{"id":"corrupted-run-3","config":null,"startedAt":"2023-01-01T00:00:00.000Z"}\n',
+        'invalid json line\n',
+        '{"id":"corrupted-run-4","config":{"id":"config-id"},"startedAt":"not-a-date"}\n'
+      ];
+
+      await fs.promises.appendFile(testLogsPath, corruptedLines.join(''));
+
+      const { items, total } = await store.listRuns(10, 0, null, testOrgId);
+
+      // Should only return the valid run
+      expect(items.length).toBe(1);
+      expect(total).toBe(1);
+      expect(items[0].id).toBe('valid-run');
+    });
+
+    it('should handle runs with missing startedAt dates', async () => {
+      const runWithoutStartedAt = {
+        ...testRun,
+        id: 'run-no-started-at',
+        startedAt: undefined
+      };
+      const validRun = { ...testRun, id: 'valid-run' };
+
+      await store.createRun(runWithoutStartedAt, testOrgId);
+      await store.createRun(validRun, testOrgId);
+
+      const { items, total } = await store.listRuns(10, 0, null, testOrgId);
+
+      // Should only return the valid run
+      expect(items.length).toBe(1);
+      expect(total).toBe(1);
+      expect(items[0].id).toBe('valid-run');
+    });
+
+    it('should handle runs with missing config IDs', async () => {
+      const runWithoutConfigId = {
+        ...testRun,
+        id: 'run-no-config-id',
+        config: { ...testRun.config, id: undefined }
+      };
+      const validRun = { ...testRun, id: 'valid-run' };
+
+      await store.createRun(runWithoutConfigId, testOrgId);
+      await store.createRun(validRun, testOrgId);
+
+      const { items, total } = await store.listRuns(10, 0, null, testOrgId);
+
+      // Should only return the valid run
+      expect(items.length).toBe(1);
+      expect(total).toBe(1);
+      expect(items[0].id).toBe('valid-run');
+    });
+
   });
 
   describe('Integration', () => {
@@ -272,6 +334,40 @@ describe('FileStore', () => {
       expect(retrieved).toBeNull();
     });
 
+    it('should get many integrations by ids, skipping missing ones', async () => {
+      const int2 = { ...testIntegration, id: 'test-int-id-2', name: 'Integration 2' };
+      await store.upsertIntegration(testIntegration.id, testIntegration, testOrgId);
+      await store.upsertIntegration(int2.id, int2, testOrgId);
+      const result = await store.getManyIntegrations([
+        testIntegration.id,
+        int2.id,
+        'missing-id'
+      ], testOrgId);
+      expect(result).toHaveLength(2);
+      expect(result.map(i => i.id).sort()).toEqual([testIntegration.id, int2.id].sort());
+    });
+  });
+
+  describe('Workflow', () => {
+    const testWorkflow = {
+      id: 'test-workflow-id',
+      steps: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    it('should get many workflows by ids, skipping missing ones', async () => {
+      const wf2 = { ...testWorkflow, id: 'test-workflow-id-2' };
+      await store.upsertWorkflow(testWorkflow.id, testWorkflow, testOrgId);
+      await store.upsertWorkflow(wf2.id, wf2, testOrgId);
+      const result = await store.getManyWorkflows([
+        testWorkflow.id,
+        wf2.id,
+        'missing-id'
+      ], testOrgId);
+      expect(result).toHaveLength(2);
+      expect(result.map(w => w.id).sort()).toEqual([testWorkflow.id, wf2.id].sort());
+    });
   });
 
   describe('Clear All', () => {
