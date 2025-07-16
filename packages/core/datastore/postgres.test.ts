@@ -1,5 +1,5 @@
 import { ApiConfig, ExtractConfig, HttpMethod, RunResult, TransformConfig } from '@superglue/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { PostgresService } from './postgres.js';
 
 // Mock Postgres client configuration
@@ -22,21 +22,37 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
         let store: PostgresService;
         const testOrgId = 'test-org';
 
-        beforeEach(async () => {
+        // Create a single connection for all tests
+        beforeAll(async () => {
             try {
                 store = new PostgresService(testConfig);
-                await store.clearAll(testOrgId);
+                // Table initialization happens once here
             } catch (error) {
                 console.error('Failed to connect to Postgres:', error);
                 throw error;
             }
         });
 
-        afterEach(async () => {
+        // Clean up after all tests
+        afterAll(async () => {
             try {
                 await store.disconnect();
             } catch (error) {
                 console.error('Failed to disconnect from Postgres:', error);
+            }
+        });
+
+        // Add this beforeEach to clean up data between test suites
+        beforeEach(async () => {
+            // Clear all data for the test org
+            await store.clearAll(testOrgId);
+            
+            // Also clean up tenant_info table since clearAll doesn't handle it
+            const client = await store['pool'].connect();
+            try {
+                await client.query('DELETE FROM tenant_info WHERE id = $1', ['default']);
+            } finally {
+                client.release();
             }
         });
 
