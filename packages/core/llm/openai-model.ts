@@ -6,16 +6,19 @@ import { LLM, LLMObjectResponse, LLMResponse } from "./llm.js";
 
 export class OpenAIModel implements LLM {
   public contextLength: number = 128000;
-  private model: OpenAI;
-  constructor() {
-    this.model = new OpenAI({
+  private client: OpenAI;
+  private model: string;
+
+  constructor(model: string = null) {
+    this.model = model || process.env.OPENAI_MODEL || "gpt-4.1";
+    this.client = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY || "",
       baseURL: process.env.OPENAI_BASE_URL,
     });
   }
   async generateText(messages: ChatCompletionMessageParam[], temperature: number = 0): Promise<LLMResponse> {
     // o models don't support temperature
-    if (process.env.OPENAI_MODEL?.startsWith('o')) {
+    if (this.model.startsWith('o')) {
       temperature = undefined;
     }
     const dateMessage = {
@@ -23,9 +26,9 @@ export class OpenAIModel implements LLM {
       content: "The current date and time is " + new Date().toISOString()
     } as ChatCompletionMessageParam;
 
-    const result = await this.model.chat.completions.create({
+    const result = await this.client.chat.completions.create({
       messages: [dateMessage, ...messages],
-      model: process.env.OPENAI_MODEL || "gpt-4o",
+      model: this.model,
       temperature: temperature
     });
     let responseText = result.choices[0].message.content;
@@ -80,7 +83,7 @@ export class OpenAIModel implements LLM {
     schema = addNullableToOptional(schema)
     schema = this.enforceStrictSchema(schema, true);
     // o models don't support temperature
-    if (process.env.OPENAI_MODEL?.startsWith('o')) {
+    if (this.model.startsWith('o')) {
       temperature = undefined;
     }
     const responseFormat = schema ? { type: "json_schema", json_schema: { name: "response", strict: true, schema: schema } } : { type: "json_object" };
@@ -88,9 +91,9 @@ export class OpenAIModel implements LLM {
       role: "system",
       content: "The current date and time is " + new Date().toISOString()
     } as ChatCompletionMessageParam;
-    const result = await this.model.chat.completions.create({
+    const result = await this.client.chat.completions.create({
       messages: [dateMessage, ...messages],
-      model: process.env.OPENAI_MODEL || "gpt-4o",
+      model: this.model,
       temperature: temperature,
       response_format: responseFormat as any,
     });

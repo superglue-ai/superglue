@@ -79,7 +79,7 @@ describe('API Utilities', () => {
       // Verify OpenAI was called correctly
       expect((OpenAI as any).prototype.chat.completions.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'test-model',
+          model: 'gpt-4.1',
           temperature: 0,
           response_format: expect.any(Object),
           messages: expect.arrayContaining([
