@@ -91,11 +91,11 @@ const ConfigTable = () => {
       setLoading(false);
       setIsRefreshing(false);
     }
-  }, [config, page, pageSize]);
+  }, [page, pageSize]);
 
   React.useEffect(() => {
     refreshConfigs();
-  }, []);
+  }, [refreshConfigs]);
 
   const handleWorkflow = () => {
     router.push('/workflows');
@@ -239,7 +239,7 @@ const ConfigTable = () => {
     return (
       <div className="p-8 max-w-none w-full min-h-full">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">Workflows</h1>
+          <h1 className="text-2xl font-bold">Configurations</h1>
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -253,7 +253,7 @@ const ConfigTable = () => {
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Refresh Workflows</p>
+                <p>Refresh Configurations</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -271,7 +271,7 @@ const ConfigTable = () => {
   return (
     <div className="p-8 max-w-none w-full min-h-full">
       <div className="flex flex-col lg:flex-row justify-between lg:items-center mb-6 gap-2">
-        <h1 className="text-2xl font-bold">Workflows</h1>
+        <h1 className="text-2xl font-bold">Configurations</h1>
         <div className="flex gap-4">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -321,7 +321,7 @@ const ConfigTable = () => {
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Refresh Workflows</p>
+                      <p>Refresh Configurations</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
