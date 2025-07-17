@@ -95,7 +95,7 @@ const ConfigTable = () => {
 
   React.useEffect(() => {
     refreshConfigs();
-  }, [refreshConfigs]);
+  }, []);
 
   const handleWorkflow = () => {
     router.push('/workflows');
