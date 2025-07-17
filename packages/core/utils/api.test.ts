@@ -1,7 +1,7 @@
 import { ApiConfig, AuthType, HttpMethod, PaginationType } from '@superglue/client';
 import OpenAI from 'openai';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mocked } from 'vitest';
-import { callEndpoint, generateApiConfig } from './api.js';
+import { callEndpoint } from './api.js';
 import * as tools from './tools.js';
 
 vi.mock('axios');
@@ -26,91 +26,17 @@ describe('API Utilities', () => {
     vi.resetAllMocks();
   });
 
-  describe('prepareEndpoint', () => {
-    const testInput: ApiConfig = {
+  describe('callEndpoint', () => {
+    const testEndpoint: ApiConfig = {
       urlHost: 'https://api.example.com',
       urlPath: 'v1/test',
       method: HttpMethod.GET,
-      id: 'test-uuid-1232-2532-3233',
+      id: 'test-endpoint-id',
       instruction: 'Test API call'
     };
-
-    beforeEach(() => {
-      // Mock OpenAI response with all required fields
-      const mockOpenAIResponse = {
-        choices: [{
-          message: {
-            content: JSON.stringify({
-              urlHost: 'https://api.example.com',
-              urlPath: 'v1/test',
-              method: HttpMethod.GET,
-              authentication: AuthType.NONE,
-              headers: [{ key: 'Content-Type', value: 'application/json' }]
-            })
-          }
-        }]
-      };
-
-      // Setup OpenAI mock properly
-      (OpenAI as any).prototype.chat = {
-        completions: {
-          create: vi.fn().mockResolvedValue(mockOpenAIResponse)
-        }
-      };
-    });
-
-    it('should prepare endpoint configuration', async () => {
-      const result = await generateApiConfig(testInput, "", {}, {}, 0, []);
-
-      expect(result.config).toMatchObject({
-        urlHost: 'https://api.example.com',
-        urlPath: 'v1/test',
-        method: HttpMethod.GET,
-        authentication: AuthType.NONE,
-        id: expect.stringMatching("test-uuid-1232-2532-3233"),
-        headers: { 'Content-Type': 'application/json' },
-        createdAt: expect.any(Date),
-        updatedAt: expect.any(Date)
-      });
-
-      expect(result.messages).toBeInstanceOf(Array);
-      expect(result.messages).toHaveLength(3); // system, user, and assistant messages
-
-      // Verify OpenAI was called correctly
-      expect((OpenAI as any).prototype.chat.completions.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          model: 'test-model',
-          temperature: 0,
-          response_format: expect.any(Object),
-          messages: expect.arrayContaining([
-            expect.objectContaining({ role: 'system' }),
-            expect.objectContaining({ role: 'user' })
-          ])
-        })
-      );
-    });
-
-    it('should handle errors gracefully', async () => {
-      vi.spyOn(tools, 'composeUrl').mockImplementation(() => {
-        throw new Error('URL composition failed');
-      });
-
-      await expect(generateApiConfig(testInput, "", {}, {}, 0, []))
-        .rejects.toThrow('URL composition failed');
-    });
-  });
-
-  describe('callEndpoint', () => {
-    const testConfig = {
-      id: 'test-uuid-1232-2532-3233',
-      urlHost: 'https://api.example.com',
-      urlPath: 'v1/test',
-      method: HttpMethod.GET,
-      headers: { 'Content-Type': 'application/json' },
-      instruction: 'Test API call',
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
+    const testPayload = { query: 'test' };
+    const testCredentials = { api_key: 'secret-key' };
+    const testOptions = {};
 
     it('should make successful API call', async () => {
       const mockResponse = {
@@ -122,14 +48,14 @@ describe('API Utilities', () => {
       };
       mockedTools.callAxios.mockResolvedValueOnce(mockResponse);
 
-      const result = await callEndpoint(testConfig, {}, {}, {});
+      const result = await callEndpoint(testEndpoint, testPayload, testCredentials, testOptions);
 
       expect(result).toEqual({ data: { result: 'success' } });
     });
 
     it('should handle pagination', async () => {
       const config = {
-        ...testConfig,
+        ...testEndpoint,
         pagination: {
           type: PaginationType.PAGE_BASED,
           pageSize: "2"
@@ -154,7 +80,7 @@ describe('API Utilities', () => {
 
     it('should handle offset-based pagination', async () => {
       const config = {
-        ...testConfig,
+        ...testEndpoint,
         queryParams: {
           offset: "{offset}",
           limit: "{limit}"
@@ -195,7 +121,7 @@ describe('API Utilities', () => {
 
     it('should handle cursor-based pagination', async () => {
       const config = {
-        ...testConfig,
+        ...testEndpoint,
         dataPath: 'data',
         pagination: {
           type: PaginationType.CURSOR_BASED,
@@ -239,7 +165,7 @@ describe('API Utilities', () => {
 
     it('should stop pagination when receiving duplicate data', async () => {
       const config = {
-        ...testConfig,
+        ...testEndpoint,
         pagination: {
           type: PaginationType.PAGE_BASED,
           pageSize: "2"
@@ -266,7 +192,7 @@ describe('API Utilities', () => {
 
     it('should stop after 500 iterations', async () => {
       const config = {
-        ...testConfig,
+        ...testEndpoint,
         pagination: {
           type: PaginationType.OFFSET_BASED,
           pageSize: "1"
@@ -290,7 +216,7 @@ describe('API Utilities', () => {
 
     it('if 2 responses are the same, stop pagination', async () => {
       const config = {
-        ...testConfig,
+        ...testEndpoint,
         pagination: {
           type: PaginationType.OFFSET_BASED,
           pageSize: "1"
@@ -325,7 +251,7 @@ describe('API Utilities', () => {
       };
       mockedTools.callAxios.mockResolvedValueOnce(errorResponse);
 
-      await expect(callEndpoint(testConfig, {}, {}, {}))
+      await expect(callEndpoint(testEndpoint, {}, {}, {}))
         .rejects.toThrow(/API call failed/);
     });
 
@@ -339,13 +265,13 @@ describe('API Utilities', () => {
       };
       mockedTools.callAxios.mockResolvedValueOnce(htmlResponse);
 
-      await expect(callEndpoint(testConfig, {}, {}, {}))
+      await expect(callEndpoint(testEndpoint, {}, {}, {}))
         .rejects.toThrow(/Received HTML response/);
     });
 
     it('should handle data path extraction', async () => {
       const config = {
-        ...testConfig,
+        ...testEndpoint,
         dataPath: 'response.items'
       };
 
@@ -369,7 +295,7 @@ describe('API Utilities', () => {
 
     it('should handle GraphQL error responses', async () => {
       const config = {
-        ...testConfig,
+        ...testEndpoint,
         method: HttpMethod.POST,
         body: 'query { test }',
       } as ApiConfig;

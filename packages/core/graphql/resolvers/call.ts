@@ -2,15 +2,18 @@ import { ApiConfig, ApiInputRequest, CacheMode, Integration, RequestOptions, Sel
 import type { Context, Metadata } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import OpenAI from "openai";
-import { config } from "../../default.js";
-import { PROMPT_MAPPING } from "../../llm/prompts.js";
-import { callEndpoint, evaluateResponse, generateApiConfig } from "../../utils/api.js";
+import { LanguageModel, ToolCall, ToolResult } from "../../llm/llm.js";
+import { EXECUTE_API_CALL_AGENT_PROMPT } from "../../llm/prompts.js";
+import { executeTool } from "../../tools/tools.js";
+import { callEndpoint, evaluateResponse } from "../../utils/api.js";
 import { Documentation } from "../../utils/documentation.js";
 import { logMessage } from "../../utils/logs.js";
 import { telemetryClient } from "../../utils/telemetry.js";
 import { maskCredentials } from "../../utils/tools.js";
 import { executeTransform } from "../../utils/transform.js";
 import { notifyWebhook } from "../../utils/webhook.js";
+import { executeWorkflowStepDefinition, modifyStepConfigDefinition } from "../../workflow/workflow-execution-tools.js";
+import { searchDocumentationDefinition } from "../../workflow/workflow-tools.js";
 
 export async function executeApiCall(
   endpoint: ApiConfig,
@@ -23,13 +26,16 @@ export async function executeApiCall(
   data: any;
   endpoint: ApiConfig;
 }> {
-  let response: any = null;
-  let retryCount = 0;
-  let lastError: string | null = null;
-  let messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
-  let success = false;
   let isSelfHealing = isSelfHealingEnabled(options);
   let isTestMode = options?.testMode || false;
+
+  if (!isSelfHealing && !isTestMode) {
+    const response = await callEndpoint(endpoint, payload, credentials, options);
+    if (!response.data) {
+      throw new Error("No data returned from API. This could be due to a configuration error.");
+    }
+    return { data: response.data, endpoint };
+  }
 
   let documentationString = "No documentation provided";
   if (!integration && isSelfHealing) {
@@ -40,68 +46,164 @@ export async function executeApiCall(
     documentationString = Documentation.postProcess(integration.documentation, endpoint.instruction || "");
   }
 
-  do {
-    try {
-      if (retryCount > 0 && isSelfHealing) {
-        logMessage('info', `Generating API config for ${endpoint?.urlHost}${retryCount > 0 ? ` (${retryCount})` : ""}`, metadata);
-        const computedApiCallConfig = await generateApiConfig(endpoint, documentationString, payload, credentials, retryCount, messages);
-        endpoint = computedApiCallConfig.config;
-        messages = computedApiCallConfig.messages;
-      }
+  // Track attempts for modify_step_config
+  const attemptHistory: Array<{
+    config: any;
+    error: string;
+    statusCode?: number;
+  }> = [];
 
-      response = await callEndpoint(endpoint, payload, credentials, options);
+  // Create a stateful tool executor that:
+  // 1. Tracks failed execute_workflow_step attempts
+  // 2. Intercepts modify_step_config to inject attempt history
+  const statefulToolExecutor = async (toolCall: ToolCall): Promise<ToolResult> => {
+    let modifiedToolCall = toolCall;
 
-      if (!response.data) {
-        throw new Error("No data returned from API. This could be due to a configuration error.");
-      }
-
-      // Check if response is valid
-      if ((retryCount > 0 && isSelfHealing) || isTestMode) {
-        logMessage('info', `Evaluating response for ${endpoint?.urlHost}`, metadata);
-        const result = await evaluateResponse(response.data, endpoint.responseSchema, endpoint.instruction, documentationString);
-        success = result.success;
-        if (!result.success) throw new Error(result.shortReason + " " + JSON.stringify(response.data).slice(0, 1000));
-        /*
-          if (result.refactorNeeded) {
-            logMessage('info', `Refactoring the API response.`, metadata);
-            const responseSchema = await generateSchema(endpoint.instruction, JSON.stringify(response.data).slice(0, 1000), metadata);
-            const transformation = await generateTransformCode(responseSchema, response.data, endpoint.instruction, metadata);
-            endpoint.responseMapping = transformation.mappingCode;
-            response.data = transformation.data;
-          }
-        */
-      }
-      else {
-        success = true;
-      }
-      break;
-    }
-    catch (error) {
-      const rawErrorString = error?.message || JSON.stringify(error || {});
-      lastError = maskCredentials(rawErrorString, credentials).slice(0, 1000);  
-
-      if (retryCount === 0) {
-        logMessage('info', `The initial configuration is not valid. Generating a new configuration. If you are creating a new configuration, this is expected.\n${lastError}`, metadata);
-      }
-      else if (retryCount > 0) {
-        messages.push({ role: "user", content: `There was an error with the configuration, please fix: ${rawErrorString.slice(0, 2000)}` });
-        if (rawErrorString.startsWith("JSONata") && !messages.some(m => String(m.content).startsWith("Please find the JSONata guide here:"))) {
-          messages.push({ role: "user", content: "Please find the JSONata guide here: " + PROMPT_MAPPING });
+    // Intercept execute_workflow_step to ensure payload/credentials are passed
+    if (toolCall.name === 'execute_workflow_step') {
+      modifiedToolCall = {
+        ...toolCall,
+        arguments: {
+          ...toolCall.arguments,
+          payload: payload,
+          credentials: credentials
         }
-        logMessage('warn', `API call failed. ${lastError}`, metadata);
+      };
+    }
+
+    // Intercept modify_step_config to inject attempt history
+    if (toolCall.name === 'modify_step_config') {
+      modifiedToolCall = {
+        ...toolCall,
+        arguments: {
+          ...toolCall.arguments,
+          payload: payload,
+          credentials: credentials,
+          documentation: toolCall.arguments.documentation ?? documentationString,
+          previousAttempts: attemptHistory // Always inject our tracked history
+        }
+      };
+    }
+
+    const toolMetadata = {
+      ...metadata,
+      integrations: integration ? [integration] : []
+    };
+
+    const result = await executeTool(modifiedToolCall, toolMetadata);
+
+    if (toolCall.name === 'execute_workflow_step' && !result.result?.success) {
+      attemptHistory.push({
+        config: toolCall.arguments.endpoint,
+        error: result.result?.error || 'Unknown error',
+        statusCode: result.result?.context?.statusCode
+      });
+    }
+
+    return result;
+  };
+
+  // Define available tools
+  const tools = [
+    executeWorkflowStepDefinition,
+    modifyStepConfigDefinition,
+    searchDocumentationDefinition
+  ];
+
+  // Prepare initial messages
+  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+    {
+      role: "system",
+      content: EXECUTE_API_CALL_AGENT_PROMPT
+    },
+    {
+      role: "user",
+      content: `Execute this API call successfully:
+
+INSTRUCTION: ${endpoint.instruction || "Make API call and retrieve data"}
+
+CURRENT CONFIGURATION:
+${JSON.stringify(endpoint, null, 2)}
+
+AVAILABLE DATA:
+- Payload: ${Object.keys(payload).length > 10 ? `${Object.keys(payload).length} fields available` : JSON.stringify(payload, null, 2)}
+- Credentials: ${Object.keys(credentials).join(", ") || "None"}
+${integration ? `- Integration: ${integration.id}` : ""}
+${documentationString !== "No documentation provided" ? `- Documentation: Available (${documentationString.length} chars)` : "- Documentation: Not available"}
+
+Start by executing the API call with execute_workflow_step using the current configuration.
+Remember: Always pass payload: { placeholder: true } and credentials: { placeholder: true } - the actual values will be injected automatically.`
+    }
+  ];
+
+  try {
+    const result = await LanguageModel.executeTaskWithTools(
+      messages,
+      tools,
+      statefulToolExecutor,
+      {
+        maxIterations: 10,
+        temperature: 0.1,
+        shouldAbort: (trace) => trace.toolCall.name === 'execute_workflow_step' && trace.result.result?.success,
+      }
+    );
+
+    // Log the result for debugging
+    logMessage('debug', `executeTaskWithTools completed with ${result.executionTrace?.length || 0} trace entries`, metadata);
+
+    // Extract the final configuration and response data from the result
+    let finalEndpoint = endpoint;
+    let responseData = null;
+    let lastError = null;
+
+    // Parse the tool calls to find successful execution
+    for (const trace of result.executionTrace || []) {
+      logMessage('debug', `Processing trace: ${trace.toolCall.name}, success: ${trace.result.result?.success}`, metadata);
+
+      if (trace.toolCall.name === 'execute_workflow_step' && trace.result.result?.success) {
+        responseData = trace.result.result.data;
+        logMessage('debug', `Found successful execute_workflow_step with data`, metadata);
+      } else if (trace.toolCall.name === 'modify_step_config' && trace.result.result?.success) {
+        finalEndpoint = trace.result.result.config;
+        logMessage('debug', `Updated endpoint configuration from modify_step_config`, metadata);
+      } else if (trace.toolCall.name === 'execute_workflow_step' && !trace.result.result?.success) {
+        lastError = trace.result.result?.error;
+        logMessage('debug', `Found failed execute_workflow_step: ${lastError}`, metadata);
       }
     }
-    retryCount++;
-  } while (retryCount < (options?.retries !== undefined ? options.retries : config.MAX_CALL_RETRIES));
-  if (!success) {
-    telemetryClient?.captureException(new Error(`API call failed after ${retryCount} retries. Last error: ${lastError}`), metadata.orgId, {
-      endpoint: endpoint,
-      retryCount: retryCount,
-    });
-    throw new Error(`API call failed after ${retryCount} retries. Last error: ${lastError}`);
-  }
 
-  return { data: response?.data, endpoint };
+    if (!responseData) {
+      const errorMessage = lastError || "Failed to execute API call after multiple attempts";
+      telemetryClient?.captureException(new Error(errorMessage), metadata.orgId, {
+        endpoint: finalEndpoint,
+        toolCalls: result.toolCalls?.length || 0
+      });
+      throw new Error(errorMessage);
+    }
+
+    // Evaluate response if needed
+    if (isTestMode || isSelfHealing) {
+      logMessage('info', `Evaluating response for ${finalEndpoint?.urlHost}`, metadata);
+      const evalResult = await evaluateResponse(responseData, finalEndpoint.responseSchema, finalEndpoint.instruction, documentationString);
+      if (!evalResult.success) {
+        throw new Error(evalResult.shortReason + " " + JSON.stringify(responseData).slice(0, 1000));
+      }
+    }
+
+    logMessage('info', `executeApiCall completed successfully, returning data`, metadata);
+    return { data: responseData, endpoint: finalEndpoint };
+
+  } catch (error) {
+    const errorMessage = error?.message || "Unknown error during API execution";
+    const maskedError = maskCredentials(errorMessage, credentials).slice(0, 1000);
+
+    telemetryClient?.captureException(new Error(maskedError), metadata.orgId, {
+      endpoint: endpoint,
+      error: errorMessage
+    });
+
+    throw new Error(`API execution failed: ${maskedError}`);
+  }
 }
 function isSelfHealingEnabled(options: RequestOptions): boolean {
   return options?.selfHealing ? options.selfHealing === SelfHealingMode.ENABLED || options.selfHealing === SelfHealingMode.REQUEST_ONLY : true;

@@ -228,3 +228,69 @@ try {
 2. **Built-in Tools**: Support for OpenAI's built-in tools (web search, file search)
 3. **Reasoning Models**: Special handling for o-series models
 4. **Prompt Caching**: Optimize for repeated schemas and instructions 
+
+
+🔍 Triggering finish_reason: "stop" after a tool call
+The model’s own logic determines finish_reason; you can’t force it based on your tool's return value.
+
+The model may return "stop" even immediately after a function call, but this is inconsistent and not reliable 
+Microsoft Learn
++11
+OpenAI Community
++11
+Vellum
++11
+OpenAI Community
++1
+OpenAI Community
++1
+.
+
+🛠 Using tool_choice: "required"
+tool_choice: "required" forces the model to call one of the provided functions each turn.
+
+However, it does not guarantee a clean finish_reason; you'll often see missing or unexpected values, and sometimes loops can occur 
+OpenAI Community
++1
+OpenAI Community
++1
+.
+
+✅ Recommended Signal Pattern
+Use turn-level orchestration instead of depending solely on finish signals:
+
+ts
+Copy
+let madeToolCall = false;
+
+for (...) {
+  const resp = await create(...);
+  for (const o of resp.output) {
+    if (o.type === 'function_call') {
+      madeToolCall = true;
+      // execute tool & inject result
+    } else if (o.type === 'message') {
+      // collect assistant text
+    }
+  }
+  if (!madeToolCall && resp.finish_reason === 'stop') {
+    // ✅ done
+  }
+  madeToolCall = false;
+}
+This ensures you loop until you receive regular assistant text without tool calls + finish_reason:'stop'.
+
+📌 Summary Table
+Feature	finish_reason: stop	Guaranteed Tool Call
+tool_choice: auto	MAY follow tool call ✅	❌
+tool_choice: required	UNRELIABLE	✅ Always one tool
+Orchestration logic	✅ Wait for text + stop	✅ Precisely controlled
+
+In short:
+
+You can’t force a "stop" finish programmatically after a tool result.
+
+tool_choice: "required" ensures a tool call, but not a clean finish.
+
+Best practice: orchestrate loop termination yourself by checking for text + no tool calls + finish_reason === "stop".
+

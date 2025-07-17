@@ -1,7 +1,8 @@
 import OpenAI from "openai";
 import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
 import { addNullableToOptional } from "../utils/tools.js";
-import { LLM, LLMAutonomousResponse, LLMObjectResponse, LLMResponse, LLMToolResponse, ToolCall, ToolDefinition, ToolResult } from "./llm.js";
+import { LLM, LLMAutonomousResponse, LLMObjectResponse, LLMResponse, ToolCall, ToolDefinition, ToolResult } from "./llm.js";
+import { AGENTIC_SYSTEM_PROMPT } from "./prompts.js";
 
 
 export class OpenAIModel implements LLM {
@@ -149,7 +150,6 @@ export class OpenAIModel implements LLM {
         }
       };
     } else {
-      // Use JSON mode without schema validation
       textFormat = {
         format: {
           type: "json_object"
@@ -158,7 +158,6 @@ export class OpenAIModel implements LLM {
     }
 
     try {
-      // Call Responses API with appropriate format
       const response = await (this.model.responses.create as any)({
         model: process.env.OPENAI_MODEL || "gpt-4o",
         input: input as any,
@@ -229,79 +228,11 @@ export class OpenAIModel implements LLM {
     }
   }
 
-  async executeTool(
-    messages: ChatCompletionMessageParam[],
-    tools: ToolDefinition[],
-    temperature: number = 0.2,
-    forceToolUse: boolean = false,
-    previousResponseId?: string
-  ): Promise<LLMToolResponse> {
-    // Prepare input messages for Responses API
-    const input = messages.map(m => ({
-      role: m.role,
-      content: typeof m.content === 'string' ? m.content : String(m.content)
-    }));
-
-    // Prepare tools in the Responses API format
-    const fnTools = tools.map(t => ({
-      type: 'function' as const,
-      name: t.name,
-      description: t.description,
-      parameters: t.parameters
-    }));
-
-    try {
-      // Call Responses API with tool_choice set to "required" to force a tool call
-      const response = await (this.model.responses.create as any)({
-        model: process.env.OPENAI_MODEL || "gpt-4o",
-        input: input as any,
-        tools: fnTools as any,
-        tool_choice: forceToolUse ? "required" : "auto",  // Use forceToolUse parameter
-        temperature,
-        previous_response_id: previousResponseId,  // Use for conversation continuity
-        store: true  // Store for conversation continuity
-      }) as any;
-
-      // Extract function call from output array
-      const functionCall = response.output?.find((item: any) => item.type === 'function_call');
-
-      // Also extract any text response
-      let textResponse: string | undefined;
-      for (const output of response.output || []) {
-        if (output.type === 'message' && output.role === 'assistant') {
-          for (const content of output.content || []) {
-            if (content.type === 'output_text') {
-              textResponse = (textResponse || '') + content.text;
-            }
-          }
-        }
-      }
-
-      // Parse arguments and create ToolCall if function was called
-      const toolCall = functionCall ? {
-        id: functionCall.call_id || functionCall.id,
-        name: functionCall.name,
-        arguments: JSON.parse(functionCall.arguments)
-      } : null;
-
-      // Return response with the response ID for potential continuation
-      return {
-        toolCall,
-        textResponse,
-        messages,
-        responseId: response.id  // Include response ID for continuation
-      };
-    } catch (error) {
-      console.error('Error in executeTool:', error);
-      throw error;
-    }
-  }
-
   async executeTaskWithTools(
     messages: ChatCompletionMessageParam[],
     tools: ToolDefinition[],
     toolExecutor: (toolCall: ToolCall) => Promise<ToolResult>,
-    options?: { maxIterations?: number; temperature?: number; previousResponseId?: string; }
+    options?: { maxIterations?: number; temperature?: number; previousResponseId?: string; shouldAbort?: (trace: { toolCall: ToolCall; result: ToolResult }) => boolean; }
   ): Promise<LLMAutonomousResponse> {
     // Build stateless response input
     let input: any[] = messages.map(m => ({
@@ -312,11 +243,7 @@ export class OpenAIModel implements LLM {
     // Add system message for agentic behavior (as recommended in docs)
     const agenticSystemMessage = {
       role: 'system',
-      content: `You are an agent - please keep going until the user's query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.
-
-If you are not sure about something, use your tools to gather the relevant information: do NOT guess or make up an answer.
-
-You MUST plan extensively before each function call, and reflect extensively on the outcomes of the previous function calls.`
+      content: AGENTIC_SYSTEM_PROMPT
     };
 
     // Prepend agentic instructions
@@ -337,82 +264,86 @@ You MUST plan extensively before each function call, and reflect extensively on 
     let responseId: string | null = options?.previousResponseId || null;
 
     for (let iteration = 0; iteration < maxIterations; iteration++) {
-      try {
-        // Call Responses API with stateless conversation management
-        const response = await (this.model.responses.create as any)({
-          model: process.env.OPENAI_MODEL || "gpt-4o",
-          input: input as any,
-          tools: fnTools as any,
-          tool_choice: "auto",  // Let model decide when to call tools
-          temperature,
-          previous_response_id: responseId,  // Use for conversation continuity
-          store: true,  // Store for multi-turn conversations
-          parallel_tool_calls: true  // Allow multiple tool calls in one turn
-        }) as any;
+      const response = await (this.model.responses.create as any)({
+        model: process.env.OPENAI_MODEL || "gpt-4o",
+        input: input as any,
+        tools: fnTools as any,
+        tool_choice: "auto",
+        temperature,
+        previous_response_id: responseId,
+        store: true,
+        parallel_tool_calls: true
+      });
 
-        responseId = response.id;
+      responseId = response.id;
+      let hasToolCalls = false;
+      let finalText = '';
 
-        // Process all outputs
-        let hasToolCalls = false;
-        let finalText = '';
-
-        for (const output of response.output || []) {
-          if (output.type === 'function_call') {
-            hasToolCalls = true;
-
-            // Parse arguments and create ToolCall
-            const toolCall: ToolCall = {
-              id: output.call_id || output.id,
-              name: output.name,
-              arguments: JSON.parse(output.arguments)
-            };
-
-            toolCalls.push(toolCall);
-
-            // Execute the tool
-            const result = await toolExecutor(toolCall);
-            executionTrace.push({ toolCall, result });
-
-            // Add function call output to input
-            input.push({
-              type: 'function_call_output',
-              call_id: toolCall.id,
-              output: typeof result.result === 'string' ? result.result : JSON.stringify(result.result)
-            });
-          } else if (output.type === 'message' && output.role === 'assistant') {
-            // Extract text from assistant message
-            for (const content of output.content || []) {
-              if (content.type === 'output_text') {
-                finalText += content.text;
-              }
-            }
-          }
-        }
-
-        // If no tool calls were made, we have our final response
-        if (!hasToolCalls && finalText) {
-          return {
-            finalResult: finalText,
-            toolCalls,
-            executionTrace,
-            messages: input as any,
-            responseId  // Include final response ID for continuation
+      for (const output of response.output || []) {
+        if (output.type === 'function_call') {
+          hasToolCalls = true;
+          const toolCall: ToolCall = {
+            id: output.call_id || output.id,
+            name: output.name,
+            arguments: JSON.parse(output.arguments)
           };
-        }
+          toolCalls.push(toolCall);
 
-        // If we had tool calls but no more iterations, continue to next iteration
-        if (!hasToolCalls && !finalText) {
-          // Model didn't produce any output - this is unexpected
-          throw new Error('Model produced no output');
+          const result = await toolExecutor(toolCall);
+          executionTrace.push({ toolCall, result });
+
+          input.push({
+            type: 'function_call_output',
+            call_id: toolCall.id,
+            output: typeof result.result === 'string' ? result.result : JSON.stringify(result.result)
+          });
+
+          if (options?.shouldAbort?.({ toolCall, result })) {
+            return { finalResult: "Execution aborted by caller.", toolCalls, executionTrace, messages: input as any, responseId };
+          }
+        } else if (output.type === 'message') {
+            finalText = output.content?.map(c => c.text).join('') || '';
         }
-      } catch (error) {
-        console.error(`Error in iteration ${iteration}:`, error);
-        throw error;
+      }
+
+      if (!hasToolCalls && response.finish_reason === 'stop') {
+        return { finalResult: finalText, toolCalls, executionTrace, messages: input as any, responseId };
       }
     }
 
-    // Max iterations reached
     throw new Error(`Maximum iterations (${maxIterations}) reached in executeTaskWithTools`);
+  }
+
+  extractLastSuccessfulToolResult(
+    toolName: string,
+    executionTrace: LLMAutonomousResponse['executionTrace']
+  ): any | null {
+    // Find all calls to the specified tool
+    const toolCalls = executionTrace.filter(step => step.toolCall.name === toolName);
+
+    if (toolCalls.length === 0) {
+      return null;
+    }
+
+    // Iterate in reverse to find the last successful call
+    for (let i = toolCalls.length - 1; i >= 0; i--) {
+      const { result } = toolCalls[i];
+
+      // Check if the tool execution was successful (no error)
+      if (!result.error && result.result) {
+        // For tools that return {success: boolean, ...data}, check success flag
+        if (typeof result.result === 'object' && 'success' in result.result) {
+          if (result.result.success) {
+            return result.result;
+          }
+        } else {
+          // For tools that don't use success flag, presence of result without error means success
+          return result.result;
+        }
+      }
+    }
+
+    return null;
   }
 }
 

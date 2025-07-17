@@ -229,8 +229,6 @@ export const buildWorkflowResolver = async (
   const { instruction, payload, integrationIds, responseSchema, useTools = true } = args;
   const metadata: Metadata = { runId: crypto.randomUUID(), orgId: context.orgId };
 
-  logMessage('info', `Building workflow for instruction: ${instruction}`, metadata);
-
   try {
     // Fetch all integrations
     const allIntegrations = await context.datastore.listIntegrations(1000, 0, context.orgId);
@@ -250,7 +248,7 @@ export const buildWorkflowResolver = async (
     );
 
     // Use tool-based building if requested
-    const workflow = useTools ? await builder.buildWithTools() : await builder.build();
+    const workflow = useTools ? await builder.buildWorkflow() : await builder.buildWorkflow();
 
     logMessage('info', `Workflow built successfully: ${workflow.id}`, metadata);
     return workflow;

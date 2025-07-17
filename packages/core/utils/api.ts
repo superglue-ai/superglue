@@ -2,13 +2,10 @@ import { type ApiConfig, AuthType, FileType, HttpMethod, PaginationType, type Re
 import type { AxiosRequestConfig } from "axios";
 import OpenAI from "openai";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
-import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
-import { LanguageModel } from "../llm/llm.js";
-import { API_PROMPT } from "../llm/prompts.js";
 import { parseFile } from "./file.js";
 import { callPostgres } from "./postgres.js";
-import { callAxios, composeUrl, generateId, replaceVariables, sample } from "./tools.js";
+import { callAxios, composeUrl, replaceVariables, sample } from "./tools.js";
+import { LanguageModel } from "../llm/llm.js";
 
 export function convertBasicAuthToBase64(headerValue: string) {
   if (!headerValue) return headerValue;
@@ -212,95 +209,6 @@ config: ${JSON.stringify(axiosConfig)}`;
 
   return {
     data: allResults?.length === 1 ? allResults[0] : allResults
-  };
-}
-
-export async function generateApiConfig(
-  apiConfig: Partial<ApiConfig>,
-  documentation: string,
-  payload: Record<string, any>,
-  credentials: Record<string, any>,
-  retryCount = 0,
-  messages: OpenAI.Chat.ChatCompletionMessageParam[] = []
-): Promise<{ config: ApiConfig; messages: OpenAI.Chat.ChatCompletionMessageParam[]; }> {
-  const schema = zodToJsonSchema(z.object({
-    urlHost: z.string(),
-    urlPath: z.string(),
-    queryParams: z.array(z.object({
-      key: z.string(),
-      value: z.string()
-    })).optional(),
-    method: z.enum(Object.values(HttpMethod) as [string, ...string[]]),
-    headers: z.array(z.object({
-      key: z.string(),
-      value: z.string()
-    })).optional(),
-    body: z.string().optional().describe("Format as JSON if not instructed otherwise. Use <<>> to access variables."),
-    authentication: z.enum(Object.values(AuthType) as [string, ...string[]]),
-    dataPath: z.string().optional().describe("The path to the data you want to extract from the response. E.g. products.variants.size"),
-    pagination: z.object({
-      type: z.enum(Object.values(PaginationType) as [string, ...string[]]),
-      pageSize: z.string().describe("Number of items per page. Set this to a number. Once you set it here as a number, you can access it using <<limit>> in headers, params, body, or url path."),
-      cursorPath: z.string().describe("If cursor_based: The path to the cursor in the response. E.g. cursor.current or next_cursor. If pagination is not cursor_based, set this to \"\"")
-    }).optional()
-  }));
-  const availableVariables = [
-    ...Object.keys(credentials || {}),
-    ...Object.keys(payload || {}),
-  ].map(v => `<<${v}>>`).join(", ");
-  if (messages.length === 0) {
-    const userPrompt = `Generate API configuration for the following:
-
-Instructions: ${apiConfig.instruction}
-
-Base URL: ${composeUrl(apiConfig.urlHost, apiConfig.urlPath)}
-
-${Object.values(apiConfig).filter(Boolean).length > 0 ? "Also, the user provided the following information. Ensure to at least try where it makes sense: " : ""}
-${apiConfig.headers ? `Headers: ${JSON.stringify(apiConfig.headers)}` : ""}
-${apiConfig.queryParams ? `Query Params: ${JSON.stringify(apiConfig.queryParams)}` : ""}
-${apiConfig.body ? `Body: ${JSON.stringify(apiConfig.body)}` : ''}
-${apiConfig.authentication ? `Authentication: ${apiConfig.authentication}` : ''}
-${apiConfig.dataPath ? `Data Path: ${apiConfig.dataPath}` : ''}
-${apiConfig.pagination ? `Pagination: ${JSON.stringify(apiConfig.pagination)}` : ''}
-${apiConfig.method ? `Method: ${apiConfig.method}` : ''}
-
-Available variables: ${availableVariables}
-Available pagination variables (if pagination is enabled): page, pageSize, offset, cursor, limit
-Example payload: ${JSON.stringify(payload || {}).slice(0, LanguageModel.contextLength / 10)}
-
-Documentation: ${String(documentation)}`;
-    messages.push({
-      role: "system",
-      content: API_PROMPT
-    });
-    messages.push({
-      role: "user",
-      content: userPrompt
-    });
-  }
-  const temperature = Math.min(retryCount * 0.1, 1);
-  const { response: generatedConfig, messages: updatedMessages } = await LanguageModel.generateObject(messages, schema, temperature);
-
-  return {
-    config: {
-      instruction: apiConfig.instruction,
-      urlHost: generatedConfig.urlHost,
-      urlPath: generatedConfig.urlPath,
-      method: generatedConfig.method,
-      queryParams: generatedConfig.queryParams ? Object.fromEntries(generatedConfig.queryParams.map(p => [p.key, p.value])) : undefined,
-      headers: generatedConfig.headers ? Object.fromEntries(generatedConfig.headers.map(p => [p.key, p.value])) : undefined,
-      body: generatedConfig.body,
-      authentication: generatedConfig.authentication,
-      pagination: generatedConfig.pagination,
-      dataPath: generatedConfig.dataPath,
-      documentationUrl: apiConfig.documentationUrl,
-      responseSchema: apiConfig.responseSchema,
-      responseMapping: apiConfig.responseMapping,
-      createdAt: apiConfig.createdAt || new Date(),
-      updatedAt: new Date(),
-      id: apiConfig.id || generateId(generatedConfig.urlHost, generatedConfig.urlPath),
-    } as ApiConfig,
-    messages: updatedMessages
   };
 }
 

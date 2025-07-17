@@ -1,21 +1,26 @@
 import { ToolCall, ToolDefinition, ToolResult } from "../llm/llm.js";
 import { generateInstructionsDefinition, generateInstructionsImplementation } from "../utils/instructions.js";
+import { executeWorkflowStepDefinition, executeWorkflowStepImplementation, modifyStepConfigDefinition, modifyStepConfigImplementation } from "../workflow/workflow-execution-tools.js";
 import { buildWorkflowDefinition, buildWorkflowImplementation, planWorkflowDefinition, planWorkflowImplementation, searchDocumentationDefinition, searchDocumentationImplementation } from "../workflow/workflow-tools.js";
 
-export type ToolImplementation = (args: Record<string, any>, metadata?: any) => Promise<any>;
+export type ToolImplementation = (args: any, metadata?: any) => Promise<any>;
 
 export const tools: Record<string, ToolImplementation> = {
     generate_instructions: generateInstructionsImplementation,
     search_documentation: searchDocumentationImplementation,
     plan_workflow: planWorkflowImplementation,
-    build_workflow: buildWorkflowImplementation
+    build_workflow: buildWorkflowImplementation,
+    execute_workflow_step: executeWorkflowStepImplementation,
+    modify_step_config: modifyStepConfigImplementation
 };
 
 export const toolDefinitions: ToolDefinition[] = [
     generateInstructionsDefinition,
     searchDocumentationDefinition,
     planWorkflowDefinition,
-    buildWorkflowDefinition
+    buildWorkflowDefinition,
+    executeWorkflowStepDefinition,
+    modifyStepConfigDefinition
 ];
 
 export async function executeTool(toolCall: ToolCall, metadata?: any): Promise<ToolResult> {

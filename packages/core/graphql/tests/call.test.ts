@@ -103,12 +103,8 @@ describe('Call Resolver', () => {
           data: { result: 'success after retry' }
         });
 
-      // Mock documentation and generateApiConfig
+      // Mock documentation and evaluateResponse
       vi.mocked(Documentation.prototype.fetchAndProcess).mockResolvedValue('test docs');
-      mockedApi.generateApiConfig.mockResolvedValue({
-        config: { ...testInput.endpoint },
-        messages: []
-      });
       mockedApi.evaluateResponse.mockResolvedValueOnce({ success: true, shortReason: '', refactorNeeded: false });
 
       const result = await executeApiCall(
@@ -125,7 +121,6 @@ describe('Call Resolver', () => {
         endpoint: { ...testInput.endpoint }
       });
       expect(mockedApi.callEndpoint).toHaveBeenCalledTimes(2);
-      expect(mockedApi.generateApiConfig).toHaveBeenCalledTimes(1);
       expect(mockedLogs.logMessage).toHaveBeenCalledWith(
         'info',
         expect.stringContaining('(1)'),
@@ -141,10 +136,6 @@ describe('Call Resolver', () => {
         .mockResolvedValue({ data: { result: 'success' } }); // Succeeds on retries
 
       vi.mocked(Documentation.prototype.fetchAndProcess).mockResolvedValue('test docs');
-      mockedApi.generateApiConfig.mockResolvedValue({
-        config: { ...testInput.endpoint },
-        messages: []
-      });
       // Mock evaluateResponse to consistently fail
       mockedApi.evaluateResponse.mockResolvedValue({ success: false, shortReason: 'Eval failed', refactorNeeded: false });
 
@@ -158,7 +149,7 @@ describe('Call Resolver', () => {
       )).rejects.toThrow(/API call failed after \d+ retries.*Last error: Eval failed/);
 
       // callEndpoint is called once for the initial attempt, then 7 more times for retries where evaluateResponse fails.
-      expect(mockedApi.callEndpoint). toHaveBeenCalledTimes(config.MAX_CALL_RETRIES);
+      expect(mockedApi.callEndpoint).toHaveBeenCalledTimes(config.MAX_CALL_RETRIES);
       // evaluateResponse is called for each of the 7 retries after the first callEndpoint failure.
       expect(mockedApi.evaluateResponse).toHaveBeenCalledTimes(config.MAX_CALL_RETRIES - 1);
       expect(mockedTelemetry.telemetryClient?.captureException).toHaveBeenCalled();
@@ -171,10 +162,6 @@ describe('Call Resolver', () => {
         .mockResolvedValue({ data: { result: 'successful data' } }); // Succeeds on subsequent calls
 
       vi.mocked(Documentation.prototype.fetchAndProcess).mockResolvedValue('test docs');
-      mockedApi.generateApiConfig.mockResolvedValue({
-        config: { ...testInput.endpoint, responseSchema: {} }, // ensure responseSchema is present
-        messages: []
-      });
 
       // Mock evaluateResponse to fail once, then succeed
       mockedApi.evaluateResponse
@@ -195,7 +182,6 @@ describe('Call Resolver', () => {
       expect(mockedApi.callEndpoint).toHaveBeenCalledTimes(3);
       // evaluateResponse called on 1st retry (fails) and 2nd retry (succeeds)
       expect(mockedApi.evaluateResponse).toHaveBeenCalledTimes(2);
-      expect(mockedApi.generateApiConfig).toHaveBeenCalledTimes(2); // Called for each retry attempt
       expect(mockedLogs.logMessage).toHaveBeenCalledWith(
         'info',
         expect.stringContaining('(1)'), // For the first retry
@@ -214,10 +200,6 @@ describe('Call Resolver', () => {
 
       // Add these missing mocks
       vi.mocked(Documentation.prototype.fetchAndProcess).mockResolvedValue('test docs');
-      mockedApi.generateApiConfig.mockResolvedValue({
-        config: { ...testInput.endpoint },
-        messages: []
-      });
 
       await expect(executeApiCall(
         testInput.endpoint,

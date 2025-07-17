@@ -2,6 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import OpenAI from "openai";
 import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
 import { LLM, LLMAutonomousResponse, LLMObjectResponse, LLMResponse, LLMToolResponse, ToolCall, ToolDefinition, ToolResult } from "./llm.js";
+import { AGENTIC_SYSTEM_PROMPT } from "./prompts.js";
 
 
 export class GeminiModel implements LLM {
@@ -172,124 +173,122 @@ export class GeminiModel implements LLM {
     }
 
     async executeTaskWithTools(
-        messages: ChatCompletionMessageParam[],
+        messages: OpenAI.Chat.ChatCompletionMessageParam[],
         tools: ToolDefinition[],
         toolExecutor: (toolCall: ToolCall) => Promise<ToolResult>,
         options?: {
             maxIterations?: number;
             temperature?: number;
+            shouldAbort?: (step: { toolCall: ToolCall; result: ToolResult }) => boolean;
         }
     ): Promise<LLMAutonomousResponse> {
-        const maxIterations = options?.maxIterations || 10;
-        const temperature = options?.temperature || 0.2;
-
-        // Convert tools to Gemini function declarations
+        const { maxIterations = 10, temperature = 0.2 } = options || {};
         const functionDeclarations = tools.map(tool => ({
             name: tool.name,
             description: tool.description,
             parameters: this.cleanSchemaForGemini(tool.parameters)
         }));
 
+        const model = this.genAI.getGenerativeModel({
+            model: process.env.GEMINI_MODEL || "gemini-1.5-flash",
+            tools: [{ functionDeclarations }]
+        });
+
+        const { geminiHistory, systemInstruction, userPrompt } = this.convertToGeminiHistory([
+            { role: "system", content: AGENTIC_SYSTEM_PROMPT },
+            ...messages
+        ]);
+
+        const chatSession = model.startChat({
+            generationConfig: { temperature, topP: 0.95, topK: 64, maxOutputTokens: 8192 },
+            history: geminiHistory
+        });
+
         let currentMessages = [...messages];
         const executionTrace: LLMAutonomousResponse['executionTrace'] = [];
         const allToolCalls: ToolCall[] = [];
-
-        // Add agentic system message similar to OpenAI implementation
-        const agenticInstruction = `You are an agent - please keep going until the user's query is completely resolved. Only stop when you are sure that the problem is solved.
-
-If you are not sure about something, use your tools to gather the relevant information: do NOT guess or make up an answer.
-
-Plan before each function call and reflect on the outcomes of previous function calls.`;
+        let pendingFunctionResponses: any[] = [];
 
         for (let i = 0; i < maxIterations; i++) {
-            const { geminiHistory, systemInstruction, userPrompt } = this.convertToGeminiHistory(currentMessages);
+            let result;
 
-            const enhancedSystemInstruction = i === 0
-                ? `${systemInstruction}\n\n${agenticInstruction}`
-                : systemInstruction;
+            if (i === 0) {
+                result = await chatSession.sendMessage(userPrompt);
+            } else if (pendingFunctionResponses.length > 0) {
+                // Send function responses back to the model
+                result = await chatSession.sendMessage(pendingFunctionResponses);
+                pendingFunctionResponses = [];
+            } else {
+                result = await chatSession.sendMessage("Continue.");
+            }
 
-            const model = this.genAI.getGenerativeModel({
-                model: process.env.GEMINI_MODEL || "gemini-2.5-flash-preview-04-17",
-                systemInstruction: enhancedSystemInstruction + "\n\n" + "The current date and time is " + new Date().toISOString(),
-                tools: [{
-                    functionDeclarations
-                }]
-            });
-
-            const chatSession = model.startChat({
-                generationConfig: {
-                    temperature: temperature,
-                    topP: 0.95,
-                    topK: 64,
-                    maxOutputTokens: 65536,
-                },
-                history: geminiHistory
-            });
-
-            const result = await chatSession.sendMessage(userPrompt);
             const response = result.response;
+            const textContent = response.text();
+            const functionCalls = response.functionCalls() || [];
 
-            // Extract text and function calls
-            let textContent: string | undefined;
-            try {
-                textContent = response.text();
-            } catch (e) {
-                // No text content
+            currentMessages.push({ role: 'assistant', content: textContent || null });
+
+            if (functionCalls.length === 0) {
+                return { finalResult: textContent, toolCalls: allToolCalls, executionTrace, messages: currentMessages };
             }
 
-            const functionCalls = response.functionCalls();
-
-            // Build assistant message
-            const assistantMessage: ChatCompletionMessageParam = {
-                role: "assistant",
-                content: textContent || null
-            };
-
-            if (functionCalls && functionCalls.length > 0) {
-                assistantMessage.tool_calls = functionCalls.map(fc => ({
-                    id: `call_${Date.now()}_${Math.random().toString(36).substring(7)}`,
-                    type: "function" as const,
-                    function: {
-                        name: fc.name,
-                        arguments: JSON.stringify(fc.args)
-                    }
-                }));
-            }
-
-            currentMessages.push(assistantMessage);
-
-            // If no function calls, we have our final response
-            if (!functionCalls || functionCalls.length === 0) {
-                return {
-                    finalResult: textContent || "",
-                    toolCalls: allToolCalls,
-                    executionTrace,
-                    messages: currentMessages
-                };
-            }
-
-            // Execute all function calls
+            // Process all function calls and collect responses
             for (const fc of functionCalls) {
                 const toolCall: ToolCall = {
-                    id: `call_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+                    id: `call_${Date.now()}_${i}`,
                     name: fc.name,
                     arguments: fc.args as Record<string, any>
                 };
                 allToolCalls.push(toolCall);
+                const toolResult = await toolExecutor(toolCall);
+                executionTrace.push({ toolCall, result: toolResult });
 
-                const result = await toolExecutor(toolCall);
-                executionTrace.push({ toolCall, result });
-
-                // Add tool result as a user message (Gemini doesn't have a specific tool result role)
-                currentMessages.push({
-                    role: "user",
-                    content: `Tool "${toolCall.name}" returned: ${JSON.stringify(result.result)}`
+                // Prepare function response for next iteration
+                pendingFunctionResponses.push({
+                    functionResponse: {
+                        name: fc.name,
+                        response: toolResult.result
+                    }
                 });
+
+                if (options?.shouldAbort?.({ toolCall, result: toolResult })) {
+                    return { finalResult: "Execution aborted by caller.", toolCalls: allToolCalls, executionTrace, messages: currentMessages };
+                }
+            }
+        }
+        throw new Error(`Maximum iterations (${maxIterations}) reached in executeTaskWithTools`);
+    }
+
+    extractLastSuccessfulToolResult(
+        toolName: string,
+        executionTrace: LLMAutonomousResponse['executionTrace']
+    ): any | null {
+        // Find all calls to the specified tool
+        const toolCalls = executionTrace.filter(step => step.toolCall.name === toolName);
+
+        if (toolCalls.length === 0) {
+            return null;
+        }
+
+        // Iterate in reverse to find the last successful call
+        for (let i = toolCalls.length - 1; i >= 0; i--) {
+            const { result } = toolCalls[i];
+
+            // Check if the tool execution was successful (no error)
+            if (!result.error && result.result) {
+                // For tools that return {success: boolean, ...data}, check success flag
+                if (typeof result.result === 'object' && 'success' in result.result) {
+                    if (result.result.success) {
+                        return result.result;
+                    }
+                } else {
+                    // For tools that don't use success flag, presence of result without error means success
+                    return result.result;
+                }
             }
         }
 
-        // Max iterations reached
-        throw new Error(`Maximum iterations (${maxIterations}) reached in executeTaskWithTools`);
+        return null;
     }
 
     private cleanSchemaForGemini(schema: any): any {

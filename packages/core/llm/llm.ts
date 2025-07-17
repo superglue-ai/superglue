@@ -9,14 +9,6 @@ export interface LLM {
     generateText(messages: OpenAI.Chat.ChatCompletionMessageParam[], temperature?: number): Promise<LLMResponse>;
     generateObject(messages: OpenAI.Chat.ChatCompletionMessageParam[], schema: any, temperature?: number): Promise<LLMObjectResponse>;
 
-    executeTool?(
-        messages: OpenAI.Chat.ChatCompletionMessageParam[],
-        tools: ToolDefinition[],
-        temperature?: number,
-        forceToolUse?: boolean,
-        previousResponseId?: string
-    ): Promise<LLMToolResponse>;
-
     executeTaskWithTools?(
         messages: OpenAI.Chat.ChatCompletionMessageParam[],
         tools: ToolDefinition[],
@@ -25,8 +17,14 @@ export interface LLM {
             maxIterations?: number;
             temperature?: number;
             previousResponseId?: string;
+            shouldAbort?: (trace: { toolCall: ToolCall; result: ToolResult }) => boolean;
         }
     ): Promise<LLMAutonomousResponse>;
+
+    extractLastSuccessfulToolResult?(
+        toolName: string, 
+        executionTrace: LLMAutonomousResponse['executionTrace']
+    ): any | null;
 }
 
 export interface ToolDefinition {

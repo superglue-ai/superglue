@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
 import { LLM, LLMAutonomousResponse, LLMObjectResponse, LLMResponse, LLMToolResponse, ToolCall, ToolDefinition, ToolResult } from "./llm.js";
+import { AGENTIC_SYSTEM_PROMPT } from "./prompts.js";
 
 export class AnthropicModel implements LLM {
     public contextLength: number = 200000; // Claude 3 supports up to 200k tokens
@@ -181,78 +182,6 @@ Your response must contain ONLY the JSON object within the <json> tags, with no 
         };
     }
 
-    async executeTool(
-        messages: OpenAI.Chat.ChatCompletionMessageParam[],
-        tools: ToolDefinition[],
-        temperature: number = 0.2,
-        forceToolUse: boolean = false,
-        previousResponseId?: string  // Not used by Anthropic, but needed for interface compatibility
-    ): Promise<LLMToolResponse> {
-        const anthropicTools = tools.map(tool => ({
-            name: tool.name,
-            description: tool.description,
-            input_schema: tool.parameters
-        }));
-
-        const anthropicMessages = this.convertToAnthropicFormat(messages);
-
-        const response = await this.client.messages.create({
-            model: process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-20241022",
-            messages: anthropicMessages.anthropicMessages,
-            system: anthropicMessages.system,
-            tools: anthropicTools,
-            tool_choice: forceToolUse ? { type: "any" as const } : { type: "auto" as const },
-            temperature,
-            max_tokens: 4096,
-        });
-
-        // Convert Anthropic response back to OpenAI format
-        const textContent = response.content
-            .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-            .map(block => block.text)
-            .join('\n');
-        
-        const toolUseBlock = response.content.find((block): block is Anthropic.ToolUseBlock => 
-            block.type === 'tool_use'
-        );
-
-        const assistantMessage: ChatCompletionMessageParam = toolUseBlock ? {
-            role: "assistant",
-            content: textContent || null,
-            tool_calls: [{
-                id: toolUseBlock.id,
-                type: "function",
-                function: {
-                    name: toolUseBlock.name,
-                    arguments: JSON.stringify(toolUseBlock.input)
-                }
-            }]
-        } : {
-            role: "assistant",
-            content: textContent
-        };
-
-        const updatedMessages = [...messages, assistantMessage];
-
-        if (toolUseBlock) {
-            return {
-                toolCall: {
-                    id: toolUseBlock.id,
-                    name: toolUseBlock.name,
-                    arguments: toolUseBlock.input as Record<string, any>
-                },
-                textResponse: textContent || undefined,
-                messages: updatedMessages
-            };
-        }
-
-        return {
-            toolCall: null,
-            textResponse: textContent || undefined,
-            messages: updatedMessages
-        };
-    }
-
     async executeTaskWithTools(
         messages: OpenAI.Chat.ChatCompletionMessageParam[],
         tools: ToolDefinition[],
@@ -260,110 +189,111 @@ Your response must contain ONLY the JSON object within the <json> tags, with no 
         options?: {
             maxIterations?: number;
             temperature?: number;
+            shouldAbort?: (step: { toolCall: ToolCall; result: ToolResult }) => boolean;
         }
     ): Promise<LLMAutonomousResponse> {
-        const maxIterations = options?.maxIterations || 10;
-        const temperature = options?.temperature || 0.2;
-
+        const { maxIterations = 10, temperature = 0.2 } = options || {};
         const anthropicTools = tools.map(tool => ({
             name: tool.name,
             description: tool.description,
             input_schema: tool.parameters
         }));
 
-        // Add agentic system message for consistency
-        const agenticSystemMessage: OpenAI.Chat.ChatCompletionMessageParam = {
-            role: "system",
-            content: `You are an agent - please keep going until the user's query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.
-
-If you are not sure about something, use your tools to gather the relevant information: do NOT guess or make up an answer.
-
-You MUST plan extensively before each function call, and reflect extensively on the outcomes of the previous function calls.`
-        };
-
-        let currentMessages = [agenticSystemMessage, ...messages];
+        let currentMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+            { role: "system", content: AGENTIC_SYSTEM_PROMPT },
+            ...messages
+        ];
         const executionTrace: LLMAutonomousResponse['executionTrace'] = [];
         const allToolCalls: ToolCall[] = [];
 
         for (let i = 0; i < maxIterations; i++) {
-            const anthropicMessages = this.convertToAnthropicFormat(currentMessages);
+            const { system, anthropicMessages } = this.convertToAnthropicFormat(currentMessages);
 
             const response = await this.client.messages.create({
-                model: process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-20241022",
-                messages: anthropicMessages.anthropicMessages,
-                system: anthropicMessages.system,
+                model: this.model,
+                messages: anthropicMessages,
+                system,
                 tools: anthropicTools,
-                tool_choice: { type: "auto" as const },
+                tool_choice: { type: "auto" },
                 temperature,
                 max_tokens: 4096,
             });
 
-            // Convert response to OpenAI format
-            const textContent = response.content
-                .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-                .map(block => block.text)
-                .join('\n');
-            
-            const toolUseBlocks = response.content.filter((block): block is Anthropic.ToolUseBlock => 
-                block.type === 'tool_use'
-            );
+            const textContent = response.content.filter((block): block is Anthropic.TextBlock => block.type === 'text').map(block => block.text).join('\n');
+            const toolUseBlocks = response.content.filter((block): block is Anthropic.ToolUseBlock => block.type === 'tool_use');
 
+            const assistantMessage: OpenAI.Chat.ChatCompletionMessageParam = { role: "assistant", content: textContent || null };
             if (toolUseBlocks.length > 0) {
-                currentMessages.push({
-                    role: "assistant",
-                    content: textContent || null,
-                    tool_calls: toolUseBlocks.map(tu => ({
-                        id: tu.id,
-                        type: "function" as const,
-                        function: {
-                            name: tu.name,
-                            arguments: JSON.stringify(tu.input)
-                        }
-                    }))
-                });
-            } else {
-                currentMessages.push({
-                    role: "assistant",
-                    content: textContent
-                });
+                assistantMessage.tool_calls = toolUseBlocks.map(tu => ({
+                    id: tu.id,
+                    type: "function",
+                    function: { name: tu.name, arguments: JSON.stringify(tu.input) }
+                }));
             }
+            currentMessages.push(assistantMessage);
 
             if (toolUseBlocks.length === 0) {
-                // Model decided to stop calling tools
-                return {
-                    finalResult: textContent,
-                    toolCalls: allToolCalls,
-                    executionTrace,
-                    messages: currentMessages
-                };
+                return { finalResult: textContent, toolCalls: allToolCalls, executionTrace, messages: currentMessages };
             }
 
-            // Execute all tool calls in this response
+            const toolResultContents = [];
             for (const toolUseBlock of toolUseBlocks) {
-                const tc: ToolCall = {
+                const toolCall: ToolCall = {
                     id: toolUseBlock.id,
                     name: toolUseBlock.name,
                     arguments: toolUseBlock.input as Record<string, any>
                 };
-                allToolCalls.push(tc);
+                allToolCalls.push(toolCall);
 
-                const result = await toolExecutor(tc);
-                executionTrace.push({ toolCall: tc, result });
-
-                // Add tool result to messages
-                currentMessages.push({
-                    role: "user",
-                    content: [{
-                        type: "tool_result",
-                        tool_use_id: toolUseBlock.id,
-                        content: JSON.stringify(result.result)
-                    }] as any
+                const result = await toolExecutor(toolCall);
+                executionTrace.push({ toolCall, result });
+                toolResultContents.push({
+                    type: "tool_result" as const,
+                    tool_use_id: toolUseBlock.id,
+                    content: JSON.stringify(result.result)
                 });
+                
+                if (options?.shouldAbort?.({ toolCall, result })) {
+                    return { finalResult: "Execution aborted by caller.", toolCalls: allToolCalls, executionTrace, messages: currentMessages };
+                }
+            }
+
+            currentMessages.push({ role: "user", content: toolResultContents });
+        }
+
+        throw new Error(`Maximum iterations (${maxIterations}) reached in executeTaskWithTools`);
+    }
+
+    extractLastSuccessfulToolResult(
+        toolName: string,
+        executionTrace: LLMAutonomousResponse['executionTrace']
+    ): any | null {
+        // Find all calls to the specified tool
+        const toolCalls = executionTrace.filter(step => step.toolCall.name === toolName);
+        
+        if (toolCalls.length === 0) {
+            return null;
+        }
+
+        // Iterate in reverse to find the last successful call
+        for (let i = toolCalls.length - 1; i >= 0; i--) {
+            const { result } = toolCalls[i];
+            
+            // Check if the tool execution was successful (no error)
+            if (!result.error && result.result) {
+                // For tools that return {success: boolean, ...data}, check success flag
+                if (typeof result.result === 'object' && 'success' in result.result) {
+                    if (result.result.success) {
+                        return result.result;
+                    }
+                } else {
+                    // For tools that don't use success flag, presence of result without error means success
+                    return result.result;
+                }
             }
         }
 
-        // Max iterations reached
-        throw new Error(`Maximum iterations (${maxIterations}) reached in executeTaskWithTools`);
+        return null;
     }
 
     private convertToAnthropicFormat(messages: ChatCompletionMessageParam[]): {

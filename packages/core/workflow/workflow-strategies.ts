@@ -117,7 +117,7 @@ const loopStrategy: ExecutionStrategy = {
             step.apiConfig,
             loopPayload,
             credentials,
-            options,
+            { ...options, testMode: options?.testMode && i === 0 },
             metadata,
             integration
           );
