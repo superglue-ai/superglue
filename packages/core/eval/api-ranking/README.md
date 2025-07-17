@@ -8,7 +8,7 @@ The API Ranking Generator evaluates APIs across multiple dimensions:
 1. **Success Rate**: How often workflows complete successfully
 2. **Execution Time**: How fast successful workflows complete
 3. **API Reliability**: Number of API call failures during execution
-4. **LLM Comparison**: How well ChatGPT and Claude perform the same tasks
+4. **LLM Comparison**: How well various LLM models (Claude Sonnet/Opus, GPT-4.1, O4 Mini, Gemini) perform the same tasks
 
 ## Experiment Methodology
 
@@ -27,7 +27,14 @@ The API Ranking Generator evaluates APIs across multiple dimensions:
 ### Direct LLM Evaluation
 To compare Superglue's performance with direct LLM usage:
 
-1. **ChatGPT (GPT-4.1)** and **Claude (Claude 3.5 Sonnet)** are given:
+1. **Multiple LLM models** are evaluated in parallel:
+   - Claude Sonnet 4 (20250514)
+   - Claude Opus 4 (20250514)
+   - GPT-4.1
+   - O4 Mini
+   - Gemini 2.5 Flash
+   
+Each model is given:
    - The same workflow instruction
    - Integration details (API endpoints, credentials)
    - A request to generate executable JavaScript code
@@ -43,8 +50,11 @@ To compare Superglue's performance with direct LLM usage:
    - Completes within the timeout
 
 **Models Used:**
-- **ChatGPT**: `gpt-4.1` (configurable via `OPENAI_MODEL` env var)
-- **Claude**: `claude-3-5-sonnet-20241022` (configurable via `ANTHROPIC_MODEL` env var)
+- **Claude Sonnet 4**: `claude-sonnet-4-20250514`
+- **Claude Opus 4**: `claude-opus-4-20250514`
+- **GPT-4.1**: `gpt-4.1`
+- **O4 Mini**: `o4-mini`
+- **Gemini 2.5 Flash**: `gemini-2.5-flash`
 
 This provides a fair comparison of how well different approaches handle the same API integration tasks.
 
@@ -110,8 +120,11 @@ The generated `ranking.csv` contains:
 - **API**: Name of the API/integration
 - **Superglue Score**: Combined performance score (0-1)
 - **Superglue Success %**: Percentage of successful runs
-- **ChatGPT Success %**: Direct ChatGPT success rate
-- **Claude Success %**: Direct Claude success rate
+- **Claude Sonnet 4**: Success rate for Claude Sonnet 4
+- **Claude Opus 4**: Success rate for Claude Opus 4
+- **GPT-4.1**: Success rate for GPT-4.1
+- **O4 Mini**: Success rate for O4 Mini
+- **Gemini 2.5 Flash**: Success rate for Gemini 2.5 Flash
 - **Instruction Prompt**: The workflow instruction used
 
 ## Adding New APIs
@@ -135,10 +148,11 @@ For example:
 
 ### LLM API Keys (Optional)
 For direct LLM comparison:
-- `OPENAI_API_KEY` - For ChatGPT evaluation
-- `ANTHROPIC_API_KEY` - For Claude evaluation
+- `OPENAI_API_KEY` - For GPT-4.1 and O4 Mini evaluation
+- `ANTHROPIC_API_KEY` - For Claude Sonnet and Opus evaluation
+- `GOOGLE_GENERATIVE_AI_API_KEY` - For Gemini evaluation
 
-If these are not provided, LLM comparison columns will show 0%.
+If these are not provided, LLM comparison columns will show 0% for the respective models.
 
 ## Metrics and Logging
 
