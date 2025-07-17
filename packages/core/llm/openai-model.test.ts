@@ -42,7 +42,7 @@ describe('OpenAIModel', () => {
           { role: 'system', content: 'The current date and time is ' + MOCK_DATE },
           ...messages
         ],
-        model: 'gpt-4o',
+        model: 'gpt-4.1',
         temperature: 0
       });
       expect(result.response).toBe('test response');
@@ -67,7 +67,7 @@ describe('OpenAIModel', () => {
 
   describe('generateObject', () => {
     it('should generate object response', async () => {
-      process.env.OPENAI_MODEL = 'gpt-4o';
+      process.env.OPENAI_MODEL = 'gpt-4.1';
       const model = new OpenAIModel();
       const responseJson = '{"key": "value"}';
       mockCreate.mockResolvedValue({
@@ -93,7 +93,7 @@ describe('OpenAIModel', () => {
           { role: 'system', content: 'The current date and time is ' + MOCK_DATE },
           ...messages
         ],
-        model: 'gpt-4o',
+        model: 'gpt-4.1',
         temperature: 0,
         response_format: {
           type: 'json_schema',

@@ -77,14 +77,8 @@ DATASTORE_TYPE=file
 STORAGE_DIR=/data
 
 # AI Provider - OPENAI or GEMINI
-# best performance / price ratio right now is GEMINI with gemini-2.5-flash-preview-04-17
+# best performance / price ratio right now is OpenAI with gpt-4.1
 LLM_PROVIDER=GEMINI
-
-# If GEMINI: Your Google API key
-# You can get one here : https://aistudio.google.com/app/apikey
-GEMINI_API_KEY=XXXXXXX
-# Gemini model to use. We recommend gemini-2.5-flash-preview-04-17
-GEMINI_MODEL=gemini-2.5-flash-preview-04-17
 
 # If OPENAI: Your OpenAI API key
 # You can get one here : https://platform.openai.com/api-keys
@@ -94,6 +88,12 @@ OPENAI_MODEL=gpt-4o
 # Optional: Set a custom OpenAI API URL (for self-hosted models or providers like fireworks.ai)
 # for fireworks, use https://api.fireworks.ai/inference/v1
 OPENAI_BASE_URL=https://api.openai.com/v1
+
+# If GEMINI: Your Google API key
+# You can get one here : https://aistudio.google.com/app/apikey
+GEMINI_API_KEY=XXXXXXX
+# Gemini model to use. We recommend gemini-2.5-flash
+GEMINI_MODEL=gemini-2.5-flash
 
 # Disable the welcome/onboarding screen for development
 NEXT_PUBLIC_DISABLE_WELCOME_SCREEN=false

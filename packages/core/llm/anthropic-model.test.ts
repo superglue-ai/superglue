@@ -45,7 +45,7 @@ describe('AnthropicModel', () => {
       const result = await model.generateText(messages);
 
       expect(mockCreate).toHaveBeenCalledWith({
-        model: 'claude-3-5-sonnet-20241022',
+        model: 'claude-sonnet-4-20250514',
         system: 'You are a helpful assistant\n\nThe current date and time is ' + MOCK_DATE,
         messages: [
           { role: 'user', content: 'Hello' },
@@ -164,7 +164,7 @@ describe('AnthropicModel', () => {
       const result = await model.generateObject(messages, schema);
 
       expect(mockCreate).toHaveBeenCalledWith({
-        model: 'claude-3-5-sonnet-20241022',
+        model: 'claude-sonnet-4-20250514',
         system: 'The current date and time is ' + MOCK_DATE,
         messages: [
           { 
@@ -224,7 +224,7 @@ describe('AnthropicModel', () => {
       await model.generateObject(messages, schema);
 
       expect(mockCreate).toHaveBeenCalledWith({
-        model: 'claude-3-5-sonnet-20241022',
+        model: 'claude-sonnet-4-20250514',
         system: 'You are a JSON generator\n\nThe current date and time is ' + MOCK_DATE,
         messages: [
           { role: 'user', content: 'First request' },
