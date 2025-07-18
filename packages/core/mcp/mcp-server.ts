@@ -771,7 +771,7 @@ AGENT WORKFLOW:
 
 BEST PRACTICES:
 - Always start with 'superglue_find_relevant_integrations' for discovery.
-- Create integrations and store credentials in integrations using 'superglue_create_integration'. Ask users for credentials if needed.
+- Create integrations and store credentials in integrations using 'superglue_create_integration'. Ask users for credentials before creating a new integration.
 - When creating integrations, capture any user-provided guidance about rate limits, special endpoints, or usage requirements in the 'specificInstructions' field.
 - Generic integrations (e.g., "postgres", "webhook", "api") can be reused for multiple services. Never create a new integration without asking the user first, and use existing integrations if possible.
 - If you get authentication errors during build_and_run despite using integrations with saved credentials, the integrations may have placeholder values instead of actual credentials. Check with the user if they provided the correct credentials.
