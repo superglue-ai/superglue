@@ -1,11 +1,11 @@
-import { type ApiConfig, AuthType, FileType, HttpMethod, PaginationType, type RequestOptions } from "@superglue/client";
+import { type ApiConfig, FileType, PaginationType, type RequestOptions } from "@superglue/client";
 import type { AxiosRequestConfig } from "axios";
 import OpenAI from "openai";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
+import { LanguageModel } from "../llm/llm.js";
 import { parseFile } from "./file.js";
 import { callPostgres } from "./postgres.js";
-import { callAxios, composeUrl, replaceVariables, sample } from "./tools.js";
-import { LanguageModel } from "../llm/llm.js";
+import { callAxios, composeUrl, evaluateStopCondition, replaceVariables, sample } from "./tools.js";
 
 export function convertBasicAuthToBase64(headerValue: string) {
   if (!headerValue) return headerValue;
@@ -36,8 +36,9 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
   let hasMore = true;
   let loopCounter = 0;
   let seenResponseHashes = new Set<string>();
-
-  while (hasMore && loopCounter < 500) {
+  const MAX_PAGINATION_REQUESTS = 1000;
+  
+  while (hasMore && loopCounter < MAX_PAGINATION_REQUESTS) {
     // Generate pagination variables
     let paginationVars = {
       page,
@@ -152,36 +153,60 @@ config: ${JSON.stringify(axiosConfig)}`;
       }
     }
 
-    if (Array.isArray(responseData)) {
-      const pageSize = parseInt(endpoint.pagination?.pageSize || "50");
-      if (!pageSize || responseData.length < pageSize) {
-        hasMore = false;
+    // Handle pagination based on stop condition
+    if (endpoint.pagination && (endpoint.pagination as any).stopCondition) {
+      // Evaluate stop condition
+      const pageInfo = {
+        page,
+        offset,
+        cursor,
+        totalFetched: allResults.length
+      };
+
+      const stopEval = await evaluateStopCondition(
+        (endpoint.pagination as any).stopCondition,
+        response.data,
+        pageInfo
+      );
+
+      if (stopEval.error) {
+        throw new Error(`Pagination stop condition error: ${stopEval.error}\nStop condition: ${(endpoint.pagination as any).stopCondition}`);
       }
-      const currentResponseHash = JSON.stringify(responseData);
-      if (!seenResponseHashes.has(currentResponseHash)) {
-        seenResponseHashes.add(currentResponseHash);
-        allResults = allResults.concat(responseData);
+
+      hasMore = !stopEval.shouldStop;
+    } else {
+      // Legacy pagination logic - only used if no stop condition is provided
+      if (Array.isArray(responseData)) {
+        const pageSize = parseInt(endpoint.pagination?.pageSize || "50");
+        if (!pageSize || responseData.length < pageSize) {
+          hasMore = false;
+        }
+        const currentResponseHash = JSON.stringify(responseData);
+        if (!seenResponseHashes.has(currentResponseHash)) {
+          seenResponseHashes.add(currentResponseHash);
+          allResults = allResults.concat(responseData);
+        }
+        else {
+          hasMore = false;
+        }
+      }
+      else if (responseData && allResults.length === 0) {
+        allResults.push(responseData);
+        hasMore = false;
       }
       else {
         hasMore = false;
       }
     }
-    else if (responseData && allResults.length === 0) {
-      allResults.push(responseData);
-      hasMore = false;
-    }
-    else {
-      hasMore = false;
-    }
 
-    // update pagination
-    if (endpoint.pagination?.type === PaginationType.PAGE_BASED) {
+    // update pagination variables
+    if (hasMore && endpoint.pagination?.type === PaginationType.PAGE_BASED) {
       page++;
     }
-    else if (endpoint.pagination?.type === PaginationType.OFFSET_BASED) {
+    else if (hasMore && endpoint.pagination?.type === PaginationType.OFFSET_BASED) {
       offset += parseInt(endpoint.pagination?.pageSize || "50");
     }
-    else if (endpoint.pagination?.type === PaginationType.CURSOR_BASED) {
+    else if (hasMore && endpoint.pagination?.type === PaginationType.CURSOR_BASED) {
       const cursorParts = (endpoint.pagination?.cursorPath || 'next_cursor').split('.');
       let nextCursor = response.data;
       for (const part of cursorParts) {
@@ -192,10 +217,15 @@ config: ${JSON.stringify(axiosConfig)}`;
         hasMore = false;
       }
     }
-    else {
-      hasMore = false;
-    }
     loopCounter++;
+  }
+
+  if (loopCounter >= MAX_PAGINATION_REQUESTS && hasMore) {
+    throw new Error(
+      `Pagination limit exceeded: Made ${MAX_PAGINATION_REQUESTS} requests but pagination stop condition still not met. ` +
+      `This may indicate an issue with the stop condition or an API that returns infinite results. ` +
+      `Stop condition: ${(endpoint.pagination as any)?.stopCondition || 'Not provided'}`
+    );
   }
 
   if (endpoint.pagination?.type === PaginationType.CURSOR_BASED) {

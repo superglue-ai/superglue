@@ -1,11 +1,13 @@
-import { Integration } from "@superglue/client";
+import { ApiConfig, AuthType, HttpMethod, Integration, PaginationType } from "@superglue/client";
 import type { ChatCompletionMessageParam } from "openai/resources/index.mjs";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { LanguageModel, ToolDefinition } from "../llm/llm.js";
+import { MODIFY_STEP_CONFIG_TOOL_PROMPT } from "../llm/prompts.js";
 import { ToolImplementation } from "../tools/tools.js";
 import { Documentation } from "../utils/documentation.js";
 import { logMessage } from "../utils/logs.js";
+import { composeUrl, generateId } from "../utils/tools.js";
 
 export const searchDocumentationDefinition: ToolDefinition = {
     name: "search_documentation",
@@ -142,8 +144,208 @@ export const buildWorkflowDefinition: ToolDefinition = {
     }
 };
 
+export const executeWorkflowStepDefinition: ToolDefinition = {
+    name: "execute_workflow_step",
+    description: "Execute an API endpoint with pagination support. Handles variable replacement, authentication, and data extraction. Validates the response against the instruction if provided to determine if the API call was successful.",
+    parameters: {
+        type: "object",
+        properties: {
+            endpoint: {
+                type: "object",
+                description: "API endpoint configuration",
+                properties: {
+                    urlHost: { type: "string", description: "Base URL host (e.g., 'https://api.example.com')" },
+                    urlPath: { type: "string", description: "API endpoint path (e.g., '/users')" },
+                    method: {
+                        type: "string",
+                        enum: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+                        description: "HTTP method"
+                    },
+                    headers: {
+                        type: "object",
+                        description: "Request headers with variable placeholders using <<variableName>>",
+                        properties: {},
+                        additionalProperties: true
+                    },
+                    queryParams: {
+                        type: "object",
+                        description: "Query parameters with variable placeholders",
+                        properties: {},
+                        additionalProperties: true
+                    },
+                    body: {
+                        type: "string",
+                        description: "Request body as string (JSON) with variable placeholders"
+                    },
+                    dataPath: {
+                        type: "string",
+                        description: "Path to extract data from response (e.g., 'data.items')"
+                    },
+                    pagination: {
+                        type: "object",
+                        description: "Pagination configuration",
+                        properties: {
+                            type: {
+                                type: "string",
+                                enum: ["NONE", "PAGE_BASED", "OFFSET_BASED", "CURSOR_BASED"]
+                            },
+                            pageSize: { type: "string", description: "Number of items per page" },
+                            cursorPath: { type: "string", description: "Path to cursor in response for cursor-based pagination" },
+                            stopCondition: { type: "string", description: "JavaScript function: (response, pageInfo) => boolean. Return true to STOP pagination." }
+                        }
+                    },
+                    instruction: {
+                        type: "string",
+                        description: "The instruction that describes what this API call should achieve. Used to validate the response."
+                    },
+                    responseSchema: {
+                        type: "object",
+                        description: "JSON Schema for the expected response structure"
+                    }
+                },
+                required: ["urlHost", "urlPath", "method"],
+                additionalProperties: true
+            },
+            payload: {
+                type: "object",
+                description: "Placeholder for payload data. Always pass { placeholder: true } - actual runtime data will be injected automatically.",
+                properties: {},
+                additionalProperties: true
+            },
+            credentials: {
+                type: "object",
+                description: "Placeholder for credentials. Always pass { placeholder: true } - actual credentials will be injected securely.",
+                properties: {},
+                additionalProperties: true
+            },
+            options: {
+                type: "object",
+                description: "Request options",
+                properties: {
+                    timeout: { type: "number", description: "Request timeout in milliseconds" }
+                }
+            }
+        },
+        required: ["endpoint", "payload", "credentials"]
+    }
+};
+
+export const modifyStepConfigDefinition: ToolDefinition = {
+    name: "modify_step_config",
+    description: "Generate or modify API configuration based on instruction, documentation, and available variables. Uses LLM to create proper API call configuration.",
+    parameters: {
+        type: "object",
+        properties: {
+            apiConfig: {
+                type: "object",
+                description: "Current API configuration that needs to be modified based on the error",
+                properties: {
+                    instruction: { type: "string", description: "Human-readable description of what this API call should do" },
+                    urlHost: { type: "string", description: "Base URL host" },
+                    urlPath: { type: "string", description: "API endpoint path" },
+                    method: {
+                        type: "string",
+                        enum: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+                        description: "HTTP method"
+                    },
+                    headers: {
+                        type: "object",
+                        description: "Request headers",
+                        properties: {},
+                        additionalProperties: true
+                    },
+                    queryParams: {
+                        type: "object",
+                        description: "Query parameters",
+                        properties: {},
+                        additionalProperties: true
+                    },
+                    body: { type: "string", description: "Request body template" },
+                    authentication: {
+                        type: "string",
+                        enum: ["NONE", "API_KEY", "BEARER_TOKEN", "BASIC_AUTH", "OAUTH2"],
+                        description: "Authentication type"
+                    },
+                    dataPath: { type: "string", description: "Path to extract data from response" },
+                    pagination: {
+                        type: "object",
+                        description: "Pagination configuration",
+                        properties: {
+                            type: {
+                                type: "string",
+                                enum: ["NONE", "PAGE_BASED", "OFFSET_BASED", "CURSOR_BASED"]
+                            },
+                            pageSize: { type: "string" },
+                            cursorPath: { type: "string" },
+                            stopCondition: { type: "string", description: "JavaScript function: (response, pageInfo) => boolean. Return true to STOP pagination." }
+                        }
+                    },
+                    responseSchema: {
+                        type: "object",
+                        description: "Expected response schema",
+                        properties: {},
+                        additionalProperties: true
+                    },
+                    responseMapping: { type: "string", description: "JSONata mapping for response" },
+                    documentationUrl: { type: "string", description: "URL to API documentation" },
+                    id: { type: "string", description: "Unique identifier for this config" },
+                    createdAt: { type: "string", description: "Creation timestamp" },
+                    updatedAt: { type: "string", description: "Last update timestamp" }
+                },
+                required: ["instruction"],
+                additionalProperties: true
+            },
+            documentation: {
+                type: "string",
+                description: "API documentation to help generate the configuration"
+            },
+            payload: {
+                type: "object",
+                description: "Example payload data for understanding available variables. ALWAYS pass this even if empty ({}).",
+                properties: {},
+                additionalProperties: true
+            },
+            credentials: {
+                type: "object",
+                description: "Available credentials for variable references. ALWAYS pass this even if empty ({}).",
+                properties: {},
+                additionalProperties: true
+            },
+            previousAttempts: {
+                type: "array",
+                description: "List of all previous configuration attempts and their errors. Each attempt should include the config that was tried and the error it produced.",
+                items: {
+                    type: "object",
+                    properties: {
+                        config: {
+                            type: "object",
+                            description: "The API configuration that was attempted",
+                            additionalProperties: true
+                        },
+                        error: {
+                            type: "string",
+                            description: "The error message that resulted from this configuration"
+                        },
+                        statusCode: {
+                            type: "number",
+                            description: "HTTP status code if available"
+                        }
+                    },
+                    required: ["config", "error"]
+                }
+            },
+            additionalContext: {
+                type: "string",
+                description: "Additional context that might help fix the configuration. This could include: relevant search results from documentation, specific error patterns you've identified, authentication examples, or any other insights gathered from previous tool calls. Extract and provide only the most relevant information."
+            }
+        },
+        required: ["apiConfig", "payload", "credentials", "previousAttempts"]
+    }
+};
+
 export const searchDocumentationImplementation: ToolImplementation = async (args, metadata) => {
     const { integrationId, query } = args;
+    logMessage('debug', `search_documentation tool called - integration: ${integrationId}, query: "${query}"`, metadata);
     const { integrations } = metadata || {};
 
     if (!integrations || !Array.isArray(integrations)) {
@@ -218,11 +420,6 @@ export const searchDocumentationImplementation: ToolImplementation = async (args
             }
         }
 
-        logMessage('info',
-            `Documentation search for '${query}' in ${integrationId} found ${uniqueResults.length} results`,
-            metadata
-        );
-
         return {
             success: true,
             integrationId,
@@ -233,11 +430,6 @@ export const searchDocumentationImplementation: ToolImplementation = async (args
         };
 
     } catch (error) {
-        logMessage('error',
-            `Error searching documentation: ${error instanceof Error ? error.message : String(error)}`,
-            metadata
-        );
-
         return {
             success: false,
             error: error instanceof Error ? error.message : String(error),
@@ -246,8 +438,79 @@ export const searchDocumentationImplementation: ToolImplementation = async (args
     }
 };
 
+export const executeWorkflowStepImplementation: ToolImplementation = async (args, metadata) => {
+    const { endpoint, payload, credentials, options = {} } = args;
+    logMessage('debug', `execute_workflow_step tool called - ${endpoint.method} ${endpoint.urlHost}${endpoint.urlPath}`, metadata);
+
+    const { integrations } = metadata || {};
+    const integration = integrations?.[0];
+
+    try {
+        // Use callEndpoint to execute the API call
+        const { callEndpoint } = await import('../utils/api.js');
+        const response = await callEndpoint(endpoint, payload, credentials, options);
+
+        const finalData = response.data;
+
+        // Evaluate response if instruction or responseSchema is provided
+        if ((endpoint.instruction || endpoint.responseSchema) && (options?.testMode || options?.selfHealing !== false)) {
+            const { evaluateResponse } = await import('../utils/api.js');
+            const { Documentation } = await import('../utils/documentation.js');
+
+            let documentationString = "No documentation provided";
+            if (integration?.documentation) {
+                documentationString = Documentation.postProcess(integration.documentation, endpoint.instruction || "");
+            }
+
+            const evalResult = await evaluateResponse(
+                finalData,
+                endpoint.responseSchema,
+                endpoint.instruction,
+                documentationString
+            );
+
+            if (!evalResult.success) {
+                logMessage('warn', `Response evaluation failed: ${evalResult.shortReason}`, metadata);
+                return {
+                    success: false,
+                    error: `Response evaluation failed: ${evalResult.shortReason}`,
+                    data: finalData,
+                    context: {
+                        url: `${endpoint.urlHost}${endpoint.urlPath}`,
+                        method: endpoint.method,
+                        hasCredentials: Object.keys(credentials || {}).length > 0,
+                        evaluationFailed: true
+                    }
+                };
+            }
+        }
+
+        return {
+            success: true,
+            data: finalData
+        };
+
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logMessage('error', `API call failed: ${errorMessage}`, metadata);
+        const isPaginationError = errorMessage.includes('Pagination stop condition error');
+
+        return {
+            success: false,
+            error: errorMessage,
+            context: {
+                url: `${endpoint.urlHost}${endpoint.urlPath}`,
+                method: endpoint.method,
+                hasCredentials: Object.keys(credentials || {}).length > 0,
+                isPaginationError
+            }
+        };
+    }
+};
+
 export const planWorkflowImplementation: ToolImplementation = async (args, metadata) => {
     const { messages, integrationIds } = args;
+    logMessage('debug', `plan_workflow tool called`, metadata);
 
     const workflowPlanSchema = zodToJsonSchema(z.object({
         id: z.string().describe("Come up with an ID for the workflow e.g. 'stripe-create-order'"),
@@ -289,11 +552,6 @@ export const planWorkflowImplementation: ToolImplementation = async (args, metad
         };
 
     } catch (error) {
-        logMessage('error',
-            `Error planning workflow: ${error instanceof Error ? error.message : String(error)}`,
-            metadata
-        );
-
         return {
             success: false,
             error: error instanceof Error ? error.message : String(error),
@@ -304,6 +562,7 @@ export const planWorkflowImplementation: ToolImplementation = async (args, metad
 
 export const buildWorkflowImplementation: ToolImplementation = async (args, metadata) => {
     const { plan, messages, instruction } = args;
+    logMessage('debug', `build_workflow tool called`, metadata);
 
     if (!plan || !plan.steps || !Array.isArray(plan.steps)) {
         return {
@@ -346,7 +605,8 @@ export const buildWorkflowImplementation: ToolImplementation = async (args, meta
                     pagination: z.object({
                         type: z.enum(Object.values(PaginationType) as [string, ...string[]]),
                         pageSize: z.string().describe("Number of items per page. Set this to a number. Once you set it here as a number, you can access it using <<limit>> in headers, params, body, or url path."),
-                        cursorPath: z.string().describe("If cursor_based: The path to the cursor in the response. E.g. cursor.current or next_cursor.")
+                        cursorPath: z.string().describe("If cursor_based: The path to the cursor in the response. E.g. cursor.current or next_cursor. If no"),
+                        stopCondition: z.string().describe("JavaScript function that determines when to stop pagination. Format: (response, pageInfo) => boolean. Return true to STOP pagination. Examples: '(response) => response.data.length === 0', '(response, pageInfo) => pageInfo.page >= 10', '(response) => !response.next_page'")
                     }).optional()
                 }).describe("Complete API configuration for this step")
             })).describe("Array of workflow steps with full configuration"),
@@ -385,15 +645,170 @@ export const buildWorkflowImplementation: ToolImplementation = async (args, meta
         };
 
     } catch (error) {
-        logMessage('error',
-            `Error building workflow: ${error instanceof Error ? error.message : String(error)}`,
-            metadata
-        );
-
         return {
             success: false,
             error: error instanceof Error ? error.message : String(error),
             workflow: null
+        };
+    }
+};
+
+export const modifyStepConfigImplementation: ToolImplementation = async (args, metadata) => {
+    const {
+        apiConfig,
+        documentation = "",
+        payload = {},
+        credentials = {},
+        previousAttempts = [],
+        additionalContext = ""
+    } = args;
+
+    const debugInfo = [`modify_step_config tool called - `];
+    if (previousAttempts.length > 0) {
+        debugInfo.push(`attempts: ${previousAttempts.length}`);
+    }
+    if (additionalContext) {
+        debugInfo.push(`context: "${additionalContext.slice(0, 100)}..."`);
+    }
+    logMessage('debug', debugInfo.join(', '), metadata);
+
+    try {
+        // Define the schema for LLM to generate API config
+        const schema = zodToJsonSchema(z.object({
+            urlHost: z.string(),
+            urlPath: z.string(),
+            queryParams: z.array(z.object({
+                key: z.string(),
+                value: z.string()
+            })).optional(),
+            method: z.enum(Object.values(HttpMethod) as [string, ...string[]]),
+            headers: z.array(z.object({
+                key: z.string(),
+                value: z.string()
+            })).optional().describe("Headers to use in the API call. Use <<>> to access variables. Handle Basic Auth and Bearer Auth correctly."),
+            body: z.string().optional().describe("Format as JSON if not instructed otherwise. Use <<>> to access variables."),
+            authentication: z.enum(Object.values(AuthType) as [string, ...string[]]),
+            dataPath: z.string().optional().describe("The path to the data you want to extract from the response. E.g. products.variants.size"),
+            pagination: z.object({
+                type: z.enum(Object.values(PaginationType) as [string, ...string[]]),
+                pageSize: z.string().describe("Number of items per page. Set this to a number. Once you set it here as a number, you can access it using <<limit>> in headers, params, body, or url path."),
+                cursorPath: z.string().optional().describe("If cursor_based: The path to the cursor in the response. E.g. cursor.current or next_cursor."),
+                stopCondition: z.string().describe("JavaScript function that determines when to stop pagination. Format: (response, pageInfo) => boolean. Return true to STOP pagination. Examples: '(response) => response.data.length === 0', '(response, pageInfo) => pageInfo.page >= 10', '(response) => !response.next_page'")
+            }).optional()
+        }));
+
+        // Build list of available variables
+        const availableVariables = [
+            ...Object.keys(credentials || {}),
+            ...Object.keys(payload || {}),
+        ].map(v => `<<${v}>>`).join(", ");
+
+        // Prepare messages for LLM
+        const messages: ChatCompletionMessageParam[] = [];
+
+        messages.push({
+            role: "system",
+            content: MODIFY_STEP_CONFIG_TOOL_PROMPT
+        });
+
+        // Build context from previous attempts
+        let attemptHistory = "";
+        if (previousAttempts.length > 0) {
+            attemptHistory = "\n\nPREVIOUS ATTEMPTS AND THEIR ERRORS:\n";
+            previousAttempts.forEach((attempt, index) => {
+                attemptHistory += `\nAttempt ${index + 1}:\n`;
+                attemptHistory += `Configuration tried:\n${JSON.stringify(attempt.config, null, 2)}\n`;
+                attemptHistory += `Error: ${attempt.error}`;
+                if (attempt.statusCode) {
+                    attemptHistory += ` (Status: ${attempt.statusCode})`;
+                }
+                attemptHistory += "\n";
+            });
+            attemptHistory += "\nPlease learn from these errors and generate a corrected configuration.\n";
+        }
+
+        // Build the user prompt
+        const userPrompt = `Generate API configuration for the following:
+
+Instructions: ${apiConfig.instruction}
+
+Base URL: ${composeUrl(apiConfig.urlHost, apiConfig.urlPath)}
+${attemptHistory}
+${Object.values(apiConfig).filter(Boolean).length > 0 ? "Current configuration (modify as needed): " : ""}
+${apiConfig.headers ? `Headers: ${JSON.stringify(apiConfig.headers)}` : ""}
+${apiConfig.queryParams ? `Query Params: ${JSON.stringify(apiConfig.queryParams)}` : ""}
+${apiConfig.body ? `Body: ${JSON.stringify(apiConfig.body)}` : ''}
+${apiConfig.authentication ? `Authentication: ${apiConfig.authentication}` : ''}
+${apiConfig.dataPath ? `Data Path: ${apiConfig.dataPath}` : ''}
+${apiConfig.pagination ? `Pagination: ${JSON.stringify(apiConfig.pagination)}` : ''}
+${apiConfig.method ? `Method: ${apiConfig.method}` : ''}
+
+Available variables: ${availableVariables}
+Available pagination variables (if pagination is enabled): page, pageSize, offset, cursor, limit
+Example payload: ${JSON.stringify(payload || {}).slice(0, LanguageModel.contextLength / 10)}
+
+Documentation: ${String(documentation)}
+${additionalContext ? `\nAdditional Context:\n${additionalContext}` : ''}`;
+
+        messages.push({
+            role: "user",
+            content: userPrompt
+        });
+
+        // Calculate temperature based on number of attempts
+        const temperature = Math.min(previousAttempts.length * 0.1, 1);
+
+        // Generate the configuration using LLM
+        const { response: generatedConfig, messages: updatedMessages } = await LanguageModel.generateObject(
+            messages,
+            schema,
+            temperature
+        );
+
+        // Build the complete API configuration
+        const config: ApiConfig = {
+            instruction: apiConfig.instruction,
+            urlHost: generatedConfig.urlHost,
+            urlPath: generatedConfig.urlPath,
+            method: generatedConfig.method,
+            queryParams: generatedConfig.queryParams ?
+                Object.fromEntries(generatedConfig.queryParams.map((p: any) => [p.key, p.value])) :
+                undefined,
+            headers: generatedConfig.headers ?
+                Object.fromEntries(generatedConfig.headers.map((p: any) => [p.key, p.value])) :
+                undefined,
+            body: generatedConfig.body,
+            authentication: generatedConfig.authentication,
+            pagination: generatedConfig.pagination,
+            dataPath: generatedConfig.dataPath,
+            documentationUrl: apiConfig.documentationUrl,
+            responseSchema: apiConfig.responseSchema,
+            responseMapping: apiConfig.responseMapping,
+            createdAt: apiConfig.createdAt || new Date(),
+            updatedAt: new Date(),
+            id: apiConfig.id || generateId(generatedConfig.urlHost, generatedConfig.urlPath),
+        };
+
+        logMessage('info',
+            `Generated API configuration for ${config.urlHost}${config.urlPath} (attempt ${previousAttempts.length + 1})`,
+            metadata
+        );
+
+        return {
+            success: true,
+            config,
+            messages: updatedMessages
+        };
+
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logMessage('error', `Failed to generate API config: ${errorMessage}`, metadata);
+
+        return {
+            success: false,
+            error: errorMessage,
+            config: apiConfig,
+            messages: []
         };
     }
 }; 

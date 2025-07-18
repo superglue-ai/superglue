@@ -259,7 +259,6 @@ Generate a complete workflow object with:
                     step.apiConfig.createdAt = new Date();
                     step.apiConfig.updatedAt = new Date();
                 }
-                // Set default responseMapping for backward compatibility
                 step.responseMapping = "$";
             });
         }

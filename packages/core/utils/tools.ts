@@ -459,3 +459,50 @@ export function safeHttpMethod(method: any): HttpMethod {
   if (upper && validMethods.includes(upper)) return upper as HttpMethod;
   return "GET" as HttpMethod;
 }
+
+/**
+ * Safely evaluates a pagination stop condition function
+ * @param stopConditionCode - JavaScript code as string: (response, pageInfo) => boolean
+ * @param response - The API response data
+ * @param pageInfo - Current pagination state
+ * @returns Object with shouldStop boolean and optional error
+ */
+export async function evaluateStopCondition(
+  stopConditionCode: string,
+  response: any,
+  pageInfo: { page: number; offset: number; cursor: any; totalFetched: number }
+): Promise<{ shouldStop: boolean; error?: string }> {
+  const isolate = new ivm.Isolate({ memoryLimit: 128 });
+
+  try {
+    const context = await isolate.createContext();
+
+    // Inject the response and pageInfo as JSON strings
+    await context.global.set('responseJSON', JSON.stringify(response));
+    await context.global.set('pageInfoJSON', JSON.stringify(pageInfo));
+
+    // Create the evaluation script
+    const script = `
+          const response = JSON.parse(responseJSON);
+          const pageInfo = JSON.parse(pageInfoJSON);
+          const fn = ${stopConditionCode};
+          const result = fn(response, pageInfo);
+          // Ensure we return a boolean
+          result === true;
+      `;
+
+    const shouldStop = await context.eval(script, { timeout: 3000 });
+
+    return { shouldStop: Boolean(shouldStop) };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    let helpfulError = `Stop condition evaluation failed: ${errorMessage}`;
+
+    return {
+      shouldStop: false, // Default to continue on error
+      error: helpfulError
+    };
+  } finally {
+    isolate.dispose();
+  }
+}

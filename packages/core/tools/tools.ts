@@ -1,7 +1,17 @@
 import { ToolCall, ToolDefinition, ToolResult } from "../llm/llm.js";
 import { generateInstructionsDefinition, generateInstructionsImplementation } from "../utils/instructions.js";
-import { executeWorkflowStepDefinition, executeWorkflowStepImplementation, modifyStepConfigDefinition, modifyStepConfigImplementation } from "../workflow/workflow-execution-tools.js";
-import { buildWorkflowDefinition, buildWorkflowImplementation, planWorkflowDefinition, planWorkflowImplementation, searchDocumentationDefinition, searchDocumentationImplementation } from "../workflow/workflow-tools.js";
+import { 
+    searchDocumentationDefinition, 
+    searchDocumentationImplementation,
+    planWorkflowDefinition,
+    planWorkflowImplementation,
+    buildWorkflowDefinition,
+    buildWorkflowImplementation,
+    executeWorkflowStepDefinition,
+    executeWorkflowStepImplementation,
+    modifyStepConfigDefinition,
+    modifyStepConfigImplementation
+} from "../workflow/workflow-tools.js";
 
 export type ToolImplementation = (args: any, metadata?: any) => Promise<any>;
 

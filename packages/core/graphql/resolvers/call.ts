@@ -12,8 +12,7 @@ import { telemetryClient } from "../../utils/telemetry.js";
 import { maskCredentials } from "../../utils/tools.js";
 import { executeTransform } from "../../utils/transform.js";
 import { notifyWebhook } from "../../utils/webhook.js";
-import { executeWorkflowStepDefinition, modifyStepConfigDefinition } from "../../workflow/workflow-execution-tools.js";
-import { searchDocumentationDefinition } from "../../workflow/workflow-tools.js";
+import { executeWorkflowStepDefinition, modifyStepConfigDefinition, searchDocumentationDefinition } from "../../workflow/workflow-tools.js";
 
 export async function executeApiCall(
   endpoint: ApiConfig,
@@ -142,7 +141,7 @@ Remember: Always pass payload: { placeholder: true } and credentials: { placehol
       tools,
       statefulToolExecutor,
       {
-        maxIterations: 10,
+        maxIterations: 20,
         temperature: 0.1,
         shouldAbort: (trace) => trace.toolCall.name === 'execute_workflow_step' && trace.result.result?.success,
       }
@@ -179,15 +178,6 @@ Remember: Always pass payload: { placeholder: true } and credentials: { placehol
         toolCalls: result.toolCalls?.length || 0
       });
       throw new Error(errorMessage);
-    }
-
-    // Evaluate response if needed
-    if (isTestMode || isSelfHealing) {
-      logMessage('info', `Evaluating response for ${finalEndpoint?.urlHost}`, metadata);
-      const evalResult = await evaluateResponse(responseData, finalEndpoint.responseSchema, finalEndpoint.instruction, documentationString);
-      if (!evalResult.success) {
-        throw new Error(evalResult.shortReason + " " + JSON.stringify(responseData).slice(0, 1000));
-      }
     }
 
     logMessage('info', `executeApiCall completed successfully, returning data`, metadata);

@@ -160,12 +160,14 @@ export const MODIFY_STEP_CONFIG_TOOL_PROMPT = `You are an API configuration assi
 </VARIABLES>
 
 <PAGINATION>
-- If the API supports pagination, please add <<page>> or <<offset>> as well as <<limit>> to the url / query params / body / headers.
-      e.g. https://api.example.com/v1/items?page=<<page>>&limit=<<limit>>
-      e.g. headers: {
-        "X-Page": "<<page>>"
-      }
-- DO NOT FORGET THIS.
+- If the API supports pagination, configure the pagination object with type and pageSize
+- Once pagination is configured with a pageSize, you can use these variables:
+  - <<page>>: Current page number
+  - <<offset>>: Current offset
+  - <<limit>>: Same as pageSize (only available if pagination.pageSize is set)
+  - <<cursor>>: For cursor-based pagination
+- Example: If you set pagination: { type: "PAGE_BASED", pageSize: "50" }, then you can use <<page>> and <<limit>> in your URL/params
+- DO NOT manually add limit parameters for user-requested result counts (e.g., "get 10 products") - those should be handled in transforms
 </PAGINATION>
 
 <POSTGRES>
@@ -439,7 +441,25 @@ If the API supports pagination for list endpoints:
 - type: None, OffsetBased, PageBased, or CursorBased
 - pageSize: Number of items per page (e.g., "50")
 - cursorPath: For cursor-based pagination, the path to the next cursor in the response
+
+IMPORTANT: DO NOT add limit parameters to handle user-requested result counts. See USER_RESULT_LIMITS section.
 </PAGINATION_CONFIGURATION>
+
+<USER_RESULT_LIMITS>
+When users request a specific number of results, handle it in the finalTransform, NOT in the API call:
+
+WRONG approach (DO NOT do this):
+- User: "Get 10 products"
+- urlPath: "/products?limit=10" ❌
+- queryParams: { limit: "10" } ❌
+
+CORRECT approach (DO this instead):
+- User: "Get 10 products"
+- urlPath: "/products"
+- finalTransform: "(sourceData) => sourceData.products.slice(0, 10)"
+
+Only use API-level limits if explicitly documented as required parameters.
+</USER_RESULT_LIMITS>
 
 <DATA_PATH_EXTRACTION>
 - dataPath: The JSON path to extract data from the response
@@ -547,7 +567,7 @@ You MUST plan extensively before each function call, and reflect extensively on 
 export const EXECUTE_API_CALL_AGENT_PROMPT = `You are an API execution agent. Your task is to successfully execute an API call based on the provided configuration.
 
 You have access to three tools:
-1. execute_workflow_step - Makes the actual API call and returns the response
+1. execute_workflow_step - Makes the actual API call, validates the response against the instruction, and returns the result
 2. modify_step_config - Fixes API configuration based on errors or documentation  
 3. search_documentation - Searches for specific information in the integration documentation
 
@@ -557,25 +577,33 @@ EXECUTION FLOW:
    - The actual values will be injected automatically by the system
 2. If successful (returns {success: true, data: ...}), your task is complete - STOP
 3. If failed, analyze the error and decide:
-   - If you need additional information on the API and how to use it, search documentation for specific information (auth patterns, endpoints, etc.). Do this only if the issue is not clear from the error message.
+   - Check if error mentions "Response evaluation failed" - this means the API call worked but the response doesn't match the instruction
+   - If the response evaluation failed, you may need to adjust the query parameters, filters, or endpoint to get the correct data
+   - If you need additional information on the API and how to use it, search documentation for specific information (auth patterns, endpoints, filters, etc.)
    - Then modify the configuration based on the error and any findings
 
 CRITICAL RULES:
+- NEVER abort early, always try to fix the issue and continue
 - ALWAYS pass payload: { placeholder: true } and credentials: { placeholder: true } to execute_workflow_step
 - When execute_workflow_step succeeds, STOP immediately - do not make more calls
+- Response evaluation failures mean the API worked but returned wrong data - adjust the request, don't change auth
 
 When using modify_step_config after searching documentation:
 - Extract only the most relevant information from search results
 - Pass key findings through the additionalContext parameter
 - Don't repeat the entire search results - summarize what's important for fixing the error
 
-EXAMPLE PATTERN:
+EXAMPLE PATTERNS:
 1. execute_workflow_step fails with "401 Unauthorized"
-2. search_documentation for "authentication" or "api key header"
-3. modify_step_config with additionalContext: "Documentation shows API key should be in 'X-API-Key' header, not 'Authorization'"
+   → search_documentation for "authentication" or "api key header"
+   → modify_step_config with additionalContext: "Documentation shows API key should be in 'X-API-Key' header"
+
+2. execute_workflow_step fails with "Response evaluation failed: The response does not include lifecycle stage"
+   → search_documentation for "contact properties" or "lifecycle stage field"
+   → modify_step_config with additionalContext: "Need to add 'properties=lifecyclestage' to query params to include lifecycle stage in response"
 
 IMPORTANT:
-- After a successful API call, STOP immediately
+- After a successful API call with valid response, STOP immediately
 - Maximum 10 iterations allowed
 - Be very specific in documentation searches
 - Extract actionable insights for additionalContext`;
