@@ -764,7 +764,8 @@ superglue: Universal API Integration Platform
 
 AGENT WORKFLOW:
 1. DISCOVER: Use 'superglue_find_relevant_integrations' to find available integrations for your task.
-2. BUILD & TEST: Use 'superglue_build_and_run' with instruction and integrations. Iterate until successful.
+2. [Optional] CREATE: Use 'superglue_create_integration' to create a new integration. ALWAYS ask user permission before creating a new integration.
+2. BUILD & TEST: Use 'superglue_build_and_run' with instruction and integrations. Iterate until successful. If no credentials are saved with the integration, add them to the build_and_run request.
 3. SAVE (Optional): Ask user if they want to save the workflow, then use 'superglue_save_workflow' with the workflow data.
 4. EXECUTE: Use 'superglue_execute_workflow' for saved workflows.
 
@@ -772,6 +773,7 @@ BEST PRACTICES:
 - Always start with 'superglue_find_relevant_integrations' for discovery.
 - Create integrations and store credentials in integrations using 'superglue_create_integration'. Ask users for credentials if needed.
 - When creating integrations, capture any user-provided guidance about rate limits, special endpoints, or usage requirements in the 'specificInstructions' field.
+- Generic integrations (e.g., "postgres", "webhook", "api") can be reused for multiple services. Never create a new integration without asking the user first, and use existing integrations if possible.
 - If you get authentication errors during build_and_run despite using integrations with saved credentials, the integrations may have placeholder values instead of actual credentials. Check with the user if they provided the correct credentials.
 - Ask user before saving workflows.
 - When saving workflows, NEVER set fields to null - omit optional fields if no value available.
