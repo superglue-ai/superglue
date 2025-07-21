@@ -1,9 +1,8 @@
 import { Metadata } from "@playwright/test";
 import { ExecutionStep, Integration, RequestOptions, Workflow, WorkflowResult, WorkflowStepResult } from "@superglue/client";
-import { Validator } from "jsonschema";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { logMessage } from "../utils/logs.js";
-import { addNullableToOptional, applyJsonata, applyTransformationWithValidation } from "../utils/tools.js";
+import { applyJsonata, applyTransformationWithValidation } from "../utils/tools.js";
 import { evaluateMapping, generateTransformCode } from "../utils/transform.js";
 import { selectStrategy } from "./workflow-strategies.js";
 
@@ -196,6 +195,7 @@ export class WorkflowExecutor implements Workflow {
       }
     }
 
+    /* we don't validate the input schema until we have figured out how to fix the edge cases
     if (this.inputSchema) {
       const validator = new Validator();
       const optionalSchema = addNullableToOptional(this.inputSchema);
@@ -203,7 +203,7 @@ export class WorkflowExecutor implements Workflow {
       if (!validation.valid) {
         throw new Error("Invalid payload: " + validation.errors.map(e => e.message).join(", "));
       }
-    }
+    }*/
   }
 
   private async prepareStepInput(
