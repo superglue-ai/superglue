@@ -1,17 +1,16 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef, useImperativeHandle, forwardRef } from 'react'
-import { Button } from '@/src/components/ui/button'
-import { Input } from '@/src/components/ui/input'
-import { Link, X } from 'lucide-react'
-import { Badge } from '@/src/components/ui/badge'
-import { cn } from '@/src/lib/utils'
-import { splitUrl } from '@/src/lib/client-utils'
-import { integrations } from '@/src/lib/integrations'
-import type { SimpleIcon } from 'simple-icons'
+import { Badge } from '@/src/components/ui/badge';
+import { Input } from '@/src/components/ui/input';
+import { splitUrl } from '@/src/lib/client-utils';
+import { integrations } from '@/src/lib/integrations';
+import { cn } from '@/src/lib/utils';
+import { Link } from 'lucide-react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import type { SimpleIcon } from 'simple-icons';
 
 // Import all icons
-import * as simpleIcons from 'simple-icons'
+import * as simpleIcons from 'simple-icons';
 
 interface URLFieldProps {
   url: string
@@ -95,10 +94,12 @@ export const URLField = forwardRef<URLFieldHandle, URLFieldProps>(function URLFi
 
   const commitUrl = useCallback((rawUrl: string) => {
     let newUrl = rawUrl
-    if (newUrl && !newUrl.startsWith('http://') && !newUrl.startsWith('https://') && newUrl.includes('.')) {
+    
+    if (newUrl && !newUrl.includes('://') && newUrl.includes('.')) {
       newUrl = `https://${newUrl}`
       setUrl(newUrl)
     }
+    
     setIconName(getIconForUrl(newUrl))
     const { urlHost, urlPath } = splitUrl(newUrl)
     const queryParams = extractQueryParams(newUrl)
