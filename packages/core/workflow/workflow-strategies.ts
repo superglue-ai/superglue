@@ -2,8 +2,8 @@ import type { ExecutionStep, RequestOptions, WorkflowStepResult } from "@supergl
 import { Integration, Metadata } from "@superglue/shared";
 import { executeApiCall } from "../graphql/resolvers/call.js";
 import { logMessage } from "../utils/logs.js";
-import { applyJsonata } from "../utils/tools.js";
-import { generateTransformJsonata } from "../utils/transform.js";
+import { applyJsonata, applyTransformationWithValidation } from "../utils/tools.js";
+import { generateTransformCode } from "../utils/transform.js";
 
 export interface ExecutionStrategy {
   execute(
@@ -90,13 +90,13 @@ const loopStrategy: ExecutionStrategy = {
         }
       }
 
-      let loopItems: any[] = await applyJsonata(payload, step.loopSelector);
+      let loopItems: any[] = (await applyTransformationWithValidation(payload, step.loopSelector, null)).data || [];
 
       if (!Array.isArray(loopItems) || loopItems.length === 0) {
         if (step.loopSelector !== "$") logMessage("error", `No input data found for '${step.id}' - regenerating data selector`, metadata);
-        const newLoopSelector = await generateTransformJsonata({ type: "array" }, payload, "Find the array of selector values for the following loop: " + step.id, metadata);
-        step.loopSelector = newLoopSelector.jsonata;
-        loopItems = await applyJsonata(payload, step.loopSelector);
+        const newLoopSelector = await generateTransformCode({ type: "array" }, payload, "Find the array of selector values for the following loop: " + step.id, metadata);
+        step.loopSelector = newLoopSelector.mappingCode;
+        loopItems = (await applyTransformationWithValidation(payload, step.loopSelector, null)).data || [];
       }
 
       if (step.loopMaxIters > 0) {
