@@ -28,16 +28,15 @@ First, create an OAuth application with your service provider:
 When creating your OAuth app, you'll need to specify a redirect/callback URI. Use:
 
 ```
-https://your-domain.com/api/auth/callback/{integration-id}
+https://your-domain.com/api/auth/callback
 ```
 
 Replace:
 - `your-domain.com` with your actual domain
-- `{integration-id}` with your integration's ID
 
 For local development, use:
 ```
-http://localhost:3000/api/auth/callback/{integration-id}
+http://localhost:3000/api/auth/callback
 ```
 
 ### 3. Create Integration in Superglue
@@ -134,7 +133,7 @@ If tokens expire and refresh fails:
 2. Fill in:
    - Application name: "Superglue Integration"
    - Homepage URL: Your Superglue instance URL
-   - Authorization callback URL: `https://your-domain.com/api/auth/callback/github`
+   - Authorization callback URL: `https://your-domain.com/api/auth/callback`
 3. Create the app and copy the Client ID and Client Secret
 4. In Superglue, create a new integration:
    - ID: `github`
