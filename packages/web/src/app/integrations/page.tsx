@@ -16,20 +16,48 @@ import { Button } from '@/src/components/ui/button';
 import { DocStatus } from '@/src/components/utils/DocStatusSpinner';
 import { useToast } from '@/src/hooks/use-toast';
 import { needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
-import { integrations as integrationTemplates } from '@/src/lib/integrations';
 import { composeUrl } from '@/src/lib/utils';
 import type { Integration } from '@superglue/client';
 import { SuperglueClient, UpsertMode } from '@superglue/client';
+import { integrations as integrationTemplates } from '@superglue/shared';
 import { waitForIntegrationProcessing } from '@superglue/shared/utils';
-import { FileDown, Globe, Pencil, Plus, RotateCw, Trash2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { FileDown, Globe, Key, Pencil, Plus, RotateCw, Trash2 } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
 import type { SimpleIcon } from 'simple-icons';
 import * as simpleIcons from 'simple-icons';
 
 export default function IntegrationsPage() {
     const config = useConfig();
     const { toast } = useToast();
+    const searchParams = useSearchParams();
     const { integrations, pendingDocIds, loading: initialLoading, refreshIntegrations, setPendingDocIds } = useIntegrations();
+    
+    // Handle OAuth callback messages
+    useEffect(() => {
+        const success = searchParams.get('success');
+        const error = searchParams.get('error');
+        const integration = searchParams.get('integration');
+        const message = searchParams.get('message');
+        const description = searchParams.get('description');
+
+        if (success === 'oauth_completed' && integration) {
+            toast({
+                title: 'OAuth Connection Successful',
+                description: `Successfully connected to ${integration}`,
+            });
+            // Clear the URL params
+            window.history.replaceState({}, '', '/integrations');
+        } else if (error) {
+            toast({
+                title: 'OAuth Error',
+                description: description || message || 'Failed to complete OAuth connection',
+                variant: 'destructive',
+            });
+            // Clear the URL params
+            window.history.replaceState({}, '', '/integrations');
+        }
+    }, [searchParams, toast]);
 
     const client = useMemo(() => new SuperglueClient({
         endpoint: config.superglueEndpoint,
@@ -52,7 +80,10 @@ export default function IntegrationsPage() {
         { value: "custom", label: "Custom", icon: "default" },
         ...Object.entries(integrationTemplates).map(([key, integration]) => ({
             value: key,
-            label: key.charAt(0).toUpperCase() + key.slice(1),
+            label: key
+                .replace(/([A-Z])/g, ' $1')  // Add space before capital letters
+                .replace(/^./, str => str.toUpperCase())  // Capitalize first letter
+                .trim(),  // Remove leading space
             icon: integration.icon || "default"
         }))
     ];
@@ -108,10 +139,7 @@ export default function IntegrationsPage() {
         setEditingIntegration(null);
         setAddFormOpen(true);
     };
-    const handleModalClose = () => {
-        setAddFormOpen(false);
-        setEditingIntegration(null);
-    };
+
     const handleSave = async (integration: Integration) => {
         try {
             if (integration.id) {
@@ -242,6 +270,14 @@ export default function IntegrationsPage() {
     }
 
 
+    // Helper to determine auth type
+    const getAuthType = (integration: Integration) => {
+        const creds = integration.credentials || {};
+        if (Object.keys(creds).length === 0) return 'none';
+        if (creds.client_id || creds.client_secret || creds.access_token || creds.refresh_token) return 'oauth';
+        return 'apikey';
+    };
+
     const handleRefresh = async () => {
         setIsRefreshing(true);
         await refreshIntegrations();
@@ -322,8 +358,20 @@ export default function IntegrationsPage() {
                                                     pending={pendingDocIds.has(integration.id)}
                                                     hasDocumentation={hasDocumentation(integration)}
                                                 />
-                                                {(!integration.credentials || Object.keys(integration.credentials).length === 0) && (
-                                                    <span className="text-xs text-amber-800 dark:text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded">No credentials</span>
+                                                {getAuthType(integration) === 'oauth' && (
+                                                    <span className="text-xs text-blue-800 dark:text-blue-300 bg-blue-500/10 px-2 py-0.5 rounded flex items-center gap-1">
+                                                        <Key className="h-3 w-3" />
+                                                        OAuth
+                                                    </span>
+                                                )}
+                                                {getAuthType(integration) === 'apikey' && (
+                                                    <span className="text-xs text-green-800 dark:text-green-300 bg-green-500/10 px-2 py-0.5 rounded flex items-center gap-1">
+                                                        <Key className="h-3 w-3" />
+                                                        API Key
+                                                    </span>
+                                                )}
+                                                {getAuthType(integration) === 'none' && (
+                                                    <span className="text-xs text-amber-800 dark:text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded">No auth</span>
                                                 )}
                                             </div>
                                         </div>
