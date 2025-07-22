@@ -113,7 +113,6 @@ async function generateApiRanking(configPath?: string): Promise<void> {
                 : Infinity;
             const avgBuildTime = runResult.attempts.reduce((sum, a) => sum + a.buildTime, 0) / runResult.attempts.length;
 
-
             const llmResults = {
                 'claude-sonnet-4-20250514': 0,
                 'claude-opus-4-20250514': 0,
@@ -167,7 +166,7 @@ async function generateApiRanking(configPath?: string): Promise<void> {
                 totalAttempts: runResult.totalAttempts,
                 successfulAttempts: runResult.successfulAttempts,
                 apiFailureCount,
-                superglueScore: calculateSuperglueScore(runResult.successRate, avgExecutionTime, apiFailureCount),
+                superglueScore: calculateAverageScore(runResult.successRate, llmResults),
                 llmResults
             });
         }
@@ -203,37 +202,27 @@ async function generateApiRanking(configPath?: string): Promise<void> {
 }
 
 /**
- * Calculate Superglue Score based on success rate, execution time, and API reliability
+ * Calculate Average Score based on all success rates (Superglue + LLM models)
  */
-function calculateSuperglueScore(
-    successRate: number,
-    avgExecutionTime: number,
-    apiFailureCount: number
-): number {
-    // Base score is success rate (0-1)
-    let score = successRate;
-
-    // Apply penalties only if there was some success
-    if (successRate > 0) {
-        // API failure penalty: each failed API call reduces score by 0.02 (max penalty: 0.2)
-        const apiFailurePenalty = Math.min(0.2, apiFailureCount * 0.02);
-        score -= apiFailurePenalty;
-
-        // Time penalty for execution (not build time)
-        if (avgExecutionTime < Infinity) {
-            // Fast workflows (< 1s) get no penalty
-            // Slow workflows (> 10s) get max penalty of 0.1
-            const timePenalty = Math.min(0.1, Math.max(0, (avgExecutionTime - 1000) / 90000));
-            score -= timePenalty;
-        }
-    } else {
-        // Failed workflows get minimal scores
-        // Base score of 0.1 or 0.2 depending on whether they got far enough to make API calls
-        score = apiFailureCount > 0 ? 0.2 : 0.1;
+function calculateAverageScore(
+    superglueSuccessRate: number,
+    llmResults: {
+        'claude-sonnet-4-20250514': number;
+        'claude-opus-4-20250514': number;
+        'gpt-4.1': number;
+        'o4-mini': number;
+        'gemini-2.5-flash': number;
     }
-
-    // Ensure score is between 0 and 1
-    return Math.max(0, Math.min(1, score));
+): number {
+    // Collect all success rates
+    const allRates = [
+        superglueSuccessRate,
+        ...Object.values(llmResults)
+    ];
+    
+    // Calculate average
+    const sum = allRates.reduce((acc, rate) => acc + rate, 0);
+    return sum / allRates.length;
 }
 
 /**
@@ -243,7 +232,7 @@ async function generateRankingCsv(results: ApiRankingResult[], outputPath: strin
     const headers = [
         'Rank', 
         'API', 
-        'Superglue Score', 
+        'Average Score', 
         'Superglue Success %',
         'Claude Sonnet 4', 
         'Claude Opus 4',
