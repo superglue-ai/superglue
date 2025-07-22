@@ -27,7 +27,6 @@ interface BuildWorkflowArgs {
   payload?: Record<string, unknown>;
   integrationIds: string[];
   responseSchema?: JSONSchema;
-  useTools?: boolean; // Add optional flag for tool-based building
 }
 
 export const executeWorkflowResolver = async (
