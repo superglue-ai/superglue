@@ -1,40 +1,94 @@
-import { ToolCall, ToolDefinition, ToolResult } from "../llm/llm.js";
+import { ApiConfig, Integration, RequestOptions } from "@superglue/client";
 import { generateInstructionsDefinition, generateInstructionsImplementation } from "../utils/instructions.js";
-import { 
-    searchDocumentationDefinition, 
-    searchDocumentationImplementation,
-    planWorkflowDefinition,
-    planWorkflowImplementation,
-    buildWorkflowDefinition,
+import {
     buildWorkflowImplementation,
-    executeWorkflowStepDefinition,
-    executeWorkflowStepImplementation,
-    modifyStepConfigDefinition,
-    modifyStepConfigImplementation
+    buildWorkflowToolDefinition,
+    searchDocumentationToolDefinition,
+    searchDocumentationToolImplementation,
+    submitToolDefinition,
+    submitToolDefinitionImplementation
 } from "../workflow/workflow-tools.js";
 
-export type ToolImplementation = (args: any, metadata?: any) => Promise<any>;
+export interface ToolDefinition {
+    name: string;
+    description: string;
+    parameters: {
+        type: "object";
+        properties: Record<string, any>;
+        required?: string[];
+    };
+}
 
-export const tools: Record<string, ToolImplementation> = {
+export interface ToolCall {
+    id: string;
+    name: string;
+    arguments: Record<string, any>;
+}
+
+export interface ToolCallResult {
+    toolCallId: string;
+    result: {
+        resultForAgent: {
+            success: boolean;
+            error?: string;
+            data?: any;
+            [key: string]: any; // Allow additional fields
+        };
+        fullResult?: any;
+    } | null;
+    error?: string;
+}
+
+// Base context with common metadata
+export interface BaseToolContext {
+    runId: string;
+    orgId: string;
+}
+
+// Specific contexts extend the base
+export interface WorkflowExecutionContext extends BaseToolContext {
+    endpoint: ApiConfig;
+    payload: Record<string, any>;
+    credentials: Record<string, string>;
+    options: RequestOptions;
+    integrations?: Integration[];
+}
+
+export interface WorkflowBuildContext extends BaseToolContext {
+    messages: any[];
+    integrations?: Integration[];
+}
+
+
+export type ToolImplementation<TContext extends BaseToolContext = BaseToolContext> = (
+    args: any,
+    context: TContext
+) => Promise<{
+    resultForAgent: {
+        success: boolean;
+        error?: string;
+        data?: any;
+        [key: string]: any;
+    };
+    fullResult?: any;
+}>;
+
+const toolRegistry: Record<string, ToolImplementation<any>> = {
     generate_instructions: generateInstructionsImplementation,
-    search_documentation: searchDocumentationImplementation,
-    plan_workflow: planWorkflowImplementation,
-    build_workflow: buildWorkflowImplementation,
-    execute_workflow_step: executeWorkflowStepImplementation,
-    modify_step_config: modifyStepConfigImplementation
+    search_documentation: searchDocumentationToolImplementation,
+    submit_tool: submitToolDefinitionImplementation,
+    build_workflow: buildWorkflowImplementation
 };
 
-export const toolDefinitions: ToolDefinition[] = [
+export const allToolDefinitions = [
     generateInstructionsDefinition,
-    searchDocumentationDefinition,
-    planWorkflowDefinition,
-    buildWorkflowDefinition,
-    executeWorkflowStepDefinition,
-    modifyStepConfigDefinition
+    searchDocumentationToolDefinition,
+    submitToolDefinition,
+    buildWorkflowToolDefinition
 ];
 
-export async function executeTool(toolCall: ToolCall, metadata?: any): Promise<ToolResult> {
-    const implementation = tools[toolCall.name];
+export async function executeTool(toolCall: ToolCall, context: BaseToolContext): Promise<ToolCallResult> {
+    const implementation = toolRegistry[toolCall.name];
 
     if (!implementation) {
         return {
@@ -45,10 +99,10 @@ export async function executeTool(toolCall: ToolCall, metadata?: any): Promise<T
     }
 
     try {
-        const result = await implementation(toolCall.arguments, metadata);
+        const result = await implementation(toolCall.arguments, context);
         return {
             toolCallId: toolCall.id,
-            result
+            result: result
         };
     } catch (error) {
         return {
@@ -59,12 +113,12 @@ export async function executeTool(toolCall: ToolCall, metadata?: any): Promise<T
     }
 }
 
-export function createToolExecutor(metadata?: any) {
-    return (toolCall: ToolCall) => executeTool(toolCall, metadata);
+export function createToolExecutor(context: BaseToolContext) {
+    return (toolCall: ToolCall) => executeTool(toolCall, context);
 }
 
 export function getToolDefinitions(toolNames?: string[]): ToolDefinition[] {
-    if (!toolNames) return toolDefinitions;
+    if (!toolNames) return allToolDefinitions;
 
-    return toolDefinitions.filter(def => toolNames.includes(def.name));
+    return allToolDefinitions.filter(def => toolNames.includes(def.name));
 } 

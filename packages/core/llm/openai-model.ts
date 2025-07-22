@@ -1,8 +1,8 @@
 import OpenAI from "openai";
 import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
+import { ToolCall, ToolCallResult, ToolDefinition } from "../tools/tools.js";
 import { addNullableToOptional } from "../utils/tools.js";
-import { LLM, LLMAutonomousResponse, LLMObjectResponse, LLMResponse, ToolCall, ToolDefinition, ToolResult } from "./llm.js";
-import { AGENTIC_SYSTEM_PROMPT } from "./prompts.js";
+import { LLM, LLMAutonomousResponse, LLMObjectResponse, LLMResponse } from "./llm.js";
 
 
 export class OpenAIModel implements LLM {
@@ -231,23 +231,10 @@ export class OpenAIModel implements LLM {
   async executeTaskWithTools(
     messages: ChatCompletionMessageParam[],
     tools: ToolDefinition[],
-    toolExecutor: (toolCall: ToolCall) => Promise<ToolResult>,
-    options?: { maxIterations?: number; temperature?: number; previousResponseId?: string; shouldAbort?: (trace: { toolCall: ToolCall; result: ToolResult }) => boolean; }
+    toolExecutor: (toolCall: ToolCall) => Promise<ToolCallResult>,
+    options?: { maxIterations?: number; temperature?: number; previousResponseId?: string; shouldAbort?: (trace: { toolCall: ToolCall; result: ToolCallResult }) => boolean; }
   ): Promise<LLMAutonomousResponse> {
-    // Build stateless response input
-    let input: any[] = messages.map(m => ({
-      role: m.role,
-      content: typeof m.content === 'string' ? m.content : String(m.content)
-    }));
-
-    // Add system message for agentic behavior (as recommended in docs)
-    const agenticSystemMessage = {
-      role: 'system',
-      content: AGENTIC_SYSTEM_PROMPT
-    };
-
-    // Prepend agentic instructions
-    input.unshift(agenticSystemMessage);
+    let responseId: string | null = null;
 
     const fnTools = tools.map(t => ({
       type: 'function' as const,
@@ -259,58 +246,58 @@ export class OpenAIModel implements LLM {
     const executionTrace: LLMAutonomousResponse['executionTrace'] = [];
     const toolCalls: ToolCall[] = [];
     const maxIterations = options?.maxIterations ?? 10;
-    const temperature = options?.temperature ?? 0.2;
+    const temperature = options?.temperature ?? 0.1;
 
-    let responseId: string | null = options?.previousResponseId || null;
+    let lastAssistantText: string | null = null;
 
-    for (let iteration = 0; iteration < maxIterations; iteration++) {
-      const response = await (this.model.responses.create as any)({
+    for (let i = 0; i < maxIterations; i++) {
+      const resp = await (this.model.responses.create as any)({
         model: process.env.OPENAI_MODEL || "gpt-4o",
-        input: input as any,
-        tools: fnTools as any,
-        tool_choice: "auto",
-        temperature,
-        previous_response_id: responseId,
+        input: messages,
+        previous_response_id: responseId ?? undefined,
+        tools: fnTools, 
+        tool_choice: "required",
+        temperature: temperature,
+        parallel_tool_calls: false,
         store: true,
-        parallel_tool_calls: true
-      });
+      }, { timeout: 60_000 });
 
-      responseId = response.id;
-      let hasToolCalls = false;
-      let finalText = '';
+      responseId = resp.id;
 
-      for (const output of response.output || []) {
-        if (output.type === 'function_call') {
-          hasToolCalls = true;
-          const toolCall: ToolCall = {
-            id: output.call_id || output.id,
-            name: output.name,
-            arguments: JSON.parse(output.arguments)
+      for (const out of resp.output || []) {
+        if (out.type === "function_call") {
+          const call: ToolCall = {
+            id: out.call_id || out.id,
+            name: out.name,
+            arguments: JSON.parse(out.arguments)
           };
-          toolCalls.push(toolCall);
 
-          const result = await toolExecutor(toolCall);
-          executionTrace.push({ toolCall, result });
+          toolCalls.push(call);
+          const result = await toolExecutor(call);
+          executionTrace.push({ toolCall: call, result });
 
-          input.push({
-            type: 'function_call_output',
-            call_id: toolCall.id,
-            output: typeof result.result === 'string' ? result.result : JSON.stringify(result.result)
-          });
+          const truncatedResultForAgent = JSON.stringify(result.result?.resultForAgent ?? null).slice(0, 4_000);
+          const msg = { type: "function_call_output", call_id: call.id, output: 'Output truncated to 4000 chars: ' + truncatedResultForAgent };
+          messages.push(msg as any);
 
-          if (options?.shouldAbort?.({ toolCall, result })) {
-            return { finalResult: "Execution aborted by caller.", toolCalls, executionTrace, messages: input as any, responseId };
+          if (options?.shouldAbort?.({ toolCall: call, result })) {
+            if (lastAssistantText) {
+              messages.push({ role: "assistant", content: lastAssistantText } as any);
+            }
+            return { finalResult: lastAssistantText ?? "aborted", toolCalls, executionTrace, messages: messages, responseId };
           }
-        } else if (output.type === 'message') {
-            finalText = output.content?.map(c => c.text).join('') || '';
+        } else if (out.type === "message") {
+          lastAssistantText = out.content?.map(c => c.text).join("") || "";
         }
       }
 
-      if (!hasToolCalls && response.finish_reason === 'stop') {
-        return { finalResult: finalText, toolCalls, executionTrace, messages: input as any, responseId };
+      if (!resp.output?.some(o => o.type === "function_call")) {
+        if (lastAssistantText) {
+          messages.push({ role: "assistant", content: lastAssistantText } as any);
+        }
+        return { finalResult: lastAssistantText ?? "", toolCalls, executionTrace, messages: messages, responseId };
       }
     }
-
     throw new Error(`Maximum iterations (${maxIterations}) reached in executeTaskWithTools`);
   }
 
@@ -318,27 +305,24 @@ export class OpenAIModel implements LLM {
     toolName: string,
     executionTrace: LLMAutonomousResponse['executionTrace']
   ): any | null {
-    // Find all calls to the specified tool
     const toolCalls = executionTrace.filter(step => step.toolCall.name === toolName);
 
     if (toolCalls.length === 0) {
       return null;
     }
 
-    // Iterate in reverse to find the last successful call
     for (let i = toolCalls.length - 1; i >= 0; i--) {
       const { result } = toolCalls[i];
 
-      // Check if the tool execution was successful (no error)
       if (!result.error && result.result) {
-        // For tools that return {success: boolean, ...data}, check success flag
-        if (typeof result.result === 'object' && 'success' in result.result) {
-          if (result.result.success) {
-            return result.result;
+        const agentResult = result.result.resultForAgent;
+
+        if (typeof agentResult === 'object' && 'success' in agentResult) {
+          if (agentResult.success) {
+            return result.result.fullResult !== undefined ? result.result.fullResult : agentResult;
           }
         } else {
-          // For tools that don't use success flag, presence of result without error means success
-          return result.result;
+          return result.result.fullResult !== undefined ? result.result.fullResult : agentResult;
         }
       }
     }

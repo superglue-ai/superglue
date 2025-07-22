@@ -365,6 +365,182 @@ function oldReplaceVariables(template: string, variables: Record<string, any>): 
   });
 }
 
+/**
+ * Validates that all variable references in a string exist in the available variables
+ */
+export function validateVariableReferences(
+  config: any,
+  availableVariables: string[]
+): { valid: boolean; errors?: Array<{ field: string; variable: string; suggestion?: string }>; message?: string } {
+  const variablePattern = /<<([^>]+)>>/g;
+  const invalidVars: Array<{ field: string; variable: string; suggestion?: string }> = [];
+
+  // Helper to find closest matching variable
+  const findClosestVariable = (target: string, variables: string[]): string | undefined => {
+    const targetLower = target.toLowerCase();
+
+    // First try exact suffix match (e.g., "contactId" -> "currentItem_id")
+    const suffixMatch = variables.find(v =>
+      v.toLowerCase().endsWith(targetLower) ||
+      v.toLowerCase().endsWith('_' + targetLower)
+    );
+    if (suffixMatch) return suffixMatch;
+
+    // Then try contains match
+    const containsMatch = variables.find(v => v.toLowerCase().includes(targetLower));
+    if (containsMatch) return containsMatch;
+
+    // For common patterns
+    if (targetLower.includes('id') || targetLower.includes('identifier')) {
+      const idMatch = variables.find(v => v.toLowerCase().includes('_id'));
+      if (idMatch) return idMatch;
+    }
+
+    return undefined;
+  };
+
+  // Check string for invalid variables
+  const checkString = (str: string | undefined, field: string) => {
+    if (!str || typeof str !== 'string') return;
+
+    let match;
+    const pattern = new RegExp(variablePattern);
+    while ((match = pattern.exec(str)) !== null) {
+      const varName = match[1];
+      if (!availableVariables.includes(varName)) {
+        invalidVars.push({
+          field,
+          variable: match[0],
+          suggestion: findClosestVariable(varName, availableVariables)
+        });
+      }
+    }
+  };
+
+  // Check all fields that might contain variables
+  checkString(config.urlPath, 'urlPath');
+  checkString(config.body, 'body');
+
+  // Check headers
+  if (config.headers && typeof config.headers === 'object') {
+    Object.entries(config.headers).forEach(([key, value]) => {
+      checkString(String(value), `headers.${key}`);
+    });
+  }
+
+  // Check query params
+  if (config.queryParams && typeof config.queryParams === 'object') {
+    Object.entries(config.queryParams).forEach(([key, value]) => {
+      checkString(String(value), `queryParams.${key}`);
+    });
+  }
+
+  if (invalidVars.length > 0) {
+    const message = `Invalid variables found:\n${invalidVars.map(v =>
+      `- ${v.variable} in ${v.field}${v.suggestion ? ` (did you mean <<${v.suggestion}>>?)` : ''}`
+    ).join('\n')}`;
+
+    return {
+      valid: false,
+      errors: invalidVars,
+      message
+    };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Detects repeated error patterns in attempt history
+ */
+export function detectRepeatedErrorPatterns(
+  attempts: Array<{ config: any; error: string; statusCode?: number }>
+): { type: string; details: any; suggestedFix?: string } | null {
+  if (attempts.length < 2) return null;
+
+  // Pattern 1: Undefined variable in URL
+  const undefinedInUrlPattern = /\/undefined|undefined/;
+  const variablePattern = /<<([^>]+)>>/;
+
+  const undefinedVarErrors = attempts.filter(a =>
+    undefinedInUrlPattern.test(a.error) &&
+    variablePattern.test(a.config.urlPath || '')
+  );
+
+  if (undefinedVarErrors.length === attempts.length) {
+    // Extract the problematic variable
+    const match = variablePattern.exec(attempts[0].config.urlPath || '');
+    if (match) {
+      return {
+        type: 'undefined_variable',
+        details: {
+          variable: match[1],
+          field: 'urlPath',
+          occurrences: attempts.length
+        },
+        suggestedFix: `The variable <<${match[1]}>> does not exist. Check available variables list for the correct name.`
+      };
+    }
+  }
+
+  // Pattern 2: Hallucinated variables in body
+  const bodyUndefinedPattern = /"undefined"|undefined/;
+  const bodyVarErrors = attempts.filter(a =>
+    bodyUndefinedPattern.test(a.error) &&
+    a.config.body &&
+    variablePattern.test(a.config.body)
+  );
+
+  if (bodyVarErrors.length >= attempts.length * 0.8) {
+    const bodyVars: string[] = [];
+    let match;
+    const pattern = new RegExp(variablePattern, 'g');
+    while ((match = pattern.exec(attempts[0].config.body || '')) !== null) {
+      bodyVars.push(match[1]);
+    }
+
+    return {
+      type: 'undefined_body_variables',
+      details: {
+        variables: bodyVars,
+        field: 'body',
+        occurrences: bodyVarErrors.length
+      },
+      suggestedFix: `Variables in request body are undefined: ${bodyVars.map(v => `<<${v}>>`).join(', ')}. Check if these should be literal strings instead of variables.`
+    };
+  }
+
+  // Pattern 3: Same configuration repeated
+  const configsIdentical = attempts.every(a =>
+    JSON.stringify(a.config) === JSON.stringify(attempts[0].config)
+  );
+
+  if (configsIdentical && attempts.length >= 3) {
+    return {
+      type: 'stuck_configuration',
+      details: {
+        repetitions: attempts.length
+      },
+      suggestedFix: 'The same configuration has been tried multiple times. A fundamental change is needed - check variable names, authentication, or endpoint URL.'
+    };
+  }
+
+  return null;
+}
+
+export function flattenObject(obj: any, parentKey = '', res: Record<string, any> = {}): Record<string, any> {
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      const propName = parentKey ? `${parentKey}_${key}` : key;
+      if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
+        flattenObject(obj[key], propName, res);
+      } else {
+        res[propName] = obj[key];
+      }
+    }
+  }
+  return res;
+}
 
 export function sample(value: any, sampleSize = 10): any {
   if (Array.isArray(value)) {

@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { ToolCall, ToolCallResult, ToolDefinition } from "../tools/tools.js";
 import { logMessage } from "../utils/logs.js";
 import { AnthropicModel } from "./anthropic-model.js";
 import { GeminiModel } from "./gemini-model.js";
@@ -12,41 +13,19 @@ export interface LLM {
     executeTaskWithTools?(
         messages: OpenAI.Chat.ChatCompletionMessageParam[],
         tools: ToolDefinition[],
-        toolExecutor: (toolCall: ToolCall) => Promise<ToolResult>,
+        toolExecutor: (toolCall: ToolCall) => Promise<ToolCallResult>,
         options?: {
             maxIterations?: number;
             temperature?: number;
             previousResponseId?: string;
-            shouldAbort?: (trace: { toolCall: ToolCall; result: ToolResult }) => boolean;
+            shouldAbort?: (trace: { toolCall: ToolCall; result: ToolCallResult }) => boolean;
         }
     ): Promise<LLMAutonomousResponse>;
 
     extractLastSuccessfulToolResult?(
-        toolName: string, 
+        toolName: string,
         executionTrace: LLMAutonomousResponse['executionTrace']
     ): any | null;
-}
-
-export interface ToolDefinition {
-    name: string;
-    description: string;
-    parameters: {
-        type: "object";
-        properties: Record<string, any>;
-        required?: string[];
-    };
-}
-
-export interface ToolCall {
-    id: string;
-    name: string;
-    arguments: Record<string, any>;
-}
-
-export interface ToolResult {
-    toolCallId: string;
-    result: any;
-    error?: string;
 }
 
 export interface LLMToolResponse {
@@ -61,7 +40,7 @@ export interface LLMAutonomousResponse {
     toolCalls: ToolCall[];
     executionTrace: Array<{
         toolCall: ToolCall;
-        result: ToolResult;
+        result: ToolCallResult;
     }>;
     messages: OpenAI.Chat.ChatCompletionMessageParam[];
     responseId?: string;  // For OpenAI conversation continuity

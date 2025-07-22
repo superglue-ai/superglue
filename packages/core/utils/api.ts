@@ -37,7 +37,7 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
   let loopCounter = 0;
   let seenResponseHashes = new Set<string>();
   const MAX_PAGINATION_REQUESTS = 1000;
-  
+
   while (hasMore && loopCounter < MAX_PAGINATION_REQUESTS) {
     // Generate pagination variables
     let paginationVars = {
@@ -105,8 +105,7 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
     ) {
       const error = JSON.stringify(response?.data?.error || response.data?.errors || response?.data || response?.statusText || "undefined");
       let message = `${endpoint.method} ${url} failed with status ${response.status}.
-Response: ${String(error).slice(0, 1000)}
-config: ${JSON.stringify(axiosConfig)}`;
+Response: ${String(error).slice(0, 1000)}`;
 
       // Add specific context for rate limit errors
       if (response.status === 429) {

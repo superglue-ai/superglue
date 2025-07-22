@@ -1,8 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
-import { LLM, LLMAutonomousResponse, LLMObjectResponse, LLMResponse, LLMToolResponse, ToolCall, ToolDefinition, ToolResult } from "./llm.js";
-import { AGENTIC_SYSTEM_PROMPT } from "./prompts.js";
+import { ToolCall, ToolCallResult, ToolDefinition } from "../tools/tools.js";
+import { LLM, LLMAutonomousResponse, LLMObjectResponse, LLMResponse } from "./llm.js";
 
 export class AnthropicModel implements LLM {
     public contextLength: number = 200000; // Claude 3 supports up to 200k tokens
@@ -185,11 +185,11 @@ Your response must contain ONLY the JSON object within the <json> tags, with no 
     async executeTaskWithTools(
         messages: OpenAI.Chat.ChatCompletionMessageParam[],
         tools: ToolDefinition[],
-        toolExecutor: (toolCall: ToolCall) => Promise<ToolResult>,
+        toolExecutor: (toolCall: ToolCall) => Promise<ToolCallResult>,
         options?: {
             maxIterations?: number;
             temperature?: number;
-            shouldAbort?: (step: { toolCall: ToolCall; result: ToolResult }) => boolean;
+            shouldAbort?: (step: { toolCall: ToolCall; result: ToolCallResult }) => boolean;
         }
     ): Promise<LLMAutonomousResponse> {
         const { maxIterations = 10, temperature = 0.2 } = options || {};
@@ -199,15 +199,11 @@ Your response must contain ONLY the JSON object within the <json> tags, with no 
             input_schema: tool.parameters
         }));
 
-        let currentMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-            { role: "system", content: AGENTIC_SYSTEM_PROMPT },
-            ...messages
-        ];
         const executionTrace: LLMAutonomousResponse['executionTrace'] = [];
         const allToolCalls: ToolCall[] = [];
 
         for (let i = 0; i < maxIterations; i++) {
-            const { system, anthropicMessages } = this.convertToAnthropicFormat(currentMessages);
+            const { system, anthropicMessages } = this.convertToAnthropicFormat(messages);
 
             const response = await this.client.messages.create({
                 model: this.model,
@@ -230,10 +226,9 @@ Your response must contain ONLY the JSON object within the <json> tags, with no 
                     function: { name: tu.name, arguments: JSON.stringify(tu.input) }
                 }));
             }
-            currentMessages.push(assistantMessage);
 
             if (toolUseBlocks.length === 0) {
-                return { finalResult: textContent, toolCalls: allToolCalls, executionTrace, messages: currentMessages };
+                return { finalResult: textContent, toolCalls: allToolCalls, executionTrace, messages: messages };
             }
 
             const toolResultContents = [];
@@ -250,15 +245,15 @@ Your response must contain ONLY the JSON object within the <json> tags, with no 
                 toolResultContents.push({
                     type: "tool_result" as const,
                     tool_use_id: toolUseBlock.id,
-                    content: JSON.stringify(result.result)
+                    content: JSON.stringify(result.result?.resultForAgent || null)
                 });
-                
+
                 if (options?.shouldAbort?.({ toolCall, result })) {
-                    return { finalResult: "Execution aborted by caller.", toolCalls: allToolCalls, executionTrace, messages: currentMessages };
+                    return { finalResult: "Execution aborted by caller.", toolCalls: allToolCalls, executionTrace, messages: messages };
                 }
             }
 
-            currentMessages.push({ role: "user", content: toolResultContents });
+            messages.push({ role: "user", content: toolResultContents });
         }
 
         throw new Error(`Maximum iterations (${maxIterations}) reached in executeTaskWithTools`);
@@ -270,7 +265,7 @@ Your response must contain ONLY the JSON object within the <json> tags, with no 
     ): any | null {
         // Find all calls to the specified tool
         const toolCalls = executionTrace.filter(step => step.toolCall.name === toolName);
-        
+
         if (toolCalls.length === 0) {
             return null;
         }
@@ -278,17 +273,21 @@ Your response must contain ONLY the JSON object within the <json> tags, with no 
         // Iterate in reverse to find the last successful call
         for (let i = toolCalls.length - 1; i >= 0; i--) {
             const { result } = toolCalls[i];
-            
+
             // Check if the tool execution was successful (no error)
             if (!result.error && result.result) {
+                // Get the agent result data
+                const agentResult = result.result.resultForAgent;
+
                 // For tools that return {success: boolean, ...data}, check success flag
-                if (typeof result.result === 'object' && 'success' in result.result) {
-                    if (result.result.success) {
-                        return result.result;
+                if (typeof agentResult === 'object' && 'success' in agentResult) {
+                    if (agentResult.success) {
+                        // Return the full data if available, otherwise the agent result
+                        return result.result.fullResult !== undefined ? result.result.fullResult : agentResult;
                     }
                 } else {
                     // For tools that don't use success flag, presence of result without error means success
-                    return result.result;
+                    return result.result.fullResult !== undefined ? result.result.fullResult : agentResult;
                 }
             }
         }

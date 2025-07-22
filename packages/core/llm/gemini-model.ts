@@ -1,9 +1,8 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import OpenAI from "openai";
 import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
-import { LLM, LLMAutonomousResponse, LLMObjectResponse, LLMResponse, LLMToolResponse, ToolCall, ToolDefinition, ToolResult } from "./llm.js";
-import { AGENTIC_SYSTEM_PROMPT } from "./prompts.js";
-
+import { LLM, LLMAutonomousResponse, LLMObjectResponse, LLMResponse, LLMToolResponse } from "./llm.js";
+import { ToolCall, ToolDefinition, ToolCallResult } from "../tools/tools.js";
 
 export class GeminiModel implements LLM {
     public contextLength: number = 1000000;
@@ -175,11 +174,11 @@ export class GeminiModel implements LLM {
     async executeTaskWithTools(
         messages: OpenAI.Chat.ChatCompletionMessageParam[],
         tools: ToolDefinition[],
-        toolExecutor: (toolCall: ToolCall) => Promise<ToolResult>,
+        toolExecutor: (toolCall: ToolCall) => Promise<ToolCallResult>,
         options?: {
             maxIterations?: number;
             temperature?: number;
-            shouldAbort?: (step: { toolCall: ToolCall; result: ToolResult }) => boolean;
+            shouldAbort?: (step: { toolCall: ToolCall; result: ToolCallResult }) => boolean;
         }
     ): Promise<LLMAutonomousResponse> {
         const { maxIterations = 10, temperature = 0.2 } = options || {};
@@ -194,10 +193,7 @@ export class GeminiModel implements LLM {
             tools: [{ functionDeclarations }]
         });
 
-        const { geminiHistory, systemInstruction, userPrompt } = this.convertToGeminiHistory([
-            { role: "system", content: AGENTIC_SYSTEM_PROMPT },
-            ...messages
-        ]);
+        const { geminiHistory, systemInstruction, userPrompt } = this.convertToGeminiHistory(messages);
 
         const chatSession = model.startChat({
             generationConfig: { temperature, topP: 0.95, topK: 64, maxOutputTokens: 8192 },
@@ -247,7 +243,7 @@ export class GeminiModel implements LLM {
                 pendingFunctionResponses.push({
                     functionResponse: {
                         name: fc.name,
-                        response: toolResult.result
+                        response: toolResult.result?.resultForAgent || null
                     }
                 });
 
@@ -276,14 +272,18 @@ export class GeminiModel implements LLM {
 
             // Check if the tool execution was successful (no error)
             if (!result.error && result.result) {
+                // Get the agent result data
+                const agentResult = result.result.resultForAgent;
+
                 // For tools that return {success: boolean, ...data}, check success flag
-                if (typeof result.result === 'object' && 'success' in result.result) {
-                    if (result.result.success) {
-                        return result.result;
+                if (typeof agentResult === 'object' && 'success' in agentResult) {
+                    if (agentResult.success) {
+                        // Return the full data if available, otherwise the agent result
+                        return result.result.fullResult !== undefined ? result.result.fullResult : agentResult;
                     }
                 } else {
                     // For tools that don't use success flag, presence of result without error means success
-                    return result.result;
+                    return result.result.fullResult !== undefined ? result.result.fullResult : agentResult;
                 }
             }
         }

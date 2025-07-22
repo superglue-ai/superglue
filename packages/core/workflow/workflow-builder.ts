@@ -1,28 +1,15 @@
 import { Integration, Workflow } from "@superglue/client";
-import { ExecutionMode, Metadata } from "@superglue/shared";
+import { Metadata } from "@superglue/shared";
 import { type OpenAI } from "openai";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { toJsonSchema } from "../external/json-schema.js";
-import { PLAN_WORKFLOW_SYSTEM_PROMPT } from "../llm/prompts.js";
-import { createToolExecutor } from "../tools/tools.js";
+import { BUILD_WORKFLOW_SYSTEM_PROMPT } from "../llm/prompts.js";
+import { executeTool } from "../tools/tools.js";
 import { Documentation } from "../utils/documentation.js";
-import { logMessage } from "../utils/logs.js"; // Added import
-import { composeUrl } from "../utils/tools.js"; // Assuming path
+import { logMessage } from "../utils/logs.js";
+import { composeUrl } from "../utils/tools.js";
 
 type ChatMessage = OpenAI.Chat.ChatCompletionMessageParam;
-
-interface WorkflowPlanStep {
-  stepId: string;
-  integrationId?: string;
-  instruction: string;
-  mode: ExecutionMode;
-  loopSelector?: string;
-}
-
-interface WorkflowPlan {
-  id: string;
-  steps: WorkflowPlanStep[];
-}
 
 export class WorkflowBuilder {
   private integrations: Record<string, Integration>;
@@ -64,7 +51,7 @@ export class WorkflowBuilder {
     }
   }
 
-  private generateIntegrationDescriptions(includeFullDocs: boolean = true): string {
+  private generateIntegrationDescriptions(): string {
     return Object.values(this.integrations).map(int => {
       const baseInfo = `
 <${int.id}>
@@ -72,21 +59,17 @@ export class WorkflowBuilder {
   Credentials available: ${Object.keys(int.credentials || {}).map(k => `${int.id}_${k}`).join(', ') || 'None'}
   ${int.specificInstructions ? `\n  User Instructions for this integration:\n  ${int.specificInstructions}\n` : ''}`;
 
-      if (includeFullDocs) {
-        const processedDoc = Documentation.postProcess(int.documentation || "", this.instruction);
-        return baseInfo + `
+      const processedDoc = Documentation.postProcess(int.documentation || "", this.instruction);
+      return baseInfo + `
   Documentation:
   \`\`\`
   ${processedDoc || 'No documentation content available.'}
   \`\`\`
 </${int.id}>`;
-      } else {
-        return baseInfo + `\n</${int.id}>`;
-      }
     }).join("\n");
   }
 
-  private generatePayloadDescription(maxLength: number = 10000): string {
+  private generatePayloadDescription(maxLength: number = 1000): string {
     if (!this.initialPayload || Object.keys(this.initialPayload).length === 0) {
       return 'No initial payload provided';
     }
@@ -99,181 +82,129 @@ export class WorkflowBuilder {
     return `Initial Input Payload contains keys: ${Object.keys(this.initialPayload).join(", ")}\nPayload example: ${truncatedPayload}`;
   }
 
-  private async planWorkflow(
-    currentMessages: ChatMessage[],
-    lastErrorFromPreviousAttempt: string | null
-  ): Promise<{ plan: WorkflowPlan; messages: ChatMessage[]; }> {
-
-    const integrationDescriptions = this.generateIntegrationDescriptions(true);
+  private prepareBuildingContext(): ChatMessage[] {
+    const integrationDescriptions = this.generateIntegrationDescriptions();
     const initialPayloadDescription = this.generatePayloadDescription();
 
-    let newMessages = [...currentMessages];
+    const availableVariables = [
+      ...Object.values(this.integrations).flatMap(int => Object.keys(int.credentials || {}).map(k => `<<${int.id}_${k}>>`)),
+      ...Object.keys(this.initialPayload || {}).map(k => `<<${k}>>`)
+    ].join(", ");
 
-    if (newMessages.length === 0) {
-      newMessages.push({ role: "system", content: PLAN_WORKFLOW_SYSTEM_PROMPT });
-      const planningPromptForAgent = `
-Create a plan to fulfill the user's request by orchestrating single API calls across the available integrations.
-
-<instruction>
-${this.instruction}
-</instruction>
-
-<available_integrations>
-${integrationDescriptions}
-</available_integrations>
-
-<initial_payload>
-${initialPayloadDescription}
-</initial_payload>
-
-<output_schema>
-Output a JSON object with a workflow plan that breaks down the instruction into manageable steps. 
-Each step should represent a single API call with:
-- A unique \`stepId\` in camelCase (e.g., 'fetchCustomerDetails', 'updateOrderStatus')
-- The \`integrationId\` to use for that step (must be one of: ${Object.keys(this.integrations).join(', ')})
-- A clear \`instruction\` describing what the API call should achieve that respects the user instruction and the integration's specific instructions
-- The execution \`mode\` (DIRECT for single execution, LOOP for iterating over collections)
-</output_schema>
-`;
-      newMessages.push({ role: "user", content: planningPromptForAgent });
-    }
-
-    if (lastErrorFromPreviousAttempt) {
-      newMessages.push({ role: "user", content: `The previous attempt resulted in an error: "${lastErrorFromPreviousAttempt}". Please analyze this error and provide a revised plan to address it. Ensure the new plan is valid and complete according to the schema.` });
-    }
-
-    const toolExecutor = createToolExecutor(this.metadata);
-
-    const toolCall = {
-      id: `plan-${Date.now()}`,
-      name: 'plan_workflow',
-      arguments: {
-        messages: newMessages,
-        integrationIds: Object.keys(this.integrations)
-      }
-    };
-
-    const result = await toolExecutor(toolCall);
-
-    if (!result.result?.success || !result.result?.plan) {
-      const errorMsg = result.result?.error || "Workflow planning failed: Tool did not produce a valid plan.";
-      logMessage('error', errorMsg + `\nPlan attempt: ${JSON.stringify(result)}`, this.metadata);
-      throw new Error(errorMsg);
-    }
-
-    const plan: WorkflowPlan = result.result.plan;
-
-    return { plan, messages: newMessages };
-  }
-
-  public async buildWorkflow(): Promise<Workflow> {
-    let success = false;
-    let attempts = 0;
-    const MAX_ATTEMPTS = 3;
-    let lastErrorForPlanning: string | null = null;
-    let builtWorkflow: Workflow | null = null;
-    let conversationMessages: ChatMessage[] = [];
-
-    do {
-      attempts++;
-      logMessage('info', `Building workflow${attempts > 1 ? ` (attempt ${attempts} of ${MAX_ATTEMPTS})` : ''}`, this.metadata);
-
-      try {
-        const { plan: currentPlan, messages: planMessages } = await this.planWorkflow(
-          conversationMessages,
-          lastErrorForPlanning
-        );
-        conversationMessages = planMessages;
-        lastErrorForPlanning = null;
-
-        // Create fresh message history for building phase
-        const buildMessages: ChatMessage[] = [];
-
-        // Add building-specific user message with integration descriptions
-        const integrationDescriptions = this.generateIntegrationDescriptions(false); // No full docs needed for building
-        const initialPayloadDescription = this.generatePayloadDescription(1000); // Shorter for building phase
-
-        const availableVariables = [
-          ...Object.values(this.integrations).flatMap(int => Object.keys(int.credentials || {}).map(k => `<<${int.id}_${k}>>`)),
-          ...Object.keys(this.initialPayload || {}).map(k => `<<${k}>>`),
-          '<<page>>', '<<pageSize>>', '<<offset>>', '<<cursor>>', '<<limit>>'
-        ].join(", ");
-
-        const buildingPromptForAgent = `
-Build a complete workflow configuration from the following plan.
+    const buildingPromptForAgent = `
+Build a complete workflow to fulfill the user's request.
 
 <instruction>
 ${this.instruction}
 </instruction>
-
-<workflow_plan>
-${JSON.stringify(currentPlan, null, 2)}
-</workflow_plan>
 
 <available_integrations>
 ${integrationDescriptions}
 </available_integrations>
 
 <available_variables>
+Template variables (use in URLs, headers, body with <<variable>> syntax):
 ${availableVariables}
+
+For pagination (when enabled):
+- <<page>> - current page number
+- <<offset>> - current offset
+- <<limit>> - page size
+- <<cursor>> - pagination cursor
 </available_variables>
 
 <initial_payload>
 ${initialPayloadDescription}
 </initial_payload>
 
+${this.responseSchema && Object.keys(this.responseSchema).length > 0 ? `<expected_output_schema>
+The final workflow output must match this JSON schema:
+${JSON.stringify(this.responseSchema, null, 2)}
+
+Your finalTransform function MUST transform the collected data from all steps to match this exact schema.
+</expected_output_schema>` : ''}
+
 <output_schema>
 Generate a complete workflow object with:
+- A workflow ID (e.g., 'stripe-create-order')
+- Steps that break down the instruction into manageable API calls
 - All API configurations for each step (URL, method, headers, body, authentication)
 - Input and response mappings as JavaScript functions
 - Loop selectors for LOOP mode steps
-- A final transform function to shape the output
+- A final transform function to shape the output${this.responseSchema && Object.keys(this.responseSchema).length > 0 ? ' to match the expected_output_schema' : ''}
 - All fields required for execution
+
+Remember:
+- Each step must be a single API call
+- Loop selectors extract arrays of ACTUAL DATA ITEMS to process
+- Input mappings prepare data for each API call
+- Use defensive programming in all JavaScript functions
+- Handle missing data gracefully with defaults
+${this.responseSchema && Object.keys(this.responseSchema).length > 0 ? '- The finalTransform MUST produce output that validates against the expected_output_schema' : ''}
 </output_schema>`;
 
-        buildMessages.push({ role: "user", content: buildingPromptForAgent });
+    return [
+      { role: "system", content: BUILD_WORKFLOW_SYSTEM_PROMPT },
+      { role: "user", content: buildingPromptForAgent }
+    ];
+  }
 
-        const toolExecutor = createToolExecutor({
+  public async buildWorkflow(): Promise<Workflow> {
+    let success = false;
+    let attempts = 0;
+    const MAX_ATTEMPTS = 3;
+    let lastError: string | null = null;
+    let builtWorkflow: Workflow | null = null;
+
+    do {
+      attempts++;
+
+      try {
+        logMessage('info', `Building workflow (attempt ${attempts})`, this.metadata);
+
+        const messages = this.prepareBuildingContext();
+
+        const toolMetadata = {
           ...this.metadata,
-          integrations: Object.values(this.integrations)
-        });
-
-        const toolCall = {
-          id: `build-${Date.now()}`,
-          name: 'build_workflow',
-          arguments: {
-            messages: buildMessages,
-            plan: currentPlan,
-            instruction: this.instruction,
-          }
+          messages
         };
 
-        const result = await toolExecutor(toolCall);
+        // Call the build_workflow tool
+        const result = await executeTool(
+          {
+            id: `build-workflow-${attempts}`,
+            name: 'build_workflow',
+            arguments: {
+              previousError: lastError
+            }
+          },
+          toolMetadata
+        );
 
-        const generatedWorkflow = result.result.workflow;
-
-        if (generatedWorkflow && generatedWorkflow.steps) {
-            generatedWorkflow.steps.forEach((step: any) => {
-                if (step.apiConfig) {
-                    step.apiConfig.id = step.id;
-                    step.apiConfig.createdAt = new Date();
-                    step.apiConfig.updatedAt = new Date();
-                }
-                step.responseMapping = "$";
-            });
+        if (result.error) {
+          throw new Error(result.error);
         }
-        
-        builtWorkflow = generatedWorkflow;
+
+        if (!result.result?.fullResult?.workflow) {
+          throw new Error('No workflow generated');
+        }
+
+        builtWorkflow = result.result.fullResult.workflow;
+
+        builtWorkflow.instruction = this.instruction;
+        builtWorkflow.responseSchema = this.responseSchema;
+
         success = true;
+
       } catch (error: any) {
         logMessage('error', `Error during workflow build attempt ${attempts}: ${error.message}`, this.metadata);
-        lastErrorForPlanning = error.message || "An unexpected error occurred during the building phase.";
+        lastError = error.message || "An unexpected error occurred during the building phase.";
         success = false;
       }
     } while (!success && attempts < MAX_ATTEMPTS);
 
     if (!builtWorkflow) {
-      const finalErrorMsg = `Failed to build workflow after ${attempts} attempts. Last error: ${lastErrorForPlanning || "Unknown final error."}`;
+      const finalErrorMsg = `Failed to build workflow after ${attempts} attempts. Last error: ${lastError || "Unknown final error."}`;
       logMessage('error', finalErrorMsg, this.metadata);
       throw new Error(finalErrorMsg);
     }

@@ -1,5 +1,6 @@
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
-import { LanguageModel, ToolDefinition } from "../llm/llm.js";
+import { LanguageModel } from "../llm/llm.js";
+import { ToolDefinition, ToolImplementation, BaseToolContext } from "../tools/tools.js";
 
 export const generateInstructionsDefinition: ToolDefinition = {
   name: "generate_instructions",
@@ -27,7 +28,7 @@ export const generateInstructionsDefinition: ToolDefinition = {
   }
 };
 
-export const generateInstructionsImplementation = async (args: any, metadata?: any) => {
+export const generateInstructionsImplementation: ToolImplementation<BaseToolContext> = async (args, context) => {
   const integrations = args.integrations;
   const messages: ChatCompletionMessageParam[] = [
     {
@@ -67,8 +68,14 @@ Remember these important rules: The output MUST be a JSON array of strings, with
 
   const { response: generatedInstructions } = await LanguageModel.generateObject(messages, schema, 0.2);
   return {
-    success: true,
-    instructions: sanitizeInstructionSuggestions(generatedInstructions)
+    resultForAgent: {
+      success: true,
+      instructions: sanitizeInstructionSuggestions(generatedInstructions)
+    },
+    fullResult: {
+      success: true,
+      instructions: sanitizeInstructionSuggestions(generatedInstructions)
+    }
   };
 };
 
