@@ -255,42 +255,6 @@ export class GeminiModel implements LLM {
         throw new Error(`Maximum iterations (${maxIterations}) reached in executeTaskWithTools`);
     }
 
-    extractLastSuccessfulToolResult(
-        toolName: string,
-        executionTrace: LLMAutonomousResponse['executionTrace']
-    ): any | null {
-        // Find all calls to the specified tool
-        const toolCalls = executionTrace.filter(step => step.toolCall.name === toolName);
-
-        if (toolCalls.length === 0) {
-            return null;
-        }
-
-        // Iterate in reverse to find the last successful call
-        for (let i = toolCalls.length - 1; i >= 0; i--) {
-            const { result } = toolCalls[i];
-
-            // Check if the tool execution was successful (no error)
-            if (!result.error && result.result) {
-                // Get the agent result data
-                const agentResult = result.result.resultForAgent;
-
-                // For tools that return {success: boolean, ...data}, check success flag
-                if (typeof agentResult === 'object' && 'success' in agentResult) {
-                    if (agentResult.success) {
-                        // Return the full data if available, otherwise the agent result
-                        return result.result.fullResult !== undefined ? result.result.fullResult : agentResult;
-                    }
-                } else {
-                    // For tools that don't use success flag, presence of result without error means success
-                    return result.result.fullResult !== undefined ? result.result.fullResult : agentResult;
-                }
-            }
-        }
-
-        return null;
-    }
-
     private cleanSchemaForGemini(schema: any): any {
         // Remove $schema property
         if (schema.$schema !== undefined) {

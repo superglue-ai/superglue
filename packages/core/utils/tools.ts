@@ -365,9 +365,6 @@ function oldReplaceVariables(template: string, variables: Record<string, any>): 
   });
 }
 
-/**
- * Validates that all variable references in a string exist in the available variables
- */
 export function validateVariableReferences(
   config: any,
   availableVariables: string[]
@@ -448,84 +445,6 @@ export function validateVariableReferences(
   }
 
   return { valid: true };
-}
-
-/**
- * Detects repeated error patterns in attempt history
- */
-export function detectRepeatedErrorPatterns(
-  attempts: Array<{ config: any; error: string; statusCode?: number }>
-): { type: string; details: any; suggestedFix?: string } | null {
-  if (attempts.length < 2) return null;
-
-  // Pattern 1: Undefined variable in URL
-  const undefinedInUrlPattern = /\/undefined|undefined/;
-  const variablePattern = /<<([^>]+)>>/;
-
-  const undefinedVarErrors = attempts.filter(a =>
-    undefinedInUrlPattern.test(a.error) &&
-    variablePattern.test(a.config.urlPath || '')
-  );
-
-  if (undefinedVarErrors.length === attempts.length) {
-    // Extract the problematic variable
-    const match = variablePattern.exec(attempts[0].config.urlPath || '');
-    if (match) {
-      return {
-        type: 'undefined_variable',
-        details: {
-          variable: match[1],
-          field: 'urlPath',
-          occurrences: attempts.length
-        },
-        suggestedFix: `The variable <<${match[1]}>> does not exist. Check available variables list for the correct name.`
-      };
-    }
-  }
-
-  // Pattern 2: Hallucinated variables in body
-  const bodyUndefinedPattern = /"undefined"|undefined/;
-  const bodyVarErrors = attempts.filter(a =>
-    bodyUndefinedPattern.test(a.error) &&
-    a.config.body &&
-    variablePattern.test(a.config.body)
-  );
-
-  if (bodyVarErrors.length >= attempts.length * 0.8) {
-    const bodyVars: string[] = [];
-    let match;
-    const pattern = new RegExp(variablePattern, 'g');
-    while ((match = pattern.exec(attempts[0].config.body || '')) !== null) {
-      bodyVars.push(match[1]);
-    }
-
-    return {
-      type: 'undefined_body_variables',
-      details: {
-        variables: bodyVars,
-        field: 'body',
-        occurrences: bodyVarErrors.length
-      },
-      suggestedFix: `Variables in request body are undefined: ${bodyVars.map(v => `<<${v}>>`).join(', ')}. Check if these should be literal strings instead of variables.`
-    };
-  }
-
-  // Pattern 3: Same configuration repeated
-  const configsIdentical = attempts.every(a =>
-    JSON.stringify(a.config) === JSON.stringify(attempts[0].config)
-  );
-
-  if (configsIdentical && attempts.length >= 3) {
-    return {
-      type: 'stuck_configuration',
-      details: {
-        repetitions: attempts.length
-      },
-      suggestedFix: 'The same configuration has been tried multiple times. A fundamental change is needed - check variable names, authentication, or endpoint URL.'
-    };
-  }
-
-  return null;
 }
 
 export function flattenObject(obj: any, parentKey = '', res: Record<string, any> = {}): Record<string, any> {
@@ -636,13 +555,7 @@ export function safeHttpMethod(method: any): HttpMethod {
   return "GET" as HttpMethod;
 }
 
-/**
- * Safely evaluates a pagination stop condition function
- * @param stopConditionCode - JavaScript code as string: (response, pageInfo) => boolean
- * @param response - The API response data
- * @param pageInfo - Current pagination state
- * @returns Object with shouldStop boolean and optional error
- */
+
 export async function evaluateStopCondition(
   stopConditionCode: string,
   response: any,

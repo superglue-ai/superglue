@@ -227,8 +227,8 @@ export const buildWorkflowResolver = async (
 ): Promise<Workflow> => {
 
   try {
+    const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
     const { instruction, payload, integrationIds, responseSchema } = args;
-    const metadata: Metadata = { runId: crypto.randomUUID(), orgId: context.orgId };
    
     if (!instruction || instruction.trim() === "") {
       throw new Error("Instruction is required to build a workflow.");

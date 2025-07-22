@@ -301,33 +301,3 @@ export class OpenAIModel implements LLM {
     throw new Error(`Maximum iterations (${maxIterations}) reached in executeTaskWithTools`);
   }
 
-  extractLastSuccessfulToolResult(
-    toolName: string,
-    executionTrace: LLMAutonomousResponse['executionTrace']
-  ): any | null {
-    const toolCalls = executionTrace.filter(step => step.toolCall.name === toolName);
-
-    if (toolCalls.length === 0) {
-      return null;
-    }
-
-    for (let i = toolCalls.length - 1; i >= 0; i--) {
-      const { result } = toolCalls[i];
-
-      if (!result.error && result.result) {
-        const agentResult = result.result.resultForAgent;
-
-        if (typeof agentResult === 'object' && 'success' in agentResult) {
-          if (agentResult.success) {
-            return result.result.fullResult !== undefined ? result.result.fullResult : agentResult;
-          }
-        } else {
-          return result.result.fullResult !== undefined ? result.result.fullResult : agentResult;
-        }
-      }
-    }
-
-    return null;
-  }
-}
-

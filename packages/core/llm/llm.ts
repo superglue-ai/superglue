@@ -21,11 +21,6 @@ export interface LLM {
             shouldAbort?: (trace: { toolCall: ToolCall; result: ToolCallResult }) => boolean;
         }
     ): Promise<LLMAutonomousResponse>;
-
-    extractLastSuccessfulToolResult?(
-        toolName: string,
-        executionTrace: LLMAutonomousResponse['executionTrace']
-    ): any | null;
 }
 
 export interface LLMToolResponse {
