@@ -1,5 +1,6 @@
 import type { ExecutionStep, RequestOptions, WorkflowStepResult } from "@superglue/client";
 import { Integration, Metadata } from "@superglue/shared";
+import { config } from "../default.js";
 import { executeApiCall } from "../graphql/resolvers/call.js";
 import { logMessage } from "../utils/logs.js";
 import { applyJsonata, applyTransformationWithValidation } from "../utils/tools.js";
@@ -99,9 +100,8 @@ const loopStrategy: ExecutionStrategy = {
         loopItems = (await applyTransformationWithValidation(payload, step.loopSelector, null)).data || [];
       }
 
-      if (step.loopMaxIters > 0) {
-        loopItems = loopItems.slice(0, step.loopMaxIters);
-      }
+      loopItems = loopItems.slice(0, step.loopMaxIters || config.DEFAULT_LOOP_MAX_ITERS);
+
       const stepResults: WorkflowStepResult[] = [];
       for (let i = 0; i < loopItems.length; i++) {
         const currentItem = loopItems[i] || "";
