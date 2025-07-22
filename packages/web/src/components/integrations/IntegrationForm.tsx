@@ -100,16 +100,15 @@ export function IntegrationForm({
             token_url: creds.token_url || '',
             access_token: creds.access_token || '',
             refresh_token: creds.refresh_token || '',
-            scopes: creds.scopes || ''
+            scopes: creds.scopes || '',
+            expires_at: creds.expires_at || ''
         };
     });
     
     // Initialize API key credentials as JSON string for CredentialsManager
     const [apiKeyCredentials, setApiKeyCredentials] = useState(() => {
         const creds = integration?.credentials || {};
-        // Remove OAuth fields to get only API key related fields
-        const { client_id, client_secret, auth_url, token_url, access_token, refresh_token, ...apiKeys } = creds;
-        return JSON.stringify(apiKeys, null, 2);
+        return JSON.stringify(creds, null, 2);
     });
 
     const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});

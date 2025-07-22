@@ -104,9 +104,9 @@ export async function refreshOAuthToken(
             access_token: tokenData.access_token,
             refresh_token: tokenData.refresh_token || refresh_token,
             token_type: tokenData.token_type || 'Bearer',
-            expires_at: tokenData.expires_in
+            expires_at: tokenData.expires_at || (tokenData.expires_in
                 ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
-                : undefined,
+                : undefined),
         };
         
         logMessage('info', 'Successfully refreshed OAuth token', { 
@@ -210,9 +210,9 @@ export async function handleOAuthCallback(
                 access_token: tokenData.access_token,
                 refresh_token: tokenData.refresh_token || integration.credentials.refresh_token,
                 token_type: tokenData.token_type || 'Bearer',
-                expires_at: tokenData.expires_in
+                expires_at: tokenData.expires_at || (tokenData.expires_in
                     ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
-                    : undefined,
+                    : undefined),
             },
         };
 

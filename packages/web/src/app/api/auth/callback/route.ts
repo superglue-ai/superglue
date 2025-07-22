@@ -14,6 +14,7 @@ interface OAuthTokenResponse {
     access_token: string;
     refresh_token?: string;
     token_type?: string;
+    expires_at?: string;
     expires_in?: number;
 }
 
@@ -168,9 +169,7 @@ export async function GET(request: NextRequest) {
                     access_token: tokenData.access_token,
                     refresh_token: tokenData.refresh_token || integration.credentials.refresh_token,
                     token_type: tokenData.token_type || 'Bearer',
-                    expires_at: tokenData.expires_in
-                        ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
-                        : undefined,
+                    expires_at: tokenData.expires_at || (tokenData.expires_in ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString() : undefined),
                 },
             },
             UpsertMode.UPDATE
