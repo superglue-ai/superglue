@@ -532,7 +532,7 @@ When executionMode is "LOOP":
 
 <PAGINATION_CONFIGURATION>
 If the API supports pagination for list endpoints:
-- type: None, OffsetBased, PageBased, or CursorBased
+- type: DISABLED, OFFSET_BASED, PAGE_BASED, or CURSOR_BASED
 - pageSize: Number of items per page (e.g., "50")
 - cursorPath: For cursor-based pagination, the path to the next cursor in the response
 - stopCondition: REQUIRED JavaScript function that determines when to stop pagination
@@ -805,6 +805,7 @@ Most modern APIs use HEADER authentication type with different header formats.
 When pagination is configured:
 - Variables become available: <<page>>, <<offset>>, <<limit>>, <<cursor>>
 - Don't hardcode limits - use the variables
+- Use "OFFSET_BASED", "PAGE_BASED", or "CURSOR_BASED" for the type.
 - stopCondition controls when to stop fetching pages
 </PAGINATION>
 

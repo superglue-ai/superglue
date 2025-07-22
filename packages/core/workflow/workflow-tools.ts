@@ -75,7 +75,8 @@ export const submitToolDefinition: ToolDefinition = {
                         properties: {
                             type: {
                                 type: "string",
-                                enum: ["None", "OffsetBased", "PageBased", "CursorBased"]
+                                enum: ["OFFSET_BASED", "PAGE_BASED", "CURSOR_BASED", "DISABLED"],
+                                description: "The type of pagination the API uses."
                             },
                             pageSize: {
                                 type: "string",
@@ -451,7 +452,7 @@ export const buildWorkflowImplementation: ToolImplementation<WorkflowBuildContex
                     authentication: z.enum(Object.values(AuthType) as [string, ...string[]]).describe("Authentication type: None, Basic, Bearer, OAuth2, or ApiKey"),
                     dataPath: z.string().optional().describe("JSONPath to extract data from response (e.g., 'data.items' or 'results[*].id')"),
                     pagination: z.object({
-                        type: z.enum(Object.values(PaginationType) as [string, ...string[]]),
+                        type: z.enum(["OFFSET_BASED", "PAGE_BASED", "CURSOR_BASED", "DISABLED"]),
                         pageSize: z.string().describe("Number of items per page (e.g., '50', '100'). Once set, pagination variables become available: <<page>>, <<offset>>, <<limit>> (same as pageSize), <<cursor>>. Use these variables with <<>> syntax in URL, headers, params, or body."),
                         cursorPath: z.string().describe("If cursor_based: The path to the cursor in the response. E.g. cursor.current or next_cursor. If not, set this to \"\""),
                         stopCondition: z.string().describe("REQUIRED: JavaScript function that determines when to stop pagination. This is the primary control for pagination. Format: (response, pageInfo) => boolean. Return true to STOP pagination. Common patterns: '(response) => response.data.length === 0' (empty page), '(response, pageInfo) => pageInfo.totalFetched >= 100' (limit total), '(response) => !response.has_more' (API flag)")

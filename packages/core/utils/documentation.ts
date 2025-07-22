@@ -360,13 +360,13 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       // Auth related
       "authentication", "authorization", "bearer", "basic", "token", "api key", "oauth", "private app",
       // Getting started
-      "introduction", "getting started", "quickstart", "guide", "guides", "tutorial",
+      "introduction", "getting started", "quickstart", "guide", "guides", "tutorial", "how to", "how-to",
       // API specific
-      "rest", "graphql", "openapi", "endpoints", "reference",
+      "rest", "graphql", "openapi", "open-api", "swagger", "endpoints", "reference",
       // HTTP methods
       "get", "post", "put", "delete", "patch",
       // Common API concepts
-      "rate limit", "pagination", "webhook", "callback", "error", "response", "errors"
+      "rate limit", "pagination", "webhook", "callback", "error", "response", "errors", "filtering", "sorting", "searching", "filter", "sort", "search"
     ];
 
     // Pool of all discovered links (array allows duplicates with different text)
