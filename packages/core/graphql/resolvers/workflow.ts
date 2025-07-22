@@ -1,6 +1,6 @@
 import { Integration, RequestOptions, Workflow, WorkflowResult } from "@superglue/client";
 import { Context, Metadata } from "@superglue/shared";
-import { flattenAndNamespaceWorkflowCredentials } from "@superglue/shared/utils";
+import { flattenAndNamespaceWorkflowCredentials, generateUniqueId, waitForIntegrationProcessing } from "@superglue/shared/utils";
 import type { GraphQLResolveInfo } from "graphql";
 import { WorkflowExecutor } from "../../workflow/workflow-executor.js";
 
@@ -225,34 +225,44 @@ export const buildWorkflowResolver = async (
   context: Context,
   info: GraphQLResolveInfo,
 ): Promise<Workflow> => {
-  const { instruction, payload, integrationIds, responseSchema, useTools = true } = args;
-  const metadata: Metadata = { runId: crypto.randomUUID(), orgId: context.orgId };
 
   try {
-    // Fetch all integrations
-    const allIntegrations = await context.datastore.listIntegrations(1000, 0, context.orgId);
-    const integrations = allIntegrations.items.filter(int => integrationIds.includes(int.id));
-
-    if (integrations.length !== integrationIds.length) {
-      const missingIds = integrationIds.filter(id => !integrations.find(int => int.id === id));
-      throw new Error(`Integration(s) not found: ${missingIds.join(', ')}`);
+    const { instruction, payload, integrationIds, responseSchema } = args;
+    const metadata: Metadata = { runId: crypto.randomUUID(), orgId: context.orgId };
+   
+    if (!instruction || instruction.trim() === "") {
+      throw new Error("Instruction is required to build a workflow.");
     }
+    if (!integrationIds || integrationIds.length === 0) {
+      throw new Error("At least one integration is required.");
+    }
+
+    // Validate that all integration IDs exist
+    const datastoreAdapter = {
+      getManyIntegrations: async (ids: string[]): Promise<Integration[]> => {
+        return await context.datastore.getManyIntegrations(ids, context.orgId);
+      }
+    };
+
+    const resolvedIntegrations = await waitForIntegrationProcessing(datastoreAdapter, integrationIds);
 
     const builder = new WorkflowBuilder(
       instruction,
-      integrations,
-      payload || {},
-      responseSchema || {},
+      resolvedIntegrations,
+      payload,
+      responseSchema,
       metadata
-    );
+    );  
+    const workflow = await builder.buildWorkflow();
 
-    // Use tool-based building if requested
-    const workflow = useTools ? await builder.buildWorkflow() : await builder.buildWorkflow();
+    workflow.id = await generateUniqueId({
+      baseId: workflow.id,
+      exists: async (id) => !!(await context.datastore.getWorkflow(id, context.orgId))
+    });
 
-    logMessage('info', `Workflow built successfully: ${workflow.id}`, metadata);
     return workflow;
   } catch (error) {
-    logMessage('error', `Failed to build workflow: ${error}`, metadata);
+    logMessage('error', `Failed to build workflow: ${error}`, { orgId: context.orgId });
     throw error;
   }
 };
