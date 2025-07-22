@@ -15,9 +15,10 @@ function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined
 }
 
 function needsDocFetch(input: Integration, oldIntegration?: Integration): boolean {
-  if (input.documentationUrl.startsWith('file://')) return false;
   // If there's no documentation URL, no need to fetch
   if (!input.documentationUrl || !input.documentationUrl.trim()) return false;
+  // If documentationUrl is a file:// URL, no need to fetch
+  if (input.documentationUrl.startsWith('file://')) return false;
   // If documentationPending is explicitly set to true, always fetch
   // For URL-based docs, fetch if:
   // 1. DocumentationPending is explicitly set to true

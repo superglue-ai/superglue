@@ -23,8 +23,13 @@ interface ApiRankingResult {
     successfulAttempts: number;
     apiFailureCount: number;
     superglueScore: number;
-    chatgptSuccessRate: number;
-    claudeSuccessRate: number;
+    llmResults: {
+        'claude-sonnet-4-20250514': number;
+        'claude-opus-4-20250514': number;
+        'gpt-4.1': number;
+        'o4-mini': number;
+        'gemini-2.5-flash': number;
+    };
 }
 
 async function generateApiRanking(configPath?: string): Promise<void> {
@@ -57,7 +62,7 @@ async function generateApiRanking(configPath?: string): Promise<void> {
                 metadata
             );
         } else {
-            logMessage('info', '✅ Direct LLM evaluation enabled (ChatGPT & Claude)', metadata);
+            logMessage('info', '✅ Direct LLM evaluation enabled for all models', metadata);
         }
 
         const integrations = Object.values(config.integrations);
@@ -109,8 +114,13 @@ async function generateApiRanking(configPath?: string): Promise<void> {
             const avgBuildTime = runResult.attempts.reduce((sum, a) => sum + a.buildTime, 0) / runResult.attempts.length;
 
 
-            let chatgptSuccessRate = 0;
-            let claudeSuccessRate = 0;
+            const llmResults = {
+                'claude-sonnet-4-20250514': 0,
+                'claude-opus-4-20250514': 0,
+                'gpt-4.1': 0,
+                'o4-mini': 0,
+                'gemini-2.5-flash': 0
+            };
 
             if (directLLMEvaluator) {
                 logMessage('info', `🤖 Running direct LLM evaluation for ${workflow.name}...`, metadata);
@@ -122,11 +132,18 @@ async function generateApiRanking(configPath?: string): Promise<void> {
                         config.settings.attemptsPerWorkflow
                     );
 
-                    chatgptSuccessRate = directLLMResults.chatgpt.successRate;
-                    claudeSuccessRate = directLLMResults.claude.successRate;
+                    // Extract success rates for each model
+                    for (const [model, result] of Object.entries(directLLMResults)) {
+                        llmResults[model as keyof typeof llmResults] = result.successRate;
+                    }
 
+                    // Log results for each model
+                    const modelResults = Object.entries(llmResults)
+                        .map(([model, rate]) => `${model}: ${(rate * 100).toFixed(0)}%`)
+                        .join(', ');
+                    
                     logMessage('info',
-                        `📊 Direct LLM results - ChatGPT: ${(chatgptSuccessRate * 100).toFixed(0)}%, Claude: ${(claudeSuccessRate * 100).toFixed(0)}%`,
+                        `📊 Direct LLM results - ${modelResults}`,
                         metadata
                     );
                 } catch (error) {
@@ -151,8 +168,7 @@ async function generateApiRanking(configPath?: string): Promise<void> {
                 successfulAttempts: runResult.successfulAttempts,
                 apiFailureCount,
                 superglueScore: calculateSuperglueScore(runResult.successRate, avgExecutionTime, apiFailureCount),
-                chatgptSuccessRate,
-                claudeSuccessRate
+                llmResults
             });
         }
 
@@ -224,7 +240,18 @@ function calculateSuperglueScore(
  * Generate the ranking CSV file
  */
 async function generateRankingCsv(results: ApiRankingResult[], outputPath: string): Promise<void> {
-    const headers = ['Rank', 'API', 'Superglue Score', 'Superglue Success %', 'ChatGPT Success %', 'Claude Success %', 'Instruction Prompt'];
+    const headers = [
+        'Rank', 
+        'API', 
+        'Superglue Score', 
+        'Superglue Success %',
+        'Claude Sonnet 4', 
+        'Claude Opus 4',
+        'GPT-4.1',
+        'O4 Mini',
+        'Gemini 2.5 Flash',
+        'Instruction Prompt'
+    ];
 
     const rows = results.map((result, index) => {
         return [
@@ -232,8 +259,11 @@ async function generateRankingCsv(results: ApiRankingResult[], outputPath: strin
             result.api, // API name
             result.superglueScore.toFixed(2), // Score
             `${(result.successRate * 100).toFixed(0)}%`, // Superglue Success %
-            `${(result.chatgptSuccessRate * 100).toFixed(0)}%`, // ChatGPT Success %
-            `${(result.claudeSuccessRate * 100).toFixed(0)}%`, // Claude Success %
+            `${(result.llmResults['claude-sonnet-4-20250514'] * 100).toFixed(0)}%`, // Claude Sonnet
+            `${(result.llmResults['claude-opus-4-20250514'] * 100).toFixed(0)}%`, // Claude Opus
+            `${(result.llmResults['gpt-4.1'] * 100).toFixed(0)}%`, // GPT-4.1
+            `${(result.llmResults['o4-mini'] * 100).toFixed(0)}%`, // O4 Mini
+            `${(result.llmResults['gemini-2.5-flash'] * 100).toFixed(0)}%`, // Gemini 2.5 Flash
             `"${result.instruction.replace(/"/g, '""')}"` // Escape quotes in instruction
         ];
     });

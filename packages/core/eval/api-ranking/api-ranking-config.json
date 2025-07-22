@@ -490,7 +490,7 @@
         "snowflake-list-tables"
     ],
     "settings": {
-        "attemptsPerWorkflow": 5,
+        "attemptsPerWorkflow": 3,
         "delayBetweenAttempts": 1000
     }
 }
