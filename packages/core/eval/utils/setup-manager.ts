@@ -287,7 +287,7 @@ export class SetupManager {
             await waitForIntegrationProcessing(
                 datastoreAdapter,
                 pendingIntegrations,
-                240000
+                600000  // 10 minutes timeout for documentation processing
             );
 
             const documentationProcessingTime = Date.now() - docStartTime;
@@ -310,7 +310,7 @@ export class SetupManager {
         } catch (error) {
             const documentationProcessingTime = Date.now() - docStartTime;
             logMessage('warn',
-                `⚠️  Documentation processing timeout after ${documentationProcessingTime}ms (4 minute limit): ${String(error)}`,
+                `⚠️  Documentation processing timeout after ${documentationProcessingTime}ms (10 minute limit): ${String(error)}`,
                 this.metadata
             );
 

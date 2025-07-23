@@ -112,7 +112,8 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
     ) {
       const error = JSON.stringify(response?.data?.error || response.data?.errors || response?.data || response?.statusText || "undefined");
       let message = `${endpoint.method} ${url} failed with status ${response.status}.
-Response: ${String(error).slice(0, 1000)}`;
+Response: ${String(error).slice(0, 1000)}
+config: ${JSON.stringify(axiosConfig)}`;
 
       // Add specific context for rate limit errors
       if (response.status === 429) {

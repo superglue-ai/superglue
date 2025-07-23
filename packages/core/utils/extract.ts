@@ -5,7 +5,7 @@ import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { LanguageModel } from "../llm/llm.js";
-import { MODIFY_STEP_CONFIG_TOOL_PROMPT } from "../llm/prompts.js";
+import { BUILD_WORKFLOW_SYSTEM_PROMPT } from "../llm/prompts.js";
 import { decompressData, parseFile } from "./file.js";
 import { logMessage } from "./logs.js";
 import { callAxios, composeUrl, replaceVariables } from "./tools.js";
@@ -91,7 +91,7 @@ export async function generateExtractConfig(extractConfig: Partial<ExtractConfig
   const messages: ChatCompletionMessageParam[] = [
     {
       role: "system",
-      content: MODIFY_STEP_CONFIG_TOOL_PROMPT
+      content: BUILD_WORKFLOW_SYSTEM_PROMPT
     },
     {
       role: "user",

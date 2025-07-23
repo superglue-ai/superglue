@@ -1,7 +1,8 @@
 import { Integration } from "@superglue/client";
 import { Context, Metadata } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
-import { executeTool, BaseToolContext, ToolCall } from "../../tools/tools.js";
+import { executeTool, ToolCall } from "../../tools/tools.js";
+import { InstructionGenerationContext } from "../../utils/instructions.js";
 import { generateSchema } from "../../utils/schema.js";
 import { telemetryClient } from "../../utils/telemetry.js";
 import { getSchemaFromData } from "../../utils/tools.js";
@@ -45,12 +46,14 @@ export const generateInstructionsResolver = async (
     const toolCall: ToolCall = {
       id: crypto.randomUUID(),
       name: "generate_instructions",
-      arguments: { integrations }
+      arguments: {}  // No arguments needed
     };
 
-    const toolContext: BaseToolContext = {
+    // Pass integrations through context
+    const toolContext: InstructionGenerationContext = {
       orgId: context.orgId,
-      runId: crypto.randomUUID()
+      runId: crypto.randomUUID(),
+      integrations: integrations
     };
 
     const callResult = await executeTool(toolCall, toolContext);

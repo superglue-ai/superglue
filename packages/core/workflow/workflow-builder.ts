@@ -212,7 +212,7 @@ ${this.responseSchema && Object.keys(this.responseSchema).length > 0 ? '- The fi
     return {
       id: builtWorkflow.id,
       steps: builtWorkflow.steps,
-      integrationIds: builtWorkflow.integrationIds || Object.keys(this.integrations),
+      integrationIds: Object.keys(this.integrations),
       finalTransform: builtWorkflow.finalTransform,
       responseSchema: this.responseSchema,
       inputSchema: this.inputSchema,

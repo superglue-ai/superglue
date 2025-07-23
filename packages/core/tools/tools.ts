@@ -1,5 +1,5 @@
 import { ApiConfig, Integration, RequestOptions } from "@superglue/client";
-import { generateInstructionsDefinition, generateInstructionsImplementation } from "../utils/instructions.js";
+import { generateInstructionsDefinition, generateInstructionsImplementation, InstructionGenerationContext } from "../utils/instructions.js";
 import {
     buildWorkflowImplementation,
     buildWorkflowToolDefinition,

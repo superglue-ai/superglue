@@ -1,35 +1,63 @@
+import type { Integration } from "@superglue/client";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { LanguageModel } from "../llm/llm.js";
-import { ToolDefinition, ToolImplementation, BaseToolContext } from "../tools/tools.js";
+import { BaseToolContext, ToolDefinition, ToolImplementation } from "../tools/tools.js";
+import { Documentation } from "./documentation.js";
+
+// Extend context to include integrations
+export interface InstructionGenerationContext extends BaseToolContext {
+  integrations: Integration[];
+}
 
 export const generateInstructionsDefinition: ToolDefinition = {
   name: "generate_instructions",
-  description: "Suggest specific, implementable workflow instructions for a set of integrations. Returns a JSON array of concise, actionable instructions.",
+  description: "Generate specific, implementable workflow instructions for the available integrations.",
   parameters: {
     type: "object",
-    properties: {
-      integrations: {
-        type: "array",
-        items: {
-          type: "object",
-          properties: {
-            id: { type: "string" },
-            urlHost: { type: "string" },
-            urlPath: { type: "string" },
-            documentation: { type: "string" },
-            documentationUrl: { type: "string" }
-          },
-          required: ["id", "urlHost", "urlPath"]
-        },
-        description: "List of integrations to generate instructions for."
-      }
-    },
-    required: ["integrations"]
+    properties: {},
+    required: []
   }
 };
 
-export const generateInstructionsImplementation: ToolImplementation<BaseToolContext> = async (args, context) => {
-  const integrations = args.integrations;
+export const generateInstructionsImplementation: ToolImplementation<InstructionGenerationContext> = async (args, context) => {
+  const { integrations } = context;
+
+  if (!integrations || integrations.length === 0) {
+    return {
+      resultForAgent: {
+        success: false,
+        error: "No integrations provided in context"
+      },
+      fullResult: {
+        success: false,
+        error: "No integrations provided in context"
+      }
+    };
+  }
+
+  // Prepare integration summaries with smart documentation truncation
+  const integrationSummaries = integrations.map(integration => {
+    // Use Documentation.postProcess to intelligently truncate documentation
+    // Focus on getting started, authentication, and basic operations
+    const truncatedDocs = integration.documentation
+      ? Documentation.postProcess(
+        integration.documentation,
+        "getting started authentication endpoints operations",
+        5,  // max_chunks
+        500 // chunk_size - smaller chunks for summaries
+      )
+      : "";
+
+    return {
+      id: integration.id,
+      urlHost: integration.urlHost,
+      urlPath: integration.urlPath,
+      // Take first 500 chars of truncated docs as summary
+      documentation: truncatedDocs.slice(0, 500) + (truncatedDocs.length > 500 ? "..." : ""),
+      documentationUrl: integration.documentationUrl
+    };
+  });
+
   const messages: ChatCompletionMessageParam[] = [
     {
       role: "system",
@@ -51,13 +79,7 @@ Remember these important rules: The output MUST be a JSON array of strings, with
     },
     {
       role: "user",
-      content: `integrations: ${JSON.stringify(integrations.map((i: any) => ({
-        id: i.id,
-        urlHost: i.urlHost,
-        urlPath: i.urlPath,
-        documentation: i.documentation?.split('\n\n')[0] || '',
-        documentationUrl: i.documentationUrl
-      })), null, 2)}`
+      content: `integrations: ${JSON.stringify(integrationSummaries, null, 2)}`
     }
   ];
 
