@@ -636,7 +636,7 @@ Important: Your model output must be just the valid JSON without line breaks and
 </OUTPUT_FORMAT>
 `;
 
-export const SELF_HEALING_API_AGENT_PROMPT = `You are an API configuration and execution agent. Your task is to successfully execute an API call by generating and refining API configurations based on the provided context and any errors encountered.
+export const SELF_HEALING_API_AGENT_PROMPT = `You are an API configuration and execution agent. Your task is to successfully execute an API call by generating and refining API configurations based on the provided context and any errors encountered. Generate tool calls and their arguments only, do not include any other text unless explictly instructed to.
 
 You have access to two tools:
 1. submit_tool - Submit an API configuration to execute the call and validate the response
