@@ -16,7 +16,7 @@
     "test:all": "npm run test:unit && npm run test:integration",
     "lint": "turbo run lint",
     "clean": "turbo run clean",
-    "generate-ranking": "cd packages/core && npm run generate-ranking"
+    "generate-ranking": "tsc && node --max-old-space-size=12288 --expose-gc dist/eval/api-ranking/generate-api-ranking.js"
   },
   "dependencies": {
     "@playwright/test": "^1.50.1",
