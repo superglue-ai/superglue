@@ -287,7 +287,7 @@ export class SetupManager {
             await waitForIntegrationProcessing(
                 datastoreAdapter,
                 pendingIntegrations,
-                600000  // 10 minutes timeout for documentation processing
+                600000
             );
 
             const documentationProcessingTime = Date.now() - docStartTime;

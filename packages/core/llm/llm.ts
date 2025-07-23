@@ -31,7 +31,7 @@ export interface LLMToolResponse {
 }
 
 export interface LLMAgentResponse {
-    finalResult: any; 
+    finalResult: any;
     toolCalls: ToolCall[];
     executionTrace: Array<{
         toolCall: ToolCall;
@@ -39,13 +39,13 @@ export interface LLMAgentResponse {
     }>;
     messages: OpenAI.Chat.ChatCompletionMessageParam[];
     responseId?: string;  // For OpenAI conversation continuity
-    success: boolean; 
+    success: boolean;
     lastSuccessfulToolCall?: {
         toolCall: ToolCall;
-        result: any;  
-        metadata?: any;  
+        result: any;
+        additionalData?: any;
     };
-    lastError?: string;  
+    lastError?: string;
     terminationReason: 'success' | 'max_iterations' | 'abort' | 'error';
 }
 

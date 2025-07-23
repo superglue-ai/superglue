@@ -286,7 +286,7 @@ export class OpenAIModel implements LLM {
             lastSuccessfulToolCall = {
               toolCall: call,
               result: result.result.fullResult.data,
-              metadata: result.result.fullResult.config
+              additionalData: result.result.fullResult.config
             };
           } else if (result.result?.resultForAgent?.error) {
             lastError = result.result.resultForAgent.error;

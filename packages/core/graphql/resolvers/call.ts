@@ -15,7 +15,7 @@ import { notifyWebhook } from "../../utils/webhook.js";
 import { searchDocumentationToolDefinition, submitToolDefinition } from "../../workflow/workflow-tools.js";
 
 export async function executeApiCall(
-  endpoint: ApiConfig,
+  originalEndpoint: ApiConfig,
   payload: any,
   credentials: Record<string, string>,
   options: RequestOptions,
@@ -29,7 +29,7 @@ export async function executeApiCall(
   let isTestMode = options?.testMode || false;
 
   try {
-    const response = await callEndpoint(endpoint, payload, credentials, options);
+    const response = await callEndpoint(originalEndpoint, payload, credentials, options);
 
     if (!response.data) {
       throw new Error("No data returned from API. This could be due to a configuration error.");
@@ -41,13 +41,13 @@ export async function executeApiCall(
 
       let documentationString = "No documentation provided";
       if (integration?.documentation) {
-        documentationString = Documentation.postProcess(integration.documentation, endpoint.instruction || "");
+        documentationString = Documentation.postProcess(integration.documentation, originalEndpoint.instruction || "");
       }
 
       const evalResult = await evaluateResponse(
         response.data,
-        endpoint.responseSchema,
-        endpoint.instruction,
+        originalEndpoint.responseSchema,
+        originalEndpoint.instruction,
         documentationString
       );
 
@@ -57,7 +57,7 @@ export async function executeApiCall(
     }
 
     // Direct execution succeeded - return immediately
-    return { data: response.data, endpoint };
+    return { data: response.data, endpoint: originalEndpoint };
 
   } catch (initialError) {
     // If self-healing is disabled, throw the error immediately
@@ -68,12 +68,12 @@ export async function executeApiCall(
     const errorMessage = initialError instanceof Error ? initialError.message : String(initialError);
     logMessage('info', `Initial API call failed, entering self-healing mode: ${errorMessage}`, metadata);
 
-    return executeWithAgentLoop(endpoint, payload, credentials, options, metadata, integration, errorMessage);
+    return executeWithAgentLoop(originalEndpoint, payload, credentials, options, metadata, integration, errorMessage);
   }
 }
 
 async function executeWithAgentLoop(
-  endpoint: ApiConfig,
+  originalEndpoint: ApiConfig,
   payload: any,
   credentials: Record<string, string>,
   options: RequestOptions,
@@ -90,12 +90,12 @@ async function executeWithAgentLoop(
   } else if (integration.documentationPending) {
     logMessage('warn', `Documentation for integration ${integration.id} is still being fetched. Proceeding without documentation.`, metadata);
   } else if (integration.documentation) {
-    documentationString = Documentation.postProcess(integration.documentation, endpoint.instruction || "");
+    documentationString = Documentation.postProcess(integration.documentation, originalEndpoint.instruction || "");
   }
 
   // Create global args for tools
   const toolContext: WorkflowExecutionContext = {
-    endpoint: endpoint,
+    endpoint: originalEndpoint,
     payload: payload,
     credentials: credentials,
     options: options,
@@ -130,10 +130,10 @@ async function executeWithAgentLoop(
 
 ERROR: ${initialError}
 
-INSTRUCTION: ${endpoint.instruction || "Make API call and retrieve data"}
+INSTRUCTION: ${originalEndpoint.instruction || "Make API call and retrieve data"}
 
 FAILED CONFIGURATION:
-${JSON.stringify(endpoint, null, 2)}
+${JSON.stringify(originalEndpoint, null, 2)}
 
 AVAILABLE CONTEXT:
 - Payload keys: ${Object.keys(payload).join(", ") || "None"} (${Object.keys(payload).length} fields)
@@ -163,10 +163,9 @@ Analyze the error and generate a corrected API configuration. Submit it using th
 
     // Check if we got a successful result
     if (result.success && result.lastSuccessfulToolCall) {
-      const { result: data, metadata } = result.lastSuccessfulToolCall;
-      const finalEndpoint = metadata || endpoint;
+      const { result: data, additionalData: finalEndpoint } = result.lastSuccessfulToolCall;
 
-      logMessage('info', `executeWorkflowStep completed successfully after self-healing`, metadata);
+      logMessage('info', `executeWorkflowStep completed successfully after self-healing`, finalEndpoint);
       return { data, endpoint: finalEndpoint };
     }
 
@@ -174,7 +173,7 @@ Analyze the error and generate a corrected API configuration. Submit it using th
     const errorMessage = result.lastError || result.finalResult || "Failed to execute API call after multiple attempts";
 
     telemetryClient?.captureException(new Error(errorMessage), metadata.orgId, {
-      endpoint: endpoint,
+      endpoint: originalEndpoint,
       toolCalls: result.toolCalls?.length || 0,
       terminationReason: result.terminationReason
     });
@@ -186,7 +185,7 @@ Analyze the error and generate a corrected API configuration. Submit it using th
     const maskedError = maskCredentials(errorMessage, credentials).slice(0, 1000);
 
     telemetryClient?.captureException(new Error(maskedError), metadata.orgId, {
-      endpoint: endpoint,
+      endpoint: originalEndpoint,
       error: errorMessage
     });
 

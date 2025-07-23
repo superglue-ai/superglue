@@ -246,7 +246,7 @@ Your response must contain ONLY the JSON object within the <json> tags, with no 
                     lastSuccessfulToolCall = {
                         toolCall: toolCall,
                         result: result.result.fullResult.data,
-                        metadata: result.result.fullResult.config
+                        supplementaryData: result.result.fullResult.config
                     };
                 } else if (result.result?.resultForAgent?.error) {
                     lastError = result.result.resultForAgent.error;

@@ -1,12 +1,12 @@
 import { ApiConfig, Integration, RequestOptions } from "@superglue/client";
-import { generateInstructionsDefinition, generateInstructionsImplementation, InstructionGenerationContext } from "../utils/instructions.js";
+import { generateInstructionsDefinition, generateInstructionsImplementation } from "../utils/instructions.js";
 import {
     buildWorkflowImplementation,
     buildWorkflowToolDefinition,
     searchDocumentationToolDefinition,
     searchDocumentationToolImplementation,
     submitToolDefinition,
-    submitToolDefinitionImplementation
+    submitToolImplementation
 } from "../workflow/workflow-tools.js";
 
 export interface ToolDefinition {
@@ -76,7 +76,7 @@ export type ToolImplementation<TContext extends BaseToolContext = BaseToolContex
 const toolRegistry: Record<string, ToolImplementation<any>> = {
     generate_instructions: generateInstructionsImplementation,
     search_documentation: searchDocumentationToolImplementation,
-    submit_tool: submitToolDefinitionImplementation,
+    submit_tool: submitToolImplementation,
     build_workflow: buildWorkflowImplementation
 };
 

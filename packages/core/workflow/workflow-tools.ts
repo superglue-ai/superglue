@@ -252,7 +252,7 @@ export const searchDocumentationToolImplementation: ToolImplementation<WorkflowE
     }
 };
 
-export const submitToolDefinitionImplementation: ToolImplementation<WorkflowExecutionContext> = async (args, context) => {
+export const submitToolImplementation: ToolImplementation<WorkflowExecutionContext> = async (args, context) => {
     // Extract API config from args
     const { apiConfig } = args;
     const { endpoint: originalEndpoint, payload, credentials, options = {}, integration } = context;
