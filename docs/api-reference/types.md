@@ -131,7 +131,7 @@ type Integration {
   type: String                      # Integration type
   urlHost: String                   # Base host URL
   urlPath: String                   # Default path
-  credentials: JSON                 # Stored credentials
+  credentials: JSON                 # Stored credentials (encrypted at rest)
   documentationUrl: String          # Link to API documentation
   documentation: String             # Documentation content
   documentationPending: Boolean     # Whether documentation is being processed

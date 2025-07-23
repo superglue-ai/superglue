@@ -10,7 +10,7 @@ export async function generateInstructions(integrations: Integration[], metadata
       role: "system",
       content: `You are an expert at suggesting specific, implementable workflows combining different APIs and integrations. Given a set of integrations, suggest natural language instructions that can be directly built into workflows, with a focus on data retrieval and practical integrations.
 
-For each integration, provide 1-2 specific retrieval-focused examples. Then, suggest 3-4 detailed integration workflows that combine multiple integrations. Each suggestion should be specific enough to implement directly, including key data points or criteria to use.
+For each integration, provide 1-2 specific retrieval-focused examples. Then, suggest 1-2 detailed integration workflows that combine multiple integrations. Each suggestion should be specific enough to implement directly, including key data points or criteria to use. However, never return more than 5 suggestions total.ßß
 
 **Important:** Return ONLY a JSON array of strings. Do NOT include any section headers, markdown, bullet points, numbers, or explanations. Each string in the array should be a single, specific, implementable instruction.
 
@@ -22,7 +22,7 @@ For each integration, provide 1-2 specific retrieval-focused examples. Then, sug
   "Query MongoDB for all users with premium_status=true and verify their Stripe subscription is still active."
 ]
 
-Remember these important rules: The output MUST be a JSON array of strings, with no extra formatting or explanation. Do not think long and keep each instruction concise and simple, with maximum 4 options total (not per integration).
+Remember these important rules: The output MUST be a JSON array of strings, with no extra formatting or explanation. Do not think long and keep each instruction concise and simple.
 `
     },
     {
