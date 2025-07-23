@@ -86,6 +86,12 @@ POSTGRES_USERNAME=superglue
 POSTGRES_PASSWORD=your-secure-password
 POSTGRES_DB=superglue
 
+# Encryption settings
+# Optional: Master key for encrypting stored credentials
+# If not set, credentials will be stored in plaintext
+# Generate a strong key: openssl rand -hex 32
+MASTER_ENCRYPTION_KEY=your-32-byte-encryption-key
+
 # AI Provider - OPENAI or GEMINI
 # best performance / price ratio right now is OpenAI with gpt-4.1
 LLM_PROVIDER=GEMINI
@@ -188,7 +194,13 @@ Expected response: `OK`
    - Use strong db passwords
    - Rotate credentials regularly
 
-3. **Telemetry**
+3. **Credential Encryption**
+   - Always set MASTER_ENCRYPTION_KEY in production
+   - Store the master key securely (e.g., in a secrets manager)
+   - Back up your master key - losing it means losing access to encrypted credentials
+   - Use a strong, randomly generated key: `openssl rand -hex 32`
+
+4. **Telemetry**
    - Superglue uses telemetry to understand how many users are using the platform.
    - You can opt out by setting the DISABLE_TELEMETRY environment variable to true.
 

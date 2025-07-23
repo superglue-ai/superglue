@@ -1,5 +1,6 @@
 import type { ApiConfig, ExtractConfig, Integration, RunResult, TransformConfig, Workflow } from "@superglue/client";
 import { Pool, PoolConfig } from 'pg';
+import { credentialEncryption } from "../utils/encryption.js";
 import { logMessage } from "../utils/logs.js";
 import type { DataStore } from "./types.js";
 
@@ -46,7 +47,16 @@ export class PostgresService implements DataStore {
                 'SELECT data FROM integrations WHERE id = ANY($1) AND org_id = $2',
                 [ids, orgId || '']
             );
-            return result.rows.map(row => ({ ...row.data, id: row.id }));
+            return result.rows.map(row => {
+                const integration = { ...row.data, id: row.id };
+                
+                // Decrypt credentials if encryption is enabled
+                if (integration.credentials) {
+                    integration.credentials = credentialEncryption.decrypt(integration.credentials);
+                }
+                
+                return integration;
+            });
         } finally {
             client.release();
         }
@@ -391,38 +401,6 @@ export class PostgresService implements DataStore {
         return this.deleteConfig(id, 'workflow', orgId);
     }
 
-    async getWorkflowWithIntegrations(id: string, orgId?: string): Promise<{ workflow: Workflow | null, integrations: Integration[] }> {
-        if (!id) return { workflow: null, integrations: [] };
-        const client = await this.pool.connect();
-        try {
-            const result = await client.query(
-                'SELECT data, integration_ids FROM configurations WHERE id = $1 AND type = $2 AND org_id = $3',
-                [id, 'workflow', orgId || '']
-            );
-
-            if (!result.rows[0]) {
-                return { workflow: null, integrations: [] };
-            }
-
-            const workflow = { ...this.parseDates(result.rows[0].data), id };
-            const integrationIds = result.rows[0].integration_ids || [];
-
-            if (integrationIds.length === 0) {
-                return { workflow, integrations: [] };
-            }
-
-            const integrationsResult = await client.query(
-                'SELECT id, data FROM integrations WHERE id = ANY($1) AND org_id = $2',
-                [integrationIds, orgId || '']
-            );
-
-            const integrations = integrationsResult.rows.map(row => ({ ...this.parseDates(row.data), id: row.id }));
-
-            return { workflow, integrations };
-        } finally {
-            client.release();
-        }
-    }
 
     // Integration Methods
     async getIntegration(id: string, orgId?: string): Promise<Integration | null> {
@@ -433,7 +411,16 @@ export class PostgresService implements DataStore {
                 'SELECT data FROM integrations WHERE id = $1 AND org_id = $2',
                 [id, orgId || '']
             );
-            return result.rows[0] ? { ...this.parseDates(result.rows[0].data), id } : null;
+            if (!result.rows[0]) return null;
+            
+            const integration = { ...this.parseDates(result.rows[0].data), id };
+            
+            // Decrypt credentials if encryption is enabled
+            if (integration.credentials) {
+                integration.credentials = credentialEncryption.decrypt(integration.credentials);
+            }
+            
+            return integration;
         } finally {
             client.release();
         }
@@ -453,7 +440,16 @@ export class PostgresService implements DataStore {
                 [orgId || '', limit, offset]
             );
 
-            const items = result.rows.map(row => ({ ...this.parseDates(row.data), id: row.id }));
+            const items = result.rows.map(row => {
+                const integration = { ...this.parseDates(row.data), id: row.id };
+                
+                // Decrypt credentials if encryption is enabled
+                if (integration.credentials) {
+                    integration.credentials = credentialEncryption.decrypt(integration.credentials);
+                }
+                
+                return integration;
+            });
             return { items, total };
         } finally {
             client.release();
@@ -464,12 +460,20 @@ export class PostgresService implements DataStore {
         if (!id || !integration) return null;
         const client = await this.pool.connect();
         try {
+            // Create a copy of the integration to avoid modifying the original
+            const integrationToStore = { ...integration };
+            
+            // Encrypt credentials if encryption is enabled
+            if (integrationToStore.credentials) {
+                integrationToStore.credentials = credentialEncryption.encrypt(integrationToStore.credentials);
+            }
+            
             await client.query(`
         INSERT INTO integrations (id, org_id, data, updated_at) 
         VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
         ON CONFLICT (id, org_id) 
         DO UPDATE SET data = $3, updated_at = CURRENT_TIMESTAMP
-      `, [id, orgId || '', JSON.stringify(integration)]);
+      `, [id, orgId || '', JSON.stringify(integrationToStore)]);
 
             return { ...integration, id };
         } finally {

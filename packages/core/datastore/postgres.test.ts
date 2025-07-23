@@ -293,63 +293,6 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
             });
         });
 
-        describe('Workflow with Integrations', () => {
-            const testWorkflow = {
-                id: 'test-workflow-with-int',
-                name: 'Test Workflow with Integrations',
-                steps: [],
-                createdAt: new Date(),
-                updatedAt: new Date(),
-            };
-
-            const testIntegration1 = {
-                id: 'int1',
-                name: 'Integration 1',
-                urlHost: 'https://int1.test',
-                credentials: { apiKey: 'secret1' },
-                createdAt: new Date(),
-                updatedAt: new Date(),
-            };
-
-            const testIntegration2 = {
-                id: 'int2',
-                name: 'Integration 2',
-                urlHost: 'https://int2.test',
-                credentials: { apiKey: 'secret2' },
-                createdAt: new Date(),
-                updatedAt: new Date(),
-            };
-
-            it('should get workflow with its integrations', async () => {
-                // Store integrations
-                await store.upsertIntegration(testIntegration1.id, testIntegration1, testOrgId);
-                await store.upsertIntegration(testIntegration2.id, testIntegration2, testOrgId);
-
-                // Store workflow with integration dependencies
-                const integrationIds = [testIntegration1.id, testIntegration2.id];
-                await store.upsertWorkflow(testWorkflow.id, testWorkflow, testOrgId, integrationIds);
-
-                const result = await store.getWorkflowWithIntegrations(testWorkflow.id, testOrgId);
-
-                expect(result.workflow).toEqual(testWorkflow);
-                expect(result.integrations).toHaveLength(2);
-                expect(result.integrations).toEqual(
-                    expect.arrayContaining([
-                        { ...testIntegration1, id: testIntegration1.id },
-                        { ...testIntegration2, id: testIntegration2.id }
-                    ])
-                );
-            });
-
-            it('should return empty integrations for workflow without dependencies', async () => {
-                await store.upsertWorkflow(testWorkflow.id, testWorkflow, testOrgId);
-                const result = await store.getWorkflowWithIntegrations(testWorkflow.id, testOrgId);
-
-                expect(result.workflow).toEqual(testWorkflow);
-                expect(result.integrations).toHaveLength(0);
-            });
-        });
-
         describe('Tenant Information', () => {
             it('should store and retrieve tenant info', async () => {
                 await store.setTenantInfo('test@example.com', false);

@@ -139,8 +139,34 @@ Superglue relies on persistent storage for its operational data:
 
 ## Security Implementation
 
+### Transport Security
 - All external connections made by Superglue during workflow steps can be encrypted (e.g., TLS 1.3 for API calls).
-- Credentials for accessing external systems within workflow steps are securely managed (e.g., stored encrypted if using Redis).
+
+### Credential Encryption
+Superglue supports at-rest encryption for all stored credentials using industry-standard AES-256-CBC encryption:
+
+- **Encryption Key**: Set the `MASTER_ENCRYPTION_KEY` environment variable to enable encryption
+- **Algorithm**: AES-256-CBC with unique initialization vectors (IVs) for each encrypted value
+- **Automatic Handling**: Credentials are automatically encrypted when stored and decrypted when retrieved
+- **Storage Format**: Encrypted values are stored as `enc:iv:encryptedData`
+- **Backward Compatibility**: If no master key is set, credentials are stored in plaintext
+
+**Key Features:**
+- Each credential field is encrypted separately with its own IV
+- The master key is hashed using SHA-256 to derive the encryption key
+- Supported in both FileStore and PostgreSQL datastores
+- Transparent to the application - no code changes required
+
+**Setup:**
+```bash
+# Generate a secure master key
+openssl rand -hex 32
+
+# Set in your environment
+export MASTER_ENCRYPTION_KEY=your-generated-key
+```
+
+**Important:** Once encryption is enabled and credentials are stored, changing or removing the master key will make existing credentials unreadable. Always backup your master key securely.
 - Transformation logic for each step runs in isolated contexts.
 - Rate limiting can be configured per API step.
 
