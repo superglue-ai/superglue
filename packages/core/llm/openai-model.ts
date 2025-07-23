@@ -257,7 +257,7 @@ export class OpenAIModel implements LLM {
 
     for (let i = 0; i < maxIterations; i++) {
       const resp = await (this.client.responses.create as any)({
-        model: process.env.OPENAI_MODEL || "gpt-4o",
+        model: this.model,
         input: messages,
         previous_response_id: responseId ?? undefined,
         tools: fnTools,
@@ -292,8 +292,8 @@ export class OpenAIModel implements LLM {
             lastError = result.result.resultForAgent.error;
           }
 
-          const truncatedResultForAgent = JSON.stringify(result.result?.resultForAgent ?? null).slice(0, 4_000);
-          const msg = { type: "function_call_output", call_id: call.id, output: 'Output truncated to 4000 chars: ' + truncatedResultForAgent };
+          const truncatedResultForAgent = JSON.stringify(result.result?.resultForAgent ?? null).slice(0, 1_000);
+          const msg = { type: "function_call_output", call_id: call.id, output: 'Output truncated to 1000 chars: ' + truncatedResultForAgent };
           messages.push(msg as any);
 
           if (options?.shouldAbort?.({ toolCall: call, result })) {
