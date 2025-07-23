@@ -1,4 +1,4 @@
-import { Integration, SelfHealingMode } from "@superglue/client";
+import { SelfHealingMode } from "@superglue/client";
 import type { ChatCompletionMessageParam } from "openai/resources/index.mjs";
 import { LanguageModel } from "../llm/llm.js";
 import { ToolDefinition, ToolImplementation, WorkflowBuildContext, WorkflowExecutionContext } from "../tools/tools.js";
@@ -122,40 +122,38 @@ export const buildWorkflowToolDefinition: ToolDefinition = {
 export const searchDocumentationToolImplementation: ToolImplementation<WorkflowExecutionContext> = async (args, context) => {
     const { integrationId, query } = args;
     logMessage('debug', `search_documentation tool called - integration: ${integrationId}, query: "${query}"`, context);
-    const { integrations } = context;
+    const { integration } = context;
 
-    if (!integrations || !Array.isArray(integrations)) {
+    if (!integration) {
         return {
             resultForAgent: {
                 success: false,
-                error: "Integrations array not provided in context. The search_documentation tool requires integrations to be passed in the tool executor context."
+                error: "Integration not provided in context. The search_documentation tool requires an integration to be passed in the tool executor context."
             },
             fullResult: {
                 success: false,
-                error: "Integrations array not provided in context. The search_documentation tool requires integrations to be passed in the tool executor context.",
+                error: "Integration not provided in context. The search_documentation tool requires an integration to be passed in the tool executor context.",
                 results: []
             }
         };
     }
 
     try {
-        const integration = integrations.find((i: Integration) => i.id === integrationId);
-
-        if (!integration) {
+        if (integration.id !== integrationId) {
             return {
                 resultForAgent: {
                     success: false,
-                    error: `Integration '${integrationId}' not found in context. Available integrations: ${integrations.map((i: Integration) => i.id).join(', ')}`
+                    error: `Integration '${integrationId}' not found. Available integration: ${integration.id}`
                 },
                 fullResult: {
                     success: false,
-                    error: `Integration '${integrationId}' not found in context. Available integrations: ${integrations.map((i: Integration) => i.id).join(', ')}`,
+                    error: `Integration '${integrationId}' not found. Available integration: ${integration.id}`,
                     results: []
                 }
             };
         }
 
-        if (!integration.documentation) {
+        if (!integration.documentation || integration.documentation.length <= 500) {
             return {
                 resultForAgent: {
                     success: true,
@@ -163,7 +161,7 @@ export const searchDocumentationToolImplementation: ToolImplementation<WorkflowE
                         integrationId,
                         query,
                         resultsCount: 0,
-                        summary: "No documentation available for this integration"
+                        summary: "No documentation available for this integration. Try to execute the API call without documentation using your own knowledge. Do not use the search_documentation tool."
                     }
                 },
                 fullResult: {
@@ -257,8 +255,7 @@ export const searchDocumentationToolImplementation: ToolImplementation<WorkflowE
 export const submitToolDefinitionImplementation: ToolImplementation<WorkflowExecutionContext> = async (args, context) => {
     // Extract API config from args
     const { apiConfig } = args;
-    const { endpoint: originalEndpoint, payload, credentials, options = {}, integrations } = context;
-    const integration = integrations?.[0];
+    const { endpoint: originalEndpoint, payload, credentials, options = {}, integration } = context;
 
     if (!apiConfig) {
         return {

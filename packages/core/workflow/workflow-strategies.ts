@@ -1,7 +1,7 @@
 import type { ApiConfig, ExecutionStep, RequestOptions, WorkflowStepResult } from "@superglue/client";
 import { SelfHealingMode } from "@superglue/client";
 import { Integration, Metadata } from "@superglue/shared";
-import { executeWorkflowStep } from "../graphql/resolvers/call.js";
+import { executeApiCall } from "../graphql/resolvers/call.js";
 import { logMessage } from "../utils/logs.js";
 import { applyJsonata, applyTransformationWithValidation, flattenObject } from "../utils/tools.js";
 import { generateTransformCode, generateTransformJsonata } from "../utils/transform.js";
@@ -39,7 +39,7 @@ const directStrategy: ExecutionStrategy = {
       config: step.apiConfig
     }
     try {
-      const apiResponse = await executeWorkflowStep(
+      const apiResponse = await executeApiCall(
         step.apiConfig,
         payload,
         credentials,
@@ -186,7 +186,7 @@ The function should return an array of items that this step will iterate over.`;
               }
             };
 
-            apiResponse = await executeWorkflowStep(
+            apiResponse = await executeApiCall(
               successfulConfig || step.apiConfig,
               loopPayload,
               credentials,
@@ -235,7 +235,7 @@ The function should return an array of items that this step will iterate over.`;
                 }
               };
 
-              apiResponse = await executeWorkflowStep(
+              apiResponse = await executeApiCall(
                 successfulConfig,
                 loopPayload,
                 credentials,

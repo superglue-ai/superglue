@@ -14,7 +14,7 @@ import { executeTransform } from "../../utils/transform.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 import { searchDocumentationToolDefinition, submitToolDefinition } from "../../workflow/workflow-tools.js";
 
-export async function executeWorkflowStep(
+export async function executeApiCall(
   endpoint: ApiConfig,
   payload: any,
   credentials: Record<string, string>,
@@ -36,7 +36,7 @@ export async function executeWorkflowStep(
     }
 
     // In test mode, always evaluate the response
-    if (isTestMode && (endpoint.instruction || endpoint.responseSchema)) {
+    if (isTestMode) {
       const { Documentation } = await import('../../utils/documentation.js');
 
       let documentationString = "No documentation provided";
@@ -93,13 +93,13 @@ async function executeWithAgentLoop(
     documentationString = Documentation.postProcess(integration.documentation, endpoint.instruction || "");
   }
 
-  // Create context for tools
+  // Create global args for tools
   const toolContext: WorkflowExecutionContext = {
     endpoint: endpoint,
     payload: payload,
     credentials: credentials,
     options: options,
-    integrations: integration ? [integration] : [],
+    integration: integration,
     runId: metadata.runId,
     orgId: metadata.orgId
   };
@@ -162,64 +162,25 @@ Analyze the error and generate a corrected API configuration. Submit it using th
       }
     );
 
-    let finalEndpoint = endpoint;
-    let responseData = null;
-    let lastError = null;
+    // Check if we got a successful result
+    if (result.success && result.lastSuccessfulToolCall) {
+      const { result: data, metadata } = result.lastSuccessfulToolCall;
+      const finalEndpoint = metadata || endpoint;
 
-    // Parse the tool calls to find successful execution
-    for (const trace of result.executionTrace || []) {
-      logMessage('debug', `Processing trace: ${trace.toolCall.name}, success: ${trace.result.result?.resultForAgent?.success}`, metadata);
-
-      if (trace.toolCall.name === 'submit_tool') {
-        if (trace.result.result?.resultForAgent?.success) {
-          responseData = trace.result.result.fullResult?.data;
-          finalEndpoint = trace.result.result.fullResult?.config || endpoint;
-          logMessage('debug', `Found successful submit_tool with data`, metadata);
-        } else {
-          lastError = trace.result.result?.resultForAgent?.error;
-          logMessage('debug', `Found failed submit_tool: ${lastError}`, metadata);
-        }
-      }
+      logMessage('info', `executeWorkflowStep completed successfully after self-healing`, metadata);
+      return { data, endpoint: finalEndpoint };
     }
 
-    if (!responseData) {
-      // Check if the agent decided to abort without making more tool calls
-      const finalMessage = result.finalResult ? String(result.finalResult) : "";
+    // Handle failure scenarios
+    const errorMessage = result.lastError || result.finalResult || "Failed to execute API call after multiple attempts";
 
-      // If the agent provided a clear abort message, use that as the error
-      if (finalMessage && !lastError && result.toolCalls?.length > 0) {
-        // Agent made some attempts but then decided to abort with explanation
-        const errorMessage = `Self-healing aborted: ${finalMessage}`;
-        telemetryClient?.captureException(new Error(errorMessage), metadata.orgId, {
-          endpoint: finalEndpoint,
-          toolCalls: result.toolCalls?.length || 0,
-          abortReason: "agent_decision"
-        });
-        throw new Error(errorMessage);
-      }
+    telemetryClient?.captureException(new Error(errorMessage), metadata.orgId, {
+      endpoint: endpoint,
+      toolCalls: result.toolCalls?.length || 0,
+      terminationReason: result.terminationReason
+    });
 
-      // If agent aborted immediately without any tool calls
-      if (finalMessage && result.toolCalls?.length === 0) {
-        const errorMessage = `Cannot proceed: ${finalMessage}`;
-        telemetryClient?.captureException(new Error(errorMessage), metadata.orgId, {
-          endpoint: finalEndpoint,
-          toolCalls: 0,
-          abortReason: "immediate_abort"
-        });
-        throw new Error(errorMessage);
-      }
-
-      // Otherwise, use the last error or a generic message
-      const errorMessage = lastError || finalMessage || "Failed to execute API call after multiple attempts";
-      telemetryClient?.captureException(new Error(errorMessage), metadata.orgId, {
-        endpoint: finalEndpoint,
-        toolCalls: result.toolCalls?.length || 0
-      });
-      throw new Error(errorMessage);
-    }
-
-    logMessage('info', `executeWorkflowStep completed successfully after self-healing`, metadata);
-    return { data: responseData, endpoint: finalEndpoint };
+    throw new Error(errorMessage);
 
   } catch (error) {
     const errorMessage = error?.message || "Unknown error during API execution";
@@ -273,7 +234,7 @@ export const callResolver = async (
       throw new Error("zod is not supported for response schema. Please use json schema instead. you can use the zod-to-json-schema package to convert zod to json schema.");
     }
 
-    const callResult = await executeWorkflowStep(endpoint, payload, credentials, options, metadata);
+    const callResult = await executeApiCall(endpoint, payload, credentials, options, metadata);
     endpoint = callResult.endpoint;
     const data = callResult.data;
 

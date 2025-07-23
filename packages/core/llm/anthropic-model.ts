@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
 import { ToolCall, ToolCallResult, ToolDefinition } from "../tools/tools.js";
-import { LLM, LLMAutonomousResponse, LLMObjectResponse, LLMResponse } from "./llm.js";
+import { LLM, LLMAgentResponse, LLMObjectResponse, LLMResponse } from "./llm.js";
 
 export class AnthropicModel implements LLM {
     public contextLength: number = 200000; // Claude 3 supports up to 200k tokens
@@ -191,7 +191,7 @@ Your response must contain ONLY the JSON object within the <json> tags, with no 
             temperature?: number;
             shouldAbort?: (step: { toolCall: ToolCall; result: ToolCallResult }) => boolean;
         }
-    ): Promise<LLMAutonomousResponse> {
+    ): Promise<LLMAgentResponse> {
         const { maxIterations = 10, temperature = 0.2 } = options || {};
         const anthropicTools = tools.map(tool => ({
             name: tool.name,
@@ -199,8 +199,10 @@ Your response must contain ONLY the JSON object within the <json> tags, with no 
             input_schema: tool.parameters
         }));
 
-        const executionTrace: LLMAutonomousResponse['executionTrace'] = [];
+        const executionTrace: LLMAgentResponse['executionTrace'] = [];
         const allToolCalls: ToolCall[] = [];
+        let lastSuccessfulToolCall: LLMAgentResponse['lastSuccessfulToolCall'] = undefined;
+        let lastError: string | undefined = undefined;
 
         for (let i = 0; i < maxIterations; i++) {
             const { system, anthropicMessages } = this.convertToAnthropicFormat(messages);
@@ -227,10 +229,6 @@ Your response must contain ONLY the JSON object within the <json> tags, with no 
                 }));
             }
 
-            if (toolUseBlocks.length === 0) {
-                return { finalResult: textContent, toolCalls: allToolCalls, executionTrace, messages: messages };
-            }
-
             const toolResultContents = [];
             for (const toolUseBlock of toolUseBlocks) {
                 const toolCall: ToolCall = {
@@ -242,6 +240,18 @@ Your response must contain ONLY the JSON object within the <json> tags, with no 
 
                 const result = await toolExecutor(toolCall);
                 executionTrace.push({ toolCall, result });
+
+                // Track successful results
+                if (result.result?.resultForAgent?.success && result.result?.fullResult) {
+                    lastSuccessfulToolCall = {
+                        toolCall: toolCall,
+                        result: result.result.fullResult.data,
+                        metadata: result.result.fullResult.config
+                    };
+                } else if (result.result?.resultForAgent?.error) {
+                    lastError = result.result.resultForAgent.error;
+                }
+
                 toolResultContents.push({
                     type: "tool_result" as const,
                     tool_use_id: toolUseBlock.id,
@@ -249,14 +259,31 @@ Your response must contain ONLY the JSON object within the <json> tags, with no 
                 });
 
                 if (options?.shouldAbort?.({ toolCall, result })) {
-                    return { finalResult: "Execution aborted by caller.", toolCalls: allToolCalls, executionTrace, messages: messages };
+                    return {
+                        finalResult: lastSuccessfulToolCall?.result ?? "Execution aborted by caller.",
+                        toolCalls: allToolCalls,
+                        executionTrace,
+                        messages: messages,
+                        success: !!lastSuccessfulToolCall,
+                        lastSuccessfulToolCall,
+                        lastError,
+                        terminationReason: lastSuccessfulToolCall ? 'success' : 'abort'
+                    };
                 }
             }
 
             messages.push({ role: "user", content: toolResultContents });
         }
-
-        throw new Error(`Maximum iterations (${maxIterations}) reached in executeTaskWithTools`);
+        return {
+            finalResult: lastSuccessfulToolCall?.result ?? null,
+            toolCalls: allToolCalls,
+            executionTrace,
+            messages: messages,
+            success: false,
+            lastSuccessfulToolCall,
+            lastError: lastError || `Maximum iterations (${maxIterations}) reached`,
+            terminationReason: 'max_iterations'
+        };
     }
 
     private convertToAnthropicFormat(messages: ChatCompletionMessageParam[]): {

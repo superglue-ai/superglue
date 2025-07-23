@@ -1,8 +1,8 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import OpenAI from "openai";
 import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
-import { LLM, LLMAutonomousResponse, LLMObjectResponse, LLMResponse, LLMToolResponse } from "./llm.js";
-import { ToolCall, ToolDefinition, ToolCallResult } from "../tools/tools.js";
+import { ToolCall, ToolCallResult, ToolDefinition } from "../tools/tools.js";
+import { LLM, LLMAgentResponse, LLMObjectResponse, LLMResponse, LLMToolResponse } from "./llm.js";
 
 export class GeminiModel implements LLM {
     public contextLength: number = 1000000;
@@ -180,7 +180,7 @@ export class GeminiModel implements LLM {
             temperature?: number;
             shouldAbort?: (step: { toolCall: ToolCall; result: ToolCallResult }) => boolean;
         }
-    ): Promise<LLMAutonomousResponse> {
+    ): Promise<LLMAgentResponse> {
         const { maxIterations = 10, temperature = 0.2 } = options || {};
         const functionDeclarations = tools.map(tool => ({
             name: tool.name,
@@ -201,9 +201,11 @@ export class GeminiModel implements LLM {
         });
 
         let currentMessages = [...messages];
-        const executionTrace: LLMAutonomousResponse['executionTrace'] = [];
+        const executionTrace: LLMAgentResponse['executionTrace'] = [];
         const allToolCalls: ToolCall[] = [];
         let pendingFunctionResponses: any[] = [];
+        let lastSuccessfulToolCall: LLMAgentResponse['lastSuccessfulToolCall'] = undefined;
+        let lastError: string | undefined = undefined;
 
         for (let i = 0; i < maxIterations; i++) {
             let result;
@@ -225,7 +227,16 @@ export class GeminiModel implements LLM {
             currentMessages.push({ role: 'assistant', content: textContent || null });
 
             if (functionCalls.length === 0) {
-                return { finalResult: textContent, toolCalls: allToolCalls, executionTrace, messages: currentMessages };
+                return {
+                    finalResult: textContent,
+                    toolCalls: allToolCalls,
+                    executionTrace,
+                    messages: currentMessages,
+                    success: false,
+                    lastSuccessfulToolCall,
+                    lastError: lastError || "No tool calls made",
+                    terminationReason: 'abort'
+                };
             }
 
             // Process all function calls and collect responses
@@ -239,6 +250,17 @@ export class GeminiModel implements LLM {
                 const toolResult = await toolExecutor(toolCall);
                 executionTrace.push({ toolCall, result: toolResult });
 
+                // Track successful results
+                if (toolResult.result?.resultForAgent?.success && toolResult.result?.fullResult) {
+                    lastSuccessfulToolCall = {
+                        toolCall: toolCall,
+                        result: toolResult.result.fullResult.data,
+                        metadata: toolResult.result.fullResult.config
+                    };
+                } else if (toolResult.result?.resultForAgent?.error) {
+                    lastError = toolResult.result.resultForAgent.error;
+                }
+
                 // Prepare function response for next iteration
                 pendingFunctionResponses.push({
                     functionResponse: {
@@ -248,11 +270,31 @@ export class GeminiModel implements LLM {
                 });
 
                 if (options?.shouldAbort?.({ toolCall, result: toolResult })) {
-                    return { finalResult: "Execution aborted by caller.", toolCalls: allToolCalls, executionTrace, messages: currentMessages };
+                    return {
+                        finalResult: lastSuccessfulToolCall?.result ?? "Execution aborted by caller.",
+                        toolCalls: allToolCalls,
+                        executionTrace,
+                        messages: currentMessages,
+                        success: !!lastSuccessfulToolCall,
+                        lastSuccessfulToolCall,
+                        lastError,
+                        terminationReason: lastSuccessfulToolCall ? 'success' : 'abort'
+                    };
                 }
             }
         }
-        throw new Error(`Maximum iterations (${maxIterations}) reached in executeTaskWithTools`);
+
+        // Max iterations reached
+        return {
+            finalResult: lastSuccessfulToolCall?.result ?? null,
+            toolCalls: allToolCalls,
+            executionTrace,
+            messages: currentMessages,
+            success: false,
+            lastSuccessfulToolCall,
+            lastError: lastError || `Maximum iterations (${maxIterations}) reached`,
+            terminationReason: 'max_iterations'
+        };
     }
 
     private cleanSchemaForGemini(schema: any): any {

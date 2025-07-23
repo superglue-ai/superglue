@@ -10,7 +10,7 @@ import * as telemetry from "../../utils/telemetry.js";
 import * as tools from "../../utils/tools.js";
 import * as transform from "../../utils/transform.js";
 import * as webhook from "../../utils/webhook.js";
-import { callResolver, executeWorkflowStep } from "../resolvers/call.js";
+import { callResolver, executeApiCall } from "../resolvers/call.js";
 
 // Mock dependencies
 vi.mock("../../utils/api.js");
@@ -74,7 +74,7 @@ describe('Call Resolver', () => {
         data: { result: 'success' }
       });
 
-      const result = await executeWorkflowStep(
+      const result = await executeApiCall(
         testInput.endpoint,
         testPayload,
         testCredentials,
@@ -107,7 +107,7 @@ describe('Call Resolver', () => {
       vi.mocked(Documentation.prototype.fetchAndProcess).mockResolvedValue('test docs');
       mockedApi.evaluateResponse.mockResolvedValueOnce({ success: true, shortReason: '', refactorNeeded: false });
 
-      const result = await executeWorkflowStep(
+      const result = await executeApiCall(
         testInput.endpoint,
         testPayload,
         testCredentials,
@@ -139,7 +139,7 @@ describe('Call Resolver', () => {
       // Mock evaluateResponse to consistently fail
       mockedApi.evaluateResponse.mockResolvedValue({ success: false, shortReason: 'Eval failed', refactorNeeded: false });
 
-      await expect(executeWorkflowStep(
+      await expect(executeApiCall(
         testInput.endpoint,
         testPayload,
         testCredentials,
@@ -168,7 +168,7 @@ describe('Call Resolver', () => {
         .mockResolvedValueOnce({ success: false, shortReason: 'Eval failed first time', refactorNeeded: false })
         .mockResolvedValueOnce({ success: true, shortReason: '', refactorNeeded: false });
 
-      const result = await executeWorkflowStep(
+      const result = await executeApiCall(
         testInput.endpoint,
         testPayload,
         testCredentials,
@@ -201,7 +201,7 @@ describe('Call Resolver', () => {
       // Add these missing mocks
       vi.mocked(Documentation.prototype.fetchAndProcess).mockResolvedValue('test docs');
 
-      await expect(executeWorkflowStep(
+      await expect(executeApiCall(
         testInput.endpoint,
         testPayload,
         testCredentials,

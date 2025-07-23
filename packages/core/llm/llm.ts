@@ -20,7 +20,7 @@ export interface LLM {
             previousResponseId?: string;
             shouldAbort?: (trace: { toolCall: ToolCall; result: ToolCallResult }) => boolean;
         }
-    ): Promise<LLMAutonomousResponse>;
+    ): Promise<LLMAgentResponse>;
 }
 
 export interface LLMToolResponse {
@@ -30,8 +30,8 @@ export interface LLMToolResponse {
     responseId?: string;  // For OpenAI conversation continuity
 }
 
-export interface LLMAutonomousResponse {
-    finalResult: any;
+export interface LLMAgentResponse {
+    finalResult: any; 
     toolCalls: ToolCall[];
     executionTrace: Array<{
         toolCall: ToolCall;
@@ -39,6 +39,14 @@ export interface LLMAutonomousResponse {
     }>;
     messages: OpenAI.Chat.ChatCompletionMessageParam[];
     responseId?: string;  // For OpenAI conversation continuity
+    success: boolean; 
+    lastSuccessfulToolCall?: {
+        toolCall: ToolCall;
+        result: any;  
+        metadata?: any;  
+    };
+    lastError?: string;  
+    terminationReason: 'success' | 'max_iterations' | 'abort' | 'error';
 }
 
 export interface LLMResponse {

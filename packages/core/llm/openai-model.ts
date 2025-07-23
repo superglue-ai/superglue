@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
 import { ToolCall, ToolCallResult, ToolDefinition } from "../tools/tools.js";
 import { addNullableToOptional } from "../utils/tools.js";
-import { LLM, LLMAutonomousResponse, LLMObjectResponse, LLMResponse } from "./llm.js";
+import { LLM, LLMAgentResponse, LLMObjectResponse, LLMResponse } from "./llm.js";
 
 
 export class OpenAIModel implements LLM {
@@ -233,7 +233,7 @@ export class OpenAIModel implements LLM {
     tools: ToolDefinition[],
     toolExecutor: (toolCall: ToolCall) => Promise<ToolCallResult>,
     options?: { maxIterations?: number; temperature?: number; previousResponseId?: string; shouldAbort?: (trace: { toolCall: ToolCall; result: ToolCallResult }) => boolean; }
-  ): Promise<LLMAutonomousResponse> {
+  ): Promise<LLMAgentResponse> {
     let responseId: string | null = null;
 
     const fnTools = tools.map(t => ({
@@ -243,19 +243,21 @@ export class OpenAIModel implements LLM {
       parameters: t.parameters
     }));
 
-    const executionTrace: LLMAutonomousResponse['executionTrace'] = [];
+    const executionTrace: LLMAgentResponse['executionTrace'] = [];
     const toolCalls: ToolCall[] = [];
     const maxIterations = options?.maxIterations ?? 10;
     const temperature = options?.temperature ?? 0.1;
 
     let lastAssistantText: string | null = null;
+    let lastSuccessfulToolCall: LLMAgentResponse['lastSuccessfulToolCall'] = undefined;
+    let lastError: string | undefined = undefined;
 
     for (let i = 0; i < maxIterations; i++) {
       const resp = await (this.model.responses.create as any)({
         model: process.env.OPENAI_MODEL || "gpt-4o",
         input: messages,
         previous_response_id: responseId ?? undefined,
-        tools: fnTools, 
+        tools: fnTools,
         tool_choice: "required",
         temperature: temperature,
         parallel_tool_calls: false,
@@ -276,6 +278,17 @@ export class OpenAIModel implements LLM {
           const result = await toolExecutor(call);
           executionTrace.push({ toolCall: call, result });
 
+          // Track successful results
+          if (result.result?.resultForAgent?.success && result.result?.fullResult) {
+            lastSuccessfulToolCall = {
+              toolCall: call,
+              result: result.result.fullResult.data,
+              metadata: result.result.fullResult.config
+            };
+          } else if (result.result?.resultForAgent?.error) {
+            lastError = result.result.resultForAgent.error;
+          }
+
           const truncatedResultForAgent = JSON.stringify(result.result?.resultForAgent ?? null).slice(0, 4_000);
           const msg = { type: "function_call_output", call_id: call.id, output: 'Output truncated to 4000 chars: ' + truncatedResultForAgent };
           messages.push(msg as any);
@@ -284,7 +297,17 @@ export class OpenAIModel implements LLM {
             if (lastAssistantText) {
               messages.push({ role: "assistant", content: lastAssistantText } as any);
             }
-            return { finalResult: lastAssistantText ?? "aborted", toolCalls, executionTrace, messages: messages, responseId };
+            return {
+              finalResult: lastSuccessfulToolCall?.result ?? lastAssistantText ?? "aborted",
+              toolCalls,
+              executionTrace,
+              messages: messages,
+              responseId,
+              success: !!lastSuccessfulToolCall,
+              lastSuccessfulToolCall,
+              lastError,
+              terminationReason: lastSuccessfulToolCall ? 'success' : 'abort'
+            };
           }
         } else if (out.type === "message") {
           lastAssistantText = out.content?.map(c => c.text).join("") || "";
@@ -295,9 +318,31 @@ export class OpenAIModel implements LLM {
         if (lastAssistantText) {
           messages.push({ role: "assistant", content: lastAssistantText } as any);
         }
-        return { finalResult: lastAssistantText ?? "", toolCalls, executionTrace, messages: messages, responseId };
+        return {
+          finalResult: lastAssistantText ?? "",
+          toolCalls,
+          executionTrace,
+          messages: messages,
+          responseId,
+          success: false,
+          lastSuccessfulToolCall,
+          lastError: lastError || "No tool calls made",
+          terminationReason: 'abort'
+        };
       }
     }
-    throw new Error(`Maximum iterations (${maxIterations}) reached in executeTaskWithTools`);
-  }
 
+    // Max iterations reached
+    return {
+      finalResult: lastSuccessfulToolCall?.result ?? null,
+      toolCalls,
+      executionTrace,
+      messages: messages,
+      responseId,
+      success: false,
+      lastSuccessfulToolCall,
+      lastError: lastError || `Maximum iterations (${maxIterations}) reached`,
+      terminationReason: 'max_iterations'
+    };
+  }
+}
