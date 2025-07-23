@@ -5,7 +5,7 @@ import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { LanguageModel } from "../llm/llm.js";
 import { parseFile } from "./file.js";
 import { callPostgres } from "./postgres.js";
-import { callAxios, composeUrl, evaluateStopCondition, replaceVariables, sample } from "./tools.js";
+import { callAxios, composeUrl, evaluateStopCondition, maskCredentials, replaceVariables, sample } from "./tools.js";
 
 export function convertBasicAuthToBase64(headerValue: string) {
   if (!headerValue) return headerValue;
@@ -111,9 +111,11 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
       (Array.isArray(response?.data?.errors) && response?.data?.errors.length > 0)
     ) {
       const error = JSON.stringify(response?.data?.error || response.data?.errors || response?.data || response?.statusText || "undefined");
+      // Mask credentials in the config before logging
+      const maskedConfig = maskCredentials(JSON.stringify(axiosConfig));
       let message = `${endpoint.method} ${url} failed with status ${response.status}.
 Response: ${String(error).slice(0, 1000)}
-config: ${JSON.stringify(axiosConfig)}`;
+config: ${maskedConfig}`;
 
       // Add specific context for rate limit errors
       if (response.status === 429) {

@@ -430,7 +430,7 @@ export const buildWorkflowImplementation: ToolImplementation<WorkflowBuildContex
                 integrationId: z.string().describe("The integration ID for this step"),
                 executionMode: z.enum(["DIRECT", "LOOP"]).describe("DIRECT for single execution, LOOP for iterating over collections"),
                 loopSelector: z.string().optional().describe("JavaScript function to select items to loop over. Format: (sourceData) => sourceData.items. Only required if executionMode is LOOP"),
-                inputMapping: z.string().optional().describe("OPTIONAL: JavaScript function to transform input data for this step. DO NOT USE unless the step specifically needs data transformation - by default all payload and previous step results are automatically available. Format: (sourceData) => ({ field1: sourceData.date, field2: sourceData.stepId.data }). Initial payload fields are at root level (sourceData.date), previous steps via stepId (sourceData.getUsers.users)"),
+                inputMapping: z.string().optional().describe("JavaScript function to transform accumulated data before this step. Format: (sourceData) => ({ field1: sourceData.date, field2: sourceData.stepId.data }). Access previous steps via sourceData.stepId. MUST throw descriptive errors if required data is missing - NO defensive programming with null/empty arrays as defaults. If null, all accumulated data passes through."),
                 apiConfig: z.object({
                     id: z.string().describe("Same as the step ID"),
                     instruction: z.string().describe("A concise instruction describing WHAT data this API call should retrieve or what action it should perform."),

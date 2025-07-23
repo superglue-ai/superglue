@@ -496,8 +496,10 @@ All transformations must be valid JavaScript arrow functions:
   * Initial payload fields are directly accessible: sourceData.date, sourceData.companies
   * Previous step results via stepId: sourceData.fetchUsers, sourceData.getProducts
   * Only use inputMapping when you need to reshape or combine data for a step
+  * MUST throw errors if required data is missing - Avoid silent failures
 - responseMapping: (sourceData) => sourceData.data.items
 - loopSelector: (sourceData) => sourceData.fetchUsers.users
+  * MUST throw error if expected array is missing rather than returning []. Exceptions can be cases if the instruction is "Get all users" and the API returns an empty array, in which case you should return [].
 - finalTransform: (sourceData) => ({ results: sourceData.processItems })
 
 CRITICAL DATA ACCESS PATTERNS:
@@ -515,31 +517,10 @@ CRITICAL DATA ACCESS PATTERNS:
    - WRONG: sourceData.getAllContacts.results.data ❌ (unless the API actually returns this structure)
    - RIGHT: sourceData.getAllContacts ✓ (check actual response structure)
 
-4. Defensive programming:
-   - Always validate data exists before using it
-   - Handle both array and non-array cases
-   - Provide sensible defaults
-
-Example robust loopSelector:
-(sourceData) => {
-  // Get contacts from previous step
-  const contacts = sourceData.getContactsCreatedAfterDate;
-  
-  // Ensure we have an array
-  if (!Array.isArray(contacts)) {
-    return [];
-  }
-  
-  // Filter based on company list from initial payload
-  const companyList = sourceData.companies || [];
-  
-  return contacts.filter(contact => {
-    const companyName = contact.properties?.company || 
-                       contact.properties?.company_name || 
-                       '';
-    return !companyList.includes(companyName);
-  });
-}
+4. Fail-fast approach (NO defensive programming):
+   - Throw explicit errors when required data is missing
+   - Never default to null, undefined, or empty arrays
+   - Make errors descriptive about what was expected
 </TRANSFORMATION_FUNCTIONS>
 
 <LOOP_EXECUTION>
