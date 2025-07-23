@@ -122,6 +122,11 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       setExecutionError(null);
       setActiveTab('results'); // Reset to default tab
     }
+    
+    // Clear validation errors when leaving prompt step
+    if (step !== 'prompt') {
+      setValidationErrors({});
+    }
   }, [step]);
 
   // Create integration options array with custom option first
@@ -263,10 +268,13 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       } catch {
         errors.payload = true;
       }
+      
+      setValidationErrors(errors);
+      
       if (Object.keys(errors).length > 0) {
         toast({
           title: 'Validation Error',
-          description: 'Please provide a valid instruction and JSON payload.',
+          description: 'Please fix the errors below before continuing.',
           variant: 'destructive',
         });
         return;
@@ -296,27 +304,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         const credentialsFromIntegrations = flattenAndNamespaceWorkflowCredentials(selectedIntegrations);
         setReviewCredentials(JSON.stringify(credentialsFromIntegrations, null, 2));
 
-        // Populate payload with required fields from inputSchema
-        if (response.inputSchema) {
-          try {
-            const defaultValues = generateDefaultFromSchema(response.inputSchema);
-            if (defaultValues.payload !== undefined && defaultValues.payload !== null) {
-              setPayload(JSON.stringify(defaultValues.payload, null, 2));
-            } else {
-              setPayload('{}');
-            }
-          } catch (error) {
-            console.warn('Failed to generate payload from schema:', error);
-            setPayload('{}');
-          }
-        } else {
-          setPayload('{}');
-        }
-
-        toast({
-          title: 'Workflow Built',
-          description: `Workflow "${response.id}" generated successfully.`,
-        });
         setStep(steps[currentIndex + 1]);
       } catch (error: any) {
         console.error('Error building workflow:', error);
@@ -797,9 +784,14 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                   <Textarea
                     id="instruction"
                     value={instruction}
-                    onChange={(e) => { setInstruction(e.target.value); }}
+                    onChange={(e) => { 
+                      setInstruction(e.target.value);
+                      if (e.target.value.trim()) {
+                        setValidationErrors(prev => ({ ...prev, instruction: false }));
+                      }
+                    }}
                     placeholder="e.g., 'Fetch customer details from CRM using the input email, then get their recent orders from productApi.'"
-                    className={cn("min-h-80")}
+                    className={cn("min-h-80", validationErrors.instruction && inputErrorStyles)}
                   />
                   {suggestions.length > 0 && !instruction && (
                     <div className="absolute bottom-0 p-3 pointer-events-none w-full">
@@ -819,6 +811,9 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                     </div>
                   )}
                 </div>
+                {validationErrors.instruction && (
+                  <p className="text-sm text-destructive mt-1">Workflow instruction is required</p>
+                )}
               </div>
 
               {/* Show loading state */}
@@ -832,26 +827,59 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                 <Label htmlFor="payload">Workflow Variables (Optional, JSON)</Label>
                 <HelpTooltip text="Provide dynamic variables for the workflow as a JSON object. Workflow variables are equivalent to your workflow's initial payload and can be referenced in the entire config. You can change them when you use the workflow later." />
                 <div className={cn(
-                  "flex-1 min-h-0 code-editor rounded-md border bg-transparent",
+                  "h-80 rounded-md border bg-transparent code-editor",
+                  validationErrors.payload && inputErrorStyles
                 )}>
-                  <Editor
-                    value={payload}
-                    onValueChange={(code) => {
-                      setPayload(code);
-                      try {
-                        JSON.parse(code);
-                        setValidationErrors(prev => ({ ...prev, payload: false }));
-                      } catch (e) {
-                        setValidationErrors(prev => ({ ...prev, payload: true }));
-                      }
-                    }}
-                    highlight={highlightJson}
-                    padding={10}
-                    tabSize={2}
-                    insertSpaces={true}
-                    className="font-mono text-xs w-full min-h-[60px] bg-transparent"
-                  />
+                  {/* Use plain textarea for large JSON (>5000 chars) for performance */}
+                  {payload.length > 5000 ? (
+                    <Textarea
+                      value={payload}
+                      onChange={(e) => {
+                        setPayload(e.target.value);
+                        try {
+                          JSON.parse(e.target.value || '{}');
+                          setValidationErrors(prev => ({ ...prev, payload: false }));
+                        } catch (e) {
+                          setValidationErrors(prev => ({ ...prev, payload: true }));
+                        }
+                      }}
+                      className={cn("h-80")}
+                      placeholder="{}"
+                      spellCheck={false}
+                    />
+                  ) : (
+                    <Editor
+                      value={payload}
+                      onValueChange={(code) => {
+                        setPayload(code);
+                        try {
+                          JSON.parse(code || '{}');
+                          setValidationErrors(prev => ({ ...prev, payload: false }));
+                        } catch (e) {
+                          setValidationErrors(prev => ({ ...prev, payload: true }));
+                        }
+                      }}
+                      highlight={highlightJson}
+                      padding={10}
+                      tabSize={2}
+                      insertSpaces={true}
+                      className="font-mono text-xs w-full h-80"
+                    />
+                  )}
                 </div>
+                {payload.length > 5000 && (
+                  <p className="text-xs text-muted-foreground">Large JSON detected - syntax highlighting disabled for performance</p>
+                )}
+                {validationErrors.payload && (
+                  <div className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5 bg-red-500/10 dark:bg-red-500/20 py-2 px-3 rounded-md mt-2">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                  <span>Invalid JSON format: Parse error</span>
+                </div>
+                )}
               </div>
             </div>
           )}
@@ -868,7 +896,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                   <div className="mb-2">
                     <Label>Instruction</Label>
                     <div className="font-mono text-sm text-foreground rounded py-1 mt-1 break-words flex items-start gap-2">
-                      {instruction}
+                      {String(instruction).length > 500 ? String(instruction).slice(0, 500) + '... [truncated]' : instruction}
                       <Button
                         variant="ghost"
                         size="icon"
@@ -938,31 +966,48 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                     <div className={cn(
                       "w-full max-w-full code-editor rounded-md border bg-transparent",
                     )}>
-                      <Editor
-                        value={payload}
-                        onValueChange={(code) => {
-                          setPayload(code);
-                        }}
-                        highlight={highlightJson}
-                        padding={10}
-                        tabSize={2}
-                        insertSpaces={true}
-                        className="font-mono text-xs w-full min-h-[60px] bg-transparent"
-                      />
+                      {/* Use plain textarea for large JSON (>5000 chars) for performance */}
+                      {payload.length > 5000 ? (
+                        <Textarea
+                          value={payload}
+                          onChange={(e) => {
+                            setPayload(e.target.value);
+                          }}
+                          className="font-mono text-xs w-full p-2.5"
+                          style={{ minHeight: '300px' }}
+                          placeholder="{}"
+                          spellCheck={false}
+                        />
+                      ) : (
+                        <Editor
+                          value={payload}
+                          onValueChange={(code) => {
+                            setPayload(code);
+                          }}
+                          highlight={highlightJson}
+                          padding={10}
+                          tabSize={2}
+                          insertSpaces={true}
+                          className="font-mono text-xs w-full min-h-[60px] bg-transparent"
+                        />
+                      )}
                     </div>
+                    {payload.length > 5000 && (
+                      <p className="text-xs text-muted-foreground">Large JSON detected - syntax highlighting disabled for performance</p>
+                    )}
                     {(() => {
                       try {
                         JSON.parse(payload);
                         return null;
-                      } catch {
+                      } catch (e) {
                         return (
-                          <div className="text-xs text-red-600 flex items-center gap-1.5 bg-red-500/10 py-1 px-2 rounded mt-2">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <div className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5 bg-red-500/10 dark:bg-red-500/20 py-2 px-3 rounded-md mt-2">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
                               <circle cx="12" cy="12" r="10" />
                               <line x1="12" y1="8" x2="12" y2="12" />
                               <line x1="12" y1="16" x2="12.01" y2="16" />
                             </svg>
-                            Invalid JSON format
+                            <span>Invalid JSON format: {e instanceof Error ? e.message : 'Parse error'}</span>
                           </div>
                         );
                       }
