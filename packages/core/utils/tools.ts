@@ -373,48 +373,18 @@ function oldReplaceVariables(template: string, variables: Record<string, any>): 
 export function validateVariableReferences(
   config: any,
   availableVariables: string[]
-): { valid: boolean; errors?: Array<{ field: string; variable: string; suggestion?: string }>; message?: string } {
+): { valid: boolean; errors?: Array<{ field: string; variable: string }>; message?: string } {
   const variablePattern = /<<([^>]+)>>/g;
-  const invalidVars: Array<{ field: string; variable: string; suggestion?: string }> = [];
-
-  // Helper to find closest matching variable
-  const findClosestVariable = (target: string, variables: string[]): string | undefined => {
-    const targetLower = target.toLowerCase();
-
-    // First try exact suffix match (e.g., "contactId" -> "currentItem_id")
-    const suffixMatch = variables.find(v =>
-      v.toLowerCase().endsWith(targetLower) ||
-      v.toLowerCase().endsWith('_' + targetLower)
-    );
-    if (suffixMatch) return suffixMatch;
-
-    // Then try contains match
-    const containsMatch = variables.find(v => v.toLowerCase().includes(targetLower));
-    if (containsMatch) return containsMatch;
-
-    // For common patterns
-    if (targetLower.includes('id') || targetLower.includes('identifier')) {
-      const idMatch = variables.find(v => v.toLowerCase().includes('_id'));
-      if (idMatch) return idMatch;
-    }
-
-    return undefined;
-  };
+  const invalidVars: Array<{ field: string; variable: string }> = [];
 
   // Check string for invalid variables
   const checkString = (str: string | undefined, field: string) => {
     if (!str || typeof str !== 'string') return;
-
+    
     let match;
-    const pattern = new RegExp(variablePattern);
-    while ((match = pattern.exec(str)) !== null) {
-      const varName = match[1];
-      if (!availableVariables.includes(varName)) {
-        invalidVars.push({
-          field,
-          variable: match[0],
-          suggestion: findClosestVariable(varName, availableVariables)
-        });
+    while ((match = variablePattern.exec(str)) !== null) {
+      if (!availableVariables.includes(match[1])) {
+        invalidVars.push({ field, variable: match[0] });
       }
     }
   };
@@ -424,28 +394,24 @@ export function validateVariableReferences(
   checkString(config.body, 'body');
 
   // Check headers
-  if (config.headers && typeof config.headers === 'object') {
+  if (config.headers) {
     Object.entries(config.headers).forEach(([key, value]) => {
       checkString(String(value), `headers.${key}`);
     });
   }
 
   // Check query params
-  if (config.queryParams && typeof config.queryParams === 'object') {
+  if (config.queryParams) {
     Object.entries(config.queryParams).forEach(([key, value]) => {
       checkString(String(value), `queryParams.${key}`);
     });
   }
 
   if (invalidVars.length > 0) {
-    const message = `Invalid variables found:\n${invalidVars.map(v =>
-      `- ${v.variable} in ${v.field}${v.suggestion ? ` (did you mean <<${v.suggestion}>>?)` : ''}`
-    ).join('\n')}`;
-
     return {
       valid: false,
       errors: invalidVars,
-      message
+      message: `Invalid variables found:\n${invalidVars.map(v => `- ${v.variable} in ${v.field}`).join('\n')}`
     };
   }
 
@@ -559,7 +525,6 @@ export function safeHttpMethod(method: any): HttpMethod {
   if (upper && validMethods.includes(upper)) return upper as HttpMethod;
   return "GET" as HttpMethod;
 }
-
 
 export async function evaluateStopCondition(
   stopConditionCode: string,

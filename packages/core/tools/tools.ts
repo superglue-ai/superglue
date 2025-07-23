@@ -12,7 +12,7 @@ import {
 export interface ToolDefinition {
     name: string;
     description: string;
-    parameters: {
+    arguments: {
         type: "object";
         properties: Record<string, any>;
         required?: string[];
@@ -47,7 +47,7 @@ export interface BaseToolContext {
 
 // Specific contexts extend the base
 export interface WorkflowExecutionContext extends BaseToolContext {
-    endpoint: ApiConfig;
+    originalEndpoint: ApiConfig;
     payload: Record<string, any>;
     credentials: Record<string, string>;
     options: RequestOptions;
@@ -111,10 +111,6 @@ export async function executeTool(toolCall: ToolCall, context: BaseToolContext):
             error: error instanceof Error ? error.message : String(error)
         };
     }
-}
-
-export function createToolExecutor(context: BaseToolContext) {
-    return (toolCall: ToolCall) => executeTool(toolCall, context);
 }
 
 export function getToolDefinitions(toolNames?: string[]): ToolDefinition[] {

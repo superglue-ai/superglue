@@ -12,7 +12,7 @@ export interface InstructionGenerationContext extends BaseToolContext {
 export const generateInstructionsDefinition: ToolDefinition = {
   name: "generate_instructions",
   description: "Generate specific, implementable workflow instructions for the available integrations.",
-  parameters: {
+  arguments: {
     type: "object",
     properties: {},
     required: []

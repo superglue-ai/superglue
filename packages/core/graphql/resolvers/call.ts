@@ -68,11 +68,11 @@ export async function executeApiCall(
     const errorMessage = initialError instanceof Error ? initialError.message : String(initialError);
     logMessage('info', `Initial API call failed, entering self-healing mode: ${errorMessage}`, metadata);
 
-    return executeWithAgentLoop(originalEndpoint, payload, credentials, options, metadata, integration, errorMessage);
+    return executeWithSelfHealing(originalEndpoint, payload, credentials, options, metadata, integration, errorMessage);
   }
 }
 
-async function executeWithAgentLoop(
+async function executeWithSelfHealing(
   originalEndpoint: ApiConfig,
   payload: any,
   credentials: Record<string, string>,
@@ -94,8 +94,8 @@ async function executeWithAgentLoop(
   }
 
   // Create global args for tools
-  const toolContext: WorkflowExecutionContext = {
-    endpoint: originalEndpoint,
+  const staticToolContext: WorkflowExecutionContext = {
+    originalEndpoint: originalEndpoint,
     payload: payload,
     credentials: credentials,
     options: options,
@@ -106,7 +106,7 @@ async function executeWithAgentLoop(
 
   // Simple tool executor
   const toolExecutor = async (toolCall: ToolCall): Promise<ToolCallResult> => {
-    return executeTool(toolCall, toolContext);
+    return executeTool(toolCall, staticToolContext);
   };
 
   const tools = [
@@ -152,7 +152,7 @@ Analyze the error and generate a corrected API configuration. Submit it using th
       tools,
       toolExecutor,
       {
-        maxIterations: 30,
+        maxIterations: 20,
         temperature: 0.1,
         shouldAbort: (trace) => {
           return trace.toolCall.name === 'submit_tool' &&
@@ -161,7 +161,6 @@ Analyze the error and generate a corrected API configuration. Submit it using th
       }
     );
 
-    // Check if we got a successful result
     if (result.success && result.lastSuccessfulToolCall) {
       const { result: data, additionalData: finalEndpoint } = result.lastSuccessfulToolCall;
 

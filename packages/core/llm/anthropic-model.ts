@@ -1,5 +1,4 @@
 import Anthropic from "@anthropic-ai/sdk";
-import OpenAI from "openai";
 import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
 import { ToolCall, ToolCallResult, ToolDefinition } from "../tools/tools.js";
 import { LLM, LLMAgentResponse, LLMObjectResponse, LLMResponse } from "./llm.js";
@@ -84,7 +83,7 @@ Your response must contain ONLY the JSON object within the <json> tags, with no 
         const fullSystem = system ? `${system}\n\n${dateMessage}` : dateMessage;
 
         const response = await this.client.messages.create({
-            model: process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-20241022",
+            model: this.model,
             system: fullSystem,
             messages: anthropicMessages,
             temperature,
@@ -183,7 +182,7 @@ Your response must contain ONLY the JSON object within the <json> tags, with no 
     }
 
     async executeTaskWithTools(
-        messages: OpenAI.Chat.ChatCompletionMessageParam[],
+        messages: ChatCompletionMessageParam[],
         tools: ToolDefinition[],
         toolExecutor: (toolCall: ToolCall) => Promise<ToolCallResult>,
         options?: {
@@ -196,7 +195,7 @@ Your response must contain ONLY the JSON object within the <json> tags, with no 
         const anthropicTools = tools.map(tool => ({
             name: tool.name,
             description: tool.description,
-            input_schema: tool.parameters
+            input_schema: tool.arguments
         }));
 
         const executionTrace: LLMAgentResponse['executionTrace'] = [];
@@ -220,7 +219,7 @@ Your response must contain ONLY the JSON object within the <json> tags, with no 
             const textContent = response.content.filter((block): block is Anthropic.TextBlock => block.type === 'text').map(block => block.text).join('\n');
             const toolUseBlocks = response.content.filter((block): block is Anthropic.ToolUseBlock => block.type === 'tool_use');
 
-            const assistantMessage: OpenAI.Chat.ChatCompletionMessageParam = { role: "assistant", content: textContent || null };
+            const assistantMessage: ChatCompletionMessageParam = { role: "assistant", content: textContent || null };
             if (toolUseBlocks.length > 0) {
                 assistantMessage.tool_calls = toolUseBlocks.map(tu => ({
                     id: tu.id,

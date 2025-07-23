@@ -1,5 +1,4 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import OpenAI from "openai";
 import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
 import { ToolCall, ToolCallResult, ToolDefinition } from "../tools/tools.js";
 import { LLM, LLMAgentResponse, LLMObjectResponse, LLMResponse, LLMToolResponse } from "./llm.js";
@@ -91,7 +90,7 @@ export class GeminiModel implements LLM {
         const functionDeclarations = tools.map(tool => ({
             name: tool.name,
             description: tool.description,
-            parameters: this.cleanSchemaForGemini(tool.parameters)
+            parameters: this.cleanSchemaForGemini(tool.arguments)
         }));
 
         const { geminiHistory, systemInstruction, userPrompt } = this.convertToGeminiHistory(messages);
@@ -102,7 +101,7 @@ export class GeminiModel implements LLM {
             : systemInstruction;
 
         const model = this.genAI.getGenerativeModel({
-            model: process.env.GEMINI_MODEL || "gemini-2.5-flash-preview-04-17",
+            model: this.model,
             systemInstruction: enhancedSystemInstruction + "\n\n" + "The current date and time is " + new Date().toISOString(),
             tools: [{
                 functionDeclarations
@@ -174,7 +173,7 @@ export class GeminiModel implements LLM {
     }
 
     async executeTaskWithTools(
-        messages: OpenAI.Chat.ChatCompletionMessageParam[],
+        messages: ChatCompletionMessageParam[],
         tools: ToolDefinition[],
         toolExecutor: (toolCall: ToolCall) => Promise<ToolCallResult>,
         options?: {
@@ -187,11 +186,11 @@ export class GeminiModel implements LLM {
         const functionDeclarations = tools.map(tool => ({
             name: tool.name,
             description: tool.description,
-            parameters: this.cleanSchemaForGemini(tool.parameters)
+            parameters: this.cleanSchemaForGemini(tool.arguments)
         }));
 
         const model = this.genAI.getGenerativeModel({
-            model: process.env.GEMINI_MODEL || "gemini-1.5-flash",
+            model: this.model,
             tools: [{ functionDeclarations }]
         });
 
@@ -334,7 +333,7 @@ export class GeminiModel implements LLM {
         return schema;
     }
 
-    private convertToGeminiHistory(messages: OpenAI.Chat.ChatCompletionMessageParam[]): { geminiHistory: any; systemInstruction: any; userPrompt: any; } {
+    private convertToGeminiHistory(messages: ChatCompletionMessageParam[]): { geminiHistory: any; systemInstruction: any; userPrompt: any; } {
         const geminiHistory: any[] = [];
         let userPrompt: any;
         let systemInstruction: any;

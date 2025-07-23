@@ -243,7 +243,7 @@ export class OpenAIModel implements LLM {
       type: 'function' as const,
       name: t.name,
       description: t.description,
-      parameters: t.parameters
+      parameters: t.arguments
     }));
 
     const executionTrace: LLMAgentResponse['executionTrace'] = [];

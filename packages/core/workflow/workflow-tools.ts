@@ -8,7 +8,7 @@ import { logMessage } from "../utils/logs.js";
 export const searchDocumentationToolDefinition: ToolDefinition = {
     name: "search_documentation",
     description: "Search integration documentation for specific information about API structure, endpoints, authentication patterns, etc. Use this when you need to understand how an API works, what endpoints are available, or how to authenticate. Returns relevant documentation excerpts matching your search query.",
-    parameters: {
+    arguments: {
         type: "object",
         properties: {
             integrationId: {
@@ -27,7 +27,7 @@ export const searchDocumentationToolDefinition: ToolDefinition = {
 export const submitToolDefinition: ToolDefinition = {
     name: "submit_tool",
     description: "Submit an API configuration to execute the API call. The tool will make the request, validate the response against the instruction, and return success or detailed error information.",
-    parameters: {
+    arguments: {
         type: "object",
         properties: {
             apiConfig: {
@@ -107,7 +107,7 @@ export const submitToolDefinition: ToolDefinition = {
 export const buildWorkflowToolDefinition: ToolDefinition = {
     name: "build_workflow",
     description: "Build a complete executable workflow from user instructions. All context including instruction, integrations, and payload are provided automatically.",
-    parameters: {
+    arguments: {
         type: "object",
         properties: {
             previousError: {
@@ -255,7 +255,7 @@ export const searchDocumentationToolImplementation: ToolImplementation<WorkflowE
 export const submitToolImplementation: ToolImplementation<WorkflowExecutionContext> = async (args, context) => {
     // Extract API config from args
     const { apiConfig } = args;
-    const { endpoint: originalEndpoint, payload, credentials, options = {}, integration } = context;
+    const { originalEndpoint: originalEndpoint, payload, credentials, options = {}, integration } = context;
 
     if (!apiConfig) {
         return {
