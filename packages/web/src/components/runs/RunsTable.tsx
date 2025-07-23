@@ -10,6 +10,7 @@ import {
   TableRow,
 } from "@/src/components/ui/table";
 import { RunResult, SuperglueClient } from '@superglue/client';
+import { Loader2 } from 'lucide-react';
 import React from 'react';
 
 const RunsTable = ({ id }: { id?: string }) => {
@@ -22,6 +23,8 @@ const RunsTable = ({ id }: { id?: string }) => {
   React.useEffect(() => {
     const getRuns = async () => {
       try {
+        setLoading(true);
+
         const superglueClient = new SuperglueClient({
           endpoint: config.superglueEndpoint,
           apiKey: config.superglueApiKey
@@ -39,7 +42,14 @@ const RunsTable = ({ id }: { id?: string }) => {
   }, [currentPage]);
 
   if (loading) {
-    return "";
+    return (
+      <div className="flex-1 flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">Loading runs...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
