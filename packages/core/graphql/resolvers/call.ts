@@ -155,9 +155,8 @@ Analyze the error and generate a corrected API configuration. Submit it using th
         maxIterations: 30,
         temperature: 0.1,
         shouldAbort: (trace) => {
-          // Stop when submit_tool succeeds
           return trace.toolCall.name === 'submit_tool' &&
-            trace.result.result?.resultForAgent?.success === true;
+            trace.result.result?.fullResult?.success === true;
         }
       }
     );

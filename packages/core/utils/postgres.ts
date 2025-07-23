@@ -27,9 +27,16 @@ function sanitizeDatabaseName(connectionString: string): string {
 
 export async function callPostgres(endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions): Promise<any> {
   const requestVars = { ...payload, ...credentials };
-  let connectionString = await replaceVariables(composeUrl(endpoint.urlHost, endpoint.urlPath), requestVars);
+  const urlHost = await replaceVariables(endpoint.urlHost, requestVars);
+  const urlPath = await replaceVariables(endpoint.urlPath, requestVars);
+  const body = await replaceVariables(endpoint.body, requestVars);
+
+  // Compose and sanitize connection string
+  let connectionString = composeUrl(urlHost, urlPath);
   connectionString = sanitizeDatabaseName(connectionString);
-  const query = await replaceVariables(JSON.parse(endpoint.body).query, requestVars);
+
+  // Parse query from body
+  const query = JSON.parse(body).query;
 
   const poolConfig: PoolConfig = {
     connectionString,

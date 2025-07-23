@@ -36,11 +36,11 @@ export const submitToolDefinition: ToolDefinition = {
                 properties: {
                     urlHost: {
                         type: "string",
-                        description: "The base URL host (e.g., https://api.example.com)"
+                        description: "The base URL host (e.g., https://api.example.com) or database connection string (e.g., postgres://user:pass@host:port)"
                     },
                     urlPath: {
                         type: "string",
-                        description: "The API endpoint path (e.g., /v1/users). Use <<variable>> syntax for dynamic values"
+                        description: "The API endpoint path (e.g., /v1/users) or database name for Postgres. Use <<variable>> syntax for dynamic values"
                     },
                     method: {
                         type: "string",
@@ -58,8 +58,8 @@ export const submitToolDefinition: ToolDefinition = {
                         additionalProperties: { type: "string" }
                     },
                     body: {
-                        type: "string",
-                        description: "Request body. Format as JSON if not instructed otherwise. Use <<>> to access variables."
+                        type: ["string", "object"],
+                        description: "Request body. For REST APIs: Format as JSON string if not instructed otherwise."
                     },
                     authentication: {
                         type: "string",
@@ -94,10 +94,10 @@ export const submitToolDefinition: ToolDefinition = {
                     },
                     instruction: {
                         type: "string",
-                        description: "REQUIRED: Specific instruction describing what this API call should achieve and what constitutes a successful response. Be precise about what data you expect. For exploratory calls, describe what information you're looking for (e.g., 'Get list of available contact properties' or 'Fetch contact details including all properties'). For action calls, describe the expected outcome (e.g., 'Update contact's lifecyclestage to lead and return the updated contact')."
+                        description: "OPTIONAL for self-healing: Only provide this when creating a new configuration, not when fixing an existing one. The original step instruction will be preserved. If provided, describes what this API call should achieve and what constitutes a successful response."
                     }
                 },
-                required: ["urlHost", "urlPath", "method", "instruction"]
+                required: ["urlHost", "urlPath", "method"]
             }
         },
         required: ["apiConfig"]
@@ -314,8 +314,8 @@ export const submitToolDefinitionImplementation: ToolImplementation<WorkflowExec
         const mergedConfig = {
             ...originalEndpoint,
             ...apiConfig,
-            // Always use the step-specific instruction from apiConfig
-            instruction: apiConfig.instruction,
+            // Preserve the original instruction - don't let self-healing change the step's purpose
+            instruction: originalEndpoint?.instruction || apiConfig.instruction,
             responseSchema: originalEndpoint?.responseSchema || apiConfig.responseSchema,
             id: originalEndpoint?.id || apiConfig.id,
             createdAt: originalEndpoint?.createdAt || new Date(),
@@ -430,7 +430,7 @@ export const buildWorkflowImplementation: ToolImplementation<WorkflowBuildContex
                 integrationId: z.string().describe("The integration ID for this step"),
                 executionMode: z.enum(["DIRECT", "LOOP"]).describe("DIRECT for single execution, LOOP for iterating over collections"),
                 loopSelector: z.string().optional().describe("JavaScript function to select items to loop over. Format: (sourceData) => sourceData.items. Only required if executionMode is LOOP"),
-                inputMapping: z.string().optional().describe("OPTIONAL: JavaScript function to transform input data for this step. Only needed when the step requires specific data reshaping. Format: (sourceData) => ({ field1: sourceData.date, field2: sourceData.stepId.data }). Initial payload fields are at root level (sourceData.date), previous steps via stepId (sourceData.getUsers.users)"),
+                inputMapping: z.string().optional().describe("OPTIONAL: JavaScript function to transform input data for this step. DO NOT USE unless the step specifically needs data transformation - by default all payload and previous step results are automatically available. Format: (sourceData) => ({ field1: sourceData.date, field2: sourceData.stepId.data }). Initial payload fields are at root level (sourceData.date), previous steps via stepId (sourceData.getUsers.users)"),
                 apiConfig: z.object({
                     id: z.string().describe("Same as the step ID"),
                     instruction: z.string().describe("A specific, concise instruction for what this single API call should achieve"),

@@ -23,9 +23,6 @@ export function convertBasicAuthToBase64(headerValue: string) {
 }
 
 export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions): Promise<{ data: any; }> {
-  if (endpoint.urlHost.startsWith("postgres")) {
-    return { data: await callPostgres(endpoint, payload, credentials, options) };
-  }
 
   const allVariables = { ...payload, ...credentials };
 
@@ -86,7 +83,17 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
       await replaceVariables(endpoint.body, requestVars) :
       "";
 
-    const url = await replaceVariables(composeUrl(endpoint.urlHost, endpoint.urlPath), requestVars);
+    // Replace variables in urlHost and urlPath separately
+    const replacedUrlHost = await replaceVariables(endpoint.urlHost, requestVars);
+    const replacedUrlPath = await replaceVariables(endpoint.urlPath, requestVars);
+
+    // Check for postgres BEFORE composing URL (which would add https://)
+    if (replacedUrlHost.startsWith("postgres://") || replacedUrlHost.startsWith("postgresql://")) {
+      return { data: await callPostgres(endpoint, payload, credentials, options) };
+    }
+
+    // For non-postgres endpoints, compose the URL normally
+    const url = composeUrl(replacedUrlHost, replacedUrlPath);
 
     const axiosConfig: AxiosRequestConfig = {
       method: endpoint.method,
