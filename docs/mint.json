@@ -59,6 +59,7 @@
       "pages": [
         "guides/self-hosting",
         "guides/architecture",
+        "guides/oauth-integrations",
         "guides/shopify",
         "guides/jira",
         "guides/hubspot"

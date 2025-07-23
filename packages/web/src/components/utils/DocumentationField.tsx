@@ -1,10 +1,11 @@
 'use client'
 
-import { Badge } from '@/src/components/ui/badge'
-import { Button } from '@/src/components/ui/button'
-import { URLField } from '@/src/components/utils/URLField'
-import { FileQuestion, FileText, Link, Upload } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { Badge } from '@/src/components/ui/badge';
+import { Button } from '@/src/components/ui/button';
+import { FileQuestion, FileText, Link, Upload } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { cn } from '../../lib/utils';
+import { Input } from '../ui/input';
 
 interface DocumentationFieldProps {
   url: string
@@ -148,12 +149,18 @@ export function DocumentationField({
         // Show URL field when no file is uploaded
         <div className="flex items-center gap-2">
           <div className="relative flex-1">
-            <URLField
-              url={localUrl}
-              onUrlChange={handleUrlChange}
+            <Input
+              value={localUrl}
+              onChange={(e) => handleUrlChange(e.target.value, '', {} )}
+              onBlur={() => {}}
               placeholder={placeholder}
-              error={urlError}
+              className={cn(
+                "pr-28",
+                urlError && "border-destructive focus-visible:ring-destructive"
+              )}
+              required={true}
             />
+
             <Badge variant="outline" className="absolute right-2 top-1/2 -translate-y-1/2 bg-background border">
               {activeType === 'url' ? (
                 <><Link className="h-3 w-3 mr-1" /> URL</>

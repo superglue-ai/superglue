@@ -7,5 +7,6 @@ export const config = {
         host: 'https://d22ze2hfwgrlye.cloudfront.net',
     },
     MAX_CALL_RETRIES: 10,
-    MAX_TRANSFORMATION_RETRIES: 10
+    MAX_TRANSFORMATION_RETRIES: 10,
+    DEFAULT_LOOP_MAX_ITERS: 100
 }
