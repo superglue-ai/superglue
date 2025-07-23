@@ -151,9 +151,7 @@ The function should return an array of items that this step will iterate over.`;
         }
       }
 
-      if (step.loopMaxIters > 0) {
-        loopItems = loopItems.slice(0, step.loopMaxIters);
-      }
+      loopItems = loopItems.slice(0, step.loopMaxIters || config.DEFAULT_LOOP_MAX_ITERS);
 
       const stepResults: WorkflowStepResult[] = [];
       let successfulConfig: ApiConfig | null = null;

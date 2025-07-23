@@ -7,15 +7,11 @@ import { LLM, LLMAgentResponse, LLMObjectResponse, LLMResponse } from "./llm.js"
 
 export class OpenAIModel implements LLM {
   public contextLength: number = 128000;
-  private client: OpenAI;
-  private model: string;
-
-  constructor(model: string = null) {
-    this.model = model || process.env.OPENAI_MODEL || "gpt-4.1";
-    this.client = new OpenAI({
+  private model: OpenAI;
+  constructor() {
+    this.model = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY || "",
       baseURL: process.env.OPENAI_BASE_URL,
-      timeout: 60000,
     });
   }
   async generateText(messages: ChatCompletionMessageParam[], temperature: number = 0): Promise<LLMResponse> {
