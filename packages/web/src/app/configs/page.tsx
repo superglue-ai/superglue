@@ -91,7 +91,7 @@ const ConfigTable = () => {
       setLoading(false);
       setIsRefreshing(false);
     }
-  }, [config, page, pageSize]);
+  }, [page, pageSize]);
 
   React.useEffect(() => {
     refreshConfigs();

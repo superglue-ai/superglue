@@ -7,12 +7,12 @@
   },
   "favicon": "/favicon.png",
   "colors": {
-    "primary": "#6A0DAD",
-    "light": "#6A0DAD",
-    "dark": "#6A0DAD",
+    "primary": "#FFA500",
+    "light": "#FFA500",
+    "dark": "#FFA500",
     "anchors": {
-      "from": "#6A0DAD",
-      "to": "#6A0DAD"
+      "from": "#FFA500",
+      "to": "#FFD700"
     }
   },
   "topbarLinks": [
@@ -59,6 +59,7 @@
       "pages": [
         "guides/self-hosting",
         "guides/architecture",
+        "guides/oauth-integrations",
         "guides/shopify",
         "guides/jira",
         "guides/hubspot"

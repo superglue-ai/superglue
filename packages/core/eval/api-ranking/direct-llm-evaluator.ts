@@ -4,7 +4,7 @@ import { logMessage } from '../../utils/logs.js';
 import { BaseWorkflowConfig } from '../utils/config-loader.js';
 
 export interface DirectLLMResult {
-    provider: 'chatgpt' | 'claude';
+    provider: 'claude-sonnet-4-20250514' | 'claude-opus-4-20250514' | 'gpt-4.1' | 'o4-mini' | 'gemini-2.5-flash';
     workflowId: string;
     workflowName: string;
     successRate: number;
@@ -23,53 +23,62 @@ export interface DirectLLMAttempt {
 }
 
 export class DirectLLMEvaluator {
-    private openaiModel: any = null;
-    private anthropicModel: any = null;
     private metadata: { orgId: string; userId: string };
 
     constructor(orgId: string = 'competitor-eval', userId: string = 'system') {
         this.metadata = { orgId, userId };
     }
 
-    private async getOpenAIModel() {
-        if (!this.openaiModel) {
-            const { OpenAIModel } = await import('../../llm/openai-model.js');
-            this.openaiModel = new OpenAIModel();
-        }
-        return this.openaiModel;
+    private async getOpenAIModel(modelName?: string) {
+        const { OpenAIModel } = await import('../../llm/openai-model.js');
+        return new OpenAIModel(modelName);
     }
 
-    private async getAnthropicModel() {
-        if (!this.anthropicModel) {
-            const { AnthropicModel } = await import('../../llm/anthropic-model.js');
-            this.anthropicModel = new AnthropicModel();
-        }
-        return this.anthropicModel;
+    private async getAnthropicModel(modelName?: string) {
+        const { AnthropicModel } = await import('../../llm/anthropic-model.js');
+        return new AnthropicModel(modelName);
+    }
+
+    private async getGeminiModel(modelName?: string) {
+        const { GeminiModel } = await import('../../llm/gemini-model.js');
+        return new GeminiModel(modelName);
     }
 
     /**
-     * Evaluate a workflow with ChatGPT and Claude
+     * Evaluate a workflow with multiple LLM models
      */
     async evaluateWorkflow(
         workflow: BaseWorkflowConfig,
         integrations: Integration[],
         maxAttempts: number
-    ): Promise<{ chatgpt: DirectLLMResult; claude: DirectLLMResult }> {
-        logMessage('info', `🤖 Evaluating workflow ${workflow.name} with ChatGPT and Claude`, this.metadata);
+    ): Promise<Record<DirectLLMResult['provider'], DirectLLMResult>> {
+        logMessage('info', `🤖 Evaluating workflow ${workflow.name} with multiple LLM models`, this.metadata);
 
-        const [chatgptResult, claudeResult] = await Promise.all([
-            this.evaluateWithProvider('chatgpt', workflow, integrations, maxAttempts),
-            this.evaluateWithProvider('claude', workflow, integrations, maxAttempts)
-        ]);
+        const providers: DirectLLMResult['provider'][] = [
+            'claude-sonnet-4-20250514',
+            'claude-opus-4-20250514',
+            'gpt-4.1',
+            'o4-mini',
+            'gemini-2.5-flash'
+        ];
 
-        return { chatgpt: chatgptResult, claude: claudeResult };
+        const results = await Promise.all(
+            providers.map(provider => 
+                this.evaluateWithProvider(provider, workflow, integrations, maxAttempts)
+            )
+        );
+
+        return providers.reduce((acc, provider, index) => {
+            acc[provider] = results[index];
+            return acc;
+        }, {} as Record<DirectLLMResult['provider'], DirectLLMResult>);
     }
 
     /**
      * Evaluate with a specific LLM provider
      */
     private async evaluateWithProvider(
-        provider: 'chatgpt' | 'claude',
+        provider: DirectLLMResult['provider'],
         workflow: BaseWorkflowConfig,
         integrations: Integration[],
         maxAttempts: number
@@ -95,6 +104,14 @@ export class DirectLLMEvaluator {
                     this.metadata
                 );
             }
+
+            // Force garbage collection between attempts (if running with --expose-gc)
+            if (global.gc) {
+                global.gc();
+            }
+
+            // Add small delay to prevent overwhelming the system
+            await new Promise(resolve => setTimeout(resolve, 100));
         }
 
         const successRate = successfulAttempts / maxAttempts;
@@ -114,7 +131,7 @@ export class DirectLLMEvaluator {
      * Run a single attempt with an LLM provider
      */
     private async runSingleAttempt(
-        provider: 'chatgpt' | 'claude',
+        provider: DirectLLMResult['provider'],
         workflow: BaseWorkflowConfig,
         integrations: Integration[],
         attemptNumber: number
@@ -136,9 +153,25 @@ export class DirectLLMEvaluator {
                 { role: 'user', content: prompt }
             ];
 
-            const model = provider === 'chatgpt'
-                ? await this.getOpenAIModel()
-                : await this.getAnthropicModel();
+            let model;
+            
+            switch (provider) {
+                case 'claude-sonnet-4-20250514':
+                    model = await this.getAnthropicModel('claude-sonnet-4-20250514');
+                    break;
+                case 'claude-opus-4-20250514':
+                    model = await this.getAnthropicModel('claude-opus-4-20250514');
+                    break;
+                case 'gpt-4.1':
+                    model = await this.getOpenAIModel('gpt-4.1');
+                    break;
+                case 'o4-mini':
+                    model = await this.getOpenAIModel('o4-mini');
+                    break;
+                case 'gemini-2.5-flash':
+                    model = await this.getGeminiModel('gemini-2.5-flash');
+                    break;
+            }
 
             const llmResponse = await model.generateText(messages, 0.1);
 
@@ -169,6 +202,15 @@ export class DirectLLMEvaluator {
         }
 
         attempt.executionTime = Date.now() - startTime;
+
+        // Truncate large results/code to save memory
+        if (attempt.generatedCode && attempt.generatedCode.length > 10000) {
+            attempt.generatedCode = attempt.generatedCode.substring(0, 10000) + '... [truncated]';
+        }
+        if (attempt.executionResult && JSON.stringify(attempt.executionResult).length > 10000) {
+            attempt.executionResult = { truncated: true, preview: JSON.stringify(attempt.executionResult).substring(0, 1000) };
+        }
+
         return attempt;
     }
 
@@ -315,7 +357,18 @@ Always wrap your code in <<CODE>> and <</CODE>> tags (note the closing tag has a
         `;
 
         try {
-            const result = await eval(wrappedCode);
+            // Create a timeout promise that rejects after 20 seconds
+            const TIMEOUT_MS = 20000;
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Code execution timed out after 20 seconds')), TIMEOUT_MS);
+            });
+
+            // Race the code execution against the timeout
+            const result = await Promise.race([
+                eval(wrappedCode),
+                timeoutPromise
+            ]);
+            
             return result;
         } catch (error) {
             throw new Error(`Code execution failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -360,6 +413,10 @@ Always wrap your code in <<CODE>> and <</CODE>> tags (note the closing tag has a
 
         if (!process.env.ANTHROPIC_API_KEY) {
             missing.push('ANTHROPIC_API_KEY');
+        }
+
+        if (!process.env.GEMINI_API_KEY) {
+            missing.push('GEMINI_API_KEY');
         }
 
         return {

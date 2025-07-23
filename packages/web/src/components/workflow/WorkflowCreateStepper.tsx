@@ -11,14 +11,13 @@ import { ArrowRight, Check, ChevronRight, FileText, Globe, Loader2, Pencil, Play
 import { useRouter } from 'next/navigation';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Editor from 'react-simple-code-editor';
 import type { SimpleIcon } from 'simple-icons';
 import * as simpleIcons from 'simple-icons';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { Switch } from '../ui/switch';
 import { Textarea } from '../ui/textarea';
 import { DocStatus } from '../utils/DocStatusSpinner';
 import { HelpTooltip } from '../utils/HelpTooltip';
@@ -114,8 +113,21 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     }
   }), [client]);
 
-  // Track previous pending IDs to detect completion
-  const previousPendingIdsRef = useRef<Set<string>>(new Set());
+  // Clear execution results when navigating away from review step
+  useEffect(() => {
+    // Don't clear on initial mount or when entering review
+    if (step !== 'review') {
+      setExecutionResult(null);
+      setFinalResult(null);
+      setExecutionError(null);
+      setActiveTab('results'); // Reset to default tab
+    }
+    
+    // Clear validation errors when leaving prompt step
+    if (step !== 'prompt') {
+      setValidationErrors({});
+    }
+  }, [step]);
 
   // Create integration options array with custom option first
   const integrationOptions = [
@@ -171,86 +183,9 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
 
   // Helper function to determine if integration has documentation
   const hasDocumentation = (integration: Integration) => {
-    // Check for direct documentation content or URL
-    const hasDirectDocs = !!(integration.documentation || integration.documentationUrl);
-
-    // For direct doc upload scenarios, if there's documentation content, consider it available
-    // even if documentationPending might be true (since it's already uploaded)
-    if (integration.documentation && integration.documentation.trim()) {
-      return true;
-    }
-
-    // For URL-based docs, check if not pending and has URL
-    if (integration.documentationUrl && !pendingDocIds.has(integration.id)) {
-      return true;
-    }
-
-    return hasDirectDocs;
+    // Check if integration has documentation URL and is not pending
+    return !!(integration.documentationUrl?.trim() && !pendingDocIds.has(integration.id));
   };
-
-  // Function to refresh documentation for a specific integration
-  const handleRefreshDocs = async (integrationId: string) => {
-    // Set pending state immediately
-    setPendingDocIds(prev => new Set([...prev, integrationId]));
-
-    try {
-      // Get current integration to upsert with documentationPending=true
-      const integration = integrations.find(i => i.id === integrationId);
-      if (!integration) return;
-
-      // Use documentationPending flag to trigger backend refresh
-      const upsertData = {
-        id: integration.id,
-        urlHost: integration.urlHost,
-        urlPath: integration.urlPath,
-        documentationUrl: integration.documentationUrl,
-        credentials: integration.credentials || {},
-        documentation: integration.documentation || '', // Keep existing docs
-        documentationPending: true // Trigger refresh
-      };
-
-      await client.upsertIntegration(integrationId, upsertData, UpsertMode.UPDATE);
-
-      // Use proper polling to wait for docs to be ready
-      const results = await waitForIntegrationReady([integrationId]);
-
-      if (results.length > 0 && results[0]?.documentation) {
-        // Success - docs are ready
-        setPendingDocIds(prev => new Set([...prev].filter(id => id !== integrationId)));
-      } else {
-        // Polling failed - reset documentationPending to false
-        await client.upsertIntegration(integrationId, {
-          ...upsertData,
-          documentationPending: false
-        }, UpsertMode.UPDATE);
-
-        setPendingDocIds(prev => new Set([...prev].filter(id => id !== integrationId)));
-      }
-
-    } catch (error) {
-      console.error('Error refreshing docs:', error);
-      // Reset documentationPending to false on error
-      try {
-        const integration = integrations.find(i => i.id === integrationId);
-        if (integration) {
-          await client.upsertIntegration(integrationId, {
-            id: integration.id,
-            urlHost: integration.urlHost,
-            urlPath: integration.urlPath,
-            documentationUrl: integration.documentationUrl,
-            credentials: integration.credentials || {},
-            documentation: integration.documentation || '',
-            documentationPending: false
-          }, UpsertMode.UPDATE);
-        }
-      } catch (resetError) {
-        console.error('Error resetting documentationPending:', resetError);
-      }
-
-      setPendingDocIds(prev => new Set([...prev].filter(id => id !== integrationId)));
-    }
-  };
-
   // --- Integration Management (add/edit) ---
   const handleIntegrationFormSave = async (integration: Integration) => {
     // Close form immediately
@@ -300,6 +235,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     setIntegrationFormEdit(null);
   };
 
+
   // --- Step Navigation ---
   const handleNext = async () => {
     const steps: WorkflowCreateStep[] = ['integrations', 'prompt', 'review', 'success'];
@@ -332,10 +268,13 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       } catch {
         errors.payload = true;
       }
+      
+      setValidationErrors(errors);
+      
       if (Object.keys(errors).length > 0) {
         toast({
           title: 'Validation Error',
-          description: 'Please provide a valid instruction and JSON payload.',
+          description: 'Please fix the errors below before continuing.',
           variant: 'destructive',
         });
         return;
@@ -365,27 +304,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         const credentialsFromIntegrations = flattenAndNamespaceWorkflowCredentials(selectedIntegrations);
         setReviewCredentials(JSON.stringify(credentialsFromIntegrations, null, 2));
 
-        // Populate payload with required fields from inputSchema
-        if (response.inputSchema) {
-          try {
-            const defaultValues = generateDefaultFromSchema(response.inputSchema);
-            if (defaultValues.payload !== undefined) {
-              setPayload(JSON.stringify(defaultValues.payload, null, 2));
-            } else {
-              setPayload('{}');
-            }
-          } catch (error) {
-            console.warn('Failed to generate payload from schema:', error);
-            setPayload('{}');
-          }
-        } else {
-          setPayload('{}');
-        }
-
-        toast({
-          title: 'Workflow Built',
-          description: `Workflow "${response.id}" generated successfully.`,
-        });
         setStep(steps[currentIndex + 1]);
       } catch (error: any) {
         console.error('Error building workflow:', error);
@@ -451,12 +369,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     if (step === 'integrations') {
       router.push('/configs');
       return;
-    }
-
-    if (step === 'review') {
-      setExecutionResult(null);
-      setFinalResult(null);
-      setExecutionError(null);
     }
 
     if (currentIndex > 0) {
@@ -622,19 +534,11 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
           {/* Step 1: Integrations */}
           {step === 'integrations' && (
             <div className="space-y-4">
-              <div className="mb-4">
-                <h3 className="mb-2 font-medium">
+              <div className="mb-4 flex items-center justify-between gap-4 px-4">
+                <h3 className="font-medium">
                   Select one or more integrations to use in your workflow. You can add new integrations as needed.
                 </h3>
-              </div>
-              <div className="mb-2 flex gap-2 items-center">
-                <Input
-                  placeholder="Search integrations..."
-                  value={integrationSearch}
-                  onChange={e => setIntegrationSearch(e.target.value)}
-                  className="w-full"
-                />
-                <Button variant="outline" size="sm" className="h-9" onClick={() => setShowIntegrationForm(true)}>
+                <Button variant="outline" size="sm" className="h-9 shrink-0" onClick={() => setShowIntegrationForm(true)}>
                   <Plus className="mr-2 h-4 w-4" /> Add Integration
                 </Button>
               </div>
@@ -650,14 +554,52 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                 ) : (
                   <div className="gap-2 flex flex-col">
                     {/* Header row */}
-                    <div className="flex items-center justify-between px-2 py-2 text-sm font-medium text-foreground border-b">
-                      <span>Integration</span>
+                    <div className="flex items-center justify-between px-4 py-2 text-sm font-medium text-foreground border-b gap-4">
+                      <Input
+                        placeholder="Search integrations..."
+                        value={integrationSearch}
+                        onChange={e => setIntegrationSearch(e.target.value)}
+                        className="h-8 text-sm flex-1"
+                      />
                       <div className="flex items-center gap-2">
-                        <span>Selected</span>
-                        <Button
-                          variant="default"
-                          size="icon"
-                          className="h-4 w-4 p-0"
+                        {(() => {
+                          const filteredIntegrations = integrations.filter(sys =>
+                            integrationSearch === '' ||
+                            sys.id.toLowerCase().includes(integrationSearch.toLowerCase()) ||
+                            sys.urlHost.toLowerCase().includes(integrationSearch.toLowerCase()) ||
+                            sys.urlPath.toLowerCase().includes(integrationSearch.toLowerCase())
+                          );
+                          const filteredIds = filteredIntegrations.map(i => i.id);
+                          const selectedCount = filteredIds.filter(id => selectedIntegrationIds.includes(id)).length;
+                          const allSelected = filteredIds.length > 0 && selectedCount === filteredIds.length;
+
+                          return (
+                            <span className="text-xs text-muted-foreground">
+                              {allSelected || selectedCount > 0 ? 'Unselect all' : 'Select all'}
+                            </span>
+                          );
+                        })()}
+                        <button
+                          className={cn(
+                            "h-5 w-5 rounded border-2 transition-all duration-200 flex items-center justify-center",
+                            (() => {
+                              const filteredIntegrations = integrations.filter(sys =>
+                                integrationSearch === '' ||
+                                sys.id.toLowerCase().includes(integrationSearch.toLowerCase()) ||
+                                sys.urlHost.toLowerCase().includes(integrationSearch.toLowerCase()) ||
+                                sys.urlPath.toLowerCase().includes(integrationSearch.toLowerCase())
+                              );
+                              const filteredIds = filteredIntegrations.map(i => i.id);
+                              const selectedCount = filteredIds.filter(id => selectedIntegrationIds.includes(id)).length;
+                              const allSelected = filteredIds.length > 0 && selectedCount === filteredIds.length;
+                              const someSelected = selectedCount > 0 && selectedCount < filteredIds.length;
+
+                              if (allSelected || someSelected) {
+                                return "bg-primary border-primary";
+                              }
+                              return "bg-background border-input hover:border-primary/50";
+                            })()
+                          )}
                           onClick={() => {
                             const filteredIntegrations = integrations.filter(sys =>
                               integrationSearch === '' ||
@@ -666,9 +608,10 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                               sys.urlPath.toLowerCase().includes(integrationSearch.toLowerCase())
                             );
                             const filteredIds = filteredIntegrations.map(i => i.id);
-                            const allSelected = filteredIds.length > 0 && filteredIds.every(id => selectedIntegrationIds.includes(id));
+                            const selectedCount = filteredIds.filter(id => selectedIntegrationIds.includes(id)).length;
+                            const allSelected = filteredIds.length > 0 && selectedCount === filteredIds.length;
 
-                            if (allSelected) {
+                            if (allSelected || selectedCount > 0) {
                               // Unselect all filtered
                               setSelectedIntegrationIds(ids => ids.filter(id => !filteredIds.includes(id)));
                             } else {
@@ -685,20 +628,30 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                               sys.urlPath.toLowerCase().includes(integrationSearch.toLowerCase())
                             );
                             const filteredIds = filteredIntegrations.map(i => i.id);
-                            const allSelected = filteredIds.length > 0 && filteredIds.every(id => selectedIntegrationIds.includes(id));
-                            return allSelected ? <Check className="h-2 w-2" /> : <div className="h-2 w-2" />;
+                            const selectedCount = filteredIds.filter(id => selectedIntegrationIds.includes(id)).length;
+                            const allSelected = filteredIds.length > 0 && selectedCount === filteredIds.length;
+                            const someSelected = selectedCount > 0 && selectedCount < filteredIds.length;
+
+                            if (allSelected) {
+                              return <Check className="h-3 w-3 text-primary-foreground" />;
+                            } else if (someSelected) {
+                              return <div className="h-0.5 w-2.5 bg-primary-foreground" />;
+                            }
+                            return null;
                           })()}
-                        </Button>
+                        </button>
                       </div>
                     </div>
                     {selectedIntegrationIds.length === 0 && integrations.length > 0 && (
-                      <div className="text-xs text-amber-800 dark:text-amber-300 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded whitespace-nowrap mx-4 mt-2">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                          <line x1="12" y1="9" x2="12" y2="13" />
-                          <line x1="12" y1="17" x2="12.01" y2="17" />
-                        </svg>
-                        Select at least one integration
+                      <div className="mx-4">
+                        <div className="text-xs text-amber-800 dark:text-amber-300 flex items-center gap-1.5 bg-amber-500/10 py-2 px-4 rounded-md">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                            <line x1="12" y1="9" x2="12" y2="13" />
+                            <line x1="12" y1="17" x2="12.01" y2="17" />
+                          </svg>
+                          Select at least one integration to continue
+                        </div>
                       </div>
                     )}
                     {integrations
@@ -714,11 +667,18 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                           <div
                             key={sys.id}
                             className={cn(
-                              "flex items-center justify-between rounded-md px-4 py-3 transition-colors",
+                              "flex items-center justify-between rounded-md px-4 py-3 transition-all duration-200 cursor-pointer",
                               selected
-                                ? "hover:bg-accent/50 border border-[#ffffff/10]"
-                                : "hover:bg-accent/50 border border-transparent"
+                                ? "bg-primary/10 dark:bg-primary/40 border border-primary/50 dark:border-primary/60 hover:bg-primary/15 dark:hover:bg-primary/25"
+                                : "bg-background border border-transparent hover:bg-accent/50 hover:border-border"
                             )}
+                            onClick={() => {
+                              if (selected) {
+                                setSelectedIntegrationIds(ids => ids.filter(i => i !== sys.id));
+                              } else {
+                                setSelectedIntegrationIds(ids => [...ids, sys.id]);
+                              }
+                            }}
                           >
                             <div className="flex items-center gap-3 flex-1 min-w-0">
                               {(() => {
@@ -740,7 +700,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                               })()}
                               <div className="flex flex-col min-w-0">
                                 <span className="font-medium truncate max-w-[200px]">{sys.id}</span>
-                                <span className="text-xs text-foreground truncate max-w-[240px]">
+                                <span className="text-xs text-muted-foreground truncate max-w-[240px]">
                                   {composeUrl(sys.urlHost, sys.urlPath)}
                                 </span>
                               </div>
@@ -771,17 +731,24 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                               >
                                 <Pencil className="h-4 w-4" />
                               </Button>
-                              <Switch
-                                className="custom-switch"
-                                checked={selected}
-                                onCheckedChange={(checked) => {
-                                  if (checked) {
-                                    setSelectedIntegrationIds(ids => [...ids, sys.id]);
-                                  } else {
+                              <button
+                                className={cn(
+                                  "h-5 w-5 rounded border-2 transition-all duration-200 flex items-center justify-center",
+                                  selected
+                                    ? "bg-primary border-primary"
+                                    : "bg-background border-input hover:border-primary/50"
+                                )}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (selected) {
                                     setSelectedIntegrationIds(ids => ids.filter(i => i !== sys.id));
+                                  } else {
+                                    setSelectedIntegrationIds(ids => [...ids, sys.id]);
                                   }
                                 }}
-                              />
+                              >
+                                {selected && <Check className="h-3 w-3 text-primary-foreground" />}
+                              </button>
                             </div>
                           </div>
                         );
@@ -817,9 +784,14 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                   <Textarea
                     id="instruction"
                     value={instruction}
-                    onChange={(e) => { setInstruction(e.target.value); }}
+                    onChange={(e) => { 
+                      setInstruction(e.target.value);
+                      if (e.target.value.trim()) {
+                        setValidationErrors(prev => ({ ...prev, instruction: false }));
+                      }
+                    }}
                     placeholder="e.g., 'Fetch customer details from CRM using the input email, then get their recent orders from productApi.'"
-                    className={cn("min-h-80")}
+                    className={cn("min-h-80", validationErrors.instruction && inputErrorStyles)}
                   />
                   {suggestions.length > 0 && !instruction && (
                     <div className="absolute bottom-0 p-3 pointer-events-none w-full">
@@ -839,6 +811,9 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                     </div>
                   )}
                 </div>
+                {validationErrors.instruction && (
+                  <p className="text-sm text-destructive mt-1">Workflow instruction is required</p>
+                )}
               </div>
 
               {/* Show loading state */}
@@ -852,26 +827,59 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                 <Label htmlFor="payload">Workflow Variables (Optional, JSON)</Label>
                 <HelpTooltip text="Provide dynamic variables for the workflow as a JSON object. Workflow variables are equivalent to your workflow's initial payload and can be referenced in the entire config. You can change them when you use the workflow later." />
                 <div className={cn(
-                  "flex-1 min-h-0 code-editor rounded-md border bg-transparent",
+                  "h-80 rounded-md border bg-transparent code-editor",
+                  validationErrors.payload && inputErrorStyles
                 )}>
-                  <Editor
-                    value={payload}
-                    onValueChange={(code) => {
-                      setPayload(code);
-                      try {
-                        JSON.parse(code);
-                        setValidationErrors(prev => ({ ...prev, payload: false }));
-                      } catch (e) {
-                        setValidationErrors(prev => ({ ...prev, payload: true }));
-                      }
-                    }}
-                    highlight={highlightJson}
-                    padding={10}
-                    tabSize={2}
-                    insertSpaces={true}
-                    className="font-mono text-xs w-full min-h-[60px] bg-transparent"
-                  />
+                  {/* Use plain textarea for large JSON (>5000 chars) for performance */}
+                  {payload.length > 5000 ? (
+                    <Textarea
+                      value={payload}
+                      onChange={(e) => {
+                        setPayload(e.target.value);
+                        try {
+                          JSON.parse(e.target.value || '{}');
+                          setValidationErrors(prev => ({ ...prev, payload: false }));
+                        } catch (e) {
+                          setValidationErrors(prev => ({ ...prev, payload: true }));
+                        }
+                      }}
+                      className={cn("h-80")}
+                      placeholder="{}"
+                      spellCheck={false}
+                    />
+                  ) : (
+                    <Editor
+                      value={payload}
+                      onValueChange={(code) => {
+                        setPayload(code);
+                        try {
+                          JSON.parse(code || '{}');
+                          setValidationErrors(prev => ({ ...prev, payload: false }));
+                        } catch (e) {
+                          setValidationErrors(prev => ({ ...prev, payload: true }));
+                        }
+                      }}
+                      highlight={highlightJson}
+                      padding={10}
+                      tabSize={2}
+                      insertSpaces={true}
+                      className="font-mono text-xs w-full h-80"
+                    />
+                  )}
                 </div>
+                {payload.length > 5000 && (
+                  <p className="text-xs text-muted-foreground">Large JSON detected - syntax highlighting disabled for performance</p>
+                )}
+                {validationErrors.payload && (
+                  <div className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5 bg-red-500/10 dark:bg-red-500/20 py-2 px-3 rounded-md mt-2">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                  <span>Invalid JSON format: Parse error</span>
+                </div>
+                )}
               </div>
             </div>
           )}
@@ -888,7 +896,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                   <div className="mb-2">
                     <Label>Instruction</Label>
                     <div className="font-mono text-sm text-foreground rounded py-1 mt-1 break-words flex items-start gap-2">
-                      {instruction}
+                      {String(instruction).length > 500 ? String(instruction).slice(0, 500) + '... [truncated]' : instruction}
                       <Button
                         variant="ghost"
                         size="icon"
@@ -958,31 +966,48 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                     <div className={cn(
                       "w-full max-w-full code-editor rounded-md border bg-transparent",
                     )}>
-                      <Editor
-                        value={payload}
-                        onValueChange={(code) => {
-                          setPayload(code);
-                        }}
-                        highlight={highlightJson}
-                        padding={10}
-                        tabSize={2}
-                        insertSpaces={true}
-                        className="font-mono text-xs w-full min-h-[60px] bg-transparent"
-                      />
+                      {/* Use plain textarea for large JSON (>5000 chars) for performance */}
+                      {payload.length > 5000 ? (
+                        <Textarea
+                          value={payload}
+                          onChange={(e) => {
+                            setPayload(e.target.value);
+                          }}
+                          className="font-mono text-xs w-full p-2.5"
+                          style={{ minHeight: '300px' }}
+                          placeholder="{}"
+                          spellCheck={false}
+                        />
+                      ) : (
+                        <Editor
+                          value={payload}
+                          onValueChange={(code) => {
+                            setPayload(code);
+                          }}
+                          highlight={highlightJson}
+                          padding={10}
+                          tabSize={2}
+                          insertSpaces={true}
+                          className="font-mono text-xs w-full min-h-[60px] bg-transparent"
+                        />
+                      )}
                     </div>
+                    {payload.length > 5000 && (
+                      <p className="text-xs text-muted-foreground">Large JSON detected - syntax highlighting disabled for performance</p>
+                    )}
                     {(() => {
                       try {
                         JSON.parse(payload);
                         return null;
-                      } catch {
+                      } catch (e) {
                         return (
-                          <div className="text-xs text-red-600 flex items-center gap-1.5 bg-red-500/10 py-1 px-2 rounded mt-2">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <div className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5 bg-red-500/10 dark:bg-red-500/20 py-2 px-3 rounded-md mt-2">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
                               <circle cx="12" cy="12" r="10" />
                               <line x1="12" y1="8" x2="12" y2="12" />
                               <line x1="12" y1="16" x2="12.01" y2="16" />
                             </svg>
-                            Invalid JSON format
+                            <span>Invalid JSON format: {e instanceof Error ? e.message : 'Parse error'}</span>
                           </div>
                         );
                       }

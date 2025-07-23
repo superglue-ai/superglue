@@ -15,17 +15,17 @@ function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined
 }
 
 function needsDocFetch(input: Integration, oldIntegration?: Integration): boolean {
-  if (input.documentationPending === true) return true;
-
-  // If there's manual documentation in the input, no need to fetch
-  if (input.documentation && input.documentation.trim() && !input.documentationPending) return false;
-
   // If there's no documentation URL, no need to fetch
   if (!input.documentationUrl || !input.documentationUrl.trim()) return false;
+  // If documentationUrl is a file:// URL, no need to fetch
+  if (input.documentationUrl.startsWith('file://')) return false;
+  // If documentationPending is explicitly set to true, always fetch
   // For URL-based docs, fetch if:
-  // 1. No old integration exists
-  // 2. URL/path has changed
-  // 3. Documentation URL has changed
+  // 1. DocumentationPending is explicitly set to true
+  // 2. No old integration exists
+  // 3. URL/path has changed
+  // 4. Documentation URL has changed
+  if (input.documentationPending === true) return true;
   if (!oldIntegration) return true;
   if (input.urlHost !== oldIntegration.urlHost) return true;
   if (input.urlPath !== oldIntegration.urlPath) return true;

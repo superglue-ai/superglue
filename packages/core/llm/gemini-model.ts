@@ -7,13 +7,15 @@ import { LLM, LLMAgentResponse, LLMObjectResponse, LLMResponse, LLMToolResponse 
 export class GeminiModel implements LLM {
     public contextLength: number = 1000000;
     private genAI: GoogleGenerativeAI;
-    constructor() {
+    private model: string;
+    constructor(model: string = null) {
         this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        this.model = model || process.env.GEMINI_MODEL || "gemini-2.5-flash";
     }
     async generateText(messages: ChatCompletionMessageParam[], temperature: number = 0): Promise<LLMResponse> {
         const { geminiHistory, systemInstruction, userPrompt } = this.convertToGeminiHistory(messages);
         const model = this.genAI.getGenerativeModel({
-            model: process.env.GEMINI_MODEL || "gemini-2.5-flash-preview-04-17",
+            model: this.model,
             systemInstruction: systemInstruction + "\n\n" + "The current date and time is " + new Date().toISOString(),
         });
 
@@ -46,7 +48,7 @@ export class GeminiModel implements LLM {
 
         const { geminiHistory, systemInstruction, userPrompt } = this.convertToGeminiHistory(messages);
         const model = this.genAI.getGenerativeModel({
-            model: process.env.GEMINI_MODEL || "gemini-2.5-flash-preview-04-17",
+            model: this.model,
             systemInstruction: systemInstruction + "\n\n" + "The current date and time is " + new Date().toISOString(),
         });
         const chatSession = model.startChat({

@@ -6,6 +6,7 @@ import { WorkflowExecutor } from "../../workflow/workflow-executor.js";
 
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { logMessage } from "../../utils/logs.js";
+import { isTokenExpired, refreshOAuthToken } from "../../utils/oauth.js";
 import { WorkflowBuilder } from "../../workflow/workflow-builder.js";
 
 function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined, defaultValue?: T): T | undefined {
@@ -93,6 +94,16 @@ export const executeWorkflowResolver = async (
           logMessage('warn', `Integration with id "${id}" not found, skipping.`, metadata);
         }
       });
+
+      // refresh oauth tokens if needed
+      for (const integration of integrations) {
+        if (integration && isTokenExpired(integration)) {
+          const refreshSuccess = await refreshOAuthToken(integration);
+          if (refreshSuccess) {
+            await context.datastore.upsertIntegration(integration.id, integration, context.orgId);
+          }
+        }
+      }
       const integrationCreds = flattenAndNamespaceWorkflowCredentials(integrations);
       mergedCredentials = { ...integrationCreds, ...(args.credentials || {}) };
     }

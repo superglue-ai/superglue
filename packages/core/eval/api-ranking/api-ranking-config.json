@@ -275,7 +275,7 @@
         "jira-sprint-health": {
             "id": "jira-sprint-health",
             "name": "JIRA Sprint Health Check",
-            "instruction": "Get all issues from the current active sprint, categorize them by status, calculate completion percentage, and identify any issues marked as Blocked or High Priority that are still in progress",
+            "instruction": "Get all issues from the current active sprint, categorize them by status, calculate completion percentage, and identify any issues marked as Blocked or High Priority that are still in progress. Empty response indicates a failure.",
             "integrationIds": [
                 "jira"
             ],
@@ -302,7 +302,7 @@
         "posthog-analytics": {
             "id": "posthog-analytics",
             "name": "PostHog Analytics",
-            "instruction": "Get the project IDs of all projects in my posthog account. For the first project, count the number of events in the last 30 days. Use the posthog query api. I want the final output to be a JSON object with the following structure: { \"project_id\": \"123\", \"event_count\": 100 }",
+            "instruction": "Get the project IDs of all projects in my posthog account. For the first project, count the number of events in the last 30 days. Use the posthog query api. I want the final output to be a JSON object with the following structure: { \"project_id\": \"xxx\", \"event_count\": xxx }",
             "integrationIds": [
                 "posthog"
             ],
@@ -418,7 +418,7 @@
         "monday-sprint-analysis": {
             "id": "monday-sprint-analysis",
             "name": "Monday.com Sprint Analysis",
-            "instruction": "Retrieve all tasks that are part of the sprint board specified in the payload input. Calculate the total number of tasks belonging to each status. Return the results as a JSON object with the following structure: { \"completed\": 10, \"in_progress\": 20, \"ready_to_start\": 30 }",
+            "instruction": "Retrieve all tasks that are part of the sprint board specified in the payload input. Calculate the total number of tasks belonging to each status. Return the results as a JSON object with the following structure: { \"completed\": xxx, \"in_progress\": xxx, \"ready_to_start\": xxx }",
             "integrationIds": [
                 "monday"
             ],
@@ -490,7 +490,7 @@
         "snowflake-list-tables"
     ],
     "settings": {
-        "attemptsPerWorkflow": 5,
+        "attemptsPerWorkflow": 3,
         "delayBetweenAttempts": 1000
     }
 }

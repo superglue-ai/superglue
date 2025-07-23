@@ -53,7 +53,6 @@ export class Documentation {
     }
 
     const fetchingStrategies: FetchingStrategy[] = [
-      new RawContentStrategy(),
       new GraphQLStrategy(),
       new PlaywrightFetchingStrategy(),
       new AxiosFetchingStrategy()
@@ -160,20 +159,6 @@ export class Documentation {
 }
 
 // --- Concrete Strategy Implementations ---
-
-class RawContentStrategy implements FetchingStrategy {
-  async tryFetch(config: ApiConfig, metadata: Metadata): Promise<string | null> {
-    if (!config.documentationUrl?.startsWith("http")) {
-      // It's raw content passed directly in the URL field
-      if (config.documentationUrl && config.documentationUrl.length > 0) {
-        logMessage('info', "Using raw content provided directly as documentation.", metadata);
-        return config.documentationUrl;
-      }
-      return null;
-    }
-    return null; // Not applicable
-  }
-}
 
 class GraphQLStrategy implements FetchingStrategy {
   private async fetchGraphQLSchema(url: string, config: ApiConfig, metadata: Metadata): Promise<any | null> {

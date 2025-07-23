@@ -196,6 +196,7 @@ export class WorkflowExecutor implements Workflow {
       }
     }
 
+    /* we don't validate the input schema until we have figured out how to fix the edge cases
     if (this.inputSchema) {
       const validator = new Validator();
       const optionalSchema = addNullableToOptional(this.inputSchema);
@@ -203,7 +204,7 @@ export class WorkflowExecutor implements Workflow {
       if (!validation.valid) {
         throw new Error("Invalid payload: " + validation.errors.map(e => e.message).join(", "));
       }
-    }
+    }*/
   }
 
   private async prepareStepInput(

@@ -1,6 +1,7 @@
 import type { ApiConfig, ExtractConfig, Integration, RunResult, TransformConfig, Workflow } from "@superglue/client";
 import fs from 'node:fs';
 import path from 'node:path';
+import { credentialEncryption } from "../utils/encryption.js";
 import { logMessage } from "../utils/logs.js";
 import type { DataStore } from "./types.js";
 
@@ -594,13 +595,28 @@ export class FileStore implements DataStore {
     if (!id) return null;
     const key = this.getKey('integration', id, orgId);
     const integration = this.storage.integrations.get(key);
-    return integration ? { ...integration, id } : null;
+    if (!integration) return null;
+    
+    // Decrypt credentials if encryption is enabled
+    const decryptedIntegration = { ...integration, id };
+    if (decryptedIntegration.credentials) {
+      decryptedIntegration.credentials = credentialEncryption.decrypt(decryptedIntegration.credentials);
+    }
+    
+    return decryptedIntegration;
   }
 
   async listIntegrations(limit = 10, offset = 0, orgId?: string): Promise<{ items: Integration[], total: number }> {
     await this.ensureInitialized();
     const orgItems = this.getOrgItems(this.storage.integrations, 'integration', orgId);
-    const items = orgItems.slice(offset, offset + limit);
+    const items = orgItems.slice(offset, offset + limit).map(integration => {
+      // Decrypt credentials if encryption is enabled
+      const decryptedIntegration = { ...integration };
+      if (decryptedIntegration.credentials) {
+        decryptedIntegration.credentials = credentialEncryption.decrypt(decryptedIntegration.credentials);
+      }
+      return decryptedIntegration;
+    });
     const total = orgItems.length;
     return { items, total };
   }
@@ -611,7 +627,15 @@ export class FileStore implements DataStore {
       .map(id => {
         const key = this.getKey('integration', id, orgId);
         const integration = this.storage.integrations.get(key);
-        return integration ? { ...integration, id } : null;
+        if (!integration) return null;
+        
+        // Decrypt credentials if encryption is enabled
+        const decryptedIntegration = { ...integration, id };
+        if (decryptedIntegration.credentials) {
+          decryptedIntegration.credentials = credentialEncryption.decrypt(decryptedIntegration.credentials);
+        }
+        
+        return decryptedIntegration;
       })
       .filter((i): i is Integration => i !== null);
   }
@@ -620,7 +644,16 @@ export class FileStore implements DataStore {
     await this.ensureInitialized();
     if (!id || !integration) return null;
     const key = this.getKey('integration', id, orgId);
-    this.storage.integrations.set(key, integration);
+    
+    // Create a copy of the integration to avoid modifying the original
+    const integrationToStore = { ...integration };
+    
+    // Encrypt credentials if encryption is enabled
+    if (integrationToStore.credentials) {
+      integrationToStore.credentials = credentialEncryption.encrypt(integrationToStore.credentials);
+    }
+    
+    this.storage.integrations.set(key, integrationToStore);
     await this.persist();
     return { ...integration, id };
   }

@@ -232,26 +232,32 @@ ${instruction ? `The user's original instruction for the transformation was: "${
 Return { success: true, reason: "Transformation is correct, complete, and aligns with the objectives." } if the transformed data accurately reflects the source data, matches the target schema, and (if provided) adheres to the user's instruction.
 If the transformation is incorrect, incomplete, introduces errors, misses crucial data from the source payload that could map to the target schema, or (if an instruction was provided) fails to follow it, return { success: false, reason: "Describe the issue with the transformation, specifically referencing how it deviates from the schema or instruction." }.
 Consider if all relevant parts of the sourcePayload have been used to populate the targetSchema where applicable.
+If transformedData is missing required or key fields (such as empty strings) while the sourcePayload clearly contains matching, decodable, or otherwise directly applicable data, this should be marked as a failure even if the mapping code appears structurally correct.
+In these cases, the what should be in the output according to visible sample source data takes priority over the mere presence or "correctness" of the mapping code.
 If the transformedData is empty or missing key fields, but the sourcePayload is not, this is likely an issue unless the targetSchema itself implies an empty object/missing fields are valid under certain source conditions.
 Focus on data accuracy and completeness of the mapping, and adherence to the instruction if provided.
 Keep in mind that you only get a sample of the source data and the transformed data. Samples mean that each array is randomized and reduced to the first 5 entries. If in doubt, check the mapping code. If that is correct, all is good.
-So, do NOT fail the evaluation if the arrays in the transformed data are different from the source data but the code is correct, look at the STRUCTURE of the data.
-Also, if data is missing from the transformed data it is not an issue, as long as the field is not required in the target schema. Be particularly lenient with arrays since the data might be sampled out.
+So, do NOT fail the evaluation if the arrays in the transformed data are different from the source data but the code is correct, look at the STRUCTURE of the data and the adherence of the transformedData to the targetSchema.
+Also, if data is not required in the target schema and is missing from the transformed data it is not an issue. Be particularly lenient with arrays since the data might be sampled out.
 `;
-    const userPrompt = `Target Schema:
+    const userPrompt = `
+<Target Schema>
 ${JSON.stringify(targetSchema, null, 2)}
+</Target Schema>
 
-Source Payload Sample (arrays are randomized and reduced to the first 5 entries, max 10KB):
+<Source Payload Sample> // arrays are randomized and reduced to the first 5 entries, max 10KB
 ${JSON.stringify(sample(sourcePayload, 5), null, 2).slice(0, 50000)}
+</Source Payload Sample>
 
-Transformed Data Sample (arrays are randomized and reduced to the first 5 entries, max 10KB):
+<Transformed Data Sample> // arrays are randomized and reduced to the first 5 entries, max 10KB
 ${JSON.stringify(sample(transformedData, 5), null, 2).slice(0, 50000)}
+</Transformed Data Sample>
 
-Please evaluate the transformation based on the criteria mentioned in the system prompt. 
-
-Here is the mapping code that was used to transform the data:
+<Mapping Code> // this is the code that was used to transform the data
 ${mappingCode}
-`;
+</Mapping Code>
+
+Critical:Please evaluate the transformation based on the criteria mentioned in the system prompt. `;
 
     const messages: ChatCompletionMessageParam[] = [
       { role: "system", content: systemPrompt },

@@ -6,6 +6,7 @@ import jsonata from "jsonata";
 import { Validator } from "jsonschema";
 import { toJsonSchema } from "../external/json-schema.js";
 import { HttpMethodEnum } from "../mcp/mcp-server.js";
+import { injectVMHelpersIndividually } from "./vm-helpers.js";
 
 export function isRequested(field: string, info: GraphQLResolveInfo) {
   return info.fieldNodes.some(
@@ -169,6 +170,10 @@ export async function applyJsonataWithValidation(data: any, expr: string, schema
 export async function executeAndValidateMappingCode(input: any, mappingCode: string, schema: any): Promise<TransformResult> {
   const isolate = new ivm.Isolate({ memoryLimit: 1024 }); // 32 MB
   const context = await isolate.createContext();
+  
+  // Inject helper functions into the context
+  await injectVMHelpersIndividually(context);
+  
   await context.global.set('input', JSON.stringify(input));
 
   let result: any;

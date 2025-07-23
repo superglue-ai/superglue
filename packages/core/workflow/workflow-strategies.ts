@@ -1,6 +1,7 @@
 import type { ApiConfig, ExecutionStep, RequestOptions, WorkflowStepResult } from "@superglue/client";
 import { SelfHealingMode } from "@superglue/client";
 import { Integration, Metadata } from "@superglue/shared";
+import { config } from "../default.js";
 import { executeApiCall } from "../graphql/resolvers/call.js";
 import { logMessage } from "../utils/logs.js";
 import { applyJsonata, applyTransformationWithValidation, flattenObject } from "../utils/tools.js";
