@@ -72,8 +72,8 @@
             "jira": {
                 "id": "jira",
                 "name": "JIRA",
-                "urlHost": "https://superglue-team-test.atlassian.net/rest/api/3",
-                "urlPath": "",
+                "urlHost": "https://superglue-team-test.atlassian.net/",
+                "urlPath": "rest/api/3",
                 "documentationUrl": "https://developer.atlassian.com/cloud/jira/platform/rest/v3",
                 "credentials": {
                     "email": "michael@superglue.ai",
