@@ -257,7 +257,7 @@ export class GeminiModel implements LLM {
                     lastSuccessfulToolCall = {
                         toolCall: toolCall,
                         result: toolResult.result.fullResult.data,
-                        supplementaryData: toolResult.result.fullResult.config
+                        additionalData: toolResult.result.fullResult.config
                     };
                 } else if (toolResult.result?.resultForAgent?.error) {
                     lastError = toolResult.result.resultForAgent.error;

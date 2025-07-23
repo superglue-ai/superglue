@@ -411,7 +411,15 @@ Further:
 - Assign descriptive stepIds in camelCase that indicate the purpose of the step
 - Make absolutely sure that each step can be achieved with a single API call (or a loop of the same call)
 - Aggregation, grouping, sorting, filtering is covered by a separate final transformation and does not need to be added as a dedicated step. However, if the API supports e.g. filtering when retrieving, this should be part of the retrieval step, just do not add an extra one.
-- Each generated step instruction should be specific based on your understanding of the API capabilities and contain information about what a successful response looks like / what the response should contain.
+
+Step Instructions:
+- Step instructions should focus on WHAT data to retrieve, not HOW the response is structured
+- AVOID specifying exact response field names or pagination structures in the instruction
+- BAD: "Get a page of products using cursor-based pagination with nodes and pageInfo (hasNextPage, endCursor)"
+- GOOD: "Retrieve products from the catalog"
+- BAD: "Fetch users and return them in a 'data.users' structure with 'next_page' token"
+- GOOD: "Get the list of active users"
+- The API's actual response structure will be discovered during execution - don't prescribe it
 </STEP_CREATION>
 
 <EXECUTION_MODES>

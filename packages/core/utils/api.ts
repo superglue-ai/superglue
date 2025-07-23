@@ -281,6 +281,8 @@ IMPORTANT CONSIDERATIONS:
   * Messaging/notification APIs that confirm delivery without response data
 - Always consider the instruction type and consult the API documentation when provided to understand expected response patterns
 - Do not assume empty responses are failures without checking the operation context
+- Focus on whether the response contains the REQUESTED DATA, not the exact structure. If the instruction asks for "products" and the response contains product data (regardless of field names), it's successful.
+- DO NOT fail validation just because field names differ from what's mentioned in the instruction.
 
 Do not make the mistake of thinking that the { success: true, shortReason: "", refactorNeeded: false } is the expected API response format. It is YOUR expected response format.
 Keep in mind that the response can come in any shape or form, just validate that the response aligns with the instruction.

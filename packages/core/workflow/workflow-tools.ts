@@ -433,7 +433,7 @@ export const buildWorkflowImplementation: ToolImplementation<WorkflowBuildContex
                 inputMapping: z.string().optional().describe("OPTIONAL: JavaScript function to transform input data for this step. DO NOT USE unless the step specifically needs data transformation - by default all payload and previous step results are automatically available. Format: (sourceData) => ({ field1: sourceData.date, field2: sourceData.stepId.data }). Initial payload fields are at root level (sourceData.date), previous steps via stepId (sourceData.getUsers.users)"),
                 apiConfig: z.object({
                     id: z.string().describe("Same as the step ID"),
-                    instruction: z.string().describe("A specific, concise instruction for what this single API call should achieve"),
+                    instruction: z.string().describe("A concise instruction describing WHAT data this API call should retrieve or what action it should perform."),
                     urlHost: z.string().describe("The base URL host (e.g., https://api.example.com)"),
                     urlPath: z.string().describe("The API endpoint path (e.g., /v1/users). Use <<variable>> syntax for dynamic values"),
                     method: z.enum(Object.values(HttpMethod) as [string, ...string[]]).describe("HTTP method: GET, POST, PUT, DELETE, or PATCH"),
