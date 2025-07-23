@@ -7,9 +7,12 @@ import { LLM, LLMAgentResponse, LLMObjectResponse, LLMResponse } from "./llm.js"
 
 export class OpenAIModel implements LLM {
   public contextLength: number = 128000;
-  private model: OpenAI;
-  constructor() {
-    this.model = new OpenAI({
+  private client: OpenAI;
+  private model: string;
+
+  constructor(model: string = null) {
+    this.model = model || process.env.OPENAI_MODEL || "gpt-4.1";
+    this.client = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY || "",
       baseURL: process.env.OPENAI_BASE_URL,
     });
@@ -30,8 +33,8 @@ export class OpenAIModel implements LLM {
 
     try {
       // Call Responses API
-      const response = await (this.model.responses.create as any)({
-        model: process.env.OPENAI_MODEL || "gpt-4o",
+      const response = await (this.client.responses.create as any)({
+        model: this.model,
         input: input as any,
         temperature: process.env.OPENAI_MODEL?.startsWith('o') ? undefined : temperature,
         store: false  // Don't store for simple text generation
@@ -66,7 +69,7 @@ export class OpenAIModel implements LLM {
     } catch (error) {
       console.error('Error in generateText with Responses API:', error);
       // Fall back to chat completions API
-      const result = await this.model.chat.completions.create({
+      const result = await this.client.chat.completions.create({
         messages: [dateMessage as ChatCompletionMessageParam, ...messages],
         model: process.env.OPENAI_MODEL || "gpt-4o",
         temperature: process.env.OPENAI_MODEL?.startsWith('o') ? undefined : temperature
@@ -158,7 +161,7 @@ export class OpenAIModel implements LLM {
     }
 
     try {
-      const response = await (this.model.responses.create as any)({
+      const response = await (this.client.responses.create as any)({
         model: process.env.OPENAI_MODEL || "gpt-4o",
         input: input as any,
         temperature: process.env.OPENAI_MODEL?.startsWith('o') ? undefined : temperature,
@@ -203,7 +206,7 @@ export class OpenAIModel implements LLM {
       console.error('Error in generateObject with Responses API:', error);
       // Fall back to chat completions API
       const responseFormat = schema ? { type: "json_schema", json_schema: { name: "response", strict: true, schema: schema } } : { type: "json_object" };
-      const result = await this.model.chat.completions.create({
+      const result = await this.client.chat.completions.create({
         messages: [dateMessage as ChatCompletionMessageParam, ...messages],
         model: process.env.OPENAI_MODEL || "gpt-4o",
         temperature: process.env.OPENAI_MODEL?.startsWith('o') ? undefined : temperature,
@@ -253,7 +256,7 @@ export class OpenAIModel implements LLM {
     let lastError: string | undefined = undefined;
 
     for (let i = 0; i < maxIterations; i++) {
-      const resp = await (this.model.responses.create as any)({
+      const resp = await (this.client.responses.create as any)({
         model: process.env.OPENAI_MODEL || "gpt-4o",
         input: messages,
         previous_response_id: responseId ?? undefined,

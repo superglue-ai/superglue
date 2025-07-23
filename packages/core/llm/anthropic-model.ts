@@ -9,11 +9,11 @@ export class AnthropicModel implements LLM {
     private client: Anthropic;
     private model: string;
 
-    constructor() {
+    constructor(model: string = null) {
+        this.model = model || process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
         this.client = new Anthropic({
             apiKey: process.env.ANTHROPIC_API_KEY || "",
         });
-        this.model = process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-20241022";
     }
 
     async generateText(messages: ChatCompletionMessageParam[], temperature: number = 0): Promise<LLMResponse> {
@@ -23,7 +23,7 @@ export class AnthropicModel implements LLM {
         const fullSystem = system ? `${system}\n\n${dateMessage}` : dateMessage;
 
         const response = await this.client.messages.create({
-            model: process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-20241022",
+            model: this.model,
             system: fullSystem,
             messages: anthropicMessages,
             temperature,
