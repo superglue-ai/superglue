@@ -239,8 +239,8 @@ export const buildWorkflowResolver = async (
 
   try {
     const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
-    const { instruction, payload={}, integrationIds, responseSchema } = args;
-   
+    const { instruction, payload = {}, integrationIds, responseSchema } = args;
+
     if (!instruction || instruction.trim() === "") {
       throw new Error("Instruction is required to build a workflow.");
     }
@@ -263,7 +263,7 @@ export const buildWorkflowResolver = async (
       payload,
       responseSchema,
       metadata
-    );  
+    );
     const workflow = await builder.buildWorkflow();
 
     workflow.id = await generateUniqueId({

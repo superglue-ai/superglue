@@ -1,9 +1,8 @@
 import { ExecutionStep, Integration, RequestOptions, Workflow, WorkflowResult, WorkflowStepResult } from "@superglue/client";
 import { Metadata } from "@superglue/shared";
-import { Validator } from "jsonschema";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { logMessage } from "../utils/logs.js";
-import { addNullableToOptional, applyTransformationWithValidation } from "../utils/tools.js";
+import { applyTransformationWithValidation } from "../utils/tools.js";
 import { evaluateMapping, generateTransformCode } from "../utils/transform.js";
 import { selectStrategy } from "./workflow-strategies.js";
 

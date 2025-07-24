@@ -5,7 +5,7 @@ import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { LanguageModel } from "../llm/llm.js";
 import { parseFile } from "./file.js";
 import { callPostgres } from "./postgres.js";
-import { callAxios, composeUrl, evaluateStopCondition, replaceVariables, sample } from "./tools.js";
+import { callAxios, composeUrl, evaluateStopCondition, maskCredentials, replaceVariables, sample } from "./tools.js";
 
 export function convertBasicAuthToBase64(headerValue: string) {
   if (!headerValue) return headerValue;
@@ -37,7 +37,7 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
 
   // Determine if we're using legacy pagination logic
   const hasStopCondition = endpoint.pagination && (endpoint.pagination as any).stopCondition;
-  const maxRequests = hasStopCondition ? MAX_PAGINATION_REQUESTS : 500; 
+  const maxRequests = hasStopCondition ? MAX_PAGINATION_REQUESTS : 500;
 
   while (hasMore && loopCounter < maxRequests) {
     // Generate pagination variables
