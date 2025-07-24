@@ -85,6 +85,7 @@ type Pagination {
   type: PaginationType!
   pageSize: String
   cursorPath: String
+  stopCondition: String
 }
 
 type RunList {
@@ -180,6 +181,7 @@ input PaginationInput {
   type: PaginationType!
   pageSize: String
   cursorPath: String
+  stopCondition: String
 }
 
 input ApiInput {

@@ -5,7 +5,7 @@ import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { LanguageModel } from "../llm/llm.js";
 import { parseFile } from "./file.js";
 import { callPostgres } from "./postgres.js";
-import { callAxios, composeUrl, evaluateStopCondition, maskCredentials, replaceVariables, sample } from "./tools.js";
+import { callAxios, composeUrl, evaluateStopCondition, replaceVariables, sample } from "./tools.js";
 
 export function convertBasicAuthToBase64(headerValue: string) {
   if (!headerValue) return headerValue;
@@ -35,7 +35,11 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
   let seenResponseHashes = new Set<string>();
   const MAX_PAGINATION_REQUESTS = 1000;
 
-  while (hasMore && loopCounter < MAX_PAGINATION_REQUESTS) {
+  // Determine if we're using legacy pagination logic
+  const hasStopCondition = endpoint.pagination && (endpoint.pagination as any).stopCondition;
+  const maxRequests = hasStopCondition ? MAX_PAGINATION_REQUESTS : 500; 
+
+  while (hasMore && loopCounter < maxRequests) {
     // Generate pagination variables
     let paginationVars = {
       page,
@@ -162,9 +166,9 @@ config: ${maskedConfig}`;
       }
     }
 
-    // Handle pagination based on stop condition
-    if (endpoint.pagination && (endpoint.pagination as any).stopCondition) {
-      // Evaluate stop condition
+    // Handle pagination based on whether stopCondition exists
+    if (hasStopCondition) {
+      // New logic: Use stop condition
       const pageInfo = {
         page,
         offset,
@@ -183,8 +187,15 @@ config: ${maskedConfig}`;
       }
 
       hasMore = !stopEval.shouldStop;
+
+      // Always add results when using stop condition (let the condition control when to stop)
+      if (Array.isArray(responseData)) {
+        allResults = allResults.concat(responseData);
+      } else if (responseData) {
+        allResults.push(responseData);
+      }
     } else {
-      // Legacy pagination logic - only used if no stop condition is provided
+      // Legacy logic: Original behavior for backwards compatibility
       if (Array.isArray(responseData)) {
         const pageSize = parseInt(endpoint.pagination?.pageSize || "50");
         if (!pageSize || responseData.length < pageSize) {
@@ -208,7 +219,7 @@ config: ${maskedConfig}`;
       }
     }
 
-    // update pagination variables
+    // Update pagination variables for next iteration
     if (hasMore && endpoint.pagination?.type === PaginationType.PAGE_BASED) {
       page++;
     }
@@ -229,11 +240,11 @@ config: ${maskedConfig}`;
     loopCounter++;
   }
 
-  if (loopCounter >= MAX_PAGINATION_REQUESTS && hasMore) {
+  if (loopCounter >= maxRequests && hasMore) {
     throw new Error(
-      `Pagination limit exceeded: Made ${MAX_PAGINATION_REQUESTS} requests but pagination stop condition still not met. ` +
-      `This may indicate an issue with the stop condition or an API that returns infinite results. ` +
-      `Stop condition: ${(endpoint.pagination as any)?.stopCondition || 'Not provided'}`
+      `Pagination limit exceeded: Made ${maxRequests} requests but pagination ${hasStopCondition ? 'stop condition still not met' : 'still has more pages'}. ` +
+      `This may indicate an issue with the ${hasStopCondition ? 'stop condition or an' : ''} API that returns infinite results. ` +
+      `${hasStopCondition ? `Stop condition: ${(endpoint.pagination as any)?.stopCondition || 'Not provided'}` : ''}`
     );
   }
 
@@ -281,8 +292,8 @@ IMPORTANT CONSIDERATIONS:
   * Deletion operations that return no content
   * Asynchronous operations that accept requests for processing
   * Messaging/notification APIs that confirm delivery without response data
+  * In cases where the instruction is a retrieval operation, an empty response is often a failure.
 - Always consider the instruction type and consult the API documentation when provided to understand expected response patterns
-- Do not assume empty responses are failures without checking the operation context
 - Focus on whether the response contains the REQUESTED DATA, not the exact structure. If the instruction asks for "products" and the response contains product data (regardless of field names), it's successful.
 - DO NOT fail validation just because field names differ from what's mentioned in the instruction.
 

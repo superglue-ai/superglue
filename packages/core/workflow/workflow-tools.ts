@@ -472,7 +472,7 @@ export const buildWorkflowImplementation: ToolImplementation<WorkflowBuildContex
         const { response: generatedWorkflow } = await LanguageModel.generateObject(
             finalMessages,
             builtWorkflowSchema,
-            0.1
+            0.0
         );
 
         const workflow = {
