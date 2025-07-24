@@ -6,17 +6,22 @@
   "exports": {
     ".": "./dist/index.js",
     "./templates": "./dist/templates.js",
-    "./utils": "./dist/utils.js"
+    "./utils": "./dist/utils.js",
+    "./utils/parseInvalidJSON": "./dist/utils/parseInvalidJSON.js"
   },
   "scripts": {
     "build": "tsc",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+     "test": "vitest"
   },
   "dependencies": {
     "openai": "^4.85.4"
   },
   "devDependencies": {
     "@types/node": "^20.17.19",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "@vitest/coverage-v8": "^1.6.1",
+    "tsconfig-paths": "^4.2.0",
+    "vitest": "^1.6.1"
   }
 }
