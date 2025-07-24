@@ -144,9 +144,7 @@ export async function transformAndValidateSchema(data: any, expr: string, schema
 export async function applyJsonataWithValidation(data: any, expr: string, schema: any): Promise<TransformResult> {
   try {
     const result = await applyJsonata(data, expr);
-    if (result === null || result === undefined) {
-      return { success: false, error: "Result is empty" };
-    }
+
     // if no schema is given, skip validation
     if (!schema) {
       return { success: true, data: result };
