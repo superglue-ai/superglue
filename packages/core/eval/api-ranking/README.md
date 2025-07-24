@@ -126,18 +126,8 @@ The generated code is executed in a sandboxed Node.js environment with:
 ### Scoring System
 
 ```
-Base Score = Success Rate (0-1)
-
-API Failure Penalty = min(0.2, failedApiCalls * 0.02)
-Time Penalty = min(0.1, max(0, (avgExecutionTime - 1000) / 90000))
-
-Final Score = Base Score - API Failure Penalty - Time Penalty
+Final Score = Average Success Rate (0-1) for each tested LLM
 ```
-
-**Scoring Components:**
-- **Success Rate**: Primary factor (0-100% mapped to 0-1)
-- **API Failures**: Each failed API call reduces score by 0.02 (max penalty: 0.2)
-- **Execution Time**: Fast workflows (<1s) get no penalty, slow workflows (>10s) get up to -0.1
 
 _Note: superglue is an integration layer designed specifically for agent-API integrations, not a general-purpose LLM. We included it to show the performance gap between specialized agent systems and general language models._
 
@@ -179,10 +169,8 @@ The API ranking system is configured through `api-ranking-config.json`:
 Required environment variables follow the pattern:
 `{INTEGRATION_ID}_{CREDENTIAL_KEY}` (all uppercase, hyphens replaced with underscores)
 
-For example:
-- `HUBSPOT_PRIVATE_APP_TOKEN`
-- `STRIPE_SECRET_KEY`
-- `GITHUB_API_KEY`
+All required keys:
+`HUBSPOT_PRIVATE_APP_TOKEN`, `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `JIRA_API_TOKEN`, `JIRA_EMAIL`, `ATTIO_API_TOKEN`, `SUPABASE_PASSWORD`, `SUPABASE_PUBLIC_API_KEY`, `SUPABASE_SECRET_KEY`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `SENDGRID_API_KEY`, `POSTGRES_LEGO_CONNECTION_STRING`, `POSTHOG_API_KEY`, `GITHUB_API_KEY`, `GITLAB_API_KEY`, `SLACK_BOT_TOKEN`, `BITBUCKET_API_TOKEN`, `BITBUCKET_EMAIL`, `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`, `ASANA_PERSONAL_ACCESS_TOKEN`, `NOTION_INTERNAL_INTEGRATION_SECRET`, `HUGGINGFACE_ACCESS_TOKEN`, `MONDAY_PERSONAL_API_TOKEN`, `SQUARE_SANDBOX_ACCESS_TOKEN`, `ZENDESK_API_TOKEN`, `ZENDESK_EMAIL`, `AIRTABLE_PERSONAL_ACCESS_TOKEN`, `SNOWFLAKE_PERSONAL_ACCESS_TOKEN`, `SNOWFLAKE_USER_NAME`, `SNOWFLAKE_ACCOUNT`
 
 #### LLM API Keys (Optional)
 For direct LLM comparison:
