@@ -4,13 +4,11 @@ import { Metadata } from "@superglue/shared";
 import axios from "axios";
 import { getIntrospectionQuery } from "graphql";
 import { NodeHtmlMarkdown } from "node-html-markdown";
+import { server_defaults } from '../default.js';
 import { LanguageModel } from "../llm/llm.js";
 import { logMessage } from "./logs.js";
 import { callPostgres } from './postgres.js';
 import { composeUrl } from "./tools.js";
-
-const DOC_AXIOS_TIMEOUT_MS = 60000;
-const DOC_PLAYWRIGHT_TIMEOUT_MS = 60000;
 
 // Strategy Interface
 interface FetchingStrategy {
@@ -103,9 +101,9 @@ export class Documentation {
       return documentation;
     }
     if (chunk_size <= 0) {
-      chunk_size = Documentation.MAX_LENGTH / 10;
+      chunk_size = Math.floor(Documentation.MAX_LENGTH / max_chunks);
     }
-    const MIN_SEARCH_TERM_LENGTH = 4;
+    const MIN_SEARCH_TERM_LENGTH = server_defaults.DOCUMENTATION_MIN_SEARCH_TERM_LENGTH;
 
     // Extract search terms from instruction
     const searchTerms = instruction?.toLowerCase()?.split(/[^a-z0-9]/)
@@ -171,7 +169,7 @@ class GraphQLStrategy implements FetchingStrategy {
           query: introspectionQuery,
           operationName: 'IntrospectionQuery'
         },
-        { headers: config.headers, params: config.queryParams, timeout: DOC_AXIOS_TIMEOUT_MS }
+        { headers: config.headers, params: config.queryParams, timeout: server_defaults.TIMEOUTS.AXIOS }
       );
 
       if (response.data.errors) {
@@ -226,7 +224,7 @@ export class AxiosFetchingStrategy implements FetchingStrategy {
         });
       }
 
-      const response = await axios.get(url.toString(), { headers: config.headers, timeout: DOC_AXIOS_TIMEOUT_MS });
+      const response = await axios.get(url.toString(), { headers: config.headers, timeout: server_defaults.TIMEOUTS.AXIOS });
       logMessage('info', `Successfully fetched content with axios for ${config.documentationUrl}`, metadata);
       return response.data;
     } catch (error) {
@@ -283,7 +281,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       await page.goto(url.toString());
       // Wait for network idle might be better for SPAs, but has risks of timeout
       // Let's stick with domcontentloaded + short timeout
-      await page.waitForLoadState('domcontentloaded', { timeout: DOC_PLAYWRIGHT_TIMEOUT_MS });
+      await page.waitForLoadState('domcontentloaded', { timeout: server_defaults.TIMEOUTS.PLAYWRIGHT });
       await page.waitForTimeout(1000); // Allow JS execution
 
       const links: Record<string, string> = await page.evaluate(() => {
@@ -347,7 +345,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       // Getting started
       "introduction", "getting started", "quickstart", "guide", "guides", "tutorial", "how to", "how-to",
       // API specific
-      "rest", "graphql", "openapi", "open-api", "swagger", "endpoints", "reference",
+      "rest", "graphql", "openapi", "open-api", "swagger", "endpoints", "reference", "query", "methods",
       // HTTP methods
       "get", "post", "put", "delete", "patch",
       // Common API concepts
@@ -372,16 +370,17 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       try {
         const linkResult = await this.fetchPageContentWithPlaywright(nextLink.href, config, metadata);
         fetchedLinks.add(nextLink.href);
-        if (linkResult?.content) {
-          combinedContent += combinedContent ? `\n\n${linkResult.content}` : linkResult.content;
+        
+        if (!linkResult?.content) continue;
+        
+        combinedContent += combinedContent ? `\n\n${linkResult.content}` : linkResult.content;
 
-          // Add newly discovered links to the pool (allow duplicates with different text)
-          if (linkResult.links) {
-            for (const [linkText, href] of Object.entries(linkResult.links)) {
-              if (this.shouldSkipLink(linkText, href)) continue;
-              linkPool.push({ linkText, href });
-            }
-          }
+        // Add newly discovered links to the pool (allow duplicates with different text)
+        if (!linkResult.links) continue;
+        
+        for (const [linkText, href] of Object.entries(linkResult.links)) {
+          if (this.shouldSkipLink(linkText, href)) continue;
+          linkPool.push({ linkText, href });
         }
       } catch (error) {
         logMessage('warn', `Failed to fetch link ${nextLink.href}: ${error?.message}`, metadata);
@@ -508,7 +507,7 @@ class OpenApiStrategy implements ProcessingStrategy {
         const baseUrl = config.documentationUrl ? new URL(config.documentationUrl).origin : config.urlHost;
         absoluteOpenApiUrl = composeUrl(baseUrl, openApiUrl);
       }
-      const openApiResponse = await axios.get(absoluteOpenApiUrl, { headers: config.headers, timeout: DOC_AXIOS_TIMEOUT_MS });
+      const openApiResponse = await axios.get(absoluteOpenApiUrl, { headers: config.headers, timeout: server_defaults.TIMEOUTS.AXIOS });
       const openApiData = openApiResponse.data;
 
       if (!openApiData) return null;

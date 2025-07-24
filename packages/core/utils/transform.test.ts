@@ -21,7 +21,7 @@ import { TransformConfig } from '@superglue/client';
 import dotenv from 'dotenv';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LanguageModel } from '../llm/llm.js';
-import { applyTransformationWithValidation } from './tools.js';
+import { transformAndValidateSchema } from './tools.js';
 import { executeTransform, generateTransformJsonata } from './transform.js';
 
 describe('transform utils', () => {
@@ -133,7 +133,7 @@ describe('transform utils', () => {
         data: samplePayload,
         metadata: { orgId: testOrgId }
       });
-      const result = await applyTransformationWithValidation(samplePayload, transform.config.responseMapping, sampleInput.responseSchema);
+      const result = await transformAndValidateSchema(samplePayload, transform.config.responseMapping, sampleInput.responseSchema);
       expect(result).toMatchObject({
         success: true,
         data: {
@@ -184,7 +184,7 @@ describe('transform utils', () => {
       const mapping = await generateTransformJsonata(sampleSchema, samplePayload, 'test-instruction', {});
       expect(mapping).toBeDefined();
 
-      const result = await applyTransformationWithValidation(samplePayload, mapping.jsonata, sampleSchema);
+      const result = await transformAndValidateSchema(samplePayload, mapping.jsonata, sampleSchema);
       expect(result).toEqual({
         success: true,
         data: {

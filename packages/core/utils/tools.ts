@@ -122,7 +122,7 @@ export function superglueJsonata(expr: string) {
   return expression;
 }
 
-export async function applyTransformationWithValidation(data: any, expr: string, schema: any): Promise<TransformResult> {
+export async function transformAndValidateSchema(data: any, expr: string, schema: any): Promise<TransformResult> {
   try {
     let result: TransformResult;
     if (!expr) {
@@ -170,10 +170,10 @@ export async function applyJsonataWithValidation(data: any, expr: string, schema
 export async function executeAndValidateMappingCode(input: any, mappingCode: string, schema: any): Promise<TransformResult> {
   const isolate = new ivm.Isolate({ memoryLimit: 1024 }); // 32 MB
   const context = await isolate.createContext();
-  
+
   // Inject helper functions into the context
   await injectVMHelpersIndividually(context);
-  
+
   await context.global.set('input', JSON.stringify(input));
 
   let result: any;
@@ -380,7 +380,7 @@ export function validateVariableReferences(
   // Check string for invalid variables
   const checkString = (str: string | undefined, field: string) => {
     if (!str || typeof str !== 'string') return;
-    
+
     let match;
     while ((match = variablePattern.exec(str)) !== null) {
       if (!availableVariables.includes(match[1])) {
@@ -550,7 +550,7 @@ export async function evaluateStopCondition(
           result === true;
       `;
 
-    const shouldStop = await context.eval(script, { timeout: 3000 });
+    const shouldStop = await context.evalClosure(script, null, { timeout: 3000 });
 
     return { shouldStop: Boolean(shouldStop) };
   } catch (error) {

@@ -61,10 +61,11 @@ export class WorkflowBuilder {
 
       const processedDoc = Documentation.postProcess(int.documentation || "", this.instruction);
       return baseInfo + `
-  Documentation:
+  <documentation>
   \`\`\`
   ${processedDoc || 'No documentation content available.'}
   \`\`\`
+  </documentation>
 </${int.id}>`;
     }).join("\n");
   }

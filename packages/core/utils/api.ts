@@ -2,6 +2,7 @@ import { type ApiConfig, FileType, PaginationType, type RequestOptions } from "@
 import type { AxiosRequestConfig } from "axios";
 import OpenAI from "openai";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
+import { server_defaults } from "../default.js";
 import { LanguageModel } from "../llm/llm.js";
 import { parseFile } from "./file.js";
 import { callPostgres } from "./postgres.js";
@@ -33,11 +34,10 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
   let hasMore = true;
   let loopCounter = 0;
   let seenResponseHashes = new Set<string>();
-  const MAX_PAGINATION_REQUESTS = 1000;
 
   // Determine if we're using legacy pagination logic
   const hasStopCondition = endpoint.pagination && (endpoint.pagination as any).stopCondition;
-  const maxRequests = hasStopCondition ? MAX_PAGINATION_REQUESTS : 500;
+  const maxRequests = hasStopCondition ? server_defaults.MAX_PAGINATION_REQUESTS : 500;
 
   while (hasMore && loopCounter < maxRequests) {
     // Generate pagination variables
@@ -52,17 +52,17 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
     // Combine all variables
     const requestVars = { ...paginationVars, ...allVariables };
 
-    // Generate request parameters with variables replaced
-    const headers = Object.fromEntries(
+    // Process headers - replace variables first
+    const headersWithReplacedVars = Object.fromEntries(
       (await Promise.all(
         Object.entries(endpoint.headers || {})
           .map(async ([key, value]) => [key, await replaceVariables(value, requestVars)])
       )).filter(([_, value]) => value && value !== "undefined" && value !== "null")
     );
 
-    // Process headers for Auth
+    // Apply auth processing to headers
     const processedHeaders = {};
-    for (const [key, value] of Object.entries(headers)) {
+    for (const [key, value] of Object.entries(headersWithReplacedVars)) {
       let processedValue = value;
       // Remove duplicate auth prefixes (e.g. "Basic Basic " or "Bearer Bearer ")
       if (key.toLowerCase() === 'authorization' && typeof value === 'string') {
@@ -76,35 +76,43 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
       processedHeaders[key] = processedValue;
     }
 
-    const queryParams = Object.fromEntries(
+    // Process query parameters - replace variables
+    const processedQueryParams = Object.fromEntries(
       (await Promise.all(
         Object.entries(endpoint.queryParams || {})
           .map(async ([key, value]) => [key, await replaceVariables(value, requestVars)])
       )).filter(([_, value]) => value && value !== "undefined" && value !== "null")
     );
 
-    const body = endpoint.body ?
+    // Process body - replace variables
+    const processedBody = endpoint.body ?
       await replaceVariables(endpoint.body, requestVars) :
       "";
 
-    // Replace variables in urlHost and urlPath separately
-    const replacedUrlHost = await replaceVariables(endpoint.urlHost, requestVars);
-    const replacedUrlPath = await replaceVariables(endpoint.urlPath, requestVars);
+    // Process URL components - replace variables
+    const processedUrlHost = await replaceVariables(endpoint.urlHost, requestVars);
+    const processedUrlPath = await replaceVariables(endpoint.urlPath, requestVars);
 
     // Check for postgres BEFORE composing URL (which would add https://)
-    if (replacedUrlHost.startsWith("postgres://") || replacedUrlHost.startsWith("postgresql://")) {
-      return { data: await callPostgres(endpoint, payload, credentials, options) };
+    if (processedUrlHost.startsWith("postgres://") || processedUrlHost.startsWith("postgresql://")) {
+      const postgresEndpoint = {
+        ...endpoint,
+        urlHost: processedUrlHost,
+        urlPath: processedUrlPath,
+        body: processedBody
+      };
+      return { data: await callPostgres(postgresEndpoint, payload, credentials, options) };
     }
 
     // For non-postgres endpoints, compose the URL normally
-    const url = composeUrl(replacedUrlHost, replacedUrlPath);
+    const processedUrl = composeUrl(processedUrlHost, processedUrlPath);
 
     const axiosConfig: AxiosRequestConfig = {
       method: endpoint.method,
-      url: url,
+      url: processedUrl,
       headers: processedHeaders,
-      data: body,
-      params: queryParams,
+      data: processedBody,
+      params: processedQueryParams,
       timeout: options?.timeout || 60000,
     };
 
@@ -117,7 +125,7 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
       const error = JSON.stringify(response?.data?.error || response.data?.errors || response?.data || response?.statusText || "undefined");
       // Mask credentials in the config before logging
       const maskedConfig = maskCredentials(JSON.stringify(axiosConfig));
-      let message = `${endpoint.method} ${url} failed with status ${response.status}.
+      let message = `${endpoint.method} ${processedUrl} failed with status ${response.status}.
 Response: ${String(error).slice(0, 1000)}
 config: ${maskedConfig}`;
 
@@ -137,7 +145,7 @@ config: ${maskedConfig}`;
     if (typeof response.data === 'string' &&
       (response.data.slice(0, 100).trim().toLowerCase().startsWith('<!doctype html') ||
         response.data.slice(0, 100).trim().toLowerCase().startsWith('<html'))) {
-      throw new Error(`Received HTML response instead of expected JSON data from ${url}. 
+      throw new Error(`Received HTML response instead of expected JSON data from ${processedUrl}. 
         This usually indicates an error page or invalid endpoint.\nResponse: ${response.data.slice(0, 2000)}`);
     }
 

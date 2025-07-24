@@ -2,7 +2,7 @@ import { ExecutionStep, Integration, RequestOptions, Workflow, WorkflowResult, W
 import { Metadata } from "@superglue/shared";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { logMessage } from "../utils/logs.js";
-import { applyTransformationWithValidation } from "../utils/tools.js";
+import { transformAndValidateSchema } from "../utils/tools.js";
 import { evaluateMapping, generateTransformCode } from "../utils/transform.js";
 import { selectStrategy } from "./workflow-strategies.js";
 
@@ -113,7 +113,7 @@ export class WorkflowExecutor implements Workflow {
         try {
           // Apply the final transform using the original data
           let currentFinalTransform = this.finalTransform || "(sourceData) => sourceData";
-          const finalResult = await applyTransformationWithValidation(rawStepData, currentFinalTransform, this.responseSchema);
+          const finalResult = await transformAndValidateSchema(rawStepData, currentFinalTransform, this.responseSchema);
           if (!finalResult.success) {
             throw new Error(finalResult.error);
           }
@@ -229,7 +229,7 @@ export class WorkflowExecutor implements Workflow {
       if (step.inputMapping) {
         // Use JS transform for input mapping
         try {
-          const transformResult = await applyTransformationWithValidation(
+          const transformResult = await transformAndValidateSchema(
             mappingContext,
             step.inputMapping,
             null // No schema validation for input mappings

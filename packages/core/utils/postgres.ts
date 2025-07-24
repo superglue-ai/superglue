@@ -1,6 +1,6 @@
 import { ApiConfig, RequestOptions } from "@superglue/client";
 import { Pool, PoolConfig } from 'pg';
-import { composeUrl, replaceVariables } from "./tools.js";
+import { composeUrl } from "./tools.js";
 
 const DEFAULT_TIMEOUT = 30000; // 30 seconds
 const DEFAULT_RETRIES = 0;
@@ -25,18 +25,35 @@ function sanitizeDatabaseName(connectionString: string): string {
   return baseUrl + cleanDbName;
 }
 
-export async function callPostgres(endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions): Promise<any> {
-  const requestVars = { ...payload, ...credentials };
-  const urlHost = await replaceVariables(endpoint.urlHost, requestVars);
-  const urlPath = await replaceVariables(endpoint.urlPath, requestVars);
-  const body = await replaceVariables(endpoint.body, requestVars);
+export async function callPostgres(
+  endpointWithProcessedValues: ApiConfig,
+  payload: Record<string, any>,
+  credentials: Record<string, any>,
+  options: RequestOptions
+): Promise<any> {
+  // IMPORTANT: This function expects urlHost, urlPath, and body to have variables already replaced
+  // Variable replacement should be done by the caller (callEndpoint) before calling this function
 
-  // Compose and sanitize connection string
-  let connectionString = composeUrl(urlHost, urlPath);
+  let connectionString = composeUrl(endpointWithProcessedValues.urlHost, endpointWithProcessedValues.urlPath);
   connectionString = sanitizeDatabaseName(connectionString);
 
-  // Parse query from body
-  const query = JSON.parse(body).query;
+  // Parse query from pre-processed body
+  if (!endpointWithProcessedValues.body) {
+    throw new Error("PostgreSQL query body is required");
+  }
+
+  let parsedBody;
+  try {
+    parsedBody = JSON.parse(endpointWithProcessedValues.body);
+  } catch (e) {
+    throw new Error(`Invalid PostgreSQL query body: ${e.message}`);
+  }
+
+  if (!parsedBody.query) {
+    throw new Error("PostgreSQL query body must contain a 'query' field");
+  }
+
+  const query = parsedBody.query;
 
   const poolConfig: PoolConfig = {
     connectionString,

@@ -1,9 +1,14 @@
-import { SelfHealingMode } from "@superglue/client";
+import { AuthType, HttpMethod, SelfHealingMode } from "@superglue/client";
 import type { ChatCompletionMessageParam } from "openai/resources/index.mjs";
 import { LanguageModel } from "../llm/llm.js";
 import { ToolDefinition, ToolImplementation, WorkflowBuildContext, WorkflowExecutionContext } from "../tools/tools.js";
 import { Documentation } from "../utils/documentation.js";
 import { logMessage } from "../utils/logs.js";
+import { validateVariableReferences } from "../utils/tools.js";
+import { callEndpoint } from "../utils/api.js";
+import { evaluateResponse } from "../utils/api.js";
+import { zodToJsonSchema } from "zod-to-json-schema";
+import { z } from "zod";
 
 export const searchDocumentationToolDefinition: ToolDefinition = {
     name: "search_documentation",
@@ -61,15 +66,6 @@ export const submitToolDefinition: ToolDefinition = {
                         type: ["string", "object"],
                         description: "Request body. For REST APIs: Format as JSON string if not instructed otherwise."
                     },
-                    authentication: {
-                        type: "string",
-                        enum: ["NONE", "HEADER", "QUERY_PARAM", "OAUTH2"],
-                        description: "Authentication type: NONE (no auth), HEADER (for Bearer/Basic/ApiKey in headers), QUERY_PARAM (for API key in URL), or OAUTH2"
-                    },
-                    dataPath: {
-                        type: "string",
-                        description: "JSONPath to extract data from response (e.g., 'data.items' or 'results[*].id')"
-                    },
                     pagination: {
                         type: "object",
                         properties: {
@@ -91,10 +87,6 @@ export const submitToolDefinition: ToolDefinition = {
                                 description: "JavaScript function that determines when to stop pagination. Format: (response, pageInfo) => boolean"
                             }
                         }
-                    },
-                    instruction: {
-                        type: "string",
-                        description: "OPTIONAL for self-healing: Only provide this when creating a new configuration, not when fixing an existing one. The original step instruction will be preserved. If provided, describes what this API call should achieve and what constitutes a successful response."
                     }
                 },
                 required: ["urlHost", "urlPath", "method"]
@@ -175,8 +167,6 @@ export const searchDocumentationToolImplementation: ToolImplementation<WorkflowE
             };
         }
 
-        const searchResults = Documentation.postProcess(integration.documentation, query);
-
         const searchTerms = query.toLowerCase().split(/[^a-z0-9]/)
             .filter(term => term.length >= 3);
 
@@ -224,7 +214,9 @@ export const searchDocumentationToolImplementation: ToolImplementation<WorkflowE
                     integrationId,
                     query,
                     resultsCount: uniqueResults.length,
-                    summary: searchResults.slice(0, 2000)
+                    summary: uniqueResults.length > 0 
+                        ? `Found ${uniqueResults.length} matches. Top results:\n\n${uniqueResults.slice(0, 3).map(r => `• ${r.matchedTerm}: ${r.context.slice(0, 200)}...`).join('\n\n')}`
+                        : "No matches found for your query."
                 }
             },
             fullResult: {
@@ -233,7 +225,9 @@ export const searchDocumentationToolImplementation: ToolImplementation<WorkflowE
                 query,
                 resultsCount: uniqueResults.length,
                 results: uniqueResults.sort((a, b) => b.relevance - a.relevance).slice(0, 10),
-                summary: searchResults.slice(0, 10000)
+                summary: uniqueResults.length > 0
+                    ? uniqueResults.map(r => `[${r.matchedTerm}] ${r.context}`).join('\n\n---\n\n')
+                    : "No matches found for your query."
             }
         };
 
@@ -278,7 +272,6 @@ export const submitToolImplementation: ToolImplementation<WorkflowExecutionConte
         ...Object.keys(payload || {})
     ];
 
-    const { validateVariableReferences } = await import('../utils/tools.js');
     const validation = validateVariableReferences(apiConfig, availableVariables);
 
     if (!validation.valid) {
@@ -322,16 +315,12 @@ export const submitToolImplementation: ToolImplementation<WorkflowExecutionConte
             updatedAt: new Date()
         };
 
-        const { callEndpoint } = await import('../utils/api.js');
         const response = await callEndpoint(mergedConfig, payload, credentials, options);
 
         const finalData = response.data;
+        const hasEvaluationCriteria = !!(mergedConfig.instruction || mergedConfig.responseSchema);
 
-        // Always evaluate the response if we have instruction or responseSchema
-        if ((mergedConfig.instruction || mergedConfig.responseSchema) && (options?.testMode || !options?.selfHealing || options.selfHealing === SelfHealingMode.ENABLED || options.selfHealing === SelfHealingMode.REQUEST_ONLY)) {
-            const { evaluateResponse } = await import('../utils/api.js');
-            const { Documentation } = await import('../utils/documentation.js');
-
+        if (hasEvaluationCriteria) {
             let documentationString = "No documentation provided";
             if (integration?.documentation) {
                 documentationString = Documentation.postProcess(integration.documentation, mergedConfig.instruction || "");
@@ -418,10 +407,6 @@ export const buildWorkflowImplementation: ToolImplementation<WorkflowBuildContex
     }
 
     try {
-        const { AuthType, HttpMethod, PaginationType } = await import('@superglue/client');
-        const { z } = await import('zod');
-        const { zodToJsonSchema } = await import('zod-to-json-schema');
-
         // Define the workflow schema
         const builtWorkflowSchema = zodToJsonSchema(z.object({
             id: z.string().describe("The workflow ID (e.g., 'stripe-create-order')"),
@@ -447,7 +432,6 @@ export const buildWorkflowImplementation: ToolImplementation<WorkflowBuildContex
                     })).optional(),
                     body: z.string().optional().describe("Format as JSON if not instructed otherwise. Use <<>> to access variables."),
                     authentication: z.enum(Object.values(AuthType) as [string, ...string[]]).describe("Authentication type: None, Basic, Bearer, OAuth2, or ApiKey"),
-                    dataPath: z.string().optional().describe("JSONPath to extract data from response (e.g., 'data.items' or 'results[*].id')"),
                     pagination: z.object({
                         type: z.enum(["OFFSET_BASED", "PAGE_BASED", "CURSOR_BASED", "DISABLED"]),
                         pageSize: z.string().describe("Number of items per page (e.g., '50', '100'). Once set, pagination variables become available: <<page>>, <<offset>>, <<limit>> (same as pageSize), <<cursor>>. Use these variables with <<>> syntax in URL, headers, params, or body."),
@@ -457,7 +441,6 @@ export const buildWorkflowImplementation: ToolImplementation<WorkflowBuildContex
                 }).describe("Complete API configuration for this step")
             })).describe("Array of workflow steps with full configuration"),
             finalTransform: z.string().describe("JavaScript function to transform the final workflow output to match responseSchema. Format: (sourceData) => ({ result: sourceData }). Access step results via sourceData.stepId"),
-            integrationIds: z.array(z.string()).describe("List of all integration IDs used in the workflow"),
         }));
 
         // Add error context if this is a retry

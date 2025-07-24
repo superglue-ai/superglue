@@ -1,10 +1,9 @@
 import type { ApiConfig, ExecutionStep, RequestOptions, WorkflowStepResult } from "@superglue/client";
-import { SelfHealingMode } from "@superglue/client";
 import { Integration, Metadata } from "@superglue/shared";
-import { config } from "../default.js";
+import { server_defaults } from "../default.js";
 import { executeApiCall } from "../graphql/resolvers/call.js";
 import { logMessage } from "../utils/logs.js";
-import { applyJsonata, applyTransformationWithValidation, flattenObject } from "../utils/tools.js";
+import { applyJsonata, flattenObject, transformAndValidateSchema } from "../utils/tools.js";
 import { generateTransformCode } from "../utils/transform.js";
 
 export interface ExecutionStrategy {
@@ -94,7 +93,7 @@ const loopStrategy: ExecutionStrategy = {
       let loopItems: any[] = [];
 
       // Apply loop selector using transformation validation to support both JSONata and JS
-      const loopSelectorResult = await applyTransformationWithValidation(payload, step.loopSelector, null);
+      const loopSelectorResult = await transformAndValidateSchema(payload, step.loopSelector, null);
       if (loopSelectorResult.success) {
         loopItems = Array.isArray(loopSelectorResult.data) ? loopSelectorResult.data : [];
       }
@@ -109,8 +108,7 @@ Step instruction: ${step.apiConfig.instruction}
 
 The function should:
 1. Extract an array of ACTUAL DATA ITEMS (not metadata or property definitions)
-2. Return an empty array if no valid data is found
-3. Apply any filtering based on the step's instruction
+2. Apply any filtering based on the step's instruction
 
 Available data in sourceData:
 ${Object.keys(payload).map(key => {
@@ -126,21 +124,21 @@ The function should return an array of items that this step will iterate over.`;
 
         if (transformResult?.mappingCode) {
           step.loopSelector = transformResult.mappingCode;
-          const retryResult = await applyTransformationWithValidation(payload, step.loopSelector, null);
+          const retryResult = await transformAndValidateSchema(payload, step.loopSelector, null);
           if (retryResult.success) {
             loopItems = Array.isArray(retryResult.data) ? retryResult.data : [];
           }
         }
       }
 
-      loopItems = loopItems.slice(0, step.loopMaxIters || config.DEFAULT_LOOP_MAX_ITERS);
+      loopItems = loopItems.slice(0, step.loopMaxIters || server_defaults.DEFAULT_LOOP_MAX_ITERS);
 
       const stepResults: WorkflowStepResult[] = [];
       let successfulConfig: ApiConfig | null = null;
 
       for (let i = 0; i < loopItems.length; i++) {
         const currentItem = loopItems[i] || "";
-        logMessage("debug", `Executing for ${JSON.stringify(currentItem).slice(0, 100)} (${i + 1}/${loopItems.length})`, metadata);
+        logMessage("debug", `Executing loop iteration ${i + 1}/${loopItems.length}`, metadata);
 
         const loopPayload: Record<string, any> = {
           ...payload,
@@ -149,60 +147,20 @@ The function should return an array of items that this step will iterate over.`;
         };
 
         try {
-          let apiResponse;
+          const apiResponse = await executeApiCall(
+            successfulConfig || step.apiConfig,
+            loopPayload,
+            credentials,
+            options, // Just pass through the original options
+            metadata,
+            integration
+          );
 
-          // First iteration OR after a failure: use executeApiCall with loop context
-          if (i === 0 || !successfulConfig) {
-            apiResponse = await executeApiCall(
-              successfulConfig || step.apiConfig,
-              loopPayload,
-              credentials,
-              { ...options, testMode: options?.testMode && i === 0 }, // testMode only on first iteration
-              metadata,
-              integration
-            );
-
-            // Store the successful configuration
-            if (apiResponse.endpoint) {
-              successfulConfig = apiResponse.endpoint;
-              logMessage("debug", `Loop iteration ${i + 1} succeeded, storing config`, metadata);
-            }
-          } else {
-            // We have a successful config, try direct call for efficiency
-            const { callEndpoint } = await import('../utils/api.js');
-
-            try {
-              // Explicitly remove testMode for cached config calls
-              const { testMode, ...directOptions } = options;
-              const response = await callEndpoint(
-                successfulConfig,
-                loopPayload,
-                credentials,
-                directOptions
-              );
-
-              apiResponse = {
-                data: response.data,
-                endpoint: successfulConfig
-              };
-            } catch (directError) {
-              // Direct call failed - fall back to executeApiCall with self-healing
-              logMessage("warn", `Direct call failed at iteration ${i + 1}, falling back to self-healing: ${directError}`, metadata);
-
-              apiResponse = await executeApiCall(
-                successfulConfig,
-                loopPayload,
-                credentials,
-                { ...options, selfHealing: SelfHealingMode.ENABLED, testMode: true }, 
-                metadata,
-                integration
-              );
-
-              // Update config if it changed
-              if (apiResponse.endpoint && apiResponse.endpoint !== successfulConfig) {
-                successfulConfig = apiResponse.endpoint;
-                logMessage("info", `Loop self-healing updated configuration at iteration ${i + 1}`, metadata);
-              }
+          // Store/update the successful configuration
+          if (apiResponse.endpoint) {
+            successfulConfig = apiResponse.endpoint;
+            if (successfulConfig !== step.apiConfig) {
+              logMessage("debug", `Loop iteration ${i + 1} updated configuration`, metadata);
             }
           }
 

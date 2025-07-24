@@ -26,7 +26,8 @@ export async function executeApiCall(
   endpoint: ApiConfig;
 }> {
   let isSelfHealing = isSelfHealingEnabled(options);
-  let isTestMode = options?.testMode || false;
+  let shouldEvaluateResponse = options?.testMode || false;
+  let documentationString = "No documentation provided";
 
   try {
     const response = await callEndpoint(originalEndpoint, payload, credentials, options);
@@ -35,11 +36,7 @@ export async function executeApiCall(
       throw new Error("No data returned from API. This could be due to a configuration error.");
     }
 
-    // In test mode, always evaluate the response
-    if (isTestMode) {
-      const { Documentation } = await import('../../utils/documentation.js');
-
-      let documentationString = "No documentation provided";
+    if (shouldEvaluateResponse) {
       if (integration?.documentation) {
         documentationString = Documentation.postProcess(integration.documentation, originalEndpoint.instruction || "");
       }
@@ -56,7 +53,6 @@ export async function executeApiCall(
       }
     }
 
-    // Direct execution succeeded - return immediately
     return { data: response.data, endpoint: originalEndpoint };
 
   } catch (initialError) {
@@ -68,7 +64,21 @@ export async function executeApiCall(
     const errorMessage = initialError instanceof Error ? initialError.message : String(initialError);
     logMessage('info', `Initial API call failed, entering self-healing mode: ${errorMessage}`, metadata);
 
-    return executeWithSelfHealing(originalEndpoint, payload, credentials, options, metadata, integration, errorMessage);
+    // Only process documentation when entering self-healing mode and when we did not already process it during response evaluation
+    if (!shouldEvaluateResponse && integration?.documentation) {
+      documentationString = Documentation.postProcess(integration.documentation, originalEndpoint.instruction || "");
+    }
+
+    return executeWithSelfHealing(
+      originalEndpoint,
+      payload,
+      credentials,
+      options,
+      metadata,
+      integration,
+      errorMessage,
+      documentationString
+    );
   }
 }
 
@@ -79,21 +89,13 @@ async function executeWithSelfHealing(
   options: RequestOptions,
   metadata: Metadata,
   integration: Integration | undefined,
-  initialError: string
+  initialError: string,
+  processedDocs: string
 ): Promise<{
   data: any;
   endpoint: ApiConfig;
 }> {
-  let documentationString = "No documentation provided";
-  if (!integration) {
-    logMessage('debug', `Self-healing enabled but no integration provided; skipping documentation-based healing.`, metadata);
-  } else if (integration.documentationPending) {
-    logMessage('warn', `Documentation for integration ${integration.id} is still being fetched. Proceeding without documentation.`, metadata);
-  } else if (integration.documentation) {
-    documentationString = Documentation.postProcess(integration.documentation, originalEndpoint.instruction || "");
-  }
 
-  // Create global args for tools
   const staticToolContext: WorkflowExecutionContext = {
     originalEndpoint: originalEndpoint,
     payload: payload,
@@ -126,21 +128,31 @@ async function executeWithSelfHealing(
     },
     {
       role: "user",
-      content: `Execute this API call successfully. The initial attempt failed with the following error:
+      content: `Execute this API call successfully. The initial attempt failed.
 
-ERROR: ${initialError}
+<error>
+${initialError.slice(0, 2000)}${initialError.length > 2000 ? '... [truncated]' : ''}
+</error>
 
-INSTRUCTION: ${originalEndpoint.instruction || "Make API call and retrieve data"}
+<instruction>
+${originalEndpoint.instruction}
+</instruction>
 
-FAILED CONFIGURATION:
-${JSON.stringify(originalEndpoint, null, 2)}
+<failed_configuration>
+  <url>${originalEndpoint.urlHost}${originalEndpoint.urlPath}</url>
+  <method>${originalEndpoint.method}</method>
+  <authentication>${originalEndpoint.authentication}</authentication>
+  <pagination>${originalEndpoint.pagination ? JSON.stringify(originalEndpoint.pagination) : 'None'}</pagination>
+  <data_path>${originalEndpoint.dataPath || 'None'}</data_path>
+</failed_configuration>
 
-AVAILABLE CONTEXT:
-- Payload keys: ${Object.keys(payload).join(", ") || "None"} (${Object.keys(payload).length} fields)
-- Credentials: ${Object.keys(credentials).length > 0 ? Object.keys(credentials).join(", ") : "NONE PROVIDED"}
-- Available variables: ${availableVariables || "None"}
-${integration ? `- Integration: ${integration.id}` : ""}
-${documentationString !== "No documentation provided" ? `- Documentation: Available (${documentationString.length} chars)` : "- Documentation: Not available"}
+<available_context>
+  <payload_keys>${Object.keys(payload).join(", ") || "None"} (${Object.keys(payload).length} fields)</payload_keys>
+  <credentials>${Object.keys(credentials).length > 0 ? Object.keys(credentials).join(", ") : "NONE PROVIDED"}</credentials>
+  <variables>${availableVariables || "None"}</variables>
+  ${integration ? `<integration>${integration.id}</integration>` : ""}
+  ${processedDocs !== "No documentation provided" ? `<documentation>Available (${processedDocs.length} chars)</documentation>` : "<documentation>Not available</documentation>"}
+</available_context>
 
 Analyze the error and generate a corrected API configuration. Submit it using the submit_tool.`
     }
