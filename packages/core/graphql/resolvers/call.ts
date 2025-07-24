@@ -2,18 +2,20 @@ import { ApiConfig, ApiInputRequest, CacheMode, Integration, RequestOptions, Sel
 import type { Context, Metadata } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import OpenAI from "openai";
-import { config } from "../../default.js";
-import { PROMPT_MAPPING } from "../../llm/prompts.js";
-import { callEndpoint, evaluateResponse, generateApiConfig } from "../../utils/api.js";
+import { LanguageModel } from "../../llm/llm.js";
+import { SELF_HEALING_API_AGENT_PROMPT } from "../../llm/prompts.js";
+import { executeTool, ToolCall, ToolCallResult, WorkflowExecutionContext } from "../../tools/tools.js";
+import { callEndpoint, evaluateResponse } from "../../utils/api.js";
 import { Documentation } from "../../utils/documentation.js";
 import { logMessage } from "../../utils/logs.js";
 import { telemetryClient } from "../../utils/telemetry.js";
 import { maskCredentials } from "../../utils/tools.js";
 import { executeTransform } from "../../utils/transform.js";
 import { notifyWebhook } from "../../utils/webhook.js";
+import { searchDocumentationToolDefinition, submitToolDefinition } from "../../workflow/workflow-tools.js";
 
 export async function executeApiCall(
-  endpoint: ApiConfig,
+  originalEndpoint: ApiConfig,
   payload: any,
   credentials: Record<string, string>,
   options: RequestOptions,
@@ -23,86 +25,173 @@ export async function executeApiCall(
   data: any;
   endpoint: ApiConfig;
 }> {
-  let response: any = null;
-  let retryCount = 0;
-  let lastError: string | null = null;
-  let messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
-  let success = false;
   let isSelfHealing = isSelfHealingEnabled(options);
   let isTestMode = options?.testMode || false;
 
-  let documentationString = "No documentation provided";
-  if (!integration && isSelfHealing) {
-    logMessage('debug', `Self-healing enabled but no integration provided; skipping documentation-based healing.`, metadata);
-  } else if (integration && integration.documentationPending) {
-    logMessage('warn', `Documentation for integration ${integration.id} is still being fetched. Proceeding without documentation.`, metadata);
-  } else if (integration && integration.documentation) {
-    documentationString = Documentation.postProcess(integration.documentation, endpoint.instruction || "");
-  }
+  try {
+    const response = await callEndpoint(originalEndpoint, payload, credentials, options);
 
-  do {
-    try {
-      if (retryCount > 0 && isSelfHealing) {
-        logMessage('info', `Generating API config for ${endpoint?.urlHost}${retryCount > 0 ? ` (${retryCount})` : ""}`, metadata);
-        const computedApiCallConfig = await generateApiConfig(endpoint, documentationString, payload, credentials, retryCount, messages);
-        endpoint = computedApiCallConfig.config;
-        messages = computedApiCallConfig.messages;
-      }
-
-      response = await callEndpoint(endpoint, payload, credentials, options);
-
-      if (!response.data) {
-        throw new Error("No data returned from API. This could be due to a configuration error.");
-      }
-
-      // Check if response is valid
-      if ((retryCount > 0 && isSelfHealing) || isTestMode) {
-        logMessage('info', `Evaluating response for ${endpoint?.urlHost}`, metadata);
-        const result = await evaluateResponse(response.data, endpoint.responseSchema, endpoint.instruction, documentationString);
-        success = result.success;
-        if (!result.success) throw new Error(result.shortReason + " " + JSON.stringify(response.data).slice(0, 1000));
-        /*
-          if (result.refactorNeeded) {
-            logMessage('info', `Refactoring the API response.`, metadata);
-            const responseSchema = await generateSchema(endpoint.instruction, JSON.stringify(response.data).slice(0, 1000), metadata);
-            const transformation = await generateTransformCode(responseSchema, response.data, endpoint.instruction, metadata);
-            endpoint.responseMapping = transformation.mappingCode;
-            response.data = transformation.data;
-          }
-        */
-      }
-      else {
-        success = true;
-      }
-      break;
+    if (!response.data) {
+      throw new Error("No data returned from API. This could be due to a configuration error.");
     }
-    catch (error) {
-      const rawErrorString = error?.message || JSON.stringify(error || {});
-      lastError = maskCredentials(rawErrorString, credentials).slice(0, 1000);  
 
-      if (retryCount === 0) {
-        logMessage('info', `The initial configuration is not valid. Generating a new configuration. If you are creating a new configuration, this is expected.\n${lastError}`, metadata);
+    // In test mode, always evaluate the response
+    if (isTestMode) {
+      const { Documentation } = await import('../../utils/documentation.js');
+
+      let documentationString = "No documentation provided";
+      if (integration?.documentation) {
+        documentationString = Documentation.postProcess(integration.documentation, originalEndpoint.instruction || "");
       }
-      else if (retryCount > 0) {
-        messages.push({ role: "user", content: `There was an error with the configuration, please fix: ${rawErrorString.slice(0, 2000)}` });
-        if (rawErrorString.startsWith("JSONata") && !messages.some(m => String(m.content).startsWith("Please find the JSONata guide here:"))) {
-          messages.push({ role: "user", content: "Please find the JSONata guide here: " + PROMPT_MAPPING });
-        }
-        logMessage('warn', `API call failed. ${lastError}`, metadata);
+
+      const evalResult = await evaluateResponse(
+        response.data,
+        originalEndpoint.responseSchema,
+        originalEndpoint.instruction,
+        documentationString
+      );
+
+      if (!evalResult.success) {
+        throw new Error(`Response evaluation failed: ${evalResult.shortReason}`);
       }
     }
-    retryCount++;
-  } while (retryCount < (options?.retries !== undefined ? options.retries : config.MAX_CALL_RETRIES));
-  if (!success) {
-    telemetryClient?.captureException(new Error(`API call failed after ${retryCount} retries. Last error: ${lastError}`), metadata.orgId, {
-      endpoint: endpoint,
-      retryCount: retryCount,
-    });
-    throw new Error(`API call failed after ${retryCount} retries. Last error: ${lastError}`);
-  }
 
-  return { data: response?.data, endpoint };
+    // Direct execution succeeded - return immediately
+    return { data: response.data, endpoint: originalEndpoint };
+
+  } catch (initialError) {
+    // If self-healing is disabled, throw the error immediately
+    if (!isSelfHealing) {
+      throw initialError;
+    }
+
+    const errorMessage = initialError instanceof Error ? initialError.message : String(initialError);
+    logMessage('info', `Initial API call failed, entering self-healing mode: ${errorMessage}`, metadata);
+
+    return executeWithSelfHealing(originalEndpoint, payload, credentials, options, metadata, integration, errorMessage);
+  }
 }
+
+async function executeWithSelfHealing(
+  originalEndpoint: ApiConfig,
+  payload: any,
+  credentials: Record<string, string>,
+  options: RequestOptions,
+  metadata: Metadata,
+  integration: Integration | undefined,
+  initialError: string
+): Promise<{
+  data: any;
+  endpoint: ApiConfig;
+}> {
+  let documentationString = "No documentation provided";
+  if (!integration) {
+    logMessage('debug', `Self-healing enabled but no integration provided; skipping documentation-based healing.`, metadata);
+  } else if (integration.documentationPending) {
+    logMessage('warn', `Documentation for integration ${integration.id} is still being fetched. Proceeding without documentation.`, metadata);
+  } else if (integration.documentation) {
+    documentationString = Documentation.postProcess(integration.documentation, originalEndpoint.instruction || "");
+  }
+
+  // Create global args for tools
+  const staticToolContext: WorkflowExecutionContext = {
+    originalEndpoint: originalEndpoint,
+    payload: payload,
+    credentials: credentials,
+    options: options,
+    integration: integration,
+    runId: metadata.runId,
+    orgId: metadata.orgId
+  };
+
+  // Simple tool executor
+  const toolExecutor = async (toolCall: ToolCall): Promise<ToolCallResult> => {
+    return executeTool(toolCall, staticToolContext);
+  };
+
+  const tools = [
+    submitToolDefinition,
+    searchDocumentationToolDefinition
+  ];
+
+  const availableVariables = [
+    ...Object.keys(credentials || {}),
+    ...Object.keys(payload || {})
+  ].map(v => `<<${v}>>`).join(", ");
+
+  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+    {
+      role: "system",
+      content: SELF_HEALING_API_AGENT_PROMPT
+    },
+    {
+      role: "user",
+      content: `Execute this API call successfully. The initial attempt failed with the following error:
+
+ERROR: ${initialError}
+
+INSTRUCTION: ${originalEndpoint.instruction || "Make API call and retrieve data"}
+
+FAILED CONFIGURATION:
+${JSON.stringify(originalEndpoint, null, 2)}
+
+AVAILABLE CONTEXT:
+- Payload keys: ${Object.keys(payload).join(", ") || "None"} (${Object.keys(payload).length} fields)
+- Credentials: ${Object.keys(credentials).length > 0 ? Object.keys(credentials).join(", ") : "NONE PROVIDED"}
+- Available variables: ${availableVariables || "None"}
+${integration ? `- Integration: ${integration.id}` : ""}
+${documentationString !== "No documentation provided" ? `- Documentation: Available (${documentationString.length} chars)` : "- Documentation: Not available"}
+
+Analyze the error and generate a corrected API configuration. Submit it using the submit_tool.`
+    }
+  ];
+
+  try {
+    const result = await LanguageModel.executeTaskWithTools(
+      messages,
+      tools,
+      toolExecutor,
+      {
+        maxIterations: 20,
+        temperature: 0.1,
+        shouldAbort: (trace) => {
+          return trace.toolCall.name === 'submit_tool' &&
+            trace.result.result?.fullResult?.success === true;
+        }
+      }
+    );
+
+    if (result.success && result.lastSuccessfulToolCall) {
+      const { result: data, additionalData: finalEndpoint } = result.lastSuccessfulToolCall;
+
+      logMessage('info', `executeWorkflowStep completed successfully after self-healing`, finalEndpoint);
+      return { data, endpoint: finalEndpoint };
+    }
+
+    // Handle failure scenarios
+    const errorMessage = result.lastError || result.finalResult || "Failed to execute API call after multiple attempts";
+
+    telemetryClient?.captureException(new Error(errorMessage), metadata.orgId, {
+      endpoint: originalEndpoint,
+      toolCalls: result.toolCalls?.length || 0,
+      terminationReason: result.terminationReason
+    });
+
+    throw new Error(errorMessage);
+
+  } catch (error) {
+    const errorMessage = error?.message || "Unknown error during API execution";
+    const maskedError = maskCredentials(errorMessage, credentials).slice(0, 1000);
+
+    telemetryClient?.captureException(new Error(maskedError), metadata.orgId, {
+      endpoint: originalEndpoint,
+      error: errorMessage
+    });
+
+    throw new Error(`API execution failed: ${maskedError}`);
+  }
+}
+
 function isSelfHealingEnabled(options: RequestOptions): boolean {
   return options?.selfHealing ? options.selfHealing === SelfHealingMode.ENABLED || options.selfHealing === SelfHealingMode.REQUEST_ONLY : true;
 }

@@ -370,6 +370,67 @@ function oldReplaceVariables(template: string, variables: Record<string, any>): 
   });
 }
 
+export function validateVariableReferences(
+  config: any,
+  availableVariables: string[]
+): { valid: boolean; errors?: Array<{ field: string; variable: string }>; message?: string } {
+  const variablePattern = /<<([^>]+)>>/g;
+  const invalidVars: Array<{ field: string; variable: string }> = [];
+
+  // Check string for invalid variables
+  const checkString = (str: string | undefined, field: string) => {
+    if (!str || typeof str !== 'string') return;
+    
+    let match;
+    while ((match = variablePattern.exec(str)) !== null) {
+      if (!availableVariables.includes(match[1])) {
+        invalidVars.push({ field, variable: match[0] });
+      }
+    }
+  };
+
+  // Check all fields that might contain variables
+  checkString(config.urlPath, 'urlPath');
+  checkString(config.body, 'body');
+
+  // Check headers
+  if (config.headers) {
+    Object.entries(config.headers).forEach(([key, value]) => {
+      checkString(String(value), `headers.${key}`);
+    });
+  }
+
+  // Check query params
+  if (config.queryParams) {
+    Object.entries(config.queryParams).forEach(([key, value]) => {
+      checkString(String(value), `queryParams.${key}`);
+    });
+  }
+
+  if (invalidVars.length > 0) {
+    return {
+      valid: false,
+      errors: invalidVars,
+      message: `Invalid variables found:\n${invalidVars.map(v => `- ${v.variable} in ${v.field}`).join('\n')}`
+    };
+  }
+
+  return { valid: true };
+}
+
+export function flattenObject(obj: any, parentKey = '', res: Record<string, any> = {}): Record<string, any> {
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      const propName = parentKey ? `${parentKey}_${key}` : key;
+      if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
+        flattenObject(obj[key], propName, res);
+      } else {
+        res[propName] = obj[key];
+      }
+    }
+  }
+  return res;
+}
 
 export function sample(value: any, sampleSize = 10): any {
   if (Array.isArray(value)) {
@@ -463,4 +524,44 @@ export function safeHttpMethod(method: any): HttpMethod {
   const upper = method?.toUpperCase?.();
   if (upper && validMethods.includes(upper)) return upper as HttpMethod;
   return "GET" as HttpMethod;
+}
+
+export async function evaluateStopCondition(
+  stopConditionCode: string,
+  response: any,
+  pageInfo: { page: number; offset: number; cursor: any; totalFetched: number }
+): Promise<{ shouldStop: boolean; error?: string }> {
+  const isolate = new ivm.Isolate({ memoryLimit: 128 });
+
+  try {
+    const context = await isolate.createContext();
+
+    // Inject the response and pageInfo as JSON strings
+    await context.global.set('responseJSON', JSON.stringify(response));
+    await context.global.set('pageInfoJSON', JSON.stringify(pageInfo));
+
+    // Create the evaluation script
+    const script = `
+          const response = JSON.parse(responseJSON);
+          const pageInfo = JSON.parse(pageInfoJSON);
+          const fn = ${stopConditionCode};
+          const result = fn(response, pageInfo);
+          // Ensure we return a boolean
+          result === true;
+      `;
+
+    const shouldStop = await context.eval(script, { timeout: 3000 });
+
+    return { shouldStop: Boolean(shouldStop) };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    let helpfulError = `Stop condition evaluation failed: ${errorMessage}`;
+
+    return {
+      shouldStop: false, // Default to continue on error
+      error: helpfulError
+    };
+  } finally {
+    isolate.dispose();
+  }
 }

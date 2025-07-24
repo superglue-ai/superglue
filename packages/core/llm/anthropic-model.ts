@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
-import { LLM, LLMObjectResponse, LLMResponse } from "./llm.js";
+import { ToolCall, ToolCallResult, ToolDefinition } from "../tools/tools.js";
+import { LLM, LLMAgentResponse, LLMObjectResponse, LLMResponse } from "./llm.js";
 
 export class AnthropicModel implements LLM {
     public contextLength: number = 200000; // Claude 3 supports up to 200k tokens
@@ -16,7 +17,7 @@ export class AnthropicModel implements LLM {
 
     async generateText(messages: ChatCompletionMessageParam[], temperature: number = 0): Promise<LLMResponse> {
         const { system, anthropicMessages } = this.convertToAnthropicFormat(messages);
-        
+
         const dateMessage = `The current date and time is ${new Date().toISOString()}`;
         const fullSystem = system ? `${system}\n\n${dateMessage}` : dateMessage;
 
@@ -47,7 +48,7 @@ export class AnthropicModel implements LLM {
 
     async generateObject(messages: ChatCompletionMessageParam[], schema: any, temperature: number = 0): Promise<LLMObjectResponse> {
         const { system, anthropicMessages } = this.convertToAnthropicFormat(messages);
-        
+
         // Add schema instruction to the last user message with XML tags for better extraction
         let lastUserIdx = -1;
         for (let i = anthropicMessages.length - 1; i >= 0; i--) {
@@ -56,14 +57,25 @@ export class AnthropicModel implements LLM {
                 break;
             }
         }
-        
+
         if (lastUserIdx !== -1) {
-            const schemaInstruction = `\n\nPlease respond with a JSON object that matches this schema, wrapped in <json> tags:
+            let schemaInstruction: string;
+            if (schema) {
+                schemaInstruction = `\n\nPlease respond with a JSON object that matches this schema, wrapped in <json> tags:
 <json>
 ${JSON.stringify(schema, null, 2)}
 </json>
 
 Your response must contain ONLY the JSON object within the <json> tags, with no additional text or explanation.`;
+            } else {
+                // When no schema is provided, just ask for valid JSON
+                schemaInstruction = `\n\nPlease respond with a valid JSON object wrapped in <json> tags:
+<json>
+{your JSON response here}
+</json>
+
+Your response must contain ONLY the JSON object within the <json> tags, with no additional text or explanation.`;
+            }
             anthropicMessages[lastUserIdx].content += schemaInstruction;
         }
 
@@ -115,7 +127,7 @@ Your response must contain ONLY the JSON object within the <json> tags, with no 
             const jsonMatches = responseText.matchAll(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g);
             let largestJson: any = null;
             let largestSize = 0;
-            
+
             for (const match of jsonMatches) {
                 try {
                     const parsed = JSON.parse(match[0]);
@@ -128,7 +140,7 @@ Your response must contain ONLY the JSON object within the <json> tags, with no 
                     // Continue trying other matches
                 }
             }
-            
+
             if (largestJson) {
                 generatedObject = largestJson;
             } else {
@@ -166,6 +178,110 @@ Your response must contain ONLY the JSON object within the <json> tags, with no 
         return {
             response: generatedObject,
             messages: updatedMessages
+        };
+    }
+
+    async executeTaskWithTools(
+        messages: ChatCompletionMessageParam[],
+        tools: ToolDefinition[],
+        toolExecutor: (toolCall: ToolCall) => Promise<ToolCallResult>,
+        options?: {
+            maxIterations?: number;
+            temperature?: number;
+            shouldAbort?: (step: { toolCall: ToolCall; result: ToolCallResult }) => boolean;
+        }
+    ): Promise<LLMAgentResponse> {
+        const { maxIterations = 10, temperature = 0.2 } = options || {};
+        const anthropicTools = tools.map(tool => ({
+            name: tool.name,
+            description: tool.description,
+            input_schema: tool.arguments
+        }));
+
+        const executionTrace: LLMAgentResponse['executionTrace'] = [];
+        const allToolCalls: ToolCall[] = [];
+        let lastSuccessfulToolCall: LLMAgentResponse['lastSuccessfulToolCall'] = undefined;
+        let lastError: string | undefined = undefined;
+
+        for (let i = 0; i < maxIterations; i++) {
+            const { system, anthropicMessages } = this.convertToAnthropicFormat(messages);
+
+            const response = await this.client.messages.create({
+                model: this.model,
+                messages: anthropicMessages,
+                system,
+                tools: anthropicTools,
+                tool_choice: { type: "auto" },
+                temperature,
+                max_tokens: 4096,
+            });
+
+            const textContent = response.content.filter((block): block is Anthropic.TextBlock => block.type === 'text').map(block => block.text).join('\n');
+            const toolUseBlocks = response.content.filter((block): block is Anthropic.ToolUseBlock => block.type === 'tool_use');
+
+            const assistantMessage: ChatCompletionMessageParam = { role: "assistant", content: textContent || null };
+            if (toolUseBlocks.length > 0) {
+                assistantMessage.tool_calls = toolUseBlocks.map(tu => ({
+                    id: tu.id,
+                    type: "function",
+                    function: { name: tu.name, arguments: JSON.stringify(tu.input) }
+                }));
+            }
+
+            const toolResultContents = [];
+            for (const toolUseBlock of toolUseBlocks) {
+                const toolCall: ToolCall = {
+                    id: toolUseBlock.id,
+                    name: toolUseBlock.name,
+                    arguments: toolUseBlock.input as Record<string, any>
+                };
+                allToolCalls.push(toolCall);
+
+                const result = await toolExecutor(toolCall);
+                executionTrace.push({ toolCall, result });
+
+                // Track successful results
+                if (result.result?.resultForAgent?.success && result.result?.fullResult) {
+                    lastSuccessfulToolCall = {
+                        toolCall: toolCall,
+                        result: result.result.fullResult.data,
+                        additionalData: result.result.fullResult.config
+                    };
+                } else if (result.result?.resultForAgent?.error) {
+                    lastError = result.result.resultForAgent.error;
+                }
+
+                toolResultContents.push({
+                    type: "tool_result" as const,
+                    tool_use_id: toolUseBlock.id,
+                    content: JSON.stringify(result.result?.resultForAgent || null)
+                });
+
+                if (options?.shouldAbort?.({ toolCall, result })) {
+                    return {
+                        finalResult: lastSuccessfulToolCall?.result ?? "Execution aborted by caller.",
+                        toolCalls: allToolCalls,
+                        executionTrace,
+                        messages: messages,
+                        success: !!lastSuccessfulToolCall,
+                        lastSuccessfulToolCall,
+                        lastError,
+                        terminationReason: lastSuccessfulToolCall ? 'success' : 'abort'
+                    };
+                }
+            }
+
+            messages.push({ role: "user", content: toolResultContents });
+        }
+        return {
+            finalResult: lastSuccessfulToolCall?.result ?? null,
+            toolCalls: allToolCalls,
+            executionTrace,
+            messages: messages,
+            success: false,
+            lastSuccessfulToolCall,
+            lastError: lastError || `Maximum iterations (${maxIterations}) reached`,
+            terminationReason: 'max_iterations'
         };
     }
 
