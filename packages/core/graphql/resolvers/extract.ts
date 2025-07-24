@@ -61,7 +61,7 @@ export const extractResolver = async (
           }
           const documentation = new Documentation(input.endpoint, credentials, metadata);
           const rawDoc = await documentation.fetchAndProcess();
-          const documentationString = Documentation.postProcess(rawDoc, input.endpoint.instruction || "");
+          const documentationString = Documentation.extractRelevantSections(rawDoc, input.endpoint.instruction || "");
           preparedExtract = await generateExtractConfig(input.endpoint, documentationString, payload, credentials, lastError);
         }
 

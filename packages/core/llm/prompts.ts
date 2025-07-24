@@ -442,13 +442,38 @@ If the API supports pagination for list endpoints:
 - pageSize: Number of items per page (e.g., "50")
 - cursorPath: For cursor-based pagination, the path to the next cursor in the response
 - stopCondition: REQUIRED JavaScript function that determines when to stop pagination. Make this strict to avoid endless fetching of too many pages.
--Variables may become available: <<page>>, <<offset>>, <<limit>>, <<cursor>>
-  Examples:
-  - "(response) => response.data.length === 0" - Stop when no more data
-  - "(response, pageInfo) => pageInfo.totalFetched >= 100" - Stop after 100 items
-  - "(response) => !response.has_more" - Stop when API indicates no more pages
 
-IMPORTANT: DO NOT add limit parameters to handle user-requested result counts.
+The stopCondition function receives two parameters:
+1. response - The current page's response data
+2. pageInfo - Object containing:
+   - page: Current page number (starts at 1)
+   - offset: Current offset value
+   - cursor: Current cursor value (if using cursor-based)
+   - totalFetched: Running total of items fetched across all pages
+
+Common stopCondition patterns:
+- "(response) => response.data.length === 0" - Stop when no more data
+- "(response, pageInfo) => pageInfo.totalFetched >= 1000" - Stop after fetching 1000 total items
+- "(response) => !response.has_more" - Stop when API indicates no more pages
+- "(response, pageInfo) => response.length === 0 || pageInfo.totalFetched >= 10000" - Stop on empty page OR safety limit
+
+Variables become available after pagination is configured: <<page>>, <<offset>>, <<limit>>, <<cursor>>
+
+CRITICAL: You MUST include BOTH pagination control parameters in your API configuration:
+
+For OFFSET_BASED pagination, you need TWO parameters:
+1. The limit/page size parameter: "limit": "<<limit>>" or "pageSize": "<<pageSize>>"
+2. The offset parameter: "offset": "<<offset>>" or "after": "<<offset>>" or "skip": "<<offset>>"
+
+For PAGE_BASED pagination, you need TWO parameters:
+1. The limit/page size parameter: "limit": "<<limit>>" or "per_page": "<<limit>>" or "pageSize": "<<pageSize>>"
+2. The page number parameter: "page": "<<page>>" or "pageNumber": "<<page>>"
+
+For CURSOR_BASED pagination, you need TWO parameters:
+1. The limit/page size parameter: "limit": "<<limit>>" or "pageSize": "<<pageSize>>"
+2. The cursor parameter: "cursor": "<<cursor>>" or "after": "<<cursor>>" or "pageToken": "<<cursor>>"
+
+Check the API documentation to determine the exact parameter names.
 </PAGINATION_CONFIGURATION>
 
 <SOAP>

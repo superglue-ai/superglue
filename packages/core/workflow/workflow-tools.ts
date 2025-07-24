@@ -352,7 +352,7 @@ export const buildWorkflowImplementation: ToolImplementation<WorkflowBuildContex
                     queryParams: z.array(z.object({
                         key: z.string(),
                         value: z.string()
-                    })).optional().describe("Query parameters as key-value pairs. Use <<variable>> syntax for dynamic values or JavaScript expressions"),
+                    })).optional().describe("Query parameters as key-value pairs. Use <<variable>> syntax for dynamic values or JavaScript expressions. CRITICAL: If using pagination, you may need to include pagination parameters here (e.g., limit: '<<limit>>', offset: '<<offset>>' for OFFSET_BASED, page: '<<page>>' for PAGE_BASED, cursor: '<<cursor>>' for CURSOR_BASED)"),
                     headers: z.array(z.object({
                         key: z.string(),
                         value: z.string()
