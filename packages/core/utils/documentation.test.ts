@@ -291,25 +291,25 @@ describe('Documentation Class', () => {
     const createLongString = (char: string, factor: number) => char.repeat(Math.ceil(DOCUMENTATION_MAX_LENGTH * factor));
 
     it('should return empty string for empty documentation', () => {
-      const result = Documentation.postProcess("", "some instruction");
+      const result = Documentation.extractRelevantSections("", "some instruction");
       expect(result).toBe("");
     });
 
     it('should return documentation as is if no instruction provided', () => {
       const doc = "Some documentation";
-      const result = Documentation.postProcess(doc, "");
+      const result = Documentation.extractRelevantSections(doc, "");
       expect(result).toBe(doc);
     });
 
     it('should return documentation as is if within length limits', () => {
       const doc = "Short documentation";
-      const result = Documentation.postProcess(doc, "some instruction");
+      const result = Documentation.extractRelevantSections(doc, "some instruction");
       expect(result).toBe(doc);
     });
 
     it('should truncate very long content if no relevant terms found', () => {
       const longContent = createLongString('A', 1.5);
-      const result = Documentation.postProcess(longContent, "unrelated instruction");
+      const result = Documentation.extractRelevantSections(longContent, "unrelated instruction");
       expect(result.length).toBe(DOCUMENTATION_MAX_LENGTH);
       expect(result).toBe(longContent.slice(0, DOCUMENTATION_MAX_LENGTH));
     });
@@ -321,7 +321,7 @@ describe('Documentation Class', () => {
       const suffix = createLongString('S', 0.6);
       const longContent = `${prefix} context around ${searchTerm} here ${middle} more context ${suffix}`;
 
-      const result = Documentation.postProcess(longContent, `instruction with ${searchTerm}`);
+      const result = Documentation.extractRelevantSections(longContent, `instruction with ${searchTerm}`);
 
       expect(result.length).toBeLessThanOrEqual(DOCUMENTATION_MAX_LENGTH);
       expect(result).toContain(searchTerm);
@@ -339,7 +339,7 @@ describe('Documentation Class', () => {
       const authSection = "important securitySchemes definition here";
       const longContent = `${prefix} some data about ${searchTerm} ${suffix} ${authSection}`;
 
-      const result = Documentation.postProcess(longContent, `instruction with ${searchTerm}`);
+      const result = Documentation.extractRelevantSections(longContent, `instruction with ${searchTerm}`);
 
       expect(result.length).toBeLessThanOrEqual(DOCUMENTATION_MAX_LENGTH);
       expect(result).toContain(searchTerm);
@@ -354,7 +354,7 @@ describe('Documentation Class', () => {
       const suffix = createLongString('S', 0.6);
       const longContent = `${prefix} ${term1} here ${middle} ${term2} there ${suffix}`;
 
-      const result = Documentation.postProcess(longContent, `instruction with ${term1} and ${term2}`);
+      const result = Documentation.extractRelevantSections(longContent, `instruction with ${term1} and ${term2}`);
 
       expect(result.length).toBeLessThanOrEqual(DOCUMENTATION_MAX_LENGTH);
       expect(result).toContain(term1);
@@ -368,7 +368,7 @@ describe('Documentation Class', () => {
       const suffix = createLongString('S', 0.6);
       const longContent = `${prefix} ${searchTerm} ${middle} ${searchTerm} ${suffix}`;
 
-      const result = Documentation.postProcess(longContent, `instruction with ${searchTerm}`);
+      const result = Documentation.extractRelevantSections(longContent, `instruction with ${searchTerm}`);
 
       expect(result.length).toBeLessThanOrEqual(DOCUMENTATION_MAX_LENGTH);
       expect(result.split("\n\n").length).toBeGreaterThan(1); // Should have multiple chunks

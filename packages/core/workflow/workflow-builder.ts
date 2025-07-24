@@ -59,7 +59,7 @@ export class WorkflowBuilder {
   Credentials available: ${Object.keys(int.credentials || {}).map(k => `${int.id}_${k}`).join(', ') || 'None'}
   ${int.specificInstructions ? `\n  User Instructions for this integration:\n  ${int.specificInstructions}\n` : ''}`;
 
-      const processedDoc = Documentation.postProcess(int.documentation || "", this.instruction);
+      const processedDoc = Documentation.extractRelevantSections(int.documentation || "", this.instruction, 10, 10000);
       return baseInfo + `
   <documentation>
   \`\`\`
@@ -121,28 +121,8 @@ ${initialPayloadDescription}
 ${this.responseSchema && Object.keys(this.responseSchema).length > 0 ? `<expected_output_schema>
 The final workflow output must match this JSON schema:
 ${JSON.stringify(this.responseSchema, null, 2)}
-
 Your finalTransform function MUST transform the collected data from all steps to match this exact schema.
-</expected_output_schema>` : ''}
-
-<output_schema>
-Generate a complete workflow object with:
-- A workflow ID (e.g., 'stripe-create-order')
-- Steps that break down the instruction into manageable API calls
-- All API configurations for each step (URL, method, headers, body, authentication)
-- Input and response mappings as JavaScript functions
-- Loop selectors for LOOP mode steps
-- A final transform function to shape the output${this.responseSchema && Object.keys(this.responseSchema).length > 0 ? ' to match the expected_output_schema' : ''}
-- All fields required for execution
-
-Remember:
-- Each step must be a single API call
-- Loop selectors extract arrays of ACTUAL DATA ITEMS to process
-- Input mappings prepare data for each API call
-- Use defensive programming in all JavaScript functions
-- Handle missing data gracefully with defaults
-${this.responseSchema && Object.keys(this.responseSchema).length > 0 ? '- The finalTransform MUST produce output that validates against the expected_output_schema' : ''}
-</output_schema>`;
+</expected_output_schema>` : 'No expected output schema provided, ensure that the final output matches the instruction.'}`;
 
     return [
       { role: "system", content: BUILD_WORKFLOW_SYSTEM_PROMPT },
@@ -151,61 +131,47 @@ ${this.responseSchema && Object.keys(this.responseSchema).length > 0 ? '- The fi
   }
 
   public async buildWorkflow(): Promise<Workflow> {
-    let success = false;
-    let attempts = 0;
-    const MAX_ATTEMPTS = 3;
-    let lastError: string | null = null;
     let builtWorkflow: Workflow | null = null;
 
-    do {
-      attempts++;
+    try {
+      logMessage('info', `Building workflow`, this.metadata);
 
-      try {
-        logMessage('info', `Building workflow (attempt ${attempts})`, this.metadata);
+      const messages = this.prepareBuildingContext();
 
-        const messages = this.prepareBuildingContext();
+      const toolMetadata = {
+        ...this.metadata,
+        messages
+      };
 
-        const toolMetadata = {
-          ...this.metadata,
-          messages
-        };
+      // Call the build_workflow tool
+      const result = await executeTool(
+        {
+          id: `build-workflow`,
+          name: 'build_workflow',
+          arguments: {}
+        },
+        toolMetadata
+      );
 
-        // Call the build_workflow tool
-        const result = await executeTool(
-          {
-            id: `build-workflow-${attempts}`,
-            name: 'build_workflow',
-            arguments: {
-              previousError: lastError
-            }
-          },
-          toolMetadata
-        );
-
-        if (result.error) {
-          throw new Error(result.error);
-        }
-
-        if (!result.result?.fullResult?.workflow) {
-          throw new Error('No workflow generated');
-        }
-
-        builtWorkflow = result.result.fullResult.workflow;
-
-        builtWorkflow.instruction = this.instruction;
-        builtWorkflow.responseSchema = this.responseSchema;
-
-        success = true;
-
-      } catch (error: any) {
-        logMessage('error', `Error during workflow build attempt ${attempts}: ${error.message}`, this.metadata);
-        lastError = error.message || "An unexpected error occurred during the building phase.";
-        success = false;
+      if (result.error) {
+        throw new Error(result.error);
       }
-    } while (!success && attempts < MAX_ATTEMPTS);
+
+      if (!result.result?.fullResult?.workflow) {
+        throw new Error('No workflow generated');
+      }
+
+      builtWorkflow = result.result.fullResult.workflow;
+
+      builtWorkflow.instruction = this.instruction;
+      builtWorkflow.responseSchema = this.responseSchema;
+
+    } catch (error: any) {
+      logMessage('error', `Error during workflow build attempt: ${error.message}`, this.metadata);
+    }
 
     if (!builtWorkflow) {
-      const finalErrorMsg = `Failed to build workflow after ${attempts} attempts. Last error: ${lastError || "Unknown final error."}`;
+      const finalErrorMsg = `The build_workflow tool call failed to build a valid workflow.`;
       logMessage('error', finalErrorMsg, this.metadata);
       throw new Error(finalErrorMsg);
     }

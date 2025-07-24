@@ -13,6 +13,8 @@ name handlers with the handle prefix, use descriptive variable names.
 
 use early returns to make code more readable.
 
+do not suggest in-line imports, move imports to the top of the page, unless instructed otherwise.
+
 to run unit tests, always just run `npm run test` in the top level project folder.
 
 don't include superfluous comments in the code, for example this is bad:

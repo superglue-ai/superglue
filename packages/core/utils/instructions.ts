@@ -37,14 +37,14 @@ export const generateInstructionsImplementation: ToolImplementation<InstructionG
 
   // Prepare integration summaries with smart documentation truncation
   const integrationSummaries = integrations.map(integration => {
-    // Use Documentation.postProcess to intelligently truncate documentation
+    // Use Documentation.extractRelevantSections to intelligently truncate documentation
     // Focus on getting started, authentication, and basic operations
     const truncatedDocs = integration.documentation
-      ? Documentation.postProcess(
+      ? Documentation.extractRelevantSections(
         integration.documentation,
-        "getting started authentication endpoints operations",
-        5,  // max_chunks
-        500 // chunk_size - smaller chunks for summaries
+        "getting started overview endpoints reference",
+        10,  // max_chunks
+        1000 // chunk_size - smaller chunks for summaries
       )
       : "";
 

@@ -309,14 +309,7 @@ Further:
 - Assign descriptive stepIds in camelCase that indicate the purpose of the step
 - Make absolutely sure that each step can be achieved with a single API call (or a loop of the same call)
 - Aggregation, grouping, sorting, filtering is covered by a separate final transformation and does not need to be added as a dedicated step. However, if the API supports e.g. filtering when retrieving, this should be part of the retrieval step, just do not add an extra one.
-
-Step Instructions:
-- Step instructions should focus on WHAT data to retrieve, not HOW the response is structured
-- AVOID specifying exact response field names or pagination structures in the instruction
-- BAD: "Get a page of products using cursor-based pagination with nodes and pageInfo (hasNextPage, endCursor)"
-- GOOD: "Retrieve products from the catalog"
-- BAD: "Fetch users and return them in a 'data.users' structure with 'next_page' token"
-- GOOD: "Get the list of active users"
+- Step instructions should DESCRIBE what data to retrieve, and how the response should be structured, without prescribing a rigid response structure.
 - The API's actual response structure will be discovered during execution - don't prescribe it
 </STEP_CREATION>
 
@@ -334,37 +327,36 @@ Important: Avoid using LOOP mode for potentially very large data objects. If you
 </DATA_DEPENDENCIES>
 
 <POSTGRES>
-General:
-- Consider that you may need explorative steps to get the right table and column names. These steps should usually reference the same database, unless you have several different postgres integrations. This is definitely the case if there is no documentation for the database.
+- You can use the following format to access a postgres database: urlHost: "postgres://<<user>>:<<password>>@<<hostname>>:<<port>>", urlPath: "<<database>>", body: {query: "<<query>>"}
+- Note that the connection string and database name may be part of the connection string, or not provided at all, or only be provided in the instruction. Look at the input variables and instructions to come up with a best guess.
 - Consider that you might need additional information from tables to process the instruction. E.g. if a user asks for a list of products, you might need to join the products table with the categories table to get the category name and filter on that.
 - In case the query is unclear (user asks for all products that are in a category but you are unsure what the exact category names are), get all category names in step 1 and then create the actual query in step 2.
-
-Configuration:
-- urlHost should be in the format: "postgres://<<user>>:<<password>>@<<host>>:<<port>>" (MUST use postgres://, NOT https://)
-- When referencing a connection string variable, assume it already has the postgres:// prefix.
-- urlPath should be the database name, e.g. "mydb". Note that the database name could be part of the connection string, or not provided at all, or only be provided in the instruction. Look at the input variables and instructions to come up with a best guess.
-- body should be a JSON object with a "query" field that contains the SQL query to execute. Make sure that the query matches the workflow step instruction.
-
-  Examples:
-  - urlHost: "postgres://admin:pass@db.com:5432", urlPath: "mydb"
-  - urlHost: "<<postgres_connection_string>>", urlPath: "<<database>>"
 </POSTGRES>
 
 <VARIABLES>
-- Evaluate the available variables and use them in the API configuration like so <<variable>>:
+- Use <<variable>> syntax to access variables and execute JavaScript expressions:
+   Basic variable access:
    e.g. https://api.example.com/v1/items?api_key=<<api_key>>
    e.g. headers: {
         "Authorization": "Bearer <<access_token>>"
    }
    e.g. headers: {
         "Authorization": "Basic <<username>>:<<password>>"
-  }
-  Note: For Basic Authentication, format as "Basic <<username>>:<<password>>" and the system will automatically convert it to Base64.
+   }
+   
+   JavaScript expressions:
+   e.g. body: { "userIds": <<(sourceData) => JSON.stringify(sourceData.users.map(u => u.id))>> }
+   e.g. body: { "timestamp": "<<(sourceData) => new Date().toISOString()>>", "count": <<(sourceData) => sourceData.items.length>> }
+   e.g. urlPath: /api/<<(sourceData) => sourceData.version || 'v1'>>/users
+   e.g. queryParams: { "active": "<<(sourceData) => sourceData.includeInactive ? 'all' : 'true'>>" }
+   
+- Note: For Basic Authentication, format as "Basic <<username>>:<<password>>" and the system will automatically convert it to Base64.
 - Headers provided starting with 'x-' are probably headers.
 - Credentials are prefixed with integration ID: <<integrationId_credentialName>>
-- NEVER hardcode pagination values like limits in URLs or bodies - always use <<>> variables when pagination is configured
+- Don't hardcode pagination values like limits in URLs or bodies - use <<>> variables when pagination is configured
 - Access previous step results via sourceData.stepId (e.g., sourceData.fetchUsers)
-- Access initial payload via sourceData.payload (e.g., sourceData.payload.userId)
+- Access initial payload via sourceData (e.g., sourceData.userId)
+- Complex transformations can be done inline: <<sourceData.contacts.filter(c => c.active).map(c => c.email).join(',')>>
 </VARIABLES>
 
 <AUTHENTICATION_PATTERNS>
@@ -382,43 +374,49 @@ IMPORTANT: Modern APIs (HubSpot, Stripe, etc.) mostly expect authentication in h
 For each step in the plan, you must:
 1. Determine the exact API endpoint URL and HTTP method based on the step instruction
 2. Build complete request headers including authentication, content-type, authorization, and any custom headers. Make sure to check the documentation for the correct authentication pattern depending on the available credentials.
-3. Create request bodies with proper structure and data types. All complex logic, calculations, or data transformations MUST be done in the 'inputMapping' JavaScript function, NOT directly in the body string.
-4. Set up data transformations for input/output mapping between steps
-5. Configure pagination if the API returns lists of data
-6. Do not add hard-coded limit parameters to the request body or URL - use <<>> variables instead.
+3. Create request bodies with proper structure and data types. Use <<>> tags to reference variables or execute JavaScript expressions.
+4. Configure pagination if the API returns lists of data
+5. Do not add hard-coded limit parameters to the request body or URL - use <<>> variables instead.
+
+IMPORTANT: Use JavaScript expressions within <<>> tags for any dynamic values or transformations:
+- Simple variable access: <<userId>>, <<currentItem_id>>
+- JavaScript functions require arrow syntax: <<(sourceData) => sourceData.user.name>>, <<(sourceData) => sourceData.getAllContacts.data>>
+- Array operations: <<(sourceData) => sourceData.users.map(u => u.id)>>
+- Filtering: <<(sourceData) => sourceData.contacts.filter(c => c.active)>>
+- Complex transformations: <<(sourceData) => JSON.stringify({ ids: sourceData.fetchUsers.map(u => u.id), timestamp: new Date().toISOString() })>>
+- Calculations: <<(sourceData) => sourceData.price * 1.2>>
+- Conditional logic: <<(sourceData) => sourceData.type === 'premium' ? 'pro' : 'basic'>>
 </STEP_CONFIGURATION>
 
 <TRANSFORMATION_FUNCTIONS>
-All transformations must be valid JavaScript arrow functions:
-- inputMapping: (sourceData) => ({ ...sourceData, userId: sourceData.fetchUser.id })
-  * Initial payload fields are directly accessible: sourceData.date, sourceData.companies
-  * Previous step results via stepId: sourceData.fetchUsers, sourceData.getProducts
-  * Only use inputMapping when you need to reshape or combine data for a step
-  * MUST throw errors if required data is missing - Avoid silent failures
-- responseMapping: (sourceData) => sourceData.data.items
+All transformations must be valid JavaScript expressions or arrow functions.
+
+For data access in <<>> tags:
+- Simple variables: <<userId>>, <<apiKey>>
+- Initial payload fields: <<date>>, <<companies>>
+- Previous step results: <<fetchUsers>>, <<getProducts.data>>
+- Complex expressions: <<sourceData.users.filter(u => u.active).map(u => u.id)>>
+- Current item in loops: <<currentItem_id>>, <<currentItem_name>>
+
+For special transformation functions:
 - loopSelector: (sourceData) => sourceData.fetchUsers.users
   * MUST throw error if expected array is missing rather than returning []. Exceptions can be cases if the instruction is "Get all users" and the API returns an empty array, in which case you should return [].
 - finalTransform: (sourceData) => ({ results: sourceData.processItems })
 
 CRITICAL DATA ACCESS PATTERNS:
-1. Initial payload data: Access directly from sourceData
-   - sourceData.date (NOT sourceData.payload.date)
-   - sourceData.companies (NOT sourceData.payload.companies)
+1. Initial payload data: Access directly in <<>> tags
+   - <<date>> (NOT <<payload.date>>)
+   - <<companies>> (NOT <<payload.companies>>)
    
 2. Previous step results: Access via step ID
-   - sourceData.getAllContacts (result from step with id "getAllContacts")
-   - sourceData.fetchUsers.data (nested data from step result)
+   - <<getAllContacts>> (result from step with id "getAllContacts")
+   - <<fetchUsers.data>> (nested data from step result)
    
 3. Common mistakes to avoid:
-   - WRONG: sourceData.payload.date ❌
-   - RIGHT: sourceData.date ✓
-   - WRONG: sourceData.getAllContacts.results.data ❌ (unless the API actually returns this structure)
-   - RIGHT: sourceData.getAllContacts ✓ (check actual response structure)
-
-4. Fail-fast approach (NO defensive programming):
-   - Throw explicit errors when required data is missing
-   - Never default to null, undefined, or empty arrays
-   - Make errors descriptive about what was expected
+   - WRONG: <<payload.date>> ❌
+   - RIGHT: <<date>> ✓
+   - WRONG: <<getAllContacts.results.data>> ❌ 
+   - RIGHT: <<getAllContacts>> ✓ (check actual response structure)
 </TRANSFORMATION_FUNCTIONS>
 
 <LOOP_EXECUTION>
@@ -429,10 +427,12 @@ When executionMode is "LOOP":
 4. Example flow:
    - loopSelector: (sourceData) => sourceData.getAllContacts.filter(c => c.status === 'active')
    - URL: /contacts/<<currentItem_id>>/update
-   - Body: {"status": "processed", "contactId": "<<currentItem_id>>"}
+   - Body: {"status": "processed", "contactId": "<<currentItem_id>>", "updatedBy": "<<userId>>", "previousData": <<JSON.stringify(currentItem)>>}
    - **CRITICAL**: Do NOT use dot notation like \`<<currentItem.id>>\`. This is incorrect. Use the flattened version, e.g., \`<<currentItem_id>>\`.
    - **CRITICAL**: Do NOT invent variables like \`<<contactId>>\` or \`<<userId>>\`. Use the actual flattened currentItem properties
-5. The inputMapping in LOOP mode can access both sourceData AND currentItem
+5. You can use JavaScript expressions to transform loop data:
+   - Body with calculations: {"price": <<currentItem_price * 1.2>>, "currency": "<<currency>>"}
+   - Body with complex logic: <<JSON.stringify({ id: currentItem_id, tags: sourceData.globalTags.concat([currentItem_category]) })>>
 6. Response data from all iterations is collected into an array
 </LOOP_EXECUTION>
 
@@ -441,7 +441,8 @@ If the API supports pagination for list endpoints:
 - type: DISABLED, OFFSET_BASED, PAGE_BASED, or CURSOR_BASED
 - pageSize: Number of items per page (e.g., "50")
 - cursorPath: For cursor-based pagination, the path to the next cursor in the response
-- stopCondition: REQUIRED JavaScript function that determines when to stop pagination
+- stopCondition: REQUIRED JavaScript function that determines when to stop pagination. Make this strict to avoid endless fetching of too many pages.
+-Variables may become available: <<page>>, <<offset>>, <<limit>>, <<cursor>>
   Examples:
   - "(response) => response.data.length === 0" - Stop when no more data
   - "(response, pageInfo) => pageInfo.totalFetched >= 100" - Stop after 100 items
@@ -450,28 +451,12 @@ If the API supports pagination for list endpoints:
 IMPORTANT: DO NOT add limit parameters to handle user-requested result counts.
 </PAGINATION_CONFIGURATION>
 
-<DEFENSIVE_JS_TRANSFORMS>
-Your generated JavaScript functions should be defensive and handle different data shapes gracefully.
-- ALWAYS check if a variable is an array with \`Array.isArray()\` before calling array methods like \`.map()\`, \`.slice()\`, or \`.filter()\`.
-- ALWAYS check if a variable is an object and not null before accessing its properties.
-- If the input data might be either a single object or an array of objects, handle both cases.
-- Do not include comments in the transform, only the code.
-</DEFENSIVE_JS_TRANSFORMS>
-
 <SOAP>
 For SOAP requests:
 - Put the entire XML envelope in the body as a string
 - Include all namespaces and proper XML structure
 - Example body: "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\">...</soapenv:Envelope>"
 </SOAP>
-
-<PAGINATION>
-When pagination is configured:
-- Variables become available: <<page>>, <<offset>>, <<limit>>, <<cursor>>
-- Don't hardcode limits - use the variables
-- Use "OFFSET_BASED", "PAGE_BASED", or "CURSOR_BASED" for the type.
-- stopCondition controls when to stop fetching pages
-</PAGINATION>
 `;
 
 
@@ -562,7 +547,6 @@ CRITICAL RULES:
    - ERROR: "undefined" in URL or response means the variable doesn't exist
    - CHECK: Is <<variableName>> in the available variables list?
    - FIX: Find the correct variable name from the list
-   - EXAMPLE: <<contactId>> → <<currentItem_id>>
 
 2. Loop context variables:
    - WRONG: <<contactId>>, <<itemId>>, <<recordId>>, <<userId>>
@@ -570,7 +554,7 @@ CRITICAL RULES:
    - The pattern is ALWAYS: <<currentItem_propertyName>> with underscore separator
 
 3. Response evaluation failures:
-   - This means the API call worked but returned data that doesn't match your instruction
+   - This means the API call worked but returned data that doesn't match your instruction (e.g. empty array when you expected a list of items)
    - Make your step instructions more explicit about what data that step should return
    - For exploratory calls, be explicit about what information that step should return
 </COMMON_ERRORS>
@@ -610,14 +594,15 @@ Most modern APIs use HEADER authentication type with different header formats.
 </AUTHENTICATION>
 
 <POSTGRES>
-PostgreSQL configuration:
-- urlHost: "postgres://<<user>>:<<password>>@<<host>>:<<port>>" (MUST use postgres://, NOT https://)
-- urlPath: "<<database_name>>", body: "{\"query\": \"SELECT...\"}"
+Correct PostgreSQL configuration:
+- urlHost: "postgres://<<user>>:<<password>>@<<hostname>>:<<port>>"
+- urlPath: "<<database_name>>"
 
 Common errors:
-- Duplicate or missing postgres:// prefixes in urlHost (pay special attention to this when using variables)
-- Database not found: Try <<database>>, extract from connection string or infer from user instruction
-- Incorrect table or column names
+- Duplicate or missing postgres:// prefixes in urlHost 
+- Duplicate or missing prefixes in urlPath (pay special attention to both error sources when using variables, and try removing or adding prefixes in case they are missing/present in the variables)
+- Database not found: Try to extract from connection string or infer from user instruction
+- Incorrect table or column names, make sure to use the ones provided in previous explorative steps rather than guessing table or column names
 - Incorrect query logic (joins, filters, etc.)
 </POSTGRES>
 

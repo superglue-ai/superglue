@@ -319,13 +319,19 @@ export async function replaceVariables(template: string, payload: Record<string,
   const matches = [...template.matchAll(pattern)];
 
   for (const match of matches) {
-    const path = match[1];
+    const path = match[1].trim();
     let value: any;
     if (payload[path]) {
       value = payload[path];
     }
     else {
-      value = await applyJsonata(payload, path);
+      // Use transformAndValidateSchema to handle both JS and JSONata
+      const result = await transformAndValidateSchema(payload, path, null);
+      if (result.success) {
+        value = result.data;
+      } else {
+        throw new Error(`Failed to run JS or JSONata expression: ${path} - ${result.error}`);
+      }
     }
 
     if (Array.isArray(value) || typeof value === 'object') {
@@ -368,54 +374,6 @@ function oldReplaceVariables(template: string, variables: Record<string, any>): 
 
     return String(value);
   });
-}
-
-export function validateVariableReferences(
-  config: any,
-  availableVariables: string[]
-): { valid: boolean; errors?: Array<{ field: string; variable: string }>; message?: string } {
-  const variablePattern = /<<([^>]+)>>/g;
-  const invalidVars: Array<{ field: string; variable: string }> = [];
-
-  // Check string for invalid variables
-  const checkString = (str: string | undefined, field: string) => {
-    if (!str || typeof str !== 'string') return;
-
-    let match;
-    while ((match = variablePattern.exec(str)) !== null) {
-      if (!availableVariables.includes(match[1])) {
-        invalidVars.push({ field, variable: match[0] });
-      }
-    }
-  };
-
-  // Check all fields that might contain variables
-  checkString(config.urlPath, 'urlPath');
-  checkString(config.body, 'body');
-
-  // Check headers
-  if (config.headers) {
-    Object.entries(config.headers).forEach(([key, value]) => {
-      checkString(String(value), `headers.${key}`);
-    });
-  }
-
-  // Check query params
-  if (config.queryParams) {
-    Object.entries(config.queryParams).forEach(([key, value]) => {
-      checkString(String(value), `queryParams.${key}`);
-    });
-  }
-
-  if (invalidVars.length > 0) {
-    return {
-      valid: false,
-      errors: invalidVars,
-      message: `Invalid variables found:\n${invalidVars.map(v => `- ${v.variable} in ${v.field}`).join('\n')}`
-    };
-  }
-
-  return { valid: true };
 }
 
 export function flattenObject(obj: any, parentKey = '', res: Record<string, any> = {}): Record<string, any> {
@@ -531,6 +489,8 @@ export async function evaluateStopCondition(
   response: any,
   pageInfo: { page: number; offset: number; cursor: any; totalFetched: number }
 ): Promise<{ shouldStop: boolean; error?: string }> {
+
+
   const isolate = new ivm.Isolate({ memoryLimit: 128 });
 
   try {
@@ -546,8 +506,8 @@ export async function evaluateStopCondition(
           const pageInfo = JSON.parse(pageInfoJSON);
           const fn = ${stopConditionCode};
           const result = fn(response, pageInfo);
-          // Ensure we return a boolean
-          result === true;
+          // Return the boolean result
+          return Boolean(result);
       `;
 
     const shouldStop = await context.evalClosure(script, null, { timeout: 3000 });

@@ -4,7 +4,6 @@ import { LanguageModel } from "../llm/llm.js";
 import { ToolDefinition, ToolImplementation, WorkflowBuildContext, WorkflowExecutionContext } from "../tools/tools.js";
 import { Documentation } from "../utils/documentation.js";
 import { logMessage } from "../utils/logs.js";
-import { validateVariableReferences } from "../utils/tools.js";
 import { callEndpoint } from "../utils/api.js";
 import { evaluateResponse } from "../utils/api.js";
 import { zodToJsonSchema } from "zod-to-json-schema";
@@ -84,7 +83,7 @@ export const submitToolDefinition: ToolDefinition = {
                             },
                             stopCondition: {
                                 type: "string",
-                                description: "JavaScript function that determines when to stop pagination. Format: (response, pageInfo) => boolean"
+                                description: "JavaScript function that determines when to stop pagination. Format: (response, pageInfo) => boolean. The pageInfo object contains: page (number), offset (number), cursor (any), totalFetched (number). Return true to STOP."
                             }
                         }
                     }
@@ -167,67 +166,32 @@ export const searchDocumentationToolImplementation: ToolImplementation<WorkflowE
             };
         }
 
-        const searchTerms = query.toLowerCase().split(/[^a-z0-9]/)
-            .filter(term => term.length >= 3);
+        // Use Documentation.extractRelevantSections for targeted search
+        const searchResults = Documentation.extractRelevantSections(
+            integration.documentation,
+            query,
+            5,   
+            400 
+        );
 
-        const results = [];
-        const docLower = integration.documentation.toLowerCase();
-
-        for (const term of searchTerms) {
-            let index = 0;
-            while ((index = docLower.indexOf(term, index)) !== -1) {
-                const contextStart = Math.max(0, index - 200);
-                const contextEnd = Math.min(integration.documentation.length, index + 200);
-                const context = integration.documentation.slice(contextStart, contextEnd);
-
-                results.push({
-                    term,
-                    context: context.trim(),
-                    position: index
-                });
-
-                index += term.length;
-
-                if (results.filter(r => r.term === term).length >= 5) break;
-            }
-        }
-
-        const uniqueResults = [];
-        const seenPositions = new Set();
-
-        for (const result of results.sort((a, b) => a.position - b.position)) {
-            const positionKey = Math.floor(result.position / 100);
-            if (!seenPositions.has(positionKey)) {
-                seenPositions.add(positionKey);
-                uniqueResults.push({
-                    matchedTerm: result.term,
-                    context: result.context,
-                    relevance: searchTerms.filter(t => result.context.toLowerCase().includes(t)).length
-                });
-            }
-        }
-
+        // Return the full search results
         return {
             resultForAgent: {
                 success: true,
                 data: {
                     integrationId,
                     query,
-                    resultsCount: uniqueResults.length,
-                    summary: uniqueResults.length > 0 
-                        ? `Found ${uniqueResults.length} matches. Top results:\n\n${uniqueResults.slice(0, 3).map(r => `• ${r.matchedTerm}: ${r.context.slice(0, 200)}...`).join('\n\n')}`
-                        : "No matches found for your query."
+                    resultsCount: searchResults.split('\n\n').filter(s => s.trim().length > 0).length,
+                    summary: searchResults || "No matches found for your query."
                 }
             },
             fullResult: {
                 success: true,
                 integrationId,
                 query,
-                resultsCount: uniqueResults.length,
-                results: uniqueResults.sort((a, b) => b.relevance - a.relevance).slice(0, 10),
-                summary: uniqueResults.length > 0
-                    ? uniqueResults.map(r => `[${r.matchedTerm}] ${r.context}`).join('\n\n---\n\n')
-                    : "No matches found for your query."
+                resultsCount: searchResults.split('\n\n').filter(s => s.trim().length > 0).length,
+                results: searchResults.split('\n\n').filter(s => s.trim().length > 0),
+                summary: searchResults
             }
         };
 
@@ -265,43 +229,7 @@ export const submitToolImplementation: ToolImplementation<WorkflowExecutionConte
     }
 
     logMessage('debug', `submit_tool called - ${apiConfig.method} ${apiConfig.urlHost}${apiConfig.urlPath}`, context);
-
-    // Validate variables before making the API call
-    const availableVariables = [
-        ...Object.keys(credentials || {}),
-        ...Object.keys(payload || {})
-    ];
-
-    const validation = validateVariableReferences(apiConfig, availableVariables);
-
-    if (!validation.valid) {
-        logMessage('warn', `Variable validation failed: ${validation.message}`, context);
-
-        const errorMessage = [
-            "Configuration contains invalid variable references:",
-            "",
-            validation.message || "",
-            "",
-            `Available variables: ${availableVariables.map(v => `<<${v}>>`).join(", ")}`,
-            "",
-            "Fix the variable references and try again."
-        ].join('\n');
-
-        return {
-            resultForAgent: {
-                success: false,
-                error: errorMessage,
-                validationErrors: validation.errors
-            },
-            fullResult: {
-                success: false,
-                error: errorMessage,
-                config: apiConfig,
-                validationErrors: validation.errors
-            }
-        };
-    }
-
+    
     try {
         // Merge the original endpoint config with the submitted config
         const mergedConfig = {
@@ -323,7 +251,7 @@ export const submitToolImplementation: ToolImplementation<WorkflowExecutionConte
         if (hasEvaluationCriteria) {
             let documentationString = "No documentation provided";
             if (integration?.documentation) {
-                documentationString = Documentation.postProcess(integration.documentation, mergedConfig.instruction || "");
+                documentationString = Documentation.extractRelevantSections(integration.documentation, mergedConfig.instruction || "");
             }
 
             const evalResult = await evaluateResponse(
@@ -412,31 +340,29 @@ export const buildWorkflowImplementation: ToolImplementation<WorkflowBuildContex
             id: z.string().describe("The workflow ID (e.g., 'stripe-create-order')"),
             steps: z.array(z.object({
                 id: z.string().describe("Unique camelCase identifier for the step (e.g., 'fetchCustomerDetails')"),
-                integrationId: z.string().describe("The integration ID for this step"),
+                integrationId: z.string().describe("REQUIRED: The integration ID for this step (must match one of the available integration IDs)"),
                 executionMode: z.enum(["DIRECT", "LOOP"]).describe("DIRECT for single execution, LOOP for iterating over collections"),
                 loopSelector: z.string().optional().describe("JavaScript function to select items to loop over. Format: (sourceData) => sourceData.items. Only required if executionMode is LOOP"),
-                inputMapping: z.string().optional().describe("JavaScript function to transform accumulated data before this step. Format: (sourceData) => ({ field1: sourceData.date, field2: sourceData.stepId.data }). Access previous steps via sourceData.stepId. MUST throw descriptive errors if required data is missing - NO defensive programming with null/empty arrays as defaults. If null, all accumulated data passes through."),
                 apiConfig: z.object({
                     id: z.string().describe("Same as the step ID"),
                     instruction: z.string().describe("A concise instruction describing WHAT data this API call should retrieve or what action it should perform."),
                     urlHost: z.string().describe("The base URL host (e.g., https://api.example.com)"),
-                    urlPath: z.string().describe("The API endpoint path (e.g., /v1/users). Use <<variable>> syntax for dynamic values"),
+                    urlPath: z.string().describe("The API endpoint path (e.g., /v1/users). Use <<variable>> syntax for dynamic values or JavaScript expressions, e.g., /users/<<currentItem_id>>/posts or /api/<<sourceData.version || 'v1'>>/data"),
                     method: z.enum(Object.values(HttpMethod) as [string, ...string[]]).describe("HTTP method: GET, POST, PUT, DELETE, or PATCH"),
                     queryParams: z.array(z.object({
                         key: z.string(),
                         value: z.string()
-                    })).optional().describe("Query parameters as key-value pairs. Use <<variable>> syntax for dynamic values"),
+                    })).optional().describe("Query parameters as key-value pairs. Use <<variable>> syntax for dynamic values or JavaScript expressions"),
                     headers: z.array(z.object({
                         key: z.string(),
                         value: z.string()
-                    })).optional(),
-                    body: z.string().optional().describe("Format as JSON if not instructed otherwise. Use <<>> to access variables."),
-                    authentication: z.enum(Object.values(AuthType) as [string, ...string[]]).describe("Authentication type: None, Basic, Bearer, OAuth2, or ApiKey"),
+                    })).optional().describe("HTTP headers as key-value pairs. Use <<variable>> syntax for dynamic values or JavaScript expressions"),
+                    body: z.string().optional().describe("Request body. Use <<variable>> syntax for dynamic values. You can also use JavaScript expressions within <<>> tags, e.g., <<sourceData.users.map(u => u.id)>> or <<new Date().toISOString()>>"),
                     pagination: z.object({
                         type: z.enum(["OFFSET_BASED", "PAGE_BASED", "CURSOR_BASED", "DISABLED"]),
                         pageSize: z.string().describe("Number of items per page (e.g., '50', '100'). Once set, pagination variables become available: <<page>>, <<offset>>, <<limit>> (same as pageSize), <<cursor>>. Use these variables with <<>> syntax in URL, headers, params, or body."),
                         cursorPath: z.string().describe("If cursor_based: The path to the cursor in the response. E.g. cursor.current or next_cursor. If not, set this to \"\""),
-                        stopCondition: z.string().describe("REQUIRED: JavaScript function that determines when to stop pagination. This is the primary control for pagination. Format: (response, pageInfo) => boolean. Return true to STOP pagination. Common patterns: '(response) => response.data.length === 0' (empty page), '(response, pageInfo) => pageInfo.totalFetched >= 100' (limit total), '(response) => !response.has_more' (API flag)")
+                        stopCondition: z.string().describe("REQUIRED: JavaScript function that determines when to stop pagination. This is the primary control for pagination. Format: (response, pageInfo) => boolean. The pageInfo object contains: page (number), offset (number), cursor (any), totalFetched (number). Return true to STOP.")
                     }).optional()
                 }).describe("Complete API configuration for this step")
             })).describe("Array of workflow steps with full configuration"),

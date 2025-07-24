@@ -91,63 +91,65 @@ export class Documentation {
     return "";
   }
 
-  public static postProcess(
+  public static extractRelevantSections(
     documentation: string,
-    instruction: string,
-    max_chunks: number = 20,
-    chunk_size: number = 0
+    searchQuery: string,
+    maxSections: number = 20,
+    sectionSize: number = 0
   ): string {
     if (documentation.length <= Documentation.MAX_LENGTH) {
       return documentation;
     }
-    if (chunk_size <= 0) {
-      chunk_size = Math.floor(Documentation.MAX_LENGTH / max_chunks);
+    if (sectionSize <= 0) {
+      sectionSize = Math.floor(Documentation.MAX_LENGTH / maxSections);
     }
     const MIN_SEARCH_TERM_LENGTH = server_defaults.DOCUMENTATION_MIN_SEARCH_TERM_LENGTH;
 
-    // Extract search terms from instruction
-    const searchTerms = instruction?.toLowerCase()?.split(/[^a-z0-9]/)
+    // Extract search terms from query
+    const searchTerms = searchQuery?.toLowerCase()?.split(/[^a-z0-9]/)
       .map(term => term.trim())
       .filter(term => term.length >= MIN_SEARCH_TERM_LENGTH) || [];
 
-    // Add common auth-related terms
-    searchTerms.push('securityschemes', 'authorization', 'authentication');
+    // Add common auth-related terms for API context (only for broad searches)
+    if (maxSections >= 10) {
+      searchTerms.push('securityschemes', 'authorization', 'authentication');
+    }
 
-    // Split document into chunks
-    const chunks: { content: string; score: number; index: number; }[] = [];
+    // Split document into sections
+    const sections: { content: string; score: number; index: number; }[] = [];
 
-    for (let i = 0; i < documentation.length; i += chunk_size) {
-      const chunk = documentation.slice(i, i + chunk_size);
-      const chunkLower = chunk.toLowerCase();
+    for (let i = 0; i < documentation.length; i += sectionSize) {
+      const section = documentation.slice(i, i + sectionSize);
+      const sectionLower = section.toLowerCase();
 
-      // Score chunk based on search term matches
+      // Score section based on search term matches
       let score = 0;
       for (const term of searchTerms) {
-        const matches = (chunkLower.match(new RegExp(term, 'g')) || []).length;
+        const matches = (sectionLower.match(new RegExp(term, 'g')) || []).length;
         score += matches;
       }
 
-      chunks.push({
-        content: chunk,
+      sections.push({
+        content: section,
         score,
         index: i
       });
     }
 
-    // Sort by score (highest first) and take top chunks
-    const topChunks = chunks
+    // Sort by score (highest first) and take top sections
+    const topSections = sections
       .sort((a, b) => b.score - a.score)
-      .slice(0, max_chunks);
+      .slice(0, maxSections);
 
-    // If no chunks have matches, return first chunk
-    if (topChunks.every(chunk => chunk.score === 0)) {
+    // If no sections have matches, return first section
+    if (topSections.every(section => section.score === 0)) {
       return documentation.slice(0, Documentation.MAX_LENGTH);
     }
 
-    // Sort selected chunks by their original position to maintain document order
-    topChunks.sort((a, b) => a.index - b.index);
+    // Sort selected sections by their original position to maintain document order
+    topSections.sort((a, b) => a.index - b.index);
 
-    const result = topChunks.map(chunk => chunk.content).join('\n\n');
+    const result = topSections.map(section => section.content).join('\n\n');
 
     // Final trim if needed
     return result.length > Documentation.MAX_LENGTH

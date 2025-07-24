@@ -38,7 +38,7 @@ export async function executeApiCall(
 
     if (shouldEvaluateResponse) {
       if (integration?.documentation) {
-        documentationString = Documentation.postProcess(integration.documentation, originalEndpoint.instruction || "");
+        documentationString = Documentation.extractRelevantSections(integration.documentation, originalEndpoint.instruction || "");
       }
 
       const evalResult = await evaluateResponse(
@@ -66,7 +66,7 @@ export async function executeApiCall(
 
     // Only process documentation when entering self-healing mode and when we did not already process it during response evaluation
     if (!shouldEvaluateResponse && integration?.documentation) {
-      documentationString = Documentation.postProcess(integration.documentation, originalEndpoint.instruction || "");
+      documentationString = Documentation.extractRelevantSections(integration.documentation, originalEndpoint.instruction || "");
     }
 
     return executeWithSelfHealing(
