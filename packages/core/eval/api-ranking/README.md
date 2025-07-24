@@ -10,11 +10,11 @@ This is the first version of the Agent-API Benchmark. In it, we're exploring how
 
 Current benchmarks tell you if a model can write Shakespeare or solve math problems. We don't care about that - we want to know **how reliably models work IRL**, in day-to-day work processes that we're claiming they'll automate. Whether that's accessing your CRM, your billing system, or in handling requests between those systems.
 
-**We built this benchmark to explore how well agents can execute against APIs:**
-- Which LLMs can reliably build working integrations into your tech stack?
-- Which APIs are actually usable by agents?
-- Where do agents fail, and why?
-- What makes an API "agent-ready"?
+**We built this benchmark to explore how well agents can execute against APIs.**
+
+## 🧪 What We Actually Test
+
+We gave LLMs API documentation and asked them to write code that makes actual API calls - things like "create a Stripe customer" or "send a Slack message". We're not testing if they can use SDKs; we're testing if they can write raw HTTP requests (with proper auth, headers, body formatting) that actually work when executed against real API endpoints and can extract relevant information from that response.
 
 ## 🥇 Best LLMs for Building Integrations
 
