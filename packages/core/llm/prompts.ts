@@ -459,7 +459,7 @@ Common stopCondition patterns:
 
 Variables become available after pagination is configured: <<page>>, <<offset>>, <<limit>>, <<cursor>>
 
-CRITICAL: You MUST include BOTH pagination control parameters in your API configuration:
+CRITICAL: You MUST include BOTH pagination control parameters in all steps that use pagination:
 
 For OFFSET_BASED pagination, you need TWO parameters:
 1. The limit/page size parameter: "limit": "<<limit>>" or "pageSize": "<<pageSize>>"
@@ -472,8 +472,6 @@ For PAGE_BASED pagination, you need TWO parameters:
 For CURSOR_BASED pagination, you need TWO parameters:
 1. The limit/page size parameter: "limit": "<<limit>>" or "pageSize": "<<pageSize>>"
 2. The cursor parameter: "cursor": "<<cursor>>" or "after": "<<cursor>>" or "pageToken": "<<cursor>>"
-
-Check the API documentation to determine the exact parameter names.
 </PAGINATION_CONFIGURATION>
 
 <SOAP>
