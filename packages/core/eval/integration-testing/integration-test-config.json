@@ -467,11 +467,13 @@
             "gitlab-list-projects": {
                 "id": "gitlab-list-projects",
                 "name": "GitLab List Projects",
-                "instruction": "List all projects in my GitLab account. Return the results as a JSON object with the following structure: { \"projects\": [ { \"name\": \"project1\", \"description\": \"description1\" } ]",
+                "instruction": "List the projects within the payload group in my GitLab account. Return the results as a JSON object with the following structure: { \"projects\": [ { \"name\": \"project1\", \"description\": \"description1\" } ]",
                 "integrationIds": [
                     "gitlab"
                 ],
-                "payload": {},
+                "payload": {
+                    "group_name": "michaelfuest-group"
+                },
                 "complexityLevel": "low",
                 "category": "single-system"
             },

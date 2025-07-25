@@ -36,7 +36,6 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
   let previousResponseHash: string | null = null;
   let firstResponseHash: string | null = null;
   let hasValidData = false;
-  let seenRequestHashes = new Set<string>();
 
   const hasStopCondition = endpoint.pagination && (endpoint.pagination as any).stopCondition;
   const maxRequests = hasStopCondition ? server_defaults.MAX_PAGINATION_REQUESTS : 500;
@@ -107,24 +106,6 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
       params: processedQueryParams,
       timeout: options?.timeout || 60000,
     };
-
-    const requestHash = JSON.stringify({
-      method: axiosConfig.method,
-      url: axiosConfig.url,
-      headers: axiosConfig.headers,
-      data: axiosConfig.data,
-      params: axiosConfig.params
-    });
-
-    if (seenRequestHashes.has(requestHash)) {
-      const maskedConfig = maskCredentials(JSON.stringify(axiosConfig), { ...credentials, ...payload });
-      throw new Error(
-        `Pagination configuration error: Detected duplicate API request. ` +
-        `The exact same request is being made multiple times, indicating pagination parameters are not being updated correctly. ` +
-        `Request: ${maskedConfig}`
-      );
-    }
-    seenRequestHashes.add(requestHash);
 
     const response = await callAxios(axiosConfig, options);
 
