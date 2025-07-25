@@ -1,42 +1,40 @@
 # Docker Build Process
 
-We use a two stage build process to increase deploy speed.
+This project supports two Docker deployment approaches:
 
-1. A base image containing all dependencies is built nightly
-2. The application image is built on top of that image
+1. Monolithic - Single container with both web and server
+2. Microservices - Separate containers for web and server
 
-## Base Image
+## Quick Start
 
-The base image contains:
-- Node.js and npm
-- All project dependencies
-- Build tools (TypeScript, Next.js, Turbo)
-- Playwright with browser dependencies
-
-This image is automatically built every night via GitHub Actions and pushed to DockerHub as a multi-architecture image at `superglueai/superglue-base:latest`.
-
-## Application Image
-
-The application image contains:
-- The base image
-- The application source code
-- Updated dependencies
-
-## Building Locally
-
-Because the application image now depends on the base image, we made a script
-which ensures that we can still build all images locally.
-
+## Option 1: Monolithic Deployment
+Single container running both web and server services:
 ```bash
-./docker/build-local-images.sh
-# OR, using the online base image
-./docker/build-local-images.sh --use-online-base
+# Build the image
+docker build -t superglue:latest -f docker/Dockerfile .
+
+# Quick testing (data lost on restart)
+docker run -p 3000:3000 -p 3001:3001 --env-file .env superglue:latest
+
+# Production/Development with data persistence
+docker run -p 3000:3000 -p 3001:3001 -v superglue_data:/data --env-file .env superglue:latest
 ```
 
-### Running the Application
+## Option 2: Microservices Deployment
+Separate containers for better scalability and resource management:
 
 ```bash
-docker run -p 3000:3000 -p 3001:3001 superglue:latest
+# Build and run both services
+docker-compose up
+
+# Build and run in background
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
 ```
 
 ## CI/CD Integration
