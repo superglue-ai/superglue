@@ -236,7 +236,7 @@ export class AxiosFetchingStrategy implements FetchingStrategy {
 }
 // Special strategy solely responsible for fetching page content if needed
 export class PlaywrightFetchingStrategy implements FetchingStrategy {
-  private static readonly MAX_FETCHED_LINKS = 50;
+  private static readonly MAX_FETCHED_LINKS = 30;
   private static browserInstance: playwright.Browser | null = null;
 
   private static async getBrowser(): Promise<playwright.Browser> {
@@ -279,7 +279,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       }
 
       page = await browserContext.newPage();
-      await page.goto(url.toString());
+      await page.goto(url.toString(), { timeout: server_defaults.TIMEOUTS.PLAYWRIGHT });
       // Wait for network idle might be better for SPAs, but has risks of timeout
       // Let's stick with domcontentloaded + short timeout
       await page.waitForLoadState('domcontentloaded', { timeout: server_defaults.TIMEOUTS.PLAYWRIGHT });

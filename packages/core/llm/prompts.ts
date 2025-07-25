@@ -357,6 +357,7 @@ Important: Avoid using LOOP mode for potentially very large data objects. If you
 - Access previous step results via sourceData.stepId (e.g., sourceData.fetchUsers)
 - Access initial payload via sourceData (e.g., sourceData.userId)
 - Complex transformations can be done inline: <<sourceData.contacts.filter(c => c.active).map(c => c.email).join(',')>>
+- If you are accessing variables in a loop context, use the flattened 'currentItem_' prefix. For example, to access the 'id' of the current item, use the variable '<<currentItem_id>>'. DO NOT use '<<currentItem.id>>'.
 </VARIABLES>
 
 <AUTHENTICATION_PATTERNS>
@@ -575,7 +576,8 @@ CRITICAL RULES:
 2. Loop context variables:
    - WRONG: <<contactId>>, <<itemId>>, <<recordId>>, <<userId>>
    - RIGHT: <<currentItem_id>>, <<currentItem_name>>, <<currentItem_properties_fieldname>>
-   - The pattern is ALWAYS: <<currentItem_propertyName>> with underscore separator
+   - The pattern is ALWAYS: <<currentItem_propertyName>> with underscore separator.
+   - DO NOT use '<<currentItem.propertyName>>'.
 
 3. Response evaluation failures:
    - This means the API call worked but returned data that doesn't match your instruction (e.g. empty array when you expected a list of items)

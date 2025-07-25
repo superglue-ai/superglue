@@ -79,7 +79,7 @@ export class WorkflowBuilder {
       );
       const generalSection = Documentation.extractRelevantSections(
         int.documentation,
-        this.instruction || "api endpoints methods",
+        this.instruction + "api endpoints methods search query filter",
         10,  // max 10 sections
         1000 // larger sections for context
       );
@@ -94,9 +94,9 @@ export class WorkflowBuilder {
     ${paginationSection || 'No pagination information found.'}
     </pagination>
     
-    <general_context>
+    <context_relevant_to_user_instruction>
     ${generalSection || 'No general documentation found.'}
-    </general_context>
+    </context_relevant_to_user_instruction>
   </documentation>
 </${int.id}>`;
     }).join("\n");

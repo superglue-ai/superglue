@@ -39,11 +39,11 @@ export const submitToolDefinition: ToolDefinition = {
                 properties: {
                     urlHost: {
                         type: "string",
-                        description: "The base URL host (e.g., https://api.example.com) or database connection string (e.g., postgres://user:pass@host:port)"
+                        description: "The base URL host (e.g., https://api.example.com) or database connection string (e.g., postgres://<<user>>:<<password>>@<<hostname>>:<<port>>)"
                     },
                     urlPath: {
                         type: "string",
-                        description: "The API endpoint path (e.g., /v1/users) or database name for Postgres. Use <<variable>> syntax for dynamic values or JavaScript expressions, e.g., /users/<<currentItem_id>>/posts or /api/<<(sourceData) => sourceData.version || 'v1'>>/data"
+                        description: "The API endpoint URL path or database name for Postgres. Use <<variable>> syntax for dynamic values or JavaScript expressions."
                     },
                     method: {
                         type: "string",
@@ -62,7 +62,7 @@ export const submitToolDefinition: ToolDefinition = {
                     },
                     body: {
                         type: ["string", "object"],
-                        description: "Request body. Use <<variable>> syntax for dynamic values. You can also use JavaScript expressions within <<>> tags, e.g., <<(sourceData) => JSON.stringify(sourceData.users.map(u => u.id))>> or <<(sourceData) => new Date().toISOString()>>"
+                        description: "Request body. Use <<variable>> syntax for dynamic values or JavaScript expressions"
                     },
                     pagination: {
                         type: "object",
@@ -79,11 +79,11 @@ export const submitToolDefinition: ToolDefinition = {
                             },
                             cursorPath: {
                                 type: "string",
-                                description: "If cursor_based: The path to the cursor in the response. If not, set this to \"\""
+                                description: "If cursor_based: The path to the cursor in the response. If not, leave empty."
                             },
                             stopCondition: {
                                 type: "string",
-                                description: "REQUIRED: JavaScript function that determines when to stop pagination. This is the primary control for pagination. Format: (response, pageInfo) => boolean. The pageInfo object contains: page (number), offset (number), cursor (any), totalFetched (number). Return true to STOP."
+                                description: "REQUIRED: JavaScript function that determines when to stop pagination. This is the primary control for pagination. Return true to STOP."
                             }
                         }
                     }
@@ -97,15 +97,10 @@ export const submitToolDefinition: ToolDefinition = {
 
 export const buildWorkflowToolDefinition: ToolDefinition = {
     name: "build_workflow",
-    description: "Build a complete executable workflow from user instructions. All context including instruction, integrations, and payload are provided automatically.",
+    description: "Build a complete executable workflow from user instructions.",
     arguments: {
         type: "object",
-        properties: {
-            previousError: {
-                type: "string",
-                description: "Optional: If this is a retry attempt, provide the error from the previous attempt to help fix the issue."
-            }
-        },
+        properties: {},
         required: []
     }
 };
@@ -171,7 +166,7 @@ export const searchDocumentationToolImplementation: ToolImplementation<WorkflowE
             integration.documentation,
             query,
             5,
-            100
+            400
         );
 
         // Return the full search results
@@ -251,7 +246,7 @@ export const submitToolImplementation: ToolImplementation<WorkflowExecutionConte
         if (hasEvaluationCriteria) {
             let documentationString = "No documentation provided";
             if (integration?.documentation) {
-                documentationString = Documentation.extractRelevantSections(integration.documentation, mergedConfig.instruction || "");
+                documentationString = Documentation.extractRelevantSections(integration.documentation, mergedConfig.instruction + "response structure field names methods search query filter", 10, 1000);
             }
 
             const evalResult = await evaluateResponse(
