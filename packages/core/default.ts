@@ -14,7 +14,7 @@ export const server_defaults = {
     TIMEOUTS: {
         AXIOS: 60000,
         PLAYWRIGHT: 60000,
-        EVAL_DOC_PROCESSING_TIMEOUT: 600000
+        EVAL_DOC_PROCESSING_TIMEOUT: 1200000
     }
     
 }

@@ -370,20 +370,38 @@ Common authentication patterns are:
 IMPORTANT: Modern APIs (HubSpot, Stripe, etc.) mostly expect authentication in headers, NOT query parameters. Only use query parameter authentication if explicitly required by the documentation.
 </AUTHENTICATION_PATTERNS>
 
+<DOCUMENTATION_FIRST_APPROACH>
+Before configuring any API step:
+1. Search documentation for the specific endpoint you need
+2. Look for:
+   - Required and optional parameters
+   - Authentication patterns
+   - Response structure
+   - Pagination details (if applicable)
+   - Rate limits or special requirements
+3. Only proceed with configuration after understanding the API's requirements
+4. If documentation is unclear or missing, make conservative choices
+</DOCUMENTATION_FIRST_APPROACH>
+
 <STEP_CONFIGURATION>
 For each step in the plan, you must:
-1. Determine the exact API endpoint URL and HTTP method based on the step instruction
-2. Build complete request headers including authentication, content-type, authorization, and any custom headers. Make sure to check the documentation for the correct authentication pattern depending on the available credentials.
-3. Create request bodies with proper structure and data types. Use <<>> tags to reference variables or execute JavaScript expressions.
-4. Configure pagination if the API returns lists of data
-5. Do not add hard-coded limit parameters to the request body or URL - use <<>> variables instead.
+1. Search documentation for the specific endpoint
+2. Determine the exact API endpoint URL and HTTP method based on the documentation
+3. Build complete request headers including authentication, content-type, authorization, and any custom headers
+4. Create request bodies with proper structure and data types. Use <<>> tags to reference variables or execute JavaScript expressions
+5. ONLY configure pagination if:
+   - The documentation explicitly describes how pagination works
+   - You know the exact parameter names the API expects
+   - You understand which pagination type to use
+   - Otherwise, leave pagination unconfigured
+6. Do not add hard-coded limit parameters to the request body or URL - use <<>> variables instead
 
-IMPORTANT: Use JavaScript expressions within <<>> tags for any dynamic values or transformations:
+JAVASCRIPT EXPRESSIONS:
+Use JavaScript expressions within <<>> tags for any dynamic values:
 - Simple variable access: <<userId>>, <<currentItem_id>>
-- JavaScript functions require arrow syntax: <<(sourceData) => sourceData.user.name>>, <<(sourceData) => sourceData.getAllContacts.data>>
+- JavaScript functions require arrow syntax: <<(sourceData) => sourceData.user.name>>
 - Array operations: <<(sourceData) => sourceData.users.map(u => u.id)>>
-- Filtering: <<(sourceData) => sourceData.contacts.filter(c => c.active)>>
-- Complex transformations: <<(sourceData) => JSON.stringify({ ids: sourceData.fetchUsers.map(u => u.id), timestamp: new Date().toISOString() })>>
+- Complex transformations: <<(sourceData) => JSON.stringify({ ids: sourceData.fetchUsers.map(u => u.id) })>>
 - Calculations: <<(sourceData) => sourceData.price * 1.2>>
 - Conditional logic: <<(sourceData) => sourceData.type === 'premium' ? 'pro' : 'basic'>>
 </STEP_CONFIGURATION>
@@ -437,41 +455,24 @@ When executionMode is "LOOP":
 </LOOP_EXECUTION>
 
 <PAGINATION_CONFIGURATION>
-If the API supports pagination for list endpoints:
-- type: DISABLED, OFFSET_BASED, PAGE_BASED, or CURSOR_BASED
-- pageSize: Number of items per page (e.g., "50")
-- cursorPath: For cursor-based pagination, the path to the next cursor in the response
-- stopCondition: REQUIRED JavaScript function that determines when to stop pagination. Make this strict to avoid endless fetching of too many pages.
+Pagination is OPTIONAL. Only configure it if you have verified the exact pagination mechanism from the documentation.
 
-The stopCondition function receives two parameters:
-1. response - The current page's response data
-2. pageInfo - Object containing:
-   - page: Current page number (starts at 1)
-   - offset: Current offset value
-   - cursor: Current cursor value (if using cursor-based)
-   - totalFetched: Running total of items fetched across all pages
+BEFORE configuring pagination:
+1. Check the documentation for pagination details
+2. Verify the exact parameter names the API expects
+3. Confirm the pagination type (offset, page, or cursor-based)
+4. If unsure about ANY aspect, DO NOT configure pagination
 
-Common stopCondition patterns:
-- "(response) => response.data.length === 0" - Stop when no more data
-- "(response, pageInfo) => pageInfo.totalFetched >= 1000" - Stop after fetching 1000 total items
-- "(response) => !response.has_more" - Stop when API indicates no more pages
-- "(response, pageInfo) => response.length === 0 || pageInfo.totalFetched >= 10000" - Stop on empty page OR safety limit
+When you DO configure pagination:
+1. Set the pagination object with type, pageSize, and stopCondition
+2. Add the exact pagination parameters to queryParams/body/headers as specified in the docs
 
-Variables become available after pagination is configured: <<page>>, <<offset>>, <<limit>>, <<cursor>>
+Common patterns (VERIFY IN DOCS FIRST):
+- OFFSET_BASED: Often uses "offset"/"limit" or "skip"/"limit" or "after"/"limit"
+- PAGE_BASED: Often uses "page"/"per_page" or "page"/"pageSize"
+- CURSOR_BASED: Often uses "cursor"/"limit" or "after"/"limit" with a cursor from response
 
-CRITICAL: You MUST include BOTH pagination control parameters in all steps that use pagination:
-
-For OFFSET_BASED pagination, you need TWO parameters:
-1. The limit/page size parameter: "limit": "<<limit>>" or "pageSize": "<<pageSize>>"
-2. The offset parameter: "offset": "<<offset>>" or "after": "<<offset>>" or "skip": "<<offset>>"
-
-For PAGE_BASED pagination, you need TWO parameters:
-1. The limit/page size parameter: "limit": "<<limit>>" or "per_page": "<<limit>>" or "pageSize": "<<pageSize>>"
-2. The page number parameter: "page": "<<page>>" or "pageNumber": "<<page>>"
-
-For CURSOR_BASED pagination, you need TWO parameters:
-1. The limit/page size parameter: "limit": "<<limit>>" or "pageSize": "<<pageSize>>"
-2. The cursor parameter: "cursor": "<<cursor>>" or "after": "<<cursor>>" or "pageToken": "<<cursor>>"
+⚠️ WARNING: Incorrect pagination configuration causes infinite loops. When in doubt, leave it unconfigured.
 </PAGINATION_CONFIGURATION>
 
 <SOAP>

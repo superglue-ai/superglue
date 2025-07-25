@@ -1,13 +1,12 @@
-import { AuthType, HttpMethod, SelfHealingMode } from "@superglue/client";
+import { HttpMethod } from "@superglue/client";
 import type { ChatCompletionMessageParam } from "openai/resources/index.mjs";
+import { z } from "zod";
+import { zodToJsonSchema } from "zod-to-json-schema";
 import { LanguageModel } from "../llm/llm.js";
 import { ToolDefinition, ToolImplementation, WorkflowBuildContext, WorkflowExecutionContext } from "../tools/tools.js";
+import { callEndpoint, evaluateResponse } from "../utils/api.js";
 import { Documentation } from "../utils/documentation.js";
 import { logMessage } from "../utils/logs.js";
-import { callEndpoint } from "../utils/api.js";
-import { evaluateResponse } from "../utils/api.js";
-import { zodToJsonSchema } from "zod-to-json-schema";
-import { z } from "zod";
 
 export const searchDocumentationToolDefinition: ToolDefinition = {
     name: "search_documentation",
@@ -44,7 +43,7 @@ export const submitToolDefinition: ToolDefinition = {
                     },
                     urlPath: {
                         type: "string",
-                        description: "The API endpoint path (e.g., /v1/users) or database name for Postgres. Use <<variable>> syntax for dynamic values"
+                        description: "The API endpoint path (e.g., /v1/users) or database name for Postgres. Use <<variable>> syntax for dynamic values or JavaScript expressions, e.g., /users/<<currentItem_id>>/posts or /api/<<(sourceData) => sourceData.version || 'v1'>>/data"
                     },
                     method: {
                         type: "string",
@@ -53,37 +52,38 @@ export const submitToolDefinition: ToolDefinition = {
                     },
                     queryParams: {
                         type: "object",
-                        description: "Query parameters as key-value pairs. Use <<variable>> syntax for dynamic values",
+                        description: "Query parameters as key-value pairs. Use <<variable>> syntax for dynamic values or JavaScript expressions.",
                         additionalProperties: { type: "string" }
                     },
                     headers: {
                         type: "object",
-                        description: "HTTP headers as key-value pairs. Use <<variable>> syntax for dynamic values",
+                        description: "HTTP headers as key-value pairs. Use <<variable>> syntax for dynamic values or JavaScript expressions",
                         additionalProperties: { type: "string" }
                     },
                     body: {
                         type: ["string", "object"],
-                        description: "Request body. For REST APIs: Format as JSON string if not instructed otherwise."
+                        description: "Request body. Use <<variable>> syntax for dynamic values. You can also use JavaScript expressions within <<>> tags, e.g., <<(sourceData) => JSON.stringify(sourceData.users.map(u => u.id))>> or <<(sourceData) => new Date().toISOString()>>"
                     },
                     pagination: {
                         type: "object",
+                        description: "OPTIONAL: Only configure if you have verified the exact pagination mechanism from the API documentation. For OFFSET_BASED, ALWAYS use <<offset>>. If PAGE_BASED, ALWAYS use <<page>>. If CURSOR_BASED, ALWAYS use <<cursor>> in the URL, headers, or body.",
                         properties: {
                             type: {
                                 type: "string",
-                                enum: ["OFFSET_BASED", "PAGE_BASED", "CURSOR_BASED", "DISABLED"],
+                                enum: ["OFFSET_BASED", "PAGE_BASED", "CURSOR_BASED"],
                                 description: "The type of pagination the API uses."
                             },
                             pageSize: {
                                 type: "string",
-                                description: "Number of items per page (e.g., '50', '100')"
+                                description: "Number of items per page (e.g., '50', '100'). Once set, this becomes available as <<limit>> (same as pageSize)."
                             },
                             cursorPath: {
                                 type: "string",
-                                description: "If cursor_based: The path to the cursor in the response"
+                                description: "If cursor_based: The path to the cursor in the response. If not, set this to \"\""
                             },
                             stopCondition: {
                                 type: "string",
-                                description: "JavaScript function that determines when to stop pagination. Format: (response, pageInfo) => boolean. The pageInfo object contains: page (number), offset (number), cursor (any), totalFetched (number). Return true to STOP."
+                                description: "REQUIRED: JavaScript function that determines when to stop pagination. This is the primary control for pagination. Format: (response, pageInfo) => boolean. The pageInfo object contains: page (number), offset (number), cursor (any), totalFetched (number). Return true to STOP."
                             }
                         }
                     }
@@ -170,8 +170,8 @@ export const searchDocumentationToolImplementation: ToolImplementation<WorkflowE
         const searchResults = Documentation.extractRelevantSections(
             integration.documentation,
             query,
-            5,   
-            400 
+            5,
+            100
         );
 
         // Return the full search results
@@ -229,7 +229,7 @@ export const submitToolImplementation: ToolImplementation<WorkflowExecutionConte
     }
 
     logMessage('debug', `submit_tool called - ${apiConfig.method} ${apiConfig.urlHost}${apiConfig.urlPath}`, context);
-    
+
     try {
         // Merge the original endpoint config with the submitted config
         const mergedConfig = {
@@ -352,18 +352,18 @@ export const buildWorkflowImplementation: ToolImplementation<WorkflowBuildContex
                     queryParams: z.array(z.object({
                         key: z.string(),
                         value: z.string()
-                    })).optional().describe("Query parameters as key-value pairs. Use <<variable>> syntax for dynamic values or JavaScript expressions. CRITICAL: If using pagination, you may need to include pagination parameters here (e.g., limit: '<<limit>>', offset: '<<offset>>' for OFFSET_BASED, page: '<<page>>' for PAGE_BASED, cursor: '<<cursor>>' for CURSOR_BASED)"),
+                    })).optional().describe("Query parameters as key-value pairs. Use <<variable>> syntax for dynamic values or JavaScript expressions."),
                     headers: z.array(z.object({
                         key: z.string(),
                         value: z.string()
                     })).optional().describe("HTTP headers as key-value pairs. Use <<variable>> syntax for dynamic values or JavaScript expressions"),
                     body: z.string().optional().describe("Request body. Use <<variable>> syntax for dynamic values. You can also use JavaScript expressions within <<>> tags, e.g., <<sourceData.users.map(u => u.id)>> or <<new Date().toISOString()>>"),
                     pagination: z.object({
-                        type: z.enum(["OFFSET_BASED", "PAGE_BASED", "CURSOR_BASED", "DISABLED"]),
-                        pageSize: z.string().describe("Number of items per page (e.g., '50', '100'). Once set, pagination variables become available: <<page>>, <<offset>>, <<limit>> (same as pageSize), <<cursor>>. Use these variables with <<>> syntax in URL, headers, params, or body."),
-                        cursorPath: z.string().describe("If cursor_based: The path to the cursor in the response. E.g. cursor.current or next_cursor. If not, set this to \"\""),
+                        type: z.enum(["OFFSET_BASED", "PAGE_BASED", "CURSOR_BASED"]),
+                        pageSize: z.string().describe("Number of items per page (e.g., '50', '100'). Once set, this becomes available as <<limit>> (same as pageSize)."),
+                        cursorPath: z.string().describe("If cursor_based: The path to the cursor in the response. If not, set this to \"\""),
                         stopCondition: z.string().describe("REQUIRED: JavaScript function that determines when to stop pagination. This is the primary control for pagination. Format: (response, pageInfo) => boolean. The pageInfo object contains: page (number), offset (number), cursor (any), totalFetched (number). Return true to STOP.")
-                    }).optional()
+                    }).optional().describe("OPTIONAL: Only configure if you have verified the exact pagination mechanism from the API documentation. For OFFSET_BASED, ALWAYS use <<offset>>. If PAGE_BASED, ALWAYS use <<page>>. If CURSOR_BASED, ALWAYS use <<cursor>> in the URL, headers, or body.")
                 }).describe("Complete API configuration for this step")
             })).describe("Array of workflow steps with full configuration"),
             finalTransform: z.string().describe("JavaScript function to transform the final workflow output to match responseSchema. Format: (sourceData) => ({ result: sourceData }). Access step results via sourceData.stepId"),

@@ -55,16 +55,48 @@ export class WorkflowBuilder {
     return Object.values(this.integrations).map(int => {
       const baseInfo = `
 <${int.id}>
-  Base URL: ${composeUrl(int.urlHost, int.urlPath)}
-  Credentials available: ${Object.keys(int.credentials || {}).map(k => `${int.id}_${k}`).join(', ') || 'None'}
-  ${int.specificInstructions ? `\n  User Instructions for this integration:\n  ${int.specificInstructions}\n` : ''}`;
+  Base URL: ${composeUrl(int.urlHost, int.urlPath)}`
 
-      const processedDoc = Documentation.extractRelevantSections(int.documentation || "", this.instruction, 10, 10000);
+      if (!int.documentation) {
+        return baseInfo + `
+  <documentation>
+  No documentation content available.
+  </documentation>
+</${int.id}>`;
+      }
+      const authSection = Documentation.extractRelevantSections(
+        int.documentation,
+        "authentication authorization api key token bearer basic oauth credentials access private app secret",
+        5,  // max 5 sections
+        400 // smaller sections for targeted info
+      );
+
+      const paginationSection = Documentation.extractRelevantSections(
+        int.documentation,
+        "pagination page offset cursor limit per_page pageSize after next previous paging paginated results list",
+        5,  // max 5 sections
+        400 // smaller sections for targeted info
+      );
+      const generalSection = Documentation.extractRelevantSections(
+        int.documentation,
+        this.instruction || "api endpoints methods",
+        10,  // max 10 sections
+        1000 // larger sections for context
+      );
+
       return baseInfo + `
   <documentation>
-  \`\`\`
-  ${processedDoc || 'No documentation content available.'}
-  \`\`\`
+    <authentication>
+    ${authSection || 'No authentication information found.'}
+    </authentication>
+    
+    <pagination>
+    ${paginationSection || 'No pagination information found.'}
+    </pagination>
+    
+    <general_context>
+    ${generalSection || 'No general documentation found.'}
+    </general_context>
   </documentation>
 </${int.id}>`;
     }).join("\n");
@@ -95,23 +127,17 @@ export class WorkflowBuilder {
     const buildingPromptForAgent = `
 Build a complete workflow to fulfill the user's request.
 
-<instruction>
+<user_instruction>
 ${this.instruction}
-</instruction>
+</user_instruction>
 
-<available_integrations>
+<available_integrations_and_documentation>
 ${integrationDescriptions}
-</available_integrations>
+</available_integrations_and_documentation>
 
 <available_variables>
-Template variables (use in URLs, headers, body with <<variable>> syntax):
+Initial payload and credentials (use in URLs, headers, body with <<variable>> syntax):
 ${availableVariables}
-
-For pagination (when enabled):
-- <<page>> - current page number
-- <<offset>> - current offset
-- <<limit>> - page size
-- <<cursor>> - pagination cursor
 </available_variables>
 
 <initial_payload>

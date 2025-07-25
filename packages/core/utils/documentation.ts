@@ -112,10 +112,9 @@ export class Documentation {
 
     // Add common auth-related terms for API context (only for broad searches)
     if (maxSections >= 10) {
-      searchTerms.push('securityschemes', 'authorization', 'authentication');
+      searchTerms.push('pagination', 'authorization', 'authentication');
     }
 
-    // Split document into sections
     const sections: { content: string; score: number; index: number; }[] = [];
 
     for (let i = 0; i < documentation.length; i += sectionSize) {
@@ -237,7 +236,7 @@ export class AxiosFetchingStrategy implements FetchingStrategy {
 }
 // Special strategy solely responsible for fetching page content if needed
 export class PlaywrightFetchingStrategy implements FetchingStrategy {
-  private static readonly MAX_FETCHED_LINKS = 25;
+  private static readonly MAX_FETCHED_LINKS = 50;
   private static browserInstance: playwright.Browser | null = null;
 
   private static async getBrowser(): Promise<playwright.Browser> {
@@ -372,14 +371,14 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       try {
         const linkResult = await this.fetchPageContentWithPlaywright(nextLink.href, config, metadata);
         fetchedLinks.add(nextLink.href);
-        
+
         if (!linkResult?.content) continue;
-        
+
         combinedContent += combinedContent ? `\n\n${linkResult.content}` : linkResult.content;
 
         // Add newly discovered links to the pool (allow duplicates with different text)
         if (!linkResult.links) continue;
-        
+
         for (const [linkText, href] of Object.entries(linkResult.links)) {
           if (this.shouldSkipLink(linkText, href)) continue;
           linkPool.push({ linkText, href });
