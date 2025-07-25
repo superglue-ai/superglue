@@ -50,7 +50,7 @@ COPY api.graphql ./
 COPY packages/core/package*.json ./packages/core/
 COPY packages/shared/package*.json ./packages/shared/
 
-# Install production dependencies
+# Install production dependencies and Playwright
 RUN npm ci --omit=dev && \
     npx playwright install --with-deps chromium
 
