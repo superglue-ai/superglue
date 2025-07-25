@@ -347,12 +347,12 @@ export const buildWorkflowImplementation: ToolImplementation<WorkflowBuildContex
                     queryParams: z.array(z.object({
                         key: z.string(),
                         value: z.string()
-                    })).optional().describe("Query parameters as key-value pairs. Use <<variable>> syntax for dynamic values or JavaScript expressions."),
+                    })).optional().describe("Query parameters as key-value pairs. If pagination is configured, ensure you have included the right pagination parameters here or in the body."),
                     headers: z.array(z.object({
                         key: z.string(),
                         value: z.string()
                     })).optional().describe("HTTP headers as key-value pairs. Use <<variable>> syntax for dynamic values or JavaScript expressions"),
-                    body: z.string().optional().describe("Request body. Use <<variable>> syntax for dynamic values. You can also use JavaScript expressions within <<>> tags, e.g., <<sourceData.users.map(u => u.id)>> or <<new Date().toISOString()>>"),
+                    body: z.string().optional().describe("Request body. Use <<variable>> syntax for dynamic values. If pagination is configured, ensure you have included the right pagination parameters here or in the queryParams."),
                     pagination: z.object({
                         type: z.enum(["OFFSET_BASED", "PAGE_BASED", "CURSOR_BASED"]),
                         pageSize: z.string().describe("Number of items per page (e.g., '50', '100'). Once set, this becomes available as <<limit>> (same as pageSize)."),

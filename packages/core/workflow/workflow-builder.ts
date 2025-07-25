@@ -91,6 +91,7 @@ export class WorkflowBuilder {
     </authentication>
     
     <pagination>
+    IMPORTANT: If the documentation does not mention pagination or the pagination section below is incomplete or unclear, DO NOT configure pagination.
     ${paginationSection || 'No pagination information found.'}
     </pagination>
     

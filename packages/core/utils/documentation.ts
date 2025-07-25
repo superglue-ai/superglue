@@ -236,7 +236,7 @@ export class AxiosFetchingStrategy implements FetchingStrategy {
 }
 // Special strategy solely responsible for fetching page content if needed
 export class PlaywrightFetchingStrategy implements FetchingStrategy {
-  private static readonly MAX_FETCHED_LINKS = 30;
+  private static readonly MAX_FETCHED_LINKS = 35;
   private static browserInstance: playwright.Browser | null = null;
 
   private static async getBrowser(): Promise<playwright.Browser> {

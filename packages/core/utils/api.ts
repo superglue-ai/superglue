@@ -34,6 +34,9 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
   let hasMore = true;
   let loopCounter = 0;
   let seenResponseHashes = new Set<string>();
+  let previousResponseHash: string | null = null;
+  let firstResponseHash: string | null = null;
+  let hasValidData = false;
 
   // Determine if we're using legacy pagination logic
   const hasStopCondition = endpoint.pagination && (endpoint.pagination as any).stopCondition;
@@ -176,25 +179,66 @@ config: ${maskedConfig}`;
 
     // Handle pagination based on whether stopCondition exists
     if (hasStopCondition) {
-      // New logic: Use stop condition
-      const pageInfo = {
-        page,
-        offset,
-        cursor,
-        totalFetched: allResults.length
-      };
 
-      const stopEval = await evaluateStopCondition(
-        (endpoint.pagination as any).stopCondition,
-        response.data,
-        pageInfo
-      );
+      const currentResponseHash = JSON.stringify(responseData);
 
-      if (stopEval.error) {
-        throw new Error(`Pagination stop condition error: ${stopEval.error}\nStop condition: ${(endpoint.pagination as any).stopCondition}`);
+      // Check if response contains valid data
+      const currentHasData = Array.isArray(responseData) ? responseData.length > 0 :
+        responseData && Object.keys(responseData).length > 0;
+
+      // Store first response hash for comparison
+      if (loopCounter === 0) {
+        firstResponseHash = currentResponseHash;
+        hasValidData = currentHasData;
       }
 
-      hasMore = !stopEval.shouldStop;
+      // Case 1: First and second responses identical with valid data - pagination broken
+      if (loopCounter === 1 && currentResponseHash === firstResponseHash && hasValidData && currentHasData) {
+        throw new Error(
+          `Pagination configuration error: The first two API requests returned identical responses with valid data. ` +
+          `This indicates the pagination parameters are not being applied correctly. ` +
+          `Please check your pagination configuration (type: ${endpoint.pagination?.type}, pageSize: ${endpoint.pagination?.pageSize}), body: ${processedBody}, queryParams: ${processedQueryParams}, headers: ${processedHeaders}.`
+        );
+      }
+
+      // Case 3: First request returns no data, second returns no data - stop condition issue
+      if (loopCounter === 1 && !hasValidData && !currentHasData) {
+        throw new Error(
+          `Stop condition error: The API returned no data on the first request, but the stop condition did not terminate pagination. ` +
+          `The stop condition should detect empty responses and stop immediately. ` +
+          `Current stop condition: ${(endpoint.pagination as any).stopCondition}`
+        );
+      }
+
+      // Case 2: After working pagination, responses become identical - just stop
+      if (loopCounter > 1 && currentResponseHash === previousResponseHash) {
+        hasMore = false;
+      } else {
+        // Normal stop condition evaluation
+        const pageInfo = {
+          page,
+          offset,
+          cursor,
+          totalFetched: allResults.length
+        };
+
+        const stopEval = await evaluateStopCondition(
+          (endpoint.pagination as any).stopCondition,
+          response.data,
+          pageInfo
+        );
+
+        if (stopEval.error) {
+          throw new Error(
+            `Pagination stop condition error: ${stopEval.error}\n` +
+            `Stop condition: ${(endpoint.pagination as any).stopCondition}`
+          );
+        }
+
+        hasMore = !stopEval.shouldStop;
+      }
+
+      previousResponseHash = currentResponseHash;
 
       // Always add results when using stop condition (let the condition control when to stop)
       if (Array.isArray(responseData)) {

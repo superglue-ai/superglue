@@ -27,7 +27,6 @@ export async function executeApiCall(
 }> {
   let isSelfHealing = isSelfHealingEnabled(options);
   let shouldEvaluateResponse = options?.testMode || false;
-  let documentationString = "No documentation provided";
 
   try {
     const response = await callEndpoint(originalEndpoint, payload, credentials, options);
@@ -37,6 +36,7 @@ export async function executeApiCall(
     }
 
     if (shouldEvaluateResponse) {
+      let documentationString = "No documentation provided";
       if (integration?.documentation) {
         documentationString = Documentation.extractRelevantSections(integration.documentation, originalEndpoint.instruction || "");
       }
@@ -64,11 +64,6 @@ export async function executeApiCall(
     const errorMessage = initialError instanceof Error ? initialError.message : String(initialError);
     logMessage('info', `Initial API call failed, entering self-healing mode: ${errorMessage}`, metadata);
 
-    // Only process documentation when entering self-healing mode and when we did not already process it during response evaluation
-    if (!shouldEvaluateResponse && integration?.documentation) {
-      documentationString = Documentation.extractRelevantSections(integration.documentation, originalEndpoint.instruction || "");
-    }
-
     return executeWithSelfHealing(
       originalEndpoint,
       payload,
@@ -76,8 +71,7 @@ export async function executeApiCall(
       options,
       metadata,
       integration,
-      errorMessage,
-      documentationString
+      errorMessage
     );
   }
 }
@@ -89,8 +83,7 @@ async function executeWithSelfHealing(
   options: RequestOptions,
   metadata: Metadata,
   integration: Integration | undefined,
-  initialError: string,
-  processedDocs: string
+  initialError: string
 ): Promise<{
   data: any;
   endpoint: ApiConfig;
@@ -116,10 +109,14 @@ async function executeWithSelfHealing(
     searchDocumentationToolDefinition
   ];
 
-  const availableVariables = [
+
+  const paginationVariables = originalEndpoint.pagination ? ['page', 'offset', 'cursor', 'limit', 'pageSize'] : [];
+  const allVariableNames = [
     ...Object.keys(credentials || {}),
-    ...Object.keys(payload || {})
-  ].map(v => `<<${v}>>`).join(", ");
+    ...Object.keys(payload || {}),
+    ...paginationVariables
+  ];
+  const availableVariables = allVariableNames.map(v => `<<${v}>>`).join(", ");
 
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     {
@@ -141,20 +138,18 @@ ${originalEndpoint.instruction}
 <failed_configuration>
   <url>${originalEndpoint.urlHost}${originalEndpoint.urlPath}</url>
   <method>${originalEndpoint.method}</method>
-  <authentication>${originalEndpoint.authentication}</authentication>
-  <pagination>${originalEndpoint.pagination ? JSON.stringify(originalEndpoint.pagination) : 'None'}</pagination>
-  <data_path>${originalEndpoint.dataPath || 'None'}</data_path>
+  <authentication>${originalEndpoint.authentication || 'None'}</authentication>
+  ${originalEndpoint.pagination ? `<pagination>${JSON.stringify(originalEndpoint.pagination, null, 2)}</pagination>` : ''}
 </failed_configuration>
 
 <available_context>
-  <payload_keys>${Object.keys(payload).join(", ") || "None"} (${Object.keys(payload).length} fields)</payload_keys>
-  <credentials>${Object.keys(credentials).length > 0 ? Object.keys(credentials).join(", ") : "NONE PROVIDED"}</credentials>
-  <variables>${availableVariables || "None"}</variables>
-  ${integration ? `<integration>${integration.id}</integration>` : ""}
-  ${processedDocs !== "No documentation provided" ? `<documentation>Available (${processedDocs.length} chars)</documentation>` : "<documentation>Not available</documentation>"}
+  <payload_fields>${Object.keys(payload).length > 0 ? Object.keys(payload).join(", ") : "None"}</payload_fields>
+  <credentials>${Object.keys(credentials).length > 0 ? Object.keys(credentials).join(", ") : "None"}</credentials>
+  <all_variables>${availableVariables || "None"}</all_variables>
+  ${integration ? `<integration>${integration.id}</integration>` : ''}
 </available_context>
 
-Analyze the error and generate a corrected API configuration. Submit it using the submit_tool.`
+Analyze the error. Then generate a corrected API configuration and submit it using the submit_tool.`
     }
   ];
 
