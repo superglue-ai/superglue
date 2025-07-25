@@ -249,7 +249,7 @@ export class OpenAIModel implements LLM {
     const executionTrace: LLMAgentResponse['executionTrace'] = [];
     const toolCalls: ToolCall[] = [];
     const maxIterations = options?.maxIterations ?? 10;
-    const temperature = options?.temperature ?? 0.1;
+    const temperature = options?.temperature ?? 0.0;
 
     let lastAssistantText: string | null = null;
     let lastSuccessfulToolCall: LLMAgentResponse['lastSuccessfulToolCall'] = undefined;
@@ -292,8 +292,8 @@ export class OpenAIModel implements LLM {
             lastError = result.result.resultForAgent.error;
           }
 
-          const truncatedResultForAgent = JSON.stringify(result.result?.resultForAgent ?? null).slice(0, 1_000);
-          const msg = { type: "function_call_output", call_id: call.id, output: 'Output truncated to 1000 chars: ' + truncatedResultForAgent };
+          const truncatedResultForAgent = JSON.stringify(result.result?.resultForAgent ?? null).slice(0, 500);
+          const msg = { type: "function_call_output", call_id: call.id, output: 'Output truncated to 500 chars: ' + truncatedResultForAgent };
           messages.push(msg as any);
 
           if (options?.shouldAbort?.({ toolCall: call, result })) {

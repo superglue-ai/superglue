@@ -227,6 +227,7 @@ Your response must contain ONLY the JSON object within the <json> tags, with no 
                     function: { name: tu.name, arguments: JSON.stringify(tu.input) }
                 }));
             }
+            messages.push(assistantMessage);
 
             const toolResultContents = [];
             for (const toolUseBlock of toolUseBlocks) {
@@ -271,7 +272,10 @@ Your response must contain ONLY the JSON object within the <json> tags, with no 
                 }
             }
 
-            messages.push({ role: "user", content: toolResultContents });
+            // Push tool results as a user message if there were any tool calls
+            if (toolResultContents.length > 0) {
+                messages.push({ role: "user", content: toolResultContents });
+            }
         }
         return {
             finalResult: lastSuccessfulToolCall?.result ?? null,
@@ -295,10 +299,52 @@ Your response must contain ONLY the JSON object within the <json> tags, with no 
         for (const message of messages) {
             if (message.role === 'system') {
                 system += (system ? '\n\n' : '') + message.content;
-            } else if (message.role === 'user' || message.role === 'assistant') {
+            } else if (message.role === 'user') {
+                // Check if this is a tool result message
+                if (Array.isArray(message.content) && message.content.length > 0 &&
+                    typeof message.content[0] === 'object' && 'type' in message.content[0] &&
+                    (message.content[0] as any).type === 'tool_result') {
+                    // This is already in Anthropic format, use as-is
+                    anthropicMessages.push({
+                        role: 'user',
+                        content: message.content as any
+                    });
+                } else {
+                    // Regular user message
+                    anthropicMessages.push({
+                        role: 'user',
+                        content: String(message.content)
+                    });
+                }
+            } else if (message.role === 'assistant') {
+                // Build content array for assistant message
+                const content: any[] = [];
+
+                // Add text content if present
+                if (message.content) {
+                    content.push({
+                        type: 'text',
+                        text: String(message.content)
+                    });
+                }
+
+                // Add tool uses if present
+                if (message.tool_calls) {
+                    for (const toolCall of message.tool_calls) {
+                        if (toolCall.type === 'function') {
+                            content.push({
+                                type: 'tool_use',
+                                id: toolCall.id,
+                                name: toolCall.function.name,
+                                input: JSON.parse(toolCall.function.arguments)
+                            });
+                        }
+                    }
+                }
+
                 anthropicMessages.push({
-                    role: message.role,
-                    content: String(message.content)
+                    role: 'assistant',
+                    content: content
                 });
             }
         }

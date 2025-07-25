@@ -80,11 +80,8 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
       )).filter(([_, value]) => value && value !== "undefined" && value !== "null")
     );
 
-    const bodyString = endpoint.body ?
-      (typeof endpoint.body === 'string' ? endpoint.body : JSON.stringify(endpoint.body)) :
-      "";
-    const processedBody = bodyString ?
-      await replaceVariables(bodyString, requestVars) :
+    const processedBody = endpoint.body ?
+      await replaceVariables(endpoint.body, requestVars) :
       "";
 
     const processedUrlHost = await replaceVariables(endpoint.urlHost, requestVars);

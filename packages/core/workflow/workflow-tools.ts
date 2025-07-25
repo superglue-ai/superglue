@@ -61,8 +61,8 @@ export const submitToolDefinition: ToolDefinition = {
                         additionalProperties: { type: "string" }
                     },
                     body: {
-                        type: ["string", "object"],
-                        description: "Request body. Use <<variable>> syntax for dynamic values or JavaScript expressions"
+                        type: "string",
+                        description: "Request body formatted as JSON string. Use <<variable>> syntax for dynamic values or JavaScript expressions"
                     },
                     pagination: {
                         type: "object",

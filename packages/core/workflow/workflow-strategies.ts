@@ -151,7 +151,10 @@ The function should return an array of items that this step will iterate over.`;
             successfulConfig || step.apiConfig,
             loopPayload,
             credentials,
-            options, // Just pass through the original options
+            {
+              ...options,
+              testMode: false
+            },
             metadata,
             integration
           );

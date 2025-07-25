@@ -565,6 +565,7 @@ CRITICAL RULES:
 - ALWAYS include a tool call in your response
 - DO NOT provide or change the 'instruction' field when fixing an existing configuration - the original step purpose should be preserved
 - Learn from each error - don't repeat the same mistake
+- Don't make more than three doc searches in a row
 - When submit_tool succeeds, STOP immediately
 
 <COMMON_ERRORS>

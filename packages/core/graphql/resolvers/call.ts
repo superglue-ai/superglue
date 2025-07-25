@@ -160,7 +160,6 @@ Analyze the error. Then generate a corrected API configuration and submit it usi
       toolExecutor,
       {
         maxIterations: 20,
-        temperature: 0.1,
         shouldAbort: (trace) => {
           return trace.toolCall.name === 'submit_tool' &&
             trace.result.result?.fullResult?.success === true;
