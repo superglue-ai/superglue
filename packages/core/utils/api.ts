@@ -24,7 +24,6 @@ export function convertBasicAuthToBase64(headerValue: string) {
 }
 
 export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions): Promise<{ data: any; }> {
-
   const allVariables = { ...payload, ...credentials };
 
   let allResults = [];
@@ -37,14 +36,13 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
   let previousResponseHash: string | null = null;
   let firstResponseHash: string | null = null;
   let hasValidData = false;
+  let seenRequestHashes = new Set<string>();
 
-  // Determine if we're using legacy pagination logic
   const hasStopCondition = endpoint.pagination && (endpoint.pagination as any).stopCondition;
   const maxRequests = hasStopCondition ? server_defaults.MAX_PAGINATION_REQUESTS : 500;
 
   while (hasMore && loopCounter < maxRequests) {
-    // Generate pagination variables
-    let paginationVars = {
+    const paginationVars = {
       page,
       offset,
       cursor,
@@ -52,22 +50,18 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
       pageSize: endpoint.pagination?.pageSize || "50"
     };
 
-    // Combine all variables
     const requestVars = { ...paginationVars, ...allVariables };
 
-    // Process headers - replace variables first
     const headersWithReplacedVars = Object.fromEntries(
       (await Promise.all(
         Object.entries(endpoint.headers || {})
-          .map(async ([key, value]) => [key, await replaceVariables(value, requestVars)])
+          .map(async ([key, value]) => [key, await replaceVariables(String(value), requestVars)])
       )).filter(([_, value]) => value && value !== "undefined" && value !== "null")
     );
 
-    // Apply auth processing to headers
     const processedHeaders = {};
     for (const [key, value] of Object.entries(headersWithReplacedVars)) {
       let processedValue = value;
-      // Remove duplicate auth prefixes (e.g. "Basic Basic " or "Bearer Bearer ")
       if (key.toLowerCase() === 'authorization' && typeof value === 'string') {
         processedValue = value.replace(/^(Basic|Bearer)\s+(Basic|Bearer)\s+/, '$1 $2');
       }
@@ -79,24 +73,23 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
       processedHeaders[key] = processedValue;
     }
 
-    // Process query parameters - replace variables
     const processedQueryParams = Object.fromEntries(
       (await Promise.all(
         Object.entries(endpoint.queryParams || {})
-          .map(async ([key, value]) => [key, await replaceVariables(value, requestVars)])
+          .map(async ([key, value]) => [key, await replaceVariables(String(value), requestVars)])
       )).filter(([_, value]) => value && value !== "undefined" && value !== "null")
     );
 
-    // Process body - replace variables
-    const processedBody = endpoint.body ?
-      await replaceVariables(endpoint.body, requestVars) :
+    const bodyString = endpoint.body ?
+      (typeof endpoint.body === 'string' ? endpoint.body : JSON.stringify(endpoint.body)) :
+      "";
+    const processedBody = bodyString ?
+      await replaceVariables(bodyString, requestVars) :
       "";
 
-    // Process URL components - replace variables
     const processedUrlHost = await replaceVariables(endpoint.urlHost, requestVars);
     const processedUrlPath = await replaceVariables(endpoint.urlPath, requestVars);
 
-    // Check for postgres BEFORE composing URL (which would add https://)
     if (processedUrlHost.startsWith("postgres://") || processedUrlHost.startsWith("postgresql://")) {
       const postgresEndpoint = {
         ...endpoint,
@@ -107,7 +100,6 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
       return { data: await callPostgres(postgresEndpoint, payload, credentials, options) };
     }
 
-    // For non-postgres endpoints, compose the URL normally
     const processedUrl = composeUrl(processedUrlHost, processedUrlPath);
 
     const axiosConfig: AxiosRequestConfig = {
@@ -119,6 +111,24 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
       timeout: options?.timeout || 60000,
     };
 
+    const requestHash = JSON.stringify({
+      method: axiosConfig.method,
+      url: axiosConfig.url,
+      headers: axiosConfig.headers,
+      data: axiosConfig.data,
+      params: axiosConfig.params
+    });
+
+    if (seenRequestHashes.has(requestHash)) {
+      const maskedConfig = maskCredentials(JSON.stringify(axiosConfig), { ...credentials, ...payload });
+      throw new Error(
+        `Pagination configuration error: Detected duplicate API request. ` +
+        `The exact same request is being made multiple times, indicating pagination parameters are not being updated correctly. ` +
+        `Request: ${maskedConfig}`
+      );
+    }
+    seenRequestHashes.add(requestHash);
+
     const response = await callAxios(axiosConfig, options);
 
     if (![200, 201, 202, 203, 204, 205].includes(response?.status) ||
@@ -126,18 +136,15 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
       (Array.isArray(response?.data?.errors) && response?.data?.errors.length > 0)
     ) {
       const error = JSON.stringify(response?.data?.error || response.data?.errors || response?.data || response?.statusText || "undefined");
-      // Mask credentials in the config before logging
       const maskedConfig = maskCredentials(JSON.stringify(axiosConfig));
       let message = `${endpoint.method} ${processedUrl} failed with status ${response.status}.
 Response: ${String(error).slice(0, 1000)}
 config: ${maskedConfig}`;
 
-      // Add specific context for rate limit errors
       if (response.status === 429) {
         const retryAfter = response.headers['retry-after']
           ? `Retry-After: ${response.headers['retry-after']}`
           : 'No Retry-After header provided';
-
         message = `Rate limit exceeded. ${retryAfter}. Maximum wait time of 60s exceeded. 
         
         ${message}`;
@@ -148,7 +155,8 @@ config: ${maskedConfig}`;
     if (typeof response.data === 'string' &&
       (response.data.slice(0, 100).trim().toLowerCase().startsWith('<!doctype html') ||
         response.data.slice(0, 100).trim().toLowerCase().startsWith('<html'))) {
-      throw new Error(`Received HTML response instead of expected JSON data from ${processedUrl}. 
+      const maskedUrl = maskCredentials(processedUrl, { ...credentials, ...payload });
+      throw new Error(`Received HTML response instead of expected JSON data from ${maskedUrl}. 
         This usually indicates an error page or invalid endpoint.\nResponse: ${response.data.slice(0, 2000)}`);
     }
 
@@ -163,9 +171,7 @@ config: ${maskedConfig}`;
     }
 
     if (endpoint.dataPath) {
-      // Navigate to the specified data path
       const pathParts = endpoint.dataPath.split('.');
-
       for (const part of pathParts) {
         // sometimes a jsonata expression is used to get the data, so ignore the $
         // TODO: fix this later
@@ -179,29 +185,28 @@ config: ${maskedConfig}`;
 
     // Handle pagination based on whether stopCondition exists
     if (hasStopCondition) {
-
       const currentResponseHash = JSON.stringify(responseData);
-
-      // Check if response contains valid data
       const currentHasData = Array.isArray(responseData) ? responseData.length > 0 :
         responseData && Object.keys(responseData).length > 0;
 
-      // Store first response hash for comparison
       if (loopCounter === 0) {
         firstResponseHash = currentResponseHash;
         hasValidData = currentHasData;
       }
 
-      // Case 1: First and second responses identical with valid data - pagination broken
       if (loopCounter === 1 && currentResponseHash === firstResponseHash && hasValidData && currentHasData) {
+        const maskedBody = maskCredentials(processedBody, { ...credentials, ...payload });
+        const maskedParams = maskCredentials(JSON.stringify(processedQueryParams), { ...credentials, ...payload });
+        const maskedHeaders = maskCredentials(JSON.stringify(processedHeaders), { ...credentials, ...payload });
+
         throw new Error(
           `Pagination configuration error: The first two API requests returned identical responses with valid data. ` +
           `This indicates the pagination parameters are not being applied correctly. ` +
-          `Please check your pagination configuration (type: ${endpoint.pagination?.type}, pageSize: ${endpoint.pagination?.pageSize}), body: ${processedBody}, queryParams: ${processedQueryParams}, headers: ${processedHeaders}.`
+          `Please check your pagination configuration (type: ${endpoint.pagination?.type}, pageSize: ${endpoint.pagination?.pageSize}), ` +
+          `body: ${maskedBody}, queryParams: ${maskedParams}, headers: ${maskedHeaders}.`
         );
       }
 
-      // Case 3: First request returns no data, second returns no data - stop condition issue
       if (loopCounter === 1 && !hasValidData && !currentHasData) {
         throw new Error(
           `Stop condition error: The API returned no data on the first request, but the stop condition did not terminate pagination. ` +
@@ -210,11 +215,9 @@ config: ${maskedConfig}`;
         );
       }
 
-      // Case 2: After working pagination, responses become identical - just stop
       if (loopCounter > 1 && currentResponseHash === previousResponseHash) {
         hasMore = false;
       } else {
-        // Normal stop condition evaluation
         const pageInfo = {
           page,
           offset,
@@ -240,14 +243,12 @@ config: ${maskedConfig}`;
 
       previousResponseHash = currentResponseHash;
 
-      // Always add results when using stop condition (let the condition control when to stop)
       if (Array.isArray(responseData)) {
         allResults = allResults.concat(responseData);
       } else if (responseData) {
         allResults.push(responseData);
       }
     } else {
-      // Legacy logic: Original behavior for backwards compatibility
       if (Array.isArray(responseData)) {
         const pageSize = parseInt(endpoint.pagination?.pageSize || "50");
         if (!pageSize || responseData.length < pageSize) {
@@ -257,36 +258,32 @@ config: ${maskedConfig}`;
         if (!seenResponseHashes.has(currentResponseHash)) {
           seenResponseHashes.add(currentResponseHash);
           allResults = allResults.concat(responseData);
-        }
-        else {
+        } else {
           hasMore = false;
         }
-      }
-      else if (responseData && allResults.length === 0) {
+      } else if (responseData && allResults.length === 0) {
         allResults.push(responseData);
         hasMore = false;
-      }
-      else {
+      } else {
         hasMore = false;
       }
     }
 
-    // Update pagination variables for next iteration
-    if (hasMore && endpoint.pagination?.type === PaginationType.PAGE_BASED) {
-      page++;
-    }
-    else if (hasMore && endpoint.pagination?.type === PaginationType.OFFSET_BASED) {
-      offset += parseInt(endpoint.pagination?.pageSize || "50");
-    }
-    else if (hasMore && endpoint.pagination?.type === PaginationType.CURSOR_BASED) {
-      const cursorParts = (endpoint.pagination?.cursorPath || 'next_cursor').split('.');
-      let nextCursor = response.data;
-      for (const part of cursorParts) {
-        nextCursor = nextCursor?.[part];
-      }
-      cursor = nextCursor;
-      if (!cursor) {
-        hasMore = false;
+    if (hasMore) {
+      if (endpoint.pagination?.type === PaginationType.PAGE_BASED) {
+        page++;
+      } else if (endpoint.pagination?.type === PaginationType.OFFSET_BASED) {
+        offset += parseInt(endpoint.pagination?.pageSize || "50");
+      } else if (endpoint.pagination?.type === PaginationType.CURSOR_BASED) {
+        const cursorParts = (endpoint.pagination?.cursorPath || 'next_cursor').split('.');
+        let nextCursor = response.data;
+        for (const part of cursorParts) {
+          nextCursor = nextCursor?.[part];
+        }
+        cursor = nextCursor;
+        if (!cursor) {
+          hasMore = false;
+        }
       }
     }
     loopCounter++;
@@ -345,6 +342,7 @@ IMPORTANT CONSIDERATIONS:
   * Asynchronous operations that accept requests for processing
   * Messaging/notification APIs that confirm delivery without response data
   * In cases where the instruction is a retrieval operation, an empty response is often a failure.
+  * In cases where the instruction is unclear, it is always better to return non empty responses than empty responses.
 - Always consider the instruction type and consult the API documentation when provided to understand expected response patterns
 - Focus on whether the response contains the REQUESTED DATA, not the exact structure. If the instruction asks for "products" and the response contains product data (regardless of field names), it's successful.
 - DO NOT fail validation just because field names differ from what's mentioned in the instruction.

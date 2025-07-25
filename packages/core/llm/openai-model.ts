@@ -265,7 +265,7 @@ export class OpenAIModel implements LLM {
         temperature: temperature,
         parallel_tool_calls: false,
         store: true,
-      }, { timeout: 60_000 });
+      }, { timeout: 30_000 });
 
       responseId = resp.id;
 

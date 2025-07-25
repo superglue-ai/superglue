@@ -314,7 +314,7 @@ export const buildWorkflowImplementation: ToolImplementation<WorkflowBuildContex
     const { previousError } = args;
     const { messages = [] } = context;
 
-    logMessage('info', `build_workflow tool called${previousError ? ' (retry)' : ''}`, context);
+    logMessage('debug', `build_workflow tool called${previousError ? ' (retry)' : ''}`, context);
 
     if (!messages || messages.length === 0) {
         return {
