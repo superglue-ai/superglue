@@ -58,10 +58,10 @@ export function IntegrationForm({
 }: IntegrationFormProps) {
     const initialSelected = integration
         ? integrationOptions.find(opt =>
-            opt.value !== 'custom' &&
+            opt.value !== 'manual' &&
             (integration.id === opt.value || (integration.urlHost && integration.urlHost.includes(opt.value)))
-        )?.value || 'custom'
-        : 'custom';
+        )?.value || 'manual'
+        : 'manual';
     const [selectedIntegration, setSelectedIntegration] = useState<string>(initialSelected);
     const [integrationDropdownOpen, setIntegrationDropdownOpen] = useState(false);
     const [id, setId] = useState(integration?.id || initialSelected);
@@ -129,7 +129,7 @@ export function IntegrationForm({
 
     // Pre-fill OAuth URLs when auth type changes to OAuth
     useEffect(() => {
-        if (authType === 'oauth' && selectedIntegration && selectedIntegration !== 'custom') {
+        if (authType === 'oauth' && selectedIntegration && selectedIntegration !== 'manual') {
             const integrationTemplate = integrations[selectedIntegration];
             if (integrationTemplate?.oauth) {
                 setOauthFields(prev => ({
@@ -157,7 +157,7 @@ export function IntegrationForm({
     const handleIntegrationSelect = (value: string) => {
         setSelectedIntegration(value);
 
-        if (value === 'custom') {
+        if (value === 'manual') {
             setUrlHost('');
             setUrlPath('');
             setDocumentationUrl('');
@@ -165,7 +165,7 @@ export function IntegrationForm({
             setSpecificInstructions('');
             // Set custom as ID if not editing
             if (!isEditing) {
-                setId('custom');
+                setId('new-integration');
             }
             return;
         }
@@ -358,8 +358,8 @@ export function IntegrationForm({
             </CardHeader>
             <CardContent className={modal ? "p-6 space-y-3 border-0" : "p-4 space-y-3"}>
                 <div>
-                    <Label htmlFor="integrationSelect">Integration Type</Label>
-                    <HelpTooltip text="Select from known integrations or choose custom for any other API." />
+                    <Label htmlFor="integrationSelect">From Template</Label>
+                    <HelpTooltip text="Select from known integrations or choose No Template for any other API." />
                     <Popover open={integrationDropdownOpen} onOpenChange={setIntegrationDropdownOpen}>
                         <PopoverTrigger asChild>
                             <Button
