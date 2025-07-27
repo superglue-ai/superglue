@@ -1,4 +1,4 @@
-import { Integration, Workflow } from "@superglue/client";
+import { ExecutionStep, Integration, Workflow } from "@superglue/client";
 import { Metadata } from "@superglue/shared";
 import { type OpenAI } from "openai";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
@@ -192,7 +192,11 @@ Your finalTransform function MUST transform the collected data from all steps to
 
       builtWorkflow.instruction = this.instruction;
       builtWorkflow.responseSchema = this.responseSchema;
-
+      try {
+        builtWorkflow.originalResponseSchema = await this.generateOriginalResponseSchema(builtWorkflow.steps);
+      } catch (error) {
+        logMessage('warn', `Error generating original response schema: ${error}`, this.metadata);
+      }
     } catch (error: any) {
       logMessage('error', `Error during workflow build attempt: ${error.message}`, this.metadata);
     }
@@ -208,10 +212,328 @@ Your finalTransform function MUST transform the collected data from all steps to
       steps: builtWorkflow.steps,
       integrationIds: Object.keys(this.integrations),
       finalTransform: builtWorkflow.finalTransform,
+      originalResponseSchema: builtWorkflow.originalResponseSchema,
       responseSchema: this.responseSchema,
       inputSchema: this.inputSchema,
       createdAt: builtWorkflow.createdAt || new Date(),
       updatedAt: builtWorkflow.updatedAt || new Date(),
     };
+  }
+  async generateOriginalResponseSchema(steps: ExecutionStep[]): Promise<JSONSchema> {
+    const properties: Record<string, any> = {};
+    const required: string[] = [];
+
+    for (const step of steps) {
+      // Get the integration for this step
+      const integration = this.integrations[step.integrationId];
+      
+      if (!integration) {
+        logMessage('warn', `Integration ${step.integrationId} not found for step ${step.id}`, this.metadata);
+        // Add a generic schema for this step
+        properties[step.id] = {
+          type: "object",
+          description: `Response data from step ${step.id}`
+        };
+        continue;
+      }
+
+      // Try to extract response schema from OpenAPI documentation
+      let stepResponseSchema: any = {
+        type: "object",
+        description: `Response data from ${integration.id} API for step ${step.id}`
+      };
+
+      if (integration.openApiSchema) {
+        try {
+          // Try to parse OpenAPI documentation if available
+          const openApiDoc = await this.parseOpenApiDocumentation(integration.openApiSchema, step.apiConfig);
+          if (openApiDoc) {
+            stepResponseSchema = openApiDoc;
+          } 
+        } catch (error) {
+          logMessage('debug', `Failed to extract OpenAPI schema for step ${step.id}: ${error}`, this.metadata);
+        }
+      }
+
+      // If it's a LOOP execution mode, wrap the schema in an array
+      if (step.executionMode === "LOOP") {
+        properties[step.id] = {
+          type: "array",
+          items: stepResponseSchema,
+          description: `Array of responses from looped execution of step ${step.id}`
+        };
+      } else {
+        properties[step.id] = stepResponseSchema;
+      }
+
+      required.push(step.id);
+    }
+
+    return {
+      type: "object",
+      properties,
+      required,
+      additionalProperties: false
+    } as JSONSchema;
+  }
+
+  private async parseOpenApiDocumentation(openApiSchema: string, apiConfig: any): Promise<any | null> {
+    if (!openApiSchema) {
+      return null;
+    }
+
+    try {
+      // Parse the schema JSON
+      let spec = JSON.parse(openApiSchema);
+
+      if (!spec) {
+        return null;
+      }
+
+      // Check if it's a Google Discovery schema
+      if (spec.resources && !spec.openapi && !spec.swagger) {
+        return this.parseGoogleDiscoverySchema(spec, apiConfig);
+      }
+
+      // Otherwise, treat it as an OpenAPI schema
+      return this.parseOpenApiSchema(spec, apiConfig);
+    } catch (error) {
+      logMessage('debug', `Error parsing API schema documentation: ${error}`, this.metadata);
+      return null;
+    }
+  }
+
+  private parseOpenApiSchema(openApiSpec: any, apiConfig: any): any | null {
+    // Extract response schema based on the API endpoint
+    const { urlPath, method } = apiConfig;
+    if (!urlPath || !method) {
+      return null;
+    }
+
+    // Clean up the path (remove variable syntax)
+    const cleanPath = urlPath.replace(/<<[^>]+>>/g, '{param}')
+      .replace(/\{[^}]+\}/g, (match) => match.toLowerCase());
+
+    // Look for the path in the OpenAPI spec
+    const paths = openApiSpec.paths || openApiSpec.specifications?.reduce((acc, spec) => ({ ...acc, ...spec.spec.paths }), {}) || {};
+    let pathSchema = null;
+
+    // Try to find exact match first
+    for (const [path, pathConfig] of Object.entries(paths)) {
+      if (this.pathMatches(cleanPath, path)) {
+        const methodConfig = pathConfig[method.toLowerCase()];
+        if (methodConfig?.responses) {
+          // Get the successful response schema (200, 201, etc.)
+          const successResponse = methodConfig.responses['200'] || 
+                                methodConfig.responses['201'] || 
+                                methodConfig.responses['2XX'] ||
+                                methodConfig.responses['default'];
+          
+          if (successResponse?.content) {
+            // Extract schema from content type
+            const content = successResponse.content['application/json'] || 
+                          successResponse.content['*/*'] ||
+                          Object.values(successResponse.content)[0];
+            
+            if (content?.schema) {
+              pathSchema = this.resolveOpenApiSchema(content.schema, openApiSpec);
+              break;
+            }
+          } else if (successResponse?.schema) {
+            // OpenAPI 2.0 format
+            pathSchema = this.resolveOpenApiSchema(successResponse.schema, openApiSpec);
+            break;
+          }
+        }
+      }
+    }
+
+    return pathSchema;
+  }
+
+  private parseGoogleDiscoverySchema(discoverySpec: any, apiConfig: any): any | null {
+    const { urlPath, method } = apiConfig;
+    if (!urlPath || !method) {
+      return null;
+    }
+
+    // Clean up the path
+    const cleanPath = urlPath.replace(/<<[^>]+>>/g, '{param}');
+
+    // Recursively search through resources and methods
+    const findMethod = (resources: any, currentPath: string = ''): any => {
+      if (!resources) return null;
+
+      for (const [resourceName, resource] of Object.entries(resources)) {
+        const res = resource as any;
+        // Check methods in this resource
+        if (res.methods) {
+          for (const [methodName, methodConfig] of Object.entries(res.methods)) {
+            const method = methodConfig as any;
+            const fullPath = method.path || method.flatPath;
+            if (fullPath && this.pathMatches(cleanPath, fullPath)) {
+              // Check if HTTP method matches
+              if (method.httpMethod?.toUpperCase() === apiConfig.method.toUpperCase()) {
+                // Found the matching method, extract response
+                if (method.response?.$ref) {
+                  // Resolve the reference in schemas
+                  return this.resolveGoogleDiscoveryRef(method.response.$ref, discoverySpec);
+                } else if (method.response) {
+                  return this.convertGoogleDiscoverySchema(method.response, discoverySpec);
+                }
+              }
+            }
+          }
+        }
+
+        // Recursively check nested resources
+        if (res.resources) {
+          const result = findMethod(res.resources, `${currentPath}/${resourceName}`);
+          if (result) return result;
+        }
+      }
+
+      return null;
+    };
+
+    return findMethod(discoverySpec.resources);
+  }
+
+  private resolveGoogleDiscoveryRef(ref: string, spec: any): any {
+    // Google Discovery refs are direct schema names
+    const schemas = spec.schemas || {};
+    const schema = schemas[ref];
+    
+    if (!schema) {
+      logMessage('debug', `Google Discovery schema reference '${ref}' not found in schemas`, this.metadata);
+      // Return a generic object schema as fallback
+      return {
+        type: 'object',
+        description: `Response of type ${ref}`
+      };
+    }
+
+    return this.convertGoogleDiscoverySchema(schema, spec);
+  }
+
+  private convertGoogleDiscoverySchema(schema: any, spec: any): any {
+    if (!schema) return null;
+
+    // Handle $ref
+    if (schema.$ref) {
+      return this.resolveGoogleDiscoveryRef(schema.$ref, spec);
+    }
+
+    // Convert Google Discovery types to JSON Schema types
+    const typeMap: Record<string, string> = {
+      'string': 'string',
+      'integer': 'integer',
+      'number': 'number',
+      'boolean': 'boolean',
+      'array': 'array',
+      'object': 'object',
+      'any': 'object'
+    };
+
+    const result: any = {};
+
+    if (schema.type) {
+      result.type = typeMap[schema.type] || schema.type;
+    }
+
+    if (schema.description) {
+      result.description = schema.description;
+    }
+
+    // Handle array items
+    if (schema.type === 'array' && schema.items) {
+      result.items = this.convertGoogleDiscoverySchema(schema.items, spec);
+    }
+
+    // Handle object properties
+    if (schema.properties) {
+      result.type = 'object';
+      result.properties = {};
+      for (const [key, value] of Object.entries(schema.properties)) {
+        result.properties[key] = this.convertGoogleDiscoverySchema(value, spec);
+      }
+    }
+
+    // Handle additional properties
+    if (schema.additionalProperties !== undefined) {
+      result.additionalProperties = schema.additionalProperties;
+    }
+
+    // Handle required fields
+    if (schema.required) {
+      result.required = schema.required;
+    }
+
+    // Handle enums
+    if (schema.enum) {
+      result.enum = schema.enum;
+    }
+
+    // Handle format
+    if (schema.format) {
+      result.format = schema.format;
+    }
+
+    return result;
+  }
+
+  private pathMatches(cleanPath: string, openApiPath: string): boolean {
+    // Convert OpenAPI path parameters to regex
+    const regexPattern = openApiPath
+      .replace(/\{[^}]+\}/g, '[^/]+')
+      .replace(/\//g, '\\/');
+    
+    const regex = new RegExp(`^${regexPattern}$`, 'i');
+    return regex.test(cleanPath);
+  }
+
+  private resolveOpenApiSchema(schema: any, spec: any): any {
+    if (!schema) return null;
+
+    // Handle $ref references
+    if (schema.$ref) {
+      const refPath = schema.$ref.replace('#/', '').split('/');
+      let resolved = spec;
+      for (const part of refPath) {
+        resolved = resolved?.[part];
+      }
+      return this.resolveOpenApiSchema(resolved, spec);
+    }
+
+    // Handle array types
+    if (schema.type === 'array' && schema.items) {
+      return {
+        type: 'array',
+        items: this.resolveOpenApiSchema(schema.items, spec)
+      };
+    }
+
+    // Handle object types
+    if (schema.type === 'object' || schema.properties) {
+      const result: any = {
+        type: 'object',
+        properties: {}
+      };
+
+      if (schema.properties) {
+        for (const [key, value] of Object.entries(schema.properties)) {
+          result.properties[key] = this.resolveOpenApiSchema(value as any, spec);
+        }
+      }
+
+      if (schema.required) {
+        result.required = schema.required;
+      }
+
+      return result;
+    }
+
+    // Return primitive types as-is
+    return schema;
   }
 }

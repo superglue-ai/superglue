@@ -8,19 +8,7 @@ import { OpenAIModel } from "./openai-model.js";
 export interface LLM {
     contextLength: number;
     generateText(messages: OpenAI.Chat.ChatCompletionMessageParam[], temperature?: number): Promise<LLMResponse>;
-    generateObject(messages: OpenAI.Chat.ChatCompletionMessageParam[], schema: any, temperature?: number): Promise<LLMObjectResponse>;
-
-    executeTaskWithTools?(
-        messages: OpenAI.Chat.ChatCompletionMessageParam[],
-        tools: ToolDefinition[],
-        toolExecutor: (toolCall: ToolCall) => Promise<ToolCallResult>,
-        options?: {
-            maxIterations?: number;
-            temperature?: number;
-            previousResponseId?: string;
-            shouldAbort?: (trace: { toolCall: ToolCall; result: ToolCallResult }) => boolean;
-        }
-    ): Promise<LLMAgentResponse>;
+    generateObject(messages: OpenAI.Chat.ChatCompletionMessageParam[], schema: any, temperature?: number, customTools?: ToolDefinition[], context?: any): Promise<LLMObjectResponse>;
 }
 
 export interface LLMToolResponse {

@@ -1,8 +1,8 @@
 import OpenAI from "openai";
 import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
-import { ToolCall, ToolCallResult, ToolDefinition } from "../tools/tools.js";
+import { ToolDefinition } from "../tools/tools.js";
 import { addNullableToOptional } from "../utils/tools.js";
-import { LLM, LLMAgentResponse, LLMObjectResponse, LLMResponse } from "./llm.js";
+import { LLM, LLMObjectResponse, LLMResponse } from "./llm.js";
 
 
 export class OpenAIModel implements LLM {
@@ -123,229 +123,159 @@ export class OpenAIModel implements LLM {
     return schema;
   };
 
-  async generateObject(messages: ChatCompletionMessageParam[], schema: any, temperature: number = 0): Promise<LLMObjectResponse> {
-    // Prepare input messages for Responses API
-    const input = messages.map(m => ({
-      role: m.role,
-      content: typeof m.content === 'string' ? m.content : String(m.content)
-    }));
-
-    // Add date context
-    const dateMessage = {
-      role: "system",
-      content: "The current date and time is " + new Date().toISOString()
-    };
-    input.unshift(dateMessage as any);
-
-    // Prepare text format based on whether schema is provided
-    let textFormat: any;
-    if (schema) {
-      // Prepare schema for strict validation
-      schema = addNullableToOptional(schema);
-      schema = this.enforceStrictSchema(schema, true);
-
-      textFormat = {
-        format: {
-          type: "json_schema",
-          name: "structured_response",
-          schema: schema,
-          strict: true
-        }
-      };
-    } else {
-      textFormat = {
-        format: {
-          type: "json_object"
-        }
-      };
-    }
-
-    try {
-      const response = await (this.client.responses.create as any)({
-        model: process.env.OPENAI_MODEL || "gpt-4o",
-        input: input as any,
-        temperature: process.env.OPENAI_MODEL?.startsWith('o') ? undefined : temperature,
-        text: textFormat,
-        store: false  // Don't store for single structured output calls
-      }) as any;
-
-      // Extract the structured output
-      let generatedObject = null;
-
-      for (const output of response.output || []) {
-        if (output.type === 'message' && output.role === 'assistant') {
-          for (const content of output.content || []) {
-            if (content.type === 'output_text') {
-              generatedObject = JSON.parse(content.text);
-
-              // Handle wrapped results (same as before)
-              if (generatedObject.___results) {
-                generatedObject = generatedObject.___results;
-              }
-              break;
-            }
-          }
-        }
+  private async processToolCall(
+    toolCallData: any,
+    tools: any[],
+    conversationMessages: any[],
+    context?: any
+  ): Promise<{ finalResult: any; shouldBreak: boolean }> {
+    const name = toolCallData.name || toolCallData.function?.name;
+    const callId = toolCallData.call_id || toolCallData.id;
+    const args = toolCallData.arguments || toolCallData.function?.arguments;
+    
+    if (name === "submit") {
+      let finalResult = typeof args === "string" ? JSON.parse(args) : args;
+      if (finalResult.___results) {
+        finalResult = finalResult.___results;
       }
-
-      if (!generatedObject) {
-        throw new Error('No structured output generated');
-      }
-
-      // Build updated messages for compatibility
-      const updatedMessages = [...messages, {
-        role: "assistant",
-        content: JSON.stringify(generatedObject)
-      }];
-
-      return {
-        response: generatedObject,
-        messages: updatedMessages
-      } as LLMObjectResponse;
-    } catch (error) {
-      console.error('Error in generateObject with Responses API:', error);
-      // Fall back to chat completions API
-      const responseFormat = schema ? { type: "json_schema", json_schema: { name: "response", strict: true, schema: schema } } : { type: "json_object" };
-      const result = await this.client.chat.completions.create({
-        messages: [dateMessage as ChatCompletionMessageParam, ...messages],
-        model: process.env.OPENAI_MODEL || "gpt-4o",
-        temperature: process.env.OPENAI_MODEL?.startsWith('o') ? undefined : temperature,
-        response_format: responseFormat as any,
+      conversationMessages.push({
+        type: "function_call_output",
+        call_id: callId,
+        output: "Done"
       });
-
-      let responseText = result.choices[0].message.content;
-      let generatedObject = JSON.parse(responseText);
-      if (generatedObject.___results) {
-        generatedObject = generatedObject.___results;
+      return { finalResult, shouldBreak: true };
+    } else {
+      const tool = tools.find(t => t.name === name);
+      if (tool && tool.execute) {
+        const toolResult = await tool.execute(typeof args === "string" ? JSON.parse(args) : args, context);
+        conversationMessages.push({
+          type: "function_call_output",
+          call_id: callId,
+          output: JSON.stringify(toolResult || {})
+        });
       }
-
-      const updatedMessages = [...messages, {
-        role: "assistant",
-        content: responseText
-      }];
-
-      return {
-        response: generatedObject,
-        messages: updatedMessages
-      } as LLMObjectResponse;
+      return { finalResult: null, shouldBreak: false };
     }
   }
 
-  async executeTaskWithTools(
-    messages: ChatCompletionMessageParam[],
-    tools: ToolDefinition[],
-    toolExecutor: (toolCall: ToolCall) => Promise<ToolCallResult>,
-    options?: { maxIterations?: number; temperature?: number; previousResponseId?: string; shouldAbort?: (trace: { toolCall: ToolCall; result: ToolCallResult }) => boolean; }
-  ): Promise<LLMAgentResponse> {
-    let responseId: string | null = null;
+  async generateObject(messages: ChatCompletionMessageParam[], schema: any, temperature: number = 0, customTools?: ToolDefinition[], context?: any): Promise<LLMObjectResponse> {
+    // Prepare the schema
+    schema = addNullableToOptional(schema);
+    schema = this.enforceStrictSchema(schema, true);
 
-    const fnTools = tools.map(t => ({
-      type: 'function' as const,
-      name: t.name,
-      description: t.description,
-      parameters: t.arguments
-    }));
-
-    const executionTrace: LLMAgentResponse['executionTrace'] = [];
-    const toolCalls: ToolCall[] = [];
-    const maxIterations = options?.maxIterations ?? 10;
-    const temperature = options?.temperature ?? 0.0;
-
-    let lastAssistantText: string | null = null;
-    let lastSuccessfulToolCall: LLMAgentResponse['lastSuccessfulToolCall'] = undefined;
-    let lastError: string | undefined = undefined;
-
-    for (let i = 0; i < maxIterations; i++) {
-      const resp = await (this.client.responses.create as any)({
-        model: this.model,
-        input: messages,
-        previous_response_id: responseId ?? undefined,
-        tools: fnTools,
-        tool_choice: "required",
-        temperature: temperature,
-        parallel_tool_calls: false,
-        store: true,
-      }, { timeout: 30_000 });
-
-      responseId = resp.id;
-
-      for (const out of resp.output || []) {
-        if (out.type === "function_call") {
-          const call: ToolCall = {
-            id: out.call_id || out.id,
-            name: out.name,
-            arguments: JSON.parse(out.arguments)
-          };
-
-          toolCalls.push(call);
-          const result = await toolExecutor(call);
-          executionTrace.push({ toolCall: call, result });
-
-          // Track successful results
-          if (result.result?.resultForAgent?.success && result.result?.fullResult) {
-            lastSuccessfulToolCall = {
-              toolCall: call,
-              result: result.result.fullResult.data,
-              additionalData: result.result.fullResult.config
-            };
-          } else if (result.result?.resultForAgent?.error) {
-            lastError = result.result.resultForAgent.error;
-          }
-
-          const truncatedResultForAgent = JSON.stringify(result.result?.resultForAgent ?? null).slice(0, 500);
-          const msg = { type: "function_call_output", call_id: call.id, output: 'Output truncated to 500 chars: ' + truncatedResultForAgent };
-          messages.push(msg as any);
-
-          if (options?.shouldAbort?.({ toolCall: call, result })) {
-            if (lastAssistantText) {
-              messages.push({ role: "assistant", content: lastAssistantText } as any);
-            }
-            return {
-              finalResult: lastSuccessfulToolCall?.result ?? lastAssistantText ?? "aborted",
-              toolCalls,
-              executionTrace,
-              messages: messages,
-              responseId,
-              success: !!lastSuccessfulToolCall,
-              lastSuccessfulToolCall,
-              lastError,
-              terminationReason: lastSuccessfulToolCall ? 'success' : 'abort'
-            };
-          }
-        } else if (out.type === "message") {
-          lastAssistantText = out.content?.map(c => c.text).join("") || "";
-        }
-      }
-
-      if (!resp.output?.some(o => o.type === "function_call")) {
-        if (lastAssistantText) {
-          messages.push({ role: "assistant", content: lastAssistantText } as any);
-        }
-        return {
-          finalResult: lastAssistantText ?? "",
-          toolCalls,
-          executionTrace,
-          messages: messages,
-          responseId,
-          success: false,
-          lastSuccessfulToolCall,
-          lastError: lastError || "No tool calls made",
-          terminationReason: 'abort'
-        };
-      }
+    // o models don't support temperature
+    if (process.env.OPENAI_MODEL?.startsWith('o')) {
+      temperature = undefined;
     }
 
-    // Max iterations reached
-    return {
-      finalResult: lastSuccessfulToolCall?.result ?? null,
-      toolCalls,
-      executionTrace,
-      messages: messages,
-      responseId,
-      success: false,
-      lastSuccessfulToolCall,
-      lastError: lastError || `Maximum iterations (${maxIterations}) reached`,
-      terminationReason: 'max_iterations'
-    };
+    const dateMessage = {
+      role: "system",
+      content: "The current date and time is " + new Date().toISOString()
+    } as ChatCompletionMessageParam;
+
+    // Create the tools configuration for Responses API
+    const tools = [
+      {
+        type: "function" as const,
+        name: "submit",
+        description: "Submit the final result in the required format",
+        parameters: schema
+      },
+      {
+        type: "web_search" as const
+      },
+      ...(customTools?.map(t => ({
+        type: "function" as const,
+        name: t.name,
+        description: t.description,
+        parameters: t.arguments,
+        execute: t.execute
+      })) || [])
+    ];
+
+    try {
+      // Use the Responses API with multi-turn support
+      let finalResult = null;
+      let conversationMessages: any = [dateMessage, ...messages];
+
+      // Continue until the model calls submit
+      while (finalResult === null) {
+        const requestParams: any = {
+          model: process.env.OPENAI_MODEL || "gpt-4.1",
+          tools: tools,
+          temperature: temperature,
+          tool_choice: "required"
+        };
+
+        requestParams.input = conversationMessages;
+        const response = await (this.client.responses.create as any)(requestParams);
+
+        // Extract the result from the response
+        const output = response.output || [];
+
+        for (const item of output) {
+          conversationMessages.push(item);
+          
+          // Check for direct function calls
+          if (item?.type === "function_call") {
+            const { finalResult: result, shouldBreak } = await this.processToolCall(
+              item,
+              tools,
+              conversationMessages,
+              context
+            );
+            if (shouldBreak) {
+              finalResult = result;
+              break;
+            }
+          }
+          
+          // Check for tool calls within messages
+          if (item?.type === "message") {
+            for (const toolCall of item?.tool_calls || []) {
+              const { finalResult: result, shouldBreak } = await this.processToolCall(
+                toolCall,
+                tools,
+                conversationMessages,
+                context
+              );
+              if (shouldBreak) {
+                finalResult = result;
+                break;
+              }
+            }
+            if (finalResult) break;
+          }
+        }
+
+        // Add a safety check to prevent infinite loops
+        // If we've made too many attempts, throw an error
+        if (!finalResult && output.length === 0) {
+          throw new Error("No output received from the model");
+        }
+      }
+
+      // Convert back to messages format for compatibility
+      const updatedMessages = [...conversationMessages, {
+        role: "assistant",
+        content: JSON.stringify(finalResult)
+      }];
+
+      return {
+        response: finalResult,
+        messages: updatedMessages
+      } as LLMObjectResponse;
+
+    } catch (error) {
+      const updatedMessages = [...messages, {
+        role: "assistant",
+        content: "Error: " + error.message
+      }];
+
+      return {
+        response: "Error: " + error.message,
+        messages: updatedMessages
+      } as LLMObjectResponse;
+    }
   }
 }

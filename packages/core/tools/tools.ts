@@ -5,8 +5,7 @@ import {
     buildWorkflowToolDefinition,
     searchDocumentationToolDefinition,
     searchDocumentationToolImplementation,
-    submitToolDefinition,
-    submitToolImplementation
+    submitToolDefinition
 } from "../workflow/workflow-tools.js";
 
 export interface ToolDefinition {
@@ -17,6 +16,7 @@ export interface ToolDefinition {
         properties: Record<string, any>;
         required?: string[];
     };
+    execute?: ToolImplementation;
 }
 
 export interface ToolCall {
@@ -76,7 +76,6 @@ export type ToolImplementation<TContext extends BaseToolContext = BaseToolContex
 const toolRegistry: Record<string, ToolImplementation<any>> = {
     generate_instructions: generateInstructionsImplementation,
     search_documentation: searchDocumentationToolImplementation,
-    submit_tool: submitToolImplementation,
     build_workflow: buildWorkflowImplementation
 };
 

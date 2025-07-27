@@ -498,6 +498,14 @@ export async function evaluateStopCondition(
     await context.global.set('responseJSON', JSON.stringify(response));
     await context.global.set('pageInfoJSON', JSON.stringify(pageInfo));
 
+    // if the stop condition code starts with return or is not a function, we need to wrap it in a function
+    if (stopConditionCode.startsWith("return")) {
+      stopConditionCode = `(response, pageInfo) => { ${stopConditionCode} }`;
+    }
+    else if (!stopConditionCode.startsWith("(response")) {
+      stopConditionCode = `(response, pageInfo) => ${stopConditionCode}`;
+    }
+
     // Create the evaluation script
     const script = `
           const response = JSON.parse(responseJSON);

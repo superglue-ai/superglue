@@ -4,106 +4,8 @@ import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { LanguageModel } from "../llm/llm.js";
 import { ToolDefinition, ToolImplementation, WorkflowBuildContext, WorkflowExecutionContext } from "../tools/tools.js";
-import { callEndpoint, evaluateResponse } from "../utils/api.js";
 import { Documentation } from "../utils/documentation.js";
 import { logMessage } from "../utils/logs.js";
-
-export const searchDocumentationToolDefinition: ToolDefinition = {
-    name: "search_documentation",
-    description: "Search integration documentation for specific information about API structure, endpoints, authentication patterns, etc. Use this when you need to understand how an API works, what endpoints are available, or how to authenticate. Returns relevant documentation excerpts matching your search query.",
-    arguments: {
-        type: "object",
-        properties: {
-            integrationId: {
-                type: "string",
-                description: "ID of the integration to search"
-            },
-            query: {
-                type: "string",
-                description: "What to search for in the documentation (e.g., 'authentication', 'batch processing', 'rate limits')"
-            }
-        },
-        required: ["integrationId", "query"]
-    }
-};
-
-export const submitToolDefinition: ToolDefinition = {
-    name: "submit_tool",
-    description: "Submit an API configuration to execute the API call. The tool will make the request, validate the response against the instruction, and return success or detailed error information.",
-    arguments: {
-        type: "object",
-        properties: {
-            apiConfig: {
-                type: "object",
-                description: "Complete API configuration to execute",
-                properties: {
-                    urlHost: {
-                        type: "string",
-                        description: "The base URL host (e.g., https://api.example.com) or database connection string (e.g., postgres://<<user>>:<<password>>@<<hostname>>:<<port>>)"
-                    },
-                    urlPath: {
-                        type: "string",
-                        description: "The API endpoint URL path or database name for Postgres. Use <<variable>> syntax for dynamic values or JavaScript expressions."
-                    },
-                    method: {
-                        type: "string",
-                        enum: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-                        description: "HTTP method"
-                    },
-                    queryParams: {
-                        type: "object",
-                        description: "Query parameters as key-value pairs. Use <<variable>> syntax for dynamic values or JavaScript expressions.",
-                        additionalProperties: { type: "string" }
-                    },
-                    headers: {
-                        type: "object",
-                        description: "HTTP headers as key-value pairs. Use <<variable>> syntax for dynamic values or JavaScript expressions",
-                        additionalProperties: { type: "string" }
-                    },
-                    body: {
-                        type: "string",
-                        description: "Request body formatted as JSON string. Use <<variable>> syntax for dynamic values or JavaScript expressions"
-                    },
-                    pagination: {
-                        type: "object",
-                        description: "OPTIONAL: Only configure if you have verified the exact pagination mechanism from the API documentation. For OFFSET_BASED, ALWAYS use <<offset>>. If PAGE_BASED, ALWAYS use <<page>>. If CURSOR_BASED, ALWAYS use <<cursor>> in the URL, headers, or body.",
-                        properties: {
-                            type: {
-                                type: "string",
-                                enum: ["OFFSET_BASED", "PAGE_BASED", "CURSOR_BASED"],
-                                description: "The type of pagination the API uses."
-                            },
-                            pageSize: {
-                                type: "string",
-                                description: "Number of items per page (e.g., '50', '100'). Once set, this becomes available as <<limit>> (same as pageSize)."
-                            },
-                            cursorPath: {
-                                type: "string",
-                                description: "If cursor_based: The path to the cursor in the response. If not, leave empty."
-                            },
-                            stopCondition: {
-                                type: "string",
-                                description: "REQUIRED: JavaScript function that determines when to stop pagination. This is the primary control for pagination. Return true to STOP."
-                            }
-                        }
-                    }
-                },
-                required: ["urlHost", "urlPath", "method"]
-            }
-        },
-        required: ["apiConfig"]
-    }
-};
-
-export const buildWorkflowToolDefinition: ToolDefinition = {
-    name: "build_workflow",
-    description: "Build a complete executable workflow from user instructions.",
-    arguments: {
-        type: "object",
-        properties: {},
-        required: []
-    }
-};
 
 export const searchDocumentationToolImplementation: ToolImplementation<WorkflowExecutionContext> = async (args, context) => {
     const { integrationId, query } = args;
@@ -205,110 +107,6 @@ export const searchDocumentationToolImplementation: ToolImplementation<WorkflowE
     }
 };
 
-export const submitToolImplementation: ToolImplementation<WorkflowExecutionContext> = async (args, context) => {
-    // Extract API config from args
-    const { apiConfig } = args;
-    const { originalEndpoint: originalEndpoint, payload, credentials, options = {}, integration } = context;
-
-    if (!apiConfig) {
-        return {
-            resultForAgent: {
-                success: false,
-                error: "No API configuration provided. Please provide a complete API configuration in the apiConfig parameter."
-            },
-            fullResult: {
-                success: false,
-                error: "No API configuration provided"
-            }
-        };
-    }
-
-    logMessage('debug', `submit_tool called - ${apiConfig.method} ${apiConfig.urlHost}${apiConfig.urlPath}`, context);
-
-    try {
-        // Merge the original endpoint config with the submitted config
-        const mergedConfig = {
-            ...originalEndpoint,
-            ...apiConfig,
-            // Preserve the original instruction - don't let self-healing change the step's purpose
-            instruction: originalEndpoint?.instruction || apiConfig.instruction,
-            responseSchema: originalEndpoint?.responseSchema || apiConfig.responseSchema,
-            id: originalEndpoint?.id || apiConfig.id,
-            createdAt: originalEndpoint?.createdAt || new Date(),
-            updatedAt: new Date()
-        };
-
-        const response = await callEndpoint(mergedConfig, payload, credentials, options);
-
-        const finalData = response.data;
-        const hasEvaluationCriteria = !!(mergedConfig.instruction || mergedConfig.responseSchema);
-
-        if (hasEvaluationCriteria) {
-            let documentationString = "No documentation provided";
-            if (integration?.documentation) {
-                documentationString = Documentation.extractRelevantSections(integration.documentation, mergedConfig.instruction + "response structure field names methods search query filter", 10, 1000);
-            }
-
-            const evalResult = await evaluateResponse(
-                finalData,
-                mergedConfig.responseSchema,
-                mergedConfig.instruction,
-                documentationString
-            );
-
-            if (!evalResult.success) {
-                logMessage('warn', `Response evaluation failed: ${evalResult.shortReason}`, context);
-
-                return {
-                    resultForAgent: {
-                        success: false,
-                        error: evalResult.shortReason,
-                        responsePreview: JSON.stringify(finalData).slice(0, 1000)
-                    },
-                    fullResult: {
-                        success: false,
-                        error: evalResult.shortReason,
-                        data: finalData,
-                        config: mergedConfig
-                    }
-                };
-            }
-        }
-
-        return {
-            resultForAgent: {
-                success: true,
-                data: {
-                    message: "API call executed successfully and response matches the instruction.",
-                    recordCount: Array.isArray(finalData) ? finalData.length : undefined,
-                    topLevelKeys: finalData && typeof finalData === 'object' ? Object.keys(finalData).slice(0, 10) : undefined
-                }
-            },
-            fullResult: {
-                success: true,
-                data: finalData,
-                config: mergedConfig
-            }
-        };
-
-    } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        logMessage('error', `API call failed: ${errorMessage}`, context);
-
-        return {
-            resultForAgent: {
-                success: false,
-                error: errorMessage,
-                config: apiConfig
-            },
-            fullResult: {
-                success: false,
-                error: errorMessage,
-                config: apiConfig
-            }
-        };
-    }
-};
 
 export const buildWorkflowImplementation: ToolImplementation<WorkflowBuildContext> = async (args, context) => {
     const { previousError } = args;
@@ -433,4 +231,103 @@ export const buildWorkflowImplementation: ToolImplementation<WorkflowBuildContex
             }
         };
     }
+};
+
+export const searchDocumentationToolDefinition: ToolDefinition = {
+    name: "search_documentation",
+    description: "Search integration documentation for specific information about API structure, endpoints, authentication patterns, etc. Use this when you need to understand how an API works, what endpoints are available, or how to authenticate. Returns relevant documentation excerpts matching your search query.",
+    arguments: {
+        type: "object",
+        properties: {
+            integrationId: {
+                type: "string",
+                description: "ID of the integration to search"
+            },
+            query: {
+                type: "string",
+                description: "What to search for in the documentation (e.g., 'authentication', 'batch processing', 'rate limits')"
+            }
+        },
+        required: ["integrationId", "query"]
+    },
+    execute: searchDocumentationToolImplementation
+};
+
+export const submitToolDefinition: ToolDefinition = {
+    name: "submit_tool",
+    description: "Submit an API configuration to execute the API call. The tool will make the request, validate the response against the instruction, and return success or detailed error information.",
+    arguments: {
+        type: "object",
+        properties: {
+            apiConfig: {
+                type: "object",
+                description: "Complete API configuration to execute",
+                properties: {
+                    urlHost: {
+                        type: "string",
+                        description: "The base URL host (e.g., https://api.example.com) or database connection string (e.g., postgres://<<user>>:<<password>>@<<hostname>>:<<port>>)"
+                    },
+                    urlPath: {
+                        type: "string",
+                        description: "The API endpoint URL path or database name for Postgres. Use <<variable>> syntax for dynamic values or JavaScript expressions."
+                    },
+                    method: {
+                        type: "string",
+                        enum: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+                        description: "HTTP method"
+                    },
+                    queryParams: {
+                        type: "object",
+                        description: "Query parameters as key-value pairs. Use <<variable>> syntax for dynamic values or JavaScript expressions.",
+                        additionalProperties: { type: "string" }
+                    },
+                    headers: {
+                        type: "object",
+                        description: "HTTP headers as key-value pairs. Use <<variable>> syntax for dynamic values or JavaScript expressions",
+                        additionalProperties: { type: "string" }
+                    },
+                    body: {
+                        type: "string",
+                        description: "Request body formatted as JSON string. Use <<variable>> syntax for dynamic values or JavaScript expressions"
+                    },
+                    pagination: {
+                        type: "object",
+                        description: "OPTIONAL: Only configure if you have verified the exact pagination mechanism from the API documentation. For OFFSET_BASED, ALWAYS use <<offset>>. If PAGE_BASED, ALWAYS use <<page>>. If CURSOR_BASED, ALWAYS use <<cursor>> in the URL, headers, or body.",
+                        properties: {
+                            type: {
+                                type: "string",
+                                enum: ["OFFSET_BASED", "PAGE_BASED", "CURSOR_BASED"],
+                                description: "The type of pagination the API uses."
+                            },
+                            pageSize: {
+                                type: "string",
+                                description: "Number of items per page (e.g., '50', '100'). Once set, this becomes available as <<limit>> (same as pageSize)."
+                            },
+                            cursorPath: {
+                                type: "string",
+                                description: "If cursor_based: The path to the cursor in the response. If not, leave empty."
+                            },
+                            stopCondition: {
+                                type: "string",
+                                description: "REQUIRED: JavaScript function that determines when to stop pagination. This is the primary control for pagination. Return true to STOP."
+                            }
+                        }
+                    }
+                },
+                required: ["urlHost", "urlPath", "method"]
+            }
+        },
+        required: ["apiConfig"]
+    }
+};
+
+export const buildWorkflowToolDefinition: ToolDefinition = {
+    name: "build_workflow",
+    description: "Build a complete executable workflow from user instructions.",
+    arguments: {
+        type: "object",
+        properties: {},
+        required: []
+    },
+    execute: buildWorkflowImplementation
 };
