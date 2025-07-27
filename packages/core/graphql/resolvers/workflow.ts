@@ -7,6 +7,7 @@ import { WorkflowExecutor } from "../../workflow/workflow-executor.js";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { logMessage } from "../../utils/logs.js";
 import { isTokenExpired, refreshOAuthToken } from "../../utils/oauth.js";
+import { replaceVariables } from "../../utils/tools.js";
 import { WorkflowBuilder } from "../../workflow/workflow-builder.js";
 
 function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined, defaultValue?: T): T | undefined {
@@ -105,7 +106,13 @@ export const executeWorkflowResolver = async (
         }
       }
       const integrationCreds = flattenAndNamespaceWorkflowCredentials(integrations);
-      mergedCredentials = { ...integrationCreds, ...(args.credentials || {}) };
+      mergedCredentials = { 
+        ...integrationCreds,
+        ...Object.entries(args.credentials || {}).reduce((acc: any, cred: any) => {
+          acc[cred.key] = replaceVariables(cred.value, integrationCreds || {});
+          return acc;
+        }, {})
+      };
     }
 
     const executor = new WorkflowExecutor(workflow, metadata, integrations);

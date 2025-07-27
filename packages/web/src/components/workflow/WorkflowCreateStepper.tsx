@@ -320,7 +320,14 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
           .map(id => freshIntegrations.find(i => i.id === id))
           .filter(Boolean);
         const credentialsFromIntegrations = flattenAndNamespaceWorkflowCredentials(selectedIntegrations);
-        setReviewCredentials(JSON.stringify(credentialsFromIntegrations, null, 2));
+        
+        // Mask the credentials for display
+        const maskedCredentials = Object.entries(credentialsFromIntegrations).reduce((acc, [key, _]) => {
+          acc[key] = `<<${key}>>`;
+          return acc;
+        }, {} as Record<string, string>);
+        
+        setReviewCredentials(JSON.stringify(maskedCredentials, null, 2));
 
         setStep(steps[currentIndex + 1]);
       } catch (error: any) {
