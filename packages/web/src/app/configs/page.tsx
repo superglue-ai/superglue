@@ -49,6 +49,30 @@ const ConfigTable = () => {
   const [showConfigStepper, setShowConfigStepper] = React.useState(false);
   const [configStepperProps, setConfigStepperProps] = React.useState<{ prefillData?: any }>({});
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
+  const [showHiddenOptions, setShowHiddenOptions] = React.useState(false);
+
+  // Add effect to track Command/Shift key presses
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.metaKey || e.shiftKey) {
+        setShowHiddenOptions(true);
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (!e.metaKey && !e.shiftKey) {
+        setShowHiddenOptions(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
 
   const refreshConfigs = React.useCallback(async () => {
     setShowConfigStepper(false);
@@ -289,10 +313,12 @@ const ConfigTable = () => {
                 <GitBranch className="mr-2 h-4 w-4" />
                 Workflow
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleWorkflowManual} className='p-4'>
-                <GitBranch className="mr-2 h-4 w-4" />
-                Workflow (Manual)
-              </DropdownMenuItem>
+              {showHiddenOptions && (
+                <DropdownMenuItem onClick={handleWorkflowManual} className='p-4'>
+                  <GitBranch className="mr-2 h-4 w-4" />
+                  Workflow (Manual)
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
