@@ -272,6 +272,7 @@ export function IntegrationForm({
             specificInstructions: specificInstructions.trim(),
             credentials: creds,
         };
+        console.log('integrationData', integrationData)
         onSave(integrationData);
     };
 
@@ -462,12 +463,14 @@ export function IntegrationForm({
                 </div>
                 <div>
                     <Label htmlFor="documentation">Documentation</Label>
-                    <HelpTooltip text="You can either paste a documentation URL or upload a file. You can add manual documentation to the instructions in the advanced options below." />
+                    <HelpTooltip text="You can either paste a documentation URL or upload a file. To add multiple pages, you can upload a zip file. You can add manual documentation to the instructions in the advanced options below." />
                     <DocumentationField
                         url={documentationUrl || ''}
                         content={documentation || ''}
                         onUrlChange={setDocumentationUrl}
-                        onContentChange={setDocumentation}
+                        onContentChange={(content) => {
+                            setDocumentation(content);
+                        }}
                         onFileUpload={handleFileUpload}
                         onFileRemove={handleFileRemove}
                         hasUploadedFile={hasUploadedFile}
