@@ -2,15 +2,13 @@ import { ApiConfig, ApiInputRequest, CacheMode, Integration, RequestOptions, Sel
 import type { Context, Metadata } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import OpenAI from "openai";
-import { LanguageModel } from "../../llm/llm.js";
-import { SELF_HEALING_API_AGENT_PROMPT } from "../../llm/prompts.js";
-import { callEndpoint, evaluateResponse } from "../../utils/api.js";
+import { server_defaults } from "../../default.js";
+import { callEndpoint, evaluateResponse, generateApiConfig } from "../../utils/api.js";
 import { logMessage } from "../../utils/logs.js";
 import { telemetryClient } from "../../utils/telemetry.js";
-import { composeUrl, generateId, maskCredentials, sample } from "../../utils/tools.js";
+import { maskCredentials } from "../../utils/tools.js";
 import { executeTransform } from "../../utils/transform.js";
 import { notifyWebhook } from "../../utils/webhook.js";
-import { searchDocumentationToolDefinition, submitToolDefinition } from "../../workflow/workflow-tools.js";
 
 
 export async function executeApiCall(
@@ -44,6 +42,9 @@ export async function executeApiCall(
       if (retryCount > 0 && isSelfHealing) {
         logMessage('info', `Generating API config for ${endpoint?.urlHost}${retryCount > 0 ? ` (${retryCount})` : ""}`, metadata);
         const computedApiCallConfig = await generateApiConfig(endpoint, documentationString, payload, credentials, retryCount, messages, { integration });
+        if (!computedApiCallConfig) {
+          throw new Error("No API config generated");
+        }
         endpoint = computedApiCallConfig.config;
         messages = computedApiCallConfig.messages;
       }
@@ -77,7 +78,7 @@ export async function executeApiCall(
       }
     }
     retryCount++;
-  } while (retryCount < (options?.retries !== undefined ? options.retries : 8));
+  } while (retryCount < (options?.retries !== undefined ? options.retries : server_defaults.MAX_CALL_RETRIES));
   if (!success) {
     telemetryClient?.captureException(new Error(`API call failed after ${retryCount} retries. Last error: ${lastError}`), metadata.orgId, {
       endpoint: endpoint,
@@ -88,91 +89,6 @@ export async function executeApiCall(
 
   return { data: response?.data, endpoint };
 }
-
-
-export async function generateApiConfig(
-  apiConfig: Partial<ApiConfig>,
-  documentation: string,
-  payload: Record<string, any>,
-  credentials: Record<string, any>,
-  retryCount = 0,
-  messages: OpenAI.Chat.ChatCompletionMessageParam[] = [],
-  context?: any
-): Promise<{ config: ApiConfig; messages: OpenAI.Chat.ChatCompletionMessageParam[]; }> {
-
-  if (messages.length === 0) {
-    const userPrompt = `Generate API configuration for the following:
-
-<instruction>
-${apiConfig.instruction}
-</instruction>
-
-<user_provided_information>
-Also, the user provided the following information. Ensure to at least try where it makes sense:
-Base URL: ${composeUrl(apiConfig.urlHost, apiConfig.urlPath)}
-${apiConfig.headers ? `Headers: ${JSON.stringify(apiConfig.headers)}` : ""}
-${apiConfig.queryParams ? `Query Params: ${JSON.stringify(apiConfig.queryParams)}` : ""}
-${apiConfig.body ? `Body: ${JSON.stringify(apiConfig.body)}` : ''}
-${apiConfig.authentication ? `Authentication: ${apiConfig.authentication}` : ''}
-${apiConfig.dataPath ? `Data Path: ${apiConfig.dataPath}` : ''}
-${apiConfig.pagination ? `Pagination: ${JSON.stringify(apiConfig.pagination)}` : ''}
-${apiConfig.method ? `Method: ${apiConfig.method}` : ''}
-</user_provided_information>
-
-<documentation>
-${documentation}
-</documentation>
-
-<available_credentials>
-${Object.keys(credentials || {}).map(v => `<<${v}>>`).join(", ")}
-</available_credentials>
-
-<example_payload>
-${JSON.stringify(sample(payload || {}, 5)).slice(0, LanguageModel.contextLength / 10)}
-</example_payload>`;
-
-    messages.push({
-      role: "system",
-      content: SELF_HEALING_API_AGENT_PROMPT
-    });
-    messages.push({
-      role: "user",
-      content: userPrompt
-    });
-  }
-
-  const temperature = Math.min(retryCount * 0.1, 1);
-  const { response: generatedConfig, messages: updatedMessages } = await LanguageModel.generateObject(
-    messages,
-    submitToolDefinition.arguments,
-    temperature,
-    [searchDocumentationToolDefinition],
-    context
-  );
-
-  return {
-    config: {
-      instruction: apiConfig.instruction,
-      urlHost: generatedConfig.apiConfig.urlHost,
-      urlPath: generatedConfig.apiConfig.urlPath,
-      method: generatedConfig.apiConfig.method,
-      queryParams: generatedConfig.apiConfig.queryParams,
-      headers: generatedConfig.apiConfig.headers,
-      body: generatedConfig.apiConfig.body,
-      authentication: generatedConfig.apiConfig.authentication,
-      pagination: generatedConfig.apiConfig.pagination,
-      dataPath: generatedConfig.apiConfig.dataPath,
-      documentationUrl: apiConfig.documentationUrl,
-      responseSchema: apiConfig.responseSchema,
-      responseMapping: apiConfig.responseMapping,
-      createdAt: apiConfig.createdAt || new Date(),
-      updatedAt: new Date(),
-      id: apiConfig.id || generateId(generatedConfig.apiConfig.urlHost, generatedConfig.apiConfig.urlPath),
-    } as ApiConfig,
-    messages: updatedMessages
-  };
-}
-
 
 function isSelfHealingEnabled(options: RequestOptions): boolean {
   return options?.selfHealing ? options.selfHealing === SelfHealingMode.ENABLED || options.selfHealing === SelfHealingMode.REQUEST_ONLY : true;

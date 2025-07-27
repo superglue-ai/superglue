@@ -355,7 +355,7 @@ class GraphQLStrategy implements FetchingStrategy {
         .some(val => typeof val === 'string' && val.includes('IntrospectionQuery'));
   }
   async tryFetch(config: ApiConfig, metadata: Metadata): Promise<string | null> {
-    if (!config.urlHost.startsWith("http")) return null; // Needs a valid HTTP URL
+    if (!config.urlHost?.startsWith("http")) return null; // Needs a valid HTTP URL
     const endpointUrl = composeUrl(config.urlHost, config.urlPath);
 
     // Heuristic: Check path or query params typical for GraphQL
@@ -599,7 +599,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
 
 class PostgreSqlStrategy implements ProcessingStrategy {
   async tryProcess(content: string, config: ApiConfig, metadata: Metadata, credentials?: Record<string, any>): Promise<string | null> {
-    if (config.urlHost.startsWith("postgres://")) {
+    if (config.urlHost?.startsWith("postgres://")) {
       const url = composeUrl(config.urlHost, config.urlPath);
 
       // First get the schema information

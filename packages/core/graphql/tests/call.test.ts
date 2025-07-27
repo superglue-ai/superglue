@@ -1,4 +1,4 @@
-import { ApiInputRequest, CacheMode, RequestOptions } from "@superglue/client";
+import { ApiInputRequest, CacheMode, Integration, RequestOptions } from "@superglue/client";
 import { Context, Metadata } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mocked } from 'vitest';
@@ -28,18 +28,6 @@ const mockedTransform = transform as Mocked<typeof transform>;
 const mockedWebhook = webhook as Mocked<typeof webhook>;
 const mockedLogs = logs as Mocked<typeof logs>;
 const mockedTelemetry = telemetry as Mocked<typeof telemetry>;
-const mockContext: Context = {
-  orgId: 'test-org',
-  datastore: {
-    getApiConfig: vi.fn(),
-    upsertApiConfig: vi.fn(),
-    createRun: vi.fn(),
-    getIntegration: vi.fn().mockResolvedValue({
-      id: 'test-integration',
-      documentation: 'test docs'
-    })
-  } as any
-};
 
 describe('Call Resolver', () => {
   beforeEach(() => {
@@ -64,6 +52,12 @@ describe('Call Resolver', () => {
         instruction: 'test-instruction'
       }
     };
+    const testIntegration: Integration = {
+      id: 'test-integration',
+      documentation: 'test docs',
+      urlHost: 'https://api.example.com',
+      urlPath: 'v1/test'
+    };
     const testPayload = { query: 'test' };
     const testCredentials = { api_key: 'secret-key' };
     const testOptions: RequestOptions = {};
@@ -80,7 +74,7 @@ describe('Call Resolver', () => {
         testCredentials,
         testOptions,
         testMetadata,
-        mockContext
+        testIntegration
       );
 
       expect(result).toEqual({
@@ -102,7 +96,13 @@ describe('Call Resolver', () => {
         .mockResolvedValueOnce({
           data: { result: 'success after retry' }
         });
-
+      mockedApi.generateApiConfig.mockResolvedValue({config: {
+        urlHost: 'https://api.example.com',
+        urlPath: 'v1/test',
+        id: 'test-endpoint-id',
+        instruction: 'test-instruction'
+      }, messages: []});
+  
       // Mock documentation and evaluateResponse
       vi.mocked(Documentation.prototype.fetchAndProcess).mockResolvedValue('test docs');
       mockedApi.evaluateResponse.mockResolvedValueOnce({ success: true, shortReason: '', refactorNeeded: false });
@@ -113,7 +113,7 @@ describe('Call Resolver', () => {
         testCredentials,
         testOptions,
         testMetadata,
-        mockContext
+        testIntegration
       );
 
       expect(result).toEqual({
@@ -138,14 +138,19 @@ describe('Call Resolver', () => {
       vi.mocked(Documentation.prototype.fetchAndProcess).mockResolvedValue('test docs');
       // Mock evaluateResponse to consistently fail
       mockedApi.evaluateResponse.mockResolvedValue({ success: false, shortReason: 'Eval failed', refactorNeeded: false });
-
+      mockedApi.generateApiConfig.mockResolvedValue({config: {
+        urlHost: 'https://api.example.com',
+        urlPath: 'v1/test',
+        id: 'test-endpoint-id',
+        instruction: 'test-instruction'
+      }, messages: []});
       await expect(executeApiCall(
         testInput.endpoint,
         testPayload,
         testCredentials,
         testOptions,
         testMetadata,
-        mockContext
+        testIntegration
       )).rejects.toThrow(/API call failed after \d+ retries.*Last error: Eval failed/);
 
       // callEndpoint is called once for the initial attempt, then 7 more times for retries where evaluateResponse fails.
@@ -162,6 +167,12 @@ describe('Call Resolver', () => {
         .mockResolvedValue({ data: { result: 'successful data' } }); // Succeeds on subsequent calls
 
       vi.mocked(Documentation.prototype.fetchAndProcess).mockResolvedValue('test docs');
+      mockedApi.generateApiConfig.mockResolvedValue({config: {
+        urlHost: 'https://api.example.com',
+        urlPath: 'v1/test',
+        id: 'test-endpoint-id',
+        instruction: 'test-instruction'
+      }, messages: []});
 
       // Mock evaluateResponse to fail once, then succeed
       mockedApi.evaluateResponse
@@ -174,7 +185,7 @@ describe('Call Resolver', () => {
         testCredentials,
         testOptions,
         testMetadata,
-        mockContext
+        testIntegration
       );
 
       expect(result.data).toEqual({ result: 'successful data' });
@@ -197,6 +208,12 @@ describe('Call Resolver', () => {
     it('should handle null response data', async () => {
       // Mock response with no data for all 5 expected calls
       mockedApi.callEndpoint.mockResolvedValue({ data: null });
+      mockedApi.generateApiConfig.mockResolvedValue({config: {
+        urlHost: 'https://api.example.com',
+        urlPath: 'v1/test',
+        id: 'test-endpoint-id',
+        instruction: 'test-instruction'
+      }, messages: []});
 
       // Add these missing mocks
       vi.mocked(Documentation.prototype.fetchAndProcess).mockResolvedValue('test docs');
@@ -207,7 +224,7 @@ describe('Call Resolver', () => {
         testCredentials,
         testOptions,
         testMetadata,
-        mockContext
+        testIntegration
       )).rejects.toThrow(/API call failed after \d+ retries/);
 
       expect(mockedApi.callEndpoint).toHaveBeenCalledTimes(server_defaults.MAX_CALL_RETRIES);

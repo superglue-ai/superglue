@@ -4,9 +4,11 @@ import OpenAI from "openai";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { server_defaults } from "../default.js";
 import { LanguageModel } from "../llm/llm.js";
+import { SELF_HEALING_API_AGENT_PROMPT } from "../llm/prompts.js";
+import { searchDocumentationToolDefinition, submitToolDefinition } from "../workflow/workflow-tools.js";
 import { parseFile } from "./file.js";
 import { callPostgres } from "./postgres.js";
-import { callAxios, composeUrl, evaluateStopCondition, maskCredentials, replaceVariables, sample } from "./tools.js";
+import { callAxios, composeUrl, evaluateStopCondition, generateId, maskCredentials, replaceVariables, sample } from "./tools.js";
 
 export function convertBasicAuthToBase64(headerValue: string) {
   if (!headerValue) return headerValue;
@@ -247,32 +249,22 @@ config: ${maskedConfig}`;
       }
     }
 
-    if (hasMore) {
-      if (endpoint.pagination?.type === PaginationType.PAGE_BASED) {
-        page++;
-      } else if (endpoint.pagination?.type === PaginationType.OFFSET_BASED) {
-        offset += parseInt(endpoint.pagination?.pageSize || "50");
-      } else if (endpoint.pagination?.type === PaginationType.CURSOR_BASED) {
-        const cursorParts = (endpoint.pagination?.cursorPath || 'next_cursor').split('.');
-        let nextCursor = response.data;
-        for (const part of cursorParts) {
-          nextCursor = nextCursor?.[part];
-        }
-        cursor = nextCursor;
-        if (!cursor) {
-          hasMore = false;
-        }
+    if (endpoint.pagination?.type === PaginationType.PAGE_BASED) {
+      page++;
+    } else if (endpoint.pagination?.type === PaginationType.OFFSET_BASED) {
+      offset += parseInt(endpoint.pagination?.pageSize || "50");
+    } else if (endpoint.pagination?.type === PaginationType.CURSOR_BASED) {
+      const cursorParts = (endpoint.pagination?.cursorPath || 'next_cursor').split('.');
+      let nextCursor = response.data;
+      for (const part of cursorParts) {
+        nextCursor = nextCursor?.[part];
+      }
+      cursor = nextCursor;
+      if (!cursor) {
+        hasMore = false;
       }
     }
     loopCounter++;
-  }
-
-  if (loopCounter >= maxRequests && hasMore) {
-    throw new Error(
-      `Pagination limit exceeded: Made ${maxRequests} requests but pagination ${hasStopCondition ? 'stop condition still not met' : 'still has more pages'}. ` +
-      `This may indicate an issue with the ${hasStopCondition ? 'stop condition or an' : ''} API that returns infinite results. ` +
-      `${hasStopCondition ? `Stop condition: ${(endpoint.pagination as any)?.stopCondition || 'Not provided'}` : ''}`
-    );
   }
 
   if (endpoint.pagination?.type === PaginationType.CURSOR_BASED) {
@@ -286,6 +278,89 @@ config: ${maskedConfig}`;
 
   return {
     data: allResults?.length === 1 ? allResults[0] : allResults
+  };
+}
+
+export async function generateApiConfig(
+  apiConfig: Partial<ApiConfig>,
+  documentation: string,
+  payload: Record<string, any>,
+  credentials: Record<string, any>,
+  retryCount = 0,
+  messages: OpenAI.Chat.ChatCompletionMessageParam[] = [],
+  context?: any
+): Promise<{ config: ApiConfig; messages: OpenAI.Chat.ChatCompletionMessageParam[]; }> {
+
+  if (messages.length === 0) {
+    const userPrompt = `Generate API configuration for the following:
+
+<instruction>
+${apiConfig.instruction}
+</instruction>
+
+<user_provided_information>
+Also, the user provided the following information. Ensure to at least try where it makes sense:
+Base URL: ${composeUrl(apiConfig.urlHost, apiConfig.urlPath)}
+${apiConfig.headers ? `Headers: ${JSON.stringify(apiConfig.headers)}` : ""}
+${apiConfig.queryParams ? `Query Params: ${JSON.stringify(apiConfig.queryParams)}` : ""}
+${apiConfig.body ? `Body: ${JSON.stringify(apiConfig.body)}` : ''}
+${apiConfig.authentication ? `Authentication: ${apiConfig.authentication}` : ''}
+${apiConfig.dataPath ? `Data Path: ${apiConfig.dataPath}` : ''}
+${apiConfig.pagination ? `Pagination: ${JSON.stringify(apiConfig.pagination)}` : ''}
+${apiConfig.method ? `Method: ${apiConfig.method}` : ''}
+</user_provided_information>
+
+<documentation>
+${documentation}
+</documentation>
+
+<available_credentials>
+${Object.keys(credentials || {}).map(v => `<<${v}>>`).join(", ")}
+</available_credentials>
+
+<example_payload>
+${JSON.stringify(sample(payload || {}, 5)).slice(0, LanguageModel.contextLength / 10)}
+</example_payload>`;
+
+    messages.push({
+      role: "system",
+      content: SELF_HEALING_API_AGENT_PROMPT
+    });
+    messages.push({
+      role: "user",
+      content: userPrompt
+    });
+  }
+
+  const temperature = Math.min(retryCount * 0.1, 1);
+  const { response: generatedConfig, messages: updatedMessages } = await LanguageModel.generateObject(
+    messages,
+    submitToolDefinition.arguments,
+    temperature,
+    [searchDocumentationToolDefinition],
+    context
+  );
+
+  return {
+    config: {
+      instruction: apiConfig.instruction,
+      urlHost: generatedConfig.apiConfig.urlHost,
+      urlPath: generatedConfig.apiConfig.urlPath,
+      method: generatedConfig.apiConfig.method,
+      queryParams: generatedConfig.apiConfig.queryParams,
+      headers: generatedConfig.apiConfig.headers,
+      body: generatedConfig.apiConfig.body,
+      authentication: generatedConfig.apiConfig.authentication,
+      pagination: generatedConfig.apiConfig.pagination,
+      dataPath: generatedConfig.apiConfig.dataPath,
+      documentationUrl: apiConfig.documentationUrl,
+      responseSchema: apiConfig.responseSchema,
+      responseMapping: apiConfig.responseMapping,
+      createdAt: apiConfig.createdAt || new Date(),
+      updatedAt: new Date(),
+      id: apiConfig.id || generateId(generatedConfig.apiConfig.urlHost, generatedConfig.apiConfig.urlPath),
+    } as ApiConfig,
+    messages: updatedMessages
   };
 }
 

@@ -2,6 +2,7 @@ import playwright from '@playwright/test';
 import { Metadata } from '@superglue/shared';
 import axios from 'axios';
 import { afterEach, beforeEach, describe, expect, it, Mocked, vi } from 'vitest';
+import { server_defaults } from '../default.js';
 import { LanguageModel } from '../llm/llm.js';
 import { Documentation, PlaywrightFetchingStrategy } from './documentation.js';
 
@@ -86,8 +87,8 @@ describe('Documentation Class', () => {
       expect(playwright.chromium.launch).toHaveBeenCalledTimes(1);
       expect(mockBrowser.newContext).toHaveBeenCalledTimes(1);
       expect(mockContext.newPage).toHaveBeenCalledTimes(1);
-      expect(mockPage.goto).toHaveBeenCalledWith(docUrl);
-      expect(mockPage.waitForLoadState).toHaveBeenCalledWith('domcontentloaded', { timeout: 15000 });
+      expect(mockPage.goto).toHaveBeenCalledWith(docUrl, { timeout: server_defaults.TIMEOUTS.PLAYWRIGHT });
+      expect(mockPage.waitForLoadState).toHaveBeenCalledWith('domcontentloaded', { timeout: server_defaults.TIMEOUTS.PLAYWRIGHT });
       expect(mockPage.waitForTimeout).toHaveBeenCalledWith(1000);
       expect(mockPage.evaluate).toHaveBeenCalledTimes(2); // For removing elements and getting links
       expect(mockPage.content).toHaveBeenCalledTimes(1);
@@ -336,14 +337,14 @@ describe('Documentation Class', () => {
       const searchTerm = "userinfo";
       const prefix = createLongString('X', 0.8);
       const suffix = createLongString('Y', 0.8);
-      const authSection = "important securitySchemes definition here";
+      const authSection = "important authorization definition here";
       const longContent = `${prefix} some data about ${searchTerm} ${suffix} ${authSection}`;
 
       const result = Documentation.extractRelevantSections(longContent, `instruction with ${searchTerm}`);
 
       expect(result.length).toBeLessThanOrEqual(DOCUMENTATION_MAX_LENGTH);
       expect(result).toContain(searchTerm);
-      expect(result).toContain("securitySchemes");
+      expect(result).toContain("authorization");
     });
 
     it('should handle multiple search terms', () => {

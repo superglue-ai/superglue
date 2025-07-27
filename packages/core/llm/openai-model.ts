@@ -71,7 +71,7 @@ export class OpenAIModel implements LLM {
       // Fall back to chat completions API
       const result = await this.client.chat.completions.create({
         messages: [dateMessage as ChatCompletionMessageParam, ...messages],
-        model: process.env.OPENAI_MODEL || "gpt-4o",
+        model: process.env.OPENAI_MODEL || "gpt-4.1",
         temperature: process.env.OPENAI_MODEL?.startsWith('o') ? undefined : temperature
       });
 

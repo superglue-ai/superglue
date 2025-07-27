@@ -17,6 +17,19 @@ vi.mock('./transform.js', async (importOriginal) => {
   };
 });
 
+vi.mock('./tools.js', async (importOriginal) => {
+  const actual = (await importOriginal()) as any;
+  return {
+    ...actual,
+    transformAndValidateSchema: vi.fn().mockImplementation(async (data, expr, schema) => {
+      if (expr === 'test-mapping') {
+        return { success: false, error: 'Invalid mapping: test-mapping' };
+      }
+      return actual.transformAndValidateSchema(data, expr, schema);
+    }),
+  };
+});
+
 import { TransformConfig } from '@superglue/client';
 import dotenv from 'dotenv';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -71,7 +84,7 @@ describe('transform utils', () => {
 
       (LanguageModel as any).generateObject.mockResolvedValueOnce({
         response: {
-          mappingCode: '(sourceData) => {return { name: sourceData.product.name };}',
+          mappingCode: '(sourceData) => {\n  return { name: sourceData.product.name };\n};\n',
           confidence: 95
         },
         messages: []
