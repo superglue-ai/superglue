@@ -3,6 +3,7 @@ import { ApiConfig } from "@superglue/client";
 import { Metadata } from "@superglue/shared";
 import axios from "axios";
 import { getIntrospectionQuery } from "graphql";
+import * as yaml from 'js-yaml';
 import { NodeHtmlMarkdown } from "node-html-markdown";
 import { server_defaults } from '../default.js';
 import { LanguageModel } from "../llm/llm.js";
@@ -22,6 +23,7 @@ export interface DocumentationConfig {
   urlHost?: string;
   instruction?: string;
   documentationUrl?: string;
+  openApiUrl?: string;
   urlPath?: string;
   headers?: Record<string, string>;
   queryParams?: Record<string, string>;
@@ -89,6 +91,170 @@ export class Documentation {
 
     logMessage('warn', "No processing strategy could handle the fetched documentation.", this.metadata);
     return "";
+  }
+
+  public async fetchOpenApiDocumentation(): Promise<string> {
+    if (!this.config.openApiUrl) {
+      return "";
+    }
+    try {
+      const response = await axios.get(this.config.openApiUrl, { timeout: server_defaults.TIMEOUTS.AXIOS });
+      let data = response.data;
+      
+      // If data is already an object (axios parsed it), check for OpenAPI links
+      if (typeof data === 'object' && data !== null) {
+        // Check if this is a discovery/index response with links to other OpenAPI docs
+        const openApiUrls = this.extractOpenApiUrls(data);
+        if (openApiUrls.length > 0) {
+          logMessage('info', `Found ${openApiUrls.length} OpenAPI specification links in response`, this.metadata);
+          const allSpecs = await this.fetchMultipleOpenApiSpecs(openApiUrls);
+          return allSpecs;
+        }
+        return JSON.stringify(data, null, 2);
+      }
+      
+      if (typeof data === 'string') {
+        const trimmedData = data.trim();
+        
+        // First, try to parse as JSON
+        try {
+          const parsed = JSON.parse(trimmedData);
+          // Check for OpenAPI links in parsed JSON
+          const openApiUrls = this.extractOpenApiUrls(parsed);
+          if (openApiUrls.length > 0) {
+            logMessage('info', `Found ${openApiUrls.length} OpenAPI specification links in response`, this.metadata);
+            const allSpecs = await this.fetchMultipleOpenApiSpecs(openApiUrls);
+            return allSpecs;
+          }
+          return JSON.stringify(parsed, null, 2);
+        } catch {
+          // Not valid JSON, try YAML parsing
+          try {
+            const parsed = yaml.load(trimmedData) as any;
+            // Verify it actually parsed to an object (not just a string)
+            if (typeof parsed === 'object' && parsed !== null) {
+              logMessage('info', `Successfully converted YAML to JSON for ${this.config.openApiUrl}`, this.metadata);
+              // Check for OpenAPI links in parsed YAML
+              const openApiUrls = this.extractOpenApiUrls(parsed);
+              if (openApiUrls.length > 0) {
+                logMessage('info', `Found ${openApiUrls.length} OpenAPI specification links in response`, this.metadata);
+                const allSpecs = await this.fetchMultipleOpenApiSpecs(openApiUrls);
+                return allSpecs;
+              }
+              return JSON.stringify(parsed, null, 2);
+            }
+          } catch (yamlError) {
+            logMessage('warn', `Failed to parse content as JSON or YAML from ${this.config.openApiUrl}: ${yamlError?.message}`, this.metadata);
+          }
+          
+          // If both JSON and YAML parsing failed, return original data
+          return data;
+        }
+      }
+      
+      // Fallback: return data as string
+      return String(data);
+    } catch (error) {
+      logMessage('warn', `Failed to fetch OpenAPI documentation from ${this.config.openApiUrl}: ${error?.message}`, this.metadata);
+      return "";
+    }
+  }
+
+  private extractOpenApiUrls(data: any): string[] {
+    const urls: string[] = [];
+    
+    // Recursive function to find all OpenAPI URLs in the data structure
+    const findOpenApiUrls = (obj: any) => {
+      if (!obj || typeof obj !== 'object') return;
+      
+      for (const key in obj) {
+        if (!obj.hasOwnProperty(key)) continue;
+        
+        const value = obj[key];
+        
+        // Look for common patterns: "openApi", "openapi", "openapiUrl", "specUrl", etc.
+        if ((key.toLowerCase().includes('openapi') || key.toLowerCase().includes('spec')) && 
+            typeof value === 'string' && 
+            value.startsWith('http')) {
+          urls.push(value);
+        }
+        
+        // Recurse into nested objects and arrays
+        if (Array.isArray(value)) {
+          value.forEach(item => findOpenApiUrls(item));
+        } else if (typeof value === 'object') {
+          findOpenApiUrls(value);
+        }
+      }
+    };
+    
+    findOpenApiUrls(data);
+    return [...new Set(urls)]; // Remove duplicates
+  }
+
+  private async fetchMultipleOpenApiSpecs(urls: string[]): Promise<string> {
+    const specs: any[] = [];
+    const MAX_CONCURRENT_FETCHES = 5;
+    const MAX_SPECS_TO_FETCH = 100; // Limit to prevent excessive fetching
+    
+    // Limit the number of specs to fetch
+    const urlsToFetch = urls.slice(0, MAX_SPECS_TO_FETCH);
+    if (urls.length > MAX_SPECS_TO_FETCH) {
+      logMessage('warn', `Found ${urls.length} OpenAPI specs but limiting to ${MAX_SPECS_TO_FETCH}`, this.metadata);
+    }
+    
+    // Fetch specs in batches to avoid overwhelming the server
+    for (let i = 0; i < urlsToFetch.length; i += MAX_CONCURRENT_FETCHES) {
+      const batch = urlsToFetch.slice(i, i + MAX_CONCURRENT_FETCHES);
+      const batchPromises = batch.map(async (url) => {
+        try {
+          const response = await axios.get(url, { timeout: server_defaults.TIMEOUTS.AXIOS });
+          let specData = response.data;
+          
+          // Parse if string
+          if (typeof specData === 'string') {
+            try {
+              specData = JSON.parse(specData);
+            } catch {
+              // Try YAML parsing
+              try {
+                specData = yaml.load(specData) as any;
+              } catch {
+                // Keep as string if parsing fails
+              }
+            }
+          }
+          
+          logMessage('info', `Fetched OpenAPI spec from ${url}`, this.metadata);
+          return {
+            url,
+            spec: specData
+          };
+        } catch (error) {
+          logMessage('warn', `Failed to fetch OpenAPI spec from ${url}: ${error?.message}`, this.metadata);
+          return null;
+        }
+      });
+      
+      const batchResults = await Promise.all(batchPromises);
+      specs.push(...batchResults.filter(result => result !== null));
+    }
+    
+    // Return combined specs
+    if (specs.length === 0) {
+      return "";
+    } else if (specs.length === 1) {
+      return JSON.stringify(specs[0].spec, null, 2);
+    } else {
+      // Return all specs with their URLs for reference
+      return JSON.stringify({
+        _meta: {
+          fetchedAt: new Date().toISOString(),
+          totalSpecs: specs.length
+        },
+        specifications: specs
+      }, null, 2);
+    }
   }
 
   public static extractRelevantSections(
@@ -214,7 +380,7 @@ class GraphQLStrategy implements FetchingStrategy {
 }
 
 export class AxiosFetchingStrategy implements FetchingStrategy {
-  async tryFetch(config: ApiConfig, metadata: Metadata): Promise<string | null> {
+  async tryFetch(config: DocumentationConfig, metadata: Metadata): Promise<string | null> {
     if (!config.documentationUrl?.startsWith("http")) return null;
 
     try {
@@ -226,8 +392,9 @@ export class AxiosFetchingStrategy implements FetchingStrategy {
       }
 
       const response = await axios.get(url.toString(), { headers: config.headers, timeout: server_defaults.TIMEOUTS.AXIOS });
+      let data = response.data;
       logMessage('info', `Successfully fetched content with axios for ${config.documentationUrl}`, metadata);
-      return response.data;
+      return data;
     } catch (error) {
       logMessage('warn', `Axios fetch failed for ${config.documentationUrl}: ${error?.message}`, metadata);
       return null;
@@ -255,7 +422,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       await closedInstance.close();
     }
   }
-  private async fetchPageContentWithPlaywright(urlString: string, config: ApiConfig, metadata: Metadata): Promise<{ content: string; links: Record<string, string>; } | null> {
+  private async fetchPageContentWithPlaywright(urlString: string, config: DocumentationConfig, metadata: Metadata): Promise<{ content: string; links: Record<string, string>; } | null> {
 
     if (!urlString?.startsWith("http")) {
       return null;
@@ -305,7 +472,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
           'nav', 'header', 'footer', '.nav', '.navbar', '.header', '.footer',
           '.cookie-banner', '.cookie-consent', '.cookies', '#cookie-banner',
           '.cookie-notice', '.sidebar', '.menu', '[role="navigation"]',
-          '[role="banner"]', '[role="contentinfo"]', 'script', 'style', // Also remove scripts/styles
+          '[role="banner"]', '[role="dialog"]', '[role="contentinfo"]', 'script', 'style', // Also remove scripts/styles
         ];
         selectorsToRemove.forEach(selector => {
           document.querySelectorAll(selector).forEach(element => {
@@ -333,7 +500,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     }
   }
 
-  async tryFetch(config: ApiConfig, metadata: Metadata): Promise<string | null> {
+  async tryFetch(config: DocumentationConfig, metadata: Metadata): Promise<string | null> {
     if (!config?.documentationUrl) return null;
 
     const fetchedLinks = new Set<string>();
