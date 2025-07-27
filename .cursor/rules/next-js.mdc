@@ -1,7 +1,7 @@
 ---
-description: write app router code for nextjs
-globs: *.tsx, *.ts, *.js, *.jsx
-alwaysApply: false
+description: 
+globs: 
+alwaysApply: true
 ---
 # Rules
 always use functional react code. always write include typescript type annotations.
