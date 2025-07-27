@@ -1,14 +1,14 @@
-import { type ApiConfig, AuthType, FileType, HttpMethod, PaginationType, type RequestOptions } from "@superglue/client";
+import { type ApiConfig, FileType, PaginationType, type RequestOptions } from "@superglue/client";
 import type { AxiosRequestConfig } from "axios";
 import OpenAI from "openai";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
-import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
+import { server_defaults } from "../default.js";
 import { LanguageModel } from "../llm/llm.js";
-import { API_PROMPT } from "../llm/prompts.js";
+import { SELF_HEALING_API_AGENT_PROMPT } from "../llm/prompts.js";
+import { searchDocumentationToolDefinition, submitToolDefinition } from "../workflow/workflow-tools.js";
 import { parseFile } from "./file.js";
 import { callPostgres } from "./postgres.js";
-import { callAxios, composeUrl, generateId, replaceVariables, sample } from "./tools.js";
+import { callAxios, composeUrl, evaluateStopCondition, generateId, maskCredentials, replaceVariables, sample } from "./tools.js";
 
 export function convertBasicAuthToBase64(headerValue: string) {
   if (!headerValue) return headerValue;
@@ -25,17 +25,7 @@ export function convertBasicAuthToBase64(headerValue: string) {
   return headerValue;
 }
 
-export async function callEndpoint(
-  endpoint: ApiConfig, 
-  payload: Record<string, any>, 
-  credentials: Record<string, any>, 
-  options: RequestOptions
-): Promise<{ data: any; }> {
-  if (endpoint.urlHost.startsWith("postgres")) {
-    return { data: await callPostgres(endpoint, payload, credentials, options) };
-  }
-
-
+export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions): Promise<{ data: any; }> {
   const allVariables = { ...payload, ...credentials };
 
   let allResults = [];
@@ -45,10 +35,15 @@ export async function callEndpoint(
   let hasMore = true;
   let loopCounter = 0;
   let seenResponseHashes = new Set<string>();
+  let previousResponseHash: string | null = null;
+  let firstResponseHash: string | null = null;
+  let hasValidData = false;
 
-  while (hasMore && loopCounter < 500) {
-    // Generate pagination variables
-    let paginationVars = {
+  const hasStopCondition = endpoint.pagination && (endpoint.pagination as any).stopCondition;
+  const maxRequests = hasStopCondition ? server_defaults.MAX_PAGINATION_REQUESTS : 500;
+
+  while (hasMore && loopCounter < maxRequests) {
+    const paginationVars = {
       page,
       offset,
       cursor,
@@ -56,22 +51,18 @@ export async function callEndpoint(
       pageSize: endpoint.pagination?.pageSize || "50"
     };
 
-    // Combine all variables
     const requestVars = { ...paginationVars, ...allVariables };
 
-    // Generate request parameters with variables replaced
-    const headers = Object.fromEntries(
+    const headersWithReplacedVars = Object.fromEntries(
       (await Promise.all(
         Object.entries(endpoint.headers || {})
-          .map(async ([key, value]) => [key, await replaceVariables(value, requestVars)])
+          .map(async ([key, value]) => [key, await replaceVariables(String(value), requestVars)])
       )).filter(([_, value]) => value && value !== "undefined" && value !== "null")
     );
 
-    // Process headers for Auth
     const processedHeaders = {};
-    for (const [key, value] of Object.entries(headers)) {
+    for (const [key, value] of Object.entries(headersWithReplacedVars)) {
       let processedValue = value;
-      // Remove duplicate auth prefixes (e.g. "Basic Basic " or "Bearer Bearer ")
       if (key.toLowerCase() === 'authorization' && typeof value === 'string') {
         processedValue = value.replace(/^(Basic|Bearer)\s+(Basic|Bearer)\s+/, '$1 $2');
       }
@@ -83,25 +74,38 @@ export async function callEndpoint(
       processedHeaders[key] = processedValue;
     }
 
-    const queryParams = Object.fromEntries(
+    const processedQueryParams = Object.fromEntries(
       (await Promise.all(
         Object.entries(endpoint.queryParams || {})
-          .map(async ([key, value]) => [key, await replaceVariables(value, requestVars)])
+          .map(async ([key, value]) => [key, await replaceVariables(String(value), requestVars)])
       )).filter(([_, value]) => value && value !== "undefined" && value !== "null")
     );
 
-    const body = endpoint.body ?
+    const processedBody = endpoint.body ?
       await replaceVariables(endpoint.body, requestVars) :
       "";
 
-    const url = await replaceVariables(composeUrl(endpoint.urlHost, endpoint.urlPath), requestVars);
+    const processedUrlHost = await replaceVariables(endpoint.urlHost, requestVars);
+    const processedUrlPath = await replaceVariables(endpoint.urlPath, requestVars);
+
+    if (processedUrlHost.startsWith("postgres://") || processedUrlHost.startsWith("postgresql://")) {
+      const postgresEndpoint = {
+        ...endpoint,
+        urlHost: processedUrlHost,
+        urlPath: processedUrlPath,
+        body: processedBody
+      };
+      return { data: await callPostgres(postgresEndpoint, payload, credentials, options) };
+    }
+
+    const processedUrl = composeUrl(processedUrlHost, processedUrlPath);
 
     const axiosConfig: AxiosRequestConfig = {
       method: endpoint.method,
-      url: url,
+      url: processedUrl,
       headers: processedHeaders,
-      data: body,
-      params: queryParams,
+      data: processedBody,
+      params: processedQueryParams,
       timeout: options?.timeout || 60000,
     };
 
@@ -112,16 +116,15 @@ export async function callEndpoint(
       (Array.isArray(response?.data?.errors) && response?.data?.errors.length > 0)
     ) {
       const error = JSON.stringify(response?.data?.error || response.data?.errors || response?.data || response?.statusText || "undefined");
-      let message = `${endpoint.method} ${url} failed with status ${response.status}.
+      const maskedConfig = maskCredentials(JSON.stringify(axiosConfig));
+      let message = `${endpoint.method} ${processedUrl} failed with status ${response.status}.
 Response: ${String(error).slice(0, 1000)}
-config: ${JSON.stringify(axiosConfig)}`;
+config: ${maskedConfig}`;
 
-      // Add specific context for rate limit errors
       if (response.status === 429) {
         const retryAfter = response.headers['retry-after']
           ? `Retry-After: ${response.headers['retry-after']}`
           : 'No Retry-After header provided';
-
         message = `Rate limit exceeded. ${retryAfter}. Maximum wait time of 60s exceeded. 
         
         ${message}`;
@@ -132,7 +135,8 @@ config: ${JSON.stringify(axiosConfig)}`;
     if (typeof response.data === 'string' &&
       (response.data.slice(0, 100).trim().toLowerCase().startsWith('<!doctype html') ||
         response.data.slice(0, 100).trim().toLowerCase().startsWith('<html'))) {
-      throw new Error(`Received HTML response instead of expected JSON data from ${url}. 
+      const maskedUrl = maskCredentials(processedUrl, { ...credentials, ...payload });
+      throw new Error(`Received HTML response instead of expected JSON data from ${maskedUrl}. 
         This usually indicates an error page or invalid endpoint.\nResponse: ${response.data.slice(0, 2000)}`);
     }
 
@@ -147,9 +151,7 @@ config: ${JSON.stringify(axiosConfig)}`;
     }
 
     if (endpoint.dataPath) {
-      // Navigate to the specified data path
       const pathParts = endpoint.dataPath.split('.');
-
       for (const part of pathParts) {
         // sometimes a jsonata expression is used to get the data, so ignore the $
         // TODO: fix this later
@@ -161,36 +163,97 @@ config: ${JSON.stringify(axiosConfig)}`;
       }
     }
 
-    if (Array.isArray(responseData)) {
-      const pageSize = parseInt(endpoint.pagination?.pageSize || "50");
-      if (!pageSize || responseData.length < pageSize) {
-        hasMore = false;
-      }
+    // Handle pagination based on whether stopCondition exists
+    if (hasStopCondition) {
       const currentResponseHash = JSON.stringify(responseData);
-      if (!seenResponseHashes.has(currentResponseHash)) {
-        seenResponseHashes.add(currentResponseHash);
-        allResults = allResults.concat(responseData);
+      const currentHasData = Array.isArray(responseData) ? responseData.length > 0 :
+        responseData && Object.keys(responseData).length > 0;
+
+      if (loopCounter === 0) {
+        firstResponseHash = currentResponseHash;
+        hasValidData = currentHasData;
       }
-      else {
+
+      if (loopCounter === 1 && currentResponseHash === firstResponseHash && hasValidData && currentHasData) {
+        const maskedBody = maskCredentials(processedBody, { ...credentials, ...payload });
+        const maskedParams = maskCredentials(JSON.stringify(processedQueryParams), { ...credentials, ...payload });
+        const maskedHeaders = maskCredentials(JSON.stringify(processedHeaders), { ...credentials, ...payload });
+
+        throw new Error(
+          `Pagination configuration error: The first two API requests returned identical responses with valid data. ` +
+          `This indicates the pagination parameters are not being applied correctly. ` +
+          `Please check your pagination configuration (type: ${endpoint.pagination?.type}, pageSize: ${endpoint.pagination?.pageSize}), ` +
+          `body: ${maskedBody}, queryParams: ${maskedParams}, headers: ${maskedHeaders}.`
+        );
+      }
+
+      if (loopCounter === 1 && !hasValidData && !currentHasData) {
+        throw new Error(
+          `Stop condition error: The API returned no data on the first request, but the stop condition did not terminate pagination. ` +
+          `The stop condition should detect empty responses and stop immediately. ` +
+          `Current stop condition: ${(endpoint.pagination as any).stopCondition}`
+        );
+      }
+
+      if (loopCounter > 1 && currentResponseHash === previousResponseHash) {
+        hasMore = false;
+      } else {
+        const pageInfo = {
+          page,
+          offset,
+          cursor,
+          totalFetched: allResults.length
+        };
+
+        const stopEval = await evaluateStopCondition(
+          (endpoint.pagination as any).stopCondition,
+          response.data,
+          pageInfo
+        );
+
+        if (stopEval.error) {
+          throw new Error(
+            `Pagination stop condition error: ${stopEval.error}\n` +
+            `Stop condition: ${(endpoint.pagination as any).stopCondition}`
+          );
+        }
+
+        hasMore = !stopEval.shouldStop;
+      }
+
+      previousResponseHash = currentResponseHash;
+
+      if (Array.isArray(responseData)) {
+        allResults = allResults.concat(responseData);
+      } else if (responseData) {
+        allResults.push(responseData);
+      }
+    } else {
+      if (Array.isArray(responseData)) {
+        const pageSize = parseInt(endpoint.pagination?.pageSize || "50");
+        if (!pageSize || responseData.length < pageSize) {
+          hasMore = false;
+        }
+        const currentResponseHash = JSON.stringify(responseData);
+        if (!seenResponseHashes.has(currentResponseHash)) {
+          seenResponseHashes.add(currentResponseHash);
+          allResults = allResults.concat(responseData);
+        } else {
+          hasMore = false;
+        }
+      } else if (responseData && allResults.length === 0) {
+        allResults.push(responseData);
+        hasMore = false;
+      } else {
         hasMore = false;
       }
-    }
-    else if (responseData && allResults.length === 0) {
-      allResults.push(responseData);
-      hasMore = false;
-    }
-    else {
-      hasMore = false;
     }
 
-    // update pagination
     if (endpoint.pagination?.type === PaginationType.PAGE_BASED) {
       page++;
-    }
-    else if (endpoint.pagination?.type === PaginationType.OFFSET_BASED) {
+    } else if (endpoint.pagination?.type === PaginationType.OFFSET_BASED) {
       offset += parseInt(endpoint.pagination?.pageSize || "50");
-    }
-    else if (endpoint.pagination?.type === PaginationType.CURSOR_BASED) {
+    } else if (endpoint.pagination?.type === PaginationType.CURSOR_BASED) {
       const cursorParts = (endpoint.pagination?.cursorPath || 'next_cursor').split('.');
       let nextCursor = response.data;
       for (const part of cursorParts) {
@@ -200,9 +263,6 @@ config: ${JSON.stringify(axiosConfig)}`;
       if (!cursor) {
         hasMore = false;
       }
-    }
-    else {
-      hasMore = false;
     }
     loopCounter++;
   }
@@ -227,41 +287,20 @@ export async function generateApiConfig(
   payload: Record<string, any>,
   credentials: Record<string, any>,
   retryCount = 0,
-  messages: OpenAI.Chat.ChatCompletionMessageParam[] = []
+  messages: OpenAI.Chat.ChatCompletionMessageParam[] = [],
+  context?: any
 ): Promise<{ config: ApiConfig; messages: OpenAI.Chat.ChatCompletionMessageParam[]; }> {
-  const schema = zodToJsonSchema(z.object({
-    urlHost: z.string(),
-    urlPath: z.string(),
-    queryParams: z.array(z.object({
-      key: z.string(),
-      value: z.string()
-    })).optional(),
-    method: z.enum(Object.values(HttpMethod) as [string, ...string[]]),
-    headers: z.array(z.object({
-      key: z.string(),
-      value: z.string()
-    })).optional(),
-    body: z.string().optional().describe("Format as JSON if not instructed otherwise. Use <<>> to access variables."),
-    authentication: z.enum(Object.values(AuthType) as [string, ...string[]]),
-    dataPath: z.string().optional().describe("The path to the data you want to extract from the response. E.g. products.variants.size"),
-    pagination: z.object({
-      type: z.enum(Object.values(PaginationType) as [string, ...string[]]),
-      pageSize: z.string().describe("Number of items per page. Set this to a number. Once you set it here as a number, you can access it using <<limit>> in headers, params, body, or url path."),
-      cursorPath: z.string().describe("If cursor_based: The path to the cursor in the response. E.g. cursor.current or next_cursor. If pagination is not cursor_based, set this to \"\"")
-    }).optional()
-  }));
-  const availableVariables = [
-    ...Object.keys(credentials || {}),
-    ...Object.keys(payload || {}),
-  ].map(v => `<<${v}>>`).join(", ");
+
   if (messages.length === 0) {
     const userPrompt = `Generate API configuration for the following:
 
-Instructions: ${apiConfig.instruction}
+<instruction>
+${apiConfig.instruction}
+</instruction>
 
+<user_provided_information>
+Also, the user provided the following information. Ensure to at least try where it makes sense:
 Base URL: ${composeUrl(apiConfig.urlHost, apiConfig.urlPath)}
-
-${Object.values(apiConfig).filter(Boolean).length > 0 ? "Also, the user provided the following information. Ensure to at least try where it makes sense: " : ""}
 ${apiConfig.headers ? `Headers: ${JSON.stringify(apiConfig.headers)}` : ""}
 ${apiConfig.queryParams ? `Query Params: ${JSON.stringify(apiConfig.queryParams)}` : ""}
 ${apiConfig.body ? `Body: ${JSON.stringify(apiConfig.body)}` : ''}
@@ -269,42 +308,57 @@ ${apiConfig.authentication ? `Authentication: ${apiConfig.authentication}` : ''}
 ${apiConfig.dataPath ? `Data Path: ${apiConfig.dataPath}` : ''}
 ${apiConfig.pagination ? `Pagination: ${JSON.stringify(apiConfig.pagination)}` : ''}
 ${apiConfig.method ? `Method: ${apiConfig.method}` : ''}
+</user_provided_information>
 
-Available variables: ${availableVariables}
-Available pagination variables (if pagination is enabled): page, pageSize, offset, cursor, limit
-Example payload: ${JSON.stringify(payload || {}).slice(0, LanguageModel.contextLength / 10)}
+<documentation>
+${documentation}
+</documentation>
 
-Documentation: ${String(documentation)}`;
+<available_credentials>
+${Object.keys(credentials || {}).map(v => `<<${v}>>`).join(", ")}
+</available_credentials>
+
+<example_payload>
+${JSON.stringify(sample(payload || {}, 5)).slice(0, LanguageModel.contextLength / 10)}
+</example_payload>`;
+
     messages.push({
       role: "system",
-      content: API_PROMPT
+      content: SELF_HEALING_API_AGENT_PROMPT
     });
     messages.push({
       role: "user",
       content: userPrompt
     });
   }
+
   const temperature = Math.min(retryCount * 0.1, 1);
-  const { response: generatedConfig, messages: updatedMessages } = await LanguageModel.generateObject(messages, schema, temperature);
+  const { response: generatedConfig, messages: updatedMessages } = await LanguageModel.generateObject(
+    messages,
+    submitToolDefinition.arguments,
+    temperature,
+    [searchDocumentationToolDefinition],
+    context
+  );
 
   return {
     config: {
       instruction: apiConfig.instruction,
-      urlHost: generatedConfig.urlHost,
-      urlPath: generatedConfig.urlPath,
-      method: generatedConfig.method,
-      queryParams: generatedConfig.queryParams ? Object.fromEntries(generatedConfig.queryParams.map(p => [p.key, p.value])) : undefined,
-      headers: generatedConfig.headers ? Object.fromEntries(generatedConfig.headers.map(p => [p.key, p.value])) : undefined,
-      body: generatedConfig.body,
-      authentication: generatedConfig.authentication,
-      pagination: generatedConfig.pagination,
-      dataPath: generatedConfig.dataPath,
+      urlHost: generatedConfig.apiConfig.urlHost,
+      urlPath: generatedConfig.apiConfig.urlPath,
+      method: generatedConfig.apiConfig.method,
+      queryParams: generatedConfig.apiConfig.queryParams,
+      headers: generatedConfig.apiConfig.headers,
+      body: generatedConfig.apiConfig.body,
+      authentication: generatedConfig.apiConfig.authentication,
+      pagination: generatedConfig.apiConfig.pagination,
+      dataPath: generatedConfig.apiConfig.dataPath,
       documentationUrl: apiConfig.documentationUrl,
       responseSchema: apiConfig.responseSchema,
       responseMapping: apiConfig.responseMapping,
       createdAt: apiConfig.createdAt || new Date(),
       updatedAt: new Date(),
-      id: apiConfig.id || generateId(generatedConfig.urlHost, generatedConfig.urlPath),
+      id: apiConfig.id || generateId(generatedConfig.apiConfig.urlHost, generatedConfig.apiConfig.urlPath),
     } as ApiConfig,
     messages: updatedMessages
   };
@@ -340,8 +394,11 @@ IMPORTANT CONSIDERATIONS:
   * Deletion operations that return no content
   * Asynchronous operations that accept requests for processing
   * Messaging/notification APIs that confirm delivery without response data
+  * In cases where the instruction is a retrieval operation, an empty response is often a failure.
+  * In cases where the instruction is unclear, it is always better to return non empty responses than empty responses.
 - Always consider the instruction type and consult the API documentation when provided to understand expected response patterns
-- Do not assume empty responses are failures without checking the operation context
+- Focus on whether the response contains the REQUESTED DATA, not the exact structure. If the instruction asks for "products" and the response contains product data (regardless of field names), it's successful.
+- DO NOT fail validation just because field names differ from what's mentioned in the instruction.
 
 Do not make the mistake of thinking that the { success: true, shortReason: "", refactorNeeded: false } is the expected API response format. It is YOUR expected response format.
 Keep in mind that the response can come in any shape or form, just validate that the response aligns with the instruction.

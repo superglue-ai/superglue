@@ -58,7 +58,7 @@ describe('generateSchema', () => {
     process.env = { ...originalEnv }
     process.env.OPENAI_API_KEY = 'test-key'
     // Set default model for tests
-    process.env.OPENAI_MODEL = 'gpt-4o'
+    process.env.OPENAI_MODEL = 'gpt-4.1'
 
     // Reset the mocks before each test
     vi.resetAllMocks()
@@ -108,10 +108,9 @@ describe('generateSchema', () => {
       0
     )
 
-    // Reset for gpt-4o test
     vi.resetAllMocks()
     delete process.env.SCHEMA_GENERATION_MODEL
-    process.env.OPENAI_MODEL = 'gpt-4o'
+    process.env.OPENAI_MODEL = 'gpt-4.1'
 
     generateObject.mockResolvedValueOnce({ response: expectedSchema, messages: [] })
 

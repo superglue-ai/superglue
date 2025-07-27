@@ -1,25 +1,25 @@
 'use client'
 
-import { useConfig } from '@/src/app/config-context'
-import { useToast } from '@/src/hooks/use-toast'
-import { inputErrorStyles, parseCredentialsHelper, splitUrl } from '@/src/lib/client-utils'
-import { integrations } from '@/src/lib/integrations'
-import { cn, composeUrl } from '@/src/lib/utils'
-import { ApolloClient, gql, InMemoryCache, useSubscription } from '@apollo/client'
-import { GraphQLWsLink } from '@apollo/client/link/subscriptions'
-import { Label } from '@radix-ui/react-label'
-import { ApiConfig, AuthType, CacheMode, SuperglueClient } from '@superglue/client'
-import { createClient } from 'graphql-ws'
-import { Copy, Loader2, Terminal, Upload, X } from 'lucide-react'
-import { useRouter } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
-import { Button } from '../ui/button'
-import { Input } from '../ui/input'
-import { Textarea } from '../ui/textarea'
-import { HelpTooltip } from '../utils/HelpTooltip'
-import { API_CREATE_STEPS, StepIndicator, type StepperStep } from '../utils/StepIndicator'
-import { URLField } from '../utils/URLField'
-import { InteractiveApiPlayground } from './InteractiveApiPlayground'
+import { useConfig } from '@/src/app/config-context';
+import { useToast } from '@/src/hooks/use-toast';
+import { inputErrorStyles, parseCredentialsHelper, splitUrl } from '@/src/lib/client-utils';
+import { integrations } from '@/src/lib/integrations';
+import { cn, composeUrl } from '@/src/lib/utils';
+import { ApolloClient, gql, InMemoryCache, useSubscription } from '@apollo/client';
+import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
+import { Label } from '@radix-ui/react-label';
+import { ApiConfig, AuthType, CacheMode, SuperglueClient } from '@superglue/client';
+import { createClient } from 'graphql-ws';
+import { Copy, Loader2, Terminal, Upload, X } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Textarea } from '../ui/textarea';
+import { HelpTooltip } from '../utils/HelpTooltip';
+import { API_CREATE_STEPS, StepIndicator, type StepperStep } from '../utils/StepIndicator';
+import { URLField } from '../utils/URLField';
+import { InteractiveApiPlayground } from './InteractiveApiPlayground';
 
 interface ConfigCreateStepperProps {
   configId?: string
@@ -219,7 +219,7 @@ export function ConfigCreateStepper({ configId: initialConfigId, mode = 'create'
         // Apply the returned config
         const config = response.config as ApiConfig
         if (config) {
-          const id = url.urlHost.replace(/^https?:\/\//, '').replace(/\//g, '') + '-' + Math.floor(1000 + Math.random() * 9000)
+          const id = url.urlHost?.replace(/^https?:\/\//, '').replace(/\//g, '') + '-' + Math.floor(1000 + Math.random() * 9000)
           setConfigId(id)
 
           // Save the configuration with the generated schema

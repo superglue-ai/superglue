@@ -37,7 +37,7 @@ export function isTokenExpired(integration: Integration): boolean {
 export function getTokenUrl(integration: Integration): string | null {
     // Try to get from known integrations first
     const match = Object.entries(integrations).find(([key]) => 
-        integration.id === key || integration.urlHost.includes(key)
+        integration.id === key || integration.urlHost?.includes(key)
     );
     
     if (match) {
@@ -258,7 +258,7 @@ export function buildOAuthAuthorizationUrl(
     if (!authUrl) {
         // Try to get from known integrations
         const match = Object.entries(integrations).find(([key]) => 
-            integration.id === key || integration.urlHost.includes(key)
+            integration.id === key || integration.urlHost?.includes(key)
         );
         
         if (match) {

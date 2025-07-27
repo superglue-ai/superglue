@@ -6,7 +6,8 @@ import { OpenAIModel } from './openai-model.js';
 vi.mock('openai');
 
 describe('OpenAIModel', () => {
-  const mockCreate = vi.fn();
+  const mockResponsesCreate = vi.fn();
+  const mockChatCreate = vi.fn();
   const MOCK_DATE = '2024-01-01T00:00:00.000Z';
 
   beforeEach(() => {
@@ -15,9 +16,12 @@ describe('OpenAIModel', () => {
     vi.setSystemTime(new Date(MOCK_DATE));
     process.env.OPENAI_API_KEY = 'test-key';
     (OpenAI as any).mockImplementation(() => ({
+      responses: {
+        create: mockResponsesCreate
+      },
       chat: {
         completions: {
-          create: mockCreate
+          create: mockChatCreate
         }
       }
     }));
@@ -26,8 +30,15 @@ describe('OpenAIModel', () => {
   describe('generateText', () => {
     it('should generate text response', async () => {
       const model = new OpenAIModel();
-      mockCreate.mockResolvedValue({
-        choices: [{ message: { content: 'test response' } }]
+      mockResponsesCreate.mockResolvedValue({
+        output: [{
+          type: 'message',
+          role: 'assistant',
+          content: [{
+            type: 'output_text',
+            text: 'test response'
+          }]
+        }]
       });
 
       const messages = [
@@ -37,13 +48,15 @@ describe('OpenAIModel', () => {
 
       const result = await model.generateText(messages);
 
-      expect(mockCreate).toHaveBeenCalledWith({
-        messages: [
-          { role: 'system', content: 'The current date and time is ' + MOCK_DATE },
-          ...messages
-        ],
+      expect(mockResponsesCreate).toHaveBeenCalledWith({
         model: 'gpt-4.1',
-        temperature: 0
+        input: [
+          { role: 'system', content: 'The current date and time is ' + MOCK_DATE },
+          { role: 'system', content: 'system prompt' },
+          { role: 'user', content: 'user message' }
+        ],
+        temperature: 0,
+        store: false
       });
       expect(result.response).toBe('test response');
       expect(result.messages).toHaveLength(3);
@@ -53,15 +66,36 @@ describe('OpenAIModel', () => {
       const oldOpenAiModel = process.env.OPENAI_MODEL;
       process.env.OPENAI_MODEL = 'o-model';
       const model = new OpenAIModel();
-      mockCreate.mockResolvedValue({
-        choices: [{ message: { content: 'test response' } }]
+      mockResponsesCreate.mockResolvedValue({
+        output: [{
+          type: 'message',
+          role: 'assistant',
+          content: [{
+            type: 'output_text',
+            text: 'test response'
+          }]
+        }]
       });
 
       await model.generateText([{ role: 'user', content: 'test' }]);
 
-      expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
+      expect(mockResponsesCreate).toHaveBeenCalledWith(expect.objectContaining({
         temperature: undefined
       }));
+      process.env.OPENAI_MODEL = undefined;
+    });
+
+    it('should fallback to chat completions on error', async () => {
+      const model = new OpenAIModel();
+      mockResponsesCreate.mockRejectedValue(new Error('Responses API error'));
+      mockChatCreate.mockResolvedValue({
+        choices: [{ message: { content: 'fallback response' } }]
+      });
+
+      const result = await model.generateText([{ role: 'user', content: 'test' }]);
+
+      expect(mockChatCreate).toHaveBeenCalled();
+      expect(result.response).toBe('fallback response');
     });
   });
 
@@ -70,8 +104,14 @@ describe('OpenAIModel', () => {
       process.env.OPENAI_MODEL = 'gpt-4.1';
       const model = new OpenAIModel();
       const responseJson = '{"key": "value"}';
-      mockCreate.mockResolvedValue({
-        choices: [{ message: { content: responseJson } }]
+      // Mock the response with a tool call to "submit"
+      mockResponsesCreate.mockResolvedValue({
+        output: [{
+          type: 'function_call',
+          name: 'submit',
+          call_id: 'call_123',
+          arguments: responseJson
+        }]
       });
 
       const schema = {
@@ -88,41 +128,49 @@ describe('OpenAIModel', () => {
       const oldMessages = [...messages];
       const result = await model.generateObject(messages, schema);
 
-      expect(mockCreate).toHaveBeenCalledWith({
-        messages: [
-          { role: 'system', content: 'The current date and time is ' + MOCK_DATE },
-          ...messages
-        ],
+      expect(mockResponsesCreate).toHaveBeenCalledWith({
         model: 'gpt-4.1',
-        temperature: 0,
-        response_format: {
-          type: 'json_schema',
-          json_schema: {
-            name: 'response',
-            strict: true,
-            schema: {
+        input: expect.arrayContaining([
+          { role: 'system', content: 'The current date and time is ' + MOCK_DATE },
+          { role: 'user', content: 'test' }
+        ]),
+        tools: expect.arrayContaining([
+          expect.objectContaining({
+            type: 'function',
+            name: 'submit',
+            parameters: expect.objectContaining({
               type: 'object',
               properties: {
                 key: { type: ['string', 'null'] }
-              },
-              required: ['key'],
-              strict: true,
-              additionalProperties: false
-            }
-          }
-        }
+              }
+            })
+          }),
+          { type: 'web_search' }
+        ]),
+        temperature: 0,
+        tool_choice: 'required'
       });
       expect(result.response).toEqual({ key: 'value' });
-      expect(result.messages).toEqual([
-        ...oldMessages,
-        { role: 'assistant', content: responseJson }
-      ]);
+      // The messages now include all intermediate steps from the Responses API
+      expect(result.messages).toContainEqual(
+        expect.objectContaining({ role: 'assistant', content: JSON.stringify({ key: 'value' }) })
+      );
     });
 
     it('should handle schema without additionalProperties', async () => {
       const model = new OpenAIModel();
-      mockCreate.mockResolvedValue({
-        choices: [{ message: { content: '{"nested": {"field": "value"}}' } }]
+      // Mock response with tool call inside a message
+      mockResponsesCreate.mockResolvedValue({
+        output: [{
+          type: 'message',
+          tool_calls: [{
+            id: 'call_456',
+            function: {
+              name: 'submit',
+              arguments: '{"nested": {"field": "value"}}'
+            }
+          }]
+        }]
       });
 
       const schema = {

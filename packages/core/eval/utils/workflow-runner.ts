@@ -184,7 +184,7 @@ export class WorkflowRunner {
                 this.metadata
             );
 
-            workflow = await builder.build();
+            workflow = await builder.buildWorkflow();
             workflow.id = await generateUniqueId({
                 baseId: workflow.id,
                 exists: async (id) => !!(await this.datastore.getWorkflow(id, this.metadata.orgId))

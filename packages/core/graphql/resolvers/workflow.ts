@@ -1,13 +1,13 @@
 import { Integration, RequestOptions, Workflow, WorkflowResult } from "@superglue/client";
 import { Context, Metadata } from "@superglue/shared";
-import { flattenAndNamespaceWorkflowCredentials, waitForIntegrationProcessing } from "@superglue/shared/utils";
+import { flattenAndNamespaceWorkflowCredentials, generateUniqueId, waitForIntegrationProcessing } from "@superglue/shared/utils";
 import type { GraphQLResolveInfo } from "graphql";
 import { WorkflowExecutor } from "../../workflow/workflow-executor.js";
 
-import { generateUniqueId } from "@superglue/shared/utils";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { logMessage } from "../../utils/logs.js";
 import { isTokenExpired, refreshOAuthToken } from "../../utils/oauth.js";
+import { replaceVariables } from "../../utils/tools.js";
 import { WorkflowBuilder } from "../../workflow/workflow-builder.js";
 
 function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined, defaultValue?: T): T | undefined {
@@ -106,7 +106,13 @@ export const executeWorkflowResolver = async (
         }
       }
       const integrationCreds = flattenAndNamespaceWorkflowCredentials(integrations);
-      mergedCredentials = { ...integrationCreds, ...(args.credentials || {}) };
+      mergedCredentials = { 
+        ...integrationCreds,
+        ...Object.entries(args.credentials || {}).reduce((acc: any, cred: any) => {
+          acc[cred.key] = replaceVariables(cred.value, integrationCreds || {});
+          return acc;
+        }, {})
+      };
     }
 
     const executor = new WorkflowExecutor(workflow, metadata, integrations);
@@ -237,6 +243,7 @@ export const buildWorkflowResolver = async (
   context: Context,
   info: GraphQLResolveInfo,
 ): Promise<Workflow> => {
+
   try {
     const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
     const { instruction, payload = {}, integrationIds, responseSchema } = args;
@@ -257,10 +264,15 @@ export const buildWorkflowResolver = async (
 
     const resolvedIntegrations = await waitForIntegrationProcessing(datastoreAdapter, integrationIds);
 
-    const builder = new WorkflowBuilder(instruction, resolvedIntegrations, payload, responseSchema, metadata);
-    const workflow = await builder.build();
+    const builder = new WorkflowBuilder(
+      instruction,
+      resolvedIntegrations,
+      payload,
+      responseSchema,
+      metadata
+    );
+    const workflow = await builder.buildWorkflow();
 
-    // prevent collisions with existing workflows
     workflow.id = await generateUniqueId({
       baseId: workflow.id,
       exists: async (id) => !!(await context.datastore.getWorkflow(id, context.orgId))
@@ -268,7 +280,7 @@ export const buildWorkflowResolver = async (
 
     return workflow;
   } catch (error) {
-    logMessage('error', "Workflow building error: " + String(error), { orgId: context.orgId });
-    throw new Error(`Failed to build workflow: ${error}`);
+    logMessage('error', `Failed to build workflow: ${error}`, { orgId: context.orgId });
+    throw error;
   }
 };

@@ -122,7 +122,7 @@ export function superglueJsonata(expr: string) {
   return expression;
 }
 
-export async function applyTransformationWithValidation(data: any, expr: string, schema: any): Promise<TransformResult> {
+export async function transformAndValidateSchema(data: any, expr: string, schema: any): Promise<TransformResult> {
   try {
     let result: TransformResult;
     if (!expr) {
@@ -144,9 +144,7 @@ export async function applyTransformationWithValidation(data: any, expr: string,
 export async function applyJsonataWithValidation(data: any, expr: string, schema: any): Promise<TransformResult> {
   try {
     const result = await applyJsonata(data, expr);
-    if (result === null || result === undefined) {
-      return { success: false, error: "Result is empty" };
-    }
+
     // if no schema is given, skip validation
     if (!schema) {
       return { success: true, data: result };
@@ -170,10 +168,10 @@ export async function applyJsonataWithValidation(data: any, expr: string, schema
 export async function executeAndValidateMappingCode(input: any, mappingCode: string, schema: any): Promise<TransformResult> {
   const isolate = new ivm.Isolate({ memoryLimit: 1024 }); // 32 MB
   const context = await isolate.createContext();
-  
+
   // Inject helper functions into the context
   await injectVMHelpersIndividually(context);
-  
+
   await context.global.set('input', JSON.stringify(input));
 
   let result: any;
@@ -319,13 +317,19 @@ export async function replaceVariables(template: string, payload: Record<string,
   const matches = [...template.matchAll(pattern)];
 
   for (const match of matches) {
-    const path = match[1];
+    const path = match[1].trim();
     let value: any;
     if (payload[path]) {
       value = payload[path];
     }
     else {
-      value = await applyJsonata(payload, path);
+      // Use transformAndValidateSchema to handle both JS and JSONata
+      const result = await transformAndValidateSchema(payload, path, null);
+      if (result.success) {
+        value = result.data;
+      } else {
+        throw new Error(`Failed to run JS or JSONata expression: ${path} - ${result.error}`);
+      }
     }
 
     if (Array.isArray(value) || typeof value === 'object') {
@@ -370,6 +374,19 @@ function oldReplaceVariables(template: string, variables: Record<string, any>): 
   });
 }
 
+export function flattenObject(obj: any, parentKey = '', res: Record<string, any> = {}): Record<string, any> {
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      const propName = parentKey ? `${parentKey}_${key}` : key;
+      if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
+        flattenObject(obj[key], propName, res);
+      } else {
+        res[propName] = obj[key];
+      }
+    }
+  }
+  return res;
+}
 
 export function sample(value: any, sampleSize = 10): any {
   if (Array.isArray(value)) {
@@ -463,4 +480,54 @@ export function safeHttpMethod(method: any): HttpMethod {
   const upper = method?.toUpperCase?.();
   if (upper && validMethods.includes(upper)) return upper as HttpMethod;
   return "GET" as HttpMethod;
+}
+
+export async function evaluateStopCondition(
+  stopConditionCode: string,
+  response: any,
+  pageInfo: { page: number; offset: number; cursor: any; totalFetched: number }
+): Promise<{ shouldStop: boolean; error?: string }> {
+
+
+  const isolate = new ivm.Isolate({ memoryLimit: 128 });
+
+  try {
+    const context = await isolate.createContext();
+
+    // Inject the response and pageInfo as JSON strings
+    await context.global.set('responseJSON', JSON.stringify(response));
+    await context.global.set('pageInfoJSON', JSON.stringify(pageInfo));
+
+    // if the stop condition code starts with return or is not a function, we need to wrap it in a function
+    if (stopConditionCode.startsWith("return")) {
+      stopConditionCode = `(response, pageInfo) => { ${stopConditionCode} }`;
+    }
+    else if (!stopConditionCode.startsWith("(response")) {
+      stopConditionCode = `(response, pageInfo) => ${stopConditionCode}`;
+    }
+
+    // Create the evaluation script
+    const script = `
+          const response = JSON.parse(responseJSON);
+          const pageInfo = JSON.parse(pageInfoJSON);
+          const fn = ${stopConditionCode};
+          const result = fn(response, pageInfo);
+          // Return the boolean result
+          return Boolean(result);
+      `;
+
+    const shouldStop = await context.evalClosure(script, null, { timeout: 3000 });
+
+    return { shouldStop: Boolean(shouldStop) };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    let helpfulError = `Stop condition evaluation failed: ${errorMessage}`;
+
+    return {
+      shouldStop: false, // Default to continue on error
+      error: helpfulError
+    };
+  } finally {
+    isolate.dispose();
+  }
 }

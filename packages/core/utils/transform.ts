@@ -2,11 +2,11 @@ import { RequestOptions, SelfHealingMode, TransformConfig, TransformInputRequest
 import type { DataStore, Metadata } from "@superglue/shared";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import prettier from "prettier";
-import { config } from "../default.js";
+import { server_defaults } from "../default.js";
 import { LanguageModel } from "../llm/llm.js";
 import { PROMPT_JS_TRANSFORM, PROMPT_MAPPING } from "../llm/prompts.js";
 import { logMessage } from "./logs.js";
-import { applyTransformationWithValidation, getSchemaFromData, sample } from "./tools.js";
+import { getSchemaFromData, sample, transformAndValidateSchema } from "./tools.js";
 
 export async function executeTransform(args: {
   datastore: DataStore,
@@ -33,7 +33,7 @@ export async function executeTransform(args: {
       throw new Error("No response mapping found");
     }
 
-    const transformResult = await applyTransformationWithValidation(
+    const transformResult = await transformAndValidateSchema(
       data,
       currentConfig.responseMapping,
       currentConfig.responseSchema
@@ -120,7 +120,7 @@ export async function generateTransformJsonata(schema: any, payload: any, instru
 
     const { response, messages: updatedMessages } = await LanguageModel.generateObject(messages, jsonataSchema, temperature);
     messages = updatedMessages;
-    const transformation = await applyTransformationWithValidation(payload, response.jsonata, schema);
+    const transformation = await transformAndValidateSchema(payload, response.jsonata, schema);
 
     if (!transformation.success) {
       throw new Error(`Validation failed: ${transformation.error}`);
@@ -189,7 +189,7 @@ ${JSON.stringify(sample(payload, 2), null, 2).slice(0, 50000)}
     try {
       // Autoformat the generated code
       response.mappingCode = await prettier.format(response.mappingCode, { parser: "babel" });
-      const validation = await applyTransformationWithValidation(payload, response.mappingCode, schema);
+      const validation = await transformAndValidateSchema(payload, response.mappingCode, schema);
       if (!validation.success) {
         throw new Error(`Validation failed: ${validation.error}`);
       }
@@ -206,7 +206,7 @@ ${JSON.stringify(sample(payload, 2), null, 2).slice(0, 50000)}
     logMessage('info', `Mapping generated successfully with ${response.confidence}% confidence`, metadata);
     return response;
   } catch (error) {
-    if (retry < config.MAX_TRANSFORMATION_RETRIES) {
+    if (retry < server_defaults.MAX_TRANSFORMATION_RETRIES) {
       const errorMessage = String(error.message);
       logMessage('warn', "Error generating JS mapping: " + errorMessage.slice(0, 1000), metadata);
       messages?.push({ role: "user", content: errorMessage });

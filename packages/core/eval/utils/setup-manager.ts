@@ -5,6 +5,7 @@ import { FileStore } from '../../datastore/filestore.js';
 import { DataStore } from '../../datastore/types.js';
 import { logMessage } from '../../utils/logs.js';
 import { IntegrationConfig } from './config-loader.js';
+import { server_defaults } from '../../default.js';
 
 export interface SetupResult {
     datastore: DataStore;
@@ -287,7 +288,7 @@ export class SetupManager {
             await waitForIntegrationProcessing(
                 datastoreAdapter,
                 pendingIntegrations,
-                240000
+                server_defaults.TIMEOUTS.EVAL_DOC_PROCESSING_TIMEOUT
             );
 
             const documentationProcessingTime = Date.now() - docStartTime;
@@ -310,7 +311,7 @@ export class SetupManager {
         } catch (error) {
             const documentationProcessingTime = Date.now() - docStartTime;
             logMessage('warn',
-                `⚠️  Documentation processing timeout after ${documentationProcessingTime}ms (4 minute limit): ${String(error)}`,
+                `⚠️  Documentation processing timeout after ${documentationProcessingTime}ms (10 minute limit): ${String(error)}`,
                 this.metadata
             );
 

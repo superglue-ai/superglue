@@ -2,6 +2,7 @@ import playwright from '@playwright/test';
 import { Metadata } from '@superglue/shared';
 import axios from 'axios';
 import { afterEach, beforeEach, describe, expect, it, Mocked, vi } from 'vitest';
+import { server_defaults } from '../default.js';
 import { LanguageModel } from '../llm/llm.js';
 import { Documentation, PlaywrightFetchingStrategy } from './documentation.js';
 
@@ -86,8 +87,8 @@ describe('Documentation Class', () => {
       expect(playwright.chromium.launch).toHaveBeenCalledTimes(1);
       expect(mockBrowser.newContext).toHaveBeenCalledTimes(1);
       expect(mockContext.newPage).toHaveBeenCalledTimes(1);
-      expect(mockPage.goto).toHaveBeenCalledWith(docUrl);
-      expect(mockPage.waitForLoadState).toHaveBeenCalledWith('domcontentloaded', { timeout: 15000 });
+      expect(mockPage.goto).toHaveBeenCalledWith(docUrl, { timeout: server_defaults.TIMEOUTS.PLAYWRIGHT });
+      expect(mockPage.waitForLoadState).toHaveBeenCalledWith('domcontentloaded', { timeout: server_defaults.TIMEOUTS.PLAYWRIGHT });
       expect(mockPage.waitForTimeout).toHaveBeenCalledWith(1000);
       expect(mockPage.evaluate).toHaveBeenCalledTimes(2); // For removing elements and getting links
       expect(mockPage.content).toHaveBeenCalledTimes(1);
@@ -291,25 +292,25 @@ describe('Documentation Class', () => {
     const createLongString = (char: string, factor: number) => char.repeat(Math.ceil(DOCUMENTATION_MAX_LENGTH * factor));
 
     it('should return empty string for empty documentation', () => {
-      const result = Documentation.postProcess("", "some instruction");
+      const result = Documentation.extractRelevantSections("", "some instruction");
       expect(result).toBe("");
     });
 
     it('should return documentation as is if no instruction provided', () => {
       const doc = "Some documentation";
-      const result = Documentation.postProcess(doc, "");
+      const result = Documentation.extractRelevantSections(doc, "");
       expect(result).toBe(doc);
     });
 
     it('should return documentation as is if within length limits', () => {
       const doc = "Short documentation";
-      const result = Documentation.postProcess(doc, "some instruction");
+      const result = Documentation.extractRelevantSections(doc, "some instruction");
       expect(result).toBe(doc);
     });
 
     it('should truncate very long content if no relevant terms found', () => {
       const longContent = createLongString('A', 1.5);
-      const result = Documentation.postProcess(longContent, "unrelated instruction");
+      const result = Documentation.extractRelevantSections(longContent, "unrelated instruction");
       expect(result.length).toBe(DOCUMENTATION_MAX_LENGTH);
       expect(result).toBe(longContent.slice(0, DOCUMENTATION_MAX_LENGTH));
     });
@@ -321,7 +322,7 @@ describe('Documentation Class', () => {
       const suffix = createLongString('S', 0.6);
       const longContent = `${prefix} context around ${searchTerm} here ${middle} more context ${suffix}`;
 
-      const result = Documentation.postProcess(longContent, `instruction with ${searchTerm}`);
+      const result = Documentation.extractRelevantSections(longContent, `instruction with ${searchTerm}`);
 
       expect(result.length).toBeLessThanOrEqual(DOCUMENTATION_MAX_LENGTH);
       expect(result).toContain(searchTerm);
@@ -336,14 +337,14 @@ describe('Documentation Class', () => {
       const searchTerm = "userinfo";
       const prefix = createLongString('X', 0.8);
       const suffix = createLongString('Y', 0.8);
-      const authSection = "important securitySchemes definition here";
+      const authSection = "important authorization definition here";
       const longContent = `${prefix} some data about ${searchTerm} ${suffix} ${authSection}`;
 
-      const result = Documentation.postProcess(longContent, `instruction with ${searchTerm}`);
+      const result = Documentation.extractRelevantSections(longContent, `instruction with ${searchTerm}`);
 
       expect(result.length).toBeLessThanOrEqual(DOCUMENTATION_MAX_LENGTH);
       expect(result).toContain(searchTerm);
-      expect(result).toContain("securitySchemes");
+      expect(result).toContain("authorization");
     });
 
     it('should handle multiple search terms', () => {
@@ -354,7 +355,7 @@ describe('Documentation Class', () => {
       const suffix = createLongString('S', 0.6);
       const longContent = `${prefix} ${term1} here ${middle} ${term2} there ${suffix}`;
 
-      const result = Documentation.postProcess(longContent, `instruction with ${term1} and ${term2}`);
+      const result = Documentation.extractRelevantSections(longContent, `instruction with ${term1} and ${term2}`);
 
       expect(result.length).toBeLessThanOrEqual(DOCUMENTATION_MAX_LENGTH);
       expect(result).toContain(term1);
@@ -368,7 +369,7 @@ describe('Documentation Class', () => {
       const suffix = createLongString('S', 0.6);
       const longContent = `${prefix} ${searchTerm} ${middle} ${searchTerm} ${suffix}`;
 
-      const result = Documentation.postProcess(longContent, `instruction with ${searchTerm}`);
+      const result = Documentation.extractRelevantSections(longContent, `instruction with ${searchTerm}`);
 
       expect(result.length).toBeLessThanOrEqual(DOCUMENTATION_MAX_LENGTH);
       expect(result.split("\n\n").length).toBeGreaterThan(1); // Should have multiple chunks

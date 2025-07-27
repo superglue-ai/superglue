@@ -21,8 +21,8 @@ import type { Integration } from '@superglue/client';
 import { SuperglueClient, UpsertMode } from '@superglue/client';
 import { integrations as integrationTemplates } from '@superglue/shared';
 import { waitForIntegrationProcessing } from '@superglue/shared/utils';
-import { FileDown, Globe, Key, Pencil, Plus, RotateCw, Trash2 } from 'lucide-react';
-import { useSearchParams } from 'next/navigation';
+import { FileDown, Globe, Key, Pencil, Plus, RotateCw, Sparkles, Trash2 } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import type { SimpleIcon } from 'simple-icons';
 import * as simpleIcons from 'simple-icons';
@@ -31,6 +31,7 @@ export default function IntegrationsPage() {
     const config = useConfig();
     const { toast } = useToast();
     const searchParams = useSearchParams();
+    const router = useRouter();
     const { integrations, pendingDocIds, loading: initialLoading, refreshIntegrations, setPendingDocIds } = useIntegrations();
     
     // Handle OAuth callback messages
@@ -77,7 +78,7 @@ export default function IntegrationsPage() {
     const [editingIntegration, setEditingIntegration] = useState<Integration | null>(null);
 
     const integrationOptions = [
-        { value: "custom", label: "Custom", icon: "default" },
+        { value: "manual", label: "No Template", icon: "default" },
         ...Object.entries(integrationTemplates).map(([key, integration]) => ({
             value: key,
             label: key
@@ -216,12 +217,6 @@ export default function IntegrationsPage() {
                 }, UpsertMode.UPDATE);
 
                 setPendingDocIds(prev => new Set([...prev].filter(id => id !== integrationId)));
-
-                toast({
-                    title: 'Refresh Failed',
-                    description: `Failed to refresh documentation for "${integrationId}".`,
-                    variant: 'destructive',
-                });
             }
 
         } catch (error) {
@@ -245,12 +240,6 @@ export default function IntegrationsPage() {
             }
 
             setPendingDocIds(prev => new Set([...prev].filter(id => id !== integrationId)));
-
-            toast({
-                title: 'Refresh Failed',
-                description: `Failed to refresh documentation for "${integrationId}".`,
-                variant: 'destructive',
-            });
         }
     };
 
@@ -376,6 +365,16 @@ export default function IntegrationsPage() {
                                             </div>
                                         </div>
                                         <div className="ml-auto flex gap-2">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="text-muted-foreground hover:text-primary"
+                                                onClick={() => router.push(`/workflows?integration=${integration.id}`)}
+                                                title="Build workflow with this integration"
+                                            >
+                                                <Sparkles className="h-4 w-4 mr-2" />
+                                                Build Workflow
+                                            </Button>
                                             <Button
                                                 variant="ghost"
                                                 size="icon"

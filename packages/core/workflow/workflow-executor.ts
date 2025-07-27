@@ -1,8 +1,8 @@
-import { Metadata } from "@playwright/test";
 import { ExecutionStep, Integration, RequestOptions, Workflow, WorkflowResult, WorkflowStepResult } from "@superglue/client";
+import { Metadata } from "@superglue/shared";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { logMessage } from "../utils/logs.js";
-import { applyJsonata, applyTransformationWithValidation } from "../utils/tools.js";
+import { transformAndValidateSchema } from "../utils/tools.js";
 import { evaluateMapping, generateTransformCode } from "../utils/transform.js";
 import { selectStrategy } from "./workflow-strategies.js";
 
@@ -24,7 +24,7 @@ export class WorkflowExecutor implements Workflow {
   ) {
     this.id = workflow.id;
     this.steps = workflow.steps;
-    this.finalTransform = workflow.finalTransform || "$";
+    this.finalTransform = workflow.finalTransform || "(sourceData) => sourceData";
     this.responseSchema = workflow.responseSchema;
     this.instruction = workflow.instruction;
     this.metadata = metadata;
@@ -112,8 +112,8 @@ export class WorkflowExecutor implements Workflow {
         };
         try {
           // Apply the final transform using the original data
-          let currentFinalTransform = this.finalTransform || "$";
-          const finalResult = await applyTransformationWithValidation(rawStepData, currentFinalTransform, this.responseSchema);
+          let currentFinalTransform = this.finalTransform || "(sourceData) => sourceData";
+          const finalResult = await transformAndValidateSchema(rawStepData, currentFinalTransform, this.responseSchema);
           if (!finalResult.success) {
             throw new Error(finalResult.error);
           }
@@ -227,10 +227,19 @@ export class WorkflowExecutor implements Workflow {
       };
 
       if (step.inputMapping) {
-        // Prepare context for JSONata expression
+        // Use JS transform for input mapping
         try {
-          const result = await applyJsonata(mappingContext, step.inputMapping || "$");
-          return result as Record<string, unknown>;
+          const transformResult = await transformAndValidateSchema(
+            mappingContext,
+            step.inputMapping,
+            null // No schema validation for input mappings
+          );
+
+          if (!transformResult.success) {
+            throw new Error(`Input mapping failed: ${transformResult.error}`);
+          }
+
+          return transformResult.data as Record<string, unknown>;
         } catch (err) {
           console.warn(`[Step ${step.id}] Input mapping failed, falling back to auto-detection`, err);
         }

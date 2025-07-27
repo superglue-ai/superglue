@@ -17,11 +17,24 @@ vi.mock('./transform.js', async (importOriginal) => {
   };
 });
 
+vi.mock('./tools.js', async (importOriginal) => {
+  const actual = (await importOriginal()) as any;
+  return {
+    ...actual,
+    transformAndValidateSchema: vi.fn().mockImplementation(async (data, expr, schema) => {
+      if (expr === 'test-mapping') {
+        return { success: false, error: 'Invalid mapping: test-mapping' };
+      }
+      return actual.transformAndValidateSchema(data, expr, schema);
+    }),
+  };
+});
+
 import { TransformConfig } from '@superglue/client';
 import dotenv from 'dotenv';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LanguageModel } from '../llm/llm.js';
-import { applyTransformationWithValidation } from './tools.js';
+import { transformAndValidateSchema } from './tools.js';
 import { executeTransform, generateTransformJsonata } from './transform.js';
 
 describe('transform utils', () => {
@@ -71,7 +84,7 @@ describe('transform utils', () => {
 
       (LanguageModel as any).generateObject.mockResolvedValueOnce({
         response: {
-          mappingCode: '(sourceData) => {return { name: sourceData.product.name };}',
+          mappingCode: '(sourceData) => {\n  return { name: sourceData.product.name };\n};\n',
           confidence: 95
         },
         messages: []
@@ -133,7 +146,7 @@ describe('transform utils', () => {
         data: samplePayload,
         metadata: { orgId: testOrgId }
       });
-      const result = await applyTransformationWithValidation(samplePayload, transform.config.responseMapping, sampleInput.responseSchema);
+      const result = await transformAndValidateSchema(samplePayload, transform.config.responseMapping, sampleInput.responseSchema);
       expect(result).toMatchObject({
         success: true,
         data: {
@@ -184,7 +197,7 @@ describe('transform utils', () => {
       const mapping = await generateTransformJsonata(sampleSchema, samplePayload, 'test-instruction', {});
       expect(mapping).toBeDefined();
 
-      const result = await applyTransformationWithValidation(samplePayload, mapping.jsonata, sampleSchema);
+      const result = await transformAndValidateSchema(samplePayload, mapping.jsonata, sampleSchema);
       expect(result).toEqual({
         success: true,
         data: {

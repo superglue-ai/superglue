@@ -8,7 +8,7 @@ import { cn, composeUrl } from '@/src/lib/utils';
 import { Integration, IntegrationInput, SuperglueClient, UpsertMode, Workflow, WorkflowResult } from '@superglue/client';
 import { flattenAndNamespaceWorkflowCredentials, waitForIntegrationProcessing } from '@superglue/shared/utils';
 import { ArrowRight, Check, ChevronRight, FileText, Globe, Loader2, Pencil, Play, Plus, Workflow as WorkflowIcon, X } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
 import { useEffect, useMemo, useState } from 'react';
@@ -63,9 +63,13 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const [isSaving, setIsSaving] = useState(false); // For upsertWorkflow mutation
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const superglueConfig = useConfig();
 
   const { integrations, pendingDocIds, loading, setPendingDocIds, refreshIntegrations } = useIntegrations();
+
+  // Parse integration from query params
+  const preselectedIntegrationId = searchParams.get('integration');
 
   const [instruction, setInstruction] = useState('');
   const [payload, setPayload] = useState('{}');
@@ -89,7 +93,12 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     JSON.stringify((currentWorkflow && (currentWorkflow as any).credentials) || {}, null, 2)
   );
 
-  const [selectedIntegrationIds, setSelectedIntegrationIds] = useState<string[]>([]);
+  const [selectedIntegrationIds, setSelectedIntegrationIds] = useState<string[]>(() => {
+    // Initialize with preselected integration if available
+    return preselectedIntegrationId && integrations.some(i => i.id === preselectedIntegrationId) 
+      ? [preselectedIntegrationId] 
+      : [];
+  });
 
   const [integrationSearch, setIntegrationSearch] = useState('');
   const [showIntegrationForm, setShowIntegrationForm] = useState(false);
@@ -113,6 +122,15 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     }
   }), [client]);
 
+  // Update selectedIntegrationIds when integrations load and preselected integration is available
+  useEffect(() => {
+    if (preselectedIntegrationId && integrations.length > 0 && selectedIntegrationIds.length === 0) {
+      if (integrations.some(i => i.id === preselectedIntegrationId)) {
+        setSelectedIntegrationIds([preselectedIntegrationId]);
+      }
+    }
+  }, [preselectedIntegrationId, integrations, selectedIntegrationIds.length]);
+
   // Clear execution results when navigating away from review step
   useEffect(() => {
     // Don't clear on initial mount or when entering review
@@ -131,7 +149,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
 
   // Create integration options array with custom option first
   const integrationOptions = [
-    { value: "custom", label: "Custom", icon: "default" },
+    { value: "manual", label: "No Template", icon: "default" },
     ...Object.entries(integrationTemplates).map(([key, integration]) => ({
       value: key,
       label: key.charAt(0).toUpperCase() + key.slice(1),
@@ -302,7 +320,14 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
           .map(id => freshIntegrations.find(i => i.id === id))
           .filter(Boolean);
         const credentialsFromIntegrations = flattenAndNamespaceWorkflowCredentials(selectedIntegrations);
-        setReviewCredentials(JSON.stringify(credentialsFromIntegrations, null, 2));
+        
+        // Mask the credentials for display
+        const maskedCredentials = Object.entries(credentialsFromIntegrations).reduce((acc, [key, _]) => {
+          acc[key] = `<<${key}>>`;
+          return acc;
+        }, {} as Record<string, string>);
+        
+        setReviewCredentials(JSON.stringify(maskedCredentials, null, 2));
 
         setStep(steps[currentIndex + 1]);
       } catch (error: any) {
@@ -791,7 +816,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                       }
                     }}
                     placeholder="e.g., 'Fetch customer details from CRM using the input email, then get their recent orders from productApi.'"
-                    className={cn("min-h-80", validationErrors.instruction && inputErrorStyles)}
+                    className={cn("min-h-64", validationErrors.instruction && inputErrorStyles)}
                   />
                   {suggestions.length > 0 && !instruction && (
                     <div className="absolute bottom-0 p-3 pointer-events-none w-full">
@@ -827,7 +852,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                 <Label htmlFor="payload">Workflow Variables (Optional, JSON)</Label>
                 <HelpTooltip text="Provide dynamic variables for the workflow as a JSON object. Workflow variables are equivalent to your workflow's initial payload and can be referenced in the entire config. You can change them when you use the workflow later." />
                 <div className={cn(
-                  "h-80 rounded-md border bg-transparent code-editor",
+                  "h-64 rounded-md border bg-transparent code-editor",
                   validationErrors.payload && inputErrorStyles
                 )}>
                   {/* Use plain textarea for large JSON (>5000 chars) for performance */}
@@ -843,7 +868,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                           setValidationErrors(prev => ({ ...prev, payload: true }));
                         }
                       }}
-                      className={cn("h-80")}
+                      className={cn("h-64")}
                       placeholder="{}"
                       spellCheck={false}
                     />
@@ -863,7 +888,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                       padding={10}
                       tabSize={2}
                       insertSpaces={true}
-                      className="font-mono text-xs w-full h-80"
+                      className="font-mono text-xs w-full h-64"
                     />
                   )}
                 </div>

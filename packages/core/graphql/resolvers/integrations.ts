@@ -1,11 +1,11 @@
 import { Integration } from '@superglue/client';
-
-import { Context, Metadata } from "@superglue/shared";
+import { Context, findMatchingIntegration, integrations, Metadata } from "@superglue/shared";
 import { generateUniqueId } from '@superglue/shared/utils';
 import { GraphQLResolveInfo } from "graphql";
 import { IntegrationSelector } from '../../integrations/integration-selector.js';
 import { Documentation } from '../../utils/documentation.js';
 import { logMessage } from '../../utils/logs.js';
+import { composeUrl } from '../../utils/tools.js';
 
 function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined, defaultValue?: T): T | undefined {
   if (newValue === null) return undefined;
@@ -81,8 +81,9 @@ export const upsertIntegrationResolver = async (
   try {
     const now = new Date();
     const oldIntegration = await context.datastore.getIntegration(input.id, context.orgId);
-
+    
     if (mode === 'CREATE') {
+      input = enrichWithTemplate(input);
       if (oldIntegration) {
         input.id = await generateUniqueId({
           baseId: input.id,
@@ -99,17 +100,21 @@ export const upsertIntegrationResolver = async (
       // Fire-and-forget async doc fetch
       (async () => {
         try {
+          // do this again since the frontend might not send everything. we need to fix this later.
+          input = enrichWithTemplate(input);
           logMessage('info', `Starting async documentation fetch for integration ${input.id}`, { orgId: context.orgId });
           const docFetcher = new Documentation(
             {
               urlHost: input.urlHost,
               urlPath: input.urlPath,
               documentationUrl: input.documentationUrl,
+              openApiUrl: input.openApiUrl,
             },
             input.credentials || {},
             { orgId: context.orgId }
           );
           const docString = await docFetcher.fetchAndProcess();
+          const openApiSchema = await docFetcher.fetchOpenApiDocumentation();
           // Check if integration still exists before upserting
           const stillExists = await context.datastore.getIntegration(input.id, context.orgId);
           if (!stillExists) {
@@ -120,6 +125,7 @@ export const upsertIntegrationResolver = async (
             ...input,
             documentation: docString,
             documentationPending: false,
+            openApiSchema: openApiSchema,
             specificInstructions: input.specificInstructions?.trim() || oldIntegration?.specificInstructions || '',
             createdAt: oldIntegration?.createdAt || now,
             updatedAt: new Date(),
@@ -153,6 +159,8 @@ export const upsertIntegrationResolver = async (
       urlPath: resolveField(input.urlPath, oldIntegration?.urlPath, ''),
       documentationUrl: resolveField(input.documentationUrl, oldIntegration?.documentationUrl, ''),
       documentation: resolveField(input.documentation, oldIntegration?.documentation, ''),
+      openApiUrl: resolveField(input.openApiUrl, oldIntegration?.openApiUrl, ''),
+      openApiSchema: resolveField(input.openApiSchema, oldIntegration?.openApiSchema, ''),
       documentationPending: shouldFetchDoc,
       credentials: resolveField(input.credentials, oldIntegration?.credentials, {}),
       specificInstructions: resolveField(input.specificInstructions?.trim(), oldIntegration?.specificInstructions, ''),
@@ -201,3 +209,20 @@ export const findRelevantIntegrationsResolver = async (
     return [];
   }
 };
+
+function enrichWithTemplate(input: Integration): Integration {
+  const matchingTemplate = integrations[String(input.name || input.id).toLowerCase()] || 
+    findMatchingIntegration(composeUrl(input.urlHost, input.urlPath))?.integration;
+
+  if (!matchingTemplate) {
+    return input;
+  }
+
+  return {
+    openApiUrl: matchingTemplate.openApiUrl,
+    openApiSchema: matchingTemplate.openApiSchema,
+    documentationUrl: matchingTemplate.docsUrl,
+    urlHost: matchingTemplate.apiUrl,
+    ...input,
+  } as Integration;
+}

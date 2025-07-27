@@ -3,14 +3,13 @@ import { ApiConfig } from "@superglue/client";
 import { Metadata } from "@superglue/shared";
 import axios from "axios";
 import { getIntrospectionQuery } from "graphql";
+import * as yaml from 'js-yaml';
 import { NodeHtmlMarkdown } from "node-html-markdown";
+import { server_defaults } from '../default.js';
 import { LanguageModel } from "../llm/llm.js";
 import { logMessage } from "./logs.js";
 import { callPostgres } from './postgres.js';
 import { composeUrl } from "./tools.js";
-
-const DOC_AXIOS_TIMEOUT_MS = 60000;
-const DOC_PLAYWRIGHT_TIMEOUT_MS = 15000;
 
 // Strategy Interface
 interface FetchingStrategy {
@@ -24,6 +23,7 @@ export interface DocumentationConfig {
   urlHost?: string;
   instruction?: string;
   documentationUrl?: string;
+  openApiUrl?: string;
   urlPath?: string;
   headers?: Record<string, string>;
   queryParams?: Record<string, string>;
@@ -93,58 +93,228 @@ export class Documentation {
     return "";
   }
 
-  public static postProcess(documentation: string, instruction: string): string {
+  public async fetchOpenApiDocumentation(): Promise<string> {
+    if (!this.config.openApiUrl) {
+      return "";
+    }
+    try {
+      const response = await axios.get(this.config.openApiUrl, { timeout: server_defaults.TIMEOUTS.AXIOS });
+      let data = response.data;
+      
+      // If data is already an object (axios parsed it), check for OpenAPI links
+      if (typeof data === 'object' && data !== null) {
+        // Check if this is a discovery/index response with links to other OpenAPI docs
+        const openApiUrls = this.extractOpenApiUrls(data);
+        if (openApiUrls.length > 0) {
+          logMessage('info', `Found ${openApiUrls.length} OpenAPI specification links in response`, this.metadata);
+          const allSpecs = await this.fetchMultipleOpenApiSpecs(openApiUrls);
+          return allSpecs;
+        }
+        return JSON.stringify(data, null, 2);
+      }
+      
+      if (typeof data === 'string') {
+        const trimmedData = data.trim();
+        
+        // First, try to parse as JSON
+        try {
+          const parsed = JSON.parse(trimmedData);
+          // Check for OpenAPI links in parsed JSON
+          const openApiUrls = this.extractOpenApiUrls(parsed);
+          if (openApiUrls.length > 0) {
+            logMessage('info', `Found ${openApiUrls.length} OpenAPI specification links in response`, this.metadata);
+            const allSpecs = await this.fetchMultipleOpenApiSpecs(openApiUrls);
+            return allSpecs;
+          }
+          return JSON.stringify(parsed, null, 2);
+        } catch {
+          // Not valid JSON, try YAML parsing
+          try {
+            const parsed = yaml.load(trimmedData) as any;
+            // Verify it actually parsed to an object (not just a string)
+            if (typeof parsed === 'object' && parsed !== null) {
+              logMessage('info', `Successfully converted YAML to JSON for ${this.config.openApiUrl}`, this.metadata);
+              // Check for OpenAPI links in parsed YAML
+              const openApiUrls = this.extractOpenApiUrls(parsed);
+              if (openApiUrls.length > 0) {
+                logMessage('info', `Found ${openApiUrls.length} OpenAPI specification links in response`, this.metadata);
+                const allSpecs = await this.fetchMultipleOpenApiSpecs(openApiUrls);
+                return allSpecs;
+              }
+              return JSON.stringify(parsed, null, 2);
+            }
+          } catch (yamlError) {
+            logMessage('warn', `Failed to parse content as JSON or YAML from ${this.config.openApiUrl}: ${yamlError?.message}`, this.metadata);
+          }
+          
+          // If both JSON and YAML parsing failed, return original data
+          return data;
+        }
+      }
+      
+      // Fallback: return data as string
+      return String(data);
+    } catch (error) {
+      logMessage('warn', `Failed to fetch OpenAPI documentation from ${this.config.openApiUrl}: ${error?.message}`, this.metadata);
+      return "";
+    }
+  }
+
+  private extractOpenApiUrls(data: any): string[] {
+    const urls: string[] = [];
+    
+    // Recursive function to find all OpenAPI URLs in the data structure
+    const findOpenApiUrls = (obj: any) => {
+      if (!obj || typeof obj !== 'object') return;
+      
+      for (const key in obj) {
+        if (!obj.hasOwnProperty(key)) continue;
+        
+        const value = obj[key];
+        
+        // Look for common patterns: "openApi", "openapi", "openapiUrl", "specUrl", etc.
+        if ((key.toLowerCase().includes('openapi') || key.toLowerCase().includes('spec')) && 
+            typeof value === 'string' && 
+            value.startsWith('http')) {
+          urls.push(value);
+        }
+        
+        // Recurse into nested objects and arrays
+        if (Array.isArray(value)) {
+          value.forEach(item => findOpenApiUrls(item));
+        } else if (typeof value === 'object') {
+          findOpenApiUrls(value);
+        }
+      }
+    };
+    
+    findOpenApiUrls(data);
+    return [...new Set(urls)]; // Remove duplicates
+  }
+
+  private async fetchMultipleOpenApiSpecs(urls: string[]): Promise<string> {
+    const specs: any[] = [];
+    const MAX_CONCURRENT_FETCHES = 5;
+    const MAX_SPECS_TO_FETCH = 100; // Limit to prevent excessive fetching
+    
+    // Limit the number of specs to fetch
+    const urlsToFetch = urls.slice(0, MAX_SPECS_TO_FETCH);
+    if (urls.length > MAX_SPECS_TO_FETCH) {
+      logMessage('warn', `Found ${urls.length} OpenAPI specs but limiting to ${MAX_SPECS_TO_FETCH}`, this.metadata);
+    }
+    
+    // Fetch specs in batches to avoid overwhelming the server
+    for (let i = 0; i < urlsToFetch.length; i += MAX_CONCURRENT_FETCHES) {
+      const batch = urlsToFetch.slice(i, i + MAX_CONCURRENT_FETCHES);
+      const batchPromises = batch.map(async (url) => {
+        try {
+          const response = await axios.get(url, { timeout: server_defaults.TIMEOUTS.AXIOS });
+          let specData = response.data;
+          
+          // Parse if string
+          if (typeof specData === 'string') {
+            try {
+              specData = JSON.parse(specData);
+            } catch {
+              // Try YAML parsing
+              try {
+                specData = yaml.load(specData) as any;
+              } catch {
+                // Keep as string if parsing fails
+              }
+            }
+          }
+          
+          logMessage('info', `Fetched OpenAPI spec from ${url}`, this.metadata);
+          return {
+            url,
+            spec: specData
+          };
+        } catch (error) {
+          logMessage('warn', `Failed to fetch OpenAPI spec from ${url}: ${error?.message}`, this.metadata);
+          return null;
+        }
+      });
+      
+      const batchResults = await Promise.all(batchPromises);
+      specs.push(...batchResults.filter(result => result !== null));
+    }
+    
+    // Return combined specs
+    if (specs.length === 0) {
+      return "";
+    } else if (specs.length === 1) {
+      return JSON.stringify(specs[0].spec, null, 2);
+    } else {
+      // Return all specs with their URLs for reference
+      return JSON.stringify({
+        _meta: {
+          fetchedAt: new Date().toISOString(),
+          totalSpecs: specs.length
+        },
+        specifications: specs
+      }, null, 2);
+    }
+  }
+
+  public static extractRelevantSections(
+    documentation: string,
+    searchQuery: string,
+    maxSections: number = 20,
+    sectionSize: number = 0
+  ): string {
     if (documentation.length <= Documentation.MAX_LENGTH) {
       return documentation;
     }
+    if (sectionSize <= 0) {
+      sectionSize = Math.floor(Documentation.MAX_LENGTH / maxSections);
+    }
+    const MIN_SEARCH_TERM_LENGTH = server_defaults.DOCUMENTATION_MIN_SEARCH_TERM_LENGTH;
 
-    const CHUNK_SIZE = Documentation.MAX_LENGTH / 10;
-    const MAX_CHUNKS = 10; // Limit number of chunks to return
-    const MIN_SEARCH_TERM_LENGTH = 4;
-
-    // Extract search terms from instruction
-    const searchTerms = instruction?.toLowerCase()?.split(/[^a-z0-9]/)
+    // Extract search terms from query
+    const searchTerms = searchQuery?.toLowerCase()?.split(/[^a-z0-9]/)
       .map(term => term.trim())
       .filter(term => term.length >= MIN_SEARCH_TERM_LENGTH) || [];
 
-    // Add common auth-related terms
-    searchTerms.push('securityschemes', 'authorization', 'authentication');
+    // Add common auth-related terms for API context (only for broad searches)
+    if (maxSections >= 10) {
+      searchTerms.push('pagination', 'authorization', 'authentication');
+    }
 
-    // Split document into chunks
-    const chunks: { content: string; score: number; index: number; }[] = [];
+    const sections: { content: string; score: number; index: number; }[] = [];
 
-    for (let i = 0; i < documentation.length; i += CHUNK_SIZE) {
-      const chunk = documentation.slice(i, i + CHUNK_SIZE);
-      const chunkLower = chunk.toLowerCase();
+    for (let i = 0; i < documentation.length; i += sectionSize) {
+      const section = documentation.slice(i, i + sectionSize);
+      const sectionLower = section.toLowerCase();
 
-      // Score chunk based on search term matches
+      // Score section based on search term matches
       let score = 0;
       for (const term of searchTerms) {
-        const matches = (chunkLower.match(new RegExp(term, 'g')) || []).length;
+        const matches = (sectionLower.match(new RegExp(term, 'g')) || []).length;
         score += matches;
       }
 
-      chunks.push({
-        content: chunk,
+      sections.push({
+        content: section,
         score,
         index: i
       });
     }
 
-    // Sort by score (highest first) and take top chunks
-    const topChunks = chunks
+    // Sort by score (highest first) and take top sections
+    const topSections = sections
       .sort((a, b) => b.score - a.score)
-      .slice(0, MAX_CHUNKS);
+      .slice(0, maxSections);
 
-    // If no chunks have matches, return first chunk
-    if (topChunks.every(chunk => chunk.score === 0)) {
+    // If no sections have matches, return first section
+    if (topSections.every(section => section.score === 0)) {
       return documentation.slice(0, Documentation.MAX_LENGTH);
     }
 
-    // Sort selected chunks by their original position to maintain document order
-    topChunks.sort((a, b) => a.index - b.index);
+    // Sort selected sections by their original position to maintain document order
+    topSections.sort((a, b) => a.index - b.index);
 
-    const result = topChunks.map(chunk => chunk.content).join('\n\n');
+    const result = topSections.map(section => section.content).join('\n\n');
 
     // Final trim if needed
     return result.length > Documentation.MAX_LENGTH
@@ -166,7 +336,7 @@ class GraphQLStrategy implements FetchingStrategy {
           query: introspectionQuery,
           operationName: 'IntrospectionQuery'
         },
-        { headers: config.headers, params: config.queryParams, timeout: DOC_AXIOS_TIMEOUT_MS }
+        { headers: config.headers, params: config.queryParams, timeout: server_defaults.TIMEOUTS.AXIOS }
       );
 
       if (response.data.errors) {
@@ -185,7 +355,7 @@ class GraphQLStrategy implements FetchingStrategy {
         .some(val => typeof val === 'string' && val.includes('IntrospectionQuery'));
   }
   async tryFetch(config: ApiConfig, metadata: Metadata): Promise<string | null> {
-    if (!config.urlHost.startsWith("http")) return null; // Needs a valid HTTP URL
+    if (!config.urlHost?.startsWith("http")) return null; // Needs a valid HTTP URL
     const endpointUrl = composeUrl(config.urlHost, config.urlPath);
 
     // Heuristic: Check path or query params typical for GraphQL
@@ -210,7 +380,7 @@ class GraphQLStrategy implements FetchingStrategy {
 }
 
 export class AxiosFetchingStrategy implements FetchingStrategy {
-  async tryFetch(config: ApiConfig, metadata: Metadata): Promise<string | null> {
+  async tryFetch(config: DocumentationConfig, metadata: Metadata): Promise<string | null> {
     if (!config.documentationUrl?.startsWith("http")) return null;
 
     try {
@@ -221,9 +391,10 @@ export class AxiosFetchingStrategy implements FetchingStrategy {
         });
       }
 
-      const response = await axios.get(url.toString(), { headers: config.headers, timeout: DOC_AXIOS_TIMEOUT_MS });
+      const response = await axios.get(url.toString(), { headers: config.headers, timeout: server_defaults.TIMEOUTS.AXIOS });
+      let data = response.data;
       logMessage('info', `Successfully fetched content with axios for ${config.documentationUrl}`, metadata);
-      return response.data;
+      return data;
     } catch (error) {
       logMessage('warn', `Axios fetch failed for ${config.documentationUrl}: ${error?.message}`, metadata);
       return null;
@@ -232,7 +403,7 @@ export class AxiosFetchingStrategy implements FetchingStrategy {
 }
 // Special strategy solely responsible for fetching page content if needed
 export class PlaywrightFetchingStrategy implements FetchingStrategy {
-  private static readonly MAX_FETCHED_LINKS = 10;
+  private static readonly MAX_FETCHED_LINKS = 35;
   private static browserInstance: playwright.Browser | null = null;
 
   private static async getBrowser(): Promise<playwright.Browser> {
@@ -251,7 +422,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       await closedInstance.close();
     }
   }
-  private async fetchPageContentWithPlaywright(urlString: string, config: ApiConfig, metadata: Metadata): Promise<{ content: string; links: Record<string, string>; } | null> {
+  private async fetchPageContentWithPlaywright(urlString: string, config: DocumentationConfig, metadata: Metadata): Promise<{ content: string; links: Record<string, string>; } | null> {
 
     if (!urlString?.startsWith("http")) {
       return null;
@@ -275,18 +446,23 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       }
 
       page = await browserContext.newPage();
-      await page.goto(url.toString());
+      await page.goto(url.toString(), { timeout: server_defaults.TIMEOUTS.PLAYWRIGHT });
       // Wait for network idle might be better for SPAs, but has risks of timeout
       // Let's stick with domcontentloaded + short timeout
-      await page.waitForLoadState('domcontentloaded', { timeout: DOC_PLAYWRIGHT_TIMEOUT_MS });
+      await page.waitForLoadState('domcontentloaded', { timeout: server_defaults.TIMEOUTS.PLAYWRIGHT });
       await page.waitForTimeout(1000); // Allow JS execution
 
       const links: Record<string, string> = await page.evaluate(() => {
         const links = {};
         const allLinks = document.querySelectorAll('a');
         allLinks.forEach(link => {
-          const key = link.textContent?.toLowerCase().trim().replace(/[^a-z0-9]/g, ' ');
-          links[key] = link?.href?.split('#')[0];
+          try {
+            const url = new URL(link?.href);
+            const key = `${link.textContent} ${url.pathname}`?.toLowerCase()?.replace(/[^a-z0-9]/g, ' ').trim();
+            links[key] = link?.href?.split('#')[0]?.trim();
+          } catch (e) {
+            // ignore
+          }
         });
         return links;
       });
@@ -296,7 +472,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
           'nav', 'header', 'footer', '.nav', '.navbar', '.header', '.footer',
           '.cookie-banner', '.cookie-consent', '.cookies', '#cookie-banner',
           '.cookie-notice', '.sidebar', '.menu', '[role="navigation"]',
-          '[role="banner"]', '[role="contentinfo"]', 'script', 'style', // Also remove scripts/styles
+          '[role="banner"]', '[role="dialog"]', '[role="contentinfo"]', 'script', 'style', // Also remove scripts/styles
         ];
         selectorsToRemove.forEach(selector => {
           document.querySelectorAll(selector).forEach(element => {
@@ -324,87 +500,106 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     }
   }
 
-  async tryFetch(config: ApiConfig, metadata: Metadata): Promise<string | null> {
-    const docResult = await this.fetchPageContentWithPlaywright(config?.documentationUrl, config, metadata);
-    let fetchedLinks = new Set<string>();
-    if (!docResult?.content) return null;
+  async tryFetch(config: DocumentationConfig, metadata: Metadata): Promise<string | null> {
+    if (!config?.documentationUrl) return null;
 
-    fetchedLinks.add(config.documentationUrl);
+    const fetchedLinks = new Set<string>();
+    let combinedContent = "";
 
     // Expanded keywords to catch more relevant documentation pages
     const requiredKeywords = [
       // Auth related
-      "authentication", "authorization", "bearer", "basic", "token",
+      "authentication", "authorization", "bearer", "basic", "token", "api key", "oauth", "private app",
       // Getting started
-      "introduction", "getting started", "quickstart", "guide", "tutorial",
+      "introduction", "getting started", "quickstart", "guide", "guides", "tutorial", "how to", "how-to",
       // API specific
-      "rest", "graphql", "openapi", "endpoints", "reference", "methods", "operations", "objects", "users", "models", "query",
+      "rest", "graphql", "openapi", "open-api", "swagger", "endpoints", "reference", "query", "methods",
       // HTTP methods
       "get", "post", "put", "delete", "patch",
       // Common API concepts
-      "rate limit", "pagination", "webhook", "callback", "error", "response"
+      "rate limit", "pagination", "webhook", "callback", "error", "response", "errors", "filtering", "sorting", "searching", "filter", "sort", "search"
     ];
 
-    if (!docResult.links) return docResult.content;
+    // Pool of all discovered links (array allows duplicates with different text)
+    const linkPool: { linkText: string, href: string; }[] = [];
 
+    // Add documentation URL with high priority score
+    linkPool.push({
+      linkText: "documentation",
+      href: config.documentationUrl,
+    });
+
+    while (fetchedLinks.size < PlaywrightFetchingStrategy.MAX_FETCHED_LINKS && linkPool.length > 0) {
+      const rankedLinks = this.rankLinks(linkPool, requiredKeywords, fetchedLinks);
+
+      if (rankedLinks.length === 0) break;
+      const nextLink = rankedLinks[0];
+
+      try {
+        const linkResult = await this.fetchPageContentWithPlaywright(nextLink.href, config, metadata);
+        fetchedLinks.add(nextLink.href);
+
+        if (!linkResult?.content) continue;
+
+        combinedContent += combinedContent ? `\n\n${linkResult.content}` : linkResult.content;
+
+        // Add newly discovered links to the pool (allow duplicates with different text)
+        if (!linkResult.links) continue;
+
+        for (const [linkText, href] of Object.entries(linkResult.links)) {
+          if (this.shouldSkipLink(linkText, href)) continue;
+          linkPool.push({ linkText, href });
+        }
+      } catch (error) {
+        logMessage('warn', `Failed to fetch link ${nextLink.href}: ${error?.message}`, metadata);
+      }
+    }
+
+    return combinedContent;
+  }
+
+  private shouldSkipLink(linkText: string, href: string): boolean {
+    return !linkText || href.includes('signup') ||
+      href.includes('login') ||
+      href.includes('pricing') ||
+      href.includes('contact') ||
+      href.includes('support') ||
+      href.includes('cookie') ||
+      href.includes('privacy') ||
+      href.includes('terms') ||
+      href.includes('legal') ||
+      href.includes('policy') ||
+      href.includes('status') ||
+      href.includes('help');
+  }
+
+  private rankLinks(links: { linkText: string, href: string; }[], keywords: string[], fetchedLinks: Set<string>): { linkText: string, href: string, matchCount: number; }[] {
     const rankedLinks: { linkText: string, href: string, matchCount: number; }[] = [];
 
-    for (const [linkText, href] of Object.entries(docResult.links)) {
-      // Skip obviously non-doc pages
-      if (!linkText || href.includes('signup') ||
-        href.includes('pricing') ||
-        href.includes('contact') ||
-        href.includes('cookie') ||
-        href.includes('privacy') ||
-        href.includes('terms') ||
-        href.includes('legal') ||
-        href.includes('policy') ||
-        href.includes('status') ||
-        href.includes('help')) {
-        continue;
-      }
+    for (const link of links) {
+      if (fetchedLinks.has(link.href)) continue;
 
       // Count keyword matches
       let matchCount = 0;
-      const linkTextLower = linkText.toLowerCase();
-      const hrefLower = href.toLowerCase();
+      const linkTextLower = link.linkText.toLowerCase();
+      const hrefLower = link.href.toLowerCase();
 
-      for (const keyword of requiredKeywords) {
+      for (const keyword of keywords) {
         if (linkTextLower.includes(keyword) || hrefLower.includes(keyword)) {
           matchCount++;
         }
       }
-      rankedLinks.push({ linkText, href, matchCount });
+      rankedLinks.push({ linkText: link.linkText, href: link.href, matchCount });
     }
 
-    // Sort by priority first (highest first), then by match count (highest first)
-    rankedLinks.sort((a, b) => {
-      return b.matchCount - a.matchCount;
-    });
-
-    // Fetch links up to MAX_FETCHED_LINKS, prioritizing higher priority ones
-    for (const link of rankedLinks) {
-      if (fetchedLinks.size >= PlaywrightFetchingStrategy.MAX_FETCHED_LINKS) break;
-      if (fetchedLinks.has(link.href)) continue;
-
-      try {
-        const linkResult = await this.fetchPageContentWithPlaywright(link.href, config, metadata);
-        if (linkResult?.content) {
-          docResult.content += `\n\n${linkResult.content}`;
-          fetchedLinks.add(link.href);
-        }
-      } catch (error) {
-        logMessage('warn', `Failed to fetch link ${link.href}: ${error?.message}`, metadata);
-      }
-    }
-
-    return docResult.content;
+    // Sort by match count (highest first)
+    return rankedLinks.sort((a, b) => b.matchCount - a.matchCount);
   }
 }
 
 class PostgreSqlStrategy implements ProcessingStrategy {
   async tryProcess(content: string, config: ApiConfig, metadata: Metadata, credentials?: Record<string, any>): Promise<string | null> {
-    if (config.urlHost.startsWith("postgres://")) {
+    if (config.urlHost?.startsWith("postgres://")) {
       const url = composeUrl(config.urlHost, config.urlPath);
 
       // First get the schema information
@@ -480,7 +675,7 @@ class OpenApiStrategy implements ProcessingStrategy {
         const baseUrl = config.documentationUrl ? new URL(config.documentationUrl).origin : config.urlHost;
         absoluteOpenApiUrl = composeUrl(baseUrl, openApiUrl);
       }
-      const openApiResponse = await axios.get(absoluteOpenApiUrl, { headers: config.headers, timeout: DOC_AXIOS_TIMEOUT_MS });
+      const openApiResponse = await axios.get(absoluteOpenApiUrl, { headers: config.headers, timeout: server_defaults.TIMEOUTS.AXIOS });
       const openApiData = openApiResponse.data;
 
       if (!openApiData) return null;

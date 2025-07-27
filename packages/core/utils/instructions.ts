@@ -1,10 +1,63 @@
-import { Integration } from "@superglue/client";
-import { Metadata } from "@superglue/shared";
+import type { Integration } from "@superglue/client";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { LanguageModel } from "../llm/llm.js";
-import { logMessage } from "./logs.js";
+import { BaseToolContext, ToolDefinition, ToolImplementation } from "../tools/tools.js";
+import { Documentation } from "./documentation.js";
 
-export async function generateInstructions(integrations: Integration[], metadata: { orgId: string }): Promise<string[]> {
+// Extend context to include integrations
+export interface InstructionGenerationContext extends BaseToolContext {
+  integrations: Integration[];
+}
+
+export const generateInstructionsDefinition: ToolDefinition = {
+  name: "generate_instructions",
+  description: "Generate specific, implementable workflow instructions for the available integrations.",
+  arguments: {
+    type: "object",
+    properties: {},
+    required: []
+  }
+};
+
+export const generateInstructionsImplementation: ToolImplementation<InstructionGenerationContext> = async (args, context) => {
+  const { integrations } = context;
+
+  if (!integrations || integrations.length === 0) {
+    return {
+      resultForAgent: {
+        success: false,
+        error: "No integrations provided in context"
+      },
+      fullResult: {
+        success: false,
+        error: "No integrations provided in context"
+      }
+    };
+  }
+
+  // Prepare integration summaries with smart documentation truncation
+  const integrationSummaries = integrations.map(integration => {
+    // Use Documentation.extractRelevantSections to intelligently truncate documentation
+    // Focus on getting started, authentication, and basic operations
+    const truncatedDocs = integration.documentation
+      ? Documentation.extractRelevantSections(
+        integration.documentation,
+        "getting started overview endpoints reference",
+        10,  // max_chunks
+        1000 // chunk_size - smaller chunks for summaries
+      )
+      : "";
+
+    return {
+      id: integration.id,
+      urlHost: integration.urlHost,
+      urlPath: integration.urlPath,
+      // Take first 500 chars of truncated docs as summary
+      documentation: truncatedDocs.slice(0, 500) + (truncatedDocs.length > 500 ? "..." : ""),
+      documentationUrl: integration.documentationUrl
+    };
+  });
+
   const messages: ChatCompletionMessageParam[] = [
     {
       role: "system",
@@ -22,75 +75,31 @@ For each integration, provide 1-2 specific retrieval-focused examples. Then, sug
   "Query MongoDB for all users with premium_status=true and verify their Stripe subscription is still active."
 ]
 
-Remember these important rules: The output MUST be a JSON array of strings, with no extra formatting or explanation. Do not think long and keep each instruction concise and simple.
-`
+Remember these important rules: The output MUST be a JSON array of strings, with no extra formatting or explanation. Do not think long and keep each instruction concise and simple, with maximum 4 options total (not per integration).`
     },
     {
       role: "user",
-      content: `integrations: ${JSON.stringify(integrations.map(i => ({
-        id: i.id,
-        urlHost: i.urlHost,
-        urlPath: i.urlPath,
-        // Only include first page of docs (roughly 1000 chars)
-        documentation: i.documentation?.split('\n\n')[0] || '',
-        documentationUrl: i.documentationUrl
-      })), null, 2)}`
+      content: `integrations: ${JSON.stringify(integrationSummaries, null, 2)}`
     }
   ];
 
-  const MAX_RETRIES = 3;
-  let retryCount = 0;
-
-  while (retryCount <= MAX_RETRIES) {
-    try {
-      logMessage('info', `Generating instructions${retryCount ? `: (retry ${retryCount})` : ""}`, metadata);
-      const instructions = await attemptInstructionGeneration(messages, retryCount, metadata);
-      return instructions;
-    } catch (error) {
-      retryCount++;
-      if (retryCount > MAX_RETRIES) {
-        logMessage('error', `Instruction generation failed after ${MAX_RETRIES} retries. Last error: ${error.message}`, metadata);
-        throw error;
-      }
-      logMessage('warn', `Instruction generation failed. Retrying...`, metadata);
-      messages.push({
-        role: "user",
-        content: `The previous attempt failed with error: ${error.message}. Please try again.`
-      });
-    }
-  }
-  throw new Error("Unexpected error in instruction generation");
-}
-
-async function attemptInstructionGeneration(
-  messages: ChatCompletionMessageParam[],
-  retry: number,
-  metadata: Metadata
-): Promise<string[]> {
-  let temperature = Math.min(0.3 * retry, 1.0);
   const schema = {
     type: "array",
-    items: {
-      type: "string"
-    }
-  }
-  const { response: generatedInstructions } = await LanguageModel.generateObject(messages, schema, temperature);
+    items: { type: "string" }
+  };
 
-  if (!Array.isArray(generatedInstructions) || generatedInstructions.length === 0) {
-    throw new Error("No valid instructions generated");
-  }
-
-  try {
-    const sanitized = sanitizeInstructionSuggestions(generatedInstructions);
-    if (!Array.isArray(sanitized) || sanitized.length === 0) {
-      throw new Error("Sanitization failed or returned no valid instructions");
+  const { response: generatedInstructions } = await LanguageModel.generateObject(messages, schema, 0.2);
+  return {
+    resultForAgent: {
+      success: true,
+      instructions: sanitizeInstructionSuggestions(generatedInstructions)
+    },
+    fullResult: {
+      success: true,
+      instructions: sanitizeInstructionSuggestions(generatedInstructions)
     }
-    return sanitized;
-  } catch (err) {
-    logMessage('error', `Sanitization failed: ${err.message}`, metadata);
-    return [];
-  }
-}
+  };
+};
 
 export function sanitizeInstructionSuggestions(raw: unknown): string[] {
   let arr: string[] = [];
