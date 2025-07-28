@@ -191,8 +191,7 @@
                 "urlPath": "",
                 "documentationUrl": "https://discord.com/developers/docs/reference",
                 "credentials": {
-                    "bot_token": "",
-                    "guild_id": ""
+                    "bot_token": ""
                 },
                 "description": "Discord API"
             },
@@ -284,35 +283,25 @@
                     "personal_access_token": ""
                 },
                 "description": "Snowflake cloud data platform SQL API"
+            },
+            "open-brewery-db": {
+                "id": "open-brewery-db",
+                "name": "Open Brewery DB",
+                "urlHost": "https://api.openbrewerydb.org",
+                "urlPath": "",
+                "documentationUrl": "https://www.openbrewerydb.org/documentation/api-reference",
+                "credentials": {
+                },
+                "description": "Open Brewery DB API"
             }
         }
     },
     "workflows": {
         "enabled": [
             "hubspot-lead-qualification",
-            "stripe-revenue-analytics",
-            "jira-sprint-health",
-            "attio-people-retrieval",
             "lego-inventory-analysis",
-            "timbuk2-product-analysis",
-            "hubspot-crm-workflow",
-            "subscription-to-db-sync",
-            "posthog-analytics",
-            "twilio-sms-analysis",
-            "sendgrid-test-email",
-            "github-list-repos",
-            "gitlab-list-projects",
-            "slack-dm-workflow",
-            "bitbucket-repos",
-            "discord-server-analysis-dm",
-            "asana-tasks",
             "notion-duplicate-email-analysis",
-            "huggingface-model-metadata",
-            "monday-sprint-analysis",
-            "square-customer-directory",
-            "zendesk-ticket-analysis",
-            "airtable-test-data-retrieval",
-            "snowflake-test-data-retrieval"
+            "open-brewery-db-test-data-retrieval"
         ],
         "definitions": {
             "hubspot-lead-qualification": {
@@ -330,7 +319,8 @@
                     ]
                 },
                 "complexityLevel": "medium",
-                "category": "single-system"
+                "category": "single-system",
+                "expectedResult": "Array of updated contacts with their IDs, their associated company names and new lead_status set to 'In Progress'. Company names should not include 'COMPANY A' or 'COMPANY B'"
             },
             "stripe-revenue-analytics": {
                 "id": "stripe-revenue-analytics",
@@ -343,18 +333,20 @@
                     "date": "2025-06-01"
                 },
                 "complexityLevel": "high",
-                "category": "single-system"
+                "category": "single-system",
+                "expectedResult": "Something like this: {\"customers\": [{\"customerId\": \"...\", \"customerName\": \"...\", \"subscriptions\": [...], \"monthlyRevenue\": 99.99}], \"totalMRR\": 999.99} (values are not important, just the structure)"
             },
             "jira-sprint-health": {
                 "id": "jira-sprint-health",
                 "name": "JIRA Sprint Health Check",
-                "instruction": "Get all issues from the current active sprint, categorize them by status, calculate completion percentage, and identify any issues marked as Blocked or High Priority that are still in progress",
+                "instruction": "Get all issue names from the current active sprint in the 'My Test Project A' project, categorize them by status (To Do, In Progress, Done). Return issue names in a list for each status and the percentage of issues that have been completed.",
                 "integrationIds": [
                     "jira"
                 ],
                 "payload": {},
                 "complexityLevel": "medium",
-                "category": "single-system"
+                "category": "single-system",
+                "expectedResult": "Something like this: {\"sprint_name\": \"...\", \"To Do\": [{\"issue_id\": \"...\", \"issue_name\": \"...\", \"status\": \"...\"}], \"In Progress\": [{\"issue_id\": \"...\", \"issue_name\": \"...\"}], \"Done\": [{\"issue_id\": \"...\", \"issue_name\": \"...\"}], \"completion_percentage\": 99.99}"
             },
             "attio-people-retrieval": {
                 "id": "attio-people-retrieval",
@@ -365,7 +357,8 @@
                 ],
                 "payload": {},
                 "complexityLevel": "medium",
-                "category": "single-system"
+                "category": "single-system",
+                "expectedResult": "{\"people\": [{\"name\": \"string\", \"email\": \"string with @ symbol\", \"description\": \"string or null\"}]}"
             },
             "lego-inventory-analysis": {
                 "id": "lego-inventory-analysis",
@@ -376,7 +369,8 @@
                 ],
                 "payload": {},
                 "complexityLevel": "low",
-                "category": "single-system"
+                "category": "single-system",
+                "expectedResult": "Something like this: {\"themes\": [{\"theme_name\": \"...\", \"set_count\": 100}]}"
             },
             "timbuk2-product-analysis": {
                 "id": "timbuk2-product-analysis",
@@ -387,12 +381,13 @@
                 ],
                 "payload": {},
                 "complexityLevel": "low",
-                "category": "single-system"
+                "category": "single-system",
+                "expectedResult": "Something like this: {\"products\": [{\"name\": \"...\", \"description\": \"...\"}]}"
             },
             "hubspot-crm-workflow": {
                 "id": "hubspot-crm-workflow",
                 "name": "HubSpotCRM Workflow",
-                "instruction": "Get all contacts with lifecycle stage: Marketing Qualified Lead from HubSpot. Filter them to only include contacts created between the input payload date and the payload date + 100 days. I want the final output to be a JSON object with the following structure: { \"contacts\": [ { \"name\": \"John Doe\", \"email\": \"john.doe@example.com\" } ]",
+                "instruction": "Get all contacts with lifecycle stage: Marketing Qualified Lead from HubSpot. Filter them to only include contacts created between the input payload date and the payload date + 100 days. Return their names, their creation dates and their new lifecycle stage.",
                 "integrationIds": [
                     "hubspot"
                 ],
@@ -400,19 +395,21 @@
                     "date": "2025-06-01"
                 },
                 "complexityLevel": "high",
-                "category": "single-system"
+                "category": "single-system",
+                "expectedResult": "Something like this: {\"contacts\": [{\"name\": \"...\", \"creation_date\": \"...\", \"new_lifecycle_stage\": \"...\"}]}"
             },
             "subscription-to-db-sync": {
                 "id": "subscription-to-db-sync",
                 "name": "Subscription to Database Sync",
-                "instruction": "Fetch all current subscriptions from Stripe, including the customer name, the product/subscription name and the subscription creation time. Note that these may have other names in the api. Write the data into my supabase database into the subscription_table_test table. The table has the following columns: customer_name, product, subscription_creation",
+                "instruction": "Fetch all current subscriptions from Stripe, including the customer name, the product/subscription name and the subscription creation time. Note that these may have other names in the api. Write the data into my supabase database into the subscription_table_test table. The table has the following columns: customer_name, product, subscription_creation. Return the customer names, the product names and the subscription creation dates.",
                 "integrationIds": [
                     "stripe",
                     "supabase"
                 ],
                 "payload": {},
                 "complexityLevel": "medium",
-                "category": "multi-system"
+                "category": "multi-system",
+                "expectedResult": "Something like this: {\"customer_names\": [\"...\"], \"product_names\": [\"...\"], \"subscription_creation_dates\": [\"...\"]}"
             },
             "posthog-analytics": {
                 "id": "posthog-analytics",
@@ -423,7 +420,8 @@
                 ],
                 "payload": {},
                 "complexityLevel": "medium",
-                "category": "single-system"
+                "category": "single-system",
+                "expectedResult": "Something like this: {\"project_id\": \"123\", \"event_count\": 100}"
             },
             "twilio-sms-analysis": {
                 "id": "twilio-sms-analysis",
@@ -434,7 +432,8 @@
                 ],
                 "payload": {},
                 "complexityLevel": "medium",
-                "category": "single-system"
+                "category": "single-system",
+                "expectedResult": "Something like this: {\"total_messages\": 100, \"delivered_count\": 90, \"failed_count\": 10, \"pending_count\": 0, \"success_rate_percent\": 90}"
             },
             "sendgrid-test-email": {
                 "id": "sendgrid-test-email",
@@ -475,7 +474,8 @@
                     "group_name": "michaelfuest-group"
                 },
                 "complexityLevel": "low",
-                "category": "single-system"
+                "category": "single-system",
+                "expectedResult": "Should contain the name superglue-integration-testing at least once"
             },
             "slack-dm-workflow": {
                 "id": "slack-dm-workflow",
@@ -500,12 +500,13 @@
                 ],
                 "payload": {},
                 "complexityLevel": "low",
-                "category": "single-system"
+                "category": "single-system",
+                "expectedResult": "Should contain the name superglue-test at least once"
             },
             "discord-server-analysis-dm": {
                 "id": "discord-server-analysis-dm",
                 "name": "Discord Server Analysis and DM",
-                "instruction": "Get all channels from my Discord server, analyze the channel structure, then find the user 'michaelfuest_89135' and send them a direct message with a summary of the server channels found. Return both the channel list and confirmation of the DM sent",
+                "instruction": "Get all channels from my Discord server, analyze the channel structure, then find the user 'michaelfuest_89135' and send them a direct message with a summary of the server channels found. Return both the full channel list and the exact text of the DM you just sent",
                 "integrationIds": [
                     "discord"
                 ],
@@ -515,20 +516,21 @@
                     "dm_message": "Hi! I just analyzed your Discord server and found the following channels. This is a test from the Superglue Discord integration bot!"
                 },
                 "complexityLevel": "medium",
-                "category": "single-system"
+                "category": "single-system",
+                "expectedResult": "Should contain a list of plausible channel names and some DM message"
             },
             "asana-tasks": {
                 "id": "asana-tasks",
                 "name": "Asana Tasks",
-                "instruction": "First, find the project ID by searching for the project name in the payload across all my workspaces. Then get all tasks assigned to me in that project, analyze my workload by completion status and return a summary of my current tasks including completion percentages.",
+                "instruction": "List all projects in my Asana account. Return the results as a JSON object with the following structure: { \"projects\": [ { \"name\": \"project1\", \"description\": \"description1\" } ]",
                 "integrationIds": [
                     "asana"
                 ],
                 "payload": {
-                    "project_name": "Product Feature Roadmap"
                 },
                 "complexityLevel": "medium",
-                "category": "single-system"
+                "category": "single-system",
+                "expectedResult": "Should contain the name 'Product Feature Roadmap' at least once"
             },
             "notion-duplicate-email-analysis": {
                 "id": "notion-duplicate-email-analysis",
@@ -541,7 +543,8 @@
                     "database_name": "Superglue Database"
                 },
                 "complexityLevel": "medium",
-                "category": "single-system"
+                "category": "single-system",
+                "expectedResult": "Should contain exactly one duplicate, namely John Doe with the email address john.doe@companya.com"
             },
             "huggingface-model-metadata": {
                 "id": "huggingface-model-metadata",
@@ -552,7 +555,8 @@
                 ],
                 "payload": {},
                 "complexityLevel": "medium",
-                "category": "single-system"
+                "category": "single-system",
+                "expectedResult": "Should contain a list of 10 models and a list of file names for each model"
             },
             "monday-sprint-analysis": {
                 "id": "monday-sprint-analysis",
@@ -565,7 +569,8 @@
                     "sprint_board_name": "TestSprint"
                 },
                 "complexityLevel": "high",
-                "category": "single-system"
+                "category": "single-system",
+                "expectedResult": "Should contain a list of tasks and the number of tasks in each status, categoriized by completed, in progress and ready to start"
             },
             "square-customer-directory": {
                 "id": "square-customer-directory",
@@ -576,7 +581,8 @@
                 ],
                 "payload": {},
                 "complexityLevel": "medium",
-                "category": "single-system"
+                "category": "single-system",
+                "expectedResult": "Should contain a JSON object with the following structure: { \"customerNames\": [\"...\"], \"customer_emails\": [\"...\"] }"
             },
             "zendesk-ticket-analysis": {
                 "id": "zendesk-ticket-analysis",
@@ -600,7 +606,8 @@
                     "workspace_name": "Test Data Management"
                 },
                 "complexityLevel": "low",
-                "category": "single-system"
+                "category": "single-system",
+                "expectedResult": "Should mention Test Data and Test Artifacts and return plausible table and field names"
             },
             "snowflake-list-tables": {
                 "id": "snowflake-list-tables",
@@ -611,7 +618,20 @@
                 ],
                 "payload": {},
                 "complexityLevel": "low",
-                "category": "single-system"
+                "category": "single-system",
+                "expectedResult": "Should return a JSON object with table names, schema names and database names"
+            },
+            "open-brewery-db-test-data-retrieval": {
+                "id": "open-brewery-db-test-data-retrieval",
+                "name": "Open Brewery DB Test Data Retrieval",
+                "instruction": "Retrieve all breweries in California from the Open Brewery DB. Count the total number of breweries and return the names of the first, and the last brewery you retrieved as well as the total number of breweries.",
+                "integrationIds": [
+                    "open-brewery-db"
+                ],
+                "payload": {},
+                "complexityLevel": "low",
+                "category": "single-system",
+                "expectedResult": "Should contain at least a thousand breweries, and the first and last brewery names"
             }
         }
     },

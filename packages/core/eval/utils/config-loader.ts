@@ -23,9 +23,12 @@ export interface BaseWorkflowConfig {
 
 // Integration Testing specific
 export interface TestWorkflowConfig extends BaseWorkflowConfig {
-    expectedKeys?: string[];
+    integrationIds: string[];
+    payload: any;
     complexityLevel: 'low' | 'medium' | 'high';
     category: 'single-system' | 'multi-system';
+    expectedKeys?: string[];
+    expectedResult?: string; // Can be a description or stringified JSON of expected result
 }
 
 export interface IntegrationTestConfig {
