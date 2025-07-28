@@ -643,55 +643,55 @@ export const integrations: Record<string, {
   redis: {
     apiUrl: "https://{host}.redis.cloud",
     regex: "^(.*\\.)?redis\\.com(/.*)?$",
-    icon: "default",
+    icon: "redis",
     docsUrl: "https://docs.redis.com/latest/rs/references/rest-api"
   },
   elastic: {
     apiUrl: "https://{cluster-id}.{region}.elasticsearch.com",
     regex: "^(.*\\.)?elastic\\.co(/.*)?$",
-    icon: "default",
+    icon: "elastic",
     docsUrl: "https://www.elastic.co/guide/en/elasticsearch/reference/current/rest-apis.html"
   },
   cockroachdb: {
     apiUrl: "https://{cluster-id}.cockroachlabs.cloud",
     regex: "^(.*\\.)?cockroachlabs\\.com(/.*)?$",
-    icon: "default",
+    icon: "cockroachlabs",
     docsUrl: "https://www.cockroachlabs.com/docs/stable/api.html"
   },
   basecamp: {
     apiUrl: "https://3.basecampapi.com/{account_id}",
     regex: "^(.*\\.)?basecamp\\.com(/.*)?$",
-    icon: "default",
+    icon: "basecamp",
     docsUrl: "https://github.com/basecamp/bc3-api"
   },
   huggingface: {
     apiUrl: "https://api-inference.huggingface.co",
     regex: "^(.*\\.)?huggingface\\.co(/.*)?$",
-    icon: "default",
+    icon: "huggingface",
     docsUrl: "https://huggingface.co/docs/api-inference/en/index"
   },
   discord: {
     apiUrl: "https://discord.com/api",
     regex: "^(.*\\.)?discord\\.com(/.*)?$",
-    icon: "default",
+    icon: "discord",
     docsUrl: "https://discord.com/developers/docs/reference"
   },
   whatsapp: {
     apiUrl: "https://graph.facebook.com/v18.0",
     regex: "^(.*\\.)?whatsapp\\.com(/.*)?$",
-    icon: "default",
+    icon: "whatsapp",
     docsUrl: "https://developers.facebook.com/docs/whatsapp/cloud-api"
   },
   telegram: {
     apiUrl: "https://api.telegram.org",
     regex: "^(.*\\.)?telegram\\.org(/.*)?$",
-    icon: "default",
+    icon: "telegram",
     docsUrl: "https://core.telegram.org/bots/api"
   },
   campaignmonitor: {
     apiUrl: "https://api.createsend.com/api",
     regex: "^(.*\\.)?createsend\\.com(/.*)?$",
-    icon: "default",
+    icon: "campaignmonitor",
     docsUrl: "https://www.campaignmonitor.com/api"
   },
   activecampaign: {
@@ -703,7 +703,7 @@ export const integrations: Record<string, {
   wix: {
     apiUrl: "https://www.wixapis.com",
     regex: "^(.*\\.)?wix\\.com(/.*)?$",
-    icon: "default",
+    icon: "wix",
     docsUrl: "https://dev.wix.com/api/rest/getting-started"
   },
   ibmcloud: {
@@ -721,7 +721,7 @@ export const integrations: Record<string, {
   matomo: {
     apiUrl: "https://{your-domain}/matomo",
     regex: "^(.*\\.)?matomo\\.org(/.*)?$",
-    icon: "default",
+    icon: "matomo",
     docsUrl: "https://developer.matomo.org/api-reference/reporting-api"
   },
   pendo: {
@@ -751,8 +751,14 @@ export const integrations: Record<string, {
   odoo: {
     apiUrl: "https://{your-instance}.odoo.com/api",
     regex: "^(.*\\.)?odoo\\.com(/.*)?$",
-    icon: "default",
+    icon: "odoo",
     docsUrl: "https://www.odoo.com/documentation/15.0/developer/api/external_api.html"
+  },
+  googleAds: {
+    apiUrl: "https://googleads.googleapis.com/v20",
+    regex: "^(.*\\.)?google\\.com(/.*)?$",
+    icon: "googleads",
+    docsUrl: "https://developers.google.com/google-ads/api/docs/concepts/overview"
   }
 }
 

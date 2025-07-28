@@ -387,7 +387,7 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
                 <div>
                   <Label className="text-xs flex items-center gap-1">
                     Body
-                    <HelpTooltip text="Request body content. Can be JSON, form data, or plain text. Use JSONata expressions to transform data from previous steps." />
+                    <HelpTooltip text="Request body content. Can be JSON, form data, or plain text. Use JavaScript expressions to transform data from previous steps." />
                   </Label>
                   <Textarea
                     value={editedStep.apiConfig.body || ''}
@@ -399,12 +399,122 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
                   />
                 </div>
 
+                <div>
+                  <Label className="text-xs flex items-center gap-1">
+                    Pagination
+                    <HelpTooltip text="Configure pagination if the API returns data in pages. Only set this if you're using pagination variables like {'<<offset>>'}, {'<<page>>'}, or {'<<cursor>>'} in your request." />
+                  </Label>
+                  <div className="space-y-2 mt-1">
+                    <Select
+                      value={editedStep.apiConfig.pagination?.type || 'none'}
+                      onValueChange={(value) => {
+                        if (value === 'none') {
+                          setEditedStep(prev => ({
+                            ...prev,
+                            apiConfig: { ...prev.apiConfig, pagination: undefined }
+                          }));
+                        } else {
+                          setEditedStep(prev => ({
+                            ...prev,
+                            apiConfig: {
+                              ...prev.apiConfig,
+                              pagination: {
+                                ...prev.apiConfig.pagination,
+                                type: value,
+                                pageSize: prev.apiConfig.pagination?.pageSize || '50',
+                                cursorPath: prev.apiConfig.pagination?.cursorPath || '',
+                                stopCondition: prev.apiConfig.pagination?.stopCondition || '(response, pageInfo) => !response.data || response.data.length === 0'
+                              }
+                            }
+                          }));
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="No pagination" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No pagination</SelectItem>
+                        <SelectItem value="OFFSET_BASED">Offset-based (uses {'<<offset>>'})</SelectItem>
+                        <SelectItem value="PAGE_BASED">Page-based (uses {'<<page>>'})</SelectItem>
+                        <SelectItem value="CURSOR_BASED">Cursor-based (uses {'<<cursor>>'})</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    {editedStep.apiConfig.pagination && (
+                      <>
+                        <div>
+                          <Label className="text-xs">Page Size</Label>
+                          <Input
+                            value={editedStep.apiConfig.pagination.pageSize || '50'}
+                            onChange={(e) => setEditedStep(prev => ({
+                              ...prev,
+                              apiConfig: {
+                                ...prev.apiConfig,
+                                pagination: {
+                                  ...prev.apiConfig.pagination!,
+                                  pageSize: e.target.value
+                                }
+                              }
+                            }))}
+                            className="text-xs mt-1"
+                            placeholder="50"
+                          />
+                        </div>
+
+                        {editedStep.apiConfig.pagination.type === 'CURSOR_BASED' && (
+                          <div>
+                            <Label className="text-xs">Cursor Path</Label>
+                            <Input
+                              value={editedStep.apiConfig.pagination.cursorPath || ''}
+                              onChange={(e) => setEditedStep(prev => ({
+                                ...prev,
+                                apiConfig: {
+                                  ...prev.apiConfig,
+                                  pagination: {
+                                    ...prev.apiConfig.pagination!,
+                                    cursorPath: e.target.value
+                                  }
+                                }
+                              }))}
+                              className="text-xs mt-1"
+                              placeholder="e.g., response.nextCursor"
+                            />
+                          </div>
+                        )}
+
+                        <div>
+                          <Label className="text-xs flex items-center gap-1">
+                            Stop Condition (JavaScript)
+                            <HelpTooltip text="JavaScript function that returns true when pagination should stop. Receives (response, pageInfo) where pageInfo has: page, offset, cursor, totalFetched." />
+                          </Label>
+                          <Textarea
+                            value={editedStep.apiConfig.pagination.stopCondition || '(response, pageInfo) => !response.data || response.data.length === 0'}
+                            onChange={(e) => setEditedStep(prev => ({
+                              ...prev,
+                              apiConfig: {
+                                ...prev.apiConfig,
+                                pagination: {
+                                  ...prev.apiConfig.pagination!,
+                                  stopCondition: e.target.value
+                                }
+                              }
+                            }))}
+                            className="font-mono text-xs h-16 mt-1"
+                            placeholder="(response, pageInfo) => !response.data || response.data.length === 0"
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
                 {editedStep.executionMode === 'LOOP' && (
                   <>
                     <div>
                       <Label className="text-xs flex items-center gap-1">
-                        Loop Selector (JSONata)
-                        <HelpTooltip text="JSONata expression to select an array from previous step outputs. The step will execute once for each item. Example: $.items or $.data[*]" />
+                        Loop Selector (JavaScript)
+                        <HelpTooltip text="JavaScript arrow function to select an array from previous step outputs. The step will execute once for each item. Example: (sourceData) => sourceData.items" />
                       </Label>
                       <Input
                         value={editedStep.loopSelector || ''}
@@ -413,7 +523,7 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
                           loopSelector: e.target.value
                         }))}
                         className="text-xs mt-1"
-                        placeholder="e.g., $.items"
+                        placeholder="e.g., (sourceData) => sourceData.items"
                       />
                     </div>
                     <div>
@@ -433,38 +543,6 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
                     </div>
                   </>
                 )}
-
-                <div>
-                  <Label className="text-xs flex items-center gap-1">
-                    Input Mapping (JSONata)
-                    <HelpTooltip text='Transform and map data from previous steps before sending to this API. Use JSONata expressions to reshape data. Example: {"name": $.user.fullName, "email": $.user.email}' />
-                  </Label>
-                  <Textarea
-                    value={editedStep.inputMapping || ''}
-                    onChange={(e) => setEditedStep(prev => ({
-                      ...prev,
-                      inputMapping: e.target.value
-                    }))}
-                    className="font-mono text-xs h-20 mt-1"
-                    placeholder="Transform input before sending to API"
-                  />
-                </div>
-
-                <div>
-                  <Label className="text-xs flex items-center gap-1">
-                    Response Mapping (JSONata)
-                    <HelpTooltip text="Transform the API response before passing to the next step. Use JSONata expressions to extract and reshape data. Example: $.data.results[*].{id: id, name: title}" />
-                  </Label>
-                  <Textarea
-                    value={editedStep.responseMapping || ''}
-                    onChange={(e) => setEditedStep(prev => ({
-                      ...prev,
-                      responseMapping: e.target.value
-                    }))}
-                    className="font-mono text-xs h-20 mt-1"
-                    placeholder="Transform API response"
-                  />
-                </div>
               </div>
             </>
           ) : (

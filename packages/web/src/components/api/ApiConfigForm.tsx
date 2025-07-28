@@ -650,8 +650,8 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
                     </div>
                     <div>
                       <Label htmlFor="responseMapping" className="flex items-center gap-1 my-1">
-                        Response Mapping (JSONata)
-                        <InfoTooltip text="JSONata expression to transform the API response into the desired format" />
+                        Response Mapping
+                        <InfoTooltip text="JS expression to transform the API response into the desired format" />
                       </Label>
                       <Textarea
                         id="responseMapping"
