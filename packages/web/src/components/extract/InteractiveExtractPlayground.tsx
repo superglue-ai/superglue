@@ -1,18 +1,18 @@
 'use client'
 
 import { useConfig } from '@/src/app/config-context'
-import { Button } from '@/src/components/ui/button'
-import { Card, CardContent } from '@/src/components/ui/card'
-import { Input } from '@/src/components/ui/input'
-import { Label } from '@/src/components/ui/label'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs'
-import JsonSchemaEditor from '@/src/components/utils/JsonSchemaEditor'
 import { findArraysOfObjects } from '@/src/lib/client-utils'
 import { ExtractConfig, SuperglueClient } from '@superglue/client'
 import { Loader2 } from "lucide-react"
 import { useEffect, useState } from 'react'
 import { AutoSizer, MultiGrid } from 'react-virtualized'
 import 'react-virtualized/styles.css'
+import JsonSchemaEditor from '@/src/components/utils/JsonSchemaEditor'
+import { Button } from '@/src/components/ui/button'
+import { Card, CardContent } from '@/src/components/ui/card'
+import { Input } from '@/src/components/ui/input'
+import { Label } from '@/src/components/ui/label'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs'
 
 interface InteractiveExtractPlaygroundProps {
   configId: string
@@ -33,7 +33,7 @@ interface InteractiveExtractPlaygroundProps {
 
 function VirtualizedTable({ data, columns }: { data: any[], columns: string[] }) {
   // Handle case where data is array of primitives
-  const processedData = data.map(item =>
+  const processedData = data.map(item => 
     typeof item === 'object' ? item : { value: item }
   );
   const processedColumns = columns.length ? columns : ['value'];
@@ -104,9 +104,9 @@ function VirtualizedTable({ data, columns }: { data: any[], columns: string[] })
   );
 }
 
-export function InteractiveExtractPlayground({
-  configId,
-  instruction,
+export function InteractiveExtractPlayground({ 
+  configId, 
+  instruction, 
   onInstructionChange,
   responseSchema,
   onResponseSchemaChange,
@@ -228,8 +228,8 @@ export function InteractiveExtractPlayground({
                           {Object.entries(rawResponse).map(([key, array]) => (
                             <TabsContent key={key} value={key} className="h-[calc(100%-40px)]">
                               {array?.length > 0 ? (
-                                <VirtualizedTable
-                                  data={array}
+                                <VirtualizedTable 
+                                  data={array} 
                                   columns={Object.keys(array[0])}
                                 />
                               ) : (
@@ -240,8 +240,8 @@ export function InteractiveExtractPlayground({
                         </Tabs>
                       ) : (
                         Object.values(rawResponse)[0]?.length > 0 ? (
-                          <VirtualizedTable
-                            data={Object.values(rawResponse)[0]}
+                          <VirtualizedTable 
+                            data={Object.values(rawResponse)[0]} 
                             columns={Object.keys(Object.values(rawResponse)[0][0])}
                           />
                         ) : (
@@ -267,8 +267,8 @@ export function InteractiveExtractPlayground({
                           {Object.entries(mappedResponse).map(([key, array]) => (
                             <TabsContent key={key} value={key} className="h-[calc(100%-40px)]">
                               {Array.isArray(array) && array.length > 0 ? (
-                                <VirtualizedTable
-                                  data={array}
+                                <VirtualizedTable 
+                                  data={array} 
                                   columns={typeof array[0] === 'object' ? Object.keys(array[0]) : []}
                                 />
                               ) : (
@@ -279,10 +279,10 @@ export function InteractiveExtractPlayground({
                         </Tabs>
                       ) : (
                         Object.values(mappedResponse)[0]?.length > 0 ? (
-                          <VirtualizedTable
-                            data={Object.values(mappedResponse)[0]}
-                            columns={typeof Object.values(mappedResponse)[0][0] === 'object'
-                              ? Object.keys(Object.values(mappedResponse)[0][0])
+                          <VirtualizedTable 
+                            data={Object.values(mappedResponse)[0]} 
+                            columns={typeof Object.values(mappedResponse)[0][0] === 'object' 
+                              ? Object.keys(Object.values(mappedResponse)[0][0]) 
                               : []}
                           />
                         ) : (
@@ -298,7 +298,7 @@ export function InteractiveExtractPlayground({
                 <TabsContent value="jsonata" className="m-0 h-full data-[state=active]:flex flex-col">
                   <div className="flex-1 min-h-0 p-4 overflow-y-auto">
                     <pre className="text-xs whitespace-pre-wrap">
-                      {responseMapping || 'No response mapping available'}
+                      {responseMapping || 'No JSONata mapping available'}
                     </pre>
                   </div>
                 </TabsContent>
