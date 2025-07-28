@@ -951,6 +951,18 @@ export const integrations: Record<string, IntegrationConfig> = {
     openApiUrl: "https://raw.githubusercontent.com/resend/resend-openapi/main/resend.yaml",
     preferredAuthType: "apikey"
   },
+  googleAds: {
+    apiUrl: "https://googleads.googleapis.com/v20",
+    regex: "^(.*\\.)?googleapis\\.com(/.*)?$",
+    icon: "googleads",
+    docsUrl: "https://developers.google.com/google-ads/api/docs/concepts/overview",
+    preferredAuthType: "oauth",
+    oauth: {
+      authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
+      tokenUrl: "https://oauth2.googleapis.com/token",
+      scopes: "https://www.googleapis.com/auth/adwords https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid"
+    }
+  },
 }
 
 /**
