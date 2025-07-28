@@ -3,13 +3,13 @@
 import { useConfig } from '@/src/app/config-context'
 import { useToast } from '@/src/hooks/use-toast'
 import { ApiConfig, CacheMode, SuperglueClient } from '@superglue/client'
-import { CopyIcon, Loader2 } from 'lucide-react'
+import { Loader2, CopyIcon } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { AutoSizer, List } from 'react-virtualized'
+import JsonSchemaEditor from '../utils/JsonSchemaEditor'
 import { Button } from '../ui/button'
 import { Card, CardContent } from '../ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
-import JsonSchemaEditor from '../utils/JsonSchemaEditor'
 
 interface InteractiveApiPlaygroundProps {
   configId: string
@@ -35,9 +35,9 @@ interface CustomRequestOptions {
   responseSchema?: object;
 }
 
-export function InteractiveApiPlayground({
-  configId,
-  instruction,
+export function InteractiveApiPlayground({ 
+  configId, 
+  instruction, 
   onInstructionChange,
   responseSchema,
   onResponseSchemaChange,
@@ -159,13 +159,13 @@ export function InteractiveApiPlayground({
     const indentLevel = indentMatch ? indentMatch[0].length : 0
     
     return (
-      <div
-        key={key}
+      <div 
+        key={key} 
         style={{
           ...style,
           whiteSpace: 'pre',
           paddingLeft: `${indentLevel * 8}px`,
-        }}
+        }} 
         className="font-mono text-xs overflow-hidden text-ellipsis"
       >
         {line?.trimLeft()}
@@ -290,7 +290,7 @@ export function InteractiveApiPlayground({
                       </Button>
                     )}
                     <pre className="text-xs whitespace-pre-wrap leading-[18px]">
-                      {isRunning || isLoading ? 'Loading...' : (responseMapping || 'No response mapping available')}
+                      {isRunning || isLoading ? 'Loading...' : (responseMapping || 'No JSONata mapping available')}
                     </pre>
                   </div>
                 </TabsContent>
