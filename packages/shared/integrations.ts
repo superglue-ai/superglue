@@ -226,7 +226,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   aws: {
     apiUrl: "https://amazonaws.com",
-    regex: "^(.*\\.)?amazonaws\\.com(/.*)?$",
+    regex: "^(.*\\.)?amazonaws\\.com(/.*)?$"
     icon: "amazonAWS",
     docsUrl: "https://docs.aws.amazon.com/index.html",
     preferredAuthType: "apikey"
@@ -276,14 +276,14 @@ export const integrations: Record<string, IntegrationConfig> = {
     }
   },
   instagram: {
-    apiUrl: "https://graph.instagram.com/v23.0/",
+    apiUrl: "https://graph.facebook.com/v23.0/",
     regex: "^(.*\\.)?instagram\\.com(/.*)?$",
     icon: "instagram",
     docsUrl: "https://developers.facebook.com/docs/instagram-platform/overview",
     preferredAuthType: "oauth",
     oauth: {
-      authUrl: "https://www.facebook.com/v21.0/dialog/oauth",
-      tokenUrl: "https://graph.facebook.com/v21.0/oauth/access_token",
+      authUrl: "https://www.facebook.com/v23.0/dialog/oauth",
+      tokenUrl: "https://graph.facebook.com/v23.0/oauth/access_token",
       scopes: "instagram_basic instagram_content_publish instagram_manage_comments instagram_manage_insights instagram_shopping_tag_products instagram_manage_messages pages_show_list pages_messaging"
     }
   },
