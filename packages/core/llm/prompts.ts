@@ -334,7 +334,7 @@ Important: Avoid using LOOP mode for potentially very large data objects. If you
 </POSTGRES>
 
 <VARIABLES>
-- Use <<variable>> syntax to access variables and execute JavaScript expressions:
+- Use <<variable>> syntax to access variables and execute JavaScript expressions wrapped in (sourceData) => ... or as a plain variable if in the payload:
    Basic variable access:
    e.g. https://api.example.com/v1/items?api_key=<<api_key>>
    e.g. headers: {
@@ -346,6 +346,7 @@ Important: Avoid using LOOP mode for potentially very large data objects. If you
    
    JavaScript expressions:
    e.g. body: { "userIds": <<(sourceData) => JSON.stringify(sourceData.users.map(u => u.id))>> }
+   e.g. body: { "message_in_base64": <<(sourceData) => { const message = 'Hello World'; return btoa(message) }>> }
    e.g. body: { "timestamp": "<<(sourceData) => new Date().toISOString()>>", "count": <<(sourceData) => sourceData.items.length>> }
    e.g. urlPath: /api/<<(sourceData) => sourceData.version || 'v1'>>/users
    e.g. queryParams: { "active": "<<(sourceData) => sourceData.includeInactive ? 'all' : 'true'>>" }
@@ -598,10 +599,14 @@ Understand what each error means:
 </ERROR_ANALYSIS>
 
 <VARIABLES>
-Use variables in the API configuration with <<variable>> syntax:
-- Headers: { "Authorization": "Bearer <<access_token>>" }
-- URL: https://api.example.com/v1/users/<<userId>>
-- Body: { "name": "<<userName>>" }
+Use variables in the API configuration with <<variable>> syntax and wrap JavaScript expressions in (sourceData) => ... or as a plain variable if in the payload:
+- e.g. urlPath: https://api.example.com/v1/users/<<userId>>
+- e.g. headers: { "Authorization": "Bearer <<access_token>>" }
+- e.g. body: { "userIds": <<(sourceData) => JSON.stringify(sourceData.users.map(u => u.id))>> }
+- e.g. body: { "message_in_base64": <<(sourceData) => { const message = 'Hello World'; return btoa(message) }>> }
+- e.g. body: { "timestamp": "<<(sourceData) => new Date().toISOString()>>", "count": <<(sourceData) => sourceData.items.length>> }
+- e.g. urlPath: /api/<<(sourceData) => sourceData.version || 'v1'>>/users
+- e.g. queryParams: { "active": "<<(sourceData) => sourceData.includeInactive ? 'all' : 'true'>>" }
 
 For Basic Auth: "Basic <<username>>:<<password>>" (auto-converts to Base64)
 Headers starting with 'x-' are likely custom headers

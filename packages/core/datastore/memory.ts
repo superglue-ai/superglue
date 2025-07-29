@@ -142,6 +142,7 @@ export class MemoryStore implements DataStore {
 
   async createRun(run: RunResult, orgId: string): Promise<RunResult> {
     if (!run) return null;
+    if ((run as any).stepResults) delete (run as any).stepResults;
     const key = this.getKey('run', run.id, orgId);
     this.storage.runs.set(key, run);
 
