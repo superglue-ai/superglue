@@ -6,6 +6,44 @@ export async function injectVMHelpersIndividually(context: any): Promise<void> {
   // Use evalSync to inject all helpers at once
   // The code will run in the context and create global functions
   context.evalSync(`
+    // Base64 encoding
+    btoa = function(str) {
+      if (!str) return '';
+      
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+      let binary = '';
+      
+      // Convert string to binary
+      for (let i = 0; i < str.length; i++) {
+        const code = str.charCodeAt(i);
+        if (code > 255) {
+          throw new Error('btoa failed: The string to be encoded contains characters outside of the Latin1 range.');
+        }
+        binary += code.toString(2).padStart(8, '0');
+      }
+      
+      // Pad binary to make it divisible by 6
+      while (binary.length % 6 !== 0) {
+        binary += '0';
+      }
+      
+      let result = '';
+      
+      // Convert 6-bit chunks to base64 characters
+      for (let i = 0; i < binary.length; i += 6) {
+        const chunk = binary.substr(i, 6);
+        const index = parseInt(chunk, 2);
+        result += chars[index];
+      }
+      
+      // Add padding
+      while (result.length % 4 !== 0) {
+        result += '=';
+      }
+      
+      return result;
+    };
+    
     // Base64 decoding
     atob = function(str) {
       if (!str) return '';
