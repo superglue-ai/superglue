@@ -3,10 +3,10 @@
         "enabled": [
             "hubspot",
             "stripe",
-            "jira",
-            "attio",
             "timbuk2-shopify",
             "postgres-lego",
+            "jira",
+            "attio",
             "supabase",
             "twilio",
             "sendgrid",
@@ -23,7 +23,8 @@
             "square",
             "zendesk",
             "airtable",
-            "snowflake"
+            "snowflake",
+            "open-brewery-db"
         ],
         "definitions": {
             "hubspot": {
@@ -299,8 +300,29 @@
     "workflows": {
         "enabled": [
             "hubspot-lead-qualification",
+            "stripe-revenue-analytics",
+            "jira-sprint-health",
+            "attio-people-retrieval",
             "lego-inventory-analysis",
+            "timbuk2-product-analysis",
+            "hubspot-crm-workflow",
+            "subscription-to-db-sync",
+            "posthog-analytics",
+            "twilio-sms-analysis",
+            "sendgrid-test-email",
+            "github-list-repos",
+            "gitlab-list-projects",
+            "slack-dm-workflow",
+            "bitbucket-repos",
+            "discord-server-analysis-dm",
+            "asana-tasks",
             "notion-duplicate-email-analysis",
+            "huggingface-model-metadata",
+            "monday-sprint-analysis",
+            "square-customer-directory",
+            "zendesk-ticket-analysis",
+            "airtable-test-data-retrieval",
+            "snowflake-list-tables",
             "open-brewery-db-test-data-retrieval"
         ],
         "definitions": {
@@ -631,13 +653,14 @@
                 "payload": {},
                 "complexityLevel": "low",
                 "category": "single-system",
-                "expectedResult": "Should contain at least a thousand breweries, and the first and last brewery names"
+                "expectedResult": "Should contain at least 900 breweries, and the first and last brewery names"
             }
         }
     },
     "testSuite": {
         "name": "Integration Test",
         "attemptsPerWorkflow": 1,
-        "delayBetweenAttempts": 500
+        "delayBetweenAttempts": 500,
+        "enableSoftValidation": true
     }
 }

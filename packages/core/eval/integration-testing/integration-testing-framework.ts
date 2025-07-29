@@ -10,7 +10,7 @@ import {
     TestWorkflowConfig as TestWorkflow
 } from '../utils/config-loader.js';
 import { IntegrationSetupResult, SetupManager } from '../utils/setup-manager.js';
-import { batchValidateResults, type SoftValidationResult } from '../utils/soft-validator.js';
+import { type SoftValidationResult } from '../utils/soft-validator.js';
 import type { BuildAttempt, ExecutionAttempt } from '../utils/workflow-report-generator.js';
 import { WorkflowRunner } from '../utils/workflow-runner.js';
 
@@ -42,9 +42,7 @@ interface TestResult {
     collectedLogs?: any[];
     softValidation?: {
         success: boolean;
-        confidence: number;
         reason: string;
-        suggestions?: string[];
     };
 }
 
@@ -309,6 +307,8 @@ export class IntegrationTestingFramework {
                         collectLogs: true,
                         saveRuns: true,
                         delayBetweenAttempts: this.config?.testSuite?.delayBetweenAttempts || 0, // Use config value, default to 0
+                        enableSoftValidation: this.config?.testSuite?.enableSoftValidation !== false, // Default to true
+                        expectedResult: testWorkflow.expectedResult,
                         onAttemptComplete: (attempt) => {
                             logMessage('info',
                                 `🔍 Attempt ${attempt.attemptNumber} result: buildSuccess=${attempt.buildSuccess}, executionSuccess=${attempt.executionSuccess}`,
@@ -409,48 +409,8 @@ export class IntegrationTestingFramework {
                     workflowPlans,
                     integrationIds: testWorkflow.integrationIds,
                     collectedLogs: runResult.collectedLogs,
-                    softValidation  // Will be populated later
+                    softValidation: runResult.softValidation  // Get from WorkflowRunner result
                 });
-            }
-
-            // Batch validate all workflows that have expected results
-            logMessage('info', '🎯 Performing batch soft validation for workflows with expected results...', this.metadata);
-
-            const workflowsToValidate = results
-                .filter(r => {
-                    const workflow = enabledWorkflows.find(w => w.id === r.workflowId);
-                    return workflow?.expectedResult && r.actualData;
-                })
-                .map(r => {
-                    const workflow = enabledWorkflows.find(w => w.id === r.workflowId)!;
-                    return {
-                        workflowId: r.workflowId,
-                        actualResult: r.actualData,
-                        expectedResult: workflow.expectedResult!,
-                        workflowInstruction: workflow.instruction
-                    };
-                });
-
-            if (workflowsToValidate.length > 0) {
-                try {
-                    const validationResults = await batchValidateResults(workflowsToValidate, this.metadata);
-
-                    // Update results with validation outcomes
-                    for (const result of results) {
-                        const validation = validationResults.get(result.workflowId);
-                        if (validation) {
-                            result.softValidation = validation;
-                            logMessage('info',
-                                `🎯 Soft validation for ${result.workflowName}: ${validation.success ? '✅' : '❌'} (confidence: ${(validation.confidence * 100).toFixed(0)}%)`,
-                                this.metadata
-                            );
-                        }
-                    }
-
-                    logMessage('info', `✅ Completed batch validation for ${workflowsToValidate.length} workflows`, this.metadata);
-                } catch (err) {
-                    logMessage('warn', `Failed to perform batch soft validation: ${err}`, this.metadata);
-                }
             }
 
             // Generate error summaries for workflows that encountered errors
@@ -478,7 +438,7 @@ export class IntegrationTestingFramework {
             }));
 
             // Calculate metrics (cleanup will happen in finally block)
-            const passed = results.filter(r => r.succeededOnAttempt !== undefined).length;
+            const passed = results.filter(r => r.succeededOnAttempt !== undefined && (!r.softValidation || r.softValidation.success)).length;
             const failed = results.length - passed;
             const averageBuildTime = results.reduce((sum, r) => sum + r.buildAttempts.reduce((sum, b) => sum + b.buildTime, 0), 0) / results.length;
             const averageExecutionTime = results.reduce((sum, r) => sum + r.executionAttempts.reduce((sum, e) => sum + e.executionTime, 0), 0) / results.length;
@@ -566,7 +526,7 @@ export class IntegrationTestingFramework {
         const min = (arr: number[]) => arr.length ? Math.min(...arr) : 0;
         const max = (arr: number[]) => arr.length ? Math.max(...arr) : 0;
 
-        const passed = testSuite.results.filter(r => r.succeededOnAttempt !== undefined).length;
+        const passed = testSuite.results.filter(r => r.succeededOnAttempt !== undefined && (!r.softValidation || r.softValidation.success)).length;
         const failed = testSuite.results.length - passed;
 
         // --- NEW: Workflow-level meta summary ---
@@ -744,11 +704,8 @@ export class IntegrationTestingFramework {
                 // Add soft validation results
                 if (success.softValidation) {
                     const sv = success.softValidation;
-                    report += `**🎯 Soft Validation:** ${sv.success ? '✅ PASS' : '⚠️ FAIL'} (confidence: ${(sv.confidence * 100).toFixed(0)}%)\n`;
+                    report += `**🎯 Soft Validation:** ${sv.success ? '✅ PASS' : '⚠️ FAIL'}\n`;
                     report += `- **Reason:** ${sv.reason}\n`;
-                    if (sv.suggestions && sv.suggestions.length > 0) {
-                        report += `- **Suggestions:** ${sv.suggestions.join('; ')}\n`;
-                    }
                     report += '\n';
                 }
 
@@ -895,7 +852,7 @@ export class IntegrationTestingFramework {
             workflowResults: testSuite.results.map(r => ({
                 workflowId: r.workflowId,
                 workflowName: r.workflowName,
-                success: r.succeededOnAttempt !== undefined,
+                success: r.succeededOnAttempt !== undefined && (!r.softValidation || r.softValidation.success),
                 succeededOnAttempt: r.succeededOnAttempt,
                 complexity: r.complexity,
                 category: r.category,

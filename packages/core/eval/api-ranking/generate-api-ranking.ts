@@ -23,6 +23,11 @@ interface ApiRankingResult {
     successfulAttempts: number;
     apiFailureCount: number;
     superglueScore: number;
+    softValidation?: {
+        success: boolean;
+        confidence: number;
+        reason: string;
+    };
     llmResults: {
         'claude-sonnet-4-20250514': number;
         'claude-opus-4-20250514': number;
@@ -96,7 +101,9 @@ async function generateApiRanking(configPath?: string): Promise<void> {
                     maxAttemptsPerWorkflow: config.settings.attemptsPerWorkflow,
                     collectLogs: true,
                     saveRuns: false,
-                    delayBetweenAttempts: config.settings.delayBetweenAttempts || 0 
+                    delayBetweenAttempts: config.settings.delayBetweenAttempts || 0,
+                    enableSoftValidation: config.settings.enableSoftValidation || false, // Default to false for API ranking
+                    expectedResult: workflow.expectedResult  // Add expectedResult if it exists
                 }
             );
 
@@ -140,7 +147,7 @@ async function generateApiRanking(configPath?: string): Promise<void> {
                     const modelResults = Object.entries(llmResults)
                         .map(([model, rate]) => `${model}: ${(rate * 100).toFixed(0)}%`)
                         .join(', ');
-                    
+
                     logMessage('info',
                         `📊 Direct LLM results - ${modelResults}`,
                         metadata
@@ -219,7 +226,7 @@ function calculateAverageScore(
         superglueSuccessRate,
         ...Object.values(llmResults)
     ];
-    
+
     // Calculate average
     const sum = allRates.reduce((acc, rate) => acc + rate, 0);
     return sum / allRates.length;
@@ -230,11 +237,11 @@ function calculateAverageScore(
  */
 async function generateRankingCsv(results: ApiRankingResult[], outputPath: string): Promise<void> {
     const headers = [
-        'Rank', 
-        'API', 
-        'Average Score', 
+        'Rank',
+        'API',
+        'Average Score',
         'Superglue Success %',
-        'Claude Sonnet 4', 
+        'Claude Sonnet 4',
         'Claude Opus 4',
         'GPT-4.1',
         'O4 Mini',

@@ -44,12 +44,14 @@ export interface IntegrationTestConfig {
         name: string;
         attemptsPerWorkflow?: number;
         delayBetweenAttempts?: number;  // Milliseconds to wait between retry attempts (default: 0)
+        enableSoftValidation?: boolean; // Optional, defaults to true
     };
 }
 
 // API Ranking specific
 export interface ApiRankingWorkflowConfig extends BaseWorkflowConfig {
     // API ranking workflows are simpler
+    expectedResult?: string; // Optional expected result for soft validation
 }
 
 export interface ApiRankingConfig {
@@ -59,6 +61,7 @@ export interface ApiRankingConfig {
     settings: {
         attemptsPerWorkflow: number;
         delayBetweenAttempts?: number;  // Milliseconds to wait between retry attempts (default: 0)
+        enableSoftValidation?: boolean; // Optional, defaults to false for API ranking
     };
 }
 

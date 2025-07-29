@@ -1,13 +1,10 @@
-import { LanguageModel } from '../../llm/llm.js';
 import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
 import { logMessage } from '../../utils/logs.js';
 import { sample } from '../../utils/tools.js';
 
 export interface SoftValidationResult {
     success: boolean;
-    confidence: number; // 0-1 scale
     reason: string;
-    suggestions?: string[];
 }
 
 export async function validateWorkflowResult(
@@ -17,6 +14,9 @@ export async function validateWorkflowResult(
     metadata: { orgId: string; userId: string }
 ): Promise<SoftValidationResult> {
     try {
+        // Lazy import to ensure env vars are loaded
+        const { LanguageModel } = await import('../../llm/llm.js');
+
         // Prepare the actual result for comparison
         let actualContent = JSON.stringify(actualResult, null, 2);
         if (actualContent.length > 10000) {
@@ -86,7 +86,7 @@ Please validate if the actual result meets the expected criteria.`;
         const response = await LanguageModel.generateObject(messages, schema, 0.1);
 
         logMessage('debug',
-            `Soft validation result: success=${response.response.success}, confidence=${response.response.confidence}`,
+            `Soft validation result: success=${response.response.success}`,
             metadata
         );
 
@@ -98,9 +98,7 @@ Please validate if the actual result meets the expected criteria.`;
 
         return {
             success: false,
-            confidence: 0,
-            reason: `Validation error: ${errorMsg}`,
-            suggestions: ['Check the expected result format', 'Ensure the workflow completed successfully']
+            reason: `Validation error: ${errorMsg}`
         };
     }
 }
