@@ -144,6 +144,15 @@ export class WorkflowExecutor implements Workflow {
           this.result.error = undefined; // Clear any previous transform error
           this.result.success = true; // Ensure success is true if transform succeeds
         } catch (transformError) {
+          // Check if self-healing is enabled before regenerating
+          if (!options?.selfHealing) {
+            // If self-healing is disabled, fail with the original error
+            this.result.success = false;
+            this.result.error = transformError?.message || transformError;
+            this.result.completedAt = new Date();
+            return this.result;
+          }
+          
           logMessage("info", `Preparing new final transform`, this.metadata);
           const instruction = "Generate the final transformation code." +
             (this.instruction ? " with the following instruction: " + this.instruction : "") +

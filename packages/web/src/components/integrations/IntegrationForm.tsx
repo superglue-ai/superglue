@@ -71,17 +71,17 @@ export function IntegrationForm({
     const [documentationUrl, setDocumentationUrl] = useState(integration?.documentationUrl || '');
     const [documentation, setDocumentation] = useState(integration?.documentation || '');
     const [specificInstructions, setSpecificInstructions] = useState(integration?.specificInstructions || '');
-    
+
     // Add state to track if user manually edited the ID
     const [isIdManuallyEdited, setIsIdManuallyEdited] = useState(false);
-    
+
     const detectAuthType = (creds: any) => {
         if (!integration) return 'apikey';
         if (!creds || Object.keys(creds).length === 0) return 'none'; // Changed from 'none' to 'apikey'
         if (creds.client_id || creds.client_secret || creds.access_token || creds.refresh_token) return 'oauth';
         return 'apikey';
     };
-    
+
     const [authType, setAuthType] = useState<'none' | 'oauth' | 'apikey'>(() => {
         try {
             const creds = integration?.credentials || {};
@@ -90,7 +90,7 @@ export function IntegrationForm({
             return 'apikey'; // Changed from 'none' to 'apikey'
         }
     });
-    
+
     // Initialize OAuth fields
     const [oauthFields, setOauthFields] = useState(() => {
         const creds = integration?.credentials || {};
@@ -105,7 +105,7 @@ export function IntegrationForm({
             expires_at: creds.expires_at || ''
         };
     });
-    
+
     // Initialize API key credentials as JSON string for CredentialsManager
     const [apiKeyCredentials, setApiKeyCredentials] = useState(() => {
         const creds = integration?.credentials || {};
@@ -204,11 +204,11 @@ export function IntegrationForm({
             if (!isEditing) {
                 setId(value);
             }
-            
+
             if (integrationTemplate.preferredAuthType) {
                 setAuthType(integrationTemplate.preferredAuthType);
             }
-            
+
             // Pre-fill OAuth URLs if OAuth is available and selected
             if (integrationTemplate.oauth) {
                 // Only pre-fill OAuth URLs if user has OAuth selected
@@ -227,7 +227,7 @@ export function IntegrationForm({
     const handleUrlChange = (host: string, path: string) => {
         setUrlHost(host);
         setUrlPath(path);
-        
+
         // Auto-update ID when URL changes (only for new integrations and if not manually edited)
         if (!isEditing && !isIdManuallyEdited) {
             const fullUrl = composeUrl(host, path);
@@ -247,9 +247,9 @@ export function IntegrationForm({
         if (specificInstructions.length > 2000) errors.specificInstructions = true;
         setValidationErrors(errors);
         if (Object.keys(errors).length > 0) return;
-        
+
         let creds = {};
-        
+
         // Build credentials based on auth type
         if (authType === 'oauth') {
             // Start with OAuth fields
@@ -324,22 +324,22 @@ export function IntegrationForm({
     const buildOAuthUrl = () => {
         try {
             const { client_id, scopes } = oauthFields;
-            
+
             if (!client_id) return null;
 
             const integrationId = isEditing ? integration!.id : id.trim();
             const redirectUri = getOAuthCallbackUrl();
-            
+
             // Get auth URL from OAuth fields or known providers
             let authUrl = oauthFields.auth_url;
             let defaultScopes = '';
-            
+
             if (!authUrl) {
                 const oauthConfig = getOAuthConfig(integrationId) || getOAuthConfig(selectedIntegration);
                 authUrl = oauthConfig?.authUrl;
                 defaultScopes = oauthConfig?.scopes || '';
             }
-            
+
             if (!authUrl) return null;
 
             const params = new URLSearchParams({
@@ -349,7 +349,7 @@ export function IntegrationForm({
                 state: btoa(JSON.stringify({
                     integrationId,  // This is the key part
                     timestamp: Date.now(),
-                    apiKey: config.superglueApiKey 
+                    apiKey: config.superglueApiKey
                 })),
             });
 
@@ -541,7 +541,7 @@ export function IntegrationForm({
                                     )}
                                 </div>
                             </div>
-                            
+
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <Label htmlFor="client_id" className="text-xs flex items-center gap-1">
@@ -573,7 +573,7 @@ export function IntegrationForm({
                                     />
                                 </div>
                             </div>
-                            
+
                             <div className="border-t pt-3">
                                 <Label className="text-xs flex items-center gap-1">
                                     Redirect URI
@@ -594,7 +594,7 @@ export function IntegrationForm({
                                     </Button>
                                 </div>
                             </div>
-                            
+
                             {oauthFields.client_id && oauthFields.client_secret && (buildOAuthUrl() !== null) && (
                                 <Button
                                     type="button"
@@ -607,7 +607,7 @@ export function IntegrationForm({
                                         if (!id.trim()) errors.id = true;
                                         if (!urlHost.trim()) errors.urlHost = true;
                                         if (specificInstructions.length > 2000) errors.specificInstructions = true;
-                                        
+
                                         if (Object.keys(errors).length > 0) {
                                             setValidationErrors(errors);
                                             toast({
@@ -617,7 +617,7 @@ export function IntegrationForm({
                                             });
                                             return;
                                         }
-                                        
+
                                         // Build credentials
                                         const oauthCreds = Object.fromEntries(
                                             Object.entries({
@@ -647,11 +647,11 @@ export function IntegrationForm({
                                             specificInstructions: specificInstructions.trim(),
                                             credentials: creds,
                                         };
-                                                                                
+
                                         try {
                                             // Save the integration first
                                             await client.upsertIntegration(integrationData.id, integrationData);
-                                            
+
                                             // Then open OAuth URL
                                             const authUrl = buildOAuthUrl();
                                             if (authUrl) {
@@ -672,7 +672,7 @@ export function IntegrationForm({
                             )}
                         </div>
                     )}
-                    
+
                     {authType === 'apikey' && (
                         <div className="space-y-2">
                             <Label htmlFor="credentials" className="flex items-center gap-2">
@@ -689,7 +689,7 @@ export function IntegrationForm({
                             {validationErrors.credentials && <p className="text-sm text-destructive">Credentials must be valid JSON.</p>}
                         </div>
                     )}
-                    
+
                     {authType === 'none' && (
                         <div className="bg-muted/50">
                             <p className="text-sm text-muted-foreground">
@@ -732,7 +732,7 @@ export function IntegrationForm({
                                 {validationErrors.id && <p className="text-sm text-destructive mt-1">Integration ID is required and must be unique.</p>}
                             </div>
                         )}
-                        
+
                         {/* OAuth Advanced Settings */}
                         {authType === 'oauth' && (
                             <>
@@ -764,8 +764,8 @@ export function IntegrationForm({
                                             placeholder="OAuth authorization endpoint"
                                             className="h-9 pr-20"
                                         />
-                                        <Badge 
-                                            variant="outline" 
+                                        <Badge
+                                            variant="outline"
                                             className="absolute right-2 top-1/2 -translate-y-1/2 bg-background border"
                                         >
                                             <Link className="h-3 w-3 mr-1" />
@@ -775,6 +775,32 @@ export function IntegrationForm({
                                     {!oauthFields.auth_url && integrations[selectedIntegration]?.oauth?.authUrl && (
                                         <p className="text-xs text-muted-foreground mt-1">
                                             Default: {integrations[selectedIntegration]?.oauth?.authUrl}
+                                        </p>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <Label htmlFor="token_url" className="text-xs">Token URL</Label>
+                                    <HelpTooltip text="OAuth token endpoint. Leave empty to use the default for this provider." />
+                                    <div className="relative">
+                                        <Input
+                                            id="token_url"
+                                            value={oauthFields.token_url}
+                                            onChange={e => setOauthFields(prev => ({ ...prev, token_url: e.target.value }))}
+                                            placeholder="OAuth token endpoint"
+                                            className="h-9 pr-20"
+                                        />
+                                        <Badge
+                                            variant="outline"
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 bg-background border"
+                                        >
+                                            <Link className="h-3 w-3 mr-1" />
+                                            URL
+                                        </Badge>
+                                    </div>
+                                    {!oauthFields.token_url && integrations[selectedIntegration]?.oauth?.tokenUrl && (
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                            Default: {integrations[selectedIntegration]?.oauth?.tokenUrl}
                                         </p>
                                     )}
                                 </div>
@@ -795,7 +821,7 @@ export function IntegrationForm({
                                 </div>
                             </>
                         )}
-                        
+
                         <div>
                             <Label htmlFor="specificInstructions">Specific Instructions</Label>
                             <HelpTooltip text="Provide specific guidance on how to use this integration (e.g., rate limits, special endpoints, authentication details). Max 2000 characters." />

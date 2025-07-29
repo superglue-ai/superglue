@@ -276,15 +276,15 @@ export const integrations: Record<string, IntegrationConfig> = {
     }
   },
   instagram: {
-    apiUrl: "https://api.instagram.com",
+    apiUrl: "https://graph.instagram.com/v23.0/",
     regex: "^(.*\\.)?instagram\\.com(/.*)?$",
     icon: "instagram",
-    docsUrl: "https://developers.facebook.com/docs/instagram-api",
+    docsUrl: "https://developers.facebook.com/docs/instagram-platform/overview",
     preferredAuthType: "oauth",
     oauth: {
-      authUrl: "https://api.instagram.com/oauth/authorize",
-      tokenUrl: "https://api.instagram.com/oauth/access_token",
-      scopes: "user_profile user_media basic instagram_basic instagram_content_publish instagram_manage_comments instagram_manage_insights instagram_shopping_tag_products"
+      authUrl: "https://www.facebook.com/v21.0/dialog/oauth",
+      tokenUrl: "https://graph.facebook.com/v21.0/oauth/access_token",
+      scopes: "instagram_basic instagram_content_publish instagram_manage_comments instagram_manage_insights instagram_shopping_tag_products instagram_manage_messages pages_show_list pages_messaging"
     }
   },
   twitter: {
