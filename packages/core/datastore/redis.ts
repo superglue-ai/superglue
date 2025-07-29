@@ -216,6 +216,7 @@ export class RedisService implements DataStore {
   async createRun(run: RunResult, orgId?: string): Promise<RunResult> {
     if (!run) return null;
     const key = this.getKey(this.RUN_PREFIX, `${run.config?.id}:${run.id}`, orgId);
+    if ((run as any).stepResults) delete (run as any).stepResults;
     await this.redis.set(key, JSON.stringify(run), {
       EX: this.TTL
     });

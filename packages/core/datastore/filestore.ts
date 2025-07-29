@@ -429,6 +429,7 @@ export class FileStore implements DataStore {
   async createRun(run: RunResult, orgId: string): Promise<RunResult> {
     await this.ensureInitialized();
     if (!run) return null;
+    if ((run as any).stepResults) delete (run as any).stepResults;
 
     // Only log runs if disable_logs environment variable is not set
     if (String(process.env.DISABLE_LOGS).toLowerCase() !== 'true') {
