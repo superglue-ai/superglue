@@ -9,7 +9,6 @@ import { logMessage } from "../utils/logs.js";
 
 export const searchDocumentationToolImplementation: ToolImplementation<WorkflowExecutionContext> = async (args, context) => {
     const { integrationId, query } = args;
-    logMessage('debug', `search_documentation tool called - integration: ${integrationId}, query: "${query}"`, context);
     const { integration } = context;
 
     if (!integration) {
@@ -111,8 +110,6 @@ export const searchDocumentationToolImplementation: ToolImplementation<WorkflowE
 export const buildWorkflowImplementation: ToolImplementation<WorkflowBuildContext> = async (args, context) => {
     const { previousError } = args;
     const { messages = [] } = context;
-
-    logMessage('debug', `build_workflow tool called${previousError ? ' (retry)' : ''}`, context);
 
     if (!messages || messages.length === 0) {
         return {
