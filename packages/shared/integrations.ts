@@ -226,7 +226,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   aws: {
     apiUrl: "https://amazonaws.com",
-    regex: "^(.*\\.)?amazonaws\\.com(/.*)?$"
+    regex: "^(.*\\.)?amazonaws\\.com(/.*)?$",
     icon: "amazonAWS",
     docsUrl: "https://docs.aws.amazon.com/index.html",
     preferredAuthType: "apikey"
