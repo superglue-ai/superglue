@@ -3,7 +3,7 @@ import { useIntegrations } from '@/src/app/integrations-context';
 import { IntegrationForm } from '@/src/components/integrations/IntegrationForm';
 import { useToast } from '@/src/hooks/use-toast';
 import { inputErrorStyles, needsUIToTriggerDocFetch, parseCredentialsHelper } from '@/src/lib/client-utils';
-import { findMatchingIntegration, integrations as integrationTemplates } from '@/src/lib/integrations';
+import { findMatchingIntegration, integrations as integrationTemplates } from "@superglue/shared"
 import { cn, composeUrl } from '@/src/lib/utils';
 import { Integration, IntegrationInput, SuperglueClient, UpsertMode, Workflow, WorkflowResult } from '@superglue/client';
 import { flattenAndNamespaceWorkflowCredentials, waitForIntegrationProcessing } from '@superglue/shared/utils';
@@ -95,8 +95,8 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
 
   const [selectedIntegrationIds, setSelectedIntegrationIds] = useState<string[]>(() => {
     // Initialize with preselected integration if available
-    return preselectedIntegrationId && integrations.some(i => i.id === preselectedIntegrationId) 
-      ? [preselectedIntegrationId] 
+    return preselectedIntegrationId && integrations.some(i => i.id === preselectedIntegrationId)
+      ? [preselectedIntegrationId]
       : [];
   });
 
@@ -140,7 +140,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       setExecutionError(null);
       setActiveTab('results'); // Reset to default tab
     }
-    
+
     // Clear validation errors when leaving prompt step
     if (step !== 'prompt') {
       setValidationErrors({});
@@ -286,9 +286,9 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       } catch {
         errors.payload = true;
       }
-      
+
       setValidationErrors(errors);
-      
+
       if (Object.keys(errors).length > 0) {
         toast({
           title: 'Validation Error',
@@ -320,13 +320,13 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
           .map(id => freshIntegrations.find(i => i.id === id))
           .filter(Boolean);
         const credentialsFromIntegrations = flattenAndNamespaceWorkflowCredentials(selectedIntegrations);
-        
+
         // Mask the credentials for display
         const maskedCredentials = Object.entries(credentialsFromIntegrations).reduce((acc, [key, _]) => {
           acc[key] = `<<${key}>>`;
           return acc;
         }, {} as Record<string, string>);
-        
+
         setReviewCredentials(JSON.stringify(maskedCredentials, null, 2));
 
         setStep(steps[currentIndex + 1]);
@@ -809,7 +809,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                   <Textarea
                     id="instruction"
                     value={instruction}
-                    onChange={(e) => { 
+                    onChange={(e) => {
                       setInstruction(e.target.value);
                       if (e.target.value.trim()) {
                         setValidationErrors(prev => ({ ...prev, instruction: false }));
@@ -897,13 +897,13 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                 )}
                 {validationErrors.payload && (
                   <div className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5 bg-red-500/10 dark:bg-red-500/20 py-2 px-3 rounded-md mt-2">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="12" y1="8" x2="12" y2="12" />
-                    <line x1="12" y1="16" x2="12.01" y2="16" />
-                  </svg>
-                  <span>Invalid JSON format: Parse error</span>
-                </div>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" y1="8" x2="12" y2="12" />
+                      <line x1="12" y1="16" x2="12.01" y2="16" />
+                    </svg>
+                    <span>Invalid JSON format: Parse error</span>
+                  </div>
                 )}
               </div>
             </div>

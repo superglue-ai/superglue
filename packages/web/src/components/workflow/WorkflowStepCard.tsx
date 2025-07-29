@@ -1,7 +1,7 @@
 import { useConfig } from '@/src/app/config-context';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/src/components/ui/select";
 import { useToast } from '@/src/hooks/use-toast';
-import { integrations as integrationTemplates } from '@/src/lib/integrations';
+import { integrations as integrationTemplates } from '@superglue/shared';
 import { cn } from '@/src/lib/utils';
 import { Integration, SuperglueClient } from "@superglue/client";
 import { ArrowDown, Check, Globe, Pencil, RotateCw, Trash2, X } from 'lucide-react';

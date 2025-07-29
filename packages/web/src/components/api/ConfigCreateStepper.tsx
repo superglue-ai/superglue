@@ -3,7 +3,7 @@
 import { useConfig } from '@/src/app/config-context';
 import { useToast } from '@/src/hooks/use-toast';
 import { inputErrorStyles, parseCredentialsHelper, splitUrl } from '@/src/lib/client-utils';
-import { integrations } from '@/src/lib/integrations';
+import { integrations } from '@superglue/shared';
 import { cn, composeUrl } from '@/src/lib/utils';
 import { ApolloClient, gql, InMemoryCache, useSubscription } from '@apollo/client';
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
