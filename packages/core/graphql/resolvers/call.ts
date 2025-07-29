@@ -90,7 +90,7 @@ export async function executeApiCall(
   return { data: response?.data, endpoint };
 }
 
-function isSelfHealingEnabled(options: RequestOptions): boolean {
+export function isSelfHealingEnabled(options: RequestOptions): boolean {
   return options?.selfHealing ? options.selfHealing === SelfHealingMode.ENABLED || options.selfHealing === SelfHealingMode.REQUEST_ONLY : true;
 }
 

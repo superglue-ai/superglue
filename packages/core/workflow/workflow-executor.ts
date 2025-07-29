@@ -1,6 +1,7 @@
 import { ExecutionStep, Integration, RequestOptions, Workflow, WorkflowResult, WorkflowStepResult } from "@superglue/client";
 import { Metadata } from "@superglue/shared";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
+import { isSelfHealingEnabled } from "../graphql/resolvers/call.js";
 import { logMessage } from "../utils/logs.js";
 import { transformAndValidateSchema } from "../utils/tools.js";
 import { evaluateMapping, generateTransformCode } from "../utils/transform.js";
@@ -145,7 +146,7 @@ export class WorkflowExecutor implements Workflow {
           this.result.success = true; // Ensure success is true if transform succeeds
         } catch (transformError) {
           // Check if self-healing is enabled before regenerating
-          if (!options?.selfHealing) {
+          if (!isSelfHealingEnabled(options)) {
             // If self-healing is disabled, fail with the original error
             this.result.success = false;
             this.result.error = transformError?.message || transformError;
