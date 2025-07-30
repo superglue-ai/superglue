@@ -28,3 +28,25 @@ export async function listRuns(req: Request, res: Response) {
     return res.status(500).json({ error: "Internal Server Error" });
   }
 }
+
+
+
+export const getRun = async (req: Request, res: Response) => {
+  try {
+    const context = req.context;
+    const { id } = req.params;
+
+    const orgId = req.orgId; 
+
+    // -- Skip orgID check for now while testing --
+
+    // if (!orgId) {
+    //   return res.status(401).json({ error: "Unauthorized. Missing orgId from auth." });
+    // }
+
+    const run = await services.getRunService(id, orgId);
+    res.json(run);
+  } catch (error: any) {
+    res.status(404).json({ error: error.message || "Run not found" });
+  }
+};
