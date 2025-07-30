@@ -24,6 +24,9 @@ function shouldTriggerDocFetch(input: Integration, oldIntegration?: Integration)
   // If documentationUrl is a file:// URL, no need to trigger
   if (input.documentationUrl.startsWith('file://')) return false;
 
+  // Special case: Manual refresh - if input explicitly sets documentationPending to true
+  if (input.documentationPending === true) return true;
+
   // Trigger a fetch if:
   // 1. This is a new integration (no old integration exists)
   if (!oldIntegration) return true;
