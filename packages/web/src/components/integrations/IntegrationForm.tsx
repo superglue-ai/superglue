@@ -282,7 +282,7 @@ export function IntegrationForm({
         };
 
         try {
-            // Save the integration first and get the actual saved integration (with correct ID)
+            // Save the integration first and get the resolved integration ID back from backend
             const savedIntegration = await onSave(integrationData);
 
             if (!savedIntegration) {
@@ -294,7 +294,7 @@ export function IntegrationForm({
                 return;
             }
 
-            // If OAuth and not already configured, trigger OAuth flow using the ACTUAL integration ID
+            // If OAuth and not already configured, trigger OAuth flow using the resolved integration ID
             if (authType === 'oauth' && (!oauthFields.access_token || !oauthFields.refresh_token)) {
                 const authUrl = buildOAuthUrlForIntegration(savedIntegration.id);
                 if (authUrl) {
