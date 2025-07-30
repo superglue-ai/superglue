@@ -268,13 +268,13 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
 
             it('should store and retrieve integrations', async () => {
                 await store.upsertIntegration(testIntegration.id, testIntegration, testOrgId);
-                const retrieved = await store.getIntegration(testIntegration.id, testOrgId);
+                const retrieved = await store.getIntegration(testIntegration.id, true, testOrgId);
                 expect(retrieved).toEqual({ ...testIntegration, id: testIntegration.id });
             });
 
             it('should list integrations', async () => {
                 await store.upsertIntegration(testIntegration.id, testIntegration, testOrgId);
-                const { items, total } = await store.listIntegrations(10, 0, testOrgId);
+                const { items, total } = await store.listIntegrations(10, 0, true, testOrgId);
                 expect(items).toHaveLength(1);
                 expect(total).toBe(1);
                 expect(items[0]).toEqual({ ...testIntegration, id: testIntegration.id });
@@ -283,12 +283,12 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
             it('should delete integrations', async () => {
                 await store.upsertIntegration(testIntegration.id, testIntegration, testOrgId);
                 await store.deleteIntegration(testIntegration.id, testOrgId);
-                const retrieved = await store.getIntegration(testIntegration.id, testOrgId);
+                const retrieved = await store.getIntegration(testIntegration.id, true, testOrgId);
                 expect(retrieved).toBeNull();
             });
 
             it('should return null for missing integration', async () => {
-                const retrieved = await store.getIntegration('does-not-exist', testOrgId);
+                const retrieved = await store.getIntegration('does-not-exist', true, testOrgId);
                 expect(retrieved).toBeNull();
             });
         });

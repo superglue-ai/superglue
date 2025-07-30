@@ -3,9 +3,9 @@ import { waitForIntegrationProcessing } from '@superglue/shared/utils';
 import fs from 'fs';
 import { FileStore } from '../../datastore/filestore.js';
 import { DataStore } from '../../datastore/types.js';
+import { server_defaults } from '../../default.js';
 import { logMessage } from '../../utils/logs.js';
 import { IntegrationConfig } from './config-loader.js';
-import { server_defaults } from '../../default.js';
 
 export interface SetupResult {
     datastore: DataStore;
@@ -167,7 +167,7 @@ export class SetupManager {
         // Refresh integrations to get the latest state after documentation processing
         const refreshedIntegrations: Integration[] = [];
         for (const integration of integrations) {
-            const updated = await datastore.getIntegration(integration.id, this.metadata.orgId);
+            const updated = await datastore.getIntegration(integration.id, true, this.metadata.orgId);
             if (updated) {
                 refreshedIntegrations.push(updated);
             } else {
@@ -216,7 +216,7 @@ export class SetupManager {
                 const docString = await docFetcher.fetchAndProcess();
 
                 // Check if integration still exists
-                const stillExists = await datastore.getIntegration(integration.id, this.metadata.orgId);
+                const stillExists = await datastore.getIntegration(integration.id, false, this.metadata.orgId);
                 if (!stillExists) {
                     logMessage('warn',
                         `Integration ${integration.id} was deleted during documentation fetch`,
@@ -243,7 +243,7 @@ export class SetupManager {
 
                 // Always update documentationPending to false even on failure
                 try {
-                    const stillExists = await datastore.getIntegration(integration.id, this.metadata.orgId);
+                    const stillExists = await datastore.getIntegration(integration.id, false, this.metadata.orgId);
                     if (stillExists) {
                         await datastore.upsertIntegration(integration.id, {
                             ...integration,
@@ -281,7 +281,7 @@ export class SetupManager {
         try {
             const datastoreAdapter = {
                 getIntegration: async (id: string): Promise<Integration | null> => {
-                    return await datastore.getIntegration(id, this.metadata.orgId);
+                    return await datastore.getIntegration(id, false, this.metadata.orgId);
                 }
             };
 
@@ -319,7 +319,7 @@ export class SetupManager {
             // to prevent "still being fetched" warnings later
             for (const integrationId of pendingIntegrations) {
                 try {
-                    const integration = await datastore.getIntegration(integrationId, this.metadata.orgId);
+                    const integration = await datastore.getIntegration(integrationId, false, this.metadata.orgId);
                     if (integration && integration.documentationPending) {
                         await datastore.upsertIntegration(integrationId, {
                             ...integration,

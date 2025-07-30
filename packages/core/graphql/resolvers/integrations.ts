@@ -1,11 +1,12 @@
 import { Integration } from '@superglue/client';
-import { Context, findMatchingIntegration, integrations, Metadata } from "@superglue/shared";
+import { findMatchingIntegration, integrations } from "@superglue/shared";
 import { generateUniqueId } from '@superglue/shared/utils';
 import { GraphQLResolveInfo } from "graphql";
 import { IntegrationSelector } from '../../integrations/integration-selector.js';
 import { Documentation } from '../../utils/documentation.js';
 import { logMessage } from '../../utils/logs.js';
 import { composeUrl } from '../../utils/tools.js';
+import { Context, Metadata } from '../types.js';
 
 function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined, defaultValue?: T): T | undefined {
   if (newValue === null) return undefined;
@@ -41,7 +42,7 @@ export const listIntegrationsResolver = async (
   info: GraphQLResolveInfo
 ) => {
   try {
-    const result = await context.datastore.listIntegrations(limit, offset, context.orgId);
+    const result = await context.datastore.listIntegrations(limit, offset, false, context.orgId);
     return {
       items: result.items,
       total: result.total,
@@ -60,8 +61,7 @@ export const getIntegrationResolver = async (
 ) => {
   if (!id) throw new Error("id is required");
   try {
-    const integration = await context.datastore.getIntegration(id, context.orgId);
-    if (!integration) throw new Error("Integration not found");
+    const integration = await context.datastore.getIntegration(id, false, context.orgId);
     return integration;
   } catch (error) {
     logMessage('error', `Error getting integration with id ${id}: ${String(error)}`, { orgId: context.orgId });
@@ -80,14 +80,14 @@ export const upsertIntegrationResolver = async (
   }
   try {
     const now = new Date();
-    const oldIntegration = await context.datastore.getIntegration(input.id, context.orgId);
+    const oldIntegration = await context.datastore.getIntegration(input.id, false, context.orgId);
     
     if (mode === 'CREATE') {
       input = enrichWithTemplate(input);
       if (oldIntegration) {
         input.id = await generateUniqueId({
           baseId: input.id,
-          exists: async (id) => !!(await context.datastore.getIntegration(id, context.orgId))
+          exists: async (id) => !!(await context.datastore.getIntegration(id, false, context.orgId))
         });
       }
     } else if (mode === 'UPDATE' && !oldIntegration) {
@@ -116,7 +116,7 @@ export const upsertIntegrationResolver = async (
           const docString = await docFetcher.fetchAndProcess();
           const openApiSchema = await docFetcher.fetchOpenApiDocumentation();
           // Check if integration still exists before upserting
-          const stillExists = await context.datastore.getIntegration(input.id, context.orgId);
+          const stillExists = await context.datastore.getIntegration(input.id, false, context.orgId);
           if (!stillExists) {
             logMessage('warn', `Integration ${input.id} was deleted while fetching documentation. Skipping upsert.`, { orgId: context.orgId });
             return;
@@ -135,7 +135,7 @@ export const upsertIntegrationResolver = async (
           logMessage('error', `Documentation fetch failed for integration ${input.id}: ${String(err)}`, { orgId: context.orgId });
           // Reset documentationPending to false on failure to prevent corrupted state
           try {
-            const stillExists = await context.datastore.getIntegration(input.id, context.orgId);
+            const stillExists = await context.datastore.getIntegration(input.id, false, context.orgId);
             if (stillExists) {
               await context.datastore.upsertIntegration(input.id, {
                 ...input,
@@ -200,7 +200,7 @@ export const findRelevantIntegrationsResolver = async (
 
   try {
     const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
-    const allIntegrations = await context.datastore.listIntegrations(1000, 0, context.orgId);
+    const allIntegrations = await context.datastore.listIntegrations(1000, 0, false, context.orgId);
 
     const selector = new IntegrationSelector(metadata);
     return await selector.select(instruction, allIntegrations.items || []);

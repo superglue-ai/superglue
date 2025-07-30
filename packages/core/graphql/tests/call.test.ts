@@ -3,14 +3,16 @@ import { Context, Metadata } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mocked } from 'vitest';
 import { server_defaults } from "../../default.js";
+import { IntegrationManager } from "../../integrations/integration-manager.js";
 import * as api from "../../utils/api.js";
+import { executeApiCall } from "../../utils/api.js";
 import { Documentation } from "../../utils/documentation.js";
 import * as logs from "../../utils/logs.js";
 import * as telemetry from "../../utils/telemetry.js";
 import * as tools from "../../utils/tools.js";
 import * as transform from "../../utils/transform.js";
 import * as webhook from "../../utils/webhook.js";
-import { callResolver, executeApiCall } from "../resolvers/call.js";
+import { callResolver } from "../resolvers/call.js";
 
 // Mock dependencies
 vi.mock("../../utils/api.js");
@@ -64,18 +66,25 @@ describe('Call Resolver', () => {
     const testMetadata: Metadata = { runId: 'test-run', orgId: 'test-org' };
 
     it('should successfully execute API call', async () => {
-      mockedApi.callEndpoint.mockResolvedValueOnce({
+      const testContext: Context = {
+        orgId: 'test-org',
+        datastore: {
+          upsertApiConfig: vi.fn(),
+          createRun: vi.fn()
+        } as any
+      };
+        mockedApi.callEndpoint.mockResolvedValueOnce({
         data: { result: 'success' }
       });
 
-      const result = await executeApiCall(
-        testInput.endpoint,
-        testPayload,
-        testCredentials,
-        testOptions,
-        testMetadata,
-        testIntegration
-      );
+      const result = await executeApiCall({
+        endpoint: testInput.endpoint,
+        payload: testPayload,
+        credentials: testCredentials,
+        options: testOptions,
+        metadata: testMetadata,
+        integrationManager: IntegrationManager.fromIntegration(testIntegration, testContext.datastore, testContext.orgId)
+      });
 
       expect(result).toEqual({
         data: { result: 'success' },
@@ -90,6 +99,14 @@ describe('Call Resolver', () => {
     });
 
     it('should retry on failure and eventually succeed', async () => {
+      const testContext: Context = {
+        orgId: 'test-org',
+        datastore: {
+          upsertApiConfig: vi.fn(),
+          createRun: vi.fn()
+        } as any
+      };
+  
       // Mock failure on first attempt, success on second
       mockedApi.callEndpoint
         .mockRejectedValueOnce(new Error('API call failed'))
@@ -107,13 +124,14 @@ describe('Call Resolver', () => {
       vi.mocked(Documentation.prototype.fetchAndProcess).mockResolvedValue('test docs');
       mockedApi.evaluateResponse.mockResolvedValueOnce({ success: true, shortReason: '', refactorNeeded: false });
 
-      const result = await executeApiCall(
-        testInput.endpoint,
-        testPayload,
-        testCredentials,
-        testOptions,
-        testMetadata,
-        testIntegration
+      const result = await executeApiCall({
+        endpoint: testInput.endpoint,
+        payload: testPayload,
+        credentials: testCredentials,
+        options: testOptions,
+        metadata: testMetadata,
+        integrationManager: IntegrationManager.fromIntegration(testIntegration, testContext.datastore, testContext.orgId) 
+      }
       );
 
       expect(result).toEqual({
@@ -129,6 +147,13 @@ describe('Call Resolver', () => {
     });
 
     it('should throw after max retries due to evaluateResponse failures', async () => {
+      const testContext: Context = {
+        orgId: 'test-org',
+        datastore: {
+          upsertApiConfig: vi.fn(),
+          createRun: vi.fn()
+        } as any
+      };
       // Mock callEndpoint to succeed (after the first attempt, which will use the unmocked path)
       // The first attempt will fail, triggering retries. Subsequent callEndpoint calls within retries will succeed.
       mockedApi.callEndpoint
@@ -144,14 +169,14 @@ describe('Call Resolver', () => {
         id: 'test-endpoint-id',
         instruction: 'test-instruction'
       }, messages: []});
-      await expect(executeApiCall(
-        testInput.endpoint,
-        testPayload,
-        testCredentials,
-        testOptions,
-        testMetadata,
-        testIntegration
-      )).rejects.toThrow(/API call failed after \d+ retries.*Last error: Eval failed/);
+      await expect(executeApiCall({
+        endpoint: testInput.endpoint,
+        payload: testPayload,
+        credentials: testCredentials,
+        options: testOptions,
+        metadata: testMetadata,
+        integrationManager: IntegrationManager.fromIntegration(testIntegration, testContext.datastore, testContext.orgId)
+      })).rejects.toThrow(/API call failed after \d+ retries.*Last error: Eval failed/);
 
       // callEndpoint is called once for the initial attempt, then 7 more times for retries where evaluateResponse fails.
       expect(mockedApi.callEndpoint).toHaveBeenCalledTimes(server_defaults.MAX_CALL_RETRIES);
@@ -161,6 +186,13 @@ describe('Call Resolver', () => {
     });
 
     it('should retry on evaluateResponse failure and eventually succeed', async () => {
+      const testContext: Context = {
+        orgId: 'test-org',
+        datastore: {
+          upsertApiConfig: vi.fn(),
+          createRun: vi.fn()
+        } as any
+      };
       // Mock callEndpoint to fail once, then succeed
       mockedApi.callEndpoint
         .mockRejectedValueOnce(new Error('Initial API call failed to trigger retry logic')) // Fails first time to enter retry
@@ -179,14 +211,14 @@ describe('Call Resolver', () => {
         .mockResolvedValueOnce({ success: false, shortReason: 'Eval failed first time', refactorNeeded: false })
         .mockResolvedValueOnce({ success: true, shortReason: '', refactorNeeded: false });
 
-      const result = await executeApiCall(
-        testInput.endpoint,
-        testPayload,
-        testCredentials,
-        testOptions,
-        testMetadata,
-        testIntegration
-      );
+      const result = await executeApiCall({
+        endpoint: testInput.endpoint,
+        payload: testPayload,
+        credentials: testCredentials,
+        options: testOptions,
+        metadata: testMetadata,
+        integrationManager: IntegrationManager.fromIntegration(testIntegration, testContext.datastore, testContext.orgId)
+      });
 
       expect(result.data).toEqual({ result: 'successful data' });
       // Initial call + 1st retry (evaluateResponse fails) + 2nd retry (evaluateResponse succeeds)
@@ -206,7 +238,14 @@ describe('Call Resolver', () => {
     });
 
     it('should handle null response data', async () => {
-      // Mock response with no data for all 5 expected calls
+      const testContext: Context = {
+        orgId: 'test-org',
+        datastore: {
+          upsertApiConfig: vi.fn(),
+          createRun: vi.fn()
+        } as any
+      };
+        // Mock response with no data for all 5 expected calls
       mockedApi.callEndpoint.mockResolvedValue({ data: null });
       mockedApi.generateApiConfig.mockResolvedValue({config: {
         urlHost: 'https://api.example.com',
@@ -218,14 +257,14 @@ describe('Call Resolver', () => {
       // Add these missing mocks
       vi.mocked(Documentation.prototype.fetchAndProcess).mockResolvedValue('test docs');
 
-      await expect(executeApiCall(
-        testInput.endpoint,
-        testPayload,
-        testCredentials,
-        testOptions,
-        testMetadata,
-        testIntegration
-      )).rejects.toThrow(/API call failed after \d+ retries/);
+      await expect(executeApiCall({
+        endpoint: testInput.endpoint,
+        payload: testPayload,
+        credentials: testCredentials,
+        options: testOptions,
+        metadata: testMetadata,
+        integrationManager: IntegrationManager.fromIntegration(testIntegration, testContext.datastore, testContext.orgId)
+      })).rejects.toThrow(/API call failed after \d+ retries/);
 
       expect(mockedApi.callEndpoint).toHaveBeenCalledTimes(server_defaults.MAX_CALL_RETRIES);
     });
