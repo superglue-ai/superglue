@@ -401,6 +401,8 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
       }
 
       setResult(workflowResult);
+      setSteps(workflowResult.config.steps);
+      setFinalTransform(workflowResult.config.finalTransform);
     } catch (error) {
       console.error("Error executing workflow:", error);
       toast({
