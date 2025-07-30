@@ -31,22 +31,37 @@ import * as simpleIcons from 'simple-icons';
 export const detectAuthType = (credentials: any): 'oauth' | 'apikey' | 'none' => {
     if (!credentials || Object.keys(credentials).length === 0) return 'none';
 
-    // Check for OAuth-specific fields
-    if (credentials.client_id || credentials.client_secret || credentials.auth_url || credentials.token_url) {
-        return 'oauth';
+    // Define OAuth-specific fields
+    const oauthSpecificFields = ['client_id', 'client_secret', 'auth_url', 'token_url', 'access_token', 'refresh_token', 'scopes', 'expires_at', 'token_type'];
+
+    // Get all credential keys
+    const allKeys = Object.keys(credentials);
+
+    // Check if all keys are OAuth-specific
+    const containsOnlyOAuthKeys = allKeys.every(key => oauthSpecificFields.includes(key));
+
+    if (containsOnlyOAuthKeys) {
+        // It's OAuth-related, now check the status
+        if (credentials.access_token && credentials.refresh_token) {
+            return 'oauth'; // Will be shown as configured
+        } else if (credentials.client_id || credentials.client_secret) {
+            return 'oauth'; // Will be shown as pending
+        } else {
+            return 'none'; // Only has meta fields like auth_url, scopes, etc.
+        }
     }
 
-    // If has any other credentials, it's API key
+    // Has non-OAuth fields, so it's API key
     return 'apikey';
 };
 
 // Helper to determine auth badge status
 export const getAuthBadge = (integration: Integration): {
-    type: 'oauth-configured' | 'oauth-pending' | 'apikey' | 'none',
+    type: 'oauth-configured' | 'oauth-incomplete' | 'apikey' | 'none',
     label: string,
     color: 'blue' | 'amber' | 'green',
     icon: 'key' | 'clock'
-} | null => {
+} => {
     const creds = integration.credentials || {};
     const authType = detectAuthType(creds);
 
@@ -59,14 +74,11 @@ export const getAuthBadge = (integration: Integration): {
         const isConfigured = !!(creds.access_token && creds.refresh_token);
         return isConfigured
             ? { type: 'oauth-configured', label: 'OAuth configured', color: 'blue', icon: 'key' }
-            : { type: 'oauth-pending', label: 'OAuth pending', color: 'amber', icon: 'clock' };
+            : { type: 'oauth-incomplete', label: 'OAuth incomplete', color: 'amber', icon: 'clock' };
     }
 
-    if (authType === 'apikey') {
-        return { type: 'apikey', label: 'API Key', color: 'green', icon: 'key' };
-    }
-
-    return null;
+    // Must be API key
+    return { type: 'apikey', label: 'API Key', color: 'green', icon: 'key' };
 };
 
 export default function IntegrationsPage() {
@@ -76,7 +88,12 @@ export default function IntegrationsPage() {
     const router = useRouter();
     const { integrations, pendingDocIds, loading: initialLoading, refreshIntegrations, setPendingDocIds } = useIntegrations();
 
-    // Handle OAuth callback messages
+    const client = useMemo(() => new SuperglueClient({
+        endpoint: config.superglueEndpoint,
+        apiKey: config.superglueApiKey,
+    }), [config.superglueEndpoint, config.superglueApiKey]);
+
+    // Handle OAuth callback messages from URL params
     useEffect(() => {
         const success = searchParams.get('success');
         const error = searchParams.get('error');
@@ -104,10 +121,55 @@ export default function IntegrationsPage() {
         }
     }, [searchParams, toast, refreshIntegrations]);
 
-    const client = useMemo(() => new SuperglueClient({
-        endpoint: config.superglueEndpoint,
-        apiKey: config.superglueApiKey,
-    }), [config.superglueEndpoint, config.superglueApiKey]);
+    // Handle OAuth callback messages from popup windows
+    useEffect(() => {
+        const handleMessage = async (event: MessageEvent) => {
+            // Verify origin matches
+            if (event.origin !== window.location.origin) return;
+
+            if (event.data.type === 'oauth-success') {
+                const integrationId = event.data.integrationId;
+
+                // Wait a moment for the backend to finish updating
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                // Refresh integrations and get the updated list
+                await refreshIntegrations();
+
+                // We need to fetch the integration directly since the state might not be updated yet
+                try {
+                    const updatedIntegration = await client.getIntegration(integrationId);
+                    if (updatedIntegration?.credentials?.access_token && updatedIntegration?.credentials?.refresh_token) {
+                        toast({
+                            title: 'OAuth Connection Successful',
+                            description: `Successfully connected to ${integrationId}`,
+                        });
+                    } else {
+                        toast({
+                            title: 'OAuth Connection Failed',
+                            description: 'OAuth flow completed but tokens were not saved. Please try again.',
+                            variant: 'destructive',
+                        });
+                    }
+                } catch (error) {
+                    toast({
+                        title: 'OAuth Connection Failed',
+                        description: 'Failed to verify OAuth connection. Please refresh the page.',
+                        variant: 'destructive',
+                    });
+                }
+            } else if (event.data.type === 'oauth-error') {
+                toast({
+                    title: 'OAuth Error',
+                    description: event.data.message || 'Failed to complete OAuth connection',
+                    variant: 'destructive',
+                });
+            }
+        };
+
+        window.addEventListener('message', handleMessage);
+        return () => window.removeEventListener('message', handleMessage);
+    }, [client, refreshIntegrations, toast]);
 
     const { waitForIntegrationReady } = useMemo(() => ({
         waitForIntegrationReady: (integrationIds: string[]) => {
@@ -333,7 +395,10 @@ export default function IntegrationsPage() {
                                     modal={true}
                                     integration={editingIntegration}
                                     onSave={handleSave}
-                                    onCancel={() => setAddFormOpen(false)}
+                                    onCancel={() => {
+                                        setAddFormOpen(false);
+                                        setEditingIntegration(null);
+                                    }}
                                     integrationOptions={integrationOptions}
                                     getSimpleIcon={getSimpleIcon}
                                     inputErrorStyles={inputErrorStyles}
@@ -357,110 +422,111 @@ export default function IntegrationsPage() {
                                     <Plus className="mr-2 h-4 w-4" /> Add Integration
                                 </Button>
                             </div>
-                            {paginatedIntegrations.map((integration) => (
-                                <div key={integration.id} className="relative">
-                                    <div className="flex items-center gap-3 border rounded-lg p-4 bg-card">
-                                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                                            {getIntegrationIcon(integration) ? (
-                                                <svg
-                                                    width="20"
-                                                    height="20"
-                                                    viewBox="0 0 24 24"
-                                                    fill={`#${getIntegrationIcon(integration)?.hex}`}
-                                                    className="flex-shrink-0"
+                            {paginatedIntegrations.map((integration) => {
+                                const badge = getAuthBadge(integration);
+                                return (
+                                    <div key={integration.id} className="relative">
+                                        <div className="flex items-center gap-3 border rounded-lg p-4 bg-card">
+                                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                {getIntegrationIcon(integration) ? (
+                                                    <svg
+                                                        width="20"
+                                                        height="20"
+                                                        viewBox="0 0 24 24"
+                                                        fill={`#${getIntegrationIcon(integration)?.hex}`}
+                                                        className="flex-shrink-0"
+                                                    >
+                                                        <path d={getIntegrationIcon(integration)?.path || ''} />
+                                                    </svg>
+                                                ) : (
+                                                    <Globe className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
+                                                )}
+                                                <div className="flex flex-col min-w-0">
+                                                    <span className="font-medium truncate max-w-[200px]">{integration.id}</span>
+                                                    <span className="text-sm text-muted-foreground truncate max-w-[240px]">
+                                                        {composeUrl(integration.urlHost, integration.urlPath) || 'No API endpoint'}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <DocStatus
+                                                        pending={pendingDocIds.has(integration.id)}
+                                                        hasDocumentation={hasDocumentation(integration)}
+                                                    />
+                                                    {(() => {
+                                                        const colorClasses = {
+                                                            blue: 'text-blue-800 dark:text-blue-300 bg-blue-500/10',
+                                                            amber: 'text-amber-800 dark:text-amber-300 bg-amber-500/10',
+                                                            green: 'text-green-800 dark:text-green-300 bg-green-500/10'
+                                                        };
+
+                                                        return (
+                                                            <span className={`text-xs ${colorClasses[badge.color]} px-2 py-0.5 rounded flex items-center gap-1`}>
+                                                                {badge.icon === 'clock' ? <Clock className="h-3 w-3" /> : <Key className="h-3 w-3" />}
+                                                                {badge.label}
+                                                            </span>
+                                                        );
+                                                    })()}
+                                                </div>
+                                            </div>
+                                            <div className="ml-auto flex gap-2">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="text-muted-foreground hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    onClick={() => router.push(`/workflows?integration=${integration.id}`)}
+                                                    title={badge.type === 'oauth-incomplete' ? "OAuth configuration required" : "Build workflow with this integration"}
+                                                    disabled={badge.type === 'oauth-incomplete'}
                                                 >
-                                                    <path d={getIntegrationIcon(integration)?.path || ''} />
-                                                </svg>
-                                            ) : (
-                                                <Globe className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
-                                            )}
-                                            <div className="flex flex-col min-w-0">
-                                                <span className="font-medium truncate max-w-[200px]">{integration.id}</span>
-                                                <span className="text-sm text-muted-foreground truncate max-w-[240px]">
-                                                    {composeUrl(integration.urlHost, integration.urlPath) || 'No API endpoint'}
-                                                </span>
+                                                    <Sparkles className="h-4 w-4 mr-2" />
+                                                    Build Workflow
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    onClick={() => handleEdit(integration)}
+                                                    disabled={pendingDocIds.has(integration.id)}
+                                                    title={pendingDocIds.has(integration.id) ? "Documentation is being processed" : "Edit integration"}
+                                                >
+                                                    <Pencil className="h-4 w-4" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-muted-foreground hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    onClick={() => handleRefreshDocs(integration.id)}
+                                                    disabled={
+                                                        !integration.documentationUrl ||
+                                                        !integration.documentationUrl.trim() ||
+                                                        integration.documentationUrl.startsWith('file://') ||
+                                                        pendingDocIds.has(integration.id)
+                                                    }
+                                                    title={
+                                                        integration.documentationUrl?.startsWith('file://')
+                                                            ? "Cannot refresh file uploads"
+                                                            : !integration.documentationUrl || !integration.documentationUrl.trim()
+                                                                ? "No documentation URL to refresh"
+                                                                : "Refresh documentation from URL"
+                                                    }
+                                                >
+                                                    <FileDown className="h-4 w-4" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-destructive hover:text-destructive"
+                                                    onClick={() => {
+                                                        setIntegrationToDelete(integration);
+                                                        setDeleteDialogOpen(true);
+                                                    }}
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
                                             </div>
-                                            <div className="flex items-center gap-2">
-                                                <DocStatus
-                                                    pending={pendingDocIds.has(integration.id)}
-                                                    hasDocumentation={hasDocumentation(integration)}
-                                                />
-                                                {(() => {
-                                                    const badge = getAuthBadge(integration);
-                                                    if (!badge) return null;
-
-                                                    const colorClasses = {
-                                                        blue: 'text-blue-800 dark:text-blue-300 bg-blue-500/10',
-                                                        amber: 'text-amber-800 dark:text-amber-300 bg-amber-500/10',
-                                                        green: 'text-green-800 dark:text-green-300 bg-green-500/10'
-                                                    };
-
-                                                    return (
-                                                        <span className={`text-xs ${colorClasses[badge.color]} px-2 py-0.5 rounded flex items-center gap-1`}>
-                                                            {badge.icon === 'clock' ? <Clock className="h-3 w-3" /> : <Key className="h-3 w-3" />}
-                                                            {badge.label}
-                                                        </span>
-                                                    );
-                                                })()}
-                                            </div>
-                                        </div>
-                                        <div className="ml-auto flex gap-2">
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                className="text-muted-foreground hover:text-primary"
-                                                onClick={() => router.push(`/workflows?integration=${integration.id}`)}
-                                                title="Build workflow with this integration"
-                                            >
-                                                <Sparkles className="h-4 w-4 mr-2" />
-                                                Build Workflow
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-8 w-8 text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
-                                                onClick={() => handleEdit(integration)}
-                                                disabled={pendingDocIds.has(integration.id)}
-                                                title={pendingDocIds.has(integration.id) ? "Documentation is being processed" : "Edit integration"}
-                                            >
-                                                <Pencil className="h-4 w-4" />
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-8 w-8 text-muted-foreground hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                                                onClick={() => handleRefreshDocs(integration.id)}
-                                                disabled={
-                                                    !integration.documentationUrl ||
-                                                    !integration.documentationUrl.trim() ||
-                                                    integration.documentationUrl.startsWith('file://') ||
-                                                    pendingDocIds.has(integration.id)
-                                                }
-                                                title={
-                                                    integration.documentationUrl?.startsWith('file://')
-                                                        ? "Cannot refresh file uploads"
-                                                        : !integration.documentationUrl || !integration.documentationUrl.trim()
-                                                            ? "No documentation URL to refresh"
-                                                            : "Refresh documentation from URL"
-                                                }
-                                            >
-                                                <FileDown className="h-4 w-4" />
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-8 w-8 text-destructive hover:text-destructive"
-                                                onClick={() => {
-                                                    setIntegrationToDelete(integration);
-                                                    setDeleteDialogOpen(true);
-                                                }}
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                             <div className="flex justify-between items-center mt-4">
                                 <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}>Previous</Button>
                                 <span className="text-sm text-muted-foreground">Page {page + 1} of {totalPages}</span>

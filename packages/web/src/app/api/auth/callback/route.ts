@@ -203,16 +203,18 @@ export async function GET(request: NextRequest) {
         const tokenData = await exchangeCodeForToken(code, integration, redirectUri, state);
 
         // Update integration with new tokens
+        const updatedCredentials = {
+            ...integration.credentials,
+            access_token: tokenData.access_token,
+            refresh_token: tokenData.refresh_token || integration.credentials.refresh_token,
+            token_type: tokenData.token_type || 'Bearer',
+            expires_at: tokenData.expires_at || (tokenData.expires_in ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString() : undefined),
+        };
+
         await client.upsertIntegration(
             integrationId,
             {
-                credentials: {
-                    ...integration.credentials,
-                    access_token: tokenData.access_token,
-                    refresh_token: tokenData.refresh_token || integration.credentials.refresh_token,
-                    token_type: tokenData.token_type || 'Bearer',
-                    expires_at: tokenData.expires_at || (tokenData.expires_in ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString() : undefined),
-                },
+                credentials: updatedCredentials,
             },
             UpsertMode.UPDATE
         );
@@ -233,10 +235,14 @@ export async function GET(request: NextRequest) {
                 <script>
                     // Try to close the window if it's a popup
                     if (window.opener) {
-                        window.close();
+                        try {
+                            window.opener.postMessage({ type: 'oauth-success', integrationId: '${integrationId}' }, '${origin}');
+                        } catch (e) {
+                            console.error('Failed to notify parent window:', e);
+                        }
+                        setTimeout(() => window.close(), 100);
                     } else {
-                        // Otherwise redirect to integrations page
-                        window.location.href = '${origin}/integrations';
+                        window.location.href = '${origin}/integrations?success=oauth_completed&integration=${integrationId}';
                     }
                 </script>
             </body>
@@ -264,7 +270,16 @@ export async function GET(request: NextRequest) {
                     <p style="margin-top: 20px;">You can close this window and try again.</p>
                 </div>
                 <script>
-                    // Close popup after a delay, or redirect if not a popup
+                    if (window.opener) {
+                        try {
+                            window.opener.postMessage({ 
+                                type: 'oauth-error', 
+                                message: '${errorMessage.replace(/'/g, "\\'")}'
+                            }, '${origin}');
+                        } catch (e) {
+                            console.error('Failed to notify parent window:', e);
+                        }
+                    }
                     setTimeout(() => {
                         if (window.opener) {
                             window.close();

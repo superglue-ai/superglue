@@ -16,10 +16,10 @@ import { URLField } from '@/src/components/utils/URLField';
 import { useToast } from '@/src/hooks/use-toast';
 import { cn, composeUrl } from '@/src/lib/utils';
 import type { Integration } from '@superglue/client';
-import { SuperglueClient } from '@superglue/client';
+
 import { getOAuthConfig, integrations } from '@superglue/shared';
-import { Check, ChevronRight, ChevronsUpDown, Copy, Globe, Key, Link } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Check, ChevronRight, ChevronsUpDown, Copy, Globe, Link } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 
 export interface IntegrationFormProps {
     integration?: Integration;
@@ -91,7 +91,8 @@ export function IntegrationForm({
             access_token: creds.access_token || '',
             refresh_token: creds.refresh_token || '',
             scopes: creds.scopes || '',
-            expires_at: creds.expires_at || ''
+            expires_at: creds.expires_at || '',
+            token_type: creds.token_type || 'Bearer'
         };
     });
 
@@ -112,16 +113,13 @@ export function IntegrationForm({
         // Check if existing integration has file upload
         integration?.documentationUrl?.startsWith('file://') || false
     );
-    const [oauthConnecting, setOauthConnecting] = useState(false);
+
     const urlFieldRef = useRef<any>(null);
     const isEditing = !!integration;
     const config = useConfig();
     const { toast } = useToast();
 
-    const client = useMemo(() => new SuperglueClient({
-        endpoint: config.superglueEndpoint,
-        apiKey: config.superglueApiKey,
-    }), [config.superglueEndpoint, config.superglueApiKey]);
+
 
     // Pre-fill OAuth URLs when auth type changes to OAuth
     useEffect(() => {
@@ -234,13 +232,15 @@ export function IntegrationForm({
         if (!id.trim()) errors.id = true;
         if (!urlHost.trim()) errors.urlHost = true;
         if (specificInstructions.length > 2000) errors.specificInstructions = true;
-        setValidationErrors(errors);
-        if (Object.keys(errors).length > 0) return;
 
         let creds = {};
 
         // Build credentials based on auth type
         if (authType === 'oauth') {
+            // Validate OAuth required fields
+            if (!oauthFields.client_id) errors.client_id = true;
+            if (!oauthFields.client_secret) errors.client_secret = true;
+
             // Start with OAuth fields
             const oauthCreds = Object.fromEntries(
                 Object.entries({
@@ -268,7 +268,8 @@ export function IntegrationForm({
             }
         }
 
-        setValidationErrors({});
+        setValidationErrors(errors);
+        if (Object.keys(errors).length > 0) return;
 
         // Create the integration object
         const integrationData = {
@@ -280,8 +281,26 @@ export function IntegrationForm({
             specificInstructions: specificInstructions.trim(),
             credentials: creds,
         };
-        console.log('integrationData', integrationData)
-        onSave(integrationData);
+
+        // Save the integration first
+        await onSave(integrationData);
+
+        // If OAuth and not already configured, trigger OAuth flow
+        if (authType === 'oauth' && (!oauthFields.access_token || !oauthFields.refresh_token)) {
+            const authUrl = buildOAuthUrl();
+            if (authUrl) {
+                const width = 600;
+                const height = 700;
+                const left = (window.screen.width - width) / 2;
+                const top = (window.screen.height - height) / 2;
+
+                const popup = window.open(
+                    authUrl,
+                    'oauth_popup',
+                    `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
+                );
+            }
+        }
     };
 
     // Generate OAuth callback URL
@@ -546,7 +565,7 @@ export function IntegrationForm({
                                         value={oauthFields.client_id}
                                         onChange={e => setOauthFields(prev => ({ ...prev, client_id: e.target.value }))}
                                         placeholder="Your OAuth app client ID"
-                                        className="h-9"
+                                        className={cn("h-9", validationErrors.client_id && inputErrorStyles)}
                                         autoComplete="off"
                                     />
                                 </div>
@@ -561,7 +580,7 @@ export function IntegrationForm({
                                         value={oauthFields.client_secret}
                                         onChange={e => setOauthFields(prev => ({ ...prev, client_secret: e.target.value }))}
                                         placeholder="Your OAuth app client secret"
-                                        className="h-9"
+                                        className={cn("h-9", validationErrors.client_secret && inputErrorStyles)}
                                         autoComplete="new-password"
                                     />
                                 </div>
@@ -588,124 +607,7 @@ export function IntegrationForm({
                                 </div>
                             </div>
 
-                            {oauthFields.client_id && oauthFields.client_secret && (buildOAuthUrl() !== null) && (
-                                <Button
-                                    type="button"
-                                    variant={oauthFields.access_token && oauthFields.refresh_token ? "outline" : "default"}
-                                    size="sm"
-                                    className="w-full"
-                                    disabled={oauthConnecting}
-                                    onClick={async () => {
-                                        // First save/upsert the integration
-                                        const errors: Record<string, boolean> = {};
-                                        if (!id.trim()) errors.id = true;
-                                        if (!urlHost.trim()) errors.urlHost = true;
-                                        if (specificInstructions.length > 2000) errors.specificInstructions = true;
 
-                                        if (Object.keys(errors).length > 0) {
-                                            setValidationErrors(errors);
-                                            toast({
-                                                title: 'Validation Error',
-                                                description: 'Please fill in all required fields before connecting OAuth',
-                                                variant: 'destructive',
-                                            });
-                                            return;
-                                        }
-
-                                        // Build credentials
-                                        const oauthCreds = Object.fromEntries(
-                                            Object.entries({
-                                                ...oauthFields,
-                                                scopes: oauthFields.scopes || integrations[selectedIntegration]?.oauth?.scopes || ''
-                                            }).filter(([_, value]) => value !== '')
-                                        );
-
-                                        // Parse and merge additional credentials if provided
-                                        let additionalCreds = {};
-                                        try {
-                                            additionalCreds = JSON.parse(apiKeyCredentials);
-                                        } catch {
-                                            // If parsing fails, just use OAuth credentials
-                                        }
-
-                                        // Merge OAuth and additional credentials
-                                        const creds = { ...oauthCreds, ...additionalCreds };
-
-                                        // Create integration data
-                                        const integrationData = {
-                                            id: isEditing ? integration!.id : id.trim(),
-                                            urlHost: urlHost.trim(),
-                                            urlPath: urlPath.trim(),
-                                            documentationUrl: documentationUrl.trim(),
-                                            documentation: documentation.trim(),
-                                            specificInstructions: specificInstructions.trim(),
-                                            credentials: creds,
-                                        };
-
-                                        try {
-                                            // Save the integration first
-                                            await client.upsertIntegration(integrationData.id, integrationData);
-
-                                            // Open OAuth in a popup window
-                                            const authUrl = buildOAuthUrl();
-                                            if (authUrl) {
-                                                setOauthConnecting(true);
-                                                const width = 600;
-                                                const height = 700;
-                                                const left = (window.screen.width - width) / 2;
-                                                const top = (window.screen.height - height) / 2;
-
-                                                const popup = window.open(
-                                                    authUrl,
-                                                    'oauth_popup',
-                                                    `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
-                                                );
-
-                                                // Poll to detect when popup is closed
-                                                const checkPopup = setInterval(() => {
-                                                    if (popup && popup.closed) {
-                                                        clearInterval(checkPopup);
-                                                        setOauthConnecting(false);
-
-                                                        // Refresh the integration to get updated OAuth status
-                                                        client.getIntegration(integrationData.id).then(updated => {
-                                                            if (updated && updated.credentials?.access_token) {
-                                                                // Update local OAuth fields with the new tokens
-                                                                setOauthFields(prev => ({
-                                                                    ...prev,
-                                                                    access_token: updated.credentials.access_token || '',
-                                                                    refresh_token: updated.credentials.refresh_token || prev.refresh_token,
-                                                                    expires_at: updated.credentials.expires_at || ''
-                                                                }));
-                                                                toast({
-                                                                    title: 'OAuth Connected',
-                                                                    description: 'Successfully connected with OAuth',
-                                                                });
-                                                            }
-                                                        }).catch(err => {
-                                                            console.error('Failed to refresh integration:', err);
-                                                        });
-                                                    }
-                                                }, 500);
-                                            }
-                                        } catch (error) {
-                                            toast({
-                                                title: 'Error',
-                                                description: 'Failed to save integration before OAuth connection',
-                                                variant: 'destructive',
-                                            });
-                                        }
-                                    }}
-                                >
-                                    <Key className="h-4 w-4 mr-2" />
-                                    {oauthConnecting
-                                        ? 'Connecting...'
-                                        : oauthFields.access_token && oauthFields.refresh_token
-                                            ? 'Reconnect with OAuth'
-                                            : 'Connect with OAuth'
-                                    }
-                                </Button>
-                            )}
                         </div>
                     )}
 
