@@ -21,11 +21,53 @@ import type { Integration } from '@superglue/client';
 import { SuperglueClient, UpsertMode } from '@superglue/client';
 import { integrations as integrationTemplates } from '@superglue/shared';
 import { waitForIntegrationProcessing } from '@superglue/shared/utils';
-import { FileDown, Globe, Key, Pencil, Plus, RotateCw, Sparkles, Trash2 } from 'lucide-react';
+import { Clock, FileDown, Globe, Key, Pencil, Plus, RotateCw, Sparkles, Trash2 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import type { SimpleIcon } from 'simple-icons';
 import * as simpleIcons from 'simple-icons';
+
+// Single source of truth for auth type detection
+export const detectAuthType = (credentials: any): 'oauth' | 'apikey' | 'none' => {
+    if (!credentials || Object.keys(credentials).length === 0) return 'none';
+
+    // Check for OAuth-specific fields
+    if (credentials.client_id || credentials.client_secret || credentials.auth_url || credentials.token_url) {
+        return 'oauth';
+    }
+
+    // If has any other credentials, it's API key
+    return 'apikey';
+};
+
+// Helper to determine auth badge status
+export const getAuthBadge = (integration: Integration): {
+    type: 'oauth-configured' | 'oauth-pending' | 'apikey' | 'none',
+    label: string,
+    color: 'blue' | 'amber' | 'green',
+    icon: 'key' | 'clock'
+} | null => {
+    const creds = integration.credentials || {};
+    const authType = detectAuthType(creds);
+
+    if (authType === 'none') {
+        return { type: 'none', label: 'No auth', color: 'amber', icon: 'key' };
+    }
+
+    if (authType === 'oauth') {
+        // OAuth is configured only when BOTH access_token AND refresh_token are present
+        const isConfigured = !!(creds.access_token && creds.refresh_token);
+        return isConfigured
+            ? { type: 'oauth-configured', label: 'OAuth configured', color: 'blue', icon: 'key' }
+            : { type: 'oauth-pending', label: 'OAuth pending', color: 'amber', icon: 'clock' };
+    }
+
+    if (authType === 'apikey') {
+        return { type: 'apikey', label: 'API Key', color: 'green', icon: 'key' };
+    }
+
+    return null;
+};
 
 export default function IntegrationsPage() {
     const config = useConfig();
@@ -33,7 +75,7 @@ export default function IntegrationsPage() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const { integrations, pendingDocIds, loading: initialLoading, refreshIntegrations, setPendingDocIds } = useIntegrations();
-    
+
     // Handle OAuth callback messages
     useEffect(() => {
         const success = searchParams.get('success');
@@ -49,6 +91,8 @@ export default function IntegrationsPage() {
             });
             // Clear the URL params
             window.history.replaceState({}, '', '/integrations');
+            // Refresh integrations to show updated OAuth status
+            refreshIntegrations();
         } else if (error) {
             toast({
                 title: 'OAuth Error',
@@ -58,7 +102,7 @@ export default function IntegrationsPage() {
             // Clear the URL params
             window.history.replaceState({}, '', '/integrations');
         }
-    }, [searchParams, toast]);
+    }, [searchParams, toast, refreshIntegrations]);
 
     const client = useMemo(() => new SuperglueClient({
         endpoint: config.superglueEndpoint,
@@ -259,13 +303,7 @@ export default function IntegrationsPage() {
     }
 
 
-    // Helper to determine auth type
-    const getAuthType = (integration: Integration) => {
-        const creds = integration.credentials || {};
-        if (Object.keys(creds).length === 0) return 'none';
-        if (creds.client_id || creds.client_secret || creds.access_token || creds.refresh_token) return 'oauth';
-        return 'apikey';
-    };
+
 
     const handleRefresh = async () => {
         setIsRefreshing(true);
@@ -347,21 +385,23 @@ export default function IntegrationsPage() {
                                                     pending={pendingDocIds.has(integration.id)}
                                                     hasDocumentation={hasDocumentation(integration)}
                                                 />
-                                                {getAuthType(integration) === 'oauth' && (
-                                                    <span className="text-xs text-blue-800 dark:text-blue-300 bg-blue-500/10 px-2 py-0.5 rounded flex items-center gap-1">
-                                                        <Key className="h-3 w-3" />
-                                                        OAuth
-                                                    </span>
-                                                )}
-                                                {getAuthType(integration) === 'apikey' && (
-                                                    <span className="text-xs text-green-800 dark:text-green-300 bg-green-500/10 px-2 py-0.5 rounded flex items-center gap-1">
-                                                        <Key className="h-3 w-3" />
-                                                        API Key
-                                                    </span>
-                                                )}
-                                                {getAuthType(integration) === 'none' && (
-                                                    <span className="text-xs text-amber-800 dark:text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded">No auth</span>
-                                                )}
+                                                {(() => {
+                                                    const badge = getAuthBadge(integration);
+                                                    if (!badge) return null;
+
+                                                    const colorClasses = {
+                                                        blue: 'text-blue-800 dark:text-blue-300 bg-blue-500/10',
+                                                        amber: 'text-amber-800 dark:text-amber-300 bg-amber-500/10',
+                                                        green: 'text-green-800 dark:text-green-300 bg-green-500/10'
+                                                    };
+
+                                                    return (
+                                                        <span className={`text-xs ${colorClasses[badge.color]} px-2 py-0.5 rounded flex items-center gap-1`}>
+                                                            {badge.icon === 'clock' ? <Clock className="h-3 w-3" /> : <Key className="h-3 w-3" />}
+                                                            {badge.label}
+                                                        </span>
+                                                    );
+                                                })()}
                                             </div>
                                         </div>
                                         <div className="ml-auto flex gap-2">

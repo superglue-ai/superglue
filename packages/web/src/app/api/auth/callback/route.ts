@@ -8,6 +8,7 @@ interface OAuthState {
     apiKey: string;
     timestamp: number;
     integrationId: string;
+    redirectUri?: string;
 }
 
 interface OAuthTokenResponse {
@@ -20,15 +21,15 @@ interface OAuthTokenResponse {
 
 function getTokenUrl(integration: any): string {
     // Check known integrations
-    const knownIntegration = Object.entries(integrations).find(([key]) => 
+    const knownIntegration = Object.entries(integrations).find(([key]) =>
         integration.id === key || integration.urlHost.includes(key)
     );
-    
+
     if (knownIntegration) {
         const [_, config] = knownIntegration;
         return config.oauth?.tokenUrl || `${integration.urlHost}/oauth/token`;
     }
-    
+
     // Custom token URL or default
     return integration.credentials?.token_url || `${integration.urlHost}/oauth/token`;
 }
@@ -40,19 +41,19 @@ function validateOAuthState(state: string | null, expectedIntegrationId: string)
 
     try {
         const stateData = JSON.parse(atob(state)) as OAuthState;
-        
+
         if (!stateData.apiKey || !stateData.timestamp || !stateData.integrationId) {
             throw new Error('Invalid OAuth state structure');
         }
-        
+
         if (Date.now() - stateData.timestamp >= OAUTH_STATE_EXPIRY_MS) {
             throw new Error('OAuth state expired. Please try again.');
         }
-        
+
         if (stateData.integrationId !== expectedIntegrationId) {
             throw new Error('Integration ID mismatch. Possible CSRF attempt.');
         }
-        
+
         return stateData;
     } catch (error) {
         if (error instanceof Error && error.message.includes('OAuth')) {
@@ -69,7 +70,7 @@ async function exchangeCodeForToken(
     state?: string
 ): Promise<OAuthTokenResponse> {
     const { client_id, client_secret } = integration.credentials || {};
-    
+
     if (!client_id || !client_secret) {
         throw new Error('OAuth client credentials not configured');
     }
@@ -108,8 +109,26 @@ function buildRedirectUrl(origin: string, path: string, params: Record<string, s
 }
 
 export async function GET(request: NextRequest) {
-    const { searchParams, origin } = request.nextUrl;
-    
+    const { searchParams } = request.nextUrl;
+
+    // Get the correct origin
+    const forwardedHost = request.headers.get('x-forwarded-host');
+    const forwardedProto = request.headers.get('x-forwarded-proto') || 'https';
+    const host = request.headers.get('host');
+
+    // Determine the correct origin:
+    // 1. Use x-forwarded-host if available
+    // 2. Use host header with forwarded proto if x-forwarded-proto is set
+    // 3. Fall back to request origin
+    let origin: string;
+    if (forwardedHost) {
+        origin = `${forwardedProto}://${forwardedHost}`;
+    } else if (request.headers.get('x-forwarded-proto') && host) {
+        origin = `${forwardedProto}://${host}`;
+    } else {
+        origin = request.nextUrl.origin;
+    }
+
     // Extract OAuth parameters
     const code = searchParams.get('code');
     const state = searchParams.get('state');
@@ -118,18 +137,41 @@ export async function GET(request: NextRequest) {
 
     // Handle OAuth provider errors
     if (error) {
-        return NextResponse.redirect(
-            buildRedirectUrl(origin, '/integrations', {
-                error: 'oauth_failed',
-                description: errorDescription || error
-            })
-        );
+        const errorMsg = errorDescription || error;
+        const html = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>OAuth Error</title>
+            </head>
+            <body>
+                <div style="text-align: center; padding: 50px; font-family: system-ui;">
+                    <h2 style="color: #dc2626;">OAuth Authorization Failed</h2>
+                    <p>${errorMsg}</p>
+                    <p style="margin-top: 20px;">You can close this window and try again.</p>
+                </div>
+                <script>
+                    setTimeout(() => {
+                        if (window.opener) {
+                            window.close();
+                        } else {
+                            window.location.href = '${origin}/integrations?error=oauth_failed&description=' + encodeURIComponent('${errorMsg}');
+                        }
+                    }, 3000);
+                </script>
+            </body>
+            </html>
+        `;
+
+        return new Response(html, {
+            headers: { 'Content-Type': 'text/html' },
+        });
     }
 
     if (!code || !state) {
         return NextResponse.redirect(
-            buildRedirectUrl(origin, '/integrations', { 
-                error: !code ? 'no_code' : 'no_state' 
+            buildRedirectUrl(origin, '/integrations', {
+                error: !code ? 'no_code' : 'no_state'
             })
         );
     }
@@ -138,12 +180,12 @@ export async function GET(request: NextRequest) {
         // Extract integration ID from state
         const stateData = JSON.parse(atob(state)) as OAuthState;
         const { integrationId, apiKey, timestamp } = stateData;
-        
+
         // Validate state timestamp
         if (Date.now() - timestamp >= OAUTH_STATE_EXPIRY_MS) {
             throw new Error('OAuth state expired. Please try again.');
         }
-        
+
         // Initialize client
         const client = new SuperglueClient({
             endpoint: process.env.GRAPHQL_ENDPOINT || `http://localhost:${process.env.GRAPHQL_PORT}`,
@@ -157,7 +199,7 @@ export async function GET(request: NextRequest) {
         }
 
         // Exchange code for tokens
-        const redirectUri = `${origin}/api/auth/callback`;
+        const redirectUri = stateData.redirectUri || `${origin}/api/auth/callback`;
         const tokenData = await exchangeCodeForToken(code, integration, redirectUri, state);
 
         // Update integration with new tokens
@@ -175,19 +217,68 @@ export async function GET(request: NextRequest) {
             UpsertMode.UPDATE
         );
 
-        return NextResponse.redirect(
-            buildRedirectUrl(origin, '/integrations', {
-                success: 'oauth_completed',
-                integration: integrationId
-            })
-        );
+        // Check if this is a popup window (opened by window.open)
+        // If so, close it. Otherwise redirect normally.
+        const html = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>OAuth Success</title>
+            </head>
+            <body>
+                <div style="text-align: center; padding: 50px; font-family: system-ui;">
+                    <h2>OAuth Connection Successful!</h2>
+                    <p>You can close this window now.</p>
+                </div>
+                <script>
+                    // Try to close the window if it's a popup
+                    if (window.opener) {
+                        window.close();
+                    } else {
+                        // Otherwise redirect to integrations page
+                        window.location.href = '${origin}/integrations';
+                    }
+                </script>
+            </body>
+            </html>
+        `;
+
+        return new Response(html, {
+            headers: { 'Content-Type': 'text/html' },
+        });
     } catch (error) {
         console.error('OAuth callback error:', error);
-        return NextResponse.redirect(
-            buildRedirectUrl(origin, '/integrations', {
-                error: 'oauth_error',
-                message: error instanceof Error ? error.message : 'Unknown error'
-            })
-        );
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+        // Handle popup window case for errors too
+        const html = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>OAuth Error</title>
+            </head>
+            <body>
+                <div style="text-align: center; padding: 50px; font-family: system-ui;">
+                    <h2 style="color: #dc2626;">OAuth Connection Failed</h2>
+                    <p>${errorMessage}</p>
+                    <p style="margin-top: 20px;">You can close this window and try again.</p>
+                </div>
+                <script>
+                    // Close popup after a delay, or redirect if not a popup
+                    setTimeout(() => {
+                        if (window.opener) {
+                            window.close();
+                        } else {
+                            window.location.href = '${origin}/integrations?error=oauth_error&message=' + encodeURIComponent('${errorMessage}');
+                        }
+                    }, 3000);
+                </script>
+            </body>
+            </html>
+        `;
+
+        return new Response(html, {
+            headers: { 'Content-Type': 'text/html' },
+        });
     }
 }

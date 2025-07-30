@@ -1,4 +1,5 @@
 import { useConfig } from '@/src/app/config-context';
+import { detectAuthType } from '@/src/app/integrations/page';
 import { Badge } from '@/src/components/ui/badge';
 import { Button } from '@/src/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/src/components/ui/card';
@@ -75,21 +76,9 @@ export function IntegrationForm({
     // Add state to track if user manually edited the ID
     const [isIdManuallyEdited, setIsIdManuallyEdited] = useState(false);
 
-    const detectAuthType = (creds: any) => {
-        if (!integration) return 'apikey';
-        if (!creds || Object.keys(creds).length === 0) return 'none'; // Changed from 'none' to 'apikey'
-        if (creds.client_id || creds.client_secret || creds.access_token || creds.refresh_token) return 'oauth';
-        return 'apikey';
-    };
-
-    const [authType, setAuthType] = useState<'none' | 'oauth' | 'apikey'>(() => {
-        try {
-            const creds = integration?.credentials || {};
-            return detectAuthType(creds);
-        } catch {
-            return 'apikey'; // Changed from 'none' to 'apikey'
-        }
-    });
+    // Initialize auth type
+    const initialAuthType = !integration ? 'apikey' : detectAuthType(integration.credentials || {});
+    const [authType, setAuthType] = useState<'none' | 'oauth' | 'apikey'>(initialAuthType);
 
     // Initialize OAuth fields
     const [oauthFields, setOauthFields] = useState(() => {
@@ -110,8 +99,7 @@ export function IntegrationForm({
     const [apiKeyCredentials, setApiKeyCredentials] = useState(() => {
         const creds = integration?.credentials || {};
         // For OAuth integrations, only include non-OAuth fields in the additional credentials
-        const detectedAuthType = detectAuthType(creds);
-        if (detectedAuthType === 'oauth' && integration) {
+        if (initialAuthType === 'oauth' && integration) {
             const { client_id, client_secret, auth_url, token_url, access_token, refresh_token, scopes, expires_at, ...additionalCreds } = creds;
             return Object.keys(additionalCreds).length > 0 ? JSON.stringify(additionalCreds, null, 2) : '{}';
         }
@@ -124,6 +112,7 @@ export function IntegrationForm({
         // Check if existing integration has file upload
         integration?.documentationUrl?.startsWith('file://') || false
     );
+    const [oauthConnecting, setOauthConnecting] = useState(false);
     const urlFieldRef = useRef<any>(null);
     const isEditing = !!integration;
     const config = useConfig();
@@ -347,11 +336,15 @@ export function IntegrationForm({
                 redirect_uri: redirectUri,
                 response_type: 'code',
                 state: btoa(JSON.stringify({
-                    integrationId,  // This is the key part
+                    integrationId,
                     timestamp: Date.now(),
-                    apiKey: config.superglueApiKey
+                    apiKey: config.superglueApiKey,
+                    redirectUri,
                 })),
             });
+
+            console.log('params', params.toString())
+            console.log('redirectUri', redirectUri)
 
             // Use explicitly set scopes or fall back to defaults
             const finalScopes = scopes || defaultScopes;
@@ -601,6 +594,7 @@ export function IntegrationForm({
                                     variant={oauthFields.access_token && oauthFields.refresh_token ? "outline" : "default"}
                                     size="sm"
                                     className="w-full"
+                                    disabled={oauthConnecting}
                                     onClick={async () => {
                                         // First save/upsert the integration
                                         const errors: Record<string, boolean> = {};
@@ -652,10 +646,47 @@ export function IntegrationForm({
                                             // Save the integration first
                                             await client.upsertIntegration(integrationData.id, integrationData);
 
-                                            // Then open OAuth URL
+                                            // Open OAuth in a popup window
                                             const authUrl = buildOAuthUrl();
                                             if (authUrl) {
-                                                window.open(authUrl, '_blank');
+                                                setOauthConnecting(true);
+                                                const width = 600;
+                                                const height = 700;
+                                                const left = (window.screen.width - width) / 2;
+                                                const top = (window.screen.height - height) / 2;
+
+                                                const popup = window.open(
+                                                    authUrl,
+                                                    'oauth_popup',
+                                                    `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
+                                                );
+
+                                                // Poll to detect when popup is closed
+                                                const checkPopup = setInterval(() => {
+                                                    if (popup && popup.closed) {
+                                                        clearInterval(checkPopup);
+                                                        setOauthConnecting(false);
+
+                                                        // Refresh the integration to get updated OAuth status
+                                                        client.getIntegration(integrationData.id).then(updated => {
+                                                            if (updated && updated.credentials?.access_token) {
+                                                                // Update local OAuth fields with the new tokens
+                                                                setOauthFields(prev => ({
+                                                                    ...prev,
+                                                                    access_token: updated.credentials.access_token || '',
+                                                                    refresh_token: updated.credentials.refresh_token || prev.refresh_token,
+                                                                    expires_at: updated.credentials.expires_at || ''
+                                                                }));
+                                                                toast({
+                                                                    title: 'OAuth Connected',
+                                                                    description: 'Successfully connected with OAuth',
+                                                                });
+                                                            }
+                                                        }).catch(err => {
+                                                            console.error('Failed to refresh integration:', err);
+                                                        });
+                                                    }
+                                                }, 500);
                                             }
                                         } catch (error) {
                                             toast({
@@ -667,7 +698,12 @@ export function IntegrationForm({
                                     }}
                                 >
                                     <Key className="h-4 w-4 mr-2" />
-                                    {oauthFields.access_token && oauthFields.refresh_token ? 'Reconnect with OAuth' : 'Connect with OAuth'}
+                                    {oauthConnecting
+                                        ? 'Connecting...'
+                                        : oauthFields.access_token && oauthFields.refresh_token
+                                            ? 'Reconnect with OAuth'
+                                            : 'Connect with OAuth'
+                                    }
                                 </Button>
                             )}
                         </div>
