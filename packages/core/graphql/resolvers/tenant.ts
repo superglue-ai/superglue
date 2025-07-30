@@ -1,4 +1,4 @@
-import type { DataStore } from "@superglue/shared";
+import { DataStore } from "../../datastore/types.js";
 
 export const getTenantInfoResolver = async (
   _: any,

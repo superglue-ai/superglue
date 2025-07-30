@@ -1,5 +1,5 @@
-import { Context } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
+import { Context } from '../types.js';
 
 export const listApisResolver = async (
   _: any,

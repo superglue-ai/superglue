@@ -1,6 +1,6 @@
-import { Context } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { telemetryClient } from "../../utils/telemetry.js";
+import { Context } from '../types.js';
 
 export const getApiResolver = async (
   _: any,

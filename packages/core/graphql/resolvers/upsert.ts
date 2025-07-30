@@ -1,6 +1,6 @@
 import { ApiConfig, ExtractConfig, TransformConfig } from "@superglue/client";
-import { Context } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
+import { Context } from '../types.js';
 
 function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined, defaultValue?: T): T | undefined {
   if (newValue === null) return undefined;

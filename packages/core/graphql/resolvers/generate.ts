@@ -1,11 +1,11 @@
 import { Integration } from "@superglue/client";
-import { Context, Metadata } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { executeTool, ToolCall } from "../../tools/tools.js";
 import { InstructionGenerationContext } from "../../utils/instructions.js";
 import { generateSchema } from "../../utils/schema.js";
 import { telemetryClient } from "../../utils/telemetry.js";
 import { getSchemaFromData } from "../../utils/tools.js";
+import { Context, Metadata } from '../types.js';
 
 export const generateSchemaResolver = async (
   _: any,
