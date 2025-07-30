@@ -1,5 +1,6 @@
 import { useConfig } from '@/src/app/config-context';
 import { useIntegrations } from '@/src/app/integrations-context';
+import { getAuthBadge } from '@/src/app/integrations/page';
 import { IntegrationForm } from '@/src/components/integrations/IntegrationForm';
 import { useToast } from '@/src/hooks/use-toast';
 import { inputErrorStyles, needsUIToTriggerDocFetch, parseCredentialsHelper } from '@/src/lib/client-utils';
@@ -7,7 +8,7 @@ import { cn, composeUrl } from '@/src/lib/utils';
 import { Integration, IntegrationInput, SuperglueClient, UpsertMode, Workflow, WorkflowResult } from '@superglue/client';
 import { findMatchingIntegration, integrations as integrationTemplates } from "@superglue/shared";
 import { flattenAndNamespaceWorkflowCredentials, waitForIntegrationProcessing } from '@superglue/shared/utils';
-import { ArrowRight, Check, ChevronRight, FileText, Globe, Loader2, Pencil, Play, Plus, Workflow as WorkflowIcon, X } from 'lucide-react';
+import { ArrowRight, Check, ChevronRight, Clock, FileText, Globe, Key, Loader2, Pencil, Play, Plus, Workflow as WorkflowIcon, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
@@ -738,9 +739,21 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                                     pending={pendingDocIds.has(sys.id)}
                                     hasDocumentation={hasDocumentation(sys)}
                                   />
-                                  {(!sys.credentials || Object.keys(sys.credentials).length === 0) && (
-                                    <span className="text-xs text-amber-800 dark:text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded">No credentials</span>
-                                  )}
+                                  {(() => {
+                                    const badge = getAuthBadge(sys);
+                                    const colorClasses = {
+                                      blue: 'text-blue-800 dark:text-blue-300 bg-blue-500/10',
+                                      amber: 'text-amber-800 dark:text-amber-300 bg-amber-500/10',
+                                      green: 'text-green-800 dark:text-green-300 bg-green-500/10'
+                                    };
+
+                                    return (
+                                      <span className={`text-xs ${colorClasses[badge.color]} px-2 py-0.5 rounded flex items-center gap-1`}>
+                                        {badge.icon === 'clock' ? <Clock className="h-3 w-3" /> : <Key className="h-3 w-3" />}
+                                        {badge.label}
+                                      </span>
+                                    );
+                                  })()}
                                 </div>
                               </div>
                             </div>
