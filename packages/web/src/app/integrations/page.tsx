@@ -247,14 +247,14 @@ export default function IntegrationsPage() {
         setAddFormOpen(true);
     };
 
-    const handleSave = async (integration: Integration) => {
+    const handleSave = async (integration: Integration): Promise<Integration | null> => {
         try {
             if (integration.id) {
                 const mode = editingIntegration ? UpsertMode.UPDATE : UpsertMode.CREATE;
                 const savedIntegration = await client.upsertIntegration(integration.id, integration, mode);
-                const needsDocFetch = needsUIToTriggerDocFetch(savedIntegration, editingIntegration);
+                const willTriggerDocFetch = needsUIToTriggerDocFetch(savedIntegration, editingIntegration);
 
-                if (needsDocFetch) {
+                if (willTriggerDocFetch) {
                     setPendingDocIds(prev => new Set([...prev, savedIntegration.id]));
 
                     // Fire-and-forget poller for background doc fetch
@@ -271,7 +271,10 @@ export default function IntegrationsPage() {
                 setEditingIntegration(null);
                 setAddFormOpen(false);
                 await refreshIntegrations();
+
+                return savedIntegration; // Return the saved integration with correct ID
             }
+            return null;
         } catch (error) {
             console.error('Error saving integration:', error);
             toast({
@@ -279,6 +282,7 @@ export default function IntegrationsPage() {
                 description: 'Failed to save integration',
                 variant: 'destructive',
             });
+            throw error; // Re-throw so the form can handle the error
         }
     };
 

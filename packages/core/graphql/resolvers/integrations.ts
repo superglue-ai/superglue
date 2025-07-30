@@ -14,23 +14,27 @@ function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined
   return defaultValue;
 }
 
-function needsDocFetch(input: Integration, oldIntegration?: Integration): boolean {
-  // If there's no documentation URL, no need to fetch
+function shouldTriggerDocFetch(input: Integration, oldIntegration?: Integration): boolean {
+  // If a doc fetch is already in progress, never trigger a new one
+  if (oldIntegration?.documentationPending === true) return false;
+
+  // If there's no documentation URL, no need to trigger
   if (!input.documentationUrl || !input.documentationUrl.trim()) return false;
-  // If documentationUrl is a file:// URL, no need to fetch
+
+  // If documentationUrl is a file:// URL, no need to trigger
   if (input.documentationUrl.startsWith('file://')) return false;
-  // If documentationPending is explicitly set to true, always fetch
-  // For URL-based docs, fetch if:
-  // 1. DocumentationPending is explicitly set to true
-  // 2. No old integration exists
-  // 3. URL/path has changed
-  // 4. Documentation URL has changed
-  if (input.documentationPending === true) return true;
+
+  // Trigger a fetch if:
+  // 1. This is a new integration (no old integration exists)
   if (!oldIntegration) return true;
-  if (input.urlHost !== oldIntegration.urlHost) return true;
-  if (input.urlPath !== oldIntegration.urlPath) return true;
+
+  // 2. The documentation URL has changed
   if (input.documentationUrl !== oldIntegration.documentationUrl) return true;
 
+  // 3. The URL host/path has changed (affects API endpoint discovery)
+  if (input.urlHost !== oldIntegration.urlHost) return true;
+  if (input.urlPath !== oldIntegration.urlPath) return true;
+  // Otherwise, don't trigger a new fetch
   return false;
 }
 
@@ -80,21 +84,25 @@ export const upsertIntegrationResolver = async (
   }
   try {
     const now = new Date();
-    const oldIntegration = await context.datastore.getIntegration(input.id, context.orgId);
-    
+
     if (mode === 'CREATE') {
-      input = enrichWithTemplate(input);
-      if (oldIntegration) {
+      const existingIntegration = await context.datastore.getIntegration(input.id, context.orgId);
+      if (existingIntegration) {
+        // ID already exists, generate a unique one
         input.id = await generateUniqueId({
           baseId: input.id,
           exists: async (id) => !!(await context.datastore.getIntegration(id, context.orgId))
         });
       }
-    } else if (mode === 'UPDATE' && !oldIntegration) {
+      input = enrichWithTemplate(input);
+    }
+    const oldIntegration = await context.datastore.getIntegration(input.id, context.orgId);
+
+    if (mode === 'UPDATE' && !oldIntegration) {
       throw new Error(`Integration with ID '${input.id}' not found.`);
     }
 
-    const shouldFetchDoc = needsDocFetch(input, oldIntegration);
+    const shouldFetchDoc = shouldTriggerDocFetch(input, oldIntegration);
 
     if (shouldFetchDoc) {
       // Fire-and-forget async doc fetch
@@ -161,7 +169,9 @@ export const upsertIntegrationResolver = async (
       documentation: resolveField(input.documentation, oldIntegration?.documentation, ''),
       openApiUrl: resolveField(input.openApiUrl, oldIntegration?.openApiUrl, ''),
       openApiSchema: resolveField(input.openApiSchema, oldIntegration?.openApiSchema, ''),
-      documentationPending: shouldFetchDoc,
+      // If we're starting a new fetch, set pending to true
+      // If we're not starting a new fetch, preserve the existing pending state
+      documentationPending: shouldFetchDoc ? true : (oldIntegration?.documentationPending || false),
       credentials: resolveField(input.credentials, oldIntegration?.credentials, {}),
       specificInstructions: resolveField(input.specificInstructions?.trim(), oldIntegration?.specificInstructions, ''),
       createdAt: oldIntegration?.createdAt || now,
@@ -211,7 +221,7 @@ export const findRelevantIntegrationsResolver = async (
 };
 
 function enrichWithTemplate(input: Integration): Integration {
-  const matchingTemplate = integrations[String(input.name || input.id).toLowerCase()] || 
+  const matchingTemplate = integrations[String(input.name || input.id).toLowerCase()] ||
     findMatchingIntegration(composeUrl(input.urlHost, input.urlPath))?.integration;
 
   if (!matchingTemplate) {

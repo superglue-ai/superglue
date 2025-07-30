@@ -3,9 +3,9 @@ import { useIntegrations } from '@/src/app/integrations-context';
 import { IntegrationForm } from '@/src/components/integrations/IntegrationForm';
 import { useToast } from '@/src/hooks/use-toast';
 import { inputErrorStyles, needsUIToTriggerDocFetch, parseCredentialsHelper } from '@/src/lib/client-utils';
-import { findMatchingIntegration, integrations as integrationTemplates } from "@superglue/shared"
 import { cn, composeUrl } from '@/src/lib/utils';
 import { Integration, IntegrationInput, SuperglueClient, UpsertMode, Workflow, WorkflowResult } from '@superglue/client';
+import { findMatchingIntegration, integrations as integrationTemplates } from "@superglue/shared";
 import { flattenAndNamespaceWorkflowCredentials, waitForIntegrationProcessing } from '@superglue/shared/utils';
 import { ArrowRight, Check, ChevronRight, FileText, Globe, Loader2, Pencil, Play, Plus, Workflow as WorkflowIcon, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -205,7 +205,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     return !!(integration.documentationUrl?.trim() && !pendingDocIds.has(integration.id));
   };
   // --- Integration Management (add/edit) ---
-  const handleIntegrationFormSave = async (integration: Integration) => {
+  const handleIntegrationFormSave = async (integration: Integration): Promise<Integration | null> => {
     // Close form immediately
     setShowIntegrationForm(false);
     setIntegrationFormEdit(null);
@@ -214,9 +214,9 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     try {
       const mode = integrationFormEdit ? UpsertMode.UPDATE : UpsertMode.CREATE;
       const savedIntegration = await client.upsertIntegration(integration.id, integration, mode);
-      const needsDocFetch = needsUIToTriggerDocFetch(savedIntegration, integrationFormEdit);
+      const willTriggerDocFetch = needsUIToTriggerDocFetch(savedIntegration, integrationFormEdit);
 
-      if (needsDocFetch) {
+      if (willTriggerDocFetch) {
         // Set pending state for new integrations with doc URLs
         setPendingDocIds(prev => new Set([...prev, savedIntegration.id]));
 
@@ -239,6 +239,8 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
 
       // Refresh integrations to ensure UI is updated
       await refreshIntegrations();
+
+      return savedIntegration;
     } catch (error) {
       console.error('Error saving integration:', error);
       toast({
@@ -246,6 +248,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         description: error instanceof Error ? error.message : 'Failed to save integration',
         variant: 'destructive',
       });
+      return null;
     }
   };
   const handleIntegrationFormCancel = () => {

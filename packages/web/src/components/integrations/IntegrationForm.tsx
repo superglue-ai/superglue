@@ -23,7 +23,7 @@ import { useEffect, useRef, useState } from 'react';
 
 export interface IntegrationFormProps {
     integration?: Integration;
-    onSave: (integration: Integration) => void | Promise<void>;
+    onSave: (integration: Integration) => Promise<Integration | null>;
     onCancel: () => void;
     integrationOptions: { value: string; label: string; icon: string }[];
     getSimpleIcon: (name: string) => any;
@@ -118,7 +118,6 @@ export function IntegrationForm({
     const isEditing = !!integration;
     const config = useConfig();
     const { toast } = useToast();
-
 
 
     // Pre-fill OAuth URLs when auth type changes to OAuth
@@ -282,24 +281,38 @@ export function IntegrationForm({
             credentials: creds,
         };
 
-        // Save the integration first
-        await onSave(integrationData);
+        try {
+            // Save the integration first and get the actual saved integration (with correct ID)
+            const savedIntegration = await onSave(integrationData);
 
-        // If OAuth and not already configured, trigger OAuth flow
-        if (authType === 'oauth' && (!oauthFields.access_token || !oauthFields.refresh_token)) {
-            const authUrl = buildOAuthUrl();
-            if (authUrl) {
-                const width = 600;
-                const height = 700;
-                const left = (window.screen.width - width) / 2;
-                const top = (window.screen.height - height) / 2;
-
-                const popup = window.open(
-                    authUrl,
-                    'oauth_popup',
-                    `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
-                );
+            if (!savedIntegration) {
+                toast({
+                    title: 'Error',
+                    description: 'Failed to save integration',
+                    variant: 'destructive',
+                });
+                return;
             }
+
+            // If OAuth and not already configured, trigger OAuth flow using the ACTUAL integration ID
+            if (authType === 'oauth' && (!oauthFields.access_token || !oauthFields.refresh_token)) {
+                const authUrl = buildOAuthUrlForIntegration(savedIntegration.id);
+                if (authUrl) {
+                    const width = 600;
+                    const height = 700;
+                    const left = (window.screen.width - width) / 2;
+                    const top = (window.screen.height - height) / 2;
+
+                    const popup = window.open(
+                        authUrl,
+                        'oauth_popup',
+                        `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
+                    );
+                }
+            }
+        } catch (error) {
+            // Error handling is done in the parent component
+            console.error('Error in form submission:', error);
         }
     };
 
@@ -329,13 +342,12 @@ export function IntegrationForm({
     };
 
     // Helper to build OAuth authorization URL
-    const buildOAuthUrl = () => {
+    const buildOAuthUrlForIntegration = (integrationId: string) => {
         try {
             const { client_id, scopes } = oauthFields;
 
             if (!client_id) return null;
 
-            const integrationId = isEditing ? integration!.id : id.trim();
             const redirectUri = getOAuthCallbackUrl();
 
             // Get auth URL from OAuth fields or known providers
@@ -362,9 +374,6 @@ export function IntegrationForm({
                 })),
             });
 
-            console.log('params', params.toString())
-            console.log('redirectUri', redirectUri)
-
             // Use explicitly set scopes or fall back to defaults
             const finalScopes = scopes || defaultScopes;
             if (finalScopes) {
@@ -381,6 +390,12 @@ export function IntegrationForm({
         } catch {
             return null;
         }
+    };
+
+    // Legacy function that uses the form's current ID (for backward compatibility)
+    const buildOAuthUrl = () => {
+        const integrationId = isEditing ? integration!.id : id.trim();
+        return buildOAuthUrlForIntegration(integrationId);
     };
 
     return (
