@@ -35,7 +35,11 @@ export function isTokenExpired(integration: Integration): boolean {
  * Get token URL for an integration based on its configuration
  */
 export function getTokenUrl(integration: Integration): string | null {
-    // Try to get from known integrations first
+    // First priority: User-provided token URL in credentials
+    const customTokenUrl = integration.credentials?.token_url as string;
+    if (customTokenUrl) return customTokenUrl;
+
+    // Second priority: Known integration template token URL
     const match = Object.entries(integrations).find(([key]) =>
         integration.id === key || integration.urlHost?.includes(key)
     );
@@ -45,11 +49,7 @@ export function getTokenUrl(integration: Integration): string | null {
         return config.oauth?.tokenUrl || null;
     }
 
-    // Check if integration has custom auth_url in credentials
-    const customTokenUrl = integration.credentials?.token_url as string;
-    if (customTokenUrl) return customTokenUrl;
-
-    // Default: assume OAuth2 token endpoint at the same host
+    // Fallback: Default OAuth token endpoint
     return `${integration.urlHost}/oauth/token`;
 }
 
@@ -59,7 +59,7 @@ export function getTokenUrl(integration: Integration): string | null {
 export async function refreshOAuthToken(
     integration: Integration,
 ): Promise<boolean> {
-    const { client_id, client_secret, refresh_token } = integration.credentials || {};
+    const { client_id, client_secret, refresh_token, access_token } = integration.credentials || {};
 
     if (!client_id || !client_secret || !refresh_token) {
         logMessage('error', 'Missing required credentials for token refresh', {
@@ -93,6 +93,10 @@ export async function refreshOAuthToken(
 
         if (!response.ok) {
             const errorText = await response.text();
+            // Check if this is a long-lived access token scenario (access_token === refresh_token)
+            if (access_token === refresh_token) {
+                throw new Error(`OAuth access token was unable to refresh. This integration likely uses a long-lived access token in its OAuth flow. Please reauthenticate with the OAuth provider to refresh the access token manually.`);
+            }
             throw new Error(`Token refresh failed: ${response.status} - ${errorText}`);
         }
 
