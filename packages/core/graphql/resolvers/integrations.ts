@@ -126,13 +126,15 @@ export const upsertIntegrationResolver = async (
           );
           const docString = await docFetcher.fetchAndProcess();
           const openApiSchema = await docFetcher.fetchOpenApiDocumentation();
-          // Check if integration still exists before upserting
-          const stillExists = await context.datastore.getIntegration(input.id, context.orgId);
-          if (!stillExists) {
+          // Check if integration still exists and fetch current state
+          const currentIntegration = await context.datastore.getIntegration(input.id, context.orgId);
+          if (!currentIntegration) {
             logMessage('warn', `Integration ${input.id} was deleted while fetching documentation. Skipping upsert.`, { orgId: context.orgId });
             return;
           }
+
           await context.datastore.upsertIntegration(input.id, {
+            ...currentIntegration,
             documentation: docString,
             documentationPending: false,
             openApiSchema: openApiSchema,
@@ -146,6 +148,7 @@ export const upsertIntegrationResolver = async (
             const stillExists = await context.datastore.getIntegration(input.id, context.orgId);
             if (stillExists) {
               await context.datastore.upsertIntegration(input.id, {
+                ...stillExists,
                 documentationPending: false,
                 updatedAt: new Date(),
               }, context.orgId);
