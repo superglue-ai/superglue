@@ -77,7 +77,7 @@ For development, register your Instagram account as a test user:
 ## Setting Up an Instagram integration with OAuth in Superglue
 
 <video autoPlay muted loop playsInline className="w-full aspect-video" src="https://superglue.cloud/files/instagram-setup.mp4" />
-```
+
 > **Note:** The Meta Graph API does not fully follow the OAuth 2.0 standards. It provides a long-lived access token without a refresh token that needs to be manually refreshed every 60 days. superglue will flag this, but any Meta integrations will need to be reauthenticated every 60 days.
 
 ## Retrieving Instagram Posts
