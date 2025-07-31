@@ -995,3 +995,30 @@ export function findMatchingIntegration(url: string): { key: string; integration
 export function getOAuthConfig(integrationKey: string): IntegrationConfig['oauth'] | null {
   return integrations[integrationKey]?.oauth || null;
 }
+
+/**
+ * Get OAuth token URL for an integration
+ * @param integration - The integration object with credentials and URL info
+ * @returns The token URL for OAuth token exchange
+ */
+export function getOAuthTokenUrl(integration: { id: string; urlHost: string; credentials?: any }): string {
+  // First priority: User-provided token URL in credentials
+  if (integration.credentials?.token_url) {
+    return integration.credentials.token_url;
+  }
+
+  // Second priority: Known integration template token URL
+  const knownIntegration = Object.entries(integrations).find(([key]) =>
+    integration.id === key || integration.urlHost.includes(key)
+  );
+
+  if (knownIntegration) {
+    const [_, config] = knownIntegration;
+    if (config.oauth?.tokenUrl) {
+      return config.oauth.tokenUrl;
+    }
+  }
+
+  // Fallback: Default OAuth token endpoint
+  return `${integration.urlHost}/oauth/token`;
+}

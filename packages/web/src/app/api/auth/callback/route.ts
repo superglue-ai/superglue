@@ -1,5 +1,5 @@
 import { SuperglueClient, UpsertMode } from '@superglue/client';
-import { integrations } from '@superglue/shared';
+import { getOAuthTokenUrl } from '@superglue/shared';
 import { NextRequest, NextResponse } from 'next/server';
 
 const OAUTH_STATE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
@@ -17,24 +17,6 @@ interface OAuthTokenResponse {
     token_type?: string;
     expires_at?: string;
     expires_in?: number;
-}
-
-function getTokenUrl(integration: any): string {
-    if (integration.credentials?.token_url) {
-        return integration.credentials.token_url;
-    }
-
-    const knownIntegration = Object.entries(integrations).find(([key]) =>
-        integration.id === key || integration.urlHost.includes(key)
-    );
-
-    if (knownIntegration) {
-        const [_, config] = knownIntegration;
-        if (config.oauth?.tokenUrl) {
-            return config.oauth.tokenUrl;
-        }
-    }
-    return `${integration.urlHost}/oauth/token`;
 }
 
 function validateOAuthState(state: string | null, expectedIntegrationId: string): OAuthState {
@@ -78,7 +60,7 @@ async function exchangeCodeForToken(
         throw new Error('OAuth client credentials not configured');
     }
 
-    const tokenUrl = getTokenUrl(integration);
+    const tokenUrl = getOAuthTokenUrl(integration);
     const response = await fetch(tokenUrl, {
         method: 'POST',
         headers: {
