@@ -497,16 +497,19 @@ export default function IntegrationsPage() {
                                                     className="h-8 w-8 text-muted-foreground hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
                                                     onClick={() => handleRefreshDocs(integration.id)}
                                                     disabled={
+                                                        pendingDocIds.has(integration.id) ||
                                                         !integration.documentationUrl ||
                                                         !integration.documentationUrl.trim() ||
                                                         integration.documentationUrl.startsWith('file://')
                                                     }
                                                     title={
-                                                        integration.documentationUrl?.startsWith('file://')
-                                                            ? "Cannot refresh file uploads"
-                                                            : !integration.documentationUrl || !integration.documentationUrl.trim()
-                                                                ? "No documentation URL to refresh"
-                                                                : "Refresh documentation from URL"
+                                                        pendingDocIds.has(integration.id)
+                                                            ? "Documentation is already being processed"
+                                                            : integration.documentationUrl?.startsWith('file://')
+                                                                ? "Cannot refresh file uploads"
+                                                                : !integration.documentationUrl || !integration.documentationUrl.trim()
+                                                                    ? "No documentation URL to refresh"
+                                                                    : "Refresh documentation from URL"
                                                     }
                                                 >
                                                     <FileDown className="h-4 w-4" />
