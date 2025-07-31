@@ -40,11 +40,11 @@ export class PostgresService implements DataStore {
             client.release();
         }
     }
-    async getManyIntegrations(ids: string[], includeDetails = true, orgId?: string): Promise<Integration[]> {
+    async getManyIntegrations(ids: string[], includeDocs = true, orgId?: string): Promise<Integration[]> {
         const client = await this.pool.connect();
         try {
             let query;
-            if (includeDetails) {
+            if (includeDocs) {
                 query = `SELECT i.id, i.name, i.type, i.url_host, i.url_path, i.credentials, 
                         i.documentation_url, i.documentation_pending,
                         i.open_api_url, i.specific_instructions, i.icon, i.version, i.created_at, i.updated_at,
@@ -70,11 +70,11 @@ export class PostgresService implements DataStore {
                     urlPath: row.url_path,
                     credentials: row.credentials ? credentialEncryption.decrypt(row.credentials) : {},
                     documentationUrl: row.documentation_url,
-                    documentation: includeDetails ? row.documentation : undefined,
+                    documentation: includeDocs ? row.documentation : undefined,
                     documentationPending: row.documentation_pending,
                     openApiUrl: row.open_api_url,
-                    openApiSchema: includeDetails ? row.open_api_schema : undefined,
-                    specificInstructions: includeDetails ? row.specific_instructions : undefined,
+                    openApiSchema: includeDocs ? row.open_api_schema : undefined,
+                    specificInstructions: row.specific_instructions,
                     icon: row.icon,
                     version: row.version,
                     createdAt: row.created_at,
@@ -455,12 +455,12 @@ export class PostgresService implements DataStore {
 
 
     // Integration Methods
-    async getIntegration(id: string, includeDetails = true, orgId?: string): Promise<Integration | null> {
+    async getIntegration(id: string, includeDocs = true, orgId?: string): Promise<Integration | null> {
         if (!id) return null;
         const client = await this.pool.connect();
         try {
             let query;
-            if (includeDetails) {
+            if (includeDocs) {
                 query = `SELECT i.id, i.name, i.type, i.url_host, i.url_path, i.credentials, 
                         i.documentation_url, i.documentation_pending,
                         i.open_api_url, i.specific_instructions, i.icon, i.version, i.created_at, i.updated_at,
@@ -487,10 +487,10 @@ export class PostgresService implements DataStore {
                 urlPath: row.url_path,
                 credentials: row.credentials ? credentialEncryption.decrypt(row.credentials) : {},
                 documentationUrl: row.documentation_url,
-                documentation: includeDetails ? row.documentation : undefined,
+                documentation: includeDocs ? row.documentation : undefined,
                 documentationPending: row.documentation_pending,
                 openApiUrl: row.open_api_url,
-                openApiSchema: includeDetails ? row.open_api_schema : undefined,
+                openApiSchema: includeDocs ? row.open_api_schema : undefined,
                 specificInstructions: row.specific_instructions,
                 icon: row.icon,
                 version: row.version,
@@ -504,7 +504,7 @@ export class PostgresService implements DataStore {
         }
     }
 
-    async listIntegrations(limit = 10, offset = 0, includeDetails = false, orgId?: string): Promise<{ items: Integration[], total: number }> {
+    async listIntegrations(limit = 10, offset = 0, includeDocs = false, orgId?: string): Promise<{ items: Integration[], total: number }> {
         const client = await this.pool.connect();
         try {
             const countResult = await client.query(
@@ -514,7 +514,7 @@ export class PostgresService implements DataStore {
             const total = parseInt(countResult.rows[0].count);
 
             let query;
-            if (includeDetails) {
+            if (includeDocs) {
                 query = `SELECT i.id, i.name, i.type, i.url_host, i.url_path, i.credentials, 
                         i.documentation_url, i.documentation_pending,
                         i.open_api_url, i.specific_instructions, i.icon, i.version, i.created_at, i.updated_at,
@@ -542,10 +542,10 @@ export class PostgresService implements DataStore {
                     urlPath: row.url_path,
                     credentials: row.credentials ? credentialEncryption.decrypt(row.credentials) : {},
                     documentationUrl: row.documentation_url,
-                    documentation: includeDetails ? row.documentation : undefined,
+                    documentation: includeDocs ? row.documentation : undefined,
                     documentationPending: row.documentation_pending,
                     openApiUrl: row.open_api_url,
-                    openApiSchema: includeDetails ? row.open_api_schema : undefined,
+                    openApiSchema: includeDocs ? row.open_api_schema : undefined,
                     specificInstructions: row.specific_instructions,
                     icon: row.icon,
                     version: row.version,
