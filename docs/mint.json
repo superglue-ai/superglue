@@ -62,7 +62,9 @@
         "guides/oauth-integrations",
         "guides/shopify",
         "guides/jira",
-        "guides/hubspot"
+        "guides/hubspot",
+        "guides/google-ads",
+        "guides/instagram-business"
       ]
     },
     {
