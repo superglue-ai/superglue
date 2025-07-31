@@ -133,12 +133,9 @@ export const upsertIntegrationResolver = async (
             return;
           }
           await context.datastore.upsertIntegration(input.id, {
-            ...input,
             documentation: docString,
             documentationPending: false,
             openApiSchema: openApiSchema,
-            specificInstructions: input.specificInstructions?.trim() || oldIntegration?.specificInstructions || '',
-            createdAt: oldIntegration?.createdAt || now,
             updatedAt: new Date(),
           }, context.orgId);
           logMessage('info', `Completed documentation fetch for integration ${input.id}`, { orgId: context.orgId });
@@ -149,10 +146,7 @@ export const upsertIntegrationResolver = async (
             const stillExists = await context.datastore.getIntegration(input.id, context.orgId);
             if (stillExists) {
               await context.datastore.upsertIntegration(input.id, {
-                ...input,
                 documentationPending: false,
-                specificInstructions: input.specificInstructions?.trim() || oldIntegration?.specificInstructions || '',
-                createdAt: oldIntegration?.createdAt || now,
                 updatedAt: new Date(),
               }, context.orgId);
               logMessage('info', `Reset documentationPending to false for integration ${input.id} after fetch failure`, { orgId: context.orgId });
