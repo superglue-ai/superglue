@@ -44,7 +44,13 @@ export function getIntegrationIcon(integration: { id: string; urlHost?: string }
     return integrations[integration.id].icon;
   }
 
-  // Then try using the proper regex-based matching
+  // Second try: strip any numeric suffix (e.g., "firebase-1" -> "firebase")
+  const baseId = integration.id.replace(/-\d+$/, '');
+  if (baseId !== integration.id && integrations[baseId]) {
+    return integrations[baseId].icon;
+  }
+
+  // Finally try using the proper regex-based matching
   if (integration.urlHost) {
     const match = findMatchingIntegration(integration.urlHost);
     if (match) {
