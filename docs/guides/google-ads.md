@@ -64,13 +64,12 @@ In Google Cloud Console:
    https://www.googleapis.com/auth/adwords
    https://www.googleapis.com/auth/userinfo.email
    https://www.googleapis.com/auth/userinfo.profile
-   openid
    ```
 6. Save and copy your **Client ID** and **Client Secret**
 
 ## Setting Up a Google Ads integration with OAuth in Superglue
 
-Follow the same OAuth setup process shown in the [Instagram Business guide](/docs/guides/instagram-business#setting-up-an-instagram-integration-with-oauth-in-superglue) or see the general [OAuth integrations guide](/docs/guides/oauth-integrations):
+Follow the same OAuth setup process shown in the [Instagram Business guide](/docs/guides/instagram-business) or see the general [OAuth integrations guide](/docs/guides/oauth-integrations):
 
 > **Important:** After connecting via OAuth, you'll need to add additional credentials in the **Advanced Settings**:
 > - Add your production account's `developer_token` to the credentials
