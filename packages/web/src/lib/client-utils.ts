@@ -1,5 +1,5 @@
-import { Integration } from "@superglue/client"
-import { cleanUrl } from "./utils"
+import { Integration } from "@superglue/client";
+import { cleanUrl } from "./utils";
 
 export const inputErrorStyles = "!border-destructive !border-[1px] focus:!ring-0 focus:!ring-offset-0"
 
@@ -73,8 +73,12 @@ export const splitUrl = (url: string) => {
     }
   }
   const urlObj = cleanUrl(url);
+  if (!urlObj) return { urlHost: '', urlPath: '' };
+
+  const auth = urlObj.username && urlObj.password ? `${urlObj.username}:${urlObj.password}@` : '';
+  
   return {
-    urlHost: urlObj.protocol + '//' + urlObj.host,
+    urlHost: urlObj.protocol + '//' + auth + urlObj.host,
     urlPath: urlObj.pathname === '/' ? '' : urlObj.pathname
   }
 }
@@ -82,11 +86,6 @@ export const splitUrl = (url: string) => {
 export function needsUIToTriggerDocFetch(newIntegration: Integration, oldIntegration: Integration | null): boolean {
   // If documentation was manually provided, no fetch needed.
   if (newIntegration.documentation && newIntegration.documentation.trim()) {
-    return false;
-  }
-
-  // If no doc URL, no fetch needed.
-  if (!newIntegration.documentationUrl || !newIntegration.documentationUrl.trim()) {
     return false;
   }
 

@@ -49,13 +49,13 @@ async function migrateApiConfigs(redisService: RedisService, postgresService: Po
   
   while (true) {
     try {
-      const { items, total } = await redisService.listApiConfigs(BATCH_SIZE, offset, orgId);
+      const { items, total } = await redisService.listApiConfigs({ limit: BATCH_SIZE, offset, orgId });
       
       if (items.length === 0) break;
       
       for (const config of items) {
         try {
-          await postgresService.upsertApiConfig(config.id, config, orgId);
+          await postgresService.upsertApiConfig({ id: config.id, config, orgId });
           stats.apiConfigs++;
         } catch (error) {
           stats.errors.push(`Failed to migrate API config ${config.id}: ${error.message}`);
@@ -81,13 +81,13 @@ async function migrateExtractConfigs(redisService: RedisService, postgresService
   
   while (true) {
     try {
-      const { items, total } = await redisService.listExtractConfigs(BATCH_SIZE, offset, orgId);
+      const { items, total } = await redisService.listExtractConfigs({ limit: BATCH_SIZE, offset, orgId });
       
       if (items.length === 0) break;
       
       for (const config of items) {
         try {
-          await postgresService.upsertExtractConfig(config.id, config, orgId);
+          await postgresService.upsertExtractConfig({ id: config.id, config, orgId });
           stats.extractConfigs++;
         } catch (error) {
           stats.errors.push(`Failed to migrate Extract config ${config.id}: ${error.message}`);
@@ -113,13 +113,13 @@ async function migrateTransformConfigs(redisService: RedisService, postgresServi
   
   while (true) {
     try {
-      const { items, total } = await redisService.listTransformConfigs(BATCH_SIZE, offset, orgId);
+      const { items, total } = await redisService.listTransformConfigs({ limit: BATCH_SIZE, offset, orgId });
       
       if (items.length === 0) break;
       
       for (const config of items) {
         try {
-          await postgresService.upsertTransformConfig(config.id, config, orgId);
+          await postgresService.upsertTransformConfig({ id: config.id, config, orgId });
           stats.transformConfigs++;
         } catch (error) {
           stats.errors.push(`Failed to migrate Transform config ${config.id}: ${error.message}`);
@@ -145,7 +145,7 @@ async function migrateWorkflows(redisService: RedisService, postgresService: Pos
   
   while (true) {
     try {
-      const { items, total } = await redisService.listWorkflows(BATCH_SIZE, offset, orgId);
+      const { items, total } = await redisService.listWorkflows({ limit: BATCH_SIZE, offset, orgId });
       
       if (items.length === 0) break;
       
@@ -153,7 +153,7 @@ async function migrateWorkflows(redisService: RedisService, postgresService: Pos
         try {
           // Extract integration IDs from the workflow
           const integrationIds = workflow.integrationIds || [];
-          await postgresService.upsertWorkflow(workflow.id, workflow, orgId, integrationIds);
+                      await postgresService.upsertWorkflow({ id: workflow.id, workflow, orgId });
           stats.workflows++;
         } catch (error) {
           stats.errors.push(`Failed to migrate Workflow ${workflow.id}: ${error.message}`);
@@ -179,13 +179,13 @@ async function migrateIntegrations(redisService: RedisService, postgresService: 
   
   while (true) {
     try {
-      const { items, total } = await redisService.listIntegrations(BATCH_SIZE, offset, true, orgId);
+      const { items, total } = await redisService.listIntegrations({ limit: BATCH_SIZE, offset, includeDocs: true, orgId });
       
       if (items.length === 0) break;
       
       for (const integration of items) {
         try {
-          await postgresService.upsertIntegration(integration.id, integration, orgId);
+          await postgresService.upsertIntegration({ id: integration.id, integration, orgId });
           stats.integrations++;
         } catch (error) {
           stats.errors.push(`Failed to migrate Integration ${integration.id}: ${error.message}`);
@@ -211,13 +211,13 @@ async function migrateRuns(redisService: RedisService, postgresService: Postgres
   
   while (true) {
     try {
-      const { items, total } = await redisService.listRuns(BATCH_SIZE, offset, undefined, orgId);
+      const { items, total } = await redisService.listRuns({ limit: BATCH_SIZE, offset, orgId });
       
       if (items.length === 0) break;
       
       for (const run of items) {
         try {
-          await postgresService.createRun(run, orgId);
+          await postgresService.createRun({ result: run, orgId });
           stats.runs++;
         } catch (error) {
           stats.errors.push(`Failed to migrate Run ${run.id}: ${error.message}`);
@@ -241,7 +241,7 @@ async function migrateTenantInfo(redisService: RedisService, postgresService: Po
   console.log('Migrating Tenant Info...');
   try {
     const tenantInfo = await redisService.getTenantInfo();
-    await postgresService.setTenantInfo(tenantInfo.email, tenantInfo.emailEntrySkipped);
+    await postgresService.setTenantInfo({ email: tenantInfo.email, emailEntrySkipped: tenantInfo.emailEntrySkipped });
     console.log('  Tenant info migrated successfully');
   } catch (error) {
     console.error('  Error migrating tenant info:', error.message);
