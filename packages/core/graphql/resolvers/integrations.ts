@@ -127,19 +127,19 @@ export const upsertIntegrationResolver = async (
           const docString = await docFetcher.fetchAndProcess();
           const openApiSchema = await docFetcher.fetchOpenApiDocumentation();
           // Check if integration still exists and fetch current state
-          const currentIntegration = await context.datastore.getIntegration(input.id, context.orgId);
-          if (!currentIntegration) {
+          const MostUpToDateIntegration = await context.datastore.getIntegration(input.id, context.orgId);
+          if (!MostUpToDateIntegration) {
             logMessage('warn', `Integration ${input.id} was deleted while fetching documentation. Skipping upsert.`, { orgId: context.orgId });
             return;
           }
 
           await context.datastore.upsertIntegration(input.id, {
-            ...currentIntegration,
+            ...MostUpToDateIntegration,
             documentation: docString,
             documentationPending: false,
             openApiSchema: openApiSchema,
-            specificInstructions: input.specificInstructions?.trim() || currentIntegration?.specificInstructions || '',
-            createdAt: currentIntegration?.createdAt || now,
+            specificInstructions: input.specificInstructions?.trim() || MostUpToDateIntegration?.specificInstructions || '',
+            createdAt: MostUpToDateIntegration?.createdAt || now,
             updatedAt: new Date(),
           }, context.orgId);
           logMessage('info', `Completed documentation fetch for integration ${input.id}`, { orgId: context.orgId });
@@ -147,13 +147,13 @@ export const upsertIntegrationResolver = async (
           logMessage('error', `Documentation fetch failed for integration ${input.id}: ${String(err)}`, { orgId: context.orgId });
           // Reset documentationPending to false on failure to prevent corrupted state
           try {
-            const stillExists = await context.datastore.getIntegration(input.id, context.orgId);
-            if (stillExists) {
+            const MostUpToDateIntegration = await context.datastore.getIntegration(input.id, context.orgId);
+            if (MostUpToDateIntegration) {
               await context.datastore.upsertIntegration(input.id, {
-                ...stillExists,
+                ...MostUpToDateIntegration,
                 documentationPending: false,
-                specificInstructions: stillExists?.specificInstructions || '',
-                createdAt: stillExists?.createdAt || now,
+                specificInstructions: MostUpToDateIntegration?.specificInstructions || '',
+                createdAt: MostUpToDateIntegration?.createdAt || now,
                 updatedAt: new Date(),
               }, context.orgId);
               logMessage('info', `Reset documentationPending to false for integration ${input.id} after fetch failure`, { orgId: context.orgId });
