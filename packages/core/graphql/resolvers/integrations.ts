@@ -87,8 +87,8 @@ export const upsertIntegrationResolver = async (
   }
   try {
     const now = new Date();
+    const existingIntegration = await context.datastore.getIntegration(input.id, true, context.orgId);
     if (mode === 'CREATE') {
-      const existingIntegration = await context.datastore.getIntegration(input.id, context.orgId);
       if (existingIntegration) {
         // ID already exists, generate a unique one
         input.id = await generateUniqueId({
@@ -98,13 +98,11 @@ export const upsertIntegrationResolver = async (
       }
       input = enrichWithTemplate(input);
     }
-    const oldIntegration = await context.datastore.getIntegration(input.id, context.orgId);
-
-    if (mode === 'UPDATE' && !oldIntegration) {
+    else if (mode === 'UPDATE' && !existingIntegration) {
       throw new Error(`Integration with ID '${input.id}' not found.`);
     }
 
-    const shouldFetchDoc = shouldTriggerDocFetch(input, oldIntegration);
+    const shouldFetchDoc = shouldTriggerDocFetch(input, existingIntegration);
 
     if (shouldFetchDoc) {
       // Fire-and-forget async doc fetch
@@ -136,8 +134,8 @@ export const upsertIntegrationResolver = async (
             documentation: docString,
             documentationPending: false,
             openApiSchema: openApiSchema,
-            specificInstructions: input.specificInstructions?.trim() || oldIntegration?.specificInstructions || '',
-            createdAt: oldIntegration?.createdAt || now,
+            specificInstructions: input.specificInstructions?.trim() || existingIntegration?.specificInstructions || '',
+            createdAt: existingIntegration?.createdAt || now,
             updatedAt: new Date(),
           }, context.orgId);
           logMessage('info', `Completed documentation fetch for integration ${input.id}`, { orgId: context.orgId });
@@ -150,8 +148,8 @@ export const upsertIntegrationResolver = async (
               await context.datastore.upsertIntegration(input.id, {
                 ...input,
                 documentationPending: false,
-                specificInstructions: input.specificInstructions?.trim() || oldIntegration?.specificInstructions || '',
-                createdAt: oldIntegration?.createdAt || now,
+                specificInstructions: input.specificInstructions?.trim() || existingIntegration?.specificInstructions || '',
+                createdAt: existingIntegration?.createdAt || now,
                 updatedAt: new Date(),
               }, context.orgId);
               logMessage('info', `Reset documentationPending to false for integration ${input.id} after fetch failure`, { orgId: context.orgId });
@@ -164,19 +162,19 @@ export const upsertIntegrationResolver = async (
     }
     const integration = {
       id: input.id,
-      name: resolveField(input.name, oldIntegration?.name, ''),
-      urlHost: resolveField(input.urlHost, oldIntegration?.urlHost, ''),
-      urlPath: resolveField(input.urlPath, oldIntegration?.urlPath, ''),
-      documentationUrl: resolveField(input.documentationUrl, oldIntegration?.documentationUrl, ''),
-      documentation: resolveField(input.documentation, oldIntegration?.documentation, ''),
-      openApiUrl: resolveField(input.openApiUrl, oldIntegration?.openApiUrl, ''),
-      openApiSchema: resolveField(input.openApiSchema, oldIntegration?.openApiSchema, ''),
+      name: resolveField(input.name, existingIntegration?.name, ''),
+      urlHost: resolveField(input.urlHost, existingIntegration?.urlHost, ''),
+      urlPath: resolveField(input.urlPath, existingIntegration?.urlPath, ''),
+      documentationUrl: resolveField(input.documentationUrl, existingIntegration?.documentationUrl, ''),
+      documentation: resolveField(input.documentation, existingIntegration?.documentation, ''),
+      openApiUrl: resolveField(input.openApiUrl, existingIntegration?.openApiUrl, ''),
+      openApiSchema: resolveField(input.openApiSchema, existingIntegration?.openApiSchema, ''),
       // If we're starting a new fetch, set pending to true
       // If we're not starting a new fetch, preserve the existing pending state
-      documentationPending: shouldFetchDoc ? true : (oldIntegration?.documentationPending || false),
-      credentials: resolveField(input.credentials, oldIntegration?.credentials, {}),
-      specificInstructions: resolveField(input.specificInstructions?.trim(), oldIntegration?.specificInstructions, ''),
-      createdAt: oldIntegration?.createdAt || now,
+      documentationPending: shouldFetchDoc ? true : (existingIntegration?.documentationPending || false),
+      credentials: resolveField(input.credentials, existingIntegration?.credentials, {}),
+      specificInstructions: resolveField(input.specificInstructions?.trim(), existingIntegration?.specificInstructions, ''),
+      createdAt: existingIntegration?.createdAt || now,
       updatedAt: now
     };
     return await context.datastore.upsertIntegration(input.id, integration, context.orgId);
