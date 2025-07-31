@@ -1,25 +1,26 @@
 ---
-title: "Google Ads OAuth Integration"
-description: "Set up OAuth authentication and fetch campaign data from Google Ads using Superglue"
+title: "Google Ads Integration"
+description: "Set up OAuth authentication and fetch campaign data from Google Ads using superglue"
 ---
 
-Integrating with Google Ads requires navigating complex authentication requirements, multiple account types, and developer tokens. Superglue simplifies this process by handling OAuth flows, managing credentials, and providing a unified interface to access your Google Ads data.
+Integrating with Google Ads requires navigating complex authentication requirements, multiple account types, and developer tokens. superglue simplifies this process by handling OAuth flows, managing credentials, and providing a natural language interface to access your Google Ads data.
 
 This guide demonstrates how to:
 
-1. Set up the required Google Ads accounts (Manager and Test accounts)
-2. Configure OAuth authentication in Superglue
-3. Fetch campaign data using workflows
+1. Set up required Google Ads accounts (Test and Manager accounts)
+2. Obtain a developer token from a production account
+3. Configure OAuth authentication for your Google Ads integration in superglue
+4. Fetch campaign data using superglue
 
-> **Note:** This guide uses test accounts to avoid billing requirements during development. The same process works for production accounts with a valid developer token.
+> **Note:** Google Ads has a very complex setup process involving test accounts, manager accounts, and developer tokens. We've done our best to summarize the process here, but refer to [Google Ads API documentation](https://developers.google.com/google-ads/api/docs/start) for more detailed information.
 
 ## Prerequisites
 
 - A Google account for creating Google Ads accounts
-- Access to Google Cloud Console (for OAuth credentials)
-- Superglue SDK installed and configured (see [Quick Start](/introduction#quick-start))
+- Access to Google Cloud Console (for OAuth client setup)
+- superglue installed and configured (see [Quick Start](/introduction#quick-start) or [app.superglue.cloud](https://app.superglue.cloud))
 
-## Google Ads Account Setup
+## Account Setup
 
 ### 1. Create a Test Manager Account (MCC)
 
@@ -40,7 +41,7 @@ Within your test manager account:
 
 ### 3. Obtain a Developer Token
 
-You'll need a production Manager Account to get a developer token:
+You'll need a live production Manager Account to get a developer token:
 
 1. Create a [production Google Ads Manager Account](https://ads.google.com/intl/en_us/home/tools/manager-accounts/)
 2. Navigate to **Admin** → **API Center**
@@ -49,67 +50,35 @@ You'll need a production Manager Account to get a developer token:
 
 > **Note:** The developer token from your production account can access test accounts created under the same Google account.
 
-## Installation
 
-Install the required dependencies:
+### 4. Create OAuth Credentials
 
-```bash
-npm install @superglue/client zod zod-to-json-schema
-```
+In Google Cloud Console:
 
-## Setting Up OAuth in Superglue
+1. Go to **APIs & Services** → **Credentials**
+2. Click **Create Credentials** → **OAuth client ID**
+3. Select **Web application** as the application type
+4. Add authorized redirect URI: `https://app.superglue.cloud/api/auth/callback`
+5. Add these scopes to your OAuth consent screen:
+   ```
+   https://www.googleapis.com/auth/adwords
+   https://www.googleapis.com/auth/userinfo.email
+   https://www.googleapis.com/auth/userinfo.profile
+   openid
+   ```
+6. Save and copy your **Client ID** and **Client Secret**
 
-### 1. Configure the Integration
+## Setting Up a Google Ads integration with OAuth in Superglue
 
-Navigate to the Integrations page in Superglue and create a new integration:
+Follow the same OAuth setup process shown in the [Instagram Business guide](/docs/guides/instagram-business#setting-up-an-instagram-integration-with-oauth-in-superglue) or see the general [OAuth integrations guide](/docs/guides/oauth-integrations):
 
-<video autoPlay muted loop playsInline className="w-full aspect-video" src="https://superglue.cloud/files/google-ads-setup.mp4" />
-
-Fill in the following configuration:
-
-```json
-{
-  "id": "google_ads",
-  "name": "Google Ads",
-  "urlHost": "https://googleads.googleapis.com/v20",
-  "documentationUrl": "https://developers.google.com/apis-explorer",
-  "authentication": "OAUTH"
-}
-```
-
-### 2. Add OAuth Credentials
-
-In the OAuth section, provide:
-
-- **Client ID**: `592234420615-q5fu0s8o4usupqnm8p7al0ns568sgj0a.apps.googleusercontent.com`
-- **Client Secret**: (obtain from Google Cloud Console or use the provided one)
-
-### 3. Configure Scopes
-
-Click on **Advanced Settings** and add these scopes (space-separated):
-
-```
-https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid https://www.googleapis.com/auth/adwords
-```
-
-### 4. Special Instructions
-
-Add this instruction to handle Google Ads' specific requirements:
-
-```
-If customer IDs are provided, add the ID to the urlPath. If manager IDs are provided and you are accessing data within a manager scope, add a login-customer-id header.
-```
-
-### 5. Connect via OAuth
-
-Click **Connect with OAuth** to:
-1. Redirect to Google's authentication page
-2. Approve the requested scopes
-3. Return to Superglue with tokens populated
+> **Important:** After connecting via OAuth, you'll need to add additional credentials in the **Advanced Settings**:
+> - Add your production account's `developer_token` to the credentials
+> - Add your test manager account ID as `login-customer-id` to enable accessing test accounts
 
 ## Fetching Campaign Data
 
-Once authenticated, you can fetch campaign data using workflows:
+Once authenticated, you can fetch your Google Ads campaign data:
 
 ```typescript
 import { SuperglueClient } from "@superglue/client";
@@ -130,7 +99,7 @@ const campaignSchema = z.object({
       clicks: z.number().optional(),
       cost: z.number().optional()
     })
-  )
+  ).describe("All campaigns from the Google Ads account")
 });
 
 const superglue = new SuperglueClient({
@@ -138,33 +107,34 @@ const superglue = new SuperglueClient({
 });
 
 async function fetchGoogleAdsCampaigns() {
-  const workflow = await superglue.buildWorkflow(
-    `Fetch all campaigns from Google Ads account 410-777-4758. 
-     Use developer token: XzzWAqVsewByCRESdRDXtg. 
-     Add manager account ID 131-404-2125 to the request header as login-customer-id.`,
-    {},
-    [{
-      integration: {
-        id: "google_ads",
-        name: "Google Ads",
-        urlHost: "https://googleads.googleapis.com/v20",
-        credentials: { 
-          // OAuth tokens are automatically included from the integration setup
-        }
-      }
-    }],
-    zodToJsonSchema(campaignSchema)
-  );
+  const workflow = await superglue.buildWorkflow({
+    instruction: "Fetch all campaigns from my Google Ads test account 410-777-4758.",
+    payload: {},
+    integrationIds: ["google_ads"],
+    responseSchema: zodToJsonSchema(campaignSchema)
+  });
 
   const result = await superglue.executeWorkflow({
-    workflow: workflow,
-    credentials: {
-      google_ads_developer_token: "XzzWAqVsewByCRESdRDXtg"
-    }
+    workflow: workflow
   });
 
   if (result.success) {
     console.log("Campaigns fetched:", result.data);
+    console.log(`Found ${result.data.campaigns.length} campaigns`);
+    
+    // Example output:
+    // {
+    //   "campaigns": [
+    //     {
+    //       "id": "1234567890",
+    //       "name": "Summer Sale Campaign",
+    //       "status": "ENABLED",
+    //       "budget_amount": 1000.00,
+    //       "impressions": 45231,
+    //       "clicks": 1823
+    //     }
+    //   ]
+    // }
   } else {
     console.error("Error:", result.error);
   }
@@ -175,16 +145,27 @@ fetchGoogleAdsCampaigns();
 
 ## Working with Google Ads Query Language (GAQL)
 
-For more complex queries, you can use GAQL in your instructions:
+Google Ads uses GAQL for complex queries. You can either provide the exact query or ask superglue to generate it:
 
 ```typescript
 const instruction = `
-  Query Google Ads using GAQL to get campaign performance data.
-  Use this query: SELECT campaign.id, campaign.name, metrics.impressions, metrics.clicks 
-  FROM campaign WHERE segments.date DURING LAST_30_DAYS
-  Account ID: 410-777-4758, Manager ID: 131-404-2125
+  Query Google Ads to get campaign performance data for the last 30 days.
+  Include campaign id, name, impressions, clicks, and cost.
+  Account ID: 410-777-4758
+`;
+
+// Or with explicit GAQL:
+const instructionWithGAQL = `
+  Use this GAQL query: SELECT campaign.id, campaign.name, metrics.impressions, 
+  metrics.clicks, metrics.cost_micros FROM campaign 
+  WHERE segments.date DURING LAST_30_DAYS
+  Account ID: 410-777-4758
 `;
 ```
+
+Superglue handles the API navigation and authentication automatically when given proper instructions.
+
+> **Note:** To access production Google Ads accounts (not test accounts), ensure your developer token has been approved for production use. Test accounts are perfect for development and don't require billing information.
 
 ## Troubleshooting
 
@@ -202,16 +183,14 @@ const instruction = `
 - Check that the OAuth app has access to Google Ads API
 - Try re-authenticating by clicking "Connect with OAuth" again
 
-## Security Best Practices
-
-1. **Store credentials securely**: Never commit developer tokens or client secrets to version control
-2. **Use test accounts**: Always develop and test with test accounts first
-3. **Limit access**: Only grant the minimum required scopes
-4. **Rotate tokens**: Periodically refresh OAuth tokens and developer tokens
-5. **Monitor usage**: Check API usage in Google Ads API Center
+### Invalid Arguments
+- The workflow contains invalid GAQL
+- Provide more explicit instructions
+- Provide few shot GAQL examples
 
 ## Next Steps
 
-- Explore [Google Ads API documentation](https://developers.google.com/google-ads/api/docs/start)
-- Learn about [GAQL syntax](https://developers.google.com/google-ads/api/docs/query/overview)
-- Build workflows to sync campaign data with your data warehouse
+- Sign up for [superglue](https://app.superglue.cloud) to start building integrations
+- Explore [MCP (Model Context Protocol)](/docs/mcp/mcp-guide) for AI-powered workflow creation
+- Check out the [Instagram Business guide](/docs/guides/instagram-business) for another OAuth integration example
+- Build workflows to sync campaign data with your data warehouse using GAQL queries

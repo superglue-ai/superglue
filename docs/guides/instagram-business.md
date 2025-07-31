@@ -1,6 +1,6 @@
 ---
 title: "Instagram Business Account Integration"
-description: "Retrieve posts and insights from Instagram Business accounts using Facebook's Graph API"
+description: "Retrieve posts and metadata from your Instagram Business accounts using superglue"
 ---
 
 Accessing Instagram Business account data involves navigating Meta's complex ecosystem of APIs, OAuth flows, and account linking requirements. superglue streamlines this process by providing a natural language interface you can use to fetch your Instagram business data through Facebook's Graph API.
@@ -62,7 +62,7 @@ Add required products to your app:
    - Add `https://app.superglue.cloud/api/auth/callback` to Valid OAuth Redirect URIs
 4. In **Settings** → **Basic**:
    - Add `app.superglue.cloud` to App Domains
-   - Set **App Mode** to **Live** (requires adding a privacy policy URL)
+   - Set **App Mode** to **Live** (requires adding a privacy policy URL for your app)
 
 ### 5. Register Test Users
 
@@ -82,38 +82,28 @@ For development, register your Instagram account as a test user:
 
 ## Retrieving Instagram Posts
 
-Once authenticated, you can fetch Instagram business account data:
+Once authenticated, you can fetch your Instagram business account data and all posts:
 
 ```typescript
 import { SuperglueClient } from "@superglue/client";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 
-// Schema for Instagram posts
+// Schema for Instagram business account and posts
 const instagramSchema = z.object({
   account: z.object({
     id: z.string(),
     username: z.string(),
-    followers_count: z.number().optional(),
-    media_count: z.number().optional()
-  }),
+    name: z.string()
+  }).describe("Instagram business account linked to the Facebook page"),
   posts: z.array(
     z.object({
       id: z.string(),
       caption: z.string().optional(),
-      media_type: z.string(),
       media_url: z.string(),
-      permalink: z.string(),
-      timestamp: z.string(),
-      like_count: z.number().optional(),
-      comments_count: z.number().optional(),
-      insights: z.object({
-        impressions: z.number().optional(),
-        reach: z.number().optional(),
-        engagement: z.number().optional()
-      }).optional()
+      timestamp: z.string()
     })
-  )
+  ).describe("All posts from the Instagram business account")
 });
 
 const superglue = new SuperglueClient({
@@ -121,18 +111,12 @@ const superglue = new SuperglueClient({
 });
 
 async function fetchInstagramData() {
-  const workflow = await superglue.buildWorkflow(
-    "Fetch all of my instagram business account data, including posts and relevant metadata.",
-    {},
-    [{
-      integration: {
-        id: "instagram_business",
-        name: "Instagram Business",
-        urlHost: "https://graph.facebook.com/v23.0"
-      }
-    }],
-    zodToJsonSchema(instagramSchema)
-  );
+  const workflow = await superglue.buildWorkflow({
+    instruction: "Fetch the instagram business account linked to my facebook page. Retrieve account data and all of my posts.",
+    payload: {},
+    integrationIds: ["instagram_business"],
+    responseSchema: zodToJsonSchema(instagramSchema)
+  });
 
   const result = await superglue.executeWorkflow({
     workflow: workflow
@@ -140,7 +124,25 @@ async function fetchInstagramData() {
 
   if (result.success) {
     console.log("Instagram data fetched:", result.data);
+    console.log(`Account: @${result.data.account.username}`);
     console.log(`Found ${result.data.posts.length} posts`);
+    
+    // Example output:
+    // {
+    //   "account": {
+    //     "id": "17841476484763742",
+    //     "username": "michael_sg_test",
+    //     "name": "Michael Fuest"
+    //   },
+    //   "posts": [
+    //     {
+    //       "id": "18084620779798785",
+    //       "caption": "Hello world",
+    //       "media_url": "https://scontent-muc2-1.cdninstagram.com/...",
+    //       "timestamp": "2025-07-31T10:00:11+0000"
+    //     }
+    //   ]
+    // }
   } else {
     console.error("Error:", result.error);
   }
@@ -149,48 +151,7 @@ async function fetchInstagramData() {
 fetchInstagramData();
 ```
 
-## Advanced Queries
-
-### Fetch Posts with Specific Fields
-
-```typescript
-const instruction = `
-  Fetch my Instagram business account posts from the last 30 days.
-  Include caption, media_url, permalink, timestamp, like_count, and comments_count.
-  Also fetch insights for impressions and reach for each post.
-`;
-```
-
-### Get Account Insights
-
-```typescript
-const insightsSchema = z.object({
-  insights: z.object({
-    daily_followers: z.array(z.object({
-      date: z.string(),
-      value: z.number()
-    })),
-    profile_views: z.number(),
-    website_clicks: z.number(),
-    reach: z.number()
-  })
-});
-
-const instruction = `
-  Fetch Instagram business account insights for the last 7 days.
-  Include follower count changes, profile views, website clicks, and reach.
-`;
-```
-
-## Working with the API Structure
-
-The Facebook Graph API structure for accessing Instagram data follows this pattern:
-
-1. **Get Facebook Pages**: `/me/accounts` returns linked Facebook pages
-2. **Get Instagram Account**: `/{page_id}?fields=instagram_business_account` returns the Instagram account ID
-3. **Get Instagram Data**: `/{instagram_account_id}/media` returns posts and content
-
-Superglue handles this navigation automatically when given proper instructions.
+> **Note:** To access live public data from accounts not registered as test users in your app, your Meta developer app must go through the App Review process. This is required by Meta for production use. See [Meta's App Review documentation](https://developers.facebook.com/docs/app-review) for detailed requirements and submission guidelines.
 
 ## Troubleshooting
 
@@ -209,14 +170,6 @@ Superglue handles this navigation automatically when given proper instructions.
 - Check that your app's OAuth redirect URI matches exactly
 - Verify App ID and App Secret are correct
 
-## Rate Limits and Best Practices
-
-1. **API Limits**: Instagram applies rate limits per user and app
-2. **Batch Requests**: Use field expansion to get multiple data points in one call
-3. **Cache Results**: Store frequently accessed data to reduce API calls
-4. **Webhook Updates**: Consider implementing webhooks for real-time updates
-5. **Data Retention**: Follow Meta's data retention policies
-
 ## App Review for Production
 
 To access data from non-test users, submit your app for review:
@@ -224,11 +177,11 @@ To access data from non-test users, submit your app for review:
 1. Go to **App Review** → **Permissions and Features**
 2. Request the required permissions
 3. Provide use case descriptions and screencasts
-4. Wait for Meta's approval (typically 5-10 business days)
+4. Wait for Meta's approval
 
 ## Next Steps
 
-- Explore [Instagram Graph API documentation](https://developers.facebook.com/docs/instagram-api)
-- Learn about [Instagram Insights metrics](https://developers.facebook.com/docs/instagram-api/guides/insights)
-- Build workflows to sync Instagram data with your analytics platform
-- Set up automated posting workflows using the Content Publishing API
+- Sign up for [superglue](https://app.superglue.cloud) to start building integrations
+- Explore [MCP (Model Context Protocol)](/docs/mcp/mcp-guide) for AI-powered workflow creation
+- Check out the [Google Ads OAuth guide](/docs/guides/google-ads) for another complex OAuth integration example
+- Build workflows to sync Instagram data with your data warehouse or analytics platform
