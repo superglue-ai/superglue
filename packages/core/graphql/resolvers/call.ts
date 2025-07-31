@@ -30,9 +30,16 @@ export const callResolver = async (
 
   try {
 
-    // Get endpoint from datastore or use the one provided in the input
+    // Get the endpoint configuration
     if (input.id) {
-      endpoint = await context.datastore.getApiConfig(input.id, context.orgId);
+      endpoint = await context.datastore.getApiConfig({ id: input.id, orgId: context.orgId });
+      if (!endpoint) {
+        return {
+          success: false,
+          data: null,
+          error: `API configuration with id ${input.id} not found`
+        };
+      }
     } else {
       endpoint = input.endpoint;
     }
@@ -68,7 +75,7 @@ export const callResolver = async (
     const config = { ...endpoint, ...transformResult?.config };
 
     if (writeCache) {
-      context.datastore.upsertApiConfig(input.id || endpoint.id, config, context.orgId);
+      context.datastore.upsertApiConfig({ id: input.id || endpoint.id, config, orgId: context.orgId });
     }
 
     // Notify webhook if configured
@@ -83,7 +90,7 @@ export const callResolver = async (
       startedAt,
       completedAt: new Date(),
     };
-    context.datastore.createRun(result, context.orgId);
+    context.datastore.createRun({ result, orgId: context.orgId });
     return { ...result, data: transformResult.data };
   } catch (error) {
     const maskedError = maskCredentials(error.message, credentials);
@@ -99,7 +106,7 @@ export const callResolver = async (
       startedAt,
       completedAt: new Date(),
     };
-    context.datastore.createRun(result, context.orgId);
+    context.datastore.createRun({ result, orgId: context.orgId });
     return result;
   }
 };

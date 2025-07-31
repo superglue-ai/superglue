@@ -188,7 +188,7 @@ export class WorkflowRunner {
             workflow = await builder.buildWorkflow();
             workflow.id = await generateUniqueId({
                 baseId: workflow.id,
-                exists: async (id) => !!(await this.datastore.getWorkflow(id, this.metadata.orgId))
+                exists: async (id) => !!(await this.datastore.getWorkflow({ id, orgId: this.metadata.orgId }))
             });
 
             attempt.buildSuccess = true;
@@ -255,14 +255,18 @@ export class WorkflowRunner {
                 // Save run if requested
                 if (saveRun) {
                     await this.datastore.createRun({
-                        id: workflowResult.id,
-                        success: workflowResult.success,
-                        error: workflowResult.error || undefined,
-                        config: workflowResult.config || workflow,
-                        stepResults: workflowResult.stepResults || [],
-                        startedAt: workflowResult.startedAt,
-                        completedAt: workflowResult.completedAt || new Date()
-                    }, this.metadata.orgId);
+                        result: {
+                            id: workflowResult.id,
+                            success: workflowResult.success,
+                            error: workflowResult.error || undefined,
+                            config: workflowResult.config || workflow,
+                            stepResults: workflowResult.stepResults || [],
+                            startedAt: workflowResult.startedAt,
+                            completedAt: workflowResult.completedAt || new Date(),
+                            data: null
+                        },
+                        orgId: this.metadata.orgId
+                    });
                 }
 
                 if (attempt.executionSuccess) {

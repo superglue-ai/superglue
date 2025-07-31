@@ -44,7 +44,7 @@ export const executeWorkflowResolver = async (
 
   try {
     if (args.input.id) {
-      workflow = await context.datastore.getWorkflow(args.input.id, context.orgId);
+      workflow = await context.datastore.getWorkflow({ id: args.input.id, orgId: context.orgId });
       if (!workflow) {
         throw new Error("Workflow not found");
       }
@@ -124,14 +124,17 @@ export const executeWorkflowResolver = async (
 
     // Save run to datastore
     context.datastore.createRun({
-      id: runId,
-      success: result.success,
-      error: result.error || undefined,
-      config: result.config || workflow,
-      stepResults: [],
-      startedAt,
-      completedAt: new Date()
-    }, context.orgId);
+      result: {
+        id: runId,
+        success: result.success,
+        error: result.error || undefined,
+        config: result.config || workflow,
+        stepResults: [],
+        startedAt,
+        completedAt: new Date()
+      },
+      orgId: context.orgId
+    });
 
     return result;
 
@@ -147,7 +150,7 @@ export const executeWorkflowResolver = async (
       completedAt: new Date(),
     };
     // Save run to datastore
-    context.datastore.createRun(result, context.orgId);
+    context.datastore.createRun({ result, orgId: context.orgId });
 
     return { ...result, data: {}, stepResults: [] } as WorkflowResult;
   }
@@ -160,7 +163,7 @@ export const upsertWorkflowResolver = async (_: unknown, { id, input }: { id: st
 
   try {
     const now = new Date();
-    const oldWorkflow = await context.datastore.getWorkflow(id, context.orgId);
+    const oldWorkflow = await context.datastore.getWorkflow({ id, orgId: context.orgId });
 
     const workflow = {
       id,
@@ -181,7 +184,7 @@ export const upsertWorkflowResolver = async (_: unknown, { id, input }: { id: st
       }
     });
 
-    return await context.datastore.upsertWorkflow(id, workflow, context.orgId);
+    return await context.datastore.upsertWorkflow({ id, workflow, orgId: context.orgId });
   } catch (error) {
     logMessage('error', "Error upserting workflow: " + String(error), { orgId: context.orgId });
     throw error;
@@ -194,7 +197,7 @@ export const deleteWorkflowResolver = async (_: unknown, { id }: { id: string },
   }
 
   try {
-    return await context.datastore.deleteWorkflow(id, context.orgId);
+    return await context.datastore.deleteWorkflow({ id, orgId: context.orgId });
   } catch (error) {
     logMessage('error', "Error deleting workflow: " + String(error), { orgId: context.orgId });
     throw error;
@@ -207,7 +210,7 @@ export const getWorkflowResolver = async (_: unknown, { id }: { id: string }, co
   }
 
   try {
-    const workflow = await context.datastore.getWorkflow(id, context.orgId);
+    const workflow = await context.datastore.getWorkflow({ id, orgId: context.orgId });
     if (!workflow) {
       throw new Error("Workflow not found");
     }
@@ -230,7 +233,7 @@ export const listWorkflowsResolver = async (
   context: any,
 ) => {
   try {
-    const result = await context.datastore.listWorkflows(limit, offset, context.orgId);
+    const result = await context.datastore.listWorkflows({ limit, offset, orgId: context.orgId });
     return {
       items: result.items,
       total: result.total,
@@ -262,7 +265,7 @@ export const buildWorkflowResolver = async (
     // Validate that all integration IDs exist
     const datastoreAdapter = {
       getManyIntegrations: async (ids: string[]): Promise<Integration[]> => {
-        return await context.datastore.getManyIntegrations(ids, true, context.orgId);
+        return await context.datastore.getManyIntegrations({ ids, includeDocs: true, orgId: context.orgId });
       }
     };
 
@@ -279,7 +282,7 @@ export const buildWorkflowResolver = async (
 
     workflow.id = await generateUniqueId({
       baseId: workflow.id,
-      exists: async (id) => !!(await context.datastore.getWorkflow(id, context.orgId))
+      exists: async (id) => !!(await context.datastore.getWorkflow({ id, orgId: context.orgId }))
     });
 
     return workflow;

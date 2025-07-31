@@ -18,7 +18,7 @@ export const upsertApiResolver = async (
   if (!id) {
     throw new Error("id is required");
   }
-  const oldConfig = await context.datastore.getApiConfig(id, context.orgId);
+  const oldConfig = await context.datastore.getApiConfig({ id, orgId: context.orgId });
 
   if (!input.urlHost && !oldConfig?.urlHost) {
     throw new Error("urlHost is required.");
@@ -46,7 +46,7 @@ export const upsertApiResolver = async (
     dataPath: resolveField(input.dataPath, oldConfig?.dataPath),
     version: resolveField(input.version, oldConfig?.version)
   };
-  await context.datastore.upsertApiConfig(id, config, context.orgId);
+  await context.datastore.upsertApiConfig({ id, config, orgId: context.orgId });
   return config;
 };
 
@@ -59,7 +59,7 @@ export const upsertTransformResolver = async (
   if (!id) {
     throw new Error("id is required");
   }
-  const oldConfig = await context.datastore.getTransformConfig(id, context.orgId);
+  const oldConfig = await context.datastore.getTransformConfig({ id, orgId: context.orgId });
 
   // reset the response mapping if there are major updates
   let newResponseMapping = input.responseMapping;
@@ -77,7 +77,7 @@ export const upsertTransformResolver = async (
     version: resolveField(input.version, oldConfig?.version)
   };
 
-  await context.datastore.upsertTransformConfig(id, config, context.orgId);
+  await context.datastore.upsertTransformConfig({ id, config, orgId: context.orgId });
   return config;
 };
 
@@ -90,7 +90,7 @@ export const upsertExtractResolver = async (
   if (!id) {
     throw new Error("id is required");
   }
-  const oldConfig = await context.datastore.getExtractConfig(id, context.orgId);
+  const oldConfig = await context.datastore.getExtractConfig({ id, orgId: context.orgId });
   const config = {
     id: id,
     urlHost: resolveField(input.urlHost, oldConfig?.urlHost, ''),
@@ -109,6 +109,6 @@ export const upsertExtractResolver = async (
     dataPath: resolveField(input.dataPath, oldConfig?.dataPath),
     version: resolveField(input.version, oldConfig?.version)
   };
-  await context.datastore.upsertExtractConfig(id, config, context.orgId);
+  await context.datastore.upsertExtractConfig({ id, config, orgId: context.orgId });
   return config;
 };

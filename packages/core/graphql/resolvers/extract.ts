@@ -53,7 +53,7 @@ export const extractResolver = async (
       }
       else {
         preparedExtract = readCache ?
-          await context.datastore.getExtractConfig(input.id, context.orgId)
+          await context.datastore.getExtractConfig({ id: input.id, orgId: context.orgId })
           : null;
         if (!preparedExtract) {
           if (!input.endpoint.instruction) {
@@ -87,7 +87,7 @@ export const extractResolver = async (
 
     // Save configuration if requested
     if (writeCache) {
-      context.datastore.upsertExtractConfig(input.id || preparedExtract.id, preparedExtract, context.orgId);
+      context.datastore.upsertExtractConfig({ id: input.id || preparedExtract.id, config: preparedExtract, orgId: context.orgId });
     }
     const completedAt = new Date();
 
