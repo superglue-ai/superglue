@@ -138,6 +138,8 @@ export const upsertIntegrationResolver = async (
             documentation: docString,
             documentationPending: false,
             openApiSchema: openApiSchema,
+            specificInstructions: input.specificInstructions?.trim() || currentIntegration?.specificInstructions || '',
+            createdAt: currentIntegration?.createdAt || now,
             updatedAt: new Date(),
           }, context.orgId);
           logMessage('info', `Completed documentation fetch for integration ${input.id}`, { orgId: context.orgId });
