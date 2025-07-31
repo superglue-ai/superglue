@@ -34,25 +34,19 @@ export const detectAuthType = (credentials: any): 'oauth' | 'apikey' | 'none' =>
     // Define OAuth-specific fields
     const oauthSpecificFields = ['client_id', 'client_secret', 'auth_url', 'token_url', 'access_token', 'refresh_token', 'scopes', 'expires_at', 'token_type'];
 
-    // Get all credential keys
-    const allKeys = Object.keys(credentials);
+    // Check if any OAuth fields are present
+    const hasOAuthFields = Object.keys(credentials).some(key => oauthSpecificFields.includes(key));
 
-    // Check if all keys are OAuth-specific
-    const containsOnlyOAuthKeys = allKeys.every(key => oauthSpecificFields.includes(key));
-
-    if (containsOnlyOAuthKeys) {
-        // It's OAuth-related, now check the status
-        if (credentials.access_token && credentials.refresh_token) {
-            return 'oauth'; // Will be shown as configured
-        } else if (credentials.client_id || credentials.client_secret) {
-            return 'oauth'; // Will be shown as pending
-        } else {
-            return 'none'; // Only has meta fields like auth_url, scopes, etc.
-        }
+    if (hasOAuthFields) {
+        // It's OAuth-based authentication
+        // The presence of additional fields (like developer_token) doesn't change this
+        return 'oauth';
     }
 
-    // Has non-OAuth fields, so it's API key
-    return 'apikey';
+    // No OAuth fields present, check if there are any other credentials
+    const hasNonOAuthCredentials = Object.keys(credentials).length > 0;
+
+    return hasNonOAuthCredentials ? 'apikey' : 'none';
 };
 
 // Helper to determine auth badge status

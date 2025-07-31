@@ -1,6 +1,6 @@
 ---
 title: "Google Ads Integration"
-description: "Set up OAuth authentication and fetch campaign data from Google Ads using superglue"
+description: "Set up OAuth authentication and fetch all campaign names from Google Ads using superglue"
 ---
 
 Integrating with Google Ads requires navigating complex authentication requirements, multiple account types, and developer tokens. superglue simplifies this process by handling OAuth flows, managing credentials, and providing a natural language interface to access your Google Ads data.
@@ -74,6 +74,7 @@ Follow the same OAuth setup process shown in the [Instagram Business guide](/doc
 > **Important:** After connecting via OAuth, you'll need to add additional credentials in the **Advanced Settings**:
 > - Add your production account's `developer_token` to the credentials
 > - Add your test manager account ID as `login-customer-id` to enable accessing test accounts
+> - Add your test Google Ads account ID that contains the campaign data under the account_id key
 
 ## Fetching Campaign Data
 
