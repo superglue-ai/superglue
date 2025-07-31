@@ -16,7 +16,7 @@ import { Button } from '@/src/components/ui/button';
 import { DocStatus } from '@/src/components/utils/DocStatusSpinner';
 import { useToast } from '@/src/hooks/use-toast';
 import { needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
-import { composeUrl } from '@/src/lib/utils';
+import { composeUrl, getIntegrationIcon as getIntegrationIconName } from '@/src/lib/utils';
 import type { Integration } from '@superglue/client';
 import { SuperglueClient, UpsertMode } from '@superglue/client';
 import { integrations as integrationTemplates } from '@superglue/shared';
@@ -361,11 +361,8 @@ export default function IntegrationsPage() {
 
     // Helper to get icon for integration
     function getIntegrationIcon(integration: Integration) {
-        const match = integrationOptions.find(opt =>
-            opt.value !== 'custom' &&
-            (integration.id === opt.value || integration.urlHost.includes(opt.value))
-        );
-        return match ? getSimpleIcon(match.icon) : null;
+        const iconName = getIntegrationIconName(integration);
+        return iconName ? getSimpleIcon(iconName) : null;
     }
 
 
@@ -500,16 +497,19 @@ export default function IntegrationsPage() {
                                                     className="h-8 w-8 text-muted-foreground hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
                                                     onClick={() => handleRefreshDocs(integration.id)}
                                                     disabled={
+                                                        pendingDocIds.has(integration.id) ||
                                                         !integration.documentationUrl ||
                                                         !integration.documentationUrl.trim() ||
                                                         integration.documentationUrl.startsWith('file://')
                                                     }
                                                     title={
-                                                        integration.documentationUrl?.startsWith('file://')
-                                                            ? "Cannot refresh file uploads"
-                                                            : !integration.documentationUrl || !integration.documentationUrl.trim()
-                                                                ? "No documentation URL to refresh"
-                                                                : "Refresh documentation from URL"
+                                                        pendingDocIds.has(integration.id)
+                                                            ? "Documentation is already being processed"
+                                                            : integration.documentationUrl?.startsWith('file://')
+                                                                ? "Cannot refresh file uploads"
+                                                                : !integration.documentationUrl || !integration.documentationUrl.trim()
+                                                                    ? "No documentation URL to refresh"
+                                                                    : "Refresh documentation from URL"
                                                     }
                                                 >
                                                     <FileDown className="h-4 w-4" />

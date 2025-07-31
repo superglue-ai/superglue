@@ -247,9 +247,14 @@ export const integrations: Record<string, IntegrationConfig> = {
     apiUrl: "https://firestore.googleapis.com",
     regex: "^(.*\\.)?(firebase\\.google\\.com|firebaseio\\.com|firestore\\.googleapis\\.com)(/.*)?$",
     icon: "firebase",
-    docsUrl: "https://firebase.google.com/docs/reference",
+    docsUrl: "https://firebase.google.com/docs/reference/firebase-management/rest",
     openApiUrl: "https://firestore.googleapis.com/$discovery/rest?version=v1",
-    preferredAuthType: "apikey"
+    preferredAuthType: "oauth",
+    oauth: {
+      authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
+      tokenUrl: "https://oauth2.googleapis.com/token",
+      scopes: "https://www.googleapis.com/auth/firebase https://www.googleapis.com/auth/datastore"
+    }
   },
   salesforce: {
     apiUrl: "https://api.salesforce.com",
@@ -279,12 +284,12 @@ export const integrations: Record<string, IntegrationConfig> = {
     apiUrl: "https://graph.facebook.com/v23.0/",
     regex: "^(.*\\.)?instagram\\.com(/.*)?$",
     icon: "instagram",
-    docsUrl: "https://developers.facebook.com/docs/instagram-platform/overview",
+    docsUrl: "https://developers.facebook.com/docs/graph-api/overview",
     preferredAuthType: "oauth",
     oauth: {
       authUrl: "https://www.facebook.com/v23.0/dialog/oauth",
       tokenUrl: "https://graph.facebook.com/v23.0/oauth/access_token",
-      scopes: "instagram_basic instagram_content_publish instagram_manage_comments instagram_manage_insights instagram_shopping_tag_products instagram_manage_messages pages_show_list pages_messaging"
+      scopes: "instagram_basic pages_show_list instagram_content_publish pages_read_engagement instagram_manage_comments instagram_manage_insights instagram_manage_messages business_management"
     }
   },
   twitter: {
@@ -1022,3 +1027,5 @@ export function getOAuthTokenUrl(integration: { id: string; urlHost: string; cre
   // Fallback: Default OAuth token endpoint
   return `${integration.urlHost}/oauth/token`;
 }
+
+

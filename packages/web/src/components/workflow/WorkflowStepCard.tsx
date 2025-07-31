@@ -1,9 +1,9 @@
 import { useConfig } from '@/src/app/config-context';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/src/components/ui/select";
 import { useToast } from '@/src/hooks/use-toast';
-import { integrations as integrationTemplates } from '@superglue/shared';
-import { cn } from '@/src/lib/utils';
+import { cn, getIntegrationIcon as getIntegrationIconName } from '@/src/lib/utils';
 import { Integration, SuperglueClient } from "@superglue/client";
+import { integrations as integrationTemplates } from '@superglue/shared';
 import { ArrowDown, Check, Globe, Pencil, RotateCw, Trash2, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type { SimpleIcon } from 'simple-icons';
@@ -92,11 +92,8 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
   ];
 
   const getIntegrationIcon = (integration: Integration) => {
-    const match = integrationOptions.find(opt =>
-      opt.value !== 'custom' &&
-      (integration.id === opt.value || integration.urlHost?.includes(opt.value))
-    );
-    return match ? getSimpleIcon(match.icon) : null;
+    const iconName = getIntegrationIconName(integration);
+    return iconName ? getSimpleIcon(iconName) : null;
   };
 
   // Sync editedStep with step prop changes

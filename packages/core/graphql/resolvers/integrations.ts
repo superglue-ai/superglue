@@ -1,43 +1,11 @@
 import { Integration } from '@superglue/client';
-import { findMatchingIntegration, integrations } from "@superglue/shared";
+import { Context, findMatchingIntegration, integrations, Metadata } from "@superglue/shared";
 import { generateUniqueId } from '@superglue/shared/utils';
 import { GraphQLResolveInfo } from "graphql";
 import { IntegrationSelector } from '../../integrations/integration-selector.js';
 import { Documentation } from '../../utils/documentation.js';
 import { logMessage } from '../../utils/logs.js';
 import { composeUrl } from '../../utils/tools.js';
-import { Context, Metadata } from '../types.js';
-
-function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined, defaultValue?: T): T | undefined {
-  if (newValue === null) return undefined;
-  if (newValue !== undefined) return newValue;
-  if (oldValue !== undefined) return oldValue;
-  return defaultValue;
-}
-
-function shouldTriggerDocFetch(input: Integration, oldIntegration?: Integration): boolean {
-  // If a doc fetch is already in progress, never trigger a new one
-  if (oldIntegration?.documentationPending === true) return false;
-
-  // If documentationUrl is a file:// URL, no need to trigger
-  if (input.documentationUrl.startsWith('file://')) return false;
-
-  // Special case: Manual refresh - if input explicitly sets documentationPending to true
-  if (input.documentationPending === true) return true;
-
-  // Trigger a fetch if:
-  // 1. This is a new integration (no old integration exists)
-  if (!oldIntegration) return true;
-
-  // 2. The documentation URL has changed
-  if (input.documentationUrl !== oldIntegration.documentationUrl) return true;
-
-  // 3. The URL host/path has changed (affects API endpoint discovery)
-  if (input.urlHost !== oldIntegration.urlHost) return true;
-  if (input.urlPath !== oldIntegration.urlPath) return true;
-  // Otherwise, don't trigger a new fetch
-  return false;
-}
 
 export const listIntegrationsResolver = async (
   _: any,
@@ -66,6 +34,7 @@ export const getIntegrationResolver = async (
   if (!id) throw new Error("id is required");
   try {
     const integration = await context.datastore.getIntegration({ id, includeDocs: false, orgId: context.orgId });
+    if (!integration) throw new Error("Integration not found");
     return integration;
   } catch (error) {
     logMessage('error', `Error getting integration with id ${id}: ${String(error)}`, { orgId: context.orgId });
@@ -84,106 +53,52 @@ export const upsertIntegrationResolver = async (
   }
   try {
     const now = new Date();
-    let existingIntegration = await context.datastore.getIntegration({ id: input.id, includeDocs: true, orgId: context.orgId });
+
+    let existingIntegrationOrNull = await context.datastore.getIntegration({ id: input.id, includeDocs: false, orgId: context.orgId });
+
+    if (mode === 'UPSERT') {
+      mode = existingIntegrationOrNull ? 'UPDATE' : 'CREATE';
+    }
+
     if (mode === 'CREATE') {
-      if (existingIntegration) {
-        // ID already exists, generate a unique one
+      if (existingIntegrationOrNull) {
         input.id = await generateUniqueId({
           baseId: input.id,
           exists: async (id) => !!(await context.datastore.getIntegration({ id, includeDocs: false, orgId: context.orgId }))
         });
-        existingIntegration = null;
+        existingIntegrationOrNull = null;
       }
       input = enrichWithTemplate(input);
-    }
-    else if (mode === 'UPDATE' && !existingIntegration) {
-      throw new Error(`Integration with ID '${input.id}' not found.`);
+    } else if (mode === 'UPDATE') {
+      if (!existingIntegrationOrNull) {
+        throw new Error(`Integration with ID '${input.id}' not found.`);
+      }
     }
 
-    const shouldFetchDoc = shouldTriggerDocFetch(input, existingIntegration);
+    const shouldFetchDoc = shouldTriggerDocFetch(input, existingIntegrationOrNull);
 
     if (shouldFetchDoc) {
-      // Fire-and-forget async doc fetch
-      (async () => {
-        try {
-          // do this again since the frontend might not send everything. we need to fix this later.
-          input = enrichWithTemplate(input);
-          logMessage('info', `Starting async documentation fetch for integration ${input.id}`, { orgId: context.orgId });
-          const docFetcher = new Documentation(
-            {
-              urlHost: input.urlHost,
-              urlPath: input.urlPath,
-              documentationUrl: input.documentationUrl,
-              openApiUrl: input.openApiUrl,
-            },
-            input.credentials || {},
-            { orgId: context.orgId }
-          );
-          const docString = await docFetcher.fetchAndProcess();
-          const openApiSchema = await docFetcher.fetchOpenApiDocumentation();
-          // Check if integration still exists before upserting
-          const stillExists = await context.datastore.getIntegration({ id: input.id, includeDocs: false, orgId: context.orgId });
-          if (!stillExists) {
-            logMessage('warn', `Integration ${input.id} was deleted while fetching documentation. Skipping upsert.`, { orgId: context.orgId });
-            return;
-          }
-          await context.datastore.upsertIntegration({
-            id: input.id,
-            integration: {
-              ...input,
-              documentation: docString,
-              documentationPending: false,
-              openApiSchema: openApiSchema,
-              specificInstructions: input.specificInstructions?.trim() || existingIntegration?.specificInstructions || '',
-              createdAt: existingIntegration?.createdAt || now,
-              updatedAt: new Date(),
-            },
-            orgId: context.orgId
-          });
-          logMessage('info', `Completed documentation fetch for integration ${input.id}`, { orgId: context.orgId });
-        } catch (err) {
-          logMessage('error', `Documentation fetch failed for integration ${input.id}: ${String(err)}`, { orgId: context.orgId });
-          // Reset documentationPending to false on failure to prevent corrupted state
-          try {
-            const stillExists = await context.datastore.getIntegration({ id: input.id, includeDocs: false, orgId: context.orgId });
-            if (stillExists) {
-              await context.datastore.upsertIntegration({
-                id: input.id,
-                integration: {
-                  ...input,
-                  documentationPending: false,
-                  specificInstructions: input.specificInstructions?.trim() || existingIntegration?.specificInstructions || '',
-                  createdAt: existingIntegration?.createdAt || now,
-                  updatedAt: new Date(),
-                },
-                orgId: context.orgId
-              });
-              logMessage('info', `Reset documentationPending to false for integration ${input.id} after fetch failure`, { orgId: context.orgId });
-            }
-          } catch (resetError) {
-            logMessage('error', `Failed to reset documentationPending for integration ${input.id}: ${String(resetError)}`, { orgId: context.orgId });
-          }
-        }
-      })();
+      triggerAsyncDocumentationFetch(input, context); // Fire-and-forget, will fetch docs in background and update integration documentation, documentationPending and metadata fields once its done
     }
-    const integration = {
+
+    const integrationToSave = {
       id: input.id,
-      name: resolveField(input.name, existingIntegration?.name, ''),
-      urlHost: resolveField(input.urlHost, existingIntegration?.urlHost, ''),
-      urlPath: resolveField(input.urlPath, existingIntegration?.urlPath, ''),
-      documentationUrl: resolveField(input.documentationUrl, existingIntegration?.documentationUrl, ''),
-      documentation: resolveField(input.documentation, existingIntegration?.documentation, ''),
-      openApiUrl: resolveField(input.openApiUrl, existingIntegration?.openApiUrl, ''),
-      openApiSchema: resolveField(input.openApiSchema, existingIntegration?.openApiSchema, ''),
+      name: resolveField(input.name, existingIntegrationOrNull?.name, ''),
+      urlHost: resolveField(input.urlHost, existingIntegrationOrNull?.urlHost, ''),
+      urlPath: resolveField(input.urlPath, existingIntegrationOrNull?.urlPath, ''),
+      documentationUrl: resolveField(input.documentationUrl, existingIntegrationOrNull?.documentationUrl, ''),
+      documentation: resolveField(input.documentation, existingIntegrationOrNull?.documentation, ''),
+      openApiUrl: resolveField(input.openApiUrl, existingIntegrationOrNull?.openApiUrl, ''),
+      openApiSchema: resolveField(input.openApiSchema, existingIntegrationOrNull?.openApiSchema, ''),
       // If we're starting a new fetch, set pending to true
       // If we're not starting a new fetch, preserve the existing pending state
-      documentationPending: shouldFetchDoc ? true : (existingIntegration?.documentationPending || false),
-      credentials: resolveField(input.credentials, existingIntegration?.credentials, {}),
-      specificInstructions: resolveField(input.specificInstructions?.trim(), existingIntegration?.specificInstructions, ''),
-      createdAt: existingIntegration?.createdAt || now,
+      documentationPending: shouldFetchDoc ? true : (existingIntegrationOrNull?.documentationPending || false),
+      credentials: resolveField(input.credentials, existingIntegrationOrNull?.credentials, {}),
+      specificInstructions: resolveField(input.specificInstructions?.trim(), existingIntegrationOrNull?.specificInstructions, ''),
+      createdAt: existingIntegrationOrNull?.createdAt || now,
       updatedAt: now
     };
-    return await context.datastore.upsertIntegration({ id: input.id, integration, orgId: context.orgId });
+    return await context.datastore.upsertIntegration({ id: input.id, integration: integrationToSave, orgId: context.orgId });
   } catch (error) {
     logMessage('error', `Error upserting integration with id ${input.id}: ${String(error)}`, { orgId: context.orgId });
     throw error;
@@ -241,4 +156,101 @@ function enrichWithTemplate(input: Integration): Integration {
     urlHost: matchingTemplate.apiUrl,
     ...input,
   } as Integration;
+}
+
+function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined, defaultValue?: T): T | undefined {
+  if (newValue === null) return undefined;
+  if (newValue !== undefined) return newValue;
+  if (oldValue !== undefined) return oldValue;
+  return defaultValue;
+}
+
+function shouldTriggerDocFetch(input: Integration, existingIntegration?: Integration | null): boolean {
+  // If a doc fetch is already in progress, never trigger a new one
+  if (existingIntegration?.documentationPending === true) return false;
+  // Special case: Manual refresh - if input explicitly sets documentationPending to true. Manual refresh only possible when doc fetching not in progress, so no conflict with condition one.
+  if (input.documentationPending === true) return true;
+  // Check if documentationUrl is a file:// URL (no need to fetch)
+  if (input.documentationUrl?.startsWith('file://')) return false;
+  // Trigger a fetch if:
+  // 1. This is a new integration (no existing integration)
+  if (!existingIntegration) return true;
+
+  // 2. The documentation URL has changed (including from empty to populated)
+  if (input.documentationUrl !== existingIntegration.documentationUrl) return true;
+  // 3. The URL host/path has changed (affects API endpoint discovery)
+  // This can trigger doc fetch even without documentationUrl (e.g., GraphQL introspection)
+  if (input.urlHost !== existingIntegration.urlHost) return true;
+  if (input.urlPath !== existingIntegration.urlPath) return true;
+  // Otherwise, don't trigger a new fetch
+  return false;
+}
+
+async function triggerAsyncDocumentationFetch(
+  input: Integration,
+  context: Context
+): Promise<void> {
+  try {
+    // Re-enrich with template to ensure we have all the fields
+    const enrichedInput = enrichWithTemplate(input);
+    logMessage('info', `Starting async documentation fetch for integration ${input.id}`, { orgId: context.orgId });
+
+    const docFetcher = new Documentation(
+      {
+        urlHost: enrichedInput.urlHost,
+        urlPath: enrichedInput.urlPath,
+        documentationUrl: enrichedInput.documentationUrl,
+        openApiUrl: enrichedInput.openApiUrl,
+      },
+      enrichedInput.credentials || {},
+      { orgId: context.orgId }
+    );
+
+    const docString = await docFetcher.fetchAndProcess();
+    const openApiSchema = await docFetcher.fetchOpenApiDocumentation();
+
+    // CRITICAL: Fetch the latest integration state before updating
+    // This ensures we don't overwrite any changes made since the initial upsert
+    const latestIntegration = await context.datastore.getIntegration({ id: input.id, includeDocs: false, orgId: context.orgId });
+    if (!latestIntegration) {
+      logMessage('warn', `Integration ${input.id} was deleted while fetching documentation. Skipping upsert.`, { orgId: context.orgId });
+      return;
+    }
+
+    // Update ONLY the documentation-related fields
+    await context.datastore.upsertIntegration({
+      id: input.id,
+      integration: {
+        ...latestIntegration,
+        documentation: docString,
+        documentationPending: false,
+        openApiSchema: openApiSchema,
+        updatedAt: new Date(),
+      },
+      orgId: context.orgId
+    });
+    logMessage('info', `Completed documentation fetch for integration ${input.id}`, { orgId: context.orgId });
+
+  } catch (err) {
+    logMessage('error', `Documentation fetch failed for integration ${input.id}: ${String(err)}`, { orgId: context.orgId });
+
+    // Reset documentationPending to false on failure
+    try {
+      const latestIntegration = await context.datastore.getIntegration({ id: input.id, includeDocs: false, orgId: context.orgId });
+      if (latestIntegration) {
+        await context.datastore.upsertIntegration({
+          id: input.id,
+          integration: {
+            ...latestIntegration,
+            documentationPending: false,
+            updatedAt: new Date(),
+          },
+          orgId: context.orgId
+        });
+        logMessage('info', `Reset documentationPending to false for integration ${input.id} after fetch failure`, { orgId: context.orgId });
+      }
+    } catch (resetError) {
+      logMessage('error', `Failed to reset documentationPending for integration ${input.id}: ${String(resetError)}`, { orgId: context.orgId });
+    }
+  }
 }
