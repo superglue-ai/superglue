@@ -210,6 +210,9 @@ export class IntegrationManager {
             return this.searchCache.get(instruction);
         }
         const documentation = await this.ensureDocumentationLoaded();
+        if(!await documentation.openApiSchema && !await documentation.content) {
+            return "no documentation provided";
+        }
         const result = Documentation.extractRelevantSections(await documentation.openApiSchema || await documentation.content, instruction);
         this.searchCache.set(instruction, result);
         return result;
