@@ -152,6 +152,8 @@ export const upsertIntegrationResolver = async (
               await context.datastore.upsertIntegration(input.id, {
                 ...stillExists,
                 documentationPending: false,
+                specificInstructions: stillExists?.specificInstructions || '',
+                createdAt: stillExists?.createdAt || now,
                 updatedAt: new Date(),
               }, context.orgId);
               logMessage('info', `Reset documentationPending to false for integration ${input.id} after fetch failure`, { orgId: context.orgId });
