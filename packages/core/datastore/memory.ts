@@ -45,170 +45,202 @@ export class MemoryStore implements DataStore {
   }
 
   // API Config Methods
-  async getApiConfig(id: string, orgId: string): Promise<ApiConfig | null> {
+  async getApiConfig(params: { id: string; orgId?: string }): Promise<ApiConfig | null> {
+    const { id, orgId } = params;
     if (!id) return null;
     const key = this.getKey('api', id, orgId);
     const config = this.storage.apis.get(key);
     return config ? { ...config, id } : null;
   }
 
-  async listApiConfigs(limit = 10, offset = 0, orgId?: string): Promise<{ items: ApiConfig[], total: number }> {
-    const orgItems = this.getOrgItems(this.storage.apis, 'api', orgId);
-    const items = orgItems
-      .slice(offset, offset + limit);
-    const total = orgItems.length;
+  async listApiConfigs(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: ApiConfig[], total: number }> {
+    const { limit = 10, offset = 0, orgId } = params || {};
+    const items = this.getOrgItems(this.storage.apis, 'api', orgId).slice(offset, offset + limit);
+    const total = this.getOrgItems(this.storage.apis, 'api', orgId).length;
     return { items, total };
   }
 
-  async upsertApiConfig(id: string, config: ApiConfig, orgId?: string): Promise<ApiConfig> {
+  async upsertApiConfig(params: { id: string; config: ApiConfig; orgId?: string }): Promise<ApiConfig> {
+    const { id, config, orgId } = params;
     if (!id || !config) return null;
     const key = this.getKey('api', id, orgId);
     this.storage.apis.set(key, config);
     return { ...config, id };
   }
 
-  async deleteApiConfig(id: string, orgId: string): Promise<boolean> {
+  async deleteApiConfig(params: { id: string; orgId?: string }): Promise<boolean> {
+    const { id, orgId } = params;
     if (!id) return false;
     const key = this.getKey('api', id, orgId);
-    const deleted = this.storage.apis.delete(key);
-    return deleted;
+    return this.storage.apis.delete(key);
   }
 
   // Extract Config Methods
-  async getExtractConfig(id: string, orgId: string): Promise<ExtractConfig | null> {
+  async getExtractConfig(params: { id: string; orgId?: string }): Promise<ExtractConfig | null> {
+    const { id, orgId } = params;
     if (!id) return null;
     const key = this.getKey('extract', id, orgId);
     const config = this.storage.extracts.get(key);
     return config ? { ...config, id } : null;
   }
 
-  async listExtractConfigs(limit = 10, offset = 0, orgId?: string): Promise<{ items: ExtractConfig[], total: number }> {
-    const items = this.getOrgItems(this.storage.extracts, 'extract', orgId)
-      .slice(offset, offset + limit);
+  async listExtractConfigs(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: ExtractConfig[], total: number }> {
+    const { limit = 10, offset = 0, orgId } = params || {};
+    const items = this.getOrgItems(this.storage.extracts, 'extract', orgId).slice(offset, offset + limit);
     const total = this.getOrgItems(this.storage.extracts, 'extract', orgId).length;
     return { items, total };
   }
 
-  async upsertExtractConfig(id: string, config: ExtractConfig, orgId: string): Promise<ExtractConfig> {
+  async upsertExtractConfig(params: { id: string; config: ExtractConfig; orgId?: string }): Promise<ExtractConfig> {
+    const { id, config, orgId } = params;
     if (!id || !config) return null;
     const key = this.getKey('extract', id, orgId);
     this.storage.extracts.set(key, config);
     return { ...config, id };
   }
 
-  async deleteExtractConfig(id: string, orgId: string): Promise<boolean> {
+  async deleteExtractConfig(params: { id: string; orgId?: string }): Promise<boolean> {
+    const { id, orgId } = params;
     if (!id) return false;
     const key = this.getKey('extract', id, orgId);
-    const deleted = this.storage.extracts.delete(key);
-    return deleted;
+    return this.storage.extracts.delete(key);
   }
 
   // Transform Config Methods
-  async getTransformConfig(id: string, orgId: string): Promise<TransformConfig | null> {
+  async getTransformConfig(params: { id: string; orgId?: string }): Promise<TransformConfig | null> {
+    const { id, orgId } = params;
     if (!id) return null;
     const key = this.getKey('transform', id, orgId);
     const config = this.storage.transforms.get(key);
     return config ? { ...config, id } : null;
   }
 
-  async listTransformConfigs(limit = 10, offset = 0, orgId?: string): Promise<{ items: TransformConfig[], total: number }> {
-    const items = this.getOrgItems(this.storage.transforms, 'transform', orgId)
-      .slice(offset, offset + limit);
+  async listTransformConfigs(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: TransformConfig[], total: number }> {
+    const { limit = 10, offset = 0, orgId } = params || {};
+    const items = this.getOrgItems(this.storage.transforms, 'transform', orgId).slice(offset, offset + limit);
     const total = this.getOrgItems(this.storage.transforms, 'transform', orgId).length;
     return { items, total };
   }
 
-  async upsertTransformConfig(id: string, config: TransformConfig, orgId: string): Promise<TransformConfig> {
+  async upsertTransformConfig(params: { id: string; config: TransformConfig; orgId?: string }): Promise<TransformConfig> {
+    const { id, config, orgId } = params;
     if (!id || !config) return null;
     const key = this.getKey('transform', id, orgId);
     this.storage.transforms.set(key, config);
     return { ...config, id };
   }
 
-  async deleteTransformConfig(id: string, orgId: string): Promise<boolean> {
+  async deleteTransformConfig(params: { id: string; orgId?: string }): Promise<boolean> {
+    const { id, orgId } = params;
     if (!id) return false;
     const key = this.getKey('transform', id, orgId);
-    const deleted = this.storage.transforms.delete(key);
-    return deleted;
+    return this.storage.transforms.delete(key);
   }
 
   // Run Result Methods
-  async getRun(id: string, orgId: string): Promise<RunResult | null> {
+  async getRun(params: { id: string; orgId?: string }): Promise<RunResult | null> {
+    const { id, orgId } = params;
     if (!id) return null;
     const key = this.getKey('run', id, orgId);
     const run = this.storage.runs.get(key);
     return run ? { ...run, id } : null;
   }
 
-  async createRun(run: RunResult, orgId: string): Promise<RunResult> {
+  async createRun(params: { result: RunResult; orgId?: string }): Promise<RunResult> {
+    const { result: run, orgId } = params;
     if (!run) return null;
-    if ((run as any).stepResults) delete (run as any).stepResults;
     const key = this.getKey('run', run.id, orgId);
     this.storage.runs.set(key, run);
-
-    if (!this.storage.runsIndex.has(orgId)) {
-      this.storage.runsIndex.set(orgId, []);
+    
+    // Update index for efficient listing
+    const configId = run.config?.id;
+    if (configId) {
+      const indexKey = this.getKey('index', configId, orgId);
+      const existing = this.storage.runsIndex.get(indexKey) || [];
+      existing.push({
+        id: run.id,
+        timestamp: run.startedAt ? run.startedAt.getTime() : Date.now(),
+        configId
+      });
+      this.storage.runsIndex.set(indexKey, existing);
     }
-
-    const index = this.storage.runsIndex.get(orgId)!;
-    index.push({
-      id: run.id,
-      timestamp: run.startedAt?.getTime() ?? 0,
-      configId: run.config?.id
-    });
-    index.sort((a, b) => b.timestamp - a.timestamp);
-
-    return run;
+    
+    return { ...run, id: run.id };
   }
 
-  async listRuns(limit = 10, offset = 0, configId?: string, orgId?: string): Promise<{ items: RunResult[], total: number }> {
-    const index = this.storage.runsIndex.get(orgId) || [];
-    const runIds = index
-      .filter(entry => !configId || entry.configId === configId)
-      .slice(offset, offset + limit)
-      .map(entry => entry.id);
-
-    const items = runIds.map(id => {
-      const key = this.getKey('run', id, orgId);
-      const run = this.storage.runs.get(key);
-      return run ? { ...run, id } : null;
-    }).filter((run): run is RunResult =>
-      run !== null &&
-      run.config &&
-      run.config.id &&
+  async listRuns(params?: { limit?: number; offset?: number; configId?: string; orgId?: string }): Promise<{ items: RunResult[], total: number }> {
+    const { limit = 10, offset = 0, configId, orgId } = params || {};
+    const allRuns = this.getOrgItems(this.storage.runs, 'run', orgId);
+    
+    // Store total count of ALL runs (including corrupted ones)
+    const totalAllRuns = allRuns.length;
+    
+    // Filter out runs with corrupted data (missing critical fields)
+    const validRuns = allRuns.filter((run): run is RunResult => 
+      run !== null && 
+      run.config && 
+      run.config.id && 
       run.startedAt instanceof Date
     );
-
-    // Sort by startedAt timestamp (most recent first)
-    items.sort((a, b) => (b.startedAt?.getTime() ?? 0) - (a.startedAt?.getTime() ?? 0));
-
-    return { items, total: index.length };
+    
+    // Sort by startedAt date (most recent first)
+    validRuns.sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime());
+    
+    // Filter by configId if provided
+    const filteredRuns = configId ? validRuns.filter(run => run.config?.id === configId) : validRuns;
+    
+    // Apply pagination
+    const items = filteredRuns.slice(offset, offset + limit);
+    
+    // Return total as count of ALL runs (including corrupted ones)
+    return { items, total: totalAllRuns };
   }
 
-  async deleteRun(id: string, orgId: string): Promise<boolean> {
+  async deleteRun(params: { id: string; orgId?: string }): Promise<boolean> {
+    const { id, orgId } = params;
     if (!id) return false;
     const key = this.getKey('run', id, orgId);
-    const deleted = this.storage.runs.delete(key);
-
-    if (deleted && this.storage.runsIndex.has(orgId)) {
-      const index = this.storage.runsIndex.get(orgId)!;
-      const entryIndex = index.findIndex(entry => entry.id === id);
-      if (entryIndex !== -1) {
-        index.splice(entryIndex, 1);
+    const run = this.storage.runs.get(key);
+    
+    if (run) {
+      // Remove from index
+      const configId = run.config?.id;
+      if (configId) {
+        const indexKey = this.getKey('index', configId, orgId);
+        const existing = this.storage.runsIndex.get(indexKey) || [];
+        const filtered = existing.filter(item => item.id !== id);
+        if (filtered.length > 0) {
+          this.storage.runsIndex.set(indexKey, filtered);
+        } else {
+          this.storage.runsIndex.delete(indexKey);
+        }
       }
     }
-    return deleted;
+    
+    return this.storage.runs.delete(key);
   }
 
-  async deleteAllRuns(orgId: string): Promise<boolean> {
-    const keys = Array.from(this.storage.runs.keys())
-      .filter(key => key.startsWith(`${orgId ? `${orgId}:` : ''}run:`));
-
-    for (const key of keys) {
-      this.storage.runs.delete(key);
+  async deleteAllRuns(params?: { orgId?: string }): Promise<boolean> {
+    const { orgId } = params || {};
+    const prefix = orgId ? `${orgId}:run:` : 'run:';
+    const keysToDelete: string[] = [];
+    
+    for (const key of this.storage.runs.keys()) {
+      if (key.startsWith(prefix)) {
+        keysToDelete.push(key);
+      }
     }
-
-    this.storage.runsIndex.delete(orgId);
+    
+    // Also clear index entries
+    const indexPrefix = orgId ? `${orgId}:index:` : 'index:';
+    for (const key of this.storage.runsIndex.keys()) {
+      if (key.startsWith(indexPrefix)) {
+        this.storage.runsIndex.delete(key);
+      }
+    }
+    
+    keysToDelete.forEach(key => this.storage.runs.delete(key));
+    
     return true;
   }
 
@@ -231,33 +263,37 @@ export class MemoryStore implements DataStore {
   }
 
   async getTenantInfo(): Promise<{ email: string | null; emailEntrySkipped: boolean }> {
-    return this.tenant;
+    return { ...this.tenant };
   }
 
-  async setTenantInfo(email?: string, emailEntrySkipped?: boolean): Promise<void> {
-    const currentInfo = this.tenant;
-    this.tenant = {
-      email: email !== undefined ? email : currentInfo.email,
-      emailEntrySkipped: emailEntrySkipped !== undefined ? emailEntrySkipped : currentInfo.emailEntrySkipped
-    };
+  async setTenantInfo(params?: { email?: string; emailEntrySkipped?: boolean }): Promise<void> {
+    const { email, emailEntrySkipped } = params || {};
+    if (email !== undefined) {
+      this.tenant.email = email;
+    }
+    if (emailEntrySkipped !== undefined) {
+      this.tenant.emailEntrySkipped = emailEntrySkipped;
+    }
   }
 
   // Workflow Methods
-  async getWorkflow(id: string, orgId?: string): Promise<Workflow | null> {
+  async getWorkflow(params: { id: string; orgId?: string }): Promise<Workflow | null> {
+    const { id, orgId } = params;
     if (!id) return null;
     const key = this.getKey('workflow', id, orgId);
     const workflow = this.storage.workflows.get(key);
     return workflow ? { ...workflow, id } : null;
   }
 
-  async listWorkflows(limit = 10, offset = 0, orgId?: string): Promise<{ items: Workflow[], total: number }> {
-    const items = this.getOrgItems(this.storage.workflows, 'workflow', orgId)
-      .slice(offset, offset + limit);
+  async listWorkflows(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: Workflow[], total: number }> {
+    const { limit = 10, offset = 0, orgId } = params || {};
+    const items = this.getOrgItems(this.storage.workflows, 'workflow', orgId).slice(offset, offset + limit);
     const total = this.getOrgItems(this.storage.workflows, 'workflow', orgId).length;
     return { items, total };
   }
 
-  async getManyWorkflows(ids: string[], orgId?: string): Promise<Workflow[]> {
+  async getManyWorkflows(params: { ids: string[]; orgId?: string }): Promise<Workflow[]> {
+    const { ids, orgId } = params;
     return ids
       .map(id => {
         const key = this.getKey('workflow', id, orgId);
@@ -267,36 +303,38 @@ export class MemoryStore implements DataStore {
       .filter((w): w is Workflow => w !== null);
   }
 
-  async upsertWorkflow(id: string, workflow: Workflow, orgId?: string): Promise<Workflow> {
+  async upsertWorkflow(params: { id: string; workflow: Workflow; orgId?: string }): Promise<Workflow> {
+    const { id, workflow, orgId } = params;
     if (!id || !workflow) return null;
     const key = this.getKey('workflow', id, orgId);
     this.storage.workflows.set(key, workflow);
-    return { ...workflow, id };
   }
 
-  async deleteWorkflow(id: string, orgId?: string): Promise<boolean> {
+  async deleteWorkflow(params: { id: string; orgId?: string }): Promise<boolean> {
+    const { id, orgId } = params;
     if (!id) return false;
     const key = this.getKey('workflow', id, orgId);
-    const deleted = this.storage.workflows.delete(key);
-    return deleted;
+    return this.storage.workflows.delete(key);
   }
 
   // Integration Methods
-  async getIntegration(id: string, includeDocs = true, orgId?: string): Promise<Integration | null> {
+  async getIntegration(params: { id: string; includeDocs?: boolean; orgId?: string }): Promise<Integration | null> {
+    const { id, includeDocs = true, orgId } = params;
     if (!id) return null;
     const key = this.getKey('integration', id, orgId);
     const integration = this.storage.integrations.get(key);
     return integration ? { ...integration, id } : null;
   }
 
-  async listIntegrations(limit = 10, offset = 0, includeDocs = true, orgId?: string): Promise<{ items: Integration[], total: number }> {
-    const orgItems = this.getOrgItems(this.storage.integrations, 'integration', orgId);
-    const items = orgItems.slice(offset, offset + limit);
-    const total = orgItems.length;
+  async listIntegrations(params?: { limit?: number; offset?: number; includeDocs?: boolean; orgId?: string }): Promise<{ items: Integration[], total: number }> {
+    const { limit = 10, offset = 0, includeDocs = true, orgId } = params || {};
+    const items = this.getOrgItems(this.storage.integrations, 'integration', orgId).slice(offset, offset + limit);
+    const total = this.getOrgItems(this.storage.integrations, 'integration', orgId).length;
     return { items, total };
   }
 
-  async getManyIntegrations(ids: string[], includeDocs = true, orgId?: string): Promise<Integration[]> {
+  async getManyIntegrations(params: { ids: string[]; orgId?: string }): Promise<Integration[]> {
+    const { ids, orgId } = params;
     return ids
       .map(id => {
         const key = this.getKey('integration', id, orgId);
@@ -306,17 +344,18 @@ export class MemoryStore implements DataStore {
       .filter((i): i is Integration => i !== null);
   }
 
-  async upsertIntegration(id: string, integration: Integration, orgId?: string): Promise<Integration> {
+  async upsertIntegration(params: { id: string; integration: Integration; orgId?: string }): Promise<Integration> {
+    const { id, integration, orgId } = params;
     if (!id || !integration) return null;
     const key = this.getKey('integration', id, orgId);
     this.storage.integrations.set(key, integration);
     return { ...integration, id };
   }
 
-  async deleteIntegration(id: string, orgId?: string): Promise<boolean> {
+  async deleteIntegration(params: { id: string; orgId?: string }): Promise<boolean> {
+    const { id, orgId } = params;
     if (!id) return false;
     const key = this.getKey('integration', id, orgId);
-    const deleted = this.storage.integrations.delete(key);
-    return deleted;
+    return this.storage.integrations.delete(key);
   }
 } 

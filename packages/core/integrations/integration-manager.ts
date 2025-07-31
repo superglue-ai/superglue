@@ -84,7 +84,7 @@ export class IntegrationManager {
 
         this._loadingPromise = (async () => {
             try {
-                const integration = await this.dataStore.getIntegration(this.id, false, this.orgId);
+                const integration = await this.dataStore.getIntegration({ id: this.id, includeDocs: false, orgId: this.orgId });
                 if (integration) {
                     this._name = integration.name;
                     this._type = integration.type;
@@ -181,7 +181,7 @@ export class IntegrationManager {
 
         try {
             // Fetch the full integration with details from datastore
-            const fullIntegration = await this.dataStore.getIntegration(this.id, true, this.orgId);
+            const fullIntegration = await this.dataStore.getIntegration({ id: this.id, includeDocs: true, orgId: this.orgId });
             
             if (fullIntegration) {
                 this._documentation = {
@@ -285,11 +285,11 @@ export class IntegrationManager {
         
         if (refreshSuccess) {
             // Save the updated credentials to datastore
-            await this.dataStore.upsertIntegration(
-                this.id, 
-                this.toIntegrationSync(), 
-                this.orgId
-            );
+            await this.dataStore.upsertIntegration({
+              id: this.id,
+              integration: this.toIntegrationSync(),
+              orgId: this.orgId
+            });
             logMessage('info', `OAuth token refreshed and saved for integration ${this.id}`, { orgId: this.orgId });
         } else {
             logMessage('warn', `Failed to refresh OAuth token for integration ${this.id}`, { orgId: this.orgId });
@@ -305,7 +305,7 @@ export class IntegrationManager {
 
     // Static factory method to create from ID only
     static async fromId(id: string, dataStore: DataStore, orgId: string): Promise<IntegrationManager> {
-        const integration = await dataStore.getIntegration(id, false, orgId);
+        const integration = await dataStore.getIntegration({ id, includeDocs: false, orgId });
         if (!integration) {
             throw new Error(`Integration with id ${id} not found`);
         }

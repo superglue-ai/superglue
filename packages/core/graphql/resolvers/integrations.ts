@@ -19,9 +19,6 @@ function shouldTriggerDocFetch(input: Integration, oldIntegration?: Integration)
   // If a doc fetch is already in progress, never trigger a new one
   if (oldIntegration?.documentationPending === true) return false;
 
-  // If there's no documentation URL, no need to trigger
-  if (!input.documentationUrl || !input.documentationUrl.trim()) return false;
-
   // If documentationUrl is a file:// URL, no need to trigger
   if (input.documentationUrl.startsWith('file://')) return false;
 
@@ -49,7 +46,7 @@ export const listIntegrationsResolver = async (
   info: GraphQLResolveInfo
 ) => {
   try {
-    const result = await context.datastore.listIntegrations(limit, offset, false, context.orgId);
+    const result = await context.datastore.listIntegrations({ limit, offset, includeDocs: false, orgId: context.orgId });
     return {
       items: result.items,
       total: result.total,
@@ -68,7 +65,7 @@ export const getIntegrationResolver = async (
 ) => {
   if (!id) throw new Error("id is required");
   try {
-    const integration = await context.datastore.getIntegration(id, false, context.orgId);
+    const integration = await context.datastore.getIntegration({ id, includeDocs: false, orgId: context.orgId });
     return integration;
   } catch (error) {
     logMessage('error', `Error getting integration with id ${id}: ${String(error)}`, { orgId: context.orgId });
@@ -87,14 +84,15 @@ export const upsertIntegrationResolver = async (
   }
   try {
     const now = new Date();
-    const existingIntegration = await context.datastore.getIntegration(input.id, true, context.orgId);
+    let existingIntegration = await context.datastore.getIntegration({ id: input.id, includeDocs: true, orgId: context.orgId });
     if (mode === 'CREATE') {
       if (existingIntegration) {
         // ID already exists, generate a unique one
         input.id = await generateUniqueId({
           baseId: input.id,
-          exists: async (id) => !!(await context.datastore.getIntegration(id, false, context.orgId))
+          exists: async (id) => !!(await context.datastore.getIntegration({ id, includeDocs: false, orgId: context.orgId }))
         });
+        existingIntegration = null;
       }
       input = enrichWithTemplate(input);
     }
@@ -124,34 +122,42 @@ export const upsertIntegrationResolver = async (
           const docString = await docFetcher.fetchAndProcess();
           const openApiSchema = await docFetcher.fetchOpenApiDocumentation();
           // Check if integration still exists before upserting
-          const stillExists = await context.datastore.getIntegration(input.id, false, context.orgId);
+          const stillExists = await context.datastore.getIntegration({ id: input.id, includeDocs: false, orgId: context.orgId });
           if (!stillExists) {
             logMessage('warn', `Integration ${input.id} was deleted while fetching documentation. Skipping upsert.`, { orgId: context.orgId });
             return;
           }
-          await context.datastore.upsertIntegration(input.id, {
-            ...input,
-            documentation: docString,
-            documentationPending: false,
-            openApiSchema: openApiSchema,
-            specificInstructions: input.specificInstructions?.trim() || existingIntegration?.specificInstructions || '',
-            createdAt: existingIntegration?.createdAt || now,
-            updatedAt: new Date(),
-          }, context.orgId);
+          await context.datastore.upsertIntegration({
+            id: input.id,
+            integration: {
+              ...input,
+              documentation: docString,
+              documentationPending: false,
+              openApiSchema: openApiSchema,
+              specificInstructions: input.specificInstructions?.trim() || existingIntegration?.specificInstructions || '',
+              createdAt: existingIntegration?.createdAt || now,
+              updatedAt: new Date(),
+            },
+            orgId: context.orgId
+          });
           logMessage('info', `Completed documentation fetch for integration ${input.id}`, { orgId: context.orgId });
         } catch (err) {
           logMessage('error', `Documentation fetch failed for integration ${input.id}: ${String(err)}`, { orgId: context.orgId });
           // Reset documentationPending to false on failure to prevent corrupted state
           try {
-            const stillExists = await context.datastore.getIntegration(input.id, false, context.orgId);
+            const stillExists = await context.datastore.getIntegration({ id: input.id, includeDocs: false, orgId: context.orgId });
             if (stillExists) {
-              await context.datastore.upsertIntegration(input.id, {
-                ...input,
-                documentationPending: false,
-                specificInstructions: input.specificInstructions?.trim() || existingIntegration?.specificInstructions || '',
-                createdAt: existingIntegration?.createdAt || now,
-                updatedAt: new Date(),
-              }, context.orgId);
+              await context.datastore.upsertIntegration({
+                id: input.id,
+                integration: {
+                  ...input,
+                  documentationPending: false,
+                  specificInstructions: input.specificInstructions?.trim() || existingIntegration?.specificInstructions || '',
+                  createdAt: existingIntegration?.createdAt || now,
+                  updatedAt: new Date(),
+                },
+                orgId: context.orgId
+              });
               logMessage('info', `Reset documentationPending to false for integration ${input.id} after fetch failure`, { orgId: context.orgId });
             }
           } catch (resetError) {
@@ -177,7 +183,7 @@ export const upsertIntegrationResolver = async (
       createdAt: existingIntegration?.createdAt || now,
       updatedAt: now
     };
-    return await context.datastore.upsertIntegration(input.id, integration, context.orgId);
+    return await context.datastore.upsertIntegration({ id: input.id, integration, orgId: context.orgId });
   } catch (error) {
     logMessage('error', `Error upserting integration with id ${input.id}: ${String(error)}`, { orgId: context.orgId });
     throw error;
@@ -192,7 +198,7 @@ export const deleteIntegrationResolver = async (
 ) => {
   if (!id) throw new Error("id is required");
   try {
-    return await context.datastore.deleteIntegration(id, context.orgId);
+    return await context.datastore.deleteIntegration({ id, orgId: context.orgId });
   } catch (error) {
     logMessage('error', `Error deleting integration: ${String(error)}`, { orgId: context.orgId });
     throw error;
@@ -210,7 +216,7 @@ export const findRelevantIntegrationsResolver = async (
 
   try {
     const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
-    const allIntegrations = await context.datastore.listIntegrations(1000, 0, false, context.orgId);
+    const allIntegrations = await context.datastore.listIntegrations({ limit: 1000, offset: 0, includeDocs: false, orgId: context.orgId });
 
     const selector = new IntegrationSelector(metadata);
     return await selector.select(instruction, allIntegrations.items || []);
