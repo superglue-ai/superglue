@@ -352,7 +352,7 @@ export class PostgresService implements DataStore {
         const client = await this.pool.connect();
         try {
             let countQuery = 'SELECT COUNT(*) FROM runs WHERE org_id = $1';
-            let selectQuery = 'SELECT id, data FROM runs WHERE org_id = $1';
+            let selectQuery = 'SELECT id, data, started_at FROM runs WHERE org_id = $1';
             let params = [orgId || ''];
 
             if (configId) {
