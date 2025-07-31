@@ -4,9 +4,9 @@ import { getAuthBadge } from '@/src/app/integrations/page';
 import { IntegrationForm } from '@/src/components/integrations/IntegrationForm';
 import { useToast } from '@/src/hooks/use-toast';
 import { inputErrorStyles, needsUIToTriggerDocFetch, parseCredentialsHelper } from '@/src/lib/client-utils';
-import { cn, composeUrl } from '@/src/lib/utils';
+import { cn, composeUrl, getIntegrationIcon as getIntegrationIconName } from '@/src/lib/utils';
 import { Integration, IntegrationInput, SuperglueClient, UpsertMode, Workflow, WorkflowResult } from '@superglue/client';
-import { findMatchingIntegration, integrations as integrationTemplates } from "@superglue/shared";
+import { integrations as integrationTemplates } from "@superglue/shared";
 import { flattenAndNamespaceWorkflowCredentials, waitForIntegrationProcessing } from '@superglue/shared/utils';
 import { ArrowRight, Check, ChevronRight, Clock, FileText, Globe, Key, Loader2, Pencil, Play, Plus, Workflow as WorkflowIcon, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -711,8 +711,8 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                           >
                             <div className="flex items-center gap-3 flex-1 min-w-0">
                               {(() => {
-                                const integration = findMatchingIntegration(sys.urlHost);
-                                const icon = integration?.integration.icon ? getSimpleIcon(integration.integration.icon) : null;
+                                const iconName = getIntegrationIconName(sys);
+                                const icon = iconName ? getSimpleIcon(iconName) : null;
                                 return icon ? (
                                   <svg
                                     width="20"

@@ -16,7 +16,7 @@ import { Button } from '@/src/components/ui/button';
 import { DocStatus } from '@/src/components/utils/DocStatusSpinner';
 import { useToast } from '@/src/hooks/use-toast';
 import { needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
-import { composeUrl } from '@/src/lib/utils';
+import { composeUrl, getIntegrationIcon as getIntegrationIconName } from '@/src/lib/utils';
 import type { Integration } from '@superglue/client';
 import { SuperglueClient, UpsertMode } from '@superglue/client';
 import { integrations as integrationTemplates } from '@superglue/shared';
@@ -361,11 +361,8 @@ export default function IntegrationsPage() {
 
     // Helper to get icon for integration
     function getIntegrationIcon(integration: Integration) {
-        const match = integrationOptions.find(opt =>
-            opt.value !== 'custom' &&
-            (integration.id === opt.value || (integration.urlHost && integration.urlHost.includes(opt.value)))
-        );
-        return match ? getSimpleIcon(match.icon) : null;
+        const iconName = getIntegrationIconName(integration);
+        return iconName ? getSimpleIcon(iconName) : null;
     }
 
 

@@ -247,9 +247,14 @@ export const integrations: Record<string, IntegrationConfig> = {
     apiUrl: "https://firestore.googleapis.com",
     regex: "^(.*\\.)?(firebase\\.google\\.com|firebaseio\\.com|firestore\\.googleapis\\.com)(/.*)?$",
     icon: "firebase",
-    docsUrl: "https://firebase.google.com/docs/reference",
+    docsUrl: "https://firebase.google.com/docs/reference/firebase-management/rest",
     openApiUrl: "https://firestore.googleapis.com/$discovery/rest?version=v1",
-    preferredAuthType: "apikey"
+    preferredAuthType: "oauth",
+    oauth: {
+      authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
+      tokenUrl: "https://oauth2.googleapis.com/token",
+      scopes: "https://www.googleapis.com/auth/firebase https://www.googleapis.com/auth/datastore"
+    }
   },
   salesforce: {
     apiUrl: "https://api.salesforce.com",
@@ -1022,3 +1027,5 @@ export function getOAuthTokenUrl(integration: { id: string; urlHost: string; cre
   // Fallback: Default OAuth token endpoint
   return `${integration.urlHost}/oauth/token`;
 }
+
+
