@@ -1,5 +1,5 @@
 import type { Integration } from '@superglue/client';
-import { getOAuthConfig, integrations, type IntegrationConfig } from '@superglue/shared';
+import { getOAuthConfig, getOAuthTokenUrl, integrations, type IntegrationConfig } from '@superglue/shared';
 import { logMessage } from './logs.js';
 
 export interface OAuthTokens {
@@ -32,34 +32,12 @@ export function isTokenExpired(integration: Integration): boolean {
 }
 
 /**
- * Get token URL for an integration based on its configuration
- */
-export function getTokenUrl(integration: Integration): string | null {
-    // Try to get from known integrations first
-    const match = Object.entries(integrations).find(([key]) =>
-        integration.id === key || integration.urlHost?.includes(key)
-    );
-
-    if (match) {
-        const [_, config] = match as [string, IntegrationConfig];
-        return config.oauth?.tokenUrl || null;
-    }
-
-    // Check if integration has custom auth_url in credentials
-    const customTokenUrl = integration.credentials?.token_url as string;
-    if (customTokenUrl) return customTokenUrl;
-
-    // Default: assume OAuth2 token endpoint at the same host
-    return `${integration.urlHost}/oauth/token`;
-}
-
-/**
  * Refresh OAuth tokens for an integration
  */
 export async function refreshOAuthToken(
     integration: Integration,
 ): Promise<boolean> {
-    const { client_id, client_secret, refresh_token } = integration.credentials || {};
+    const { client_id, client_secret, refresh_token, access_token } = integration.credentials || {};
 
     if (!client_id || !client_secret || !refresh_token) {
         logMessage('error', 'Missing required credentials for token refresh', {
@@ -72,7 +50,7 @@ export async function refreshOAuthToken(
     }
 
     try {
-        const tokenUrl = getTokenUrl(integration);
+        const tokenUrl = getOAuthTokenUrl(integration);
         if (!tokenUrl) {
             throw new Error('Could not determine token URL for integration');
         }
@@ -93,6 +71,10 @@ export async function refreshOAuthToken(
 
         if (!response.ok) {
             const errorText = await response.text();
+            // Check if this is a long-lived access token scenario (access_token === refresh_token)
+            if (access_token === refresh_token) {
+                throw new Error(`OAuth access token was unable to refresh. This integration likely uses a long-lived access token in its OAuth flow. Please reauthenticate with the OAuth provider to refresh the access token manually.`);
+            }
             throw new Error(`Token refresh failed: ${response.status} - ${errorText}`);
         }
 
@@ -168,7 +150,7 @@ export async function handleOAuthCallback(
         }
 
         // Get token URL
-        const tokenUrl = getTokenUrl(integration);
+        const tokenUrl = getOAuthTokenUrl(integration);
         if (!tokenUrl) {
             return {
                 success: false,
