@@ -284,7 +284,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     oauth: {
       authUrl: "https://www.facebook.com/v23.0/dialog/oauth",
       tokenUrl: "https://graph.facebook.com/v23.0/oauth/access_token",
-      scopes: "instagram_basic instagram_content_publish instagram_manage_comments instagram_manage_insights instagram_shopping_tag_products instagram_manage_messages pages_show_list pages_messaging"
+      scopes: "instagram_basic pages_show_list instagram_content_publish pages_read_engagement instagram_manage_comments instagram_manage_insights instagram_manage_messages business_management"
     }
   },
   twitter: {

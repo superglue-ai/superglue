@@ -363,7 +363,7 @@ export default function IntegrationsPage() {
     function getIntegrationIcon(integration: Integration) {
         const match = integrationOptions.find(opt =>
             opt.value !== 'custom' &&
-            (integration.id === opt.value || integration.urlHost.includes(opt.value))
+            (integration.id === opt.value || (integration.urlHost && integration.urlHost.includes(opt.value)))
         );
         return match ? getSimpleIcon(match.icon) : null;
     }
