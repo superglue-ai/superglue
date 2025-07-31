@@ -1,4 +1,4 @@
-import type { ApiConfig, ExtractConfig, RunResult, TransformConfig, Workflow, Integration } from "@superglue/client";
+import type { ApiConfig, ExtractConfig, Integration, RunResult, TransformConfig, Workflow } from "@superglue/client";
 export interface DataStore {
   // API Config Methods
   getApiConfig(id: string, orgId?: string): Promise<ApiConfig | null>;
@@ -37,9 +37,9 @@ export interface DataStore {
   setTenantInfo(email?: string, emailEntrySkipped?: boolean): Promise<void>;
 
   // Integration Methods
-  getIntegration(id: string, orgId?: string): Promise<Integration | null>;
-  listIntegrations(limit?: number, offset?: number, orgId?: string): Promise<{ items: Integration[], total: number }>;
+  getIntegration(id: string, includeDocs?: boolean, orgId?: string): Promise<Integration | null>;
+  listIntegrations(limit?: number, offset?: number, includeDocs?: boolean, orgId?: string): Promise<{ items: Integration[], total: number }>;
   upsertIntegration(id: string, integration: Integration, orgId?: string): Promise<Integration>;
   deleteIntegration(id: string, orgId?: string): Promise<boolean>;
-  getManyIntegrations(ids: string[], orgId?: string): Promise<Integration[]>;
+  getManyIntegrations(ids: string[], includeDocs?: boolean, orgId?: string): Promise<Integration[]>;
 }

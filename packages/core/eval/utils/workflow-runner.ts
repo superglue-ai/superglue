@@ -1,6 +1,7 @@
 import { Integration, Workflow, WorkflowResult } from '@superglue/client';
 import { generateUniqueId } from '@superglue/shared/utils';
 import { DataStore } from '../../datastore/types.js';
+import { IntegrationManager } from '../../integrations/integration-manager.js';
 import { logEmitter, logMessage } from '../../utils/logs.js';
 import { BaseWorkflowConfig } from './config-loader.js';
 
@@ -228,7 +229,7 @@ export class WorkflowRunner {
                 const executor = new WorkflowExecutor(
                     workflow,
                     metadataWithWorkflowId,
-                    integrations
+                    IntegrationManager.fromIntegrations(integrations, this.datastore, this.metadata.orgId)
                 );
 
                 // Combine all credentials from integrations

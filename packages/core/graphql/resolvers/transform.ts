@@ -1,9 +1,9 @@
 import { CacheMode, FileType, RequestOptions, TransformConfig, TransformInputRequest } from "@superglue/client";
-import { Context, Metadata } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { parseFile } from "../../utils/file.js";
 import { executeTransform } from "../../utils/transform.js";
 import { notifyWebhook } from "../../utils/webhook.js";
+import { Context, Metadata } from '../types.js';
 
 export const transformResolver = async (
   _: any,

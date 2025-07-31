@@ -387,7 +387,11 @@ Always wrap your code in <<CODE>> and <</CODE>> tags (note the closing tag has a
             // Load evaluateResponse dynamically
             const { evaluateResponse } = await import('../../utils/api.js');
             const documentation = integrations[0]?.documentation || '';
-            const evaluation = await evaluateResponse(result, undefined, instruction, documentation);
+            const evaluation = await evaluateResponse({
+                data: result,
+                instruction,
+                documentation
+            });
 
             return {
                 success: evaluation.success,

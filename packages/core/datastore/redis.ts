@@ -365,14 +365,14 @@ export class RedisService implements DataStore {
   }
 
   // Integration Methods
-  async getIntegration(id: string, orgId?: string): Promise<Integration | null> {
+  async getIntegration(id: string, includeDocs = true, orgId?: string): Promise<Integration | null> {
     if (!id) return null;
     const key = this.getKey(this.INTEGRATION_PREFIX, id, orgId);
     const data = await this.redis.get(key);
     return parseWithId(data, id);
   }
 
-  async listIntegrations(limit = 10, offset = 0, orgId?: string): Promise<{ items: Integration[], total: number }> {
+  async listIntegrations(limit = 10, offset = 0, includeDocs = true, orgId?: string): Promise<{ items: Integration[], total: number }> {
     const pattern = this.getPattern(this.INTEGRATION_PREFIX, orgId);
     const keys = await this.redis.keys(pattern);
     const slicedKeys = keys.slice(offset, offset + limit);
@@ -386,7 +386,7 @@ export class RedisService implements DataStore {
     return { items: integrations.filter((i): i is Integration => i !== null), total: keys.length };
   }
 
-  async getManyIntegrations(ids: string[], orgId?: string): Promise<Integration[]> {
+  async getManyIntegrations(ids: string[], includeDocs = true, orgId?: string): Promise<Integration[]> {
     if (!ids.length) return [];
     const keys = ids.map(id => this.getKey(this.INTEGRATION_PREFIX, id, orgId));
     const dataArray = await this.redis.mGet(keys);

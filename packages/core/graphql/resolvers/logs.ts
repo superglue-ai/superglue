@@ -1,6 +1,7 @@
-import { Context, LogEntry } from "@superglue/shared";
+import { LogEntry } from "@superglue/shared";
 import { EventEmitter } from 'events';
 import { logEmitter } from '../../utils/logs.js';
+import { Context } from '../types.js';
 // Export resolver
 export const logsResolver = {
     subscribe: (_, { }, context: Context) => {

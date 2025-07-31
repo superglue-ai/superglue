@@ -1,5 +1,4 @@
 import { CacheMode, DecompressionMethod, ExtractConfig, ExtractInputRequest, FileType, RequestOptions } from "@superglue/client";
-import type { Context, Metadata } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { Documentation } from "../../utils/documentation.js";
 import { callExtract, generateExtractConfig, processFile } from "../../utils/extract.js";
@@ -7,6 +6,7 @@ import { logMessage } from "../../utils/logs.js";
 import { telemetryClient } from "../../utils/telemetry.js";
 import { maskCredentials } from "../../utils/tools.js";
 import { notifyWebhook } from "../../utils/webhook.js";
+import { Context, Metadata } from '../types.js';
 
 export const extractResolver = async (
   _: any,

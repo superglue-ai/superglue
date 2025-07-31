@@ -1,11 +1,12 @@
 import { Integration } from '@superglue/client';
-import { Context, findMatchingIntegration, integrations, Metadata } from "@superglue/shared";
+import { findMatchingIntegration, integrations } from "@superglue/shared";
 import { generateUniqueId } from '@superglue/shared/utils';
 import { GraphQLResolveInfo } from "graphql";
 import { IntegrationSelector } from '../../integrations/integration-selector.js';
 import { Documentation } from '../../utils/documentation.js';
 import { logMessage } from '../../utils/logs.js';
 import { composeUrl } from '../../utils/tools.js';
+import { Context, Metadata } from '../types.js';
 
 function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined, defaultValue?: T): T | undefined {
   if (newValue === null) return undefined;
@@ -48,7 +49,7 @@ export const listIntegrationsResolver = async (
   info: GraphQLResolveInfo
 ) => {
   try {
-    const result = await context.datastore.listIntegrations(limit, offset, context.orgId);
+    const result = await context.datastore.listIntegrations(limit, offset, false, context.orgId);
     return {
       items: result.items,
       total: result.total,
@@ -67,8 +68,7 @@ export const getIntegrationResolver = async (
 ) => {
   if (!id) throw new Error("id is required");
   try {
-    const integration = await context.datastore.getIntegration(id, context.orgId);
-    if (!integration) throw new Error("Integration not found");
+    const integration = await context.datastore.getIntegration(id, false, context.orgId);
     return integration;
   } catch (error) {
     logMessage('error', `Error getting integration with id ${id}: ${String(error)}`, { orgId: context.orgId });
@@ -87,25 +87,22 @@ export const upsertIntegrationResolver = async (
   }
   try {
     const now = new Date();
-
+    const existingIntegration = await context.datastore.getIntegration(input.id, true, context.orgId);
     if (mode === 'CREATE') {
-      const existingIntegration = await context.datastore.getIntegration(input.id, context.orgId);
       if (existingIntegration) {
         // ID already exists, generate a unique one
         input.id = await generateUniqueId({
           baseId: input.id,
-          exists: async (id) => !!(await context.datastore.getIntegration(id, context.orgId))
+          exists: async (id) => !!(await context.datastore.getIntegration(id, false, context.orgId))
         });
       }
       input = enrichWithTemplate(input);
     }
-    const oldIntegration = await context.datastore.getIntegration(input.id, context.orgId);
-
-    if (mode === 'UPDATE' && !oldIntegration) {
+    else if (mode === 'UPDATE' && !existingIntegration) {
       throw new Error(`Integration with ID '${input.id}' not found.`);
     }
 
-    const shouldFetchDoc = shouldTriggerDocFetch(input, oldIntegration);
+    const shouldFetchDoc = shouldTriggerDocFetch(input, existingIntegration);
 
     if (shouldFetchDoc) {
       // Fire-and-forget async doc fetch
@@ -127,7 +124,7 @@ export const upsertIntegrationResolver = async (
           const docString = await docFetcher.fetchAndProcess();
           const openApiSchema = await docFetcher.fetchOpenApiDocumentation();
           // Check if integration still exists before upserting
-          const stillExists = await context.datastore.getIntegration(input.id, context.orgId);
+          const stillExists = await context.datastore.getIntegration(input.id, false, context.orgId);
           if (!stillExists) {
             logMessage('warn', `Integration ${input.id} was deleted while fetching documentation. Skipping upsert.`, { orgId: context.orgId });
             return;
@@ -137,8 +134,8 @@ export const upsertIntegrationResolver = async (
             documentation: docString,
             documentationPending: false,
             openApiSchema: openApiSchema,
-            specificInstructions: input.specificInstructions?.trim() || oldIntegration?.specificInstructions || '',
-            createdAt: oldIntegration?.createdAt || now,
+            specificInstructions: input.specificInstructions?.trim() || existingIntegration?.specificInstructions || '',
+            createdAt: existingIntegration?.createdAt || now,
             updatedAt: new Date(),
           }, context.orgId);
           logMessage('info', `Completed documentation fetch for integration ${input.id}`, { orgId: context.orgId });
@@ -146,13 +143,13 @@ export const upsertIntegrationResolver = async (
           logMessage('error', `Documentation fetch failed for integration ${input.id}: ${String(err)}`, { orgId: context.orgId });
           // Reset documentationPending to false on failure to prevent corrupted state
           try {
-            const stillExists = await context.datastore.getIntegration(input.id, context.orgId);
+            const stillExists = await context.datastore.getIntegration(input.id, false, context.orgId);
             if (stillExists) {
               await context.datastore.upsertIntegration(input.id, {
                 ...input,
                 documentationPending: false,
-                specificInstructions: input.specificInstructions?.trim() || oldIntegration?.specificInstructions || '',
-                createdAt: oldIntegration?.createdAt || now,
+                specificInstructions: input.specificInstructions?.trim() || existingIntegration?.specificInstructions || '',
+                createdAt: existingIntegration?.createdAt || now,
                 updatedAt: new Date(),
               }, context.orgId);
               logMessage('info', `Reset documentationPending to false for integration ${input.id} after fetch failure`, { orgId: context.orgId });
@@ -165,19 +162,19 @@ export const upsertIntegrationResolver = async (
     }
     const integration = {
       id: input.id,
-      name: resolveField(input.name, oldIntegration?.name, ''),
-      urlHost: resolveField(input.urlHost, oldIntegration?.urlHost, ''),
-      urlPath: resolveField(input.urlPath, oldIntegration?.urlPath, ''),
-      documentationUrl: resolveField(input.documentationUrl, oldIntegration?.documentationUrl, ''),
-      documentation: resolveField(input.documentation, oldIntegration?.documentation, ''),
-      openApiUrl: resolveField(input.openApiUrl, oldIntegration?.openApiUrl, ''),
-      openApiSchema: resolveField(input.openApiSchema, oldIntegration?.openApiSchema, ''),
+      name: resolveField(input.name, existingIntegration?.name, ''),
+      urlHost: resolveField(input.urlHost, existingIntegration?.urlHost, ''),
+      urlPath: resolveField(input.urlPath, existingIntegration?.urlPath, ''),
+      documentationUrl: resolveField(input.documentationUrl, existingIntegration?.documentationUrl, ''),
+      documentation: resolveField(input.documentation, existingIntegration?.documentation, ''),
+      openApiUrl: resolveField(input.openApiUrl, existingIntegration?.openApiUrl, ''),
+      openApiSchema: resolveField(input.openApiSchema, existingIntegration?.openApiSchema, ''),
       // If we're starting a new fetch, set pending to true
       // If we're not starting a new fetch, preserve the existing pending state
-      documentationPending: shouldFetchDoc ? true : (oldIntegration?.documentationPending || false),
-      credentials: resolveField(input.credentials, oldIntegration?.credentials, {}),
-      specificInstructions: resolveField(input.specificInstructions?.trim(), oldIntegration?.specificInstructions, ''),
-      createdAt: oldIntegration?.createdAt || now,
+      documentationPending: shouldFetchDoc ? true : (existingIntegration?.documentationPending || false),
+      credentials: resolveField(input.credentials, existingIntegration?.credentials, {}),
+      specificInstructions: resolveField(input.specificInstructions?.trim(), existingIntegration?.specificInstructions, ''),
+      createdAt: existingIntegration?.createdAt || now,
       updatedAt: now
     };
     return await context.datastore.upsertIntegration(input.id, integration, context.orgId);
@@ -213,7 +210,7 @@ export const findRelevantIntegrationsResolver = async (
 
   try {
     const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
-    const allIntegrations = await context.datastore.listIntegrations(1000, 0, context.orgId);
+    const allIntegrations = await context.datastore.listIntegrations(1000, 0, false, context.orgId);
 
     const selector = new IntegrationSelector(metadata);
     return await selector.select(instruction, allIntegrations.items || []);
