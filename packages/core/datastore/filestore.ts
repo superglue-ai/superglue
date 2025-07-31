@@ -591,7 +591,7 @@ export class FileStore implements DataStore {
   }
 
   // Integration Methods
-  async getIntegration(id: string, includeDetails = true, orgId?: string): Promise<Integration | null> {
+  async getIntegration(id: string, includeDocs = true, orgId?: string): Promise<Integration | null> {
     await this.ensureInitialized();
     if (!id) return null;
     const key = this.getKey('integration', id, orgId);
@@ -607,7 +607,7 @@ export class FileStore implements DataStore {
     return decryptedIntegration;
   }
 
-  async listIntegrations(limit = 10, offset = 0, includeDetails = true, orgId?: string): Promise<{ items: Integration[], total: number }> {
+  async listIntegrations(limit = 10, offset = 0, includeDocs = true, orgId?: string): Promise<{ items: Integration[], total: number }> {
     await this.ensureInitialized();
     const orgItems = this.getOrgItems(this.storage.integrations, 'integration', orgId);
     const items = orgItems.slice(offset, offset + limit).map(integration => {
@@ -622,7 +622,7 @@ export class FileStore implements DataStore {
     return { items, total };
   }
 
-  async getManyIntegrations(ids: string[], includeDetails = true, orgId?: string): Promise<Integration[]> {
+  async getManyIntegrations(ids: string[], includeDocs = true, orgId?: string): Promise<Integration[]> {
     await this.ensureInitialized();
     return ids
       .map(id => {

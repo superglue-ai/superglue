@@ -282,21 +282,21 @@ export class MemoryStore implements DataStore {
   }
 
   // Integration Methods
-  async getIntegration(id: string, includeDetails = true, orgId?: string): Promise<Integration | null> {
+  async getIntegration(id: string, includeDocs = true, orgId?: string): Promise<Integration | null> {
     if (!id) return null;
     const key = this.getKey('integration', id, orgId);
     const integration = this.storage.integrations.get(key);
     return integration ? { ...integration, id } : null;
   }
 
-  async listIntegrations(limit = 10, offset = 0, includeDetails = true, orgId?: string): Promise<{ items: Integration[], total: number }> {
+  async listIntegrations(limit = 10, offset = 0, includeDocs = true, orgId?: string): Promise<{ items: Integration[], total: number }> {
     const orgItems = this.getOrgItems(this.storage.integrations, 'integration', orgId);
     const items = orgItems.slice(offset, offset + limit);
     const total = orgItems.length;
     return { items, total };
   }
 
-  async getManyIntegrations(ids: string[], includeDetails = true, orgId?: string): Promise<Integration[]> {
+  async getManyIntegrations(ids: string[], includeDocs = true, orgId?: string): Promise<Integration[]> {
     return ids
       .map(id => {
         const key = this.getKey('integration', id, orgId);
