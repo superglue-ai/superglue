@@ -279,7 +279,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     apiUrl: "https://graph.facebook.com/v23.0/",
     regex: "^(.*\\.)?instagram\\.com(/.*)?$",
     icon: "instagram",
-    docsUrl: "https://developers.facebook.com/docs/instagram-platform/overview",
+    docsUrl: "https://developers.facebook.com/docs/graph-api/overview",
     preferredAuthType: "oauth",
     oauth: {
       authUrl: "https://www.facebook.com/v23.0/dialog/oauth",
