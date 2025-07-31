@@ -1,5 +1,5 @@
 import { SuperglueClient, UpsertMode } from '@superglue/client';
-import { integrations } from '@superglue/shared';
+import { getOAuthTokenUrl } from '@superglue/shared';
 import { NextRequest, NextResponse } from 'next/server';
 
 const OAUTH_STATE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
@@ -17,21 +17,6 @@ interface OAuthTokenResponse {
     token_type?: string;
     expires_at?: string;
     expires_in?: number;
-}
-
-function getTokenUrl(integration: any): string {
-    // Check known integrations
-    const knownIntegration = Object.entries(integrations).find(([key]) =>
-        integration.id === key || integration.urlHost.includes(key)
-    );
-
-    if (knownIntegration) {
-        const [_, config] = knownIntegration;
-        return config.oauth?.tokenUrl || `${integration.urlHost}/oauth/token`;
-    }
-
-    // Custom token URL or default
-    return integration.credentials?.token_url || `${integration.urlHost}/oauth/token`;
 }
 
 function validateOAuthState(state: string | null, expectedIntegrationId: string): OAuthState {
@@ -75,7 +60,7 @@ async function exchangeCodeForToken(
         throw new Error('OAuth client credentials not configured');
     }
 
-    const tokenUrl = getTokenUrl(integration);
+    const tokenUrl = getOAuthTokenUrl(integration);
     const response = await fetch(tokenUrl, {
         method: 'POST',
         headers: {
@@ -194,6 +179,7 @@ export async function GET(request: NextRequest) {
 
         // Fetch integration
         const integration = await client.getIntegration(integrationId);
+
         if (!integration) {
             throw new Error('Integration not found');
         }
@@ -202,13 +188,27 @@ export async function GET(request: NextRequest) {
         const redirectUri = stateData.redirectUri || `${origin}/api/auth/callback`;
         const tokenData = await exchangeCodeForToken(code, integration, redirectUri, state);
 
+        if (!tokenData || typeof tokenData !== 'object') {
+            throw new Error('Invalid token response from OAuth provider');
+        }
+
+        let { access_token, refresh_token, ...additionalFields } = tokenData;
+
+        if (!access_token) {
+            throw new Error('No access token received from OAuth provider. Please try again.');
+        }
+
+        if (!refresh_token) {
+            refresh_token = access_token;
+            // If refresh token is not provided, use access token as refresh token.
+        }
         // Update integration with new tokens
         const updatedCredentials = {
             ...integration.credentials,
-            access_token: tokenData.access_token,
-            refresh_token: tokenData.refresh_token || integration.credentials.refresh_token,
-            token_type: tokenData.token_type || 'Bearer',
-            expires_at: tokenData.expires_at || (tokenData.expires_in ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString() : undefined),
+            access_token: access_token,
+            refresh_token: refresh_token,
+            token_type: additionalFields.token_type || 'Bearer',
+            expires_at: additionalFields.expires_at || (additionalFields.expires_in ? new Date(Date.now() + additionalFields.expires_in * 1000).toISOString() : undefined),
         };
 
         await client.upsertIntegration(

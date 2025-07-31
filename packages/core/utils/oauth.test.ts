@@ -1,10 +1,10 @@
 import type { Integration } from '@superglue/client';
+import { getOAuthTokenUrl } from '@superglue/shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as logs from './logs.js';
 import {
     buildOAuthAuthorizationUrl,
     buildOAuthHeaders,
-    getTokenUrl,
     handleOAuthCallback,
     isTokenExpired,
     refreshOAuthToken,
@@ -86,7 +86,7 @@ describe('OAuth Utilities', () => {
                 urlHost: 'https://api.github.com',
                 credentials: {},
             };
-            expect(getTokenUrl(integration)).toBe('https://github.com/login/oauth/access_token');
+            expect(getOAuthTokenUrl(integration)).toBe('https://github.com/login/oauth/access_token');
         });
 
         it('should return token URL for known integration by URL host', () => {
@@ -95,7 +95,7 @@ describe('OAuth Utilities', () => {
                 urlHost: 'https://api.github.com',
                 credentials: {},
             };
-            expect(getTokenUrl(integration)).toBe('https://github.com/login/oauth/access_token');
+            expect(getOAuthTokenUrl(integration)).toBe('https://github.com/login/oauth/access_token');
         });
 
         it('should return custom token URL from credentials', () => {
@@ -106,7 +106,7 @@ describe('OAuth Utilities', () => {
                     token_url: 'https://custom.com/oauth/token',
                 },
             };
-            expect(getTokenUrl(integration)).toBe('https://custom.com/oauth/token');
+            expect(getOAuthTokenUrl(integration)).toBe('https://custom.com/oauth/token');
         });
 
         it('should return default token URL for unknown integration', () => {
@@ -115,7 +115,7 @@ describe('OAuth Utilities', () => {
                 urlHost: 'https://api.unknown.com',
                 credentials: {},
             };
-            expect(getTokenUrl(integration)).toBe('https://api.unknown.com/oauth/token');
+            expect(getOAuthTokenUrl(integration)).toBe('https://api.unknown.com/oauth/token');
         });
     });
 
