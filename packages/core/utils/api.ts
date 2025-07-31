@@ -3,11 +3,15 @@ import type { AxiosRequestConfig } from "axios";
 import OpenAI from "openai";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { server_defaults } from "../default.js";
+import { isSelfHealingEnabled, Metadata } from "../graphql/types.js";
+import { IntegrationManager } from "../integrations/integration-manager.js";
 import { LanguageModel } from "../llm/llm.js";
 import { SELF_HEALING_API_AGENT_PROMPT } from "../llm/prompts.js";
 import { searchDocumentationToolDefinition, submitToolDefinition } from "../workflow/workflow-tools.js";
 import { parseFile } from "./file.js";
+import { logMessage } from "./logs.js";
 import { callPostgres } from "./postgres.js";
+import { telemetryClient } from "./telemetry.js";
 import { callAxios, composeUrl, evaluateStopCondition, generateId, maskCredentials, replaceVariables, sample } from "./tools.js";
 
 export function convertBasicAuthToBase64(headerValue: string) {
@@ -281,17 +285,26 @@ config: ${maskedConfig}`;
   };
 }
 
-export async function generateApiConfig(
+export async function generateApiConfig({
+  apiConfig,
+  payload,
+  credentials,
+  retryCount,
+  messages,
+  integrationManager,
+}: {
   apiConfig: Partial<ApiConfig>,
-  documentation: string,
   payload: Record<string, any>,
   credentials: Record<string, any>,
-  retryCount = 0,
-  messages: OpenAI.Chat.ChatCompletionMessageParam[] = [],
-  context?: any
-): Promise<{ config: ApiConfig; messages: OpenAI.Chat.ChatCompletionMessageParam[]; }> {
-
+  retryCount?: number,
+  messages?: OpenAI.Chat.ChatCompletionMessageParam[],
+  integrationManager: IntegrationManager,
+}): Promise<{ config: ApiConfig; messages: OpenAI.Chat.ChatCompletionMessageParam[]; }> {
+  if(!retryCount) retryCount = 0;
+  if(!messages) messages = [];
+  
   if (messages.length === 0) {
+    await integrationManager.ensureDocumentationLoaded();
     const userPrompt = `Generate API configuration for the following:
 
 <instruction>
@@ -310,8 +323,12 @@ ${apiConfig.pagination ? `Pagination: ${JSON.stringify(apiConfig.pagination)}` :
 ${apiConfig.method ? `Method: ${apiConfig.method}` : ''}
 </user_provided_information>
 
+<integration_instructions>
+${integrationManager?.specificInstructions}
+</integration_instructions>
+
 <documentation>
-${documentation}
+${await integrationManager?.searchDocumentation(apiConfig.instruction)}
 </documentation>
 
 <available_credentials>
@@ -338,7 +355,7 @@ ${JSON.stringify(sample(payload || {}, 5)).slice(0, LanguageModel.contextLength 
     submitToolDefinition.arguments,
     temperature,
     [searchDocumentationToolDefinition],
-    context
+    { integration: await integrationManager?.toIntegration() }
   );
 
   return {
@@ -364,12 +381,17 @@ ${JSON.stringify(sample(payload || {}, 5)).slice(0, LanguageModel.contextLength 
   };
 }
 
-export async function evaluateResponse(
+export async function evaluateResponse({
+  data,
+  responseSchema,
+  instruction,
+  documentation
+}: {
   data: any,
-  responseSchema: JSONSchema,
+  responseSchema?: JSONSchema,
   instruction: string,
   documentation?: string
-): Promise<{ success: boolean, refactorNeeded: boolean, shortReason: string; }> {
+}): Promise<{ success: boolean, refactorNeeded: boolean, shortReason: string; }> {
   let content = JSON.stringify(data);
   if (content.length > LanguageModel.contextLength / 2) {
     content = JSON.stringify(sample(data, 10)) + "\n\n...truncated...";
@@ -420,4 +442,95 @@ Instruction: ${instruction}${documentationContext}`
     0
   );
   return response.response;
+}
+
+export async function executeApiCall({
+  endpoint,
+  payload,
+  credentials,
+  integrationManager,
+  options,
+  metadata,
+  }: {
+  endpoint: ApiConfig,
+  payload: any,
+  credentials: Record<string, string>,
+  integrationManager: IntegrationManager,
+  options: RequestOptions,
+  metadata: Metadata,
+}): Promise<{
+  data: any;
+  endpoint: ApiConfig;
+}> {
+  let response: any = null;
+  let retryCount = 0;
+  let lastError: string | null = null;
+  let messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
+  let success = false;
+  let isSelfHealing = isSelfHealingEnabled(options);
+
+
+  do {
+    try {
+      if (retryCount > 0 && isSelfHealing) {
+        logMessage('info', `Generating API config for ${endpoint?.urlHost}${retryCount > 0 ? ` (${retryCount})` : ""}`, metadata);
+        const computedApiCallConfig = await generateApiConfig({
+          apiConfig: endpoint,
+          payload,
+          credentials,
+          retryCount,
+          messages,
+          integrationManager
+        });
+        if (!computedApiCallConfig) {
+          throw new Error("No API config generated");
+        }
+        endpoint = computedApiCallConfig.config;
+        messages = computedApiCallConfig.messages;
+      }
+
+      response = await callEndpoint(endpoint, payload, credentials, options);
+
+      if (!response.data) {
+        throw new Error("No data returned from API. This could be due to a configuration error.");
+      }
+
+      // Check if response is valid
+      if (retryCount > 0 && isSelfHealing) {
+        const result = await evaluateResponse({
+          data: response.data,
+          responseSchema: endpoint.responseSchema,
+          instruction: endpoint.instruction,
+          documentation: await integrationManager?.searchDocumentation(endpoint.instruction)
+        });
+        success = result.success;
+        if (!result.success) throw new Error(result.shortReason + " " + JSON.stringify(response.data).slice(0, 1000));
+      }
+      else {
+        success = true;
+      }
+      break;
+    }
+    catch (error) {
+      const rawErrorString = error?.message || JSON.stringify(error || {});
+      lastError = maskCredentials(rawErrorString, credentials).slice(0, 1000);
+      if (retryCount === 0) {
+        logMessage('info', `The initial configuration is not valid. Generating a new configuration. If you are creating a new configuration, this is expected.\n${lastError}`, metadata);
+      }
+      else if (retryCount > 0) {
+        messages.push({ role: "user", content: `There was an error with the configuration, please fix: ${rawErrorString.slice(0, 2000)}` });
+        logMessage('warn', `API call failed. ${lastError}`, metadata);
+      }
+    }
+    retryCount++;
+  } while (retryCount < (options?.retries !== undefined ? options.retries : server_defaults.MAX_CALL_RETRIES));
+  if (!success) {
+    telemetryClient?.captureException(new Error(`API call failed after ${retryCount} retries. Last error: ${lastError}`), metadata.orgId, {
+      endpoint: endpoint,
+      retryCount: retryCount,
+    });
+    throw new Error(`API call failed after ${retryCount} retries. Last error: ${lastError}`);
+  }
+
+  return { data: response?.data, endpoint };
 }

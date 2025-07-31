@@ -56,13 +56,15 @@ export class RedisService implements DataStore {
   }
 
   // API Config Methods
-  async getApiConfig(id: string, orgId?: string): Promise<ApiConfig | null> {
+  async getApiConfig(params: { id: string; orgId?: string }): Promise<ApiConfig | null> {
+    const { id, orgId } = params;
     if (!id) return null;
     const data = await this.redis.get(this.getKey(this.API_PREFIX, id, orgId));
     return parseWithId(data, id);
   }
 
-  async listApiConfigs(limit = 10, offset = 0, orgId?: string): Promise<{ items: ApiConfig[], total: number }> {
+  async listApiConfigs(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: ApiConfig[], total: number }> {
+    const { limit = 10, offset = 0, orgId } = params || {};
     const pattern = this.getPattern(this.API_PREFIX, orgId);
     const keys = await this.redis.keys(pattern);
     const slicedKeys = keys.slice(offset, offset + limit);
@@ -76,27 +78,31 @@ export class RedisService implements DataStore {
     return { items: configs.filter((c): c is ApiConfig => c !== null), total: keys.length };
   }
 
-  async upsertApiConfig(id: string, config: ApiConfig, orgId: string): Promise<ApiConfig> {
+  async upsertApiConfig(params: { id: string; config: ApiConfig; orgId?: string }): Promise<ApiConfig> {
+    const { id, config, orgId } = params;
     if (!id || !config) return null;
     const key = this.getKey(this.API_PREFIX, id, orgId);
     await this.redis.set(key, JSON.stringify(config));
     return config;
   }
 
-  async deleteApiConfig(id: string, orgId: string): Promise<boolean> {
+  async deleteApiConfig(params: { id: string; orgId?: string }): Promise<boolean> {
+    const { id, orgId } = params;
     if (!id) return false;
     const deleted = await this.redis.del(this.getKey(this.API_PREFIX, id, orgId));
     return deleted > 0;
   }
 
   // Extract Methods
-  async getExtractConfig(id: string, orgId: string): Promise<ExtractConfig | null> {
+  async getExtractConfig(params: { id: string; orgId?: string }): Promise<ExtractConfig | null> {
+    const { id, orgId } = params;
     if (!id) return null;
     const data = await this.redis.get(this.getKey(this.EXTRACT_PREFIX, id, orgId));
     return parseWithId(data, id);
   }
 
-  async listExtractConfigs(limit = 10, offset = 0, orgId?: string): Promise<{ items: ExtractConfig[], total: number }> {
+  async listExtractConfigs(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: ExtractConfig[], total: number }> {
+    const { limit = 10, offset = 0, orgId } = params || {};
     const pattern = this.getPattern(this.EXTRACT_PREFIX, orgId);
     const keys = await this.redis.keys(pattern);
     const slicedKeys = keys.slice(offset, offset + limit);
@@ -110,27 +116,31 @@ export class RedisService implements DataStore {
     return { items: configs.filter((c): c is ExtractConfig => c !== null), total: keys.length };
   }
 
-  async upsertExtractConfig(id: string, config: ExtractConfig, orgId?: string): Promise<ExtractConfig> {
+  async upsertExtractConfig(params: { id: string; config: ExtractConfig; orgId?: string }): Promise<ExtractConfig> {
+    const { id, config, orgId } = params;
     if (!id || !config) return null;
     const key = this.getKey(this.EXTRACT_PREFIX, id, orgId);
     await this.redis.set(key, JSON.stringify(config));
     return config;
   }
 
-  async deleteExtractConfig(id: string, orgId?: string): Promise<boolean> {
+  async deleteExtractConfig(params: { id: string; orgId?: string }): Promise<boolean> {
+    const { id, orgId } = params;
     if (!id) return false;
     const deleted = await this.redis.del(this.getKey(this.EXTRACT_PREFIX, id, orgId));
     return deleted > 0;
   }
 
   // Transform Methods
-  async getTransformConfig(id: string, orgId?: string): Promise<TransformConfig | null> {
+  async getTransformConfig(params: { id: string; orgId?: string }): Promise<TransformConfig | null> {
+    const { id, orgId } = params;
     if (!id) return null;
     const data = await this.redis.get(this.getKey(this.TRANSFORM_PREFIX, id, orgId));
     return parseWithId(data, id);
   }
 
-  async listTransformConfigs(limit = 10, offset = 0, orgId?: string): Promise<{ items: TransformConfig[], total: number }> {
+  async listTransformConfigs(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: TransformConfig[], total: number }> {
+    const { limit = 10, offset = 0, orgId } = params || {};
     const pattern = this.getPattern(this.TRANSFORM_PREFIX, orgId);
     const keys = await this.redis.keys(pattern);
     const slicedKeys = keys.slice(offset, offset + limit);
@@ -144,20 +154,23 @@ export class RedisService implements DataStore {
     return { items: configs.filter((c): c is TransformConfig => c !== null), total: keys.length };
   }
 
-  async upsertTransformConfig(id: string, config: TransformConfig, orgId?: string): Promise<TransformConfig> {
+  async upsertTransformConfig(params: { id: string; config: TransformConfig; orgId?: string }): Promise<TransformConfig> {
+    const { id, config, orgId } = params;
     if (!id || !config) return null;
     const key = this.getKey(this.TRANSFORM_PREFIX, id, orgId);
     await this.redis.set(key, JSON.stringify(config));
     return config;
   }
 
-  async deleteTransformConfig(id: string, orgId?: string): Promise<boolean> {
+  async deleteTransformConfig(params: { id: string; orgId?: string }): Promise<boolean> {
+    const { id, orgId } = params;
     if (!id) return false;
     const deleted = await this.redis.del(this.getKey(this.TRANSFORM_PREFIX, id, orgId));
     return deleted > 0;
   }
 
-  async getRun(id: string, orgId?: string): Promise<RunResult | null> {
+  async getRun(params: { id: string; orgId?: string }): Promise<RunResult | null> {
+    const { id, orgId } = params;
     if (!id) return null;
     const pattern = this.getRunByIdPattern(this.RUN_PREFIX, id, orgId);
     const keys = await this.redis.keys(pattern);
@@ -168,7 +181,8 @@ export class RedisService implements DataStore {
     return parseWithId(data, id);
   }
 
-  async listRuns(limit = 10, offset = 0, configId?: string, orgId?: string): Promise<{ items: RunResult[], total: number }> {
+  async listRuns(params?: { limit?: number; offset?: number; configId?: string; orgId?: string }): Promise<{ items: RunResult[], total: number }> {
+    const { limit = 10, offset = 0, configId, orgId } = params || {};
     const pattern = configId
       ? this.getRunsByConfigPattern(this.RUN_PREFIX, configId, orgId)
       : this.getPattern(this.RUN_PREFIX, orgId);
@@ -203,7 +217,8 @@ export class RedisService implements DataStore {
     };
   }
 
-  async deleteAllRuns(orgId: string): Promise<boolean> {
+  async deleteAllRuns(params?: { orgId?: string }): Promise<boolean> {
+    const { orgId } = params || {};
     const pattern = this.getPattern(this.RUN_PREFIX, orgId);
     const keys = await this.redis.keys(pattern);
 
@@ -213,7 +228,8 @@ export class RedisService implements DataStore {
     return keys.length > 0;
   }
 
-  async createRun(run: RunResult, orgId?: string): Promise<RunResult> {
+  async createRun(params: { result: RunResult; orgId?: string }): Promise<RunResult> {
+    const { result: run, orgId } = params;
     if (!run) return null;
     const key = this.getKey(this.RUN_PREFIX, `${run.config?.id}:${run.id}`, orgId);
     if ((run as any).stepResults) delete (run as any).stepResults;
@@ -223,7 +239,8 @@ export class RedisService implements DataStore {
     return run;
   }
 
-  async deleteRun(id: string, orgId?: string): Promise<boolean> {
+  async deleteRun(params: { id: string; orgId?: string }): Promise<boolean> {
+    const { id, orgId } = params;
     if (!id) return false;
     const pattern = this.getRunByIdPattern(this.RUN_PREFIX, id, orgId);
     const keys = await this.redis.keys(pattern);
@@ -281,7 +298,8 @@ export class RedisService implements DataStore {
     }
   }
 
-  async setTenantInfo(email?: string, emailEntrySkipped?: boolean): Promise<void> {
+  async setTenantInfo(params?: { email?: string; emailEntrySkipped?: boolean }): Promise<void> {
+    const { email, emailEntrySkipped } = params || {};
     try {
       const currentInfo = await this.getTenantInfo();
       const tenantInfo = {
@@ -295,7 +313,8 @@ export class RedisService implements DataStore {
   }
 
   // Workflow Methods
-  async getWorkflow(id: string, orgId?: string): Promise<Workflow | null> {
+  async getWorkflow(params: { id: string; orgId?: string }): Promise<Workflow | null> {
+    const { id, orgId } = params;
     try {
       if (!id) return null;
       const key = this.getKey(this.WORKFLOW_PREFIX, id, orgId);
@@ -307,7 +326,8 @@ export class RedisService implements DataStore {
     }
   }
 
-  async listWorkflows(limit = 10, offset = 0, orgId?: string): Promise<{ items: Workflow[], total: number }> {
+  async listWorkflows(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: Workflow[], total: number }> {
+    const { limit = 10, offset = 0, orgId } = params || {};
     try {
       const pattern = this.getPattern(this.WORKFLOW_PREFIX, orgId);
       const keys = await this.redis.keys(pattern);
@@ -329,7 +349,8 @@ export class RedisService implements DataStore {
     }
   }
 
-  async getManyWorkflows(ids: string[], orgId?: string): Promise<Workflow[]> {
+  async getManyWorkflows(params: { ids: string[]; orgId?: string }): Promise<Workflow[]> {
+    const { ids, orgId } = params;
     if (!ids.length) return [];
     const keys = ids.map(id => this.getKey(this.WORKFLOW_PREFIX, id, orgId));
     const dataArray = await this.redis.mGet(keys);
@@ -338,7 +359,8 @@ export class RedisService implements DataStore {
       .filter((w): w is Workflow => w !== null);
   }
 
-  async upsertWorkflow(id: string, workflow: Workflow, orgId?: string): Promise<Workflow> {
+  async upsertWorkflow(params: { id: string; workflow: Workflow; orgId?: string }): Promise<Workflow> {
+    const { id, workflow, orgId } = params;
     try {
       if (!id || !workflow) return null;
       const key = this.getKey(this.WORKFLOW_PREFIX, id, orgId);
@@ -352,7 +374,8 @@ export class RedisService implements DataStore {
     }
   }
 
-  async deleteWorkflow(id: string, orgId?: string): Promise<boolean> {
+  async deleteWorkflow(params: { id: string; orgId?: string }): Promise<boolean> {
+    const { id, orgId } = params;
     try {
       if (!id) return false;
       const key = this.getKey(this.WORKFLOW_PREFIX, id, orgId);
@@ -365,14 +388,16 @@ export class RedisService implements DataStore {
   }
 
   // Integration Methods
-  async getIntegration(id: string, orgId?: string): Promise<Integration | null> {
+  async getIntegration(params: { id: string; includeDocs?: boolean; orgId?: string }): Promise<Integration | null> {
+    const { id, includeDocs = true, orgId } = params;
     if (!id) return null;
     const key = this.getKey(this.INTEGRATION_PREFIX, id, orgId);
     const data = await this.redis.get(key);
     return parseWithId(data, id);
   }
 
-  async listIntegrations(limit = 10, offset = 0, orgId?: string): Promise<{ items: Integration[], total: number }> {
+  async listIntegrations(params?: { limit?: number; offset?: number; includeDocs?: boolean; orgId?: string }): Promise<{ items: Integration[], total: number }> {
+    const { limit = 10, offset = 0, includeDocs = true, orgId } = params || {};
     const pattern = this.getPattern(this.INTEGRATION_PREFIX, orgId);
     const keys = await this.redis.keys(pattern);
     const slicedKeys = keys.slice(offset, offset + limit);
@@ -386,7 +411,8 @@ export class RedisService implements DataStore {
     return { items: integrations.filter((i): i is Integration => i !== null), total: keys.length };
   }
 
-  async getManyIntegrations(ids: string[], orgId?: string): Promise<Integration[]> {
+  async getManyIntegrations(params: { ids: string[]; includeDocs?: boolean; orgId?: string }): Promise<Integration[]> {
+    const { ids, includeDocs = true, orgId } = params;
     if (!ids.length) return [];
     const keys = ids.map(id => this.getKey(this.INTEGRATION_PREFIX, id, orgId));
     const dataArray = await this.redis.mGet(keys);
@@ -395,14 +421,16 @@ export class RedisService implements DataStore {
       .filter((i): i is Integration => i !== null);
   }
 
-  async upsertIntegration(id: string, integration: Integration, orgId?: string): Promise<Integration> {
+  async upsertIntegration(params: { id: string; integration: Integration; orgId?: string }): Promise<Integration> {
+    const { id, integration, orgId } = params;
     if (!id || !integration) return null;
     const key = this.getKey(this.INTEGRATION_PREFIX, id, orgId);
     await this.redis.set(key, JSON.stringify(integration));
     return { ...integration, id };
   }
 
-  async deleteIntegration(id: string, orgId?: string): Promise<boolean> {
+  async deleteIntegration(params: { id: string; orgId?: string }): Promise<boolean> {
+    const { id, orgId } = params;
     if (!id) return false;
     const key = this.getKey(this.INTEGRATION_PREFIX, id, orgId);
     const result = await this.redis.del(key);

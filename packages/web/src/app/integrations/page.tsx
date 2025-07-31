@@ -499,8 +499,7 @@ export default function IntegrationsPage() {
                                                     disabled={
                                                         !integration.documentationUrl ||
                                                         !integration.documentationUrl.trim() ||
-                                                        integration.documentationUrl.startsWith('file://') ||
-                                                        pendingDocIds.has(integration.id)
+                                                        integration.documentationUrl.startsWith('file://')
                                                     }
                                                     title={
                                                         integration.documentationUrl?.startsWith('file://')

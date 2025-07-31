@@ -1,9 +1,9 @@
 import { CacheMode, FileType, RequestOptions, TransformConfig, TransformInputRequest } from "@superglue/client";
-import { Context, Metadata } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { parseFile } from "../../utils/file.js";
 import { executeTransform } from "../../utils/transform.js";
 import { notifyWebhook } from "../../utils/webhook.js";
+import { Context, Metadata } from '../types.js';
 
 export const transformResolver = async (
   _: any,
@@ -50,7 +50,7 @@ export const transformResolver = async (
     });
     // Save configuration if requested
     if (writeCache) {
-      context.datastore.upsertTransformConfig(input.id || input.endpoint.id, transformResult.config, context.orgId);
+      context.datastore.upsertTransformConfig({ id: input.id || input.endpoint.id, config: transformResult.config, orgId: context.orgId });
     }
     const completedAt = new Date();
 

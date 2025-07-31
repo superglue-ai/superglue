@@ -1,7 +1,8 @@
-import { ExecutionStep, Integration, RequestOptions, Workflow, WorkflowResult, WorkflowStepResult } from "@superglue/client";
+import { ExecutionStep, RequestOptions, Workflow, WorkflowResult, WorkflowStepResult } from "@superglue/client";
 import { Metadata } from "@superglue/shared";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
-import { isSelfHealingEnabled } from "../graphql/resolvers/call.js";
+import { isSelfHealingEnabled } from "../graphql/types.js";
+import { IntegrationManager } from "../integrations/integration-manager.js";
 import { logMessage } from "../utils/logs.js";
 import { transformAndValidateSchema } from "../utils/tools.js";
 import { evaluateMapping, generateTransformCode } from "../utils/transform.js";
@@ -16,12 +17,12 @@ export class WorkflowExecutor implements Workflow {
   public metadata: Metadata;
   public instruction?: string;
   public inputSchema?: JSONSchema;
-  private integrations: Record<string, Integration>;
+  private integrations: Record<string, IntegrationManager>;
 
   constructor(
     workflow: Workflow,
     metadata: Metadata,
-    integrations: Integration[] = []
+    integrations: IntegrationManager[] = []
   ) {
     this.id = workflow.id;
     this.steps = workflow.steps;
@@ -33,7 +34,7 @@ export class WorkflowExecutor implements Workflow {
     this.integrations = integrations.reduce((acc, int) => {
       acc[int.id] = int;
       return acc;
-    }, {} as Record<string, Integration>);
+    }, {} as Record<string, IntegrationManager>);
     this.result = {
       id: crypto.randomUUID(),
       success: false,
@@ -70,14 +71,14 @@ export class WorkflowExecutor implements Workflow {
         try {
           const strategy = selectStrategy(step);
           const stepInputPayload = await this.prepareStepInput(step, payload);
-          const integration = step.integrationId ? this.integrations[step.integrationId] : undefined;
+          const integrationManager = step.integrationId ? this.integrations[step.integrationId] : undefined;
           stepResult = await strategy.execute(
             step,
             stepInputPayload,
             credentials,
             options || {},
             this.metadata,
-            integration
+            integrationManager
           );
           step.apiConfig = stepResult.config;
         } catch (stepError) {

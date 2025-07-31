@@ -309,16 +309,18 @@ export class FileStore implements DataStore {
   }
 
   // API Config Methods
-  async getApiConfig(id: string, orgId: string): Promise<ApiConfig | null> {
+  async getApiConfig(params: { id: string; orgId?: string }): Promise<ApiConfig | null> {
     await this.ensureInitialized();
+    const { id, orgId } = params;
     if (!id) return null;
     const key = this.getKey('api', id, orgId);
     const config = this.storage.apis.get(key);
     return config ? { ...config, id } : null;
   }
 
-  async listApiConfigs(limit = 10, offset = 0, orgId?: string): Promise<{ items: ApiConfig[], total: number }> {
+  async listApiConfigs(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: ApiConfig[], total: number }> {
     await this.ensureInitialized();
+    const { limit = 10, offset = 0, orgId } = params || {};
     const orgItems = this.getOrgItems(this.storage.apis, 'api', orgId);
     const items = orgItems
       .slice(offset, offset + limit);
@@ -326,8 +328,9 @@ export class FileStore implements DataStore {
     return { items, total };
   }
 
-  async upsertApiConfig(id: string, config: ApiConfig, orgId?: string): Promise<ApiConfig> {
+  async upsertApiConfig(params: { id: string; config: ApiConfig; orgId?: string }): Promise<ApiConfig> {
     await this.ensureInitialized();
+    const { id, config, orgId } = params;
     if (!id || !config) return null;
     const key = this.getKey('api', id, orgId);
     this.storage.apis.set(key, config);
@@ -335,8 +338,9 @@ export class FileStore implements DataStore {
     return { ...config, id };
   }
 
-  async deleteApiConfig(id: string, orgId: string): Promise<boolean> {
+  async deleteApiConfig(params: { id: string; orgId?: string }): Promise<boolean> {
     await this.ensureInitialized();
+    const { id, orgId } = params;
     if (!id) return false;
     const key = this.getKey('api', id, orgId);
     const deleted = this.storage.apis.delete(key);
@@ -345,24 +349,27 @@ export class FileStore implements DataStore {
   }
 
   // Extract Config Methods
-  async getExtractConfig(id: string, orgId: string): Promise<ExtractConfig | null> {
+  async getExtractConfig(params: { id: string; orgId?: string }): Promise<ExtractConfig | null> {
     await this.ensureInitialized();
+    const { id, orgId } = params;
     if (!id) return null;
     const key = this.getKey('extract', id, orgId);
     const config = this.storage.extracts.get(key);
     return config ? { ...config, id } : null;
   }
 
-  async listExtractConfigs(limit = 10, offset = 0, orgId?: string): Promise<{ items: ExtractConfig[], total: number }> {
+  async listExtractConfigs(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: ExtractConfig[], total: number }> {
     await this.ensureInitialized();
+    const { limit = 10, offset = 0, orgId } = params || {};
     const items = this.getOrgItems(this.storage.extracts, 'extract', orgId)
       .slice(offset, offset + limit);
     const total = this.getOrgItems(this.storage.extracts, 'extract', orgId).length;
     return { items, total };
   }
 
-  async upsertExtractConfig(id: string, config: ExtractConfig, orgId: string): Promise<ExtractConfig> {
+  async upsertExtractConfig(params: { id: string; config: ExtractConfig; orgId?: string }): Promise<ExtractConfig> {
     await this.ensureInitialized();
+    const { id, config, orgId } = params;
     if (!id || !config) return null;
     const key = this.getKey('extract', id, orgId);
     this.storage.extracts.set(key, config);
@@ -370,8 +377,9 @@ export class FileStore implements DataStore {
     return { ...config, id };
   }
 
-  async deleteExtractConfig(id: string, orgId: string): Promise<boolean> {
+  async deleteExtractConfig(params: { id: string; orgId?: string }): Promise<boolean> {
     await this.ensureInitialized();
+    const { id, orgId } = params;
     if (!id) return false;
     const key = this.getKey('extract', id, orgId);
     const deleted = this.storage.extracts.delete(key);
@@ -380,24 +388,27 @@ export class FileStore implements DataStore {
   }
 
   // Transform Config Methods  
-  async getTransformConfig(id: string, orgId: string): Promise<TransformConfig | null> {
+  async getTransformConfig(params: { id: string; orgId?: string }): Promise<TransformConfig | null> {
     await this.ensureInitialized();
+    const { id, orgId } = params;
     if (!id) return null;
     const key = this.getKey('transform', id, orgId);
     const config = this.storage.transforms.get(key);
     return config ? { ...config, id } : null;
   }
 
-  async listTransformConfigs(limit = 10, offset = 0, orgId?: string): Promise<{ items: TransformConfig[], total: number }> {
+  async listTransformConfigs(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: TransformConfig[], total: number }> {
     await this.ensureInitialized();
+    const { limit = 10, offset = 0, orgId } = params || {};
     const items = this.getOrgItems(this.storage.transforms, 'transform', orgId)
       .slice(offset, offset + limit);
     const total = this.getOrgItems(this.storage.transforms, 'transform', orgId).length;
     return { items, total };
   }
 
-  async upsertTransformConfig(id: string, config: TransformConfig, orgId: string): Promise<TransformConfig> {
+  async upsertTransformConfig(params: { id: string; config: TransformConfig; orgId?: string }): Promise<TransformConfig> {
     await this.ensureInitialized();
+    const { id, config, orgId } = params;
     if (!id || !config) return null;
     const key = this.getKey('transform', id, orgId);
     this.storage.transforms.set(key, config);
@@ -405,8 +416,9 @@ export class FileStore implements DataStore {
     return { ...config, id };
   }
 
-  async deleteTransformConfig(id: string, orgId: string): Promise<boolean> {
+  async deleteTransformConfig(params: { id: string; orgId?: string }): Promise<boolean> {
     await this.ensureInitialized();
+    const { id, orgId } = params;
     if (!id) return false;
     const key = this.getKey('transform', id, orgId);
     const deleted = this.storage.transforms.delete(key);
@@ -415,8 +427,9 @@ export class FileStore implements DataStore {
   }
 
   // Run Result Methods
-  async getRun(id: string, orgId: string): Promise<RunResult | null> {
+  async getRun(params: { id: string; orgId?: string }): Promise<RunResult | null> {
     await this.ensureInitialized();
+    const { id, orgId } = params;
     if (!id) return null;
 
     const runs = await this.readRunsFromLogs(orgId);
@@ -426,8 +439,9 @@ export class FileStore implements DataStore {
     return run || null;
   }
 
-  async createRun(run: RunResult, orgId: string): Promise<RunResult> {
+  async createRun(params: { result: RunResult; orgId?: string }): Promise<RunResult> {
     await this.ensureInitialized();
+    const { result: run, orgId } = params;
     if (!run) return null;
     if ((run as any).stepResults) delete (run as any).stepResults;
 
@@ -439,8 +453,9 @@ export class FileStore implements DataStore {
     return run;
   }
 
-  async listRuns(limit = 10, offset = 0, configId?: string, orgId?: string): Promise<{ items: RunResult[], total: number }> {
+  async listRuns(params?: { limit?: number; offset?: number; configId?: string; orgId?: string }): Promise<{ items: RunResult[], total: number }> {
     await this.ensureInitialized();
+    const { limit = 10, offset = 0, configId, orgId } = params || {};
     const allRuns = await this.readRunsFromLogs(orgId, configId);
 
     // Filter out invalid runs
@@ -458,43 +473,40 @@ export class FileStore implements DataStore {
     return { items, total: validRuns.length };
   }
 
-  async deleteRun(id: string, orgId: string): Promise<boolean> {
+  async deleteRun(params: { id: string; orgId?: string }): Promise<boolean> {
     await this.ensureInitialized();
+    const { id, orgId } = params;
     if (!id) return false;
     return this.removeRunFromLogs(id, orgId);
   }
 
-  async deleteAllRuns(orgId: string): Promise<boolean> {
+  async deleteAllRuns(params?: { orgId?: string }): Promise<boolean> {
     await this.ensureInitialized();
+    const { orgId } = params || {};
     try {
       try {
         await fs.promises.access(this.logsFilePath);
       } catch {
+        // Logs file doesn't exist, nothing to delete
         return true;
       }
 
-      const content = await fs.promises.readFile(this.logsFilePath, 'utf-8');
-      if (!content.trim()) {
-        return true;
-      }
+      // Read all existing logs
+      const logs = await fs.promises.readFile(this.logsFilePath, 'utf-8');
+      const lines = logs.split('\n').filter(line => line.trim());
 
-      const lines = content.trim().split('\n');
-      const filteredLines: string[] = [];
-
-      for (const line of lines) {
+      // Filter out logs for the specified org
+      const remainingLines = lines.filter(line => {
         try {
-          const run = JSON.parse(line) as RunResult & { orgId: string };
-          if (run.orgId !== orgId) {
-            filteredLines.push(line);
-          }
-        } catch (parseError) {
-          // Keep unparseable lines
-          filteredLines.push(line);
+          const logEntry = JSON.parse(line);
+          return logEntry.orgId !== orgId;
+        } catch {
+          return true; // Keep malformed lines
         }
-      }
+      });
 
-      const newContent = filteredLines.length > 0 ? filteredLines.join('\n') + '\n' : '';
-      await fs.promises.writeFile(this.logsFilePath, newContent, { mode: 0o644 });
+      // Write back the filtered logs
+      await fs.promises.writeFile(this.logsFilePath, remainingLines.join('\n') + '\n');
       return true;
     } catch (error) {
       logMessage('error', 'Failed to delete all runs: ' + error);
@@ -534,8 +546,9 @@ export class FileStore implements DataStore {
     return this.storage.tenant;
   }
 
-  async setTenantInfo(email?: string, emailEntrySkipped?: boolean): Promise<void> {
+  async setTenantInfo(params?: { email?: string; emailEntrySkipped?: boolean }): Promise<void> {
     await this.ensureInitialized();
+    const { email, emailEntrySkipped } = params || {};
     const currentInfo = this.storage.tenant;
     this.storage.tenant = {
       email: email !== undefined ? email : currentInfo.email,
@@ -545,24 +558,27 @@ export class FileStore implements DataStore {
   }
 
   // Workflow Methods
-  async getWorkflow(id: string, orgId?: string): Promise<Workflow | null> {
+  async getWorkflow(params: { id: string; orgId?: string }): Promise<Workflow | null> {
     await this.ensureInitialized();
+    const { id, orgId } = params;
     if (!id) return null;
     const key = this.getKey('workflow', id, orgId);
     const workflow = this.storage.workflows.get(key);
     return workflow ? { ...workflow, id } : null;
   }
 
-  async listWorkflows(limit = 10, offset = 0, orgId?: string): Promise<{ items: Workflow[], total: number }> {
+  async listWorkflows(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: Workflow[], total: number }> {
     await this.ensureInitialized();
+    const { limit = 10, offset = 0, orgId } = params || {};
     const items = this.getOrgItems(this.storage.workflows, 'workflow', orgId)
       .slice(offset, offset + limit);
     const total = this.getOrgItems(this.storage.workflows, 'workflow', orgId).length;
     return { items, total };
   }
 
-  async getManyWorkflows(ids: string[], orgId?: string): Promise<Workflow[]> {
+  async getManyWorkflows(params: { ids: string[]; orgId?: string }): Promise<Workflow[]> {
     await this.ensureInitialized();
+    const { ids, orgId } = params;
     return ids
       .map(id => {
         const key = this.getKey('workflow', id, orgId);
@@ -572,8 +588,9 @@ export class FileStore implements DataStore {
       .filter((w): w is Workflow => w !== null);
   }
 
-  async upsertWorkflow(id: string, workflow: Workflow, orgId?: string): Promise<Workflow> {
+  async upsertWorkflow(params: { id: string; workflow: Workflow; orgId?: string }): Promise<Workflow> {
     await this.ensureInitialized();
+    const { id, workflow, orgId } = params;
     if (!id || !workflow) return null;
     const key = this.getKey('workflow', id, orgId);
     this.storage.workflows.set(key, workflow);
@@ -581,8 +598,9 @@ export class FileStore implements DataStore {
     return { ...workflow, id };
   }
 
-  async deleteWorkflow(id: string, orgId?: string): Promise<boolean> {
+  async deleteWorkflow(params: { id: string; orgId?: string }): Promise<boolean> {
     await this.ensureInitialized();
+    const { id, orgId } = params;
     if (!id) return false;
     const key = this.getKey('workflow', id, orgId);
     const deleted = this.storage.workflows.delete(key);
@@ -591,8 +609,9 @@ export class FileStore implements DataStore {
   }
 
   // Integration Methods
-  async getIntegration(id: string, orgId?: string): Promise<Integration | null> {
+  async getIntegration(params: { id: string; includeDocs?: boolean; orgId?: string }): Promise<Integration | null> {
     await this.ensureInitialized();
+    const { id, includeDocs = true, orgId } = params;
     if (!id) return null;
     const key = this.getKey('integration', id, orgId);
     const integration = this.storage.integrations.get(key);
@@ -607,60 +626,60 @@ export class FileStore implements DataStore {
     return decryptedIntegration;
   }
 
-  async listIntegrations(limit = 10, offset = 0, orgId?: string): Promise<{ items: Integration[], total: number }> {
+  async listIntegrations(params?: { limit?: number; offset?: number; includeDocs?: boolean; orgId?: string }): Promise<{ items: Integration[], total: number }> {
     await this.ensureInitialized();
+    const { limit = 10, offset = 0, includeDocs = true, orgId } = params || {};
     const orgItems = this.getOrgItems(this.storage.integrations, 'integration', orgId);
-    const items = orgItems.slice(offset, offset + limit).map(integration => {
-      // Decrypt credentials if encryption is enabled
-      const decryptedIntegration = { ...integration };
-      if (decryptedIntegration.credentials) {
-        decryptedIntegration.credentials = credentialEncryption.decrypt(decryptedIntegration.credentials);
-      }
-      return decryptedIntegration;
-    });
+    const items = orgItems
+      .slice(offset, offset + limit)
+      .map(integration => {
+        const decrypted = { ...integration };
+        if (decrypted.credentials) {
+          decrypted.credentials = credentialEncryption.decrypt(decrypted.credentials);
+        }
+        return decrypted;
+      });
     const total = orgItems.length;
     return { items, total };
   }
 
-  async getManyIntegrations(ids: string[], orgId?: string): Promise<Integration[]> {
+  async getManyIntegrations(params: { ids: string[]; orgId?: string }): Promise<Integration[]> {
     await this.ensureInitialized();
+    const { ids, orgId } = params;
     return ids
       .map(id => {
         const key = this.getKey('integration', id, orgId);
         const integration = this.storage.integrations.get(key);
         if (!integration) return null;
-        
-        // Decrypt credentials if encryption is enabled
-        const decryptedIntegration = { ...integration, id };
-        if (decryptedIntegration.credentials) {
-          decryptedIntegration.credentials = credentialEncryption.decrypt(decryptedIntegration.credentials);
+        const decrypted = { ...integration, id };
+        if (decrypted.credentials) {
+          decrypted.credentials = credentialEncryption.decrypt(decrypted.credentials);
         }
-        
-        return decryptedIntegration;
+        return decrypted;
       })
       .filter((i): i is Integration => i !== null);
   }
 
-  async upsertIntegration(id: string, integration: Integration, orgId?: string): Promise<Integration> {
+  async upsertIntegration(params: { id: string; integration: Integration; orgId?: string }): Promise<Integration> {
     await this.ensureInitialized();
+    const { id, integration, orgId } = params;
     if (!id || !integration) return null;
     const key = this.getKey('integration', id, orgId);
     
-    // Create a copy of the integration to avoid modifying the original
-    const integrationToStore = { ...integration };
-    
-    // Encrypt credentials if encryption is enabled
-    if (integrationToStore.credentials) {
-      integrationToStore.credentials = credentialEncryption.encrypt(integrationToStore.credentials);
+    // Encrypt credentials if encryption is enabled and credentials exist
+    const toStore = { ...integration };
+    if (toStore.credentials) {
+      toStore.credentials = credentialEncryption.encrypt(toStore.credentials);
     }
     
-    this.storage.integrations.set(key, integrationToStore);
+    this.storage.integrations.set(key, toStore);
     await this.persist();
     return { ...integration, id };
   }
 
-  async deleteIntegration(id: string, orgId?: string): Promise<boolean> {
+  async deleteIntegration(params: { id: string; orgId?: string }): Promise<boolean> {
     await this.ensureInitialized();
+    const { id, orgId } = params;
     if (!id) return false;
     const key = this.getKey('integration', id, orgId);
     const deleted = this.storage.integrations.delete(key);
