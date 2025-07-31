@@ -18,9 +18,6 @@ function shouldTriggerDocFetch(input: Integration, oldIntegration?: Integration)
   // If a doc fetch is already in progress, never trigger a new one
   if (oldIntegration?.documentationPending === true) return false;
 
-  // If there's no documentation URL, no need to trigger
-  if (!input.documentationUrl || !input.documentationUrl.trim()) return false;
-
   // If documentationUrl is a file:// URL, no need to trigger
   if (input.documentationUrl.startsWith('file://')) return false;
 
