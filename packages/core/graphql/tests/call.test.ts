@@ -82,7 +82,9 @@ describe('Call Resolver', () => {
       // Mock executeApiCall
       mockedApi.executeApiCall.mockResolvedValue({
         data: { result: 'success' },
-        endpoint: testInput.endpoint
+        endpoint: testInput.endpoint,
+        statusCode: 200,
+        headers:  {}
       });
 
       // Mock transform
@@ -116,7 +118,9 @@ describe('Call Resolver', () => {
       // Mock executeApiCall
       mockedApi.executeApiCall.mockResolvedValue({
         data: { result: 'success' },
-        endpoint: testInput.endpoint
+        endpoint: testInput.endpoint,
+        statusCode: 200,
+        headers:  {}
       });
 
       // Mock transform
@@ -172,7 +176,9 @@ describe('Call Resolver', () => {
       // Mock executeApiCall
       mockedApi.executeApiCall.mockResolvedValue({
         data: { result: 'success' },
-        endpoint: testInput.endpoint
+        endpoint: testInput.endpoint,
+        statusCode: 200,
+        headers:  {}
       });
 
       // Mock transform to always fail
@@ -202,7 +208,9 @@ describe('Call Resolver', () => {
       // Mock executeApiCall
       mockedApi.executeApiCall.mockResolvedValue({
         data: { result: 'success' },
-        endpoint: testInput.endpoint
+        endpoint: testInput.endpoint,
+        statusCode: 200,
+        headers:  {}
       });
 
       // Mock transform
@@ -269,7 +277,9 @@ describe('Call Resolver', () => {
       // Mock executeApiCall
       mockedApi.executeApiCall.mockResolvedValue({
         data: { result: 'success' },
-        endpoint: testInput.endpoint
+        endpoint: testInput.endpoint,
+        statusCode: 200,
+        headers:  {}
       });
 
       // Mock transform
@@ -297,6 +307,8 @@ describe('Call Resolver', () => {
       // Reset mocks
       vi.clearAllMocks();
       mockedApi.executeApiCall.mockResolvedValue({
+        statusCode: 200,
+        headers:  {},
         data: { result: 'success' },
         endpoint: testInput.endpoint
       });

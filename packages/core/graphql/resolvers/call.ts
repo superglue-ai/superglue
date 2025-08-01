@@ -87,6 +87,8 @@ export const callResolver = async (
       id: callId,
       success: true,
       config: config,
+      statusCode: callResult?.statusCode,
+      headers: callResult?.headers,
       startedAt,
       completedAt: new Date(),
     };
@@ -103,6 +105,7 @@ export const callResolver = async (
       success: false,
       error: maskedError,
       config: endpoint,
+      statusCode: error?.statusCode,
       startedAt,
       completedAt: new Date(),
     };
