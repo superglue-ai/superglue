@@ -281,9 +281,11 @@ export class IntegrationManager {
         }
 
         // Attempt to refresh the token
-        const refreshSuccess = await refreshOAuthToken(this.toIntegrationSync());
+        const refreshResult = await refreshOAuthToken(this.toIntegrationSync());
         
-        if (refreshSuccess) {
+        if (refreshResult.success) {
+            // update the credentials in the integration manager
+            this.credentials = refreshResult.newCredentials;
             // Save the updated credentials to datastore
             await this.dataStore.upsertIntegration({
               id: this.id,
@@ -295,7 +297,7 @@ export class IntegrationManager {
             logMessage('warn', `Failed to refresh OAuth token for integration ${this.id}`, { orgId: this.orgId });
         }
 
-        return refreshSuccess;
+        return refreshResult.success;
     }
 
     // Static factory method to create from Integration

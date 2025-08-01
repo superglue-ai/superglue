@@ -36,7 +36,7 @@ export function isTokenExpired(integration: Integration): boolean {
  */
 export async function refreshOAuthToken(
     integration: Integration,
-): Promise<boolean> {
+): Promise<{ success: boolean, newCredentials: Record<string, any> }> {
     const { client_id, client_secret, refresh_token, access_token } = integration.credentials || {};
 
     if (!client_id || !client_secret || !refresh_token) {
@@ -46,7 +46,7 @@ export async function refreshOAuthToken(
             hasClientSecret: !!client_secret,
             hasRefreshToken: !!refresh_token
         });
-        return false;
+        return { success: false, newCredentials: {} };
     }
 
     try {
@@ -95,13 +95,13 @@ export async function refreshOAuthToken(
             integrationId: integration.id
         });
 
-        return true;
+        return { success: true, newCredentials: integration.credentials };
     } catch (error) {
         logMessage('error', 'Error refreshing OAuth token', {
             integrationId: integration.id,
             error: error instanceof Error ? error.message : String(error)
         });
-        return false;
+        return { success: false, newCredentials: {} };
     }
 }
 
