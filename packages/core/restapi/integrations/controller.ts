@@ -65,3 +65,21 @@ export const getIntegration = async (req: Request, res: Response) => {
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+
+export const upsertIntegration = async (req: Request, res: Response) => {
+  try {
+    const input = req.body.input;
+    const mode = req.body.mode || 'UPSERT';
+    const orgId = req.orgId; 
+    if (!input || !input.id) {
+      return res.status(400).json({ error: 'Missing required field: input.id' });
+    }
+
+    const result = await services.upsertIntegrationService(input, mode, orgId);
+    res.status(200).json(result);
+  } catch (err) {
+    console.error('REST: Error upserting integration:', err);
+    res.status(500).json({ error: err.message || 'Internal Server Error' });
+  }
+};
