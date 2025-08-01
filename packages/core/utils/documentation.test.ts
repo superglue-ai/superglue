@@ -3,6 +3,15 @@ import { Metadata } from '@superglue/shared';
 import axios from 'axios';
 import { afterEach, beforeEach, describe, expect, it, Mocked, vi } from 'vitest';
 import { server_defaults } from '../default.js';
+// Mock llm.js to prevent module loading issues
+vi.mock('../llm/llm.js', () => ({
+  LanguageModel: {
+    contextLength: 128000,
+    generateText: vi.fn(),
+    generateObject: vi.fn()
+  }
+}));
+
 import { LanguageModel } from '../llm/llm.js';
 import { Documentation, PlaywrightFetchingStrategy } from './documentation.js';
 

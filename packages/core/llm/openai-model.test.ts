@@ -4,6 +4,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OpenAIModel } from './openai-model.js';
 
 vi.mock('openai');
+vi.mock('./llm.js', () => ({
+  LanguageModel: {
+    contextLength: 128000,
+    generateText: vi.fn(),
+    generateObject: vi.fn()
+  },
+  selectLanguageModel: vi.fn(),
+  LLM: vi.fn()
+}));
 
 describe('OpenAIModel', () => {
   const mockResponsesCreate = vi.fn();

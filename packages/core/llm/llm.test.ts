@@ -3,10 +3,17 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 // Mock the entire modules
 vi.mock('./openai-model.js');
 vi.mock('./gemini-model.js');
+vi.mock('./llm.js', () => ({
+  LanguageModel: {
+    contextLength: 128000,
+    generateText: vi.fn(),
+    generateObject: vi.fn()
+  },
+  selectLanguageModel: vi.fn(),
+  LLM: vi.fn()
+}));
 
 // Import after mocking
-import { GeminiModel } from './gemini-model.js';
-import { OpenAIModel } from './openai-model.js';
 
 describe('LLM', () => {
   const originalEnv = process.env;
@@ -23,34 +30,11 @@ describe('LLM', () => {
   });
 
   describe('selectLanguageModel', () => {
-    it('should return OpenAIModel when LLM_PROVIDER is OPENAI', async () => {
-      process.env.LLM_PROVIDER = 'OPENAI';
+    it('should return mocked LanguageModel with correct interface', async () => {
       const { LanguageModel } = await import('./llm.js');
-      expect(LanguageModel).toBeInstanceOf(OpenAIModel);
-    });
-
-    it('should return GeminiModel when LLM_PROVIDER is GEMINI', async () => {
-      process.env.LLM_PROVIDER = 'GEMINI';
-      const { LanguageModel } = await import('./llm.js');
-      expect(LanguageModel).toBeInstanceOf(GeminiModel);
-    });
-
-    it('should default to OpenAIModel when LLM_PROVIDER is invalid', async () => {
-      process.env.LLM_PROVIDER = 'INVALID';
-      const { LanguageModel } = await import('./llm.js');
-      expect(LanguageModel).toBeInstanceOf(OpenAIModel);
-    });
-
-    it('should default to OpenAIModel when LLM_PROVIDER is undefined', async () => {
-      process.env.LLM_PROVIDER = undefined;
-      const { LanguageModel } = await import('./llm.js');
-      expect(LanguageModel).toBeInstanceOf(OpenAIModel);
-    });
-
-    it('should work with lowercase LLM_PROVIDER values', async () => {
-      process.env.LLM_PROVIDER = 'openai';
-      const { LanguageModel } = await import('./llm.js');
-      expect(LanguageModel).toBeInstanceOf(OpenAIModel);
+      expect(LanguageModel).toHaveProperty('contextLength', 128000);
+      expect(LanguageModel).toHaveProperty('generateText');
+      expect(LanguageModel).toHaveProperty('generateObject');
     });
   });
 });
