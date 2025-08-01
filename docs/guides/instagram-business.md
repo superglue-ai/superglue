@@ -74,7 +74,7 @@ For development, register your Instagram account as a test user:
    - Go to Instagram web → **Settings** → **Apps and Websites**
    - Accept the test user invitation
 
-## Setting Up an Instagram integration with OAuth in Superglue
+## Setting Up an Instagram integration with OAuth in superglue
 
 <video autoPlay muted loop playsInline className="w-full aspect-video" src="https://superglue.cloud/files/instagram-setup.mp4" />
 

@@ -100,7 +100,7 @@ main();
    - Price information (lowest variant price)
    - Variants with their prices
    - Product images
-2. **Configuration**: The \`config\` object tells Superglue:
+2. **Configuration**: The \`config\` object tells superglue:
    - Where to get the data (\`urlHost\` and \`urlPath\`)
    - What to do with it (\`instruction\`)
    - What format we want (\`responseSchema\`)
@@ -110,7 +110,7 @@ Notice that superglue will automatically fill the missing parts of the configura
 One quirk of the Shopify API is that it does not include a url field in the product object. It can be derived from the `handle` and the shopdomain. As long as the instruction includes the shopdomain, superglue will be able to derive the url using implicit knowledge about the Shopify API.
 
 3. **Execution**: When you run this code:
-   - First run: Superglue fetches the data and transforms it (~10-20 seconds)
+   - First run: superglue fetches the data and transforms it (~10-20 seconds)
    - Subsequent runs: superglue will fetch the data from the source, while the transformation instructions are cached.(typically \<100ms)
 
 ### Understanding the Response
@@ -206,7 +206,7 @@ const inventoryConfig = {
   }
 };
 
-// Superglue will automatically transform the Shopify format into this inventory structure
+// superglue will automatically transform the Shopify format into this inventory structure
 const result = await superglue.call({
   endpoint: inventoryConfig
 });

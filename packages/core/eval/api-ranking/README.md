@@ -91,7 +91,7 @@ Out of 630 integration attempts (21 APIs × 6 platforms × 5 attempts each):
 
 ### How We Test
 
-#### Superglue Evaluation
+#### superglue Evaluation
 1. Each workflow is run **5 times** to ensure consistency
 2. For each attempt:
    - Build the workflow using LLM to generate API configurations
@@ -104,7 +104,7 @@ Out of 630 integration attempts (21 APIs × 6 platforms × 5 attempts each):
    - Total API call failures across all attempts
 
 #### Direct LLM Evaluation
-To compare Superglue's performance with direct LLM usage:
+To compare superglue's performance with direct LLM usage:
 
 **Models tested:**
 - **Claude Sonnet 4** (`claude-sonnet-4-20250514`)
@@ -181,10 +181,10 @@ For direct LLM comparison:
 ### Output
 
 The generated `ranking.csv` contains:
-- **Rank**: Position based on Superglue Score
+- **Rank**: Position based on superglue Score
 - **API**: Name of the API/integration
-- **Superglue Score**: Combined performance score (0-1)
-- **Superglue Success %**: Percentage of successful runs
+- **superglue Score**: Combined performance score (0-1)
+- **superglue Success %**: Percentage of successful runs
 - **Claude Sonnet 4**: Success rate for Claude Sonnet 4
 - **Claude Opus 4**: Success rate for Claude Opus 4
 - **GPT-4.1**: Success rate for GPT-4.1
@@ -212,4 +212,4 @@ Connect with us via these channels for any inquiries: **hi@superglue.ai**
 
 ---
 
-Made with ❤️ by the Superglue team
+Made with ❤️ by the superglue team

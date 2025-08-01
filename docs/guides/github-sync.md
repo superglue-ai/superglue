@@ -1,24 +1,24 @@
 ---
-title: "Superglue Workflow Synchronization with GitHub Actions"
+title: "superglue Workflow Synchronization with GitHub Actions"
 ---
 
-This document describes how to set up and use the GitHub Actions workflow to automatically synchronize Superglue workflow definitions stored in this repository with the Superglue service.
+This document describes how to set up and use the GitHub Actions workflow to automatically synchronize superglue workflow definitions stored in this repository with the superglue service.
 
-The synchronization treats the workflow definitions in the `superglue/workflows/` directory as the source of truth. Any changes pushed to these files (on the `main` branch) or the daily schedule will trigger the action to update the corresponding workflows in Superglue using the `upsertWorkflow` operation.
+The synchronization treats the workflow definitions in the `superglue/workflows/` directory as the source of truth. Any changes pushed to these files (on the `main` branch) or the daily schedule will trigger the action to update the corresponding workflows in superglue using the `upsertWorkflow` operation.
 
 ## Setup
 
 1. **Store Workflow Definitions:**
    - Create a directory named `superglue/workflows/` in the root of your repository.
-   - Place your Superglue workflow definitions inside this directory as individual JSON files.
+   - Place your superglue workflow definitions inside this directory as individual JSON files.
    - **Important:** The name of each file (without the `.json` extension) will be used as the `id` for the workflow when calling `upsertWorkflow`. For example, a file named `superglue/workflows/my-cool-workflow.json` will upsert a workflow with the ID `my-cool-workflow`. The `id` field _within_ the JSON file itself is not used by the `upsertWorkflow` mutation's logic but should ideally match the filename for clarity.
-2. **Add Superglue API Key as a Secret:**
+2. **Add superglue API Key as a Secret:**
    - Go to your GitHub repository's **Settings** \> **Secrets and variables** \> **Actions**.
    - Click **New repository secret**.
    - Create a secret named `SUPERGLUE_API_KEY`.
-   - Paste your Superglue API key into the **Value** field.
+   - Paste your superglue API key into the **Value** field.
    - Click **Add secret**.
-   - (Optional) If you use a custom Superglue endpoint (not `https://graphql.superglue.cloud`), create another secret named `SUPERGLUE_API_ENDPOINT` with your custom endpoint URL.
+   - (Optional) If you use a custom superglue endpoint (not `https://graphql.superglue.cloud`), create another secret named `SUPERGLUE_API_ENDPOINT` with your custom endpoint URL.
 3. **Ensure Script and Workflow Files Exist:**
    - Make sure the `scripts/upsert-superglue-workflows.js` file exists and contains the synchronization logic.
    - Make sure the `.github/workflows/superglue-sync.yml` file exists and defines the GitHub Actions workflow.
@@ -40,13 +40,13 @@ The synchronization treats the workflow definitions in the `superglue/workflows/
   4. For each file:
      - Parses the JSON content.
      - Extracts the workflow ID from the filename.
-     - Calls `client.upsertWorkflow(workflowId, workflowData)` to create or update the workflow in Superglue.
+     - Calls `client.upsertWorkflow(workflowId, workflowData)` to create or update the workflow in superglue.
   5. Logs progress and any errors to the GitHub Actions console.
 
 ## .github/workflows/superglue-sync.yml
 
 ```yaml
-name: Sync Superglue Workflows
+name: Sync superglue Workflows
 
 on:
   schedule:
@@ -75,7 +75,7 @@ jobs:
       - name: Install dependencies
         run: npm install @superglue/client
 
-      - name: Sync Workflows TO Superglue
+      - name: Sync Workflows TO superglue
         run: node scripts/upsert-superglue-workflows.js
         env:
           SUPERGLUE_API_KEY: ${{ secrets.SUPERGLUE_API_KEY }}
@@ -99,7 +99,7 @@ jobs:
       - name: Install dependencies
         run: npm install @superglue/client
 
-      - name: Sync Workflows FROM Superglue
+      - name: Sync Workflows FROM superglue
         run: node scripts/fetch-superglue-workflows.js # This is the new script
         env:
           SUPERGLUE_API_KEY: ${{ secrets.SUPERGLUE_API_KEY }}
@@ -117,7 +117,7 @@ jobs:
           if git diff --staged --quiet; then
             echo "No changes to commit."
           else
-            git commit -m "chore: Sync workflows from Superglue service"
+            git commit -m "chore: Sync workflows from superglue service"
             git push
           fi
 ```
@@ -217,7 +217,7 @@ if (!fs.existsSync(WORKFLOWS_DIR)) {
 const client = new SuperglueClient({ apiKey: API_KEY, endpoint: API_ENDPOINT });
 
 async function fetchAndWriteWorkflows() {
-  console.log(`Fetching all workflows from Superglue...`);
+  console.log(`Fetching all workflows from superglue...`);
   let allWorkflows = [];
   let offset = 0;
   const limit = 50; // Adjust limit as needed, API might have its own max

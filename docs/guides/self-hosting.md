@@ -3,7 +3,7 @@ title: "Self-Hosting Guide"
 description: "Deploy and manage your own superglue instance"
 ---
 
-This guide walks you through deploying and managing your own instance of Superglue for complete control over your data processing pipeline.
+This guide walks you through deploying and managing your own instance of superglue for complete control over your data processing pipeline.
 
 ## Prerequisites
 
@@ -61,7 +61,7 @@ volumes:
 Copy `.env.example` to `.env` and fill in your values. Here are all available variables:
 
 ```env
-# Port for the Superglue server
+# Port for the superglue server
 GRAPHQL_PORT=3000
 
 # Endpoint for the graphql api (used so the web dashboard knows where to find the server)
@@ -155,7 +155,7 @@ docker run -d \
   postgres:15-alpine
 ```
 
-4. **Start Superglue**
+4. **Start superglue**
 
 ```bash
 docker run -d \
@@ -201,7 +201,7 @@ Expected response: `OK`
    - Use a strong, randomly generated key: `openssl rand -hex 32`
 
 4. **Telemetry**
-   - Superglue uses telemetry to understand how many users are using the platform.
+   - superglue uses telemetry to understand how many users are using the platform.
    - You can opt out by setting the DISABLE_TELEMETRY environment variable to true.
 
 ### Resource Allocation
@@ -217,7 +217,7 @@ Recommended minimum resources:
 Access container logs:
 
 ```bash
-# Superglue logs
+# superglue logs
 docker logs superglue
 
 # Redis logs
@@ -247,7 +247,7 @@ docker-compose up -d
 
 ## Support and Resources
 
-- **Documentation**: [Superglue Docs](https://docs.superglue.cloud)
+- **Documentation**: [superglue Docs](https://docs.superglue.cloud)
 - **GitHub Issues**: [Report bugs](https://github.com/superglue-ai/superglue/issues)
 - **Discord Community**: [Join our Discord](https://discord.gg/SKRYYQEp)
 - **Email Support**: stefan@superglue.cloud

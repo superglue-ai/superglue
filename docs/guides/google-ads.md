@@ -67,7 +67,7 @@ In Google Cloud Console:
    ```
 6. Save and copy your **Client ID** and **Client Secret**
 
-## Setting Up a Google Ads integration with OAuth in Superglue
+## Setting Up a Google Ads integration with OAuth in superglue
 
 Follow the same OAuth setup process shown in the [Instagram Business guide](/docs/guides/instagram-business) or see the general [OAuth integrations guide](/docs/guides/oauth-integrations):
 
@@ -162,7 +162,7 @@ const instructionWithGAQL = `
 `;
 ```
 
-Superglue handles the API navigation and authentication automatically when given proper instructions.
+superglue handles the API navigation and authentication automatically when given proper instructions.
 
 > **Note:** To access production Google Ads accounts (not test accounts), ensure your developer token has been approved for production use. Test accounts are perfect for development and don't require billing information.
 
