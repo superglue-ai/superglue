@@ -375,7 +375,10 @@ export class IntegrationTestingFramework {
                             executionAttempts,
                             workflowPlans,
                             integrationIds: testWorkflow.integrationIds,
-                            logs: runResult.collectedLogs
+                            logs: runResult.collectedLogs,
+                            softValidation: runResult.softValidation,
+                            actualResult: runResult.finalResult?.data,
+                            expectedResult: testWorkflow.expectedResult
                         });
                         logMessage('info', `📊 Generated execution report for ${testWorkflow.name} (${runResult.collectedLogs.length} logs analyzed)`, this.metadata);
                         errorSummary = analysis.summary;
@@ -576,12 +579,7 @@ export class IntegrationTestingFramework {
                 result += `\n    Data Preview: ${r.dataPreview}`;
             }
 
-            // Add soft validation results
-            if (r.softValidation) {
-                const sv = r.softValidation;
-                result += `\n    🎯 Soft Validation: ${sv.success ? '✅ PASS' : '❌ FAIL'}`;
-                result += `\n       Reason: ${sv.reason}`;
-            }
+
 
             if (r.errorSummary) {
                 result += `\n    🤖 AI Analysis: ${r.errorSummary}`;
@@ -701,12 +699,10 @@ export class IntegrationTestingFramework {
                     report += `**Data Preview:** \`${originalResult.dataPreview}\`\n\n`;
                 }
 
-                // Add soft validation results
-                if (success.softValidation) {
-                    const sv = success.softValidation;
-                    report += `**🎯 Soft Validation:** ${sv.success ? '✅ PASS' : '⚠️ FAIL'}\n`;
-                    report += `- **Reason:** ${sv.reason}\n`;
-                    report += '\n';
+                // Only show soft validation if it's relevant (i.e., it failed)
+                if (success.softValidation && !success.softValidation.success) {
+                    report += `**🎯 Soft Validation:** ❌ FAIL\n`;
+                    report += `- **Reason:** ${success.softValidation.reason}\n\n`;
                 }
 
                 if (success.executionReport) {
@@ -737,8 +733,10 @@ export class IntegrationTestingFramework {
                 // Add data preview if available
                 const originalResult = testSuite.results.find(r => r.workflowId === failed.workflowId);
                 if (originalResult?.dataPreview) {
-                    report += `**Data Preview:** ${originalResult.dataPreview}\n\n`;
+                    report += `**Data Preview:** \`${originalResult.dataPreview}\`\n\n`;
                 }
+
+
 
                 if (failed.errorSummary) {
                     report += `**AI Analysis:** ${failed.errorSummary}\n\n`;

@@ -24,7 +24,10 @@
             "zendesk",
             "airtable",
             "snowflake",
-            "open-brewery-db"
+            "futurama",
+            "openbrewerydb",
+            "openweathermap",
+            "intercom"
         ],
         "definitions": {
             "hubspot": {
@@ -192,7 +195,8 @@
                 "urlPath": "",
                 "documentationUrl": "https://discord.com/developers/docs/reference",
                 "credentials": {
-                    "bot_token": ""
+                    "bot_token": "",
+                    "guild_id": ""
                 },
                 "description": "Discord API"
             },
@@ -285,15 +289,45 @@
                 },
                 "description": "Snowflake cloud data platform SQL API"
             },
-            "open-brewery-db": {
-                "id": "open-brewery-db",
+            "futurama": {
+                "id": "futurama",
+                "name": "Futurama API",
+                "urlHost": "https://api.sampleapis.com",
+                "urlPath": "/futurama",
+                "documentationUrl": "https://sampleapis.com/api-list/futurama",
+                "credentials": {},
+                "description": "Public API for Futurama TV show data"
+            },
+            "openbrewerydb": {
+                "id": "openbrewerydb",
                 "name": "Open Brewery DB",
                 "urlHost": "https://api.openbrewerydb.org",
-                "urlPath": "",
-                "documentationUrl": "https://www.openbrewerydb.org/documentation/api-reference",
+                "urlPath": "/v1",
+                "documentationUrl": "https://www.openbrewerydb.org/documentation",
+                "credentials": {},
+                "description": "Public API for brewery information"
+            },
+            "openweathermap": {
+                "id": "openweathermap",
+                "name": "OpenWeatherMap",
+                "urlHost": "https://api.openweathermap.org",
+                "urlPath": "/data/2.5",
+                "documentationUrl": "https://openweathermap.org/api",
                 "credentials": {
+                    "api_key": ""
                 },
-                "description": "Open Brewery DB API"
+                "description": "Weather data and forecast API"
+            },
+            "intercom": {
+                "id": "intercom",
+                "name": "Intercom",
+                "urlHost": "https://api.intercom.io",
+                "urlPath": "",
+                "documentationUrl": "https://developers.intercom.com/docs/build-an-integration/learn-more/rest-apis",
+                "credentials": {
+                    "access_token": ""
+                },
+                "description": "Intercom API"
             }
         }
     },
@@ -323,7 +357,21 @@
             "zendesk-ticket-analysis",
             "airtable-test-data-retrieval",
             "snowflake-list-tables",
-            "open-brewery-db-test-data-retrieval"
+            "stripe-list-recent-customers",
+            "stripe-active-subscriptions-count",
+            "stripe-recent-invoices",
+            "stripe-customer-search",
+            "stripe-product-list",
+            "attio-company-enrichment",
+            "attio-company-record-cleanup",
+            "posthog-user-activity-summary",
+            "futurama-character-analysis",
+            "openbrewery-state-analysis",
+            "openweathermap-multi-city-forecast",
+            "intercom-ticket-type-slack-notification",
+            "zendesk-open-tickets-slack-alert",
+            "stripe-attio-customer-reconciliation",
+            "posthog-stripe-engagement-alert"
         ],
         "definitions": {
             "hubspot-lead-qualification": {
@@ -342,7 +390,7 @@
                 },
                 "complexityLevel": "medium",
                 "category": "single-system",
-                "expectedResult": "Array of updated contacts with their IDs, their associated company names and new lead_status set to 'In Progress'. Company names should not include 'COMPANY A' or 'COMPANY B'"
+                "expectedResult": "Should process all HubSpot contacts created after the specified date, filter out contacts from the specified companies, and update remaining contacts' lead status to 'In Progress'. Expected to return counts of total contacts processed, how many were filtered out, and how many were updated."
             },
             "stripe-revenue-analytics": {
                 "id": "stripe-revenue-analytics",
@@ -356,19 +404,19 @@
                 },
                 "complexityLevel": "high",
                 "category": "single-system",
-                "expectedResult": "Something like this: {\"customers\": [{\"customerId\": \"...\", \"customerName\": \"...\", \"subscriptions\": [...], \"monthlyRevenue\": 99.99}], \"totalMRR\": 999.99} (values are not important, just the structure)"
+                "expectedResult": "Should fetch all Stripe subscriptions created in the 3-month period after the payload date, group them by customer, and calculate the total monthly recurring revenue. Expected to return MRR value, total subscription count, unique customer count, and average revenue per customer."
             },
             "jira-sprint-health": {
                 "id": "jira-sprint-health",
                 "name": "JIRA Sprint Health Check",
-                "instruction": "Get all issue names from the current active sprint in the 'My Test Project A' project, categorize them by status (To Do, In Progress, Done). Return issue names in a list for each status and the percentage of issues that have been completed.",
+                "instruction": "Get all issues from the current active sprint, categorize them by status, calculate completion percentage, and identify any issues marked as Blocked or High Priority that are still in progress",
                 "integrationIds": [
                     "jira"
                 ],
                 "payload": {},
                 "complexityLevel": "medium",
                 "category": "single-system",
-                "expectedResult": "Something like this: {\"sprint_name\": \"...\", \"To Do\": [{\"issue_id\": \"...\", \"issue_name\": \"...\", \"status\": \"...\"}], \"In Progress\": [{\"issue_id\": \"...\", \"issue_name\": \"...\"}], \"Done\": [{\"issue_id\": \"...\", \"issue_name\": \"...\"}], \"completion_percentage\": 99.99}"
+                "expectedResult": "Should retrieve all issues from the current active sprint and provide a health check summary including sprint name, total issues broken down by status, completion percentage, list of blocked issues, and high-priority issues still in progress."
             },
             "attio-people-retrieval": {
                 "id": "attio-people-retrieval",
@@ -380,7 +428,7 @@
                 "payload": {},
                 "complexityLevel": "medium",
                 "category": "single-system",
-                "expectedResult": "{\"people\": [{\"name\": \"string\", \"email\": \"string with @ symbol\", \"description\": \"string or null\"}]}"
+                "expectedResult": "Should return a JSON object with a 'people' array containing all Attio records that have email addresses. Each person should include their name, email, and description fields."
             },
             "lego-inventory-analysis": {
                 "id": "lego-inventory-analysis",
@@ -392,7 +440,7 @@
                 "payload": {},
                 "complexityLevel": "low",
                 "category": "single-system",
-                "expectedResult": "Something like this: {\"themes\": [{\"theme_name\": \"...\", \"set_count\": 100}]}"
+                "expectedResult": "Should query the LEGO database and return the most popular themes ranked by number of sets. Expected to show theme names with their set counts and the total number of themes analyzed."
             },
             "timbuk2-product-analysis": {
                 "id": "timbuk2-product-analysis",
@@ -404,12 +452,12 @@
                 "payload": {},
                 "complexityLevel": "low",
                 "category": "single-system",
-                "expectedResult": "Something like this: {\"products\": [{\"name\": \"...\", \"description\": \"...\"}]}"
+                "expectedResult": "Should fetch all products from Timbuk2 with automatic pagination handling. Expected to return total product count, list of product categories, and average price across all products."
             },
             "hubspot-crm-workflow": {
                 "id": "hubspot-crm-workflow",
                 "name": "HubSpotCRM Workflow",
-                "instruction": "Get all contacts with lifecycle stage: Marketing Qualified Lead from HubSpot. Filter them to only include contacts created between the input payload date and the payload date + 100 days. Return their names, their creation dates and their new lifecycle stage.",
+                "instruction": "Get all contacts with lifecycle stage: Marketing Qualified Lead from HubSpot. Filter them to only include contacts created between the input payload date and the payload date + 100 days. I want the final output to be a JSON object with the following structure: { \"contacts\": [ { \"name\": \"John Doe\", \"email\": \"john.doe@example.com\" } ]",
                 "integrationIds": [
                     "hubspot"
                 ],
@@ -418,12 +466,12 @@
                 },
                 "complexityLevel": "high",
                 "category": "single-system",
-                "expectedResult": "Something like this: {\"contacts\": [{\"name\": \"...\", \"creation_date\": \"...\", \"new_lifecycle_stage\": \"...\"}]}"
+                "expectedResult": "Should retrieve all HubSpot contacts with 'Marketing Qualified Lead' lifecycle stage created within the specified date range. Returns a JSON object with contacts array containing name and email for each contact."
             },
             "subscription-to-db-sync": {
                 "id": "subscription-to-db-sync",
                 "name": "Subscription to Database Sync",
-                "instruction": "Fetch all current subscriptions from Stripe, including the customer name, the product/subscription name and the subscription creation time. Note that these may have other names in the api. Write the data into my supabase database into the subscription_table_test table. The table has the following columns: customer_name, product, subscription_creation. Return the customer names, the product names and the subscription creation dates.",
+                "instruction": "Fetch all current subscriptions from Stripe, including the customer name, the product/subscription name and the subscription creation time. Note that these may have other names in the api. Write the data into my supabase database into the subscription_table_test table. The table has the following columns: customer_name, product, subscription_creation",
                 "integrationIds": [
                     "stripe",
                     "supabase"
@@ -431,7 +479,7 @@
                 "payload": {},
                 "complexityLevel": "medium",
                 "category": "multi-system",
-                "expectedResult": "Something like this: {\"customer_names\": [\"...\"], \"product_names\": [\"...\"], \"subscription_creation_dates\": [\"...\"]}"
+                "expectedResult": "Should fetch all current Stripe subscriptions with customer and product details, then sync them to the Supabase subscription_table_test table. Expected to return count of subscriptions synced and sync status."
             },
             "posthog-analytics": {
                 "id": "posthog-analytics",
@@ -443,7 +491,7 @@
                 "payload": {},
                 "complexityLevel": "medium",
                 "category": "single-system",
-                "expectedResult": "Something like this: {\"project_id\": \"123\", \"event_count\": 100}"
+                "expectedResult": "Should retrieve all PostHog project IDs and count events for the first project in the last 30 days. Returns a JSON object with project_id and event_count as specified in the instruction."
             },
             "twilio-sms-analysis": {
                 "id": "twilio-sms-analysis",
@@ -455,7 +503,7 @@
                 "payload": {},
                 "complexityLevel": "medium",
                 "category": "single-system",
-                "expectedResult": "Something like this: {\"total_messages\": 100, \"delivered_count\": 90, \"failed_count\": 10, \"pending_count\": 0, \"success_rate_percent\": 90}"
+                "expectedResult": "Should analyze all SMS messages sent from Twilio account, categorize by delivery status, and calculate success rate. Returns total messages, counts by status (delivered, failed, pending), and success rate percentage."
             },
             "sendgrid-test-email": {
                 "id": "sendgrid-test-email",
@@ -472,7 +520,8 @@
                     "content_type": "text/plain"
                 },
                 "complexityLevel": "low",
-                "category": "single-system"
+                "category": "single-system",
+                "expectedResult": "Should send a test email via SendGrid with the specified recipient, subject, and content. Returns confirmation with message ID and delivery status."
             },
             "github-list-repos": {
                 "id": "github-list-repos",
@@ -483,7 +532,8 @@
                 ],
                 "payload": {},
                 "complexityLevel": "low",
-                "category": "single-system"
+                "category": "single-system",
+                "expectedResult": "Should list all repositories in the GitHub account. Returns a JSON object with 'repos' array containing repository names and descriptions."
             },
             "gitlab-list-projects": {
                 "id": "gitlab-list-projects",
@@ -497,7 +547,7 @@
                 },
                 "complexityLevel": "low",
                 "category": "single-system",
-                "expectedResult": "Should contain the name superglue-integration-testing at least once"
+                "expectedResult": "Should list all projects within the specified GitLab group. Returns a JSON object with 'projects' array containing project names and descriptions."
             },
             "slack-dm-workflow": {
                 "id": "slack-dm-workflow",
@@ -511,7 +561,8 @@
                     "message": "Hi, this is superglue-bot testing Slack workflows!"
                 },
                 "complexityLevel": "medium",
-                "category": "single-system"
+                "category": "single-system",
+                "expectedResult": "Should find the Slack user ID for the specified email address and send them a direct message with the provided content. Returns confirmation of message delivery."
             },
             "bitbucket-repos": {
                 "id": "bitbucket-repos",
@@ -523,12 +574,12 @@
                 "payload": {},
                 "complexityLevel": "low",
                 "category": "single-system",
-                "expectedResult": "Should contain the name superglue-test at least once"
+                "expectedResult": "Should list all projects in the Bitbucket account. Returns a JSON object with 'projects' array containing project names and descriptions."
             },
             "discord-server-analysis-dm": {
                 "id": "discord-server-analysis-dm",
                 "name": "Discord Server Analysis and DM",
-                "instruction": "Get all channels from my Discord server, analyze the channel structure, then find the user 'michaelfuest_89135' and send them a direct message with a summary of the server channels found. Return both the full channel list and the exact text of the DM you just sent",
+                "instruction": "Get all channels from my Discord server, analyze the channel structure, then find the user 'michaelfuest_89135' and send them a direct message with a summary of the server channels found. Return both the channel list and confirmation of the DM sent",
                 "integrationIds": [
                     "discord"
                 ],
@@ -539,20 +590,21 @@
                 },
                 "complexityLevel": "medium",
                 "category": "single-system",
-                "expectedResult": "Should contain a list of plausible channel names and some DM message"
+                "expectedResult": "Should retrieve all channels from the Discord server, analyze the channel structure, find and DM the specified user with a summary. Returns channel list and DM confirmation."
             },
             "asana-tasks": {
                 "id": "asana-tasks",
                 "name": "Asana Tasks",
-                "instruction": "List all projects in my Asana account. Return the results as a JSON object with the following structure: { \"projects\": [ { \"name\": \"project1\", \"description\": \"description1\" } ]",
+                "instruction": "First, find the project ID by searching for the project name in the payload across all my workspaces. Then get all tasks assigned to me in that project, analyze my workload by completion status and return a summary of my current tasks including completion percentages.",
                 "integrationIds": [
                     "asana"
                 ],
                 "payload": {
+                    "project_name": "Product Feature Roadmap"
                 },
                 "complexityLevel": "medium",
                 "category": "single-system",
-                "expectedResult": "Should contain the name 'Product Feature Roadmap' at least once"
+                "expectedResult": "Should find the project by name, retrieve all tasks assigned to the user, analyze workload by completion status, and return task summary with completion percentages."
             },
             "notion-duplicate-email-analysis": {
                 "id": "notion-duplicate-email-analysis",
@@ -566,7 +618,7 @@
                 },
                 "complexityLevel": "medium",
                 "category": "single-system",
-                "expectedResult": "Should contain exactly one duplicate, namely John Doe with the email address john.doe@companya.com"
+                "expectedResult": "Should query the Notion database for all records with email data, identify duplicates, and return count of duplicates with a list of duplicate emails and their occurrence counts."
             },
             "huggingface-model-metadata": {
                 "id": "huggingface-model-metadata",
@@ -578,7 +630,7 @@
                 "payload": {},
                 "complexityLevel": "medium",
                 "category": "single-system",
-                "expectedResult": "Should contain a list of 10 models and a list of file names for each model"
+                "expectedResult": "Should retrieve popular public models from Hugging Face (limit 10), extract model names and available file names. Returns JSON with 'models' array containing model_name and file_names for each."
             },
             "monday-sprint-analysis": {
                 "id": "monday-sprint-analysis",
@@ -592,7 +644,7 @@
                 },
                 "complexityLevel": "high",
                 "category": "single-system",
-                "expectedResult": "Should contain a list of tasks and the number of tasks in each status, categoriized by completed, in progress and ready to start"
+                "expectedResult": "Should retrieve all tasks from the specified sprint board and calculate totals by status. Returns JSON with counts for completed, in_progress, and ready_to_start tasks."
             },
             "square-customer-directory": {
                 "id": "square-customer-directory",
@@ -604,7 +656,7 @@
                 "payload": {},
                 "complexityLevel": "medium",
                 "category": "single-system",
-                "expectedResult": "Should contain a JSON object with the following structure: { \"customerNames\": [\"...\"], \"customer_emails\": [\"...\"] }"
+                "expectedResult": "Should retrieve all customers from Square directory and extract names and emails. Returns JSON with customerNames array and customer_emails array."
             },
             "zendesk-ticket-analysis": {
                 "id": "zendesk-ticket-analysis",
@@ -615,7 +667,8 @@
                 ],
                 "payload": {},
                 "complexityLevel": "medium",
-                "category": "single-system"
+                "category": "single-system",
+                "expectedResult": "Should retrieve all tickets from Zendesk, analyze their statuses, and return a summary with total ticket counts for each status category."
             },
             "airtable-test-data-retrieval": {
                 "id": "airtable-test-data-retrieval",
@@ -629,7 +682,7 @@
                 },
                 "complexityLevel": "low",
                 "category": "single-system",
-                "expectedResult": "Should mention Test Data and Test Artifacts and return plausible table and field names"
+                "expectedResult": "Should retrieve all tables in the Test Data Management workspace and return table names with their field names in a structured format."
             },
             "snowflake-list-tables": {
                 "id": "snowflake-list-tables",
@@ -641,26 +694,230 @@
                 "payload": {},
                 "complexityLevel": "low",
                 "category": "single-system",
-                "expectedResult": "Should return a JSON object with table names, schema names and database names"
+                "expectedResult": "Should execute SQL query to list all tables in Snowflake database. Returns JSON with table names, schema names, and database names."
             },
-            "open-brewery-db-test-data-retrieval": {
-                "id": "open-brewery-db-test-data-retrieval",
-                "name": "Open Brewery DB Test Data Retrieval",
-                "instruction": "Retrieve all breweries in California from the Open Brewery DB. Count the total number of breweries and return the names of the first, and the last brewery you retrieved as well as the total number of breweries.",
+            "stripe-list-recent-customers": {
+                "id": "stripe-list-recent-customers",
+                "name": "Stripe Recent Customers List",
+                "instruction": "List the 10 most recently created customers from Stripe, including their email, name, and creation date. Return the results in order of most recently created to least recently created.",
                 "integrationIds": [
-                    "open-brewery-db"
+                    "stripe"
                 ],
                 "payload": {},
                 "complexityLevel": "low",
                 "category": "single-system",
-                "expectedResult": "Should contain at least 900 breweries, and the first and last brewery names"
+                "expectedResult": "Should list the 10 most recently created Stripe customers with their email, name, and creation date. Should not return empty results."
+            },
+            "stripe-active-subscriptions-count": {
+                "id": "stripe-active-subscriptions-count",
+                "name": "Stripe Active Subscriptions Count",
+                "instruction": "Get all active subscriptions from Stripe, count them by status (active, trialing, past_due), and return a summary with total_active, total_trialing, total_past_due counts",
+                "integrationIds": [
+                    "stripe"
+                ],
+                "payload": {},
+                "complexityLevel": "low",
+                "category": "single-system",
+                "expectedResult": "Should retrieve all active Stripe subscriptions and count them by status. Returns total counts for active, trialing, and past_due subscriptions. Should at least contain three subscriptions in total."
+            },
+            "stripe-recent-invoices": {
+                "id": "stripe-recent-invoices",
+                "name": "Stripe Recent Invoices Summary",
+                "instruction": "Fetch all of my invoices from Stripe, calculate the total amount and return a summary with total_amount invoiced and total amount past due",
+                "integrationIds": [
+                    "stripe"
+                ],
+                "payload": {},
+                "complexityLevel": "low",
+                "category": "single-system",
+                "expectedResult": "Should fetch at least 10 invoices from Stripe and return non zero values for total_amount and total_amount_past_due."
+            },
+            "stripe-customer-search": {
+                "id": "stripe-customer-search",
+                "name": "Stripe Customer Search by Email",
+                "instruction": "Search for a customer in Stripe using the email address from the payload, retrieve their subscription status and and return their customer ID, subscription status and the subscription product name",
+                "integrationIds": [
+                    "stripe"
+                ],
+                "payload": {
+                    "customer_email": "customer2@example.com"
+                },
+                "complexityLevel": "low",
+                "category": "single-system",
+                "expectedResult": "Should search for a Stripe customer by email and retrieve their subscription status and payment info. Returns customer ID, email, subscription status, last payment date and amount."
+            },
+            "stripe-product-list": {
+                "id": "stripe-product-list",
+                "name": "Stripe Products and Prices",
+                "instruction": "List all products from Stripe along with their active prices, return a summary showing product names, descriptions, and current pricing for each product",
+                "integrationIds": [
+                    "stripe"
+                ],
+                "payload": {},
+                "complexityLevel": "low",
+                "category": "single-system",
+                "expectedResult": "Should list all Stripe products with their active prices. Returns products array with name, description, price, currency, and billing interval for each product."
+            },
+            "attio-company-enrichment": {
+                "id": "attio-company-enrichment",
+                "name": "Attio Company Data Enrichment",
+                "instruction": "Get all company records from Attio that have a website domain but are missing employee count or industry information, attempt to enrich these fields based on the domain and your best guess of what the company does, and return a list of companies that you enriched with missing data",
+                "integrationIds": [
+                    "attio"
+                ],
+                "payload": {},
+                "complexityLevel": "medium",
+                "category": "single-system",
+                "expectedResult": "Should analyze Attio company records with domains but missing employee count or industry data. Returns list of companies needing enrichment with their missing fields, plus totals analyzed and missing data."
+            },
+            "attio-company-record-cleanup": {
+                "id": "attio-company-record-cleanup",
+                "name": "Attio Company Record Cleanup",
+                "instruction": "Get all company records from Attio that have a website domain and remove / clear / delete employee counts and industry information. Return only the names of the companies whose records you cleaned up.",
+                "integrationIds": [
+                    "attio"
+                ],
+                "payload": {},
+                "complexityLevel": "medium",
+                "category": "single-system",
+                "expectedResult": "Should return a non-empty list of company names."
+            },
+            "posthog-user-activity-summary": {
+                "id": "posthog-user-activity-summary",
+                "name": "PostHog User Activity Summary",
+                "instruction": "Query PostHog to get a history of our daily active users for the month specified in the payload, and return the top 3 days with the most active users in that month and return the dates and number of active users on each of those days in order",
+                "integrationIds": [
+                    "posthog"
+                ],
+                "payload": {
+                    "month": "2025-07"
+                },
+                "complexityLevel": "high",
+                "category": "single-system",
+                "expectedResult": "Should contain a response with three dates and the number of active users on each of those days, ideally in order of most active to least active."
+            },
+            "futurama-character-analysis": {
+                "id": "futurama-character-analysis",
+                "name": "Futurama Character Database",
+                "instruction": "Fetch all characters from the Futurama API using proper pagination, count the total number of characters, group them by their species, and return a summary with total_characters, species_breakdown showing count per species, and the names of all robot characters",
+                "integrationIds": [
+                    "futurama"
+                ],
+                "payload": {},
+                "complexityLevel": "medium",
+                "category": "single-system",
+                "expectedResult": "Should fetch all Futurama characters with pagination, count total characters, group by species showing counts, and list all robot character names. Total characters should be at least 100+."
+            },
+            "openbrewery-state-analysis": {
+                "id": "openbrewery-state-analysis",
+                "name": "Open Brewery State Analysis",
+                "instruction": "Use the Open Brewery DB API to fetch all breweries in the United States with proper pagination handling, group them by state, calculate which states have the most breweries per capita (you'll need to use approximate state populations), and return the top 10 states by brewery density along with your population estimates for each state",
+                "integrationIds": [
+                    "openbrewerydb"
+                ],
+                "payload": {},
+                "complexityLevel": "high",
+                "category": "single-system",
+                "expectedResult": "Should fetch all US breweries with pagination, group by state, calculate breweries per capita using state populations, and return top 10 states by brewery density with counts."
+            },
+            "openweathermap-multi-city-forecast": {
+                "id": "openweathermap-multi-city-forecast",
+                "name": "OpenWeatherMap Multi-City Weather Analysis",
+                "instruction": "Fetch current weather data for the cities listed in the payload using the OpenWeatherMap API, compare temperatures across all cities, identify the hottest and coldest cities, calculate the average temperature, and return a summary with city_temperatures sorted by temperature, hottest_city, coldest_city, average_temperature, and weather conditions for each city",
+                "integrationIds": [
+                    "openweathermap"
+                ],
+                "payload": {
+                    "cities": [
+                        "London",
+                        "New York",
+                        "Tokyo",
+                        "Sydney",
+                        "Dubai",
+                        "Moscow",
+                        "Rio de Janeiro",
+                        "Cape Town",
+                        "Mumbai",
+                        "Toronto"
+                    ]
+                },
+                "complexityLevel": "medium",
+                "category": "single-system",
+                "expectedResult": "Should fetch weather data for all specified cities, compare temperatures, identify hottest and coldest cities, calculate average temperature, and return sorted city temperatures with weather conditions."
+            },
+            "intercom-ticket-type-slack-notification": {
+                "id": "intercom-ticket-type-slack-notification",
+                "name": "Intercom Ticket Type Creation with Slack Notification",
+                "instruction": "Create a new ticket type in Intercom with the name and description from the payload, then retrieve the newly created ticket type details from Intercom, and send a Slack message to the user specified in the payload with the ticket type name and description that was just created, confirming it was successfully set up in Intercom. Return the ticket type name and description that was just created.",
+                "integrationIds": [
+                    "intercom",
+                    "slack"
+                ],
+                "payload": {
+                    "ticket_type_name": "Feature Request",
+                    "ticket_type_description": "Customer requests for new product features and enhancements",
+                    "slack_user_email": "michael@superglue.ai"
+                },
+                "complexityLevel": "medium",
+                "category": "multi-system",
+                "expectedResult": "Return data should include the ticket type name and description that was just created, no specific format is required."
+            },
+            "zendesk-open-tickets-slack-alert": {
+                "id": "zendesk-open-tickets-slack-alert",
+                "name": "Zendesk Open Tickets Slack Alert",
+                "instruction": "Retrieve all open tickets from Zendesk that have been unassigned for more than 24 hours, count them by priority level, and send a Slack message to the user specified in the payload with a summary showing the number of unassigned tickets by priority and a list of the 5 oldest ticket subjects",
+                "integrationIds": [
+                    "zendesk",
+                    "slack"
+                ],
+                "payload": {
+                    "slack_user_email": "michael@superglue.ai"
+                },
+                "complexityLevel": "medium",
+                "category": "multi-system",
+                "expectedResult": "Should retrieve Zendesk tickets unassigned for over 24 hours, count by priority level, identify 5 oldest tickets, and send Slack alert with summary showing unassigned counts by priority and oldest ticket subjects."
+            },
+            "stripe-attio-customer-reconciliation": {
+                "id": "stripe-attio-customer-reconciliation",
+                "name": "Stripe-Attio Customer Reconciliation with SendGrid Report",
+                "instruction": "First, fetch all customers from Stripe including their email, name, and total lifetime value (sum of all successful charges). Then, retrieve all people records from Attio CRM that have email addresses. Match customers between both systems using email addresses (case-insensitive), identify: 1) Stripe customers not in Attio, 2) Attio contacts not in Stripe, and 3) Matched customers with their Stripe lifetime value. Finally, send a reconciliation report via SendGrid to the email in the payload containing: total matches found, list of high-value Stripe customers (>$1000 lifetime value) missing from Attio, list of Attio contacts not yet customers in Stripe, and summary statistics. Return the sent email content as the final output.",
+                "integrationIds": [
+                    "stripe",
+                    "attio",
+                    "sendgrid"
+                ],
+                "payload": {
+                    "report_recipient": "michael@superglue.ai",
+                    "report_sender": "reports@superglue.ai",
+                    "minimum_value_threshold": 1000
+                },
+                "complexityLevel": "high",
+                "category": "multi-system",
+                "expectedResult": "Should reconcile Stripe and Attio customer data, identify mismatches and high-value missing customers, send detailed email report via SendGrid, and return the email content that was sent including match statistics and customer lists."
+            },
+            "posthog-stripe-engagement-alert": {
+                "id": "posthog-stripe-engagement-alert",
+                "name": "PostHog Active Users Stripe Status Slack Alert",
+                "instruction": "Query PostHog to get all unique users who triggered events in the last 10 days, extract their email addresses from user properties. Then, for each of these active users, search in Stripe to check if they have an active subscription or have made any payments in the last 30 days. Categorize users into: 1) Active users with active Stripe subscriptions, 2) Active users who are past customers (have payment history but no active subscription), 3) Active users who have never paid. Finally, send a Slack message to the user in the payload with a summary showing: total active users from PostHog, breakdown by payment status categories, list of active users without subscriptions (potential upsell targets), and any active users whose subscriptions are ending soon (within 7 days). Return the analysis summary that was sent to Slack.",
+                "integrationIds": [
+                    "posthog",
+                    "stripe",
+                    "slack"
+                ],
+                "payload": {
+                    "slack_user_email": "michael@superglue.ai",
+                    "days_active": 10,
+                    "subscription_ending_days": 7
+                },
+                "complexityLevel": "high",
+                "category": "multi-system",
+                "expectedResult": "Should analyze PostHog active users against Stripe payment data, categorize by subscription status, identify upsell opportunities and expiring subscriptions, send Slack alert with detailed breakdown and actionable insights."
             }
         }
     },
     "testSuite": {
         "name": "Integration Test",
         "attemptsPerWorkflow": 1,
-        "delayBetweenAttempts": 500,
-        "enableSoftValidation": true
+        "delayBetweenAttempts": 500
     }
 }
