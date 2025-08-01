@@ -1,5 +1,13 @@
 name: Manual Integration Test
 
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason for running the test'
+        required: false
+        default: 'Manual trigger'
+
 # Only users with write access can trigger this workflow
 # Secrets are repository-level and shared among all authorized users
 permissions:
@@ -14,6 +22,7 @@ jobs:
       - name: Show trigger info
         run: |
           echo "🚀 Workflow triggered by: ${{ github.actor }}"
+          echo "📝 Reason: ${{ inputs.reason }}"
           echo "🔐 Using repository-level secrets (shared across team)"
           
       - name: Checkout repository
