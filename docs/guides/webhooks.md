@@ -320,7 +320,7 @@ Just create the appropriate integrations and workflows for your specific use cas
 ## Best Practices
 
 1. **Idempotency**: Handle duplicate webhooks gracefully
-2. **Fast Response**: Respond to webhooks quickly (< 10s), do heavy processing asynchronously  
+2. **Fast Response**: Respond to webhooks quickly (\< 10s), do heavy processing asynchronously  
 3. **Verify Signatures**: Always verify webhook signatures in production
 4. **Graceful Failures**: Return appropriate HTTP status codes
 5. **Monitoring**: Log webhook processing for debugging
