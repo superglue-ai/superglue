@@ -1,0 +1,165 @@
+name: Manual Integration Test
+
+# Only users with write access can trigger this workflow
+# Secrets are repository-level and shared among all authorized users
+permissions:
+  contents: read  # Read code
+  actions: read   # Read workflow runs
+
+jobs:
+  integration-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Show trigger info
+        run: |
+          echo "🚀 Workflow triggered by: ${{ github.actor }}"
+          echo "🔐 Using repository-level secrets (shared across team)"
+          
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          
+      - name: Install dependencies
+        run: npm install
+        
+      - name: Create custom config for GHA
+        run: |
+          # Create a temporary config file with GHA-specific settings
+          node -e "
+          const fs = require('fs');
+          const path = require('path');
+          
+          // Read the original config
+          const configPath = path.join('packages/core/eval/integration-testing/integration-test-config.json');
+          const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+          
+          // Override the testSuite settings for GHA
+          config.testSuite = {
+            ...config.testSuite,
+            name: 'GHA Integration test',
+            attemptsPerWorkflow: 1,
+            delayBetweenAttempts: 500
+          };
+          
+          // Save the modified config
+          const ghaConfigPath = path.join('packages/core/eval/integration-testing/gha-integration-test-config.json');
+          fs.writeFileSync(ghaConfigPath, JSON.stringify(config, null, 4));
+          
+          console.log('Created GHA-specific config with:');
+          console.log('- name: GHA Integration test');
+          console.log('- attemptsPerWorkflow: 1');
+          console.log('- delayBetweenAttempts: 500');
+          "
+          
+      - name: Build packages
+        run: |
+          cd packages/core
+          npm run build
+          
+      - name: Run integration tests with custom config
+        run: |
+          cd packages/core
+          # Set the custom config path and run the test
+          export INTEGRATION_TEST_CONFIG_PATH="./eval/integration-testing/gha-integration-test-config.json"
+          npx vitest run eval/integration-testing/integration.test.ts --reporter=verbose
+        env:
+          # Add any required environment variables here
+          DATA_STORE_TYPE: FILE
+          DATA_STORE_FILE_PATH: ./.test-integration-data
+          INTEGRATION_TEST_CONFIG_PATH: ./eval/integration-testing/gha-integration-test-config.json
+          # LLM Provider configuration - required for workflow building and analysis
+          LLM_PROVIDER: ${{ secrets.LLM_PROVIDER }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+          OPENAI_API_BASE_URL: ${{ secrets.OPENAI_API_BASE_URL }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_MODEL: ${{ secrets.ANTHROPIC_MODEL }}
+          # Integration credentials - add these as GitHub secrets
+          HUBSPOT_PRIVATE_APP_TOKEN: ${{ secrets.HUBSPOT_PRIVATE_APP_TOKEN }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          ATTIO_API_TOKEN: ${{ secrets.ATTIO_API_TOKEN }}
+          SUPABASE_PASSWORD: ${{ secrets.SUPABASE_PASSWORD }}
+          SUPABASE_PUBLIC_API_KEY: ${{ secrets.SUPABASE_PUBLIC_API_KEY }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
+          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+          POSTGRES_LEGO_CONNECTION_STRING: ${{ secrets.POSTGRES_LEGO_CONNECTION_STRING }}
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+          GITHUB_API_KEY: ${{ secrets.GITHUB_API_KEY }}
+          GITLAB_API_KEY: ${{ secrets.GITLAB_API_KEY }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          BITBUCKET_API_TOKEN: ${{ secrets.BITBUCKET_API_TOKEN }}
+          BITBUCKET_EMAIL: ${{ secrets.BITBUCKET_EMAIL }}
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_GUILD_ID: ${{ secrets.DISCORD_GUILD_ID }}
+          ASANA_PERSONAL_ACCESS_TOKEN: ${{ secrets.ASANA_PERSONAL_ACCESS_TOKEN }}
+          NOTION_INTERNAL_INTEGRATION_SECRET: ${{ secrets.NOTION_INTERNAL_INTEGRATION_SECRET }}
+          HUGGINGFACE_ACCESS_TOKEN: ${{ secrets.HUGGINGFACE_ACCESS_TOKEN }}
+          MONDAY_PERSONAL_API_TOKEN: ${{ secrets.MONDAY_PERSONAL_API_TOKEN }}
+          SQUARE_SANDBOX_ACCESS_TOKEN: ${{ secrets.SQUARE_SANDBOX_ACCESS_TOKEN }}
+          ZENDESK_API_TOKEN: ${{ secrets.ZENDESK_API_TOKEN }}
+          ZENDESK_EMAIL: ${{ secrets.ZENDESK_EMAIL }}
+          AIRTABLE_PERSONAL_ACCESS_TOKEN: ${{ secrets.AIRTABLE_PERSONAL_ACCESS_TOKEN }}
+          SNOWFLAKE_PERSONAL_ACCESS_TOKEN: ${{ secrets.SNOWFLAKE_PERSONAL_ACCESS_TOKEN }}
+          SNOWFLAKE_USER_NAME: ${{ secrets.SNOWFLAKE_USER_NAME }}
+          SNOWFLAKE_USER_PASSWORD: ${{ secrets.SNOWFLAKE_USER_PASSWORD }}
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          INTERCOM_ACCESS_TOKEN: ${{ secrets.INTERCOM_ACCESS_TOKEN }}
+          OPENWEATHERMAP_API_KEY: ${{ secrets.OPENWEATHERMAP_API_KEY }}
+          
+      - name: Check if test reports were generated
+        run: |
+          if [ -d "packages/core/test-reports" ]; then
+            echo "Test reports directory found"
+            ls -la packages/core/test-reports/
+          else
+            echo "No test reports directory found"
+          fi
+          
+      - name: Upload test results as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-results
+          path: |
+            packages/core/test-reports/latest.md
+            packages/core/test-reports/latest.json
+          retention-days: 30
+          
+      - name: Display test summary
+        if: always()
+        run: |
+          if [ -f "packages/core/test-reports/latest.md" ]; then
+            echo "## Test Results Summary"
+            echo ""
+            # Display the first 100 lines of the markdown report
+            head -n 100 packages/core/test-reports/latest.md
+            echo ""
+            echo "... (truncated, see full report in artifacts)"
+          else
+            echo "No test report found"
+          fi
+          
+      - name: Create job summary
+        if: always()
+        run: |
+          if [ -f "packages/core/test-reports/latest.md" ]; then
+            echo "# Integration Test Results" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            # Add the full markdown report to the job summary
+            cat packages/core/test-reports/latest.md >> $GITHUB_STEP_SUMMARY
+          else
+            echo "# Integration Test Results" >> $GITHUB_STEP_SUMMARY
+            echo "No test report was generated." >> $GITHUB_STEP_SUMMARY
+          fi

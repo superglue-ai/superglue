@@ -11,7 +11,6 @@
             "twilio",
             "sendgrid",
             "posthog",
-            "github",
             "gitlab",
             "slack",
             "bitbucket",
@@ -142,17 +141,6 @@
                     "api_key": ""
                 },
                 "description": "User Analytics API"
-            },
-            "github": {
-                "id": "github",
-                "name": "GitHub",
-                "urlHost": "https://api.github.com",
-                "urlPath": "",
-                "documentationUrl": "https://docs.github.com/en/rest",
-                "credentials": {
-                    "api_key": ""
-                },
-                "description": "GitHub API"
             },
             "gitlab": {
                 "id": "gitlab",
@@ -344,7 +332,6 @@
             "posthog-analytics",
             "twilio-sms-analysis",
             "sendgrid-test-email",
-            "github-list-repos",
             "gitlab-list-projects",
             "slack-dm-workflow",
             "bitbucket-repos",
@@ -377,7 +364,7 @@
             "hubspot-lead-qualification": {
                 "id": "hubspot-lead-qualification",
                 "name": "HubSpot Lead Qualification Pipeline",
-                "instruction": "Get all HubSpot contacts created in the 30 days after the payload date, filter out contacts working at the companies in the payload company list, and update the lead status of remaining contacts to In Progress",
+                "instruction": "Get all HubSpot contacts created in the 30 days after the payload date, filter out contacts working at the companies in the payload company list, and update the lead status of remaining contacts to In Progress. Finally, return ALL contacts, their names, their creation dates and the companies they work at as well as the lead status.",
                 "integrationIds": [
                     "hubspot"
                 ],
@@ -390,7 +377,25 @@
                 },
                 "complexityLevel": "medium",
                 "category": "single-system",
-                "expectedResult": "Should process all HubSpot contacts created after the specified date, filter out contacts from the specified companies, and update remaining contacts' lead status to 'In Progress'. Expected to return counts of total contacts processed, how many were filtered out, and how many were updated."
+                "expectedResult": "Should return counts of total contacts processed (should be exactly 3). Should also contain data for a total of 8 contacts, 4 of which are working at COMPANY A or COMPANY B, and 4 of which are not. Lead status not be In Progress for any customer working at COMPANY A or COMPANY B or with a creation date later than July 1st."
+            },
+            "hubspot-lead-qualification-2": {
+                "id": "hubspot-lead-qualification",
+                "name": "HubSpot Lead Qualification Pipeline",
+                "instruction": "Get all HubSpot contacts created in the 30 days after the payload date, filter out contacts working at the companies in the payload company list, and update the lead status of remaining contacts to Attempted to Contact. Finally, return ALL contacts, their names, their creation dates and the companies they work at as well as the lead status.",
+                "integrationIds": [
+                    "hubspot"
+                ],
+                "payload": {
+                    "date": "2025-06-01",
+                    "companies": [
+                        "COMPANY A",
+                        "COMPANY B"
+                    ]
+                },
+                "complexityLevel": "medium",
+                "category": "single-system",
+                "expectedResult": "Should return counts of total contacts processed (should be exactly 3). Should also contain data for a total of 8 contacts, 4 of which are working at COMPANY A or COMPANY B, and 4 of which are not. Lead status not be Attempted to Contact for any customer working at COMPANY A or COMPANY B or with a creation date later than July 1st."
             },
             "stripe-revenue-analytics": {
                 "id": "stripe-revenue-analytics",
@@ -457,7 +462,7 @@
             "hubspot-crm-workflow": {
                 "id": "hubspot-crm-workflow",
                 "name": "HubSpotCRM Workflow",
-                "instruction": "Get all contacts with lifecycle stage: Marketing Qualified Lead from HubSpot. Filter them to only include contacts created between the input payload date and the payload date + 100 days. I want the final output to be a JSON object with the following structure: { \"contacts\": [ { \"name\": \"John Doe\", \"email\": \"john.doe@example.com\" } ]",
+                "instruction": "Get all contacts with lifecycle stage: Marketing Qualified Lead from HubSpot. Filter them to only include contacts created between the input payload date and the payload date + 20 days. I want the final output to be a JSON object with the following structure: { \"contacts\": [ { \"name\": \"John Doe\", \"email\": \"john.doe@example.com\" } ]",
                 "integrationIds": [
                     "hubspot"
                 ],
@@ -466,7 +471,7 @@
                 },
                 "complexityLevel": "high",
                 "category": "single-system",
-                "expectedResult": "Should retrieve all HubSpot contacts with 'Marketing Qualified Lead' lifecycle stage created within the specified date range. Returns a JSON object with contacts array containing name and email for each contact."
+                "expectedResult": "Should actually be empty results (although the JSON structure can be the one specified in the instruction) if the calls are made correctly."
             },
             "subscription-to-db-sync": {
                 "id": "subscription-to-db-sync",
@@ -522,18 +527,6 @@
                 "complexityLevel": "low",
                 "category": "single-system",
                 "expectedResult": "Should send a test email via SendGrid with the specified recipient, subject, and content. Returns confirmation with message ID and delivery status."
-            },
-            "github-list-repos": {
-                "id": "github-list-repos",
-                "name": "GitHub List Repos",
-                "instruction": "List all repositories in my GitHub account. Return the results as a JSON object with the following structure: { \"repos\": [ { \"name\": \"repo1\", \"description\": \"description1\" } ]",
-                "integrationIds": [
-                    "github"
-                ],
-                "payload": {},
-                "complexityLevel": "low",
-                "category": "single-system",
-                "expectedResult": "Should list all repositories in the GitHub account. Returns a JSON object with 'repos' array containing repository names and descriptions."
             },
             "gitlab-list-projects": {
                 "id": "gitlab-list-projects",
