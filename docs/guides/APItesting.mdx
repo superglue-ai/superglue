@@ -1,13 +1,13 @@
 ---
 title: "API Schema Testing Guide"
-description: "Use Superglue's API endpoints to programmatically test and validate API schema designs."
+description: "Use superglue's API endpoints to programmatically test and validate API schema designs."
 ---
 
 This guide shows how to integrate schema testing into your development workflow using direct API calls.
 
 ## **Overview**
 
-The Superglue API provides GraphQL endpoints for creating integrations, building workflows, and executing schema tests. This allows you to automate schema validation and integrate testing into your CI/CD pipeline.
+The superglue API provides GraphQL endpoints for creating integrations, building workflows, and executing schema tests. This allows you to automate schema validation and integrate testing into your CI/CD pipeline.
 
 ## **Authentication**
 
@@ -250,11 +250,11 @@ async function makeGraphQLRequest(query, variables = {}) {
   });
 
   const result = await response.json();
-  
+
   if (result.errors) {
     throw new Error(`GraphQL Error: ${result.errors.map(e => e.message).join(', ')}`);
   }
-  
+
   return result.data;
 }
 
@@ -329,7 +329,7 @@ async function testSchemaWorkflow(integrationId, testName) {
   };
 
   const result = await makeGraphQLRequest(query, variables);
-  
+
   return {
     testName,
     success: result.buildAndRunWorkflow.result.success,
@@ -345,7 +345,7 @@ async function runSchemaComparison() {
   try {
     // Step 1: Create test integrations
     console.log('📝 Creating test integrations...');
-    
+
     await createTestIntegration(
       'products-api-v1',
       'Products API v1 - Nested Schema',
@@ -354,7 +354,7 @@ async function runSchemaComparison() {
     );
 
     await createTestIntegration(
-      'products-api-v2', 
+      'products-api-v2',
       'Products API v2 - Flat Schema',
       '/v2/products',
       'Products API with flat structure'
@@ -364,19 +364,19 @@ async function runSchemaComparison() {
 
     // Step 2: Test both schemas
     console.log('🧪 Testing schema versions...');
-    
+
     const v1Result = await testSchemaWorkflow('products-api-v1', 'Nested Schema (v1)');
     const v2Result = await testSchemaWorkflow('products-api-v2', 'Flat Schema (v2)');
 
     // Step 3: Compare results
     console.log('📊 Schema Comparison Results:\n');
-    
+
     console.log(`${v1Result.testName}:`);
     console.log(`  Success: ${v1Result.success ? '✅' : '❌'}`);
     console.log(`  Steps: ${v1Result.stepCount}`);
     console.log(`  Execution Time: ${v1Result.executionTime}ms`);
     if (v1Result.error) console.log(`  Error: ${v1Result.error}`);
-    
+
     console.log(`\n${v2Result.testName}:`);
     console.log(`  Success: ${v2Result.success ? '✅' : '❌'}`);
     console.log(`  Steps: ${v2Result.stepCount}`);
@@ -385,11 +385,11 @@ async function runSchemaComparison() {
 
     // Step 4: Determine winner
     console.log('\n🏆 Analysis:');
-    
+
     if (v1Result.success && v2Result.success) {
       const v1Score = v1Result.stepCount;
       const v2Score = v2Result.stepCount;
-      
+
       if (v1Score < v2Score) {
         console.log(`Winner: ${v1Result.testName} (${v1Score} steps vs ${v2Score} steps)`);
       } else if (v2Score < v1Score) {
@@ -481,7 +481,7 @@ const testCases = [
     }
   },
   {
-    name: "Price Update Workflow", 
+    name: "Price Update Workflow",
     instruction: "Update product prices from external pricing service",
     expectedOutput: {
       type: "object",
@@ -506,7 +506,7 @@ const testCases = [
 
 async function runBatchTests(integrationId) {
   const results = [];
-  
+
   for (const testCase of testCases) {
     try {
       const result = await testSchemaWorkflow(integrationId, testCase.name);
@@ -519,7 +519,7 @@ async function runBatchTests(integrationId) {
       });
     }
   }
-  
+
   return results;
 }
 ```
@@ -533,15 +533,15 @@ javascript
 ```
 async function benchmarkSchema(integrationId, iterations = 5) {
   const times = [];
-  
+
   for (let i = 0; i < iterations; i++) {
     const start = Date.now();
     const result = await testSchemaWorkflow(integrationId, `Benchmark ${i + 1}`);
     const end = Date.now();
-    
+
     times.push(end - start);
   }
-  
+
   return {
     average: times.reduce((sum, time) => sum + time, 0) / times.length,
     min: Math.min(...times),
@@ -570,21 +570,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18'
-      
+
       - name: Install dependencies
         run: npm install
-      
+
       - name: Run schema tests
         run: node schema-test.js
         env:
           SUPERGLUE_API_KEY: ${{ secrets.SUPERGLUE_API_KEY }}
           API_STAGING_URL: ${{ secrets.API_STAGING_URL }}
-      
+
       - name: Post results to PR
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v6
@@ -592,13 +592,13 @@ jobs:
           script: |
             const fs = require('fs');
             const results = JSON.parse(fs.readFileSync('test-results.json', 'utf8'));
-            
+
             const comment = `## 🧪 Schema Test Results
-            
+
             ${results.map(r => `- **${r.testName}**: ${r.success ? '✅' : '❌'} (${r.stepCount} steps)`).join('\n')}
-            
+
             ${results.some(r => !r.success) ? '⚠️ Some tests failed - review before merging' : '✅ All tests passed'}`;
-            
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
@@ -660,15 +660,15 @@ function sleep(ms) {
 
 async function runTestsWithRateLimit(tests) {
   const results = [];
-  
+
   for (const test of tests) {
     const result = await safeTestWorkflow(test.integrationId, test.name);
     results.push(result);
-    
+
     // Rate limit: wait 1 second between tests
     await sleep(1000);
   }
-  
+
   return results;
 }
 ```

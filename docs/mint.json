@@ -1,6 +1,6 @@
 {
   "$schema": "https://mintlify.com/schema.json",
-  "name": "Superglue",
+  "name": "superglue",
   "logo": {
     "dark": "/logo/dark.svg",
     "light": "/logo/light.svg"
@@ -60,6 +60,7 @@
         "guides/self-hosting",
         "guides/architecture",
         "guides/oauth-integrations",
+        "guides/webhooks",
         "guides/shopify",
         "guides/jira",
         "guides/hubspot",

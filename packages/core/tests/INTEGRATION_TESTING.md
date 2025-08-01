@@ -2,7 +2,7 @@
 
 ## Overview
 
-The integration testing framework provides automated, multi-attempt reliability testing for Superglue workflows, with deep diagnostics and AI-powered error analysis. It is designed for speed, isolation, and actionable reporting, supporting modern API ranking and robust credential management.
+The integration testing framework provides automated, multi-attempt reliability testing for superglue workflows, with deep diagnostics and AI-powered error analysis. It is designed for speed, isolation, and actionable reporting, supporting modern API ranking and robust credential management.
 
 ## Architecture & Key Features
 
