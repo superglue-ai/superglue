@@ -32,15 +32,18 @@ jobs:
           echo "🔐 Using repository-level secrets (shared across team)"
           
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
         
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v3
         with:
           node-version: '24.x'
+          cache: 'npm'
           
       - name: Install dependencies
-        run: npm install
+        run: |
+          rm -rf node_modules package-lock.json
+          npm install
         
       - name: Create custom config for GHA
         run: |
@@ -73,9 +76,9 @@ jobs:
           node create-gha-config.js
           rm create-gha-config.js
           
-      - name: Build packages
+      - name: Build all packages
         run: |
-          cd packages/core
+          # Build shared package first, then all packages
           npm run build
           
       - name: Run integration tests with custom config
