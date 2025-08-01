@@ -387,7 +387,7 @@ export class AxiosFetchingStrategy implements FetchingStrategy {
       const url = new URL(config.documentationUrl);
       if (config.queryParams) {
         Object.entries(config.queryParams).forEach(([key, value]) => {
-          url.searchParams.append(key, value);
+          url?.searchParams?.append(key, value);
         });
       }
 
@@ -441,7 +441,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       const url = new URL(urlString);
       if (config.queryParams) {
         Object.entries(config.queryParams).forEach(([key, value]) => {
-          url.searchParams.append(key, value);
+          url?.searchParams?.append(key, value);
         });
       }
 
