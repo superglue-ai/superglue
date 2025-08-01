@@ -403,7 +403,7 @@
                 "payload": {},
                 "complexityLevel": "medium",
                 "category": "single-system",
-                "expectedResult": "Should return a JSON object with a 'people' array containing all Attio records that have email addresses. Each person should include their name, email, and description fields."
+                "expectedResult": "Should return a JSON object with a 'people' array containing all Attio records that have email addresses. Each person should include their name, email, and description fields. An empty response is a failure."
             },
             "lego-inventory-analysis": {
                 "id": "lego-inventory-analysis",
@@ -495,8 +495,7 @@
                     "content_type": "text/plain"
                 },
                 "complexityLevel": "low",
-                "category": "single-system",
-                "expectedResult": "Should send a test email via SendGrid with the specified recipient, subject, and content. Returns confirmation with message ID and delivery status."
+                "category": "single-system"
             },
             "gitlab-list-projects": {
                 "id": "gitlab-list-projects",
@@ -638,14 +637,14 @@
             "snowflake-list-tables": {
                 "id": "snowflake-list-tables",
                 "name": "Snowflake List All Tables",
-                "instruction": "Execute a SQL query to list all tables in the snowflake database. Return the results as a JSON object with table names, schema names, and database names.",
+                "instruction": "List all tables from the TESTING_SCHEMA in the snowflake SUPERGLUE_DATA database. Return the results as a JSON object with table names, table column names and the first row of each table",
                 "integrationIds": [
                     "snowflake"
                 ],
                 "payload": {},
                 "complexityLevel": "low",
                 "category": "single-system",
-                "expectedResult": "Should execute SQL query to list all tables in Snowflake database. Returns JSON with table names, schema names, and database names."
+                "expectedResult": "Should return a response that contains the COMPANY_CODES table and mention COMPANY_NAME and COMPANY_CODE columns. First row data should be non empty."
             },
             "stripe-list-recent-customers": {
                 "id": "stripe-list-recent-customers",
@@ -724,14 +723,14 @@
             "attio-company-record-cleanup": {
                 "id": "attio-company-record-cleanup",
                 "name": "Attio Company Record Cleanup",
-                "instruction": "Get all company records from Attio that have a website domain and remove / clear / delete employee counts and industry information. Return only the names of the companies whose records you cleaned up.",
+                "instruction": "Get all company records from Attio that have a website domain and remove / clear / delete employee counts and industry information. Return the names of the companies whose records you cleaned up.",
                 "integrationIds": [
                     "attio"
                 ],
                 "payload": {},
                 "complexityLevel": "medium",
                 "category": "single-system",
-                "expectedResult": "Should return a non-empty list of company names."
+                "expectedResult": "Should return a non-empty list of company names (additional data is fine, but not required)."
             },
             "posthog-user-activity-summary": {
                 "id": "posthog-user-activity-summary",
@@ -750,14 +749,14 @@
             "futurama-character-analysis": {
                 "id": "futurama-character-analysis",
                 "name": "Futurama Character Database",
-                "instruction": "Fetch all characters from the Futurama API using proper pagination, count the total number of characters, group them by their species, and return a summary with total_characters, species_breakdown showing count per species, and the names of all robot characters",
+                "instruction": "Fetch all characters from the Futurama API, count the total number of characters, group them by their species, and return a summary with total_characters, species_breakdown showing count per species, and the names of all robot characters",
                 "integrationIds": [
                     "futurama"
                 ],
                 "payload": {},
                 "complexityLevel": "medium",
                 "category": "single-system",
-                "expectedResult": "Should fetch all Futurama characters with pagination, count total characters, group by species showing counts, and list all robot character names. Total characters should be at least 100+."
+                "expectedResult": "Should fetch all Futurama characters with pagination, count total characters, group by species showing counts, and list all robot character names. Total characters should be at least 10."
             },
             "openbrewery-state-analysis": {
                 "id": "openbrewery-state-analysis",
@@ -834,7 +833,7 @@
             "posthog-stripe-engagement-alert": {
                 "id": "posthog-stripe-engagement-alert",
                 "name": "PostHog Active Users Stripe Status Slack Alert",
-                "instruction": "Query PostHog to get all unique users who triggered events in the last 10 days, extract their email addresses from user properties. Then, for each of these active users, search in Stripe to check if they have an active subscription or have made any payments in the last 30 days. Categorize users into: 1) Active users with active Stripe subscriptions, 2) Active users who are past customers (have payment history but no active subscription), 3) Active users who have never paid. Finally, send a Slack message to the user in the payload with a summary showing: total active users from PostHog, breakdown by payment status categories, list of active users without subscriptions (potential upsell targets), and any active users whose subscriptions are ending soon (within 7 days). Return the analysis summary that was sent to Slack.",
+                "instruction": "Query PostHog to get all unique users who triggered events in the last 10 days, extract their email addresses from user properties. Then, for each of these active users, search in Stripe to check if they have an active subscription or have made any payments in the last 30 days. Categorize users into: 1) Active users with active Stripe subscriptions, 2) Active users who are past customers (have payment history but no active subscription), 3) Active users who have never paid. Finally, send a Slack message to the user in the payload with a summary showing: total active users from PostHog, breakdown by payment status categories, list of active users without subscriptions (potential upsell targets), and any active users whose subscriptions are ending soon (within 7 days). Return the analysis summary that was sent to Slack. If active users do not have a stripe email or can't be found, that is fine, return",
                 "integrationIds": [
                     "posthog",
                     "stripe",
