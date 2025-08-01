@@ -104,12 +104,12 @@ export class Documentation {
       // If data is already an object (axios parsed it), check for OpenAPI links
       if (typeof data === 'object' && data !== null) {
         // Check if this is a discovery/index response with links to other OpenAPI docs
-        //const openApiUrls = this.extractOpenApiUrls(data);
-        //if (openApiUrls.length > 0) {
-        //  logMessage('info', `Found ${openApiUrls.length} OpenAPI specification links in response`, this.metadata);
-        //  const allSpecs = await this.fetchMultipleOpenApiSpecs(openApiUrls);
-        //  return allSpecs;
-        //}
+        const openApiUrls = this.extractOpenApiUrls(data);
+        if (openApiUrls.length > 0) {
+          logMessage('info', `Found ${openApiUrls.length} OpenAPI specification links in response`, this.metadata);
+          const allSpecs = await this.fetchMultipleOpenApiSpecs(openApiUrls);
+          return allSpecs;
+        }
         return JSON.stringify(data, null, 2);
       }
       
@@ -120,12 +120,12 @@ export class Documentation {
         try {
           const parsed = JSON.parse(trimmedData);
           // Check for OpenAPI links in parsed JSON
-          //const openApiUrls = this.extractOpenApiUrls(parsed);
-          //if (openApiUrls.length > 0) {
-          //  logMessage('info', `Found ${openApiUrls.length} OpenAPI specification links in response`, this.metadata);
-          //  const allSpecs = await this.fetchMultipleOpenApiSpecs(openApiUrls);
-          //  return allSpecs;
-          //}
+          const openApiUrls = this.extractOpenApiUrls(parsed);
+          if (openApiUrls.length > 0) {
+            logMessage('info', `Found ${openApiUrls.length} OpenAPI specification links in response`, this.metadata);
+            const allSpecs = await this.fetchMultipleOpenApiSpecs(openApiUrls);
+            return allSpecs;
+          }
           return JSON.stringify(parsed, null, 2);
         } catch {
           // Not valid JSON, try YAML parsing
@@ -135,12 +135,12 @@ export class Documentation {
             if (typeof parsed === 'object' && parsed !== null) {
               logMessage('info', `Successfully converted YAML to JSON for ${this.config.openApiUrl}`, this.metadata);
               // Check for OpenAPI links in parsed YAML
-              //const openApiUrls = this.extractOpenApiUrls(parsed);
-              //if (openApiUrls.length > 0) {
-              //  logMessage('info', `Found ${openApiUrls.length} OpenAPI specification links in response`, this.metadata);
-              //  const allSpecs = await this.fetchMultipleOpenApiSpecs(openApiUrls);
-              //  return allSpecs;
-              //}
+              const openApiUrls = this.extractOpenApiUrls(parsed);
+              if (openApiUrls.length > 0) {
+                logMessage('info', `Found ${openApiUrls.length} OpenAPI specification links in response`, this.metadata);
+                const allSpecs = await this.fetchMultipleOpenApiSpecs(openApiUrls);
+                return allSpecs;
+              }
               return JSON.stringify(parsed, null, 2);
             }
           } catch (yamlError) {
