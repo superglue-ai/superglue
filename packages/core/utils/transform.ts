@@ -4,7 +4,7 @@ import type { ChatCompletionMessageParam } from "openai/resources/chat/completio
 import prettier from "prettier";
 import { server_defaults } from "../default.js";
 import { LanguageModel } from "../llm/llm.js";
-import { PROMPT_JS_TRANSFORM, PROMPT_MAPPING } from "../llm/prompts.js";
+import { PROMPT_JS_TRANSFORM } from "../llm/prompts.js";
 import { logMessage } from "./logs.js";
 import { getSchemaFromData, sample, transformAndValidateSchema } from "./tools.js";
 
@@ -91,56 +91,6 @@ function isSelfHealing(options: RequestOptions): boolean {
   return options?.selfHealing ? options.selfHealing === SelfHealingMode.ENABLED || options.selfHealing === SelfHealingMode.TRANSFORM_ONLY : true;
 }
 
-export async function generateTransformJsonata(schema: any, payload: any, instruction: string, metadata: Metadata, retry = 0, messages?: ChatCompletionMessageParam[]): Promise<{ jsonata: string, confidence: number } | null> {
-  try {
-    logMessage('info', "Generating mapping" + (retry > 0 ? ` (retry ${retry})` : ''), metadata);
-    const userPrompt =
-      `Given a source data and structure, create a jsonata expression in JSON FORMAT.
-  
-  Important: The output should be a jsonata expression creating an object that exactly matches the following schema:
-  ${JSON.stringify(schema, null, 2)}
-  
-  ${instruction ? `The instruction from the user is: ${instruction}` : ''}
-  
-  ------
-  
-  Source Data Structure:
-  ${getSchemaFromData(payload)}
-  
-  Source data Sample:
-  ${JSON.stringify(sample(payload, 2), null, 2).slice(0, 50000)}`
-
-    if (!messages) {
-      messages = [
-        { role: "system", content: PROMPT_MAPPING },
-        { role: "user", content: userPrompt }
-      ]
-    }
-    const temperature = Math.min(retry * 0.1, 1);
-
-    const { response, messages: updatedMessages } = await LanguageModel.generateObject(messages, jsonataSchema, temperature);
-    messages = updatedMessages;
-    const transformation = await transformAndValidateSchema(payload, response.jsonata, schema);
-
-    if (!transformation.success) {
-      throw new Error(`Validation failed: ${transformation.error}`);
-    }
-    const evaluation = await evaluateMapping(transformation.data, response.jsonata, payload, schema, instruction, metadata);
-    if (!evaluation.success) {
-      throw new Error(`Mapping evaluation failed: ${evaluation.reason}`);
-    }
-    return response;
-  } catch (error) {
-    if (retry < 8) {
-      const errorMessage = String(error.message);
-      logMessage('warn', "Error generating mapping: " + errorMessage.slice(0, 250), metadata);
-      messages.push({ role: "user", content: errorMessage });
-      return generateTransformJsonata(schema, payload, instruction, metadata, retry + 1, messages);
-    }
-  }
-  return null;
-}
-
 export async function generateTransformCode(
   schema: any,
   payload: any,
@@ -154,17 +104,11 @@ export async function generateTransformCode(
 
     if (!messages || messages?.length === 0) {
       const userPrompt =
-        `Given a source data and structure, create a JavaScript function (as a string) that transforms the input data to exactly match the following schema:
-${JSON.stringify(schema, null, 2)}
-
-${instruction ? `The instruction from the user is: ${instruction}` : ''}
-
-------
-Source Data Structure:
-${getSchemaFromData(payload)}
-
-Source data Sample:
-${JSON.stringify(sample(payload, 2), null, 2).slice(0, 50000)}
+        `Given a source data and structure, create a JavaScript function (as a string) that transforms the input data according to the instruction.
+${instruction ? `<user_instruction>${instruction}</user_instruction>` : ''}
+${schema ? `<target_schema>${JSON.stringify(schema, null, 2)}</target_schema>` : ''}
+<source_data_structure>${getSchemaFromData(payload)}</source_data_structure>
+<source_data_sample>${JSON.stringify(sample(payload, 2), null, 2).slice(0, 50000)}</source_data_sample>
 `;
       messages = [
         { role: "system", content: PROMPT_JS_TRANSFORM },

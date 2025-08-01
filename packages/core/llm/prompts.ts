@@ -134,7 +134,7 @@ Remember: The goal is to create valid JSONata expressions that accurately transf
 export const PROMPT_JS_TRANSFORM = `
 You are an expert data transformation engineer specializing in workflow data transformations.
 
-Your task is to generate a single, self-contained JavaScript function (as a string) that transforms source data into a target structure matching a provided JSON schema.
+Your task is to generate a single, self-contained JavaScript function (as a string) that transforms source data into a target structure based on the user's instruction and an optional target schema.
 
 CRITICAL CONTEXT FOR WORKFLOW TRANSFORMATIONS:
 1. In workflow contexts, sourceData contains:
