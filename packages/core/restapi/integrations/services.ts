@@ -41,3 +41,21 @@ export const findRelevantIntegrationService = async (instruction: string | undef
     throw error;
   }
 };
+
+
+export const getIntegrationById = async (id: string, orgId: any) => {
+
+  // if (!datastore || !orgId) {
+  //   throw new Error('Missing datastore or orgId in context');
+  // }
+
+  try {
+
+    const integration = await datastore.getIntegration(id, orgId);
+    return integration;
+
+  }catch (error) {  
+    logMessage('error', `Error getting integration by ID ${id}: ${String(error)}`, { orgId });
+    throw error;
+  }
+};
