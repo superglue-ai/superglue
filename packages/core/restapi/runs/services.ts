@@ -11,7 +11,7 @@ export async function listRuns(
   configId: string,
   orgId: string
 ): Promise<RunListResponse> {
-  return datastore.listRuns(limit, offset, configId, orgId);
+  return datastore.listRuns({ limit, offset, configId, orgId });
 }
 
 
@@ -20,7 +20,7 @@ export async function getRunService(id: string, orgId: string) {
     throw new Error("id is required");
   }
 
-  const run = await datastore.getRun(id, orgId);
+  const run = await datastore.getRun({ id, orgId });
   if (!run) {
     telemetryClient?.captureException(new Error(`run with id ${id} not found`), orgId, { id });
     throw new Error(`run with id ${id} not found`);
