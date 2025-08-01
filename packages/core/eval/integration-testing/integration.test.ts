@@ -41,9 +41,9 @@ describe('Integration Tests', () => {
     });
 
     it('should run integration tests successfully', async () => {
-        const framework = await IntegrationTestingFramework.create(
-            './eval/integration-testing/integration-test-config.json'
-        );
+        // Use custom config path from environment variable if provided
+        const configPath = process.env.INTEGRATION_TEST_CONFIG_PATH || './eval/integration-testing/integration-test-config.json';
+        const framework = await IntegrationTestingFramework.create(configPath);
 
         const results = await framework.runTestSuite();
 

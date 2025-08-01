@@ -68,6 +68,12 @@ interface ErrorAnalysisInput {
     }>;
     integrationIds: string[];
     logs?: any[];
+    softValidation?: {
+        success: boolean;
+        reason: string;
+    };
+    actualResult?: any;
+    expectedResult?: string;
 }
 
 export class WorkflowReportGenerator {
@@ -113,12 +119,27 @@ export class WorkflowReportGenerator {
             workflowPlans = [],
             originalInstruction,
             integrationIds,
-            logs = []
+            logs = [],
+            softValidation,
+            actualResult,
+            expectedResult
         } = input;
 
-        const overallSuccess = buildAttempts.some(b => b.success) && executionAttempts.some(e => e.success);
+        const overallSuccess = buildAttempts.some(b => b.success) &&
+            executionAttempts.some(e => e.success) &&
+            (!softValidation || softValidation.success);
         const totalAttempts = Math.max(buildAttempts.length, 1);
-        const logMessages = logs.map(l => `[${l.level}] ${l.message}`);
+
+        // Add soft validation failure to logs if present
+        const logMessages = [...logs];
+        if (softValidation && !softValidation.success) {
+            logMessages.push({
+                level: 'ERROR',
+                message: `Soft validation failed: ${softValidation.reason}. Actual data: ${actualResult ? JSON.stringify(actualResult).substring(0, 200) + '...' : 'null'}`
+            });
+        }
+
+        const formattedLogs = logMessages.map(l => `[${l.level}] ${l.message}`);
 
         const relevantPlan = workflowPlans.find(p => p.buildSuccess && p.executionSuccess) ||
             workflowPlans[workflowPlans.length - 1];
@@ -145,8 +166,8 @@ ${simplifiedPlans.map(p => `- Attempt ${p.attemptNumber}: ${p.outcome} (${p.step
 WORKFLOW STRUCTURE:
 ${simplifiedPlan ? JSON.stringify(simplifiedPlan, null, 2) : 'No plans generated'}
 
-ALL RELEVANT LOGS (${logMessages.length} total):
-${logMessages.map((msg, i) => `${i + 1}. ${msg}`).join('\n\n') || 'None'}
+ALL RELEVANT LOGS (${formattedLogs.length} total):
+${formattedLogs.map((msg, i) => `${i + 1}. ${msg}`).join('\n\n') || 'None'}
 
 ANALYSIS INSTRUCTIONS:
 - Focus on the log messages (especially WARN/ERROR) to identify error patterns, root causes, and authentication issues.

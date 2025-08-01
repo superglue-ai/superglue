@@ -10,9 +10,9 @@ import {
     TestWorkflowConfig as TestWorkflow
 } from '../utils/config-loader.js';
 import { IntegrationSetupResult, SetupManager } from '../utils/setup-manager.js';
+import { type SoftValidationResult } from '../utils/soft-validator.js';
 import type { BuildAttempt, ExecutionAttempt } from '../utils/workflow-report-generator.js';
 import { WorkflowRunner } from '../utils/workflow-runner.js';
-// Documentation will be imported dynamically to ensure env vars are loaded first
 
 interface TestResult {
     workflowId: string;
@@ -40,6 +40,10 @@ interface TestResult {
     }>;
     integrationIds?: string[];
     collectedLogs?: any[];
+    softValidation?: {
+        success: boolean;
+        reason: string;
+    };
 }
 
 interface TestSuite {
@@ -303,6 +307,8 @@ export class IntegrationTestingFramework {
                         collectLogs: true,
                         saveRuns: true,
                         delayBetweenAttempts: this.config?.testSuite?.delayBetweenAttempts || 0, // Use config value, default to 0
+                        enableSoftValidation: this.config?.testSuite?.enableSoftValidation !== false, // Default to true
+                        expectedResult: testWorkflow.expectedResult,
                         onAttemptComplete: (attempt) => {
                             logMessage('info',
                                 `🔍 Attempt ${attempt.attemptNumber} result: buildSuccess=${attempt.buildSuccess}, executionSuccess=${attempt.executionSuccess}`,
@@ -369,7 +375,10 @@ export class IntegrationTestingFramework {
                             executionAttempts,
                             workflowPlans,
                             integrationIds: testWorkflow.integrationIds,
-                            logs: runResult.collectedLogs
+                            logs: runResult.collectedLogs,
+                            softValidation: runResult.softValidation,
+                            actualResult: runResult.finalResult?.data,
+                            expectedResult: testWorkflow.expectedResult
                         });
                         logMessage('info', `📊 Generated execution report for ${testWorkflow.name} (${runResult.collectedLogs.length} logs analyzed)`, this.metadata);
                         errorSummary = analysis.summary;
@@ -380,6 +389,7 @@ export class IntegrationTestingFramework {
                 }
 
                 const dataPreview = actualData ? this.generateDataPreview(actualData) : undefined;
+                let softValidation: SoftValidationResult | undefined;
 
                 results.push({
                     workflowId: testWorkflow.id,
@@ -401,11 +411,10 @@ export class IntegrationTestingFramework {
                     successRate: runResult.successRate,
                     workflowPlans,
                     integrationIds: testWorkflow.integrationIds,
-                    collectedLogs: runResult.collectedLogs
+                    collectedLogs: runResult.collectedLogs,
+                    softValidation: runResult.softValidation  // Get from WorkflowRunner result
                 });
             }
-
-
 
             // Generate error summaries for workflows that encountered errors
             logMessage('info', '🤖 Generating execution reports for all workflows...', this.metadata);
@@ -432,7 +441,7 @@ export class IntegrationTestingFramework {
             }));
 
             // Calculate metrics (cleanup will happen in finally block)
-            const passed = results.filter(r => r.succeededOnAttempt !== undefined).length;
+            const passed = results.filter(r => r.succeededOnAttempt !== undefined && (!r.softValidation || r.softValidation.success)).length;
             const failed = results.length - passed;
             const averageBuildTime = results.reduce((sum, r) => sum + r.buildAttempts.reduce((sum, b) => sum + b.buildTime, 0), 0) / results.length;
             const averageExecutionTime = results.reduce((sum, r) => sum + r.executionAttempts.reduce((sum, e) => sum + e.executionTime, 0), 0) / results.length;
@@ -520,7 +529,7 @@ export class IntegrationTestingFramework {
         const min = (arr: number[]) => arr.length ? Math.min(...arr) : 0;
         const max = (arr: number[]) => arr.length ? Math.max(...arr) : 0;
 
-        const passed = testSuite.results.filter(r => r.succeededOnAttempt !== undefined).length;
+        const passed = testSuite.results.filter(r => r.succeededOnAttempt !== undefined && (!r.softValidation || r.softValidation.success)).length;
         const failed = testSuite.results.length - passed;
 
         // --- NEW: Workflow-level meta summary ---
@@ -569,6 +578,8 @@ export class IntegrationTestingFramework {
             if (r.dataPreview) {
                 result += `\n    Data Preview: ${r.dataPreview}`;
             }
+
+
 
             if (r.errorSummary) {
                 result += `\n    🤖 AI Analysis: ${r.errorSummary}`;
@@ -688,6 +699,12 @@ export class IntegrationTestingFramework {
                     report += `**Data Preview:** \`${originalResult.dataPreview}\`\n\n`;
                 }
 
+                // Only show soft validation if it's relevant (i.e., it failed)
+                if (success.softValidation && !success.softValidation.success) {
+                    report += `**🎯 Soft Validation:** ❌ FAIL\n`;
+                    report += `- **Reason:** ${success.softValidation.reason}\n\n`;
+                }
+
                 if (success.executionReport) {
                     report += `**Execution Analysis:**\n`;
                     report += `- **Summary:** ${success.executionReport.executionSummary}\n`;
@@ -716,8 +733,10 @@ export class IntegrationTestingFramework {
                 // Add data preview if available
                 const originalResult = testSuite.results.find(r => r.workflowId === failed.workflowId);
                 if (originalResult?.dataPreview) {
-                    report += `**Data Preview:** ${originalResult.dataPreview}\n\n`;
+                    report += `**Data Preview:** \`${originalResult.dataPreview}\`\n\n`;
                 }
+
+
 
                 if (failed.errorSummary) {
                     report += `**AI Analysis:** ${failed.errorSummary}\n\n`;
@@ -831,7 +850,7 @@ export class IntegrationTestingFramework {
             workflowResults: testSuite.results.map(r => ({
                 workflowId: r.workflowId,
                 workflowName: r.workflowName,
-                success: r.succeededOnAttempt !== undefined,
+                success: r.succeededOnAttempt !== undefined && (!r.softValidation || r.softValidation.success),
                 succeededOnAttempt: r.succeededOnAttempt,
                 complexity: r.complexity,
                 category: r.category,
@@ -848,7 +867,9 @@ export class IntegrationTestingFramework {
                 // New per-workflow metrics
                 totalAttempts: r.totalAttempts,
                 successfulAttempts: r.successfulAttempts,
-                successRate: (r.successRate * 100).toFixed(1) + '%'
+                successRate: (r.successRate * 100).toFixed(1) + '%',
+                // Soft validation results
+                softValidation: r.softValidation
             })),
             integrationSetupResults: testSuite.integrationSetupResults,
             retryStatistics: testSuite.retryStatistics,
