@@ -22,24 +22,24 @@ export async function listIntegrations(req: Request, res: Response) {
 }
 
 
-export const findRelevantIntegrations = async (req: Request, res: Response) => {
-  try {
-    const instruction = req.query.instruction as string | undefined;
-    const context = req.context;
+// export const findRelevantIntegrations = async (req: Request, res: Response) => {
+//   try {
+//     const instruction = req.query.instruction as string | undefined;
+//     const context = req.context;
 
-    const orgId = req.orgId;
+//     const orgId = req.orgId;
 
-    // if (!orgId) {
-    //   return res.status(401).json({ error: 'Unauthorized. Missing orgId  from auth.' });
-    // }
+//     // if (!orgId) {
+//     //   return res.status(401).json({ error: 'Unauthorized. Missing orgId  from auth.' });
+//     // }
 
-    const integrations = await services.findRelevantIntegrationService(instruction, orgId);
-    res.json(integrations);
-  } catch (error) {
-    console.error('Error in finding Relevant Integrations:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
+//     const integrations = await services.findRelevantIntegrationService(instruction, orgId);
+//     res.json(integrations);
+//   } catch (error) {
+//     console.error('Error in finding Relevant Integrations:', error);
+//     res.status(500).json({ error: 'Internal server error' });
+//   }
+// };
 
 
 
@@ -81,5 +81,23 @@ export const upsertIntegration = async (req: Request, res: Response) => {
   } catch (err) {
     console.error('REST: Error upserting integration:', err);
     res.status(500).json({ error: err.message || 'Internal Server Error' });
+  }
+};
+
+
+export const deleteIntegration = async (req:Request, res:Response) => {
+  const { id } = req.params;
+  const orgId = req.orgId;
+
+  if (!id) {
+    return res.status(400).json({ error: "Integration ID is required" });
+  }
+
+  try {
+    const deleted = await services.deleteIntegrationService(id, orgId);
+    return res.status(200).json({ success: deleted });
+  } catch (err) {
+    console.error(`Error deleting integration ${id}:`, err);
+    return res.status(500).json({ error: "Internal server error" });
   }
 };

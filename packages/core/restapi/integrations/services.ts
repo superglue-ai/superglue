@@ -25,27 +25,28 @@ export async function listIntegrationService(limit: number, offset: number, orgI
 
 }
 
+// TODO: Fix Error ReferenceError: Cannot access 'LanguageModel' before initialization
 
-export const findRelevantIntegrationService = async (instruction: string | undefined, orgId: any) => {
+// export const findRelevantIntegrationService = async (instruction: string | undefined, orgId: any) => {
 
-  const logInstruction = instruction ? `instruction: ${instruction}` : 'no instruction (returning all integrations)';
+//   const logInstruction = instruction ? `instruction: ${instruction}` : 'no instruction (returning all integrations)';
 
-  logMessage('info', `Finding relevant integrations for ${logInstruction}`, { orgId });
+//   logMessage('info', `Finding relevant integrations for ${logInstruction}`, { orgId });
 
-  try {
-    const metadata: Metadata = {
-      orgId,
-      runId: crypto.randomUUID()
-    };
-    const allIntegrations = await datastore.listIntegrations({ limit: 1000, offset: 0, orgId });
+//   try {
+//     const metadata: Metadata = {
+//       orgId,
+//       runId: crypto.randomUUID()
+//     };
+//     const allIntegrations = await datastore.listIntegrations({ limit: 1000, offset: 0, orgId });
 
-    const selector = new IntegrationSelector(metadata);
-    return await selector.select(instruction, allIntegrations.items || []);
-  } catch (error) {
-    logMessage('error', `Error finding relevant integrations: ${String(error)}`, { orgId });
-    throw error;
-  }
-};
+//     const selector = new IntegrationSelector(metadata);
+//     return await selector.select(instruction, allIntegrations.items || []);
+//   } catch (error) {
+//     logMessage('error', `Error finding relevant integrations: ${String(error)}`, { orgId });
+//     throw error;
+//   }
+// };
 
 
 export const getIntegrationById = async (id: string, orgId: any) => {
@@ -157,10 +158,10 @@ function shouldTriggerDocFetch(input: Integration, existing?: Integration | null
   return false;
 }
 
-async function triggerAsyncDocumentationFetch(input: Integration, context: any): Promise<void> {
+async function triggerAsyncDocumentationFetch(input: Integration, orgId: any): Promise<void> {
   try {
     const enrichedInput = enrichWithTemplate(input);
-    logMessage('info', `Starting async documentation fetch for ${input.id}`, { orgId: context.orgId });
+    logMessage('info', `Starting async documentation fetch for ${input.id}`, { orgId});
 
     const docFetcher = new Documentation(
       {
@@ -170,16 +171,16 @@ async function triggerAsyncDocumentationFetch(input: Integration, context: any):
         openApiUrl: enrichedInput.openApiUrl,
       },
       enrichedInput.credentials || {},
-      { orgId: context.orgId }
+      { orgId: orgId }
     );
 
     const doc = await docFetcher.fetchAndProcess();
     const schema = await docFetcher.fetchOpenApiDocumentation();
 
-    const latest = await context.datastore.getIntegration({ id: input.id, includeDocs: false, orgId: context.orgId });
+    const latest = await datastore.getIntegration({ id: input.id, includeDocs: false, orgId: orgId });
     if (!latest) return;
 
-    await context.datastore.upsertIntegration({
+    await datastore.upsertIntegration({
       id: input.id,
       integration: {
         ...latest,
@@ -188,20 +189,20 @@ async function triggerAsyncDocumentationFetch(input: Integration, context: any):
         openApiSchema: schema,
         updatedAt: new Date(),
       },
-      orgId: context.orgId,
+      orgId: orgId,
     });
   } catch (err) {
-    logMessage('error', `Doc fetch failed for ${input.id}: ${String(err)}`, { orgId: context.orgId });
-    const latest = await context.datastore.getIntegration({ id: input.id, includeDocs: false, orgId: context.orgId });
+    logMessage('error', `Doc fetch failed for ${input.id}: ${String(err)}`, { orgId: orgId });
+    const latest = await datastore.getIntegration({ id: input.id, includeDocs: false, orgId: orgId });
     if (latest) {
-      await context.datastore.upsertIntegration({
+      await datastore.upsertIntegration({
         id: input.id,
         integration: {
           ...latest,
           documentationPending: false,
           updatedAt: new Date(),
         },
-        orgId: context.orgId,
+        orgId: orgId,
       });
     }
   }
@@ -209,3 +210,19 @@ async function triggerAsyncDocumentationFetch(input: Integration, context: any):
 
 
 // --- helpers Functions END---
+
+
+export const deleteIntegrationService = async (id: string, orgId: any) => {
+  try {
+    const integration = await datastore.getIntegration({ id, orgId });
+    if (!integration) {
+      throw new Error(`Integration with ID '${id}' not found.`);
+    }
+
+    return await datastore.deleteIntegration({ id, orgId });
+  } catch (error) {
+    logMessage('error', `Error deleting integration ${id}: ${String(error)}`, { orgId });
+    throw error;
+  }
+};
+
