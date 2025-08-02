@@ -22,24 +22,24 @@ export async function listIntegrations(req: Request, res: Response) {
 }
 
 
-// export const findRelevantIntegrations = async (req: Request, res: Response) => {
-//   try {
-//     const instruction = req.query.instruction as string | undefined;
-//     const context = req.context;
+export const findRelevantIntegrations = async (req: Request, res: Response) => {
+  try {
+    const instruction = req.query.instruction as string | undefined;
+    const context = req.context;
 
-//     const orgId = req.orgId;
+    const orgId = req.orgId;
 
-//     // if (!orgId) {
-//     //   return res.status(401).json({ error: 'Unauthorized. Missing orgId  from auth.' });
-//     // }
+    // if (!orgId) {
+    //   return res.status(401).json({ error: 'Unauthorized. Missing orgId  from auth.' });
+    // }
 
-//     const integrations = await services.findRelevantIntegrationService(instruction, orgId);
-//     res.json(integrations);
-//   } catch (error) {
-//     console.error('Error in finding Relevant Integrations:', error);
-//     res.status(500).json({ error: 'Internal server error' });
-//   }
-// };
+    const integrations = await services.findRelevantIntegrationService(instruction, orgId);
+    res.json(integrations);
+  } catch (error) {
+    console.error('Error in finding Relevant Integrations:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
 
 
 

@@ -1,13 +1,12 @@
 import { Router } from 'express';
-// import { deleteIntegration, findRelevantIntegrations, getIntegration, listIntegrations, upsertIntegration } from './controller.js';
-import {listIntegrations, getIntegration, upsertIntegration, deleteIntegration} from './controller.js';
+import { deleteIntegration, findRelevantIntegrations, getIntegration, listIntegrations, upsertIntegration } from './controller.js';
 
 import { authMiddleware } from '../../auth/auth.js';
 
 const router = Router();
 
 router.get('/', authMiddleware, listIntegrations);
-// router.get('/relevant', authMiddleware, findRelevantIntegrations);
+router.get('/relevant', authMiddleware, findRelevantIntegrations);
 router.get('/:id', authMiddleware, getIntegration);
 
 router.post('/upsert', authMiddleware, upsertIntegration); 
