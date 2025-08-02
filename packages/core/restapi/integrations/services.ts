@@ -1,12 +1,18 @@
 import { createDataStore } from '../../datastore/datastore.js';
 import { Metadata } from "@superglue/shared";
-import {IntegrationSelector} from '../../integrations/integration-selector.js';
+// import {IntegrationSelector} from '../../integrations/integration-selector.js';
 import { logMessage } from '../../utils/logs.js';
 import { Integration } from '@superglue/client';
 import { generateUniqueId } from '@superglue/shared/utils';
 import { integrations, findMatchingIntegration } from '@superglue/shared';
 import { composeUrl } from '../../utils/tools.js';
 import { Documentation } from '../../utils/documentation.js';
+// Dynamic imports (await import(...)) help avoid circular dependency issues which caused 
+// (ReferenceError: Cannot access 'LanguageModel' before initialization)
+const IntegrationSelector = async () => {
+  const mod = await import("../../integrations/integration-selector.js");
+  return mod.IntegrationSelector;
+};
 
 
 const datastore = createDataStore({
@@ -25,28 +31,27 @@ export async function listIntegrationService(limit: number, offset: number, orgI
 
 }
 
-// TODO: Fix Error ReferenceError: Cannot access 'LanguageModel' before initialization
+export const findRelevantIntegrationService = async (instruction: string | undefined, orgId: any) => {
 
-// export const findRelevantIntegrationService = async (instruction: string | undefined, orgId: any) => {
+  const logInstruction = instruction ? `instruction: ${instruction}` : 'no instruction (returning all integrations)';
 
-//   const logInstruction = instruction ? `instruction: ${instruction}` : 'no instruction (returning all integrations)';
+  logMessage('info', `Finding relevant integrations for ${logInstruction}`, { orgId });
 
-//   logMessage('info', `Finding relevant integrations for ${logInstruction}`, { orgId });
+  try {
+    const metadata: Metadata = {
+      orgId,
+      runId: crypto.randomUUID()
+    };
+    const allIntegrations = await datastore.listIntegrations({ limit: 1000, offset: 0, orgId });
 
-//   try {
-//     const metadata: Metadata = {
-//       orgId,
-//       runId: crypto.randomUUID()
-//     };
-//     const allIntegrations = await datastore.listIntegrations({ limit: 1000, offset: 0, orgId });
-
-//     const selector = new IntegrationSelector(metadata);
-//     return await selector.select(instruction, allIntegrations.items || []);
-//   } catch (error) {
-//     logMessage('error', `Error finding relevant integrations: ${String(error)}`, { orgId });
-//     throw error;
-//   }
-// };
+    const IntegrationSelectorClass = await IntegrationSelector();
+    const selector = new IntegrationSelectorClass(metadata);
+    return await selector.select(instruction, allIntegrations.items || []);
+  } catch (error) {
+    logMessage('error', `Error finding relevant integrations: ${String(error)}`, { orgId });
+    throw error;
+  }
+};
 
 
 export const getIntegrationById = async (id: string, orgId: any) => {
@@ -60,7 +65,7 @@ export const getIntegrationById = async (id: string, orgId: any) => {
     const integration = await datastore.getIntegration({ id, orgId });
     return integration;
 
-  }catch (error) {  
+  } catch (error) {
     logMessage('error', `Error getting integration by ID ${id}: ${String(error)}`, { orgId });
     throw error;
   }
@@ -73,7 +78,7 @@ export const getIntegrationById = async (id: string, orgId: any) => {
 export async function upsertIntegrationService(input: Integration, mode: 'CREATE' | 'UPDATE' | 'UPSERT', orgId: any) {
   const now = new Date();
 
-  let existing = await datastore.getIntegration({id: input.id, includeDocs: false, orgId });
+  let existing = await datastore.getIntegration({ id: input.id, includeDocs: false, orgId });
 
   if (mode === 'UPSERT') {
     mode = existing ? 'UPDATE' : 'CREATE';
@@ -84,7 +89,7 @@ export async function upsertIntegrationService(input: Integration, mode: 'CREATE
       input.id = await generateUniqueId({
         baseId: input.id,
         exists: async (id) =>
-          !!(await datastore.getIntegration({id, orgId})),
+          !!(await datastore.getIntegration({ id, orgId })),
       });
       existing = null;
     }
@@ -116,9 +121,10 @@ export async function upsertIntegrationService(input: Integration, mode: 'CREATE
   };
 
   return await datastore.upsertIntegration(
-    {id: input.id, 
-    orgId,
-    integration: integrationToSave
+    {
+      id: input.id,
+      orgId,
+      integration: integrationToSave
     }
   );
 }
@@ -161,7 +167,7 @@ function shouldTriggerDocFetch(input: Integration, existing?: Integration | null
 async function triggerAsyncDocumentationFetch(input: Integration, orgId: any): Promise<void> {
   try {
     const enrichedInput = enrichWithTemplate(input);
-    logMessage('info', `Starting async documentation fetch for ${input.id}`, { orgId});
+    logMessage('info', `Starting async documentation fetch for ${input.id}`, { orgId });
 
     const docFetcher = new Documentation(
       {
