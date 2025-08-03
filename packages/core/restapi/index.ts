@@ -3,6 +3,7 @@ import express from 'express';
 import runsRoutes from './runs/route.js';
 import integrationsRoutes from './integrations/route.js';
 import generateRoutes from './generate/route.js';
+import workflowRoutes from './workflows/route.js';
 
 const app = express();
 app.use(express.json());
@@ -10,6 +11,7 @@ app.use(express.json());
 app.use('/runs', runsRoutes);
 app.use('/integrations', integrationsRoutes);
 app.use('/generate', generateRoutes);
+app.use('/workflows', workflowRoutes);
 
 const PORT = 3002;
 if (process.env.NODE_ENV !== 'test') {
