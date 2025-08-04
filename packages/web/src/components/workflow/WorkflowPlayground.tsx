@@ -321,6 +321,17 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
 
   const saveWorkflow = async () => {
     try {
+      try {
+        JSON.parse(responseSchema || '{}');
+      } catch (e) {
+        throw new Error("Invalid response schema JSON");
+      }
+      try {
+        JSON.parse(inputSchema || '{}');
+      } catch (e) {
+        throw new Error("Invalid input schema JSON");
+      }
+
       if (!workflowId.trim()) {
         updateWorkflowId(`wf-${Date.now()}`);
       }
@@ -375,10 +386,18 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
       // Validate JSON before execution
       try {
         JSON.parse(credentials || '{}');
+      } catch (e) {
+        throw new Error("Invalid credentials JSON");
+      }
+      try {
         JSON.parse(responseSchema || '{}');
+      } catch (e) {
+        throw new Error("Invalid response schema JSON");
+      }
+      try {
         JSON.parse(inputSchema || '{}');
       } catch (e) {
-        throw new Error("Invalid credentials JSON format");
+        throw new Error("Invalid input schema JSON");
       }
       const workflowResult = await client.executeWorkflow({
         workflow: {
