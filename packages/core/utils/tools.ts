@@ -420,9 +420,9 @@ export function maskCredentials(message: string, credentials?: Record<string, st
 
   let maskedMessage = message;
   Object.entries(credentials).forEach(([key, value]) => {
-    if (value && value.length > 0 && typeof value === 'string') {
-      // Use global flag to replace all occurrences
-      const regex = new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+    const valueString = String(value);
+    if (value && valueString) {
+      const regex = new RegExp(valueString.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
       maskedMessage = maskedMessage.replace(regex, `{masked_${key}}`);
     }
   });
