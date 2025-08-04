@@ -192,17 +192,6 @@
             },
             "description": "Huggingface API"
         },
-        "monday": {
-            "id": "monday",
-            "name": "Monday",
-            "urlHost": "https://api.monday.com",
-            "urlPath": "/v2",
-            "documentationUrl": "https://developer.monday.com/api-reference/docs/basics",
-            "credentials": {
-                "personal_api_token": ""
-            },
-            "description": "Monday API"
-        },
         "square": {
             "id": "square",
             "name": "Square",
@@ -213,18 +202,6 @@
                 "sandbox_access_token": ""
             },
             "description": "Square API"
-        },
-        "zendesk": {
-            "id": "zendesk",
-            "name": "Zendesk",
-            "urlHost": "https://superglue.zendesk.com",
-            "urlPath": "",
-            "documentationUrl": "https://developer.zendesk.com/api-reference",
-            "credentials": {
-                "api_token": "",
-                "email": ""
-            },
-            "description": "Zendesk API"
         },
         "airtable": {
             "id": "airtable",
@@ -247,6 +224,17 @@
                 "personal_access_token": ""
             },
             "description": "Snowflake cloud data platform SQL API"
+        },
+        "intercom": {
+            "id": "intercom",
+            "name": "Intercom",
+            "urlHost": "https://api.intercom.io",
+            "urlPath": "",
+            "documentationUrl": "https://developers.intercom.com/docs/build-an-integration/learn-more/rest-apis",
+            "credentials": {
+                "access_token": ""
+            },
+            "description": "Intercom API"
         }
     },
     "workflows": {
@@ -415,32 +403,12 @@
             ],
             "payload": {}
         },
-        "monday-sprint-analysis": {
-            "id": "monday-sprint-analysis",
-            "name": "Monday.com Sprint Analysis",
-            "instruction": "Retrieve all tasks that are part of the sprint board specified in the payload input. Calculate the total number of tasks belonging to each status. Return the results as a JSON object with the following structure: { \"completed\": xxx, \"in_progress\": xxx, \"ready_to_start\": xxx }",
-            "integrationIds": [
-                "monday"
-            ],
-            "payload": {
-                "sprint_board_name": "TestSprint"
-            }
-        },
         "square-customer-directory": {
             "id": "square-customer-directory",
             "name": "Square Customer Directory Export",
             "instruction": "Retrieve all customers from my Square customer directory. Extract their names and email addresses, and return a JSON object with only two properties: customerNames as an array of customer names and customer_emails as an array of corresponding email addresses",
             "integrationIds": [
                 "square"
-            ],
-            "payload": {}
-        },
-        "zendesk-ticket-analysis": {
-            "id": "zendesk-ticket-analysis",
-            "name": "Zendesk Ticket Analysis",
-            "instruction": "Retrieve all tickets from my Zendesk account, analyze their statuses, and return a summary of the total number of tickets in each status category",
-            "integrationIds": [
-                "zendesk"
             ],
             "payload": {}
         },
@@ -458,9 +426,18 @@
         "snowflake-list-tables": {
             "id": "snowflake-list-tables",
             "name": "Snowflake List All Tables",
-            "instruction": "Execute a SQL query to list all tables in the snowflake database. Return the results as a JSON object with table names, schema names, and database names.",
+            "instruction": "List all tables from the TESTING_SCHEMA in the snowflake SUPERGLUE_DATA database. Return the results as a JSON object with table names, table column names and the first row of each table",
             "integrationIds": [
                 "snowflake"
+            ],
+            "payload": {}
+        },
+        "supabase-list-table-schemas": {
+            "id": "supabase-list-table-schemas",
+            "name": "Supabase List Table Schemas",
+            "instruction": "List all tables from my Supabase database along with their column names, data types, and constraints. Return the results as a JSON object with table names and their schema definitions including column names, types, nullable status, and any primary/foreign key relationships.",
+            "integrationIds": [
+                "supabase"
             ],
             "payload": {}
         }
@@ -471,7 +448,7 @@
         "jira-sprint-health",
         "attio-people-retrieval",
         "timbuk2-product-analysis",
-        "subscription-to-db-sync",
+        "supabase-list-table-schemas",
         "posthog-analytics",
         "twilio-sms-analysis",
         "sendgrid-test-email",
@@ -483,9 +460,7 @@
         "asana-tasks",
         "notion-duplicate-email-analysis",
         "huggingface-model-metadata",
-        "monday-sprint-analysis",
         "square-customer-directory",
-        "zendesk-ticket-analysis",
         "airtable-test-data-retrieval",
         "snowflake-list-tables"
     ],
