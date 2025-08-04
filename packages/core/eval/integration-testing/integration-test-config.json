@@ -352,7 +352,7 @@
                 "expectedResult": "Should return counts of total contacts processed (should be exactly 3). Should also contain data for a total of 8 contacts, 4 of which are working at COMPANY A or COMPANY B, and 4 of which are not. Lead status not be In Progress for any customer working at COMPANY A or COMPANY B or with a creation date later than July 1st."
             },
             "hubspot-lead-qualification-2": {
-                "id": "hubspot-lead-qualification",
+                "id": "hubspot-lead-qualification-2",
                 "name": "HubSpot Lead Qualification Pipeline",
                 "instruction": "Get all HubSpot contacts created in the 30 days after the payload date, filter out contacts working at the companies in the payload company list, and update the lead status of remaining contacts to Attempted to Contact. Finally, return ALL contacts, their names, their creation dates and the companies they work at as well as the lead status.",
                 "integrationIds": [
@@ -824,6 +824,7 @@
     "testSuite": {
         "name": "Integration Test",
         "attemptsPerWorkflow": 1,
-        "delayBetweenAttempts": 500
+        "delayBetweenAttempts": 500,
+        "enableSoftValidation": true
     }
 }

@@ -102,8 +102,8 @@ async function generateApiRanking(configPath?: string): Promise<void> {
                     collectLogs: true,
                     saveRuns: false,
                     delayBetweenAttempts: config.settings.delayBetweenAttempts || 0,
-                    enableSoftValidation: config.settings.enableSoftValidation || false, // Default to false for API ranking
-                    expectedResult: workflow.expectedResult  // Add expectedResult if it exists
+                    enableSoftValidation: config.settings.enableSoftValidation || false, 
+                    expectedResult: workflow.expectedResult 
                 }
             );
 

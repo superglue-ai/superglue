@@ -17,24 +17,19 @@ export async function validateWorkflowResult(
         // Lazy import to ensure env vars are loaded
         const { LanguageModel } = await import('../../llm/llm.js');
 
-        // Prepare the actual result for comparison
         let actualContent = JSON.stringify(actualResult, null, 2);
         if (actualContent.length > 10000) {
             // Sample if too large
             actualContent = JSON.stringify(sample(actualResult, 10), null, 2) + "\n\n...truncated...";
         }
 
-        // Try to parse expected result as JSON for better formatting
         let expectedContent = expectedResult;
         let isExpectedJson = false;
-        try {
-            const parsed = JSON.parse(expectedResult);
-            expectedContent = JSON.stringify(parsed, null, 2);
-            isExpectedJson = true;
-        } catch {
-            // Not JSON, use as-is (likely a description)
-        }
-
+   
+        const parsed = JSON.parse(expectedResult);
+        expectedContent = JSON.stringify(parsed, null, 2);
+        isExpectedJson = true;
+        
         const systemPrompt = `You are a workflow result validator for integration testing. Your job is to determine if the actual workflow result meets the expected criteria.
 
 IMPORTANT CONSIDERATIONS:
@@ -115,40 +110,3 @@ Please validate if the actual result reasonably aligns with the expected criteri
         };
     }
 }
-
-/**
- * Batch validate multiple workflow results
- */
-export async function batchValidateResults(
-    results: Array<{
-        actualResult: any;
-        expectedResult: string;
-        workflowInstruction: string;
-        workflowId: string;
-    }>,
-    metadata: { orgId: string; userId: string }
-): Promise<Map<string, SoftValidationResult>> {
-    const validationMap = new Map<string, SoftValidationResult>();
-
-    const batchSize = 3;
-    for (let i = 0; i < results.length; i += batchSize) {
-        const batch = results.slice(i, i + batchSize);
-
-        const validationPromises = batch.map(async (item) => {
-            const result = await validateWorkflowResult(
-                item.actualResult,
-                item.expectedResult,
-                item.workflowInstruction,
-                metadata
-            );
-            return { workflowId: item.workflowId, result };
-        });
-
-        const batchResults = await Promise.all(validationPromises);
-        batchResults.forEach(({ workflowId, result }) => {
-            validationMap.set(workflowId, result);
-        });
-    }
-
-    return validationMap;
-} 

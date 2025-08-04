@@ -306,8 +306,8 @@ export class IntegrationTestingFramework {
                         maxAttemptsPerWorkflow: ATTEMPTS_PER_WORKFLOW,
                         collectLogs: true,
                         saveRuns: true,
-                        delayBetweenAttempts: this.config?.testSuite?.delayBetweenAttempts || 0, // Use config value, default to 0
-                        enableSoftValidation: this.config?.testSuite?.enableSoftValidation !== false, // Default to true
+                        delayBetweenAttempts: this.config?.testSuite?.delayBetweenAttempts || 0,
+                        enableSoftValidation: this.config?.testSuite?.enableSoftValidation !== false,
                         expectedResult: testWorkflow.expectedResult,
                         onAttemptComplete: (attempt) => {
                             logMessage('info',
@@ -412,7 +412,7 @@ export class IntegrationTestingFramework {
                     workflowPlans,
                     integrationIds: testWorkflow.integrationIds,
                     collectedLogs: runResult.collectedLogs,
-                    softValidation: runResult.softValidation  // Get from WorkflowRunner result
+                    softValidation: runResult.softValidation
                 });
             }
 
