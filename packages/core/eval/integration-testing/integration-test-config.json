@@ -18,7 +18,6 @@
             "asana",
             "notion",
             "huggingface",
-            "monday",
             "square",
             "airtable",
             "snowflake",
@@ -220,17 +219,6 @@
                 },
                 "description": "Huggingface API"
             },
-            "monday": {
-                "id": "monday",
-                "name": "Monday",
-                "urlHost": "https://api.monday.com",
-                "urlPath": "/v2",
-                "documentationUrl": "https://developer.monday.com/api-reference/docs/basics",
-                "credentials": {
-                    "personal_api_token": ""
-                },
-                "description": "Monday API"
-            },
             "square": {
                 "id": "square",
                 "name": "Square",
@@ -309,26 +297,40 @@
     "workflows": {
         "enabled": [
             "hubspot-lead-qualification",
+            "hubspot-lead-qualification-2",
             "stripe-revenue-analytics",
             "jira-sprint-health",
             "attio-people-retrieval",
+            "lego-inventory-analysis",
             "timbuk2-product-analysis",
+            "hubspot-crm-workflow",
+            "subscription-to-db-sync",
+            "posthog-analytics",
+            "twilio-sms-analysis",
             "sendgrid-test-email",
             "gitlab-list-projects",
+            "slack-dm-workflow",
             "bitbucket-repos",
             "discord-server-analysis-dm",
-            "monday-sprint-analysis",
+            "asana-tasks",
+            "notion-duplicate-email-analysis",
+            "huggingface-model-metadata",
+            "square-customer-directory",
+            "airtable-test-data-retrieval",
             "snowflake-list-tables",
             "stripe-list-recent-customers",
+            "stripe-active-subscriptions-count",
             "stripe-recent-invoices",
             "stripe-customer-search",
+            "stripe-product-list",
             "attio-company-enrichment",
             "attio-company-record-cleanup",
             "posthog-user-activity-summary",
             "futurama-character-analysis",
-            
-            "stripe-attio-customer-reconciliation",
-            "posthog-stripe-engagement-alert"
+            "openbrewery-state-analysis",
+            "openweathermap-multi-city-forecast",
+            "intercom-ticket-type-slack-notification",
+            "stripe-attio-customer-reconciliation"
         ],
         "definitions": {
             "hubspot-lead-qualification": {
@@ -500,7 +502,7 @@
             "gitlab-list-projects": {
                 "id": "gitlab-list-projects",
                 "name": "GitLab List Projects",
-                "instruction": "List the projects within the payload group in my GitLab account. Return the results as a JSON object with the following structure: { \"projects\": [ { \"name\": \"project1\", \"description\": \"description1\" } ]",
+                "instruction": "List the projects within the provided input payload group in my GitLab account. Return the results as a JSON object with the following structure: { \"projects\": [ { \"name\": \"project1\" } ]",
                 "integrationIds": [
                     "gitlab"
                 ],
@@ -520,7 +522,8 @@
                 ],
                 "payload": {
                     "email": "michael@superglue.ai",
-                    "message": "Hi, this is superglue-bot testing Slack workflows!"
+                    "message": "Hi, this is superglue-bot testing Slack workflows!",
+                    "guild_id": "1389218511934722080"
                 },
                 "complexityLevel": "medium",
                 "category": "single-system",
@@ -593,20 +596,6 @@
                 "complexityLevel": "medium",
                 "category": "single-system",
                 "expectedResult": "Should retrieve popular public models from Hugging Face (limit 10), extract model names and available file names. Returns JSON with 'models' array containing model_name and file_names for each."
-            },
-            "monday-sprint-analysis": {
-                "id": "monday-sprint-analysis",
-                "name": "Monday.com Sprint Analysis",
-                "instruction": "Retrieve all tasks that are part of the sprint board specified in the payload input. Calculate the total number of tasks belonging to each status. Return the results as a JSON object with the following structure: { \"completed\": 10, \"in_progress\": 20, \"ready_to_start\": 30 }",
-                "integrationIds": [
-                    "monday"
-                ],
-                "payload": {
-                    "sprint_board_name": "TestSprint"
-                },
-                "complexityLevel": "high",
-                "category": "single-system",
-                "expectedResult": "Should retrieve all tasks from the specified sprint board and calculate totals by status. Returns JSON with counts for completed, in_progress, and ready_to_start tasks."
             },
             "square-customer-directory": {
                 "id": "square-customer-directory",
@@ -829,24 +818,6 @@
                 "complexityLevel": "high",
                 "category": "multi-system",
                 "expectedResult": "Should reconcile Stripe and Attio customer data, identify mismatches and high-value missing customers, send detailed email report via SendGrid, and return the email content that was sent including match statistics and customer lists."
-            },
-            "posthog-stripe-engagement-alert": {
-                "id": "posthog-stripe-engagement-alert",
-                "name": "PostHog Active Users Stripe Status Slack Alert",
-                "instruction": "Query PostHog to get all unique users who triggered events in the last 10 days, extract their email addresses from user properties. Then, for each of these active users, search in Stripe to check if they have an active subscription or have made any payments in the last 30 days. Categorize users into: 1) Active users with active Stripe subscriptions, 2) Active users who are past customers (have payment history but no active subscription), 3) Active users who have never paid. Finally, send a Slack message to the user in the payload with a summary showing: total active users from PostHog, breakdown by payment status categories, list of active users without subscriptions (potential upsell targets), and any active users whose subscriptions are ending soon (within 7 days). Return the analysis summary that was sent to Slack. If active users do not have a stripe email or can't be found, that is fine, return",
-                "integrationIds": [
-                    "posthog",
-                    "stripe",
-                    "slack"
-                ],
-                "payload": {
-                    "slack_user_email": "michael@superglue.ai",
-                    "days_active": 10,
-                    "subscription_ending_days": 7
-                },
-                "complexityLevel": "high",
-                "category": "multi-system",
-                "expectedResult": "Should analyze PostHog active users against Stripe payment data, categorize by subscription status, identify upsell opportunities and expiring subscriptions, send Slack alert with detailed breakdown and actionable insights."
             }
         }
     },
