@@ -7,7 +7,9 @@ import { logMessage } from "../../utils/logs.js";
 import { replaceVariables } from "../../utils/tools.js";
 import { WorkflowBuilder } from "../../workflow/workflow-builder.js";
 import { createDataStore } from "../../datastore/datastore.js";
-
+import { parseFile } from "../../utils/file.js";
+import { FileType } from "@superglue/client";
+import crypto from "crypto"
 
 
 const datastore = createDataStore({
@@ -15,10 +17,10 @@ const datastore = createDataStore({
 });
 
 function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined, defaultValue?: T): T | undefined {
-    if (newValue === null) return undefined;
-    if (newValue !== undefined) return newValue;
-    if (oldValue !== undefined) return oldValue;
-    return defaultValue;
+  if (newValue === null) return undefined;
+  if (newValue !== undefined) return newValue;
+  if (oldValue !== undefined) return oldValue;
+  return defaultValue;
 }
 
 interface ExecuteWorkflowArgs {
@@ -26,7 +28,9 @@ interface ExecuteWorkflowArgs {
   payload?: any;
   credentials?: any;
   options?: RequestOptions;
+  file?: Buffer | string;
 }
+
 
 interface BuildWorkflowArgs {
   instruction: string;
@@ -112,58 +116,57 @@ export const executeWorkflowService = async (orgId: any, args: ExecuteWorkflowAr
   const runId = crypto.randomUUID();
   const startedAt = new Date();
   const metadata = { orgId: orgId, runId };
-  let workflow: any = undefined;
+  let workflow: Workflow | undefined;
 
   try {
+    // Retrieve or validate workflow
     if (args.input.id) {
-      workflow = await datastore.getWorkflow({ id: args.input.id, orgId: orgId });
+      workflow = await datastore.getWorkflow({ id: args.input.id, orgId });
       if (!workflow) throw new Error("Workflow not found");
     } else if (args.input.workflow) {
       workflow = args.input.workflow;
-      if (!workflow.id) throw new Error("Workflow must have an ID");
-      if (!workflow.steps || !Array.isArray(workflow.steps)) throw new Error("Workflow must have steps array");
-      logMessage('info', `Executing workflow ${workflow.id}`, metadata);
+      if (!workflow.id || !Array.isArray(workflow.steps)) {
+        throw new Error("Workflow must have an ID and a steps array");
+      }
     } else {
       throw new Error("Must provide either workflow ID or workflow object");
     }
 
-    if (typeof workflow.inputSchema === 'string') {
-      workflow.inputSchema = JSON.parse(workflow.inputSchema);
-    }
-    if (typeof workflow.responseSchema === 'string') {
-      workflow.responseSchema = JSON.parse(workflow.responseSchema);
+    if (typeof workflow.inputSchema === 'string') workflow.inputSchema = JSON.parse(workflow.inputSchema);
+    if (typeof workflow.responseSchema === 'string') workflow.responseSchema = JSON.parse(workflow.responseSchema);
+
+    // Handle file-to-payload conversion
+    let payload = args.payload;
+    if (!payload && args.file) {
+      const buffer = typeof args.file === 'string' ? Buffer.from(args.file, 'base64') : args.file;
+      payload = await parseFile(buffer, FileType.AUTO);
     }
 
     let mergedCredentials = args.credentials || {};
     let integrationManagers: IntegrationManager[] = [];
 
-    // Get all integration IDs
+    // Collect integration IDs from workflow
     const allIntegrationIds = new Set<string>();
-    workflow.integrationIds?.forEach((id: string) => allIntegrationIds.add(id));
-    workflow.steps?.forEach((step: any) => {
-      if (step.integrationId) {
-        allIntegrationIds.add(step.integrationId);
-      }
-    });
+    workflow.integrationIds?.forEach(id => allIntegrationIds.add(id));
+    workflow.steps?.forEach(step => step.integrationId && allIntegrationIds.add(step.integrationId));
 
+    // Resolve credentials
     if (allIntegrationIds.size > 0) {
-      const requestedIds = Array.from(allIntegrationIds);
-      integrationManagers = await IntegrationManager.fromIds(requestedIds, datastore, orgId);
-
+      const ids = Array.from(allIntegrationIds);
+      integrationManagers = await IntegrationManager.fromIds(ids, datastore, orgId);
       await Promise.all(integrationManagers.map(i => i.refreshTokenIfNeeded()));
-      const integrationCreds = flattenAndNamespaceWorkflowCredentials(integrationManagers);
+      const creds = flattenAndNamespaceWorkflowCredentials(integrationManagers);
 
-      const processedCredentials = await Promise.all(
-        Object.entries(args.credentials || {}).map(async ([key, value]) => {
-          return { [key]: await replaceVariables(String(value), integrationCreds) };
-        })
+      const processed = await Promise.all(
+        Object.entries(args.credentials || {}).map(async ([k, v]) => ({ [k]: await replaceVariables(String(v), creds) }))
       );
 
-      mergedCredentials = Object.assign({}, integrationCreds, ...processedCredentials);
+      mergedCredentials = Object.assign({}, creds, ...processed);
     }
 
+    // Execute workflow
     const executor = new WorkflowExecutor(workflow, metadata, integrationManagers);
-    const result = await executor.execute(args.payload, mergedCredentials, args.options);
+    const result = await executor.execute(payload, mergedCredentials, args.options);
 
     await datastore.createRun({
       result: {
@@ -175,7 +178,7 @@ export const executeWorkflowService = async (orgId: any, args: ExecuteWorkflowAr
         startedAt,
         completedAt: new Date()
       },
-      orgId: orgId
+      orgId
     });
 
     return result;
@@ -191,10 +194,11 @@ export const executeWorkflowService = async (orgId: any, args: ExecuteWorkflowAr
       startedAt,
       completedAt: new Date()
     };
-    await datastore.createRun({ result, orgId: orgId });
+    await datastore.createRun({ result, orgId });
     return { ...result, data: {}, stepResults: [] };
   }
 };
+
 
 
 

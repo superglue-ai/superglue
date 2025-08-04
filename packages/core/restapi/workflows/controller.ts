@@ -77,13 +77,21 @@ export const executeWorkflow = async (req: Request, res: Response) => {
   const args = req.body;
 
   try {
-    const result = await executeWorkflowService(orgId, args);
+    // base64 -> Buffer if file is present
+    const fileBuffer = args.file ? Buffer.from(args.file, 'base64') : undefined;
+
+    const result = await executeWorkflowService(orgId, {
+      ...args,
+      file: fileBuffer,
+    });
+
     res.status(200).json(result);
   } catch (err: any) {
     console.error('Error executing workflow:', err);
     res.status(500).json({ error: err.message || 'Failed to execute workflow' });
   }
 };
+
 
 
 export const buildWorkflow = async (req: Request, res: Response) => {
