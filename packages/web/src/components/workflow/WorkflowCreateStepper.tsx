@@ -1,13 +1,14 @@
 import { useConfig } from '@/src/app/config-context';
 import { useIntegrations } from '@/src/app/integrations-context';
+import { getAuthBadge } from '@/src/app/integrations/page';
 import { IntegrationForm } from '@/src/components/integrations/IntegrationForm';
 import { useToast } from '@/src/hooks/use-toast';
 import { inputErrorStyles, needsUIToTriggerDocFetch, parseCredentialsHelper } from '@/src/lib/client-utils';
-import { findMatchingIntegration, integrations as integrationTemplates } from '@/src/lib/integrations';
-import { cn, composeUrl } from '@/src/lib/utils';
+import { cn, composeUrl, getIntegrationIcon as getIntegrationIconName } from '@/src/lib/utils';
 import { Integration, IntegrationInput, SuperglueClient, UpsertMode, Workflow, WorkflowResult } from '@superglue/client';
+import { integrations as integrationTemplates } from "@superglue/shared";
 import { flattenAndNamespaceWorkflowCredentials, waitForIntegrationProcessing } from '@superglue/shared/utils';
-import { ArrowRight, Check, ChevronRight, FileText, Globe, Loader2, Pencil, Play, Plus, Workflow as WorkflowIcon, X } from 'lucide-react';
+import { ArrowRight, Check, ChevronRight, Clock, FileText, Globe, Key, Loader2, Pencil, Play, Plus, Workflow as WorkflowIcon, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
@@ -95,8 +96,8 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
 
   const [selectedIntegrationIds, setSelectedIntegrationIds] = useState<string[]>(() => {
     // Initialize with preselected integration if available
-    return preselectedIntegrationId && integrations.some(i => i.id === preselectedIntegrationId) 
-      ? [preselectedIntegrationId] 
+    return preselectedIntegrationId && integrations.some(i => i.id === preselectedIntegrationId)
+      ? [preselectedIntegrationId]
       : [];
   });
 
@@ -140,7 +141,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       setExecutionError(null);
       setActiveTab('results'); // Reset to default tab
     }
-    
+
     // Clear validation errors when leaving prompt step
     if (step !== 'prompt') {
       setValidationErrors({});
@@ -205,7 +206,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     return !!(integration.documentationUrl?.trim() && !pendingDocIds.has(integration.id));
   };
   // --- Integration Management (add/edit) ---
-  const handleIntegrationFormSave = async (integration: Integration) => {
+  const handleIntegrationFormSave = async (integration: Integration): Promise<Integration | null> => {
     // Close form immediately
     setShowIntegrationForm(false);
     setIntegrationFormEdit(null);
@@ -214,9 +215,9 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     try {
       const mode = integrationFormEdit ? UpsertMode.UPDATE : UpsertMode.CREATE;
       const savedIntegration = await client.upsertIntegration(integration.id, integration, mode);
-      const needsDocFetch = needsUIToTriggerDocFetch(savedIntegration, integrationFormEdit);
+      const willTriggerDocFetch = needsUIToTriggerDocFetch(savedIntegration, integrationFormEdit);
 
-      if (needsDocFetch) {
+      if (willTriggerDocFetch) {
         // Set pending state for new integrations with doc URLs
         setPendingDocIds(prev => new Set([...prev, savedIntegration.id]));
 
@@ -239,6 +240,8 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
 
       // Refresh integrations to ensure UI is updated
       await refreshIntegrations();
+
+      return savedIntegration;
     } catch (error) {
       console.error('Error saving integration:', error);
       toast({
@@ -246,6 +249,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         description: error instanceof Error ? error.message : 'Failed to save integration',
         variant: 'destructive',
       });
+      return null;
     }
   };
   const handleIntegrationFormCancel = () => {
@@ -286,9 +290,9 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       } catch {
         errors.payload = true;
       }
-      
+
       setValidationErrors(errors);
-      
+
       if (Object.keys(errors).length > 0) {
         toast({
           title: 'Validation Error',
@@ -320,13 +324,13 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
           .map(id => freshIntegrations.find(i => i.id === id))
           .filter(Boolean);
         const credentialsFromIntegrations = flattenAndNamespaceWorkflowCredentials(selectedIntegrations);
-        
+
         // Mask the credentials for display
         const maskedCredentials = Object.entries(credentialsFromIntegrations).reduce((acc, [key, _]) => {
           acc[key] = `<<${key}>>`;
           return acc;
         }, {} as Record<string, string>);
-        
+
         setReviewCredentials(JSON.stringify(maskedCredentials, null, 2));
 
         setStep(steps[currentIndex + 1]);
@@ -707,8 +711,8 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                           >
                             <div className="flex items-center gap-3 flex-1 min-w-0">
                               {(() => {
-                                const integration = findMatchingIntegration(sys.urlHost);
-                                const icon = integration?.integration.icon ? getSimpleIcon(integration.integration.icon) : null;
+                                const iconName = getIntegrationIconName(sys);
+                                const icon = iconName ? getSimpleIcon(iconName) : null;
                                 return icon ? (
                                   <svg
                                     width="20"
@@ -735,9 +739,21 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                                     pending={pendingDocIds.has(sys.id)}
                                     hasDocumentation={hasDocumentation(sys)}
                                   />
-                                  {(!sys.credentials || Object.keys(sys.credentials).length === 0) && (
-                                    <span className="text-xs text-amber-800 dark:text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded">No credentials</span>
-                                  )}
+                                  {(() => {
+                                    const badge = getAuthBadge(sys);
+                                    const colorClasses = {
+                                      blue: 'text-blue-800 dark:text-blue-300 bg-blue-500/10',
+                                      amber: 'text-amber-800 dark:text-amber-300 bg-amber-500/10',
+                                      green: 'text-green-800 dark:text-green-300 bg-green-500/10'
+                                    };
+
+                                    return (
+                                      <span className={`text-xs ${colorClasses[badge.color]} px-2 py-0.5 rounded flex items-center gap-1`}>
+                                        {badge.icon === 'clock' ? <Clock className="h-3 w-3" /> : <Key className="h-3 w-3" />}
+                                        {badge.label}
+                                      </span>
+                                    );
+                                  })()}
                                 </div>
                               </div>
                             </div>
@@ -809,7 +825,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                   <Textarea
                     id="instruction"
                     value={instruction}
-                    onChange={(e) => { 
+                    onChange={(e) => {
                       setInstruction(e.target.value);
                       if (e.target.value.trim()) {
                         setValidationErrors(prev => ({ ...prev, instruction: false }));
@@ -897,13 +913,13 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                 )}
                 {validationErrors.payload && (
                   <div className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5 bg-red-500/10 dark:bg-red-500/20 py-2 px-3 rounded-md mt-2">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="12" y1="8" x2="12" y2="12" />
-                    <line x1="12" y1="16" x2="12.01" y2="16" />
-                  </svg>
-                  <span>Invalid JSON format: Parse error</span>
-                </div>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" y1="8" x2="12" y2="12" />
+                      <line x1="12" y1="16" x2="12.01" y2="16" />
+                    </svg>
+                    <span>Invalid JSON format: Parse error</span>
+                  </div>
                 )}
               </div>
             </div>

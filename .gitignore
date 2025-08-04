@@ -13,7 +13,7 @@ diff.sh
 packages/web/public/test/*
 packages/core/.superglue/superglue_logs.json
 packages/core/.superglue/superglue_logs.jsonl
-
+scripts/migrate-redis-to-postgres.ts
 # Testing/evaluation artifacts
 **/.test-integration-data/
 **/test-reports/

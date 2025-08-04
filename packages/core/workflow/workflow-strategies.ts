@@ -1,7 +1,8 @@
 import type { ApiConfig, ExecutionStep, RequestOptions, WorkflowStepResult } from "@superglue/client";
 import { Integration, Metadata } from "@superglue/shared";
 import { server_defaults } from "../default.js";
-import { executeApiCall } from "../graphql/resolvers/call.js";
+import { IntegrationManager } from "../integrations/integration-manager.js";
+import { executeApiCall } from "../utils/api.js";
 import { logMessage } from "../utils/logs.js";
 import { applyJsonata, flattenObject, transformAndValidateSchema } from "../utils/tools.js";
 import { generateTransformCode } from "../utils/transform.js";
@@ -31,7 +32,7 @@ const directStrategy: ExecutionStrategy = {
     credentials: Record<string, string>,
     options: RequestOptions = {},
     metadata: Metadata,
-    integration?: Integration
+    integrationManager?: IntegrationManager
   ): Promise<WorkflowStepResult> {
     const result: WorkflowStepResult = {
       stepId: step.id,
@@ -39,14 +40,14 @@ const directStrategy: ExecutionStrategy = {
       config: step.apiConfig
     }
     try {
-      const apiResponse = await executeApiCall(
-        step.apiConfig,
+      const apiResponse = await executeApiCall({
+        endpoint: step.apiConfig,
         payload,
         credentials,
         options,
         metadata,
-        integration
-      );
+        integrationManager
+      });
       const transformedData = await applyJsonata(apiResponse.data, step.responseMapping); //LEGACY: New workflow strategy will not use respone mappings
 
       result.rawData = apiResponse.data;
@@ -73,7 +74,7 @@ const loopStrategy: ExecutionStrategy = {
     credentials: Record<string, string>,
     options: RequestOptions = {},
     metadata: Metadata,
-    integration?: Integration
+    integrationManager?: IntegrationManager
   ): Promise<WorkflowStepResult> {
     const result: WorkflowStepResult = {
       stepId: step.id,
@@ -147,17 +148,17 @@ The function should return an array of items that this step will iterate over.`;
         };
 
         try {
-          const apiResponse = await executeApiCall(
-            successfulConfig || step.apiConfig,
-            loopPayload,
+          const apiResponse = await executeApiCall({
+            endpoint: successfulConfig || step.apiConfig,
+            payload: loopPayload,
             credentials,
-            {
+            options: {
               ...options,
               testMode: false
             },
-            metadata,
-            integration
-          );
+            integrationManager, 
+            metadata
+          });
 
           // Store/update the successful configuration
           if (apiResponse.endpoint) {

@@ -146,7 +146,7 @@ async function startServer() {
   // Modified server startup
   await new Promise<void>((resolve) => httpServer.listen({ port: PORT }, resolve));
 
-  logMessage('info', `🚀 Superglue server ready at http://localhost:${PORT}/ and ws://localhost:${PORT}/`);
+  logMessage('info', `🚀 superglue server ready at http://localhost:${PORT}/ and ws://localhost:${PORT}/`);
 }
 
 startServer();

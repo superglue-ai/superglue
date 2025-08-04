@@ -1,6 +1,8 @@
-import { ExecutionStep, Integration, RequestOptions, Workflow, WorkflowResult, WorkflowStepResult } from "@superglue/client";
+import { ExecutionStep, RequestOptions, Workflow, WorkflowResult, WorkflowStepResult } from "@superglue/client";
 import { Metadata } from "@superglue/shared";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
+import { isSelfHealingEnabled } from "../graphql/types.js";
+import { IntegrationManager } from "../integrations/integration-manager.js";
 import { logMessage } from "../utils/logs.js";
 import { transformAndValidateSchema } from "../utils/tools.js";
 import { evaluateMapping, generateTransformCode } from "../utils/transform.js";
@@ -15,12 +17,12 @@ export class WorkflowExecutor implements Workflow {
   public metadata: Metadata;
   public instruction?: string;
   public inputSchema?: JSONSchema;
-  private integrations: Record<string, Integration>;
+  private integrations: Record<string, IntegrationManager>;
 
   constructor(
     workflow: Workflow,
     metadata: Metadata,
-    integrations: Integration[] = []
+    integrations: IntegrationManager[] = []
   ) {
     this.id = workflow.id;
     this.steps = workflow.steps;
@@ -32,7 +34,7 @@ export class WorkflowExecutor implements Workflow {
     this.integrations = integrations.reduce((acc, int) => {
       acc[int.id] = int;
       return acc;
-    }, {} as Record<string, Integration>);
+    }, {} as Record<string, IntegrationManager>);
     this.result = {
       id: crypto.randomUUID(),
       success: false,
@@ -69,14 +71,14 @@ export class WorkflowExecutor implements Workflow {
         try {
           const strategy = selectStrategy(step);
           const stepInputPayload = await this.prepareStepInput(step, payload);
-          const integration = step.integrationId ? this.integrations[step.integrationId] : undefined;
+          const integrationManager = step.integrationId ? this.integrations[step.integrationId] : undefined;
           stepResult = await strategy.execute(
             step,
             stepInputPayload,
             credentials,
             options || {},
             this.metadata,
-            integration
+            integrationManager
           );
           step.apiConfig = stepResult.config;
         } catch (stepError) {
@@ -144,6 +146,15 @@ export class WorkflowExecutor implements Workflow {
           this.result.error = undefined; // Clear any previous transform error
           this.result.success = true; // Ensure success is true if transform succeeds
         } catch (transformError) {
+          // Check if self-healing is enabled before regenerating
+          if (!isSelfHealingEnabled(options)) {
+            // If self-healing is disabled, fail with the original error
+            this.result.success = false;
+            this.result.error = transformError?.message || transformError;
+            this.result.completedAt = new Date();
+            return this.result;
+          }
+          
           logMessage("info", `Preparing new final transform`, this.metadata);
           const instruction = "Generate the final transformation code." +
             (this.instruction ? " with the following instruction: " + this.instruction : "") +

@@ -1,10 +1,10 @@
 # OAuth Integrations Guide
 
-This guide explains how to set up OAuth authentication for your integrations in Superglue.
+This guide explains how to set up OAuth authentication for your integrations in superglue.
 
 ## Overview
 
-Superglue supports OAuth 2.0 authentication for integrations, allowing secure access to APIs without storing passwords. OAuth provides:
+superglue supports OAuth 2.0 authentication for integrations, allowing secure access to APIs without storing passwords. OAuth provides:
 
 - Secure token-based authentication
 - Automatic token refresh (when refresh tokens are available)
@@ -18,7 +18,8 @@ Superglue supports OAuth 2.0 authentication for integrations, allowing secure ac
 First, create an OAuth application with your service provider:
 
 - **GitHub**: Settings → Developer settings → OAuth Apps
-- **Google**: [Google Cloud Console](https://console.cloud.google.com/) → APIs & Services → Credentials
+- **Google Ads**: [Google Cloud Console](https://console.cloud.google.com/) → APIs & Services → Credentials (see [detailed guide](/docs/guides/google-ads))
+- **Instagram/Meta**: [Meta for Developers](https://developers.facebook.com/) → Create App (see [detailed guide](/docs/guides/instagram-business))
 - **Slack**: [Your Apps](https://api.slack.com/apps) → Create New App → OAuth & Permissions
 - **HubSpot**: [App Dashboard](https://app.hubspot.com/apps) → Create app
 - **Stripe**: [Dashboard](https://dashboard.stripe.com/) → Connect → Settings
@@ -27,23 +28,30 @@ First, create an OAuth application with your service provider:
 
 When creating your OAuth app, you'll need to specify a redirect/callback URI. Use:
 
+For superglue cloud:
+```
+https://app.superglue.cloud/api/auth/callback
+```
+
+For self-hosted instances:
 ```
 https://your-domain.com/api/auth/callback
 ```
 
-Replace:
-- `your-domain.com` with your actual domain
-
-For local development, use:
+For local development:
 ```
 http://localhost:3000/api/auth/callback
 ```
 
-### 3. Create Integration in Superglue
+### 3. Create Integration in superglue
 
 1. Go to the Integrations page
 2. Click "Add Integration"
-3. Fill in the OAuth credentials:
+3. Fill in the basic configuration (ID, name, URL host)
+4. Select "OAuth" as the authentication type
+5. Provide your OAuth credentials:
+   - **Client ID**: From your OAuth app
+   - **Client Secret**: From your OAuth app
 
 ```json
 {
@@ -62,7 +70,7 @@ After saving the integration:
 1. The OAuth callback URL will be displayed
 2. Click "Connect with OAuth" to initiate the authentication flow
 3. Authorize the application on the provider's page
-4. You'll be redirected back to Superglue with tokens populated
+4. You'll be redirected back to superglue with tokens populated
 
 ## OAuth Credential Fields
 
@@ -78,20 +86,21 @@ After saving the integration:
 
 ## Supported Providers
 
-Superglue has built-in support for these OAuth providers:
+superglue has built-in support for these OAuth providers:
 
 - **GitHub**: `auth_url`: `https://github.com/login/oauth/authorize`
-- **Google**: `auth_url`: `https://accounts.google.com/o/oauth2/v2/auth`
+- **Google Ads**: `auth_url`: `https://accounts.google.com/o/oauth2/v2/auth` (see [setup guide](/docs/guides/google-ads))
+- **Instagram/Meta**: `auth_url`: `https://www.facebook.com/v23.0/dialog/oauth` (see [setup guide](/docs/guides/instagram-business))
 - **Microsoft**: `auth_url`: `https://login.microsoftonline.com/common/oauth2/v2.0/authorize`
 - **Slack**: `auth_url`: `https://slack.com/oauth/v2/authorize`
 - **HubSpot**: `auth_url`: `https://app.hubspot.com/oauth/authorize`
 - **Stripe**: `auth_url`: `https://connect.stripe.com/oauth/authorize`
 
-For other providers, specify the `auth_url` manually.
+For other providers, specify the `auth_url` manually in the Advanced Settings.
 
 ## Token Refresh
 
-Superglue automatically handles token refresh when:
+superglue automatically handles token refresh when:
 
 1. The provider supplies a `refresh_token`
 2. The `expires_at` timestamp indicates the token is expired or expiring soon
@@ -131,11 +140,11 @@ If tokens expire and refresh fails:
 
 1. Go to GitHub Settings → Developer settings → OAuth Apps → New OAuth App
 2. Fill in:
-   - Application name: "Superglue Integration"
-   - Homepage URL: Your Superglue instance URL
-   - Authorization callback URL: `https://your-domain.com/api/auth/callback`
+   - Application name: "superglue Integration"
+   - Homepage URL: Your superglue instance URL
+   - Authorization callback URL: `https://app.superglue.cloud/api/auth/callback`
 3. Create the app and copy the Client ID and Client Secret
-4. In Superglue, create a new integration:
+4. In superglue, create a new integration:
    - ID: `github`
    - URL Host: `https://api.github.com`
    - Credentials:
@@ -147,4 +156,11 @@ If tokens expire and refresh fails:
      ```
 5. Save and click "Connect with OAuth"
 6. Authorize the app on GitHub
-7. You're ready to use GitHub APIs in your workflows! 
+7. You're ready to use GitHub APIs in your workflows!
+
+## Detailed Integration Guides
+
+For complex OAuth setups with additional requirements, see our detailed guides:
+
+- [Google Ads Integration](/docs/guides/google-ads) - Includes test account setup and developer token configuration
+- [Instagram Business Integration](/docs/guides/instagram-business) - Covers Meta's app setup and Facebook page linking requirements 

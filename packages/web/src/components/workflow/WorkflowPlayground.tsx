@@ -155,13 +155,13 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
       }
       const flattenedCreds = flattenAndNamespaceWorkflowCredentials(relevantIntegrations);
       setIntegrationCredentials(flattenedCreds);
-      
+
       // Create masked credentials for display
       const maskedCreds = Object.entries(flattenedCreds).reduce((acc, [key, _]) => {
         acc[key] = `<<${key}>>`;
         return acc;
       }, {} as Record<string, string>);
-      
+
       constructFromInputSchemaWithCreds(inputSchemaStr, maskedCreds);
 
       toast({
@@ -225,7 +225,7 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
       acc[key] = `<<${key}>>`;
       return acc;
     }, {} as Record<string, string>);
-    
+
     constructFromInputSchemaWithCreds(schema, maskedCreds);
   };
 
@@ -401,6 +401,8 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
       }
 
       setResult(workflowResult);
+      setSteps(workflowResult.config.steps);
+      setFinalTransform(workflowResult.config.finalTransform);
     } catch (error) {
       console.error("Error executing workflow:", error);
       toast({

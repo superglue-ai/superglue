@@ -1,5 +1,4 @@
-import { ApiConfig, AuthType, HttpMethod, PaginationType } from '@superglue/client';
-import OpenAI from 'openai';
+import { ApiConfig, HttpMethod, PaginationType } from '@superglue/client';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mocked } from 'vitest';
 import { callEndpoint } from './api.js';
 import * as tools from './tools.js';
@@ -48,9 +47,9 @@ describe('API Utilities', () => {
       };
       mockedTools.callAxios.mockResolvedValueOnce(mockResponse);
 
-      const result = await callEndpoint(testEndpoint, testPayload, testCredentials, testOptions);
+      const result = await callEndpoint({endpoint: testEndpoint, payload: testPayload, credentials: testCredentials, options: testOptions});
 
-      expect(result).toEqual({ data: { result: 'success' } });
+      expect(result).toEqual({ data: { result: 'success' }, statusCode: 200, headers: {} });
     });
 
     it('should handle pagination', async () => {
@@ -71,7 +70,7 @@ describe('API Utilities', () => {
         .mockResolvedValueOnce(mockResponses[0])
         .mockResolvedValueOnce(mockResponses[1]);
 
-      const result = await callEndpoint(config, {}, {}, {});
+      const result = await callEndpoint({endpoint: config, payload: {}, credentials: {}, options: {}});
 
       expect(result.data).toHaveLength(3);
       expect(result.data).toEqual([{ id: 1 }, { id: 2 }, { id: 3 }]);
@@ -100,7 +99,7 @@ describe('API Utilities', () => {
         .mockResolvedValueOnce(mockResponses[0])
         .mockResolvedValueOnce(mockResponses[1]);
 
-      const result = await callEndpoint(config, {}, {}, {});
+      const result = await callEndpoint({endpoint: config, payload: {}, credentials: {}, options: {}});
 
       expect(result.data).toHaveLength(3);
       expect(mockedTools.callAxios).toHaveBeenNthCalledWith(
@@ -157,7 +156,7 @@ describe('API Utilities', () => {
         .mockResolvedValueOnce(mockResponses[0])
         .mockResolvedValueOnce(mockResponses[1]);
 
-      const result = await callEndpoint(config, {}, {}, {});
+      const result = await callEndpoint({endpoint: config, payload: {}, credentials: {}, options: {}});
 
       expect(result.data.results).toHaveLength(3);
       expect(result.data.next_cursor).toBeNull();
@@ -184,7 +183,7 @@ describe('API Utilities', () => {
         .mockResolvedValueOnce(sameResponse)
         .mockResolvedValueOnce(sameResponse); // Same data returned
 
-      const result = await callEndpoint(config, {}, {}, {});
+      const result = await callEndpoint({endpoint: config, payload: {}, credentials: {}, options: {}});
 
       expect(result.data).toHaveLength(2); // Should only include unique data
       expect(mockedTools.callAxios).toHaveBeenCalledTimes(2);
@@ -209,7 +208,7 @@ describe('API Utilities', () => {
       for (let i = 0; i < 505; i++) {
         mockedTools.callAxios.mockResolvedValueOnce({ ...mockResponse, data: [{ id: i }] });
       }
-      const result = await callEndpoint(config, {}, {}, {});
+      const result = await callEndpoint({endpoint: config, payload: {}, credentials: {}, options: {}});
       // Should stop at 500 iterations (as defined in the code)
       expect(mockedTools.callAxios).toHaveBeenCalledTimes(500);
     });
@@ -234,7 +233,7 @@ describe('API Utilities', () => {
 
       mockedTools.callAxios.mockResolvedValue(mockResponse);
 
-      const result = await callEndpoint(config, {}, {}, {});
+      const result = await callEndpoint({endpoint: config, payload: {}, credentials: {}, options: {}});
 
       // Should stop at 500 iterations (as defined in the code)
       expect(mockedTools.callAxios).toHaveBeenCalledTimes(2);
@@ -251,7 +250,7 @@ describe('API Utilities', () => {
       };
       mockedTools.callAxios.mockResolvedValueOnce(errorResponse);
 
-      await expect(callEndpoint(testEndpoint, {}, {}, {}))
+      await expect(callEndpoint({endpoint: testEndpoint, payload: {}, credentials: {}, options: {}}))
         .rejects.toThrow(/API call failed/);
     });
 
@@ -265,7 +264,7 @@ describe('API Utilities', () => {
       };
       mockedTools.callAxios.mockResolvedValueOnce(htmlResponse);
 
-      await expect(callEndpoint(testEndpoint, {}, {}, {}))
+      await expect(callEndpoint({endpoint: testEndpoint, payload: {}, credentials: {}, options: {}}))
         .rejects.toThrow(/Received HTML response/);
     });
 
@@ -288,7 +287,7 @@ describe('API Utilities', () => {
       };
       mockedTools.callAxios.mockResolvedValueOnce(mockResponse);
 
-      const result = await callEndpoint(config, {}, {}, {});
+      const result = await callEndpoint({endpoint: config, payload: {}, credentials: {}, options: {}});
 
       expect(result.data).toEqual([{ id: 1 }, { id: 2 }]);
     });
@@ -318,7 +317,7 @@ describe('API Utilities', () => {
       };
       mockedTools.callAxios.mockResolvedValueOnce(graphqlErrorResponse);
 
-      await expect(callEndpoint(config, {}, {}, {}))
+      await expect(callEndpoint({endpoint: config, payload: {}, credentials: {}, options: {}}))
         .rejects.toThrow(/API call failed*/);
     });
   });

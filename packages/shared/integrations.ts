@@ -134,18 +134,6 @@ export const integrations: Record<string, IntegrationConfig> = {
       scopes: "data.records:read data.records:write data.recordComments:read data.recordComments:write schema.bases:read schema.bases:write webhook:manage user.email:read"
     }
   },
-  google: {
-    apiUrl: "https://googleapis.com",
-    regex: "^(.*\\.)?google\\.com(/.*)?$",
-    icon: "google",
-    docsUrl: "https://developers.google.com/apis-explorer",
-    preferredAuthType: "oauth",
-    oauth: {
-      authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
-      tokenUrl: "https://oauth2.googleapis.com/token",
-      scopes: "https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid"
-    }
-  },
   gmail: {
     apiUrl: "https://gmail.googleapis.com/gmail/v1",
     regex: "^(.*\\.)?(gmail\\.googleapis\\.com|mail\\.google\\.com)(/.*)?$",
@@ -247,9 +235,14 @@ export const integrations: Record<string, IntegrationConfig> = {
     apiUrl: "https://firestore.googleapis.com",
     regex: "^(.*\\.)?(firebase\\.google\\.com|firebaseio\\.com|firestore\\.googleapis\\.com)(/.*)?$",
     icon: "firebase",
-    docsUrl: "https://firebase.google.com/docs/reference",
+    docsUrl: "https://firebase.google.com/docs/reference/firebase-management/rest",
     openApiUrl: "https://firestore.googleapis.com/$discovery/rest?version=v1",
-    preferredAuthType: "apikey"
+    preferredAuthType: "oauth",
+    oauth: {
+      authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
+      tokenUrl: "https://oauth2.googleapis.com/token",
+      scopes: "https://www.googleapis.com/auth/firebase https://www.googleapis.com/auth/datastore"
+    }
   },
   salesforce: {
     apiUrl: "https://api.salesforce.com",
@@ -276,15 +269,15 @@ export const integrations: Record<string, IntegrationConfig> = {
     }
   },
   instagram: {
-    apiUrl: "https://api.instagram.com",
+    apiUrl: "https://graph.facebook.com/v23.0/",
     regex: "^(.*\\.)?instagram\\.com(/.*)?$",
     icon: "instagram",
-    docsUrl: "https://developers.facebook.com/docs/instagram-api",
+    docsUrl: "https://developers.facebook.com/docs/graph-api/overview",
     preferredAuthType: "oauth",
     oauth: {
-      authUrl: "https://api.instagram.com/oauth/authorize",
-      tokenUrl: "https://api.instagram.com/oauth/access_token",
-      scopes: "user_profile user_media basic instagram_basic instagram_content_publish instagram_manage_comments instagram_manage_insights instagram_shopping_tag_products"
+      authUrl: "https://www.facebook.com/v23.0/dialog/oauth",
+      tokenUrl: "https://graph.facebook.com/v23.0/oauth/access_token",
+      scopes: "instagram_basic pages_show_list instagram_content_publish pages_read_engagement instagram_manage_comments instagram_manage_insights instagram_manage_messages business_management"
     }
   },
   twitter: {
@@ -951,6 +944,30 @@ export const integrations: Record<string, IntegrationConfig> = {
     openApiUrl: "https://raw.githubusercontent.com/resend/resend-openapi/main/resend.yaml",
     preferredAuthType: "apikey"
   },
+  googleAds: {
+    apiUrl: "https://googleads.googleapis.com/v20",
+    regex: "^(.*\\.)?googleapis\\.com(/.*)?$",
+    icon: "googleads",
+    docsUrl: "https://developers.google.com/google-ads/api/docs/concepts/overview",
+    preferredAuthType: "oauth",
+    oauth: {
+      authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
+      tokenUrl: "https://oauth2.googleapis.com/token",
+      scopes: "https://www.googleapis.com/auth/adwords https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid"
+    }
+  },
+  google: { // catch all google api
+    apiUrl: "https://googleapis.com",
+    regex: "^(.*\\.)?google\\.com(/.*)?$",
+    icon: "google",
+    docsUrl: "https://developers.google.com/apis-explorer",
+    preferredAuthType: "oauth",
+    oauth: {
+      authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
+      tokenUrl: "https://oauth2.googleapis.com/token",
+      scopes: "https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid"
+    }
+  },
 }
 
 /**
@@ -983,3 +1000,32 @@ export function findMatchingIntegration(url: string): { key: string; integration
 export function getOAuthConfig(integrationKey: string): IntegrationConfig['oauth'] | null {
   return integrations[integrationKey]?.oauth || null;
 }
+
+/**
+ * Get OAuth token URL for an integration
+ * @param integration - The integration object with credentials and URL info
+ * @returns The token URL for OAuth token exchange
+ */
+export function getOAuthTokenUrl(integration: { id: string; urlHost: string; credentials?: any }): string {
+  // First priority: User-provided token URL in credentials
+  if (integration.credentials?.token_url) {
+    return integration.credentials.token_url;
+  }
+
+  // Second priority: Known integration template token URL
+  const knownIntegration = Object.entries(integrations).find(([key]) =>
+    integration.id === key || integration.urlHost.includes(key)
+  );
+
+  if (knownIntegration) {
+    const [_, config] = knownIntegration;
+    if (config.oauth?.tokenUrl) {
+      return config.oauth.tokenUrl;
+    }
+  }
+
+  // Fallback: Default OAuth token endpoint
+  return `${integration.urlHost}/oauth/token`;
+}
+
+

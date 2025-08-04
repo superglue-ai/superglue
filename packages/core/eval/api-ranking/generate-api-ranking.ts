@@ -93,7 +93,7 @@ async function generateApiRanking(configPath?: string): Promise<void> {
                 workflow.integrationIds.includes(i.id)
             );
 
-            // Run Superglue evaluation
+            // Run superglue evaluation
             const runResult = await workflowRunner.runWorkflow(
                 workflow,
                 workflowIntegrations,
@@ -209,7 +209,7 @@ async function generateApiRanking(configPath?: string): Promise<void> {
 }
 
 /**
- * Calculate Average Score based on all success rates (Superglue + LLM models)
+ * Calculate Average Score based on all success rates (superglue + LLM models)
  */
 function calculateAverageScore(
     superglueSuccessRate: number,
@@ -240,7 +240,7 @@ async function generateRankingCsv(results: ApiRankingResult[], outputPath: strin
         'Rank',
         'API',
         'Average Score',
-        'Superglue Success %',
+        'superglue Success %',
         'Claude Sonnet 4',
         'Claude Opus 4',
         'GPT-4.1',
@@ -254,7 +254,7 @@ async function generateRankingCsv(results: ApiRankingResult[], outputPath: strin
             index + 1, // Rank
             result.api, // API name
             result.superglueScore.toFixed(2), // Score
-            `${(result.successRate * 100).toFixed(0)}%`, // Superglue Success %
+            `${(result.successRate * 100).toFixed(0)}%`, // superglue Success %
             `${(result.llmResults['claude-sonnet-4-20250514'] * 100).toFixed(0)}%`, // Claude Sonnet
             `${(result.llmResults['claude-opus-4-20250514'] * 100).toFixed(0)}%`, // Claude Opus
             `${(result.llmResults['gpt-4.1'] * 100).toFixed(0)}%`, // GPT-4.1

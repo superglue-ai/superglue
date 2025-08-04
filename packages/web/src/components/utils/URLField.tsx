@@ -2,9 +2,10 @@
 
 import { Badge } from '@/src/components/ui/badge';
 import { Input } from '@/src/components/ui/input';
-import { splitUrl } from '@/src/lib/client-utils';
-import { integrations } from '@/src/lib/integrations';
-import { cn } from '@/src/lib/utils';
+import { Popover, PopoverContent, PopoverTrigger } from '@/src/components/ui/popover';
+import { inputErrorStyles, splitUrl } from '@/src/lib/client-utils';
+import { integrations } from '@superglue/shared';
+import { cleanUrl, cn } from '@/src/lib/utils';
 import { Link } from 'lucide-react';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { SimpleIcon } from 'simple-icons';
@@ -50,7 +51,7 @@ export const URLField = forwardRef<URLFieldHandle, URLFieldProps>(function URLFi
     try {
       const urlObj = new URL(url)
       const fullPath = `${urlObj.hostname}${urlObj.pathname}`
-      
+
       for (const [name, integration] of Object.entries(integrations)) {
         const regex = new RegExp(integration.regex)
         if (regex.test(fullPath)) {
@@ -65,7 +66,7 @@ export const URLField = forwardRef<URLFieldHandle, URLFieldProps>(function URLFi
 
   const getSimpleIcon = (name: string): SimpleIcon | null => {
     if (!name) return null
-    
+
     // Convert service name to proper format for simple-icons
     const formatted = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase()
     const iconKey = `si${formatted}`
@@ -94,12 +95,12 @@ export const URLField = forwardRef<URLFieldHandle, URLFieldProps>(function URLFi
 
   const commitUrl = useCallback((rawUrl: string) => {
     let newUrl = rawUrl
-    
+
     if (newUrl && !newUrl.includes('://') && newUrl.includes('.')) {
       newUrl = `https://${newUrl}`
       setUrl(newUrl)
     }
-    
+
     setIconName(getIconForUrl(newUrl))
     const { urlHost, urlPath } = splitUrl(newUrl)
     const queryParams = extractQueryParams(newUrl)
@@ -122,7 +123,7 @@ export const URLField = forwardRef<URLFieldHandle, URLFieldProps>(function URLFi
     onUrlChange('', '', {})
   }, [onUrlChange])
 
-    useEffect(() => {
+  useEffect(() => {
     // Only update internal state when prop actually changes
     if (initialUrl !== previousUrlRef.current) {
       setUrl(initialUrl || '')
@@ -169,10 +170,10 @@ export const URLField = forwardRef<URLFieldHandle, URLFieldProps>(function URLFi
             <Badge variant="outline">
               {simpleIcon ? (
                 <div className="flex items-center">
-                  <svg 
-                    width="12" 
-                    height="12" 
-                    viewBox="0 0 24 24" 
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
                     fill={`#${simpleIcon.hex}`}
                     className="mr-1"
                   >

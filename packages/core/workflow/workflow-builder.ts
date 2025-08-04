@@ -211,6 +211,7 @@ Your finalTransform function MUST transform the collected data from all steps to
       id: builtWorkflow.id,
       steps: builtWorkflow.steps,
       integrationIds: Object.keys(this.integrations),
+      instruction: this.instruction,
       finalTransform: builtWorkflow.finalTransform,
       originalResponseSchema: builtWorkflow.originalResponseSchema,
       responseSchema: this.responseSchema,

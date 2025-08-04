@@ -224,7 +224,7 @@ Generate integration code for a specific workflow. Use this to show users how to
 
 ## Agent Workflow
 
-The recommended workflow for agents using the Superglue MCP server:
+The recommended workflow for agents using the superglue MCP server:
 
 1. **DISCOVER**: Use `superglue_find_relevant_integrations` to find available integrations for your task
 2. **BUILD & TEST**: Use `superglue_build_and_run` with instruction and integrations. Iterate until successful

@@ -525,7 +525,7 @@
                 "payload": {
                     "guild_id": "1389218511934722080",
                     "target_username": "michaelfuest_89135",
-                    "dm_message": "Hi! I just analyzed your Discord server and found the following channels. This is a test from the Superglue Discord integration bot!"
+                    "dm_message": "Hi! I just analyzed your Discord server and found the following channels. This is a test from the superglue Discord integration bot!"
                 },
                 "complexityLevel": "medium",
                 "category": "single-system",
@@ -548,12 +548,12 @@
             "notion-duplicate-email-analysis": {
                 "id": "notion-duplicate-email-analysis",
                 "name": "Notion Duplicate Email Analysis",
-                "instruction": "Query the Superglue Database in Notion to retrieve all records with email data, analyze the email column to identify duplicate email addresses, count the total number of duplicates, and return a list of the duplicate emails along with how many times each appears",
+                "instruction": "Query the superglue Database in Notion to retrieve all records with email data, analyze the email column to identify duplicate email addresses, count the total number of duplicates, and return a list of the duplicate emails along with how many times each appears",
                 "integrationIds": [
                     "notion"
                 ],
                 "payload": {
-                    "database_name": "Superglue Database"
+                    "database_name": "superglue Database"
                 },
                 "complexityLevel": "medium",
                 "category": "single-system",

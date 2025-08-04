@@ -1,14 +1,34 @@
 import { type ApiConfig, FileType, PaginationType, type RequestOptions } from "@superglue/client";
-import type { AxiosRequestConfig } from "axios";
+import type { AxiosRequestConfig, AxiosResponse } from "axios";
 import OpenAI from "openai";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { server_defaults } from "../default.js";
+import { isSelfHealingEnabled, Metadata } from "../graphql/types.js";
+import { IntegrationManager } from "../integrations/integration-manager.js";
 import { LanguageModel } from "../llm/llm.js";
 import { SELF_HEALING_API_AGENT_PROMPT } from "../llm/prompts.js";
 import { searchDocumentationToolDefinition, submitToolDefinition } from "../workflow/workflow-tools.js";
 import { parseFile } from "./file.js";
+import { logMessage } from "./logs.js";
 import { callPostgres } from "./postgres.js";
+import { telemetryClient } from "./telemetry.js";
 import { callAxios, composeUrl, evaluateStopCondition, generateId, maskCredentials, replaceVariables, sample } from "./tools.js";
+
+export class ApiCallError extends Error {
+  statusCode?: number;
+
+  constructor(message: string, statusCode?: number, ) {
+    super(message);
+    this.name = 'ApiCallError';
+    this.statusCode = statusCode;
+  }
+}
+export class AbortError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AbortError';
+  }
+}
 
 export function convertBasicAuthToBase64(headerValue: string) {
   if (!headerValue) return headerValue;
@@ -25,7 +45,7 @@ export function convertBasicAuthToBase64(headerValue: string) {
   return headerValue;
 }
 
-export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions): Promise<{ data: any; }> {
+export async function callEndpoint({endpoint, payload, credentials, options}: {endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions}): Promise<{ data: any; statusCode: number; headers: Record<string, any>; }> {
   const allVariables = { ...payload, ...credentials };
 
   let allResults = [];
@@ -38,7 +58,7 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
   let previousResponseHash: string | null = null;
   let firstResponseHash: string | null = null;
   let hasValidData = false;
-
+  let lastResponse: AxiosResponse = null;
   const hasStopCondition = endpoint.pagination && (endpoint.pagination as any).stopCondition;
   const maxRequests = hasStopCondition ? server_defaults.MAX_PAGINATION_REQUESTS : 500;
 
@@ -95,7 +115,7 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
         urlPath: processedUrlPath,
         body: processedBody
       };
-      return { data: await callPostgres(postgresEndpoint, payload, credentials, options) };
+      return { data: await callPostgres(postgresEndpoint, payload, credentials, options), statusCode: 200, headers: {} };
     }
 
     const processedUrl = composeUrl(processedUrlHost, processedUrlPath);
@@ -109,42 +129,43 @@ export async function callEndpoint(endpoint: ApiConfig, payload: Record<string, 
       timeout: options?.timeout || 60000,
     };
 
-    const response = await callAxios(axiosConfig, options);
+    lastResponse = await callAxios(axiosConfig, options);
 
-    if (![200, 201, 202, 203, 204, 205].includes(response?.status) ||
-      response.data?.error ||
-      (Array.isArray(response?.data?.errors) && response?.data?.errors.length > 0)
+    if (![200, 201, 202, 203, 204, 205].includes(lastResponse?.status) ||
+      lastResponse.data?.error ||
+      (Array.isArray(lastResponse?.data?.errors) && lastResponse?.data?.errors.length > 0)
     ) {
-      const error = JSON.stringify(response?.data?.error || response.data?.errors || response?.data || response?.statusText || "undefined");
+      const error = JSON.stringify(lastResponse?.data?.error || lastResponse.data?.errors || lastResponse?.data || lastResponse?.statusText || "undefined");
       const maskedConfig = maskCredentials(JSON.stringify(axiosConfig));
-      let message = `${endpoint.method} ${processedUrl} failed with status ${response.status}.
+      let message = `${endpoint.method} ${processedUrl} failed with status ${lastResponse.status}.
 Response: ${String(error).slice(0, 1000)}
 config: ${maskedConfig}`;
 
-      if (response.status === 429) {
-        const retryAfter = response.headers['retry-after']
-          ? `Retry-After: ${response.headers['retry-after']}`
+      if (lastResponse.status === 429) {
+        const retryAfter = lastResponse.headers['retry-after']
+          ? `Retry-After: ${lastResponse.headers['retry-after']}`
           : 'No Retry-After header provided';
         message = `Rate limit exceeded. ${retryAfter}. Maximum wait time of 60s exceeded. 
         
         ${message}`;
       }
 
-      throw new Error(`API call failed with status ${response.status}. Response: ${message}`);
+      throw new ApiCallError(`API call failed with status ${lastResponse.status}. Response: ${message}`, lastResponse.status);
     }
-    if (typeof response.data === 'string' &&
-      (response.data.slice(0, 100).trim().toLowerCase().startsWith('<!doctype html') ||
-        response.data.slice(0, 100).trim().toLowerCase().startsWith('<html'))) {
+    
+    if (typeof lastResponse.data === 'string' &&
+      (lastResponse.data.slice(0, 100).trim().toLowerCase().startsWith('<!doctype html') ||
+        lastResponse.data.slice(0, 100).trim().toLowerCase().startsWith('<html'))) {
       const maskedUrl = maskCredentials(processedUrl, { ...credentials, ...payload });
-      throw new Error(`Received HTML response instead of expected JSON data from ${maskedUrl}. 
-        This usually indicates an error page or invalid endpoint.\nResponse: ${response.data.slice(0, 2000)}`);
+      throw new ApiCallError(`Received HTML response instead of expected JSON data from ${maskedUrl}. 
+        This usually indicates an error page or invalid endpoint.\nResponse: ${lastResponse.data.slice(0, 2000)}`, lastResponse.status);
     }
 
     let dataPathSuccess = true;
 
     // TODO: we need to remove the data path and just join the data with the next page of data, otherwise we will have to do a lot of gymnastics to get the data path right
 
-    let responseData = response.data;
+    let responseData = lastResponse.data;
 
     if (responseData && typeof responseData === 'string') {
       responseData = await parseFile(Buffer.from(responseData), FileType.AUTO);
@@ -207,7 +228,7 @@ config: ${maskedConfig}`;
 
         const stopEval = await evaluateStopCondition(
           (endpoint.pagination as any).stopCondition,
-          response.data,
+          lastResponse.data,
           pageInfo
         );
 
@@ -255,7 +276,7 @@ config: ${maskedConfig}`;
       offset += parseInt(endpoint.pagination?.pageSize || "50");
     } else if (endpoint.pagination?.type === PaginationType.CURSOR_BASED) {
       const cursorParts = (endpoint.pagination?.cursorPath || 'next_cursor').split('.');
-      let nextCursor = response.data;
+      let nextCursor = lastResponse.data;
       for (const part of cursorParts) {
         nextCursor = nextCursor?.[part];
       }
@@ -272,25 +293,37 @@ config: ${maskedConfig}`;
       data: {
         next_cursor: cursor,
         ...(Array.isArray(allResults) ? { results: allResults } : allResults)
-      }
+      },
+      statusCode: lastResponse.status,
+      headers: lastResponse.headers
     };
   }
 
   return {
-    data: allResults?.length === 1 ? allResults[0] : allResults
+    data: allResults?.length === 1 ? allResults[0] : allResults,
+    statusCode: lastResponse.status,
+    headers: lastResponse.headers
   };
 }
 
-export async function generateApiConfig(
+export async function generateApiConfig({
+  apiConfig,
+  payload,
+  credentials,
+  retryCount,
+  messages,
+  integrationManager,
+}: {
   apiConfig: Partial<ApiConfig>,
-  documentation: string,
   payload: Record<string, any>,
   credentials: Record<string, any>,
-  retryCount = 0,
-  messages: OpenAI.Chat.ChatCompletionMessageParam[] = [],
-  context?: any
-): Promise<{ config: ApiConfig; messages: OpenAI.Chat.ChatCompletionMessageParam[]; }> {
-
+  retryCount?: number,
+  messages?: OpenAI.Chat.ChatCompletionMessageParam[],
+  integrationManager: IntegrationManager,
+}): Promise<{ config: ApiConfig; messages: OpenAI.Chat.ChatCompletionMessageParam[]; }> {
+  if(!retryCount) retryCount = 0;
+  if(!messages) messages = [];
+  
   if (messages.length === 0) {
     const userPrompt = `Generate API configuration for the following:
 
@@ -310,8 +343,12 @@ ${apiConfig.pagination ? `Pagination: ${JSON.stringify(apiConfig.pagination)}` :
 ${apiConfig.method ? `Method: ${apiConfig.method}` : ''}
 </user_provided_information>
 
+<integration_instructions>
+${integrationManager?.specificInstructions}
+</integration_instructions>
+
 <documentation>
-${documentation}
+${await integrationManager?.searchDocumentation(apiConfig.instruction)}
 </documentation>
 
 <available_credentials>
@@ -338,8 +375,12 @@ ${JSON.stringify(sample(payload || {}, 5)).slice(0, LanguageModel.contextLength 
     submitToolDefinition.arguments,
     temperature,
     [searchDocumentationToolDefinition],
-    context
+    { integration: await integrationManager?.toIntegration() }
   );
+
+  if(generatedConfig?.error) {
+    throw new AbortError(generatedConfig.error);
+  }
 
   return {
     config: {
@@ -364,12 +405,17 @@ ${JSON.stringify(sample(payload || {}, 5)).slice(0, LanguageModel.contextLength 
   };
 }
 
-export async function evaluateResponse(
+export async function evaluateResponse({
+  data,
+  responseSchema,
+  instruction,
+  documentation
+}: {
   data: any,
-  responseSchema: JSONSchema,
+  responseSchema?: JSONSchema,
   instruction: string,
   documentation?: string
-): Promise<{ success: boolean, refactorNeeded: boolean, shortReason: string; }> {
+}): Promise<{ success: boolean, refactorNeeded: boolean, shortReason: string; }> {
   let content = JSON.stringify(data);
   if (content.length > LanguageModel.contextLength / 2) {
     content = JSON.stringify(sample(data, 10)) + "\n\n...truncated...";
@@ -420,4 +466,103 @@ Instruction: ${instruction}${documentationContext}`
     0
   );
   return response.response;
+}
+
+export async function executeApiCall({
+  endpoint,
+  payload,
+  credentials,
+  integrationManager,
+  options,
+  metadata,
+  }: {
+  endpoint: ApiConfig,
+  payload: any,
+  credentials: Record<string, string>,
+  integrationManager: IntegrationManager,
+  options: RequestOptions,
+  metadata: Metadata,
+}): Promise<{
+  data: any;
+  endpoint: ApiConfig;
+  statusCode: number;
+  headers: Record<string, any>;
+}> {
+  let response: any = null;
+  let retryCount = 0;
+  let lastError: string | null = null;
+  let messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
+  let success = false;
+  let isSelfHealing = isSelfHealingEnabled(options);
+
+
+  do {
+    try {
+      if (retryCount > 0 && isSelfHealing) {
+        logMessage('info', `Generating API config for ${endpoint?.urlHost}${retryCount > 0 ? ` (${retryCount})` : ""}`, metadata);
+        const computedApiCallConfig = await generateApiConfig({
+          apiConfig: endpoint,
+          payload,
+          credentials,
+          retryCount,
+          messages,
+          integrationManager
+        });
+        if (!computedApiCallConfig) {
+          throw new Error("No API config generated");
+        }
+        endpoint = computedApiCallConfig.config;
+        messages = computedApiCallConfig.messages;
+      }
+
+      response = await callEndpoint({endpoint, payload, credentials, options});
+
+      if (!response.data) {
+        throw new Error("No data returned from API. This could be due to a configuration error.");
+      }
+
+      // Check if response is valid
+      if (retryCount > 0 && isSelfHealing) {
+        const result = await evaluateResponse({
+          data: response.data,
+          responseSchema: endpoint.responseSchema,
+          instruction: endpoint.instruction,
+          documentation: await integrationManager?.searchDocumentation(endpoint.instruction)
+        });
+        success = result.success;
+        if (!result.success) throw new Error(result.shortReason + " " + JSON.stringify(response.data).slice(0, 1000));
+      }
+      else {
+        success = true;
+      }
+      break;
+    }
+    catch (error) {
+      const rawErrorString = error?.message || JSON.stringify(error || {});
+      lastError = maskCredentials(rawErrorString, credentials).slice(0, 1000);
+      if(retryCount > 0) {
+        messages.push({ role: "user", content: `There was an error with the configuration, please fix: ${rawErrorString.slice(0, 2000)}` });
+        logMessage('warn', `API call failed. ${lastError}`, metadata);
+      }
+
+      // hack to get the status code from the error
+      if (!response?.statusCode) {
+        response = response || {};
+        response.statusCode = error instanceof ApiCallError ? error.statusCode : 500;
+      }
+      if(error instanceof AbortError) {
+        break;
+      }
+    }
+    retryCount++;
+  } while (retryCount < (options?.retries !== undefined ? options.retries : server_defaults.MAX_CALL_RETRIES));
+  if (!success) {
+    telemetryClient?.captureException(new Error(`API call failed after ${retryCount} retries. Last error: ${lastError}`), metadata.orgId, {
+      endpoint: endpoint,
+      retryCount: retryCount,
+    });
+    throw new ApiCallError(`API call failed after ${retryCount} retries. Last error: ${lastError}`, response?.statusCode);
+  }
+
+  return { data: response?.data, endpoint, statusCode: response?.statusCode, headers: response?.headers };
 }

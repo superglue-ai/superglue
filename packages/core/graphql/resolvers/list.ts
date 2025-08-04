@@ -1,5 +1,5 @@
-import { Context } from "@superglue/shared";
-import { GraphQLResolveInfo } from "graphql";
+import { GraphQLResolveInfo } from 'graphql';
+import { Context } from '../types.js';
 
 export const listApisResolver = async (
   _: any,
@@ -7,7 +7,7 @@ export const listApisResolver = async (
   context: Context,
   info: GraphQLResolveInfo
 ) => {
-  const result = await context.datastore.listApiConfigs(limit, offset, context.orgId);
+  const result = await context.datastore.listApiConfigs({ limit, offset, orgId: context.orgId });
   return result;
 };
 
@@ -17,7 +17,7 @@ export const listTransformsResolver = async (
   context: Context,
   info: GraphQLResolveInfo
 ) => {
-  const result = await context.datastore.listTransformConfigs(limit, offset, context.orgId);
+  const result = await context.datastore.listTransformConfigs({ limit, offset, orgId: context.orgId });
   return result;
 };
 
@@ -27,7 +27,7 @@ export const listExtractsResolver = async (
   context: Context,
   info: GraphQLResolveInfo
 ) => {
-  const result = await context.datastore.listExtractConfigs(limit, offset, context.orgId);
+  const result = await context.datastore.listExtractConfigs({ limit, offset, orgId: context.orgId });
   return result;
 };
 
@@ -37,6 +37,6 @@ export const listRunsResolver = async (
   context: Context,
   info: GraphQLResolveInfo
 ) => {
-  const result = await context.datastore.listRuns(limit, offset, configId, context.orgId);
+  const result = await context.datastore.listRuns({ limit, offset, configId, orgId: context.orgId });
   return result;
 };

@@ -1,11 +1,12 @@
 import { HttpMethod, RequestOptions } from "@superglue/client";
-import axios, { AxiosRequestConfig } from "axios";
+import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
 import { GraphQLResolveInfo } from "graphql";
 import ivm from 'isolated-vm';
 import jsonata from "jsonata";
 import { Validator } from "jsonschema";
 import { toJsonSchema } from "../external/json-schema.js";
 import { HttpMethodEnum } from "../mcp/mcp-server.js";
+import { ApiCallError } from "./api.js";
 import { injectVMHelpersIndividually } from "./vm-helpers.js";
 
 export function isRequested(field: string, info: GraphQLResolveInfo) {
@@ -223,15 +224,18 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
     config.data = undefined;
   }
   else if (config.data && config.data.trim().startsWith("{")) {
-    config.data = JSON.parse(config.data);
+    try {
+      config.data = JSON.parse(config.data);
+    } catch (error) { }
   }
   else if (!config.data) {
     config.data = undefined;
   }
 
   do {
+    let response: AxiosResponse | null = null;
     try {
-      const response = await axios({
+      response = await axios({
         ...config,
         validateStatus: null, // Don't throw on any status
       });
@@ -267,7 +271,7 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
 
       return response;
     } catch (error) {
-      if (retryCount >= maxRetries) throw error;
+      if (retryCount >= maxRetries) throw new ApiCallError(error.message, response?.status);
       retryCount++;
       await new Promise(resolve => setTimeout(resolve, delay * retryCount));
     }

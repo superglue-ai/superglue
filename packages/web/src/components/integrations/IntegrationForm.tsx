@@ -1,6 +1,8 @@
 import { useConfig } from '@/src/app/config-context';
+import { detectAuthType } from '@/src/app/integrations/page';
+import { Badge } from '@/src/components/ui/badge';
 import { Button } from '@/src/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/src/components/ui/command';
 import { Input } from '@/src/components/ui/input';
 import { Label } from '@/src/components/ui/label';
@@ -14,14 +16,14 @@ import { URLField } from '@/src/components/utils/URLField';
 import { useToast } from '@/src/hooks/use-toast';
 import { cn, composeUrl } from '@/src/lib/utils';
 import type { Integration } from '@superglue/client';
-import { SuperglueClient } from '@superglue/client';
+
 import { getOAuthConfig, integrations } from '@superglue/shared';
-import { Check, ChevronRight, ChevronsUpDown, Copy, Globe, Key } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Check, ChevronRight, ChevronsUpDown, Copy, Globe, Link } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 
 export interface IntegrationFormProps {
     integration?: Integration;
-    onSave: (integration: Integration) => void | Promise<void>;
+    onSave: (integration: Integration) => Promise<Integration | null>;
     onCancel: () => void;
     integrationOptions: { value: string; label: string; icon: string }[];
     getSimpleIcon: (name: string) => any;
@@ -32,13 +34,13 @@ export interface IntegrationFormProps {
 function sanitizeIntegrationId(id: string) {
     // Remove protocol if present
     let cleanId = id.replace(/^.*:\/\//, '');
-    
+
     // Take everything before the first slash
     const slashIndex = cleanId.indexOf('/');
     if (slashIndex !== -1) {
         cleanId = cleanId.substring(0, slashIndex);
     }
-    
+
     // Clean up and return
     return cleanId
         .toLowerCase()
@@ -70,26 +72,14 @@ export function IntegrationForm({
     const [documentationUrl, setDocumentationUrl] = useState(integration?.documentationUrl || '');
     const [documentation, setDocumentation] = useState(integration?.documentation || '');
     const [specificInstructions, setSpecificInstructions] = useState(integration?.specificInstructions || '');
-    
+
     // Add state to track if user manually edited the ID
     const [isIdManuallyEdited, setIsIdManuallyEdited] = useState(false);
-    
-    const detectAuthType = (creds: any) => {
-        if(!integration) return 'apikey';
-        if (!creds || Object.keys(creds).length === 0) return 'none'; // Changed from 'none' to 'apikey'
-        if (creds.client_id || creds.client_secret || creds.access_token || creds.refresh_token) return 'oauth';
-        return 'apikey';
-    };
-    
-    const [authType, setAuthType] = useState<'none' | 'oauth' | 'apikey'>(() => {
-        try {
-            const creds = integration?.credentials || {};
-            return detectAuthType(creds);
-        } catch {
-            return 'apikey'; // Changed from 'none' to 'apikey'
-        }
-    });
-    
+
+    // Initialize auth type
+    const initialAuthType = !integration ? 'apikey' : detectAuthType(integration.credentials || {});
+    const [authType, setAuthType] = useState<'none' | 'oauth' | 'apikey'>(initialAuthType);
+
     // Initialize OAuth fields
     const [oauthFields, setOauthFields] = useState(() => {
         const creds = integration?.credentials || {};
@@ -101,14 +91,20 @@ export function IntegrationForm({
             access_token: creds.access_token || '',
             refresh_token: creds.refresh_token || '',
             scopes: creds.scopes || '',
-            expires_at: creds.expires_at || ''
+            expires_at: creds.expires_at || '',
+            token_type: creds.token_type || 'Bearer'
         };
     });
-    
+
     // Initialize API key credentials as JSON string for CredentialsManager
     const [apiKeyCredentials, setApiKeyCredentials] = useState(() => {
         const creds = integration?.credentials || {};
-        return JSON.stringify(creds, null, 2);
+        // For OAuth integrations, only include non-OAuth fields in the additional credentials
+        if (initialAuthType === 'oauth' && integration) {
+            const { client_id, client_secret, auth_url, token_url, access_token, refresh_token, scopes, expires_at, ...additionalCreds } = creds;
+            return Object.keys(additionalCreds).length > 0 ? JSON.stringify(additionalCreds, null, 2) : '{}';
+        }
+        return Object.keys(creds).length > 0 ? JSON.stringify(creds, null, 2) : '{}';
     });
 
     const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
@@ -117,15 +113,12 @@ export function IntegrationForm({
         // Check if existing integration has file upload
         integration?.documentationUrl?.startsWith('file://') || false
     );
+
     const urlFieldRef = useRef<any>(null);
     const isEditing = !!integration;
     const config = useConfig();
     const { toast } = useToast();
 
-    const client = useMemo(() => new SuperglueClient({
-        endpoint: config.superglueEndpoint,
-        apiKey: config.superglueApiKey,
-    }), [config.superglueEndpoint, config.superglueApiKey]);
 
     // Pre-fill OAuth URLs when auth type changes to OAuth
     useEffect(() => {
@@ -197,11 +190,11 @@ export function IntegrationForm({
             if (!isEditing) {
                 setId(value);
             }
-            
+
             if (integrationTemplate.preferredAuthType) {
                 setAuthType(integrationTemplate.preferredAuthType);
             }
-            
+
             // Pre-fill OAuth URLs if OAuth is available and selected
             if (integrationTemplate.oauth) {
                 // Only pre-fill OAuth URLs if user has OAuth selected
@@ -220,7 +213,7 @@ export function IntegrationForm({
     const handleUrlChange = (host: string, path: string) => {
         setUrlHost(host);
         setUrlPath(path);
-        
+
         // Auto-update ID when URL changes (only for new integrations and if not manually edited)
         if (!isEditing && !isIdManuallyEdited) {
             const fullUrl = composeUrl(host, path);
@@ -238,19 +231,33 @@ export function IntegrationForm({
         if (!id.trim()) errors.id = true;
         if (!urlHost.trim()) errors.urlHost = true;
         if (specificInstructions.length > 2000) errors.specificInstructions = true;
-        setValidationErrors(errors);
-        if (Object.keys(errors).length > 0) return;
-        
+
         let creds = {};
-        
+
         // Build credentials based on auth type
         if (authType === 'oauth') {
-            creds = Object.fromEntries(
+            // Validate OAuth required fields
+            if (!oauthFields.client_id) errors.client_id = true;
+            if (!oauthFields.client_secret) errors.client_secret = true;
+
+            // Start with OAuth fields
+            const oauthCreds = Object.fromEntries(
                 Object.entries({
                     ...oauthFields,
                     scopes: oauthFields.scopes || integrations[selectedIntegration]?.oauth?.scopes || ''
                 }).filter(([_, value]) => value !== '')
             );
+
+            // Parse and merge additional credentials if provided
+            let additionalCreds = {};
+            try {
+                additionalCreds = JSON.parse(apiKeyCredentials);
+            } catch {
+                // If parsing fails, just use OAuth credentials
+            }
+
+            // Merge OAuth and additional credentials
+            creds = { ...oauthCreds, ...additionalCreds };
         } else if (authType === 'apikey') {
             try {
                 creds = JSON.parse(apiKeyCredentials);
@@ -259,8 +266,9 @@ export function IntegrationForm({
                 return;
             }
         }
-        
-        setValidationErrors({});
+
+        setValidationErrors(errors);
+        if (Object.keys(errors).length > 0) return;
 
         // Create the integration object
         const integrationData = {
@@ -272,8 +280,40 @@ export function IntegrationForm({
             specificInstructions: specificInstructions.trim(),
             credentials: creds,
         };
-        console.log('integrationData', integrationData)
-        onSave(integrationData);
+
+        try {
+            // Save the integration first and get the resolved integration ID back from backend
+            const savedIntegration = await onSave(integrationData);
+
+            if (!savedIntegration) {
+                toast({
+                    title: 'Error',
+                    description: 'Failed to save integration',
+                    variant: 'destructive',
+                });
+                return;
+            }
+
+            // If OAuth and not already configured, trigger OAuth flow using the resolved integration ID
+            if (authType === 'oauth' && (!oauthFields.access_token || !oauthFields.refresh_token)) {
+                const authUrl = buildOAuthUrlForIntegration(savedIntegration.id);
+                if (authUrl) {
+                    const width = 600;
+                    const height = 700;
+                    const left = (window.screen.width - width) / 2;
+                    const top = (window.screen.height - height) / 2;
+
+                    const popup = window.open(
+                        authUrl,
+                        'oauth_popup',
+                        `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
+                    );
+                }
+            }
+        } catch (error) {
+            // Error handling is done in the parent component
+            console.error('Error in form submission:', error);
+        }
     };
 
     // Generate OAuth callback URL
@@ -302,35 +342,35 @@ export function IntegrationForm({
     };
 
     // Helper to build OAuth authorization URL
-    const buildOAuthUrl = () => {
+    const buildOAuthUrlForIntegration = (integrationId: string) => {
         try {
             const { client_id, scopes } = oauthFields;
-            
+
             if (!client_id) return null;
 
-            const integrationId = isEditing ? integration!.id : id.trim();
             const redirectUri = getOAuthCallbackUrl();
-            
+
             // Get auth URL from OAuth fields or known providers
             let authUrl = oauthFields.auth_url;
             let defaultScopes = '';
-            
+
             if (!authUrl) {
                 const oauthConfig = getOAuthConfig(integrationId) || getOAuthConfig(selectedIntegration);
                 authUrl = oauthConfig?.authUrl;
                 defaultScopes = oauthConfig?.scopes || '';
             }
-            
+
             if (!authUrl) return null;
 
             const params = new URLSearchParams({
                 client_id,
                 redirect_uri: redirectUri,
                 response_type: 'code',
-                state: btoa(JSON.stringify({ 
-                    integrationId,  // This is the key part
+                state: btoa(JSON.stringify({
+                    integrationId,
                     timestamp: Date.now(),
-                    apiKey: config.superglueApiKey 
+                    apiKey: config.superglueApiKey,
+                    redirectUri,
                 })),
             });
 
@@ -352,12 +392,27 @@ export function IntegrationForm({
         }
     };
 
+    // Legacy function that uses the form's current ID (for backward compatibility)
+    const buildOAuthUrl = () => {
+        const integrationId = isEditing ? integration!.id : id.trim();
+        return buildOAuthUrlForIntegration(integrationId);
+    };
+
     return (
-        <Card className={modal ? "border-0 shadow-none bg-background" : "mt-4 border-primary/50"}>
-            <CardHeader className={modal ? "p-6 pb-0 border-0" : "py-3 px-4"}>
+        <Card className={cn(
+            modal ? "border-0 shadow-none bg-background" : "mt-4 border-primary/50",
+            "flex flex-col max-h-[calc(100vh-200px)]"
+        )}>
+            <CardHeader className={cn(
+                modal ? "p-6 pb-0 border-0" : "py-3 px-4",
+                "flex-shrink-0"
+            )}>
                 <CardTitle className="text-lg">{integration ? 'Edit Integration' : 'Add New Integration'}</CardTitle>
             </CardHeader>
-            <CardContent className={modal ? "p-6 space-y-3 border-0" : "p-4 space-y-3"}>
+            <CardContent className={cn(
+                modal ? "p-6 space-y-3 border-0" : "p-4 space-y-3",
+                "flex-1 overflow-y-auto"
+            )}>
                 <div>
                     <Label htmlFor="integrationSelect">From Template</Label>
                     <HelpTooltip text="Select from known integrations or choose No Template for any other API." />
@@ -484,9 +539,9 @@ export function IntegrationForm({
                                 text="Choose how to authenticate with this API. OAuth is recommended for supported services."
                             />
                         </Label>
-                        <Select 
+                        <Select
                             key={authType}
-                            value={authType} 
+                            value={authType}
                             onValueChange={(value: 'apikey' | 'oauth' | 'none') => setAuthType(value)}
                         >
                             <SelectTrigger className="w-full">
@@ -511,9 +566,9 @@ export function IntegrationForm({
                                             <span className="text-green-600 text-xs font-normal">Successfully configured</span>
                                         </>
                                     )}
-                                </div>                                
+                                </div>
                             </div>
-                            
+
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <Label htmlFor="client_id" className="text-xs flex items-center gap-1">
@@ -525,7 +580,7 @@ export function IntegrationForm({
                                         value={oauthFields.client_id}
                                         onChange={e => setOauthFields(prev => ({ ...prev, client_id: e.target.value }))}
                                         placeholder="Your OAuth app client ID"
-                                        className="h-9"
+                                        className={cn("h-9", validationErrors.client_id && inputErrorStyles)}
                                         autoComplete="off"
                                     />
                                 </div>
@@ -540,12 +595,12 @@ export function IntegrationForm({
                                         value={oauthFields.client_secret}
                                         onChange={e => setOauthFields(prev => ({ ...prev, client_secret: e.target.value }))}
                                         placeholder="Your OAuth app client secret"
-                                        className="h-9"
+                                        className={cn("h-9", validationErrors.client_secret && inputErrorStyles)}
                                         autoComplete="new-password"
                                     />
                                 </div>
                             </div>
-                            
+
                             <div className="border-t pt-3">
                                 <Label className="text-xs flex items-center gap-1">
                                     Redirect URI
@@ -566,74 +621,11 @@ export function IntegrationForm({
                                     </Button>
                                 </div>
                             </div>
-                            
-                            {oauthFields.client_id && oauthFields.client_secret && (buildOAuthUrl() !== null) && (
-                                <Button
-                                    type="button"
-                                    variant={oauthFields.access_token && oauthFields.refresh_token ? "outline" : "default"}
-                                    size="sm"
-                                    className="w-full"
-                                    onClick={async () => {
-                                        // First save/upsert the integration
-                                        const errors: Record<string, boolean> = {};
-                                        if (!id.trim()) errors.id = true;
-                                        if (!urlHost.trim()) errors.urlHost = true;
-                                        if (specificInstructions.length > 2000) errors.specificInstructions = true;
-                                        
-                                        if (Object.keys(errors).length > 0) {
-                                            setValidationErrors(errors);
-                                            toast({
-                                                title: 'Validation Error',
-                                                description: 'Please fill in all required fields before connecting OAuth',
-                                                variant: 'destructive',
-                                            });
-                                            return;
-                                        }
-                                        
-                                        // Build credentials
-                                        const creds = Object.fromEntries(
-                                            Object.entries({
-                                                ...oauthFields,
-                                                scopes: oauthFields.scopes || integrations[selectedIntegration]?.oauth?.scopes || ''
-                                            }).filter(([_, value]) => value !== '')
-                                        );
-                                        
-                                        // Create integration data
-                                        const integrationData = {
-                                            id: isEditing ? integration!.id : id.trim(),
-                                            urlHost: urlHost.trim(),
-                                            urlPath: urlPath.trim(),
-                                            documentationUrl: documentationUrl.trim(),
-                                            documentation: documentation.trim(),
-                                            specificInstructions: specificInstructions.trim(),
-                                            credentials: creds,
-                                        };
-                                                                                
-                                        try {
-                                            // Save the integration first
-                                            await client.upsertIntegration(integrationData.id, integrationData);
-                                            
-                                            // Then open OAuth URL
-                                            const authUrl = buildOAuthUrl();
-                                            if (authUrl) {
-                                                window.open(authUrl, '_blank');
-                                            }
-                                        } catch (error) {
-                                            toast({
-                                                title: 'Error',
-                                                description: 'Failed to save integration before OAuth connection',
-                                                variant: 'destructive',
-                                            });
-                                        }
-                                    }}
-                                >
-                                    <Key className="h-4 w-4 mr-2" />
-                                    {oauthFields.access_token && oauthFields.refresh_token ? 'Reconnect with OAuth' : 'Connect with OAuth'}
-                                </Button>
-                            )}
+
+
                         </div>
                     )}
-                    
+
                     {authType === 'apikey' && (
                         <div className="space-y-2">
                             <Label htmlFor="credentials" className="flex items-center gap-2">
@@ -650,7 +642,7 @@ export function IntegrationForm({
                             {validationErrors.credentials && <p className="text-sm text-destructive">Credentials must be valid JSON.</p>}
                         </div>
                     )}
-                    
+
                     {authType === 'none' && (
                         <div className="bg-muted/50">
                             <p className="text-sm text-muted-foreground">
@@ -693,7 +685,7 @@ export function IntegrationForm({
                                 {validationErrors.id && <p className="text-sm text-destructive mt-1">Integration ID is required and must be unique.</p>}
                             </div>
                         )}
-                        
+
                         {/* OAuth Advanced Settings */}
                         {authType === 'oauth' && (
                             <>
@@ -717,22 +709,72 @@ export function IntegrationForm({
                                 <div>
                                     <Label htmlFor="auth_url" className="text-xs">Authorization URL</Label>
                                     <HelpTooltip text="OAuth authorization endpoint. Leave empty to use the default for this provider." />
-                                    <Input
-                                        id="auth_url"
-                                        value={oauthFields.auth_url}
-                                        onChange={e => setOauthFields(prev => ({ ...prev, auth_url: e.target.value }))}
-                                        placeholder="OAuth authorization endpoint"
-                                        className="h-9"
-                                    />
+                                    <div className="relative">
+                                        <Input
+                                            id="auth_url"
+                                            value={oauthFields.auth_url}
+                                            onChange={e => setOauthFields(prev => ({ ...prev, auth_url: e.target.value }))}
+                                            placeholder="OAuth authorization endpoint"
+                                            className="h-9 pr-20"
+                                        />
+                                        <Badge
+                                            variant="outline"
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 bg-background border"
+                                        >
+                                            <Link className="h-3 w-3 mr-1" />
+                                            URL
+                                        </Badge>
+                                    </div>
                                     {!oauthFields.auth_url && integrations[selectedIntegration]?.oauth?.authUrl && (
                                         <p className="text-xs text-muted-foreground mt-1">
                                             Default: {integrations[selectedIntegration]?.oauth?.authUrl}
                                         </p>
                                     )}
                                 </div>
+
+                                <div>
+                                    <Label htmlFor="token_url" className="text-xs">Token URL</Label>
+                                    <HelpTooltip text="OAuth token endpoint. Leave empty to use the default for this provider." />
+                                    <div className="relative">
+                                        <Input
+                                            id="token_url"
+                                            value={oauthFields.token_url}
+                                            onChange={e => setOauthFields(prev => ({ ...prev, token_url: e.target.value }))}
+                                            placeholder="OAuth token endpoint"
+                                            className="h-9 pr-20"
+                                        />
+                                        <Badge
+                                            variant="outline"
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 bg-background border"
+                                        >
+                                            <Link className="h-3 w-3 mr-1" />
+                                            URL
+                                        </Badge>
+                                    </div>
+                                    {!oauthFields.token_url && integrations[selectedIntegration]?.oauth?.tokenUrl && (
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                            Default: {integrations[selectedIntegration]?.oauth?.tokenUrl}
+                                        </p>
+                                    )}
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="additionalCredentials" className="flex items-center gap-2 text-xs">
+                                        Additional API Credentials
+                                        <HelpTooltip text="Some APIs require additional credentials alongside OAuth. Common examples: developer_token (Google Ads), account_id, workspace_id. Add any extra key-value pairs needed." />
+                                    </Label>
+                                    <div className="w-full">
+                                        <CredentialsManager
+                                            value={apiKeyCredentials}
+                                            onChange={setApiKeyCredentials}
+                                            className={cn('min-h-20', validationErrors.credentials && inputErrorStyles)}
+                                        />
+                                    </div>
+                                    {validationErrors.credentials && <p className="text-sm text-destructive">Credentials must be valid JSON.</p>}
+                                </div>
                             </>
                         )}
-                        
+
                         <div>
                             <Label htmlFor="specificInstructions">Specific Instructions</Label>
                             <HelpTooltip text="Provide specific guidance on how to use this integration (e.g., rate limits, special endpoints, authentication details). Max 2000 characters." />
@@ -760,13 +802,18 @@ export function IntegrationForm({
                         </div>
                     </>
                 )}
-                <div className="flex justify-end gap-2 pt-2">
+            </CardContent>
+            <CardFooter className={cn(
+                modal ? "p-6 pt-0 border-0" : "p-4 pt-2",
+                "flex-shrink-0"
+            )}>
+                <div className="flex justify-end gap-2 w-full">
                     <Button variant="outline" onClick={onCancel}>Cancel</Button>
                     <Button onClick={handleSubmit}>
                         {integration ? 'Save Changes' : 'Add Integration'}
                     </Button>
                 </div>
-            </CardContent>
+            </CardFooter>
         </Card>
     );
 }

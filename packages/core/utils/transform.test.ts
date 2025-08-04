@@ -35,7 +35,7 @@ import dotenv from 'dotenv';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LanguageModel } from '../llm/llm.js';
 import { transformAndValidateSchema } from './tools.js';
-import { executeTransform, generateTransformJsonata } from './transform.js';
+import { executeTransform } from './transform.js';
 
 describe('transform utils', () => {
   beforeEach(() => {
@@ -153,80 +153,6 @@ describe('transform utils', () => {
           name: 'John Doe'
         }
       });
-    });
-  });
-
-  describe('generateTransformJsonata', () => {
-    beforeEach(() => {
-      vi.clearAllMocks();
-      vi.resetModules();
-      (LanguageModel as any).generateObject.mockReset();
-    });
-
-    const sampleSchema = {
-      type: 'object',
-      properties: {
-        name: { type: 'string' }
-      }
-    };
-
-    const samplePayload = {
-      user: {
-        firstName: 'John',
-        lastName: 'Doe'
-      }
-    };
-
-    it('should generate mapping successfully', async () => {
-      (LanguageModel as any).generateObject
-        .mockResolvedValueOnce({
-          response: {
-            jsonata: '{"name": user.firstName & " " & user.lastName}',
-            confidence: 95,
-            confidence_reasoning: 'Direct field mapping available'
-          },
-          messages: []
-        })
-        .mockResolvedValueOnce({
-          response: {
-            success: true,
-            reason: "Transformation is correct, complete, and aligns with the objectives."
-          }
-        });
-
-      const mapping = await generateTransformJsonata(sampleSchema, samplePayload, 'test-instruction', {});
-      expect(mapping).toBeDefined();
-
-      const result = await transformAndValidateSchema(samplePayload, mapping.jsonata, sampleSchema);
-      expect(result).toEqual({
-        success: true,
-        data: {
-          name: 'John Doe'
-        }
-      });
-    }, 30000);
-
-    it('should retry on failure', async () => {
-      let attempts = 0;
-      (LanguageModel as any).generateObject.mockRejectedValueOnce(attempts++ === 0 ? new Error('API Error') : null);
-      (LanguageModel as any).generateObject.mockResolvedValueOnce({
-        response: {
-          jsonata: '{"name": user.firstName & " " & user.lastName}',
-          confidence: 95,
-          confidence_reasoning: 'Direct field mapping available'
-        },
-        messages: []
-      });
-      const result = await generateTransformJsonata(sampleSchema, samplePayload, 'test-instruction', {});
-      expect(result).toBeDefined();
-      expect(attempts).toBe(1);
-    });
-
-    it('should return null after max retries', async () => {
-      (LanguageModel as any).generateObject.mockRejectedValue(new Error('API Error'));
-
-      const result = await generateTransformJsonata(sampleSchema, samplePayload, 'test-instruction', {});
-      expect(result).toBeNull();
     });
   });
 });

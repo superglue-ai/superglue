@@ -312,7 +312,7 @@ export class IntegrationTestingFramework {
                 // Get integrations for the workflow
                 const integrations = await Promise.all(
                     testWorkflow.integrationIds.map(async (id: string) => {
-                        const integration = await this.datastore.getIntegration(id, this.metadata.orgId);
+                        const integration = await this.datastore.getIntegration({ id, includeDocs: true, orgId: this.metadata.orgId });
                         if (!integration) {
                             throw new Error(`Integration not found: ${id}`);
                         }

@@ -144,6 +144,9 @@ export class OpenAIModel implements LLM {
         output: "Done"
       });
       return { finalResult, shouldBreak: true };
+    } else if (name === "abort") {
+      let error = typeof args === "string" ? JSON.parse(args) : args;
+      return { finalResult: { "error": error?.reason || "Unknown error" }, shouldBreak: true };
     } else {
       const tool = tools.find(t => t.name === name);
       if (tool && tool.execute) {
@@ -178,8 +181,20 @@ export class OpenAIModel implements LLM {
       {
         type: "function" as const,
         name: "submit",
-        description: "Submit the final result in the required format",
+        description: "Submit the final result in the required format. Submit the result even if it's an error and keep submitting until we stop. Keep non-function messages short and concise because they are only for debugging.",
         parameters: schema
+      },
+      {
+        type: "function" as const,
+        name: "abort",
+        description: "There is absolutely no way given the input to complete the request successfully, abort the request",
+        parameters: {
+          type: "object",
+          properties: {
+            reason: { type: "string", description: "The reason for aborting" }
+          },
+          required: ["reason"]
+        }
       },
       {
         type: "web_search" as const
@@ -196,7 +211,9 @@ export class OpenAIModel implements LLM {
     try {
       // Use the Responses API with multi-turn support
       let finalResult = null;
-      let conversationMessages: any = [dateMessage, ...messages];
+      // if the first message is the date message, don't add it again
+      let conversationMessages: any = String(messages[0]?.content)?.startsWith("The current date and time is") ? 
+        messages : [dateMessage, ...messages];
 
       // Continue until the model calls submit
       while (finalResult === null) {

@@ -387,7 +387,7 @@ export class AxiosFetchingStrategy implements FetchingStrategy {
       const url = new URL(config.documentationUrl);
       if (config.queryParams) {
         Object.entries(config.queryParams).forEach(([key, value]) => {
-          url.searchParams.append(key, value);
+          url?.searchParams?.append(key, value);
         });
       }
 
@@ -441,7 +441,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       const url = new URL(urlString);
       if (config.queryParams) {
         Object.entries(config.queryParams).forEach(([key, value]) => {
-          url.searchParams.append(key, value);
+          url?.searchParams?.append(key, value);
         });
       }
 
@@ -617,7 +617,7 @@ ORDER BY table_name, ordinal_position;`
 
       const schemaResponse = await callPostgres({ ...config, body: JSON.stringify(schemaQuery) }, null, credentials, null);
       if (!schemaResponse) return null;
-      return `<DOCUMENTATION>${content}</DOCUMENTATION><DB_SCHEMA>\n\n${JSON.stringify(schemaResponse, null, 2)}\n\n</DB_SCHEMA>`;
+      return `${content ? `<DOCUMENTATION>\n${content}\n</DOCUMENTATION>\n` : ""}<DB_SCHEMA>\n${JSON.stringify(schemaResponse, null, 2)}\n</DB_SCHEMA>`;
     }
     return null;
   }

@@ -1,5 +1,5 @@
 import type { Integration } from '@superglue/client';
-import { getOAuthConfig, integrations, type IntegrationConfig } from '@superglue/shared';
+import { getOAuthConfig, getOAuthTokenUrl, integrations, type IntegrationConfig } from '@superglue/shared';
 import { logMessage } from './logs.js';
 
 export interface OAuthTokens {
@@ -22,35 +22,13 @@ export interface OAuthCallbackResult {
 export function isTokenExpired(integration: Integration): boolean {
     const { expires_at } = integration.credentials || {};
     if (!expires_at) return false;
-    
+
     // Consider token expired if it expires in less than 5 minutes
     const expiryTime = new Date(expires_at).getTime();
     const now = Date.now();
     const fiveMinutes = 5 * 60 * 1000;
-    
-    return expiryTime < (now + fiveMinutes);
-}
 
-/**
- * Get token URL for an integration based on its configuration
- */
-export function getTokenUrl(integration: Integration): string | null {
-    // Try to get from known integrations first
-    const match = Object.entries(integrations).find(([key]) => 
-        integration.id === key || integration.urlHost?.includes(key)
-    );
-    
-    if (match) {
-        const [_, config] = match as [string, IntegrationConfig];
-        return config.oauth?.tokenUrl || null;
-    }
-    
-    // Check if integration has custom auth_url in credentials
-    const customTokenUrl = integration.credentials?.token_url as string;
-    if (customTokenUrl) return customTokenUrl;
-    
-    // Default: assume OAuth2 token endpoint at the same host
-    return `${integration.urlHost}/oauth/token`;
+    return expiryTime < (now + fiveMinutes);
 }
 
 /**
@@ -58,21 +36,21 @@ export function getTokenUrl(integration: Integration): string | null {
  */
 export async function refreshOAuthToken(
     integration: Integration,
-): Promise<boolean> {
-    const { client_id, client_secret, refresh_token } = integration.credentials || {};
-    
+): Promise<{ success: boolean, newCredentials: Record<string, any> }> {
+    const { client_id, client_secret, refresh_token, access_token } = integration.credentials || {};
+
     if (!client_id || !client_secret || !refresh_token) {
-        logMessage('error', 'Missing required credentials for token refresh', { 
+        logMessage('error', 'Missing required credentials for token refresh', {
             integrationId: integration.id,
             hasClientId: !!client_id,
             hasClientSecret: !!client_secret,
             hasRefreshToken: !!refresh_token
         });
-        return false;
+        return { success: false, newCredentials: {} };
     }
-    
+
     try {
-        const tokenUrl = getTokenUrl(integration);
+        const tokenUrl = getOAuthTokenUrl(integration);
         if (!tokenUrl) {
             throw new Error('Could not determine token URL for integration');
         }
@@ -90,14 +68,18 @@ export async function refreshOAuthToken(
                 client_secret,
             }),
         });
-        
+
         if (!response.ok) {
             const errorText = await response.text();
+            // Check if this is a long-lived access token scenario (access_token === refresh_token)
+            if (access_token === refresh_token) {
+                throw new Error(`OAuth access token was unable to refresh. This integration likely uses a long-lived access token in its OAuth flow. Please reauthenticate with the OAuth provider to refresh the access token manually.`);
+            }
             throw new Error(`Token refresh failed: ${response.status} - ${errorText}`);
         }
-        
+
         const tokenData: OAuthTokens = await response.json();
-        
+
         // Update integration credentials in place
         integration.credentials = {
             ...integration.credentials,
@@ -108,18 +90,18 @@ export async function refreshOAuthToken(
                 ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
                 : undefined),
         };
-        
-        logMessage('info', 'Successfully refreshed OAuth token', { 
-            integrationId: integration.id 
+
+        logMessage('info', 'Successfully refreshed OAuth token', {
+            integrationId: integration.id
         });
-        
-        return true;
+
+        return { success: true, newCredentials: integration.credentials };
     } catch (error) {
-        logMessage('error', 'Error refreshing OAuth token', { 
+        logMessage('error', 'Error refreshing OAuth token', {
             integrationId: integration.id,
             error: error instanceof Error ? error.message : String(error)
         });
-        return false;
+        return { success: false, newCredentials: {} };
     }
 }
 
@@ -128,11 +110,11 @@ export async function refreshOAuthToken(
  */
 export function buildOAuthHeaders(integration: Integration): Record<string, string> {
     const { access_token, token_type = 'Bearer' } = integration.credentials || {};
-    
+
     if (!access_token) {
         return {};
     }
-    
+
     return {
         Authorization: `${token_type} ${access_token}`,
     };
@@ -150,7 +132,7 @@ export async function handleOAuthCallback(
 ): Promise<OAuthCallbackResult> {
     try {
         const integration = await getIntegration(integrationId);
-        
+
         if (!integration) {
             return {
                 success: false,
@@ -159,7 +141,7 @@ export async function handleOAuthCallback(
         }
 
         const { client_id, client_secret } = integration.credentials || {};
-        
+
         if (!client_id || !client_secret) {
             return {
                 success: false,
@@ -168,7 +150,7 @@ export async function handleOAuthCallback(
         }
 
         // Get token URL
-        const tokenUrl = getTokenUrl(integration);
+        const tokenUrl = getOAuthTokenUrl(integration);
         if (!tokenUrl) {
             return {
                 success: false,
@@ -219,8 +201,8 @@ export async function handleOAuthCallback(
         // Save the updated integration
         await updateIntegration(integrationId, updatedIntegration);
 
-        logMessage('info', 'Successfully completed OAuth flow', { 
-            integrationId 
+        logMessage('info', 'Successfully completed OAuth flow', {
+            integrationId
         });
 
         return {
@@ -228,11 +210,11 @@ export async function handleOAuthCallback(
             integration: updatedIntegration
         };
     } catch (error) {
-        logMessage('error', 'OAuth callback error', { 
+        logMessage('error', 'OAuth callback error', {
             integrationId,
             error: error instanceof Error ? error.message : String(error)
         });
-        
+
         return {
             success: false,
             error: error instanceof Error ? error.message : 'Unknown error'
@@ -249,30 +231,30 @@ export function buildOAuthAuthorizationUrl(
     state?: string
 ): string | null {
     const { client_id, auth_url } = integration.credentials || {};
-    
+
     if (!client_id) return null;
 
     // Try to get auth URL from configuration or credentials
     let authUrl = auth_url as string | undefined;
-    
+
     if (!authUrl) {
         // Try to get from known integrations
-        const match = Object.entries(integrations).find(([key]) => 
+        const match = Object.entries(integrations).find(([key]) =>
             integration.id === key || integration.urlHost?.includes(key)
         );
-        
+
         if (match) {
             const [_, config] = match as [string, IntegrationConfig];
             authUrl = config.oauth?.authUrl;
         }
     }
-    
+
     if (!authUrl) return null;
 
     // Get default scopes
     const oauthConfig = getOAuthConfig(integration.id);
     const defaultScopes = oauthConfig?.scopes || '';
-    
+
     const params = new URLSearchParams({
         client_id,
         redirect_uri: redirectUri,

@@ -1,4 +1,4 @@
-import { ApiConfig, ExtractConfig, HttpMethod, RunResult, TransformConfig } from '@superglue/client';
+import { ApiConfig, ExtractConfig, HttpMethod, Integration, RunResult, TransformConfig, Workflow } from '@superglue/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { RedisService } from './redis.js';
 
@@ -39,7 +39,7 @@ if (!testConfig.host || !testConfig.port || !testConfig.username || !testConfig.
     });
 
     describe('API Config', () => {
-      const testConfig: ApiConfig = {
+      const testApiConfig: ApiConfig = {
         id: 'test-id',
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -51,23 +51,23 @@ if (!testConfig.host || !testConfig.port || !testConfig.username || !testConfig.
       };
 
       it('should store and retrieve API configs', async () => {
-        await store.upsertApiConfig(testConfig.id, testConfig, testOrgId);
-        const retrieved = await store.getApiConfig(testConfig.id, testOrgId);
-        expect(retrieved).toEqual(testConfig);
+        await store.upsertApiConfig({ id: testApiConfig.id, config: testApiConfig, orgId: testOrgId });
+        const retrieved = await store.getApiConfig({ id: testApiConfig.id, orgId: testOrgId });
+        expect(retrieved).toEqual(testApiConfig);
       });
 
       it('should list API configs', async () => {
-        await store.upsertApiConfig(testConfig.id, testConfig, testOrgId);
-        const { items, total } = await store.listApiConfigs(10, 0, testOrgId);
+        await store.upsertApiConfig({ id: testApiConfig.id, config: testApiConfig, orgId: testOrgId });
+        const { items, total } = await store.listApiConfigs({ limit: 10, offset: 0, orgId: testOrgId });
         expect(items).toHaveLength(1);
         expect(total).toBe(1);
-        expect(items[0]).toEqual(testConfig);
+        expect(items[0]).toEqual(testApiConfig);
       });
 
       it('should delete API configs', async () => {
-        await store.upsertApiConfig(testConfig.id, testConfig, testOrgId);
-        await store.deleteApiConfig(testConfig.id, testOrgId);
-        const retrieved = await store.getApiConfig(testConfig.id, testOrgId);
+        await store.upsertApiConfig({ id: testApiConfig.id, config: testApiConfig, orgId: testOrgId });
+        await store.deleteApiConfig({ id: testApiConfig.id, orgId: testOrgId });
+        const retrieved = await store.getApiConfig({ id: testApiConfig.id, orgId: testOrgId });
         expect(retrieved).toBeNull();
       });
     });
@@ -82,23 +82,23 @@ if (!testConfig.host || !testConfig.port || !testConfig.username || !testConfig.
       };
 
       it('should store and retrieve extract configs', async () => {
-        await store.upsertExtractConfig(testExtractConfig.id, testExtractConfig, testOrgId);
-        const retrieved = await store.getExtractConfig(testExtractConfig.id, testOrgId);
+        await store.upsertExtractConfig({ id: testExtractConfig.id, config: testExtractConfig, orgId: testOrgId });
+        const retrieved = await store.getExtractConfig({ id: testExtractConfig.id, orgId: testOrgId });
         expect(retrieved).toEqual(testExtractConfig);
       });
 
       it('should list extract configs', async () => {
-        await store.upsertExtractConfig(testExtractConfig.id, testExtractConfig, testOrgId);
-        const { items, total } = await store.listExtractConfigs(10, 0, testOrgId);
+        await store.upsertExtractConfig({ id: testExtractConfig.id, config: testExtractConfig, orgId: testOrgId });
+        const { items, total } = await store.listExtractConfigs({ limit: 10, offset: 0, orgId: testOrgId });
         expect(items).toHaveLength(1);
         expect(total).toBe(1);
         expect(items[0]).toEqual(testExtractConfig);
       });
 
       it('should delete extract configs', async () => {
-        await store.upsertExtractConfig(testExtractConfig.id, testExtractConfig, testOrgId);
-        await store.deleteExtractConfig(testExtractConfig.id, testOrgId);
-        const retrieved = await store.getExtractConfig(testExtractConfig.id, testOrgId);
+        await store.upsertExtractConfig({ id: testExtractConfig.id, config: testExtractConfig, orgId: testOrgId });
+        await store.deleteExtractConfig({ id: testExtractConfig.id, orgId: testOrgId });
+        const retrieved = await store.getExtractConfig({ id: testExtractConfig.id, orgId: testOrgId });
         expect(retrieved).toBeNull();
       });
     });
@@ -114,23 +114,23 @@ if (!testConfig.host || !testConfig.port || !testConfig.username || !testConfig.
       };
 
       it('should store and retrieve transform configs', async () => {
-        await store.upsertTransformConfig(testTransformConfig.id, testTransformConfig, testOrgId);
-        const retrieved = await store.getTransformConfig(testTransformConfig.id, testOrgId);
+        await store.upsertTransformConfig({ id: testTransformConfig.id, config: testTransformConfig, orgId: testOrgId });
+        const retrieved = await store.getTransformConfig({ id: testTransformConfig.id, orgId: testOrgId });
         expect(retrieved).toEqual(testTransformConfig);
       });
 
       it('should list transform configs', async () => {
-        await store.upsertTransformConfig(testTransformConfig.id, testTransformConfig, testOrgId);
-        const { items, total } = await store.listTransformConfigs(10, 0, testOrgId);
+        await store.upsertTransformConfig({ id: testTransformConfig.id, config: testTransformConfig, orgId: testOrgId });
+        const { items, total } = await store.listTransformConfigs({ limit: 10, offset: 0, orgId: testOrgId });
         expect(items).toHaveLength(1);
         expect(total).toBe(1);
         expect(items[0]).toEqual(testTransformConfig);
       });
 
       it('should delete transform configs', async () => {
-        await store.upsertTransformConfig(testTransformConfig.id, testTransformConfig, testOrgId);
-        await store.deleteTransformConfig(testTransformConfig.id, testOrgId);
-        const retrieved = await store.getTransformConfig(testTransformConfig.id, testOrgId);
+        await store.upsertTransformConfig({ id: testTransformConfig.id, config: testTransformConfig, orgId: testOrgId });
+        await store.deleteTransformConfig({ id: testTransformConfig.id, orgId: testOrgId });
+        const retrieved = await store.getTransformConfig({ id: testTransformConfig.id, orgId: testOrgId });
         expect(retrieved).toBeNull();
       });
     });
@@ -157,8 +157,8 @@ if (!testConfig.host || !testConfig.port || !testConfig.username || !testConfig.
       };
 
       it('should store and retrieve runs', async () => {
-        await store.createRun(testRun, testOrgId);
-        const retrieved = await store.getRun(testRun.id, testOrgId);
+        await store.createRun({ result: testRun, orgId: testOrgId });
+        const retrieved = await store.getRun({ id: testRun.id, orgId: testOrgId });
         expect(retrieved).toEqual(testRun);
       });
 
@@ -174,10 +174,10 @@ if (!testConfig.host || !testConfig.port || !testConfig.username || !testConfig.
           startedAt: new Date(),
         };
 
-        await store.createRun(run1, testOrgId);
-        await store.createRun(run2, testOrgId);
+        await store.createRun({ result: run1, orgId: testOrgId });
+        await store.createRun({ result: run2, orgId: testOrgId });
 
-        const { items, total } = await store.listRuns(10, 0, null, testOrgId);
+        const { items, total } = await store.listRuns({ limit: 10, offset: 0, configId: null, orgId: testOrgId });
         expect(items).toHaveLength(2);
         expect(total).toBe(2);
         expect(items[0].id).toBe(run2.id); // Most recent first
@@ -185,16 +185,16 @@ if (!testConfig.host || !testConfig.port || !testConfig.username || !testConfig.
       });
 
       it('should delete runs', async () => {
-        await store.createRun(testRun, testOrgId);
-        await store.deleteRun(testRun.id, testOrgId);
-        const retrieved = await store.getRun(testRun.id, testOrgId);
+        await store.createRun({ result: testRun, orgId: testOrgId });
+        await store.deleteRun({ id: testRun.id, orgId: testOrgId });
+        const retrieved = await store.getRun({ id: testRun.id, orgId: testOrgId });
         expect(retrieved).toBeNull();
       });
 
       it('should delete all runs', async () => {
-        await store.createRun(testRun, testOrgId);
-        await store.deleteAllRuns(testOrgId);
-        const { items, total } = await store.listRuns(10, 0, null, testOrgId);
+        await store.createRun({ result: testRun, orgId: testOrgId });
+        await store.deleteAllRuns({ orgId: testOrgId });
+        const { items, total } = await store.listRuns({ limit: 10, offset: 0, configId: null, orgId: testOrgId });
         expect(items).toHaveLength(0);
         expect(total).toBe(0);
       });
@@ -202,7 +202,7 @@ if (!testConfig.host || !testConfig.port || !testConfig.username || !testConfig.
       it('should filter out corrupted runs and continue listing valid ones', async () => {
         // Create a valid run
         const validRun = { ...testRun, id: 'valid-run' };
-        await store.createRun(validRun, testOrgId);
+        await store.createRun({ result: validRun, orgId: testOrgId });
 
         // Manually insert corrupted runs into Redis to simulate corruption
         const corruptedRun1 = { id: 'corrupted-run-1', config: null, startedAt: null };
@@ -217,7 +217,7 @@ if (!testConfig.host || !testConfig.port || !testConfig.username || !testConfig.
         await store['redis'].set(key2, JSON.stringify(corruptedRun2));
         await store['redis'].set(key3, JSON.stringify(corruptedRun3));
 
-        const { items, total } = await store.listRuns(10, 0, null, testOrgId);
+        const { items, total } = await store.listRuns({ limit: 10, offset: 0, configId: null, orgId: testOrgId });
 
         // Should only return the valid run
         expect(items.length).toBe(1);
@@ -233,10 +233,10 @@ if (!testConfig.host || !testConfig.port || !testConfig.username || !testConfig.
         };
         const validRun = { ...testRun, id: 'valid-run' };
 
-        await store.createRun(runWithoutStartedAt, testOrgId);
-        await store.createRun(validRun, testOrgId);
+        await store.createRun({ result: runWithoutStartedAt, orgId: testOrgId });
+        await store.createRun({ result: validRun, orgId: testOrgId });
 
-        const { items, total } = await store.listRuns(10, 0, null, testOrgId);
+        const { items, total } = await store.listRuns({ limit: 10, offset: 0, configId: null, orgId: testOrgId });
 
         // Should only return the valid run
         expect(items.length).toBe(1);
@@ -252,10 +252,10 @@ if (!testConfig.host || !testConfig.port || !testConfig.username || !testConfig.
         };
         const validRun = { ...testRun, id: 'valid-run' };
 
-        await store.createRun(runWithoutConfigId, testOrgId);
-        await store.createRun(validRun, testOrgId);
+        await store.createRun({ result: runWithoutConfigId, orgId: testOrgId });
+        await store.createRun({ result: validRun, orgId: testOrgId });
 
-        const { items, total } = await store.listRuns(10, 0, null, testOrgId);
+        const { items, total } = await store.listRuns({ limit: 10, offset: 0, configId: null, orgId: testOrgId });
 
         // Should only return the valid run
         expect(items.length).toBe(1);
@@ -265,7 +265,7 @@ if (!testConfig.host || !testConfig.port || !testConfig.username || !testConfig.
     });
 
     describe('Integration', () => {
-      const testIntegration = {
+      const testIntegration: Integration = {
         id: 'test-int-id',
         name: 'Test Integration',
         urlHost: 'https://integration.test',
@@ -275,62 +275,62 @@ if (!testConfig.host || !testConfig.port || !testConfig.username || !testConfig.
       };
 
       it('should store and retrieve integrations', async () => {
-        await store.upsertIntegration(testIntegration.id, testIntegration, testOrgId);
-        const retrieved = await store.getIntegration(testIntegration.id, testOrgId);
+        await store.upsertIntegration({ id: testIntegration.id, integration: testIntegration, orgId: testOrgId });
+        const retrieved = await store.getIntegration({ id: testIntegration.id, includeDocs: true, orgId: testOrgId });
         expect(retrieved).toEqual({ ...testIntegration, id: testIntegration.id });
       });
 
       it('should list integrations', async () => {
-        await store.upsertIntegration(testIntegration.id, testIntegration, testOrgId);
-        const { items, total } = await store.listIntegrations(10, 0, testOrgId);
+        await store.upsertIntegration({ id: testIntegration.id, integration: testIntegration, orgId: testOrgId });
+        const { items, total } = await store.listIntegrations({ limit: 10, offset: 0, includeDocs: true, orgId: testOrgId });
         expect(items).toHaveLength(1);
         expect(total).toBe(1);
         expect(items[0]).toEqual({ ...testIntegration, id: testIntegration.id });
       });
 
       it('should delete integrations', async () => {
-        await store.upsertIntegration(testIntegration.id, testIntegration, testOrgId);
-        await store.deleteIntegration(testIntegration.id, testOrgId);
-        const retrieved = await store.getIntegration(testIntegration.id, testOrgId);
+        await store.upsertIntegration({ id: testIntegration.id, integration: testIntegration, orgId: testOrgId });
+        await store.deleteIntegration({ id: testIntegration.id, orgId: testOrgId });
+        const retrieved = await store.getIntegration({ id: testIntegration.id, includeDocs: true, orgId: testOrgId });
         expect(retrieved).toBeNull();
       });
 
       it('should return null for missing integration', async () => {
-        const retrieved = await store.getIntegration('does-not-exist', testOrgId);
+        const retrieved = await store.getIntegration({ id: 'does-not-exist', includeDocs: true, orgId: testOrgId });
         expect(retrieved).toBeNull();
       });
 
       it('should get many integrations by ids, skipping missing ones', async () => {
         const int2 = { ...testIntegration, id: 'test-int-id-2', name: 'Integration 2' };
-        await store.upsertIntegration(testIntegration.id, testIntegration, testOrgId);
-        await store.upsertIntegration(int2.id, int2, testOrgId);
-        const result = await store.getManyIntegrations([
-          testIntegration.id,
-          int2.id,
-          'missing-id'
-        ], testOrgId);
+        await store.upsertIntegration({ id: testIntegration.id, integration: testIntegration, orgId: testOrgId });
+        await store.upsertIntegration({ id: int2.id, integration: int2, orgId: testOrgId });
+        const result = await store.getManyIntegrations({
+          ids: [testIntegration.id, int2.id, 'missing-id'],
+          orgId: testOrgId
+        });
         expect(result).toHaveLength(2);
         expect(result.map(i => i.id).sort()).toEqual([testIntegration.id, int2.id].sort());
       });
     });
 
     describe('Workflow', () => {
-      const testWorkflow = {
+      const testWorkflow: Workflow = {
         id: 'test-workflow-id',
         steps: [],
         createdAt: new Date(),
         updatedAt: new Date(),
+        instruction: 'Test workflow',
+        inputSchema: {}
       };
 
       it('should get many workflows by ids, skipping missing ones', async () => {
         const wf2 = { ...testWorkflow, id: 'test-workflow-id-2' };
-        await store.upsertWorkflow(testWorkflow.id, testWorkflow, testOrgId);
-        await store.upsertWorkflow(wf2.id, wf2, testOrgId);
-        const result = await store.getManyWorkflows([
-          testWorkflow.id,
-          wf2.id,
-          'missing-id'
-        ], testOrgId);
+        await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow, orgId: testOrgId });
+        await store.upsertWorkflow({ id: wf2.id, workflow: wf2, orgId: testOrgId });
+        const result = await store.getManyWorkflows({
+          ids: [testWorkflow.id, wf2.id, 'missing-id'],
+          orgId: testOrgId
+        });
         expect(result).toHaveLength(2);
         expect(result.map(w => w.id).sort()).toEqual([testWorkflow.id, wf2.id].sort());
       });

@@ -1,6 +1,7 @@
 import { Integration, Workflow, WorkflowResult } from '@superglue/client';
 import { generateUniqueId } from '@superglue/shared/utils';
 import { DataStore } from '../../datastore/types.js';
+import { IntegrationManager } from '../../integrations/integration-manager.js';
 import { logEmitter, logMessage } from '../../utils/logs.js';
 import { BaseWorkflowConfig } from './config-loader.js';
 import { validateWorkflowResult, type SoftValidationResult } from './soft-validator.js';
@@ -230,7 +231,7 @@ export class WorkflowRunner {
             workflow = await builder.buildWorkflow();
             workflow.id = await generateUniqueId({
                 baseId: workflow.id,
-                exists: async (id) => !!(await this.datastore.getWorkflow(id, this.metadata.orgId))
+                exists: async (id) => !!(await this.datastore.getWorkflow({ id, orgId: this.metadata.orgId }))
             });
 
             attempt.buildSuccess = true;
@@ -271,7 +272,7 @@ export class WorkflowRunner {
                 const executor = new WorkflowExecutor(
                     workflow,
                     metadataWithWorkflowId,
-                    integrations
+                    IntegrationManager.fromIntegrations(integrations, this.datastore, this.metadata.orgId)
                 );
 
                 // Combine all credentials from integrations
@@ -297,14 +298,18 @@ export class WorkflowRunner {
                 // Save run if requested
                 if (saveRun) {
                     await this.datastore.createRun({
-                        id: workflowResult.id,
-                        success: workflowResult.success,
-                        error: workflowResult.error || undefined,
-                        config: workflowResult.config || workflow,
-                        stepResults: workflowResult.stepResults || [],
-                        startedAt: workflowResult.startedAt,
-                        completedAt: workflowResult.completedAt || new Date()
-                    }, this.metadata.orgId);
+                        result: {
+                            id: workflowResult.id,
+                            success: workflowResult.success,
+                            error: workflowResult.error || undefined,
+                            config: workflowResult.config || workflow,
+                            stepResults: workflowResult.stepResults || [],
+                            startedAt: workflowResult.startedAt,
+                            completedAt: workflowResult.completedAt || new Date(),
+                            data: null
+                        },
+                        orgId: this.metadata.orgId
+                    });
                 }
 
                 if (attempt.executionSuccess) {
