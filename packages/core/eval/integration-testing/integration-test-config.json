@@ -301,7 +301,7 @@
             "stripe-list-recent-customers",
             "stripe-active-subscriptions-count",
             "stripe-recent-invoices",
-            "stripe-customer-search",
+            "stripe-non-existent-customer-search",
             "stripe-product-list",
             "attio-company-enrichment",
             "attio-company-record-cleanup"
@@ -645,9 +645,9 @@
                 "category": "single-system",
                 "expectedResult": "Should fetch at least 10 invoices from Stripe and return non zero values for total_amount and total_amount_past_due."
             },
-            "stripe-customer-search": {
-                "id": "stripe-customer-search",
-                "name": "Stripe Customer Search by Email",
+            "stripe-non-existent-customer-search": {
+                "id": "stripe-non-existent-customer-search",
+                "name": "Stripe Non-Existent Customer Search by Email",
                 "instruction": "Search for a customer in Stripe using the email address from the payload, retrieve their subscription status and and return their customer ID, subscription status and the subscription product name",
                 "integrationIds": [
                     "stripe"
@@ -657,7 +657,21 @@
                 },
                 "complexityLevel": "low",
                 "category": "single-system",
-                "expectedResult": "Should search for a Stripe customer by email and retrieve their subscription status and payment info. Returns customer ID, email, subscription status, last payment date and amount."
+                "expectedResult": "Should search for a Stripe customer by email and retrieve their subscription status and payment info. Returns customer ID, email, subscription status, last payment date and amount. In this particular case, the customer should not exist, so empty or descriptive text results are fine."
+            },
+            "stripe-customer-search": {
+                "id": "stripe-customer-search",
+                "name": "Stripe Customer Search by Email",
+                "instruction": "Search for a customer in Stripe using the email address from the payload, retrieve their subscription status and and return their customer ID, subscription status and the subscription product name",
+                "integrationIds": [
+                    "stripe"
+                ],
+                "payload": {
+                    "customer_email": "customer1@test.com"
+                },
+                "complexityLevel": "low",
+                "category": "single-system",
+                "expectedResult": "Should search for a Stripe customer by email and retrieve their subscription status and payment info. Returns customer ID, email, subscription status, last payment date and amount. This customer should exist, so the results should be non-empty."
             },
             "stripe-product-list": {
                 "id": "stripe-product-list",
