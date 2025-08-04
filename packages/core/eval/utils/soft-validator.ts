@@ -25,11 +25,16 @@ export async function validateWorkflowResult(
 
         let expectedContent = expectedResult;
         let isExpectedJson = false;
-   
-        const parsed = JSON.parse(expectedResult);
-        expectedContent = JSON.stringify(parsed, null, 2);
-        isExpectedJson = true;
-        
+
+        try {
+            const parsed = JSON.parse(expectedResult);
+            expectedContent = JSON.stringify(parsed, null, 2);
+            isExpectedJson = true;
+        } catch (e) {
+            expectedContent = expectedResult;
+            isExpectedJson = false;
+        }
+
         const systemPrompt = `You are a workflow result validator for integration testing. Your job is to determine if the actual workflow result meets the expected criteria.
 
 IMPORTANT CONSIDERATIONS:
