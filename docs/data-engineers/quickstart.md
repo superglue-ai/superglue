@@ -206,17 +206,17 @@ Superglue eliminates the complexity of API integrations and data transformations
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="UI vs SDK Comparison" icon="balance-scale" href="/data-engineers/ui-vs-sdk">
+  <Card title="UI vs SDK Comparison" icon="scale" href="/data-engineers/ui-vs-sdk">
     When to use the chat interface vs the SDK for different scenarios
   </Card>
   <Card title="API Ranking Benchmark" icon="trophy" href="/data-engineers/api-ranking">
-    See how Superglue compares to traditional coding approaches
+    See how superglue compares to traditional coding approaches
   </Card>
-  <Card title="Data Pipeline Patterns" icon="pipe" href="/data-engineers/data-pipelines">
+  <Card title="Data Pipeline Patterns" icon="workflow" href="/data-engineers/data-pipelines">
     Common patterns for ETL, real-time sync, and data transformation
   </Card>
   <Card title="Self-Hosting Guide" icon="server" href="/guides/self-hosting">
-    Deploy Superglue in your own infrastructure
+    Deploy superglue in your own infrastructure with your own llms.
   </Card>
 </CardGroup>
 
