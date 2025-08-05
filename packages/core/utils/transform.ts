@@ -1,4 +1,4 @@
-import { RequestOptions, SelfHealingMode, TransformConfig, TransformInputRequest } from "@superglue/client";
+import { RequestOptions, TransformConfig, TransformInputRequest } from "@superglue/client";
 import type { DataStore, Metadata } from "@superglue/shared";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import prettier from "prettier";
@@ -6,7 +6,7 @@ import { server_defaults } from "../default.js";
 import { LanguageModel } from "../llm/llm.js";
 import { PROMPT_JS_TRANSFORM } from "../llm/prompts.js";
 import { logMessage } from "./logs.js";
-import { getSchemaFromData, sample, transformAndValidateSchema } from "./tools.js";
+import { getSchemaFromData, isSelfHealingEnabled, sample, transformAndValidateSchema } from "./tools.js";
 
 export async function executeTransform(args: {
   datastore: DataStore,
@@ -57,7 +57,7 @@ export async function executeTransform(args: {
 
     // if the transform is not self healing and there is an existing mapping, throw an error
     // if there is no mapping that means that the config is being generated for the first time and should generate regardless
-    if (currentConfig.responseMapping && !isSelfHealing(options)) {
+    if (currentConfig.responseMapping && !isSelfHealingEnabled(options, "transform")) {
       throw new Error(transformError);
     }
 
@@ -85,10 +85,6 @@ export async function executeTransform(args: {
       config: currentConfig
     };
   }
-}
-
-function isSelfHealing(options: RequestOptions): boolean {
-  return options?.selfHealing ? options.selfHealing === SelfHealingMode.ENABLED || options.selfHealing === SelfHealingMode.TRANSFORM_ONLY : true;
 }
 
 export async function generateTransformCode(

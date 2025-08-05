@@ -3,7 +3,7 @@ import type { AxiosRequestConfig, AxiosResponse } from "axios";
 import OpenAI from "openai";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { server_defaults } from "../default.js";
-import { isSelfHealingEnabled, Metadata } from "../graphql/types.js";
+import { Metadata } from "../graphql/types.js";
 import { IntegrationManager } from "../integrations/integration-manager.js";
 import { LanguageModel } from "../llm/llm.js";
 import { SELF_HEALING_API_AGENT_PROMPT } from "../llm/prompts.js";
@@ -12,7 +12,7 @@ import { parseFile } from "./file.js";
 import { logMessage } from "./logs.js";
 import { callPostgres } from "./postgres.js";
 import { telemetryClient } from "./telemetry.js";
-import { callAxios, composeUrl, evaluateStopCondition, generateId, maskCredentials, replaceVariables, sample } from "./tools.js";
+import { callAxios, composeUrl, evaluateStopCondition, generateId, isSelfHealingEnabled, maskCredentials, replaceVariables, sample } from "./tools.js";
 
 export class ApiCallError extends Error {
   statusCode?: number;
@@ -493,7 +493,7 @@ export async function executeApiCall({
   let lastError: string | null = null;
   let messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
   let success = false;
-  let isSelfHealing = isSelfHealingEnabled(options);
+  let isSelfHealing = isSelfHealingEnabled(options, "api");
 
 
   do {

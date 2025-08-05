@@ -1,4 +1,4 @@
-import { HttpMethod, RequestOptions } from "@superglue/client";
+import { HttpMethod, RequestOptions, SelfHealingMode } from "@superglue/client";
 import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
 import { GraphQLResolveInfo } from "graphql";
 import ivm from 'isolated-vm';
@@ -533,5 +533,14 @@ export async function evaluateStopCondition(
     };
   } finally {
     isolate.dispose();
+  }
+}
+
+export function isSelfHealingEnabled(options: RequestOptions, type: "transform" | "api"): boolean {
+  if (type === "transform") {
+    return options?.selfHealing ? options.selfHealing === SelfHealingMode.ENABLED || options.selfHealing === SelfHealingMode.TRANSFORM_ONLY : true;
+  }
+  if (type === "api") {
+    return options?.selfHealing ? options.selfHealing === SelfHealingMode.ENABLED || options.selfHealing === SelfHealingMode.REQUEST_ONLY : true;
   }
 }
