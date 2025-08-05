@@ -133,9 +133,9 @@ Superglue eliminates the complexity of API integrations and data transformations
 <CardGroup cols={2}>
   <Card title="10x Faster Development" icon="rocket">
     **Traditional:** Write API clients, handle pagination, manage schemas, build
-    error handling 
+    error handling
 
-    **superglue:** Describe your requirements in natural language 
+    **superglue:** Describe your requirements in natural language
   </Card>
   <Card title="Self-Healing Pipelines" icon="heart">
     **Traditional:** Breaks when APIs change, requires manual fixes \

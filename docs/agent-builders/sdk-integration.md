@@ -12,16 +12,16 @@ description: "Build custom AI applications with the Superglue SDK"
 
 <Tabs>
   <Tab title="Use SDK When">
-    ✅ Building custom AI applications ✅ Need full control over the integration
-    flow ✅ Want to embed Superglue in your own products ✅ Building production
-    systems with specific requirements ✅ Need to handle errors and retries
-    yourself ✅ Want to customize the user experience
+    ✅ Requiring full control over the integration flow \
+    ✅ Embedding superglue in your own products \
+    ✅ Building production systems with specific requirements \
+    ✅ Handling authentication, errors, and retries yourself
   </Tab>
   <Tab title="Use MCP When">
-    ✅ Working with existing agent frameworks (Claude, LangChain, etc.) ✅ Want
-    the simplest possible integration ✅ Building conversational AI experiences
-    ✅ Need natural language workflow building ✅ Want automatic error handling
-    and retries ✅ Prototyping quickly
+    ✅ Working with existing agent frameworks and tools (Claude, LangChain, etc.) \
+    ✅ Building conversational AI experiences \
+    ✅ Handling authentication with superglue \
+    ✅ Relying on automatic error handling and retries
   </Tab>
 </Tabs>
 
@@ -41,8 +41,7 @@ const superglue = new SuperglueClient({
 ```
 
 <Tip>
-  **Self-hosting?** Set `baseUrl` to your instance URL and omit `apiKey` if auth
-  is disabled.
+  **Self-hosting?** Set `baseUrl` to your instance URL.
 </Tip>
 
 ## Core SDK Methods
@@ -52,8 +51,24 @@ const superglue = new SuperglueClient({
 The most powerful method for AI applications - describe what you want and get it done:
 
 ```typescript
-const result = await superglue.buildAndExecuteWorkflow({
-  instruction: "Get my latest Stripe customers and their subscription details",
+import { SuperglueClient } from "@superglue/client";
+
+const superglue = new SuperglueClient({
+  apiKey: "your_api_key_here"
+});
+
+const integration = await superglue.upsertIntegration({
+	id: "stripe",
+	urlHost: "https://api.stripe.com",
+	documentationUrl: "https://docs.stripe.com/api",
+	credentials: {
+		apiKey: "sk_......."
+	}
+});
+
+const workflow = await superglue.buildWorkflow({
+  id: "stripe-customers"
+  instruction: "Get Stripe customers from last 30 days with email, name, and subscription status",
   integrationIds: ["stripe"],
   responseSchema: {
     type: "object",
@@ -63,30 +78,17 @@ const result = await superglue.buildAndExecuteWorkflow({
         items: {
           type: "object",
           properties: {
-            id: { type: "string" },
             email: { type: "string" },
-            subscription_status: { type: "string" },
-            monthly_revenue: { type: "number" },
-          },
-        },
-      },
-    },
-  },
-  credentials: {
-    stripe_secret_key: process.env.STRIPE_SECRET_KEY,
-  },
+            name: { type: "string" },
+            subscription_status: { type: "string" }
+          }
+        }
+      }
+    }
+  }
 });
 
-if (result.success) {
-  console.log("Customer data:", result.data);
-
-  // Save the workflow for reuse
-  await superglue.saveWorkflow({
-    id: "customer-subscription-report",
-    name: "Customer Subscription Report",
-    workflow: result.workflow,
-  });
-}
+const result = await superglue.executeWorkflow({ workflow });
 ```
 
 ### Working with Saved Workflows
@@ -120,14 +122,14 @@ const integrations = await superglue.findRelevantIntegrations(
 );
 
 // Create a new integration
-await superglue.createIntegration({
+await superglue.upsertIntegration({
   id: "internal-crm",
   name: "Internal CRM API",
   urlHost: "https://crm.company.com",
   credentials: {
     api_key: "your_crm_api_key",
   },
-  documentation: "API for accessing customer records and contact information",
+  documentationUrl: "https://docs.crm.com",
 });
 
 // List all integrations
@@ -148,7 +150,8 @@ class CustomerSupportAI {
 
   async handleCustomerQuery(query: string, customerId: string) {
     // Get customer context from multiple sources
-    const customerContext = await this.superglue.buildAndExecuteWorkflow({
+    const workflow = await this.superglue.buildWorkflow({
+      id: "customer-data",
       instruction: `Get comprehensive customer data for customer ID ${customerId} including:
         - Stripe subscription and billing history  
         - HubSpot contact details and interaction history
@@ -164,13 +167,13 @@ class CustomerSupportAI {
         },
       },
     });
-
-    if (!customerContext.success) {
+	const result = await this.superglue.executeWorkflow({ workflow });
+    if (!result.success) {
       throw new Error("Failed to get customer context");
     }
 
     // Use the context to provide personalized support
-    return this.generateResponse(query, customerContext.data);
+    return this.generateResponse(query, result.data);
   }
 
   private generateResponse(query: string, context: any) {
@@ -407,24 +410,16 @@ if (result.success) {
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card
-    title="Credential Management"
-    href="/agent-builders/credential-management"
-    icon="key"
-  >
+  <Card title="Credential Management" icon="key" href="/agent-builders/credential-management">
     Learn about secure credential storage and runtime credential passing
   </Card>
-  <Card
-    title="Complete MCP Guide"
-    href="/mcp/mcp"
-    icon="plug"
-  >
+  <Card title="Complete MCP Guide" icon="plug" href="/mcp/mcp">
     Compare SDK approach with MCP for different use cases
   </Card>
-  <Card title="API Reference" href="/api-reference/overview" icon="book">
+  <Card title="API Reference" icon="book" href="/api-reference/overview">
     Complete SDK method reference and parameters
   </Card>
-  <Card title="Example Apps" href="/guides/hubspot" icon="code">
+  <Card title="Example Apps" icon="code" href="/guides/hubspot">
     See complete example applications built with the SDK
   </Card>
 </CardGroup>

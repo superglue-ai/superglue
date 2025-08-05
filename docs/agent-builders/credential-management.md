@@ -59,7 +59,7 @@ const superglue = new SuperglueClient({
 });
 
 // Create integration with stored credentials
-await superglue.createIntegration({
+await superglue.upsertIntegration({
   id: "my-stripe",
   name: "Stripe Production",
   urlHost: "https://api.stripe.com",
@@ -99,23 +99,14 @@ With MCP, credentials are managed through the web interface and automatically us
   "mcpServers": {
     "superglue": {
       "command": "npx",
-      "args": [
-        "mcp-remote",
-        "https://mcp.superglue.ai",
-        "--header",
-        "Authorization:${AUTH_HEADER}"
-      ],
+      "args": ["@superglue/mcp-server"],
       "env": {
-        "AUTH_HEADER": "Bearer YOUR_SUPERGLUE_API_KEY"
+        "SUPERGLUE_API_KEY": "your_superglue_api_key"
       }
     }
   }
 }
 ```
-
-<Tip>
-**Self-hosting?** Replace `https://mcp.superglue.ai` with `http://localhost:3000/mcp` (or your instance URL)
-</Tip>
 
 Then in Claude Desktop:
 
@@ -300,20 +291,22 @@ const result = await superglue.executeWorkflow({
 <CardGroup cols={2}>
   <Card title="Credential Rotation" icon="rotate">
     **For stored credentials:**
+
     - Update credentials in Superglue when they rotate
     - Use webhooks to automate credential updates
-    
+
     **For runtime credentials:**
+
     - Implement automatic token refresh
     - Monitor credential expiration
   </Card>
-  
   <Card title="Least Privilege" icon="shield">
     **For all approaches:**
+
     - Only grant necessary API permissions
     - Use read-only keys when possible
     - Regularly audit credential usage
-    
+
     ```typescript
     // Example: Read-only Stripe key for reports
     credentials: {
@@ -321,16 +314,17 @@ const result = await superglue.executeWorkflow({
     }
     ```
   </Card>
-  
   <Card title="Environment Separation" icon="building">
     **Development:**
+
     - Use test/sandbox credentials
     - Store in Superglue for convenience
-    
+
     **Production:**
+
     - Use runtime credential passing
     - Store in secure vault/environment
-    
+
     ```typescript
     const isProduction = process.env.NODE_ENV === 'production';
     const credentials = isProduction ? 
@@ -338,13 +332,13 @@ const result = await superglue.executeWorkflow({
       undefined; // Use stored dev credentials
     ```
   </Card>
-  
   <Card title="Audit & Monitoring" icon="eye">
     **Track credential usage:**
+
     - Log all API calls (without credentials)
     - Monitor for unusual access patterns
     - Set up alerts for failed authentications
-    
+
     ```typescript
     const result = await superglue.executeWorkflow({
       workflowId: "audit-workflow",
@@ -363,12 +357,12 @@ const result = await superglue.executeWorkflow({
 <Tabs>
   <Tab title="Development & Prototyping">
     **Use Superglue-managed credentials:**
-    
-    ✅ Faster setup and iteration  
-    ✅ No credential management complexity  
-    ✅ Easy testing across team members  
-    ✅ Built-in credential validation  
-    
+
+    ✅ Faster setup and iteration\
+    ✅ No credential management complexity\
+    ✅ Easy testing across team members\
+    ✅ Built-in credential validation
+
     ```typescript
     // Simple development setup
     await superglue.buildAndExecuteWorkflow({
@@ -377,15 +371,14 @@ const result = await superglue.executeWorkflow({
     });
     ```
   </Tab>
-  
   <Tab title="Production & Enterprise">
     **Use runtime credential passing:**
-    
-    ✅ Maximum security control  
-    ✅ Compliance with security policies  
-    ✅ Full audit trail  
-    ✅ Integration with existing credential systems  
-    
+
+    ✅ Maximum security control\
+    ✅ Compliance with security policies\
+    ✅ Full audit trail\
+    ✅ Integration with existing credential systems
+
     ```typescript
     // Production setup with vault integration
     const credentials = await vault.getCredentials(userId);
@@ -395,10 +388,9 @@ const result = await superglue.executeWorkflow({
     });
     ```
   </Tab>
-  
   <Tab title="Hybrid Approach">
     **Use both approaches strategically:**
-    
+
     ```typescript
     const isDevelopment = process.env.NODE_ENV === 'development';
     
@@ -424,24 +416,16 @@ const result = await superglue.executeWorkflow({
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card
-    title="Complete MCP Guide"
-    href="/mcp/mcp"
-    icon="plug"
-  >
+  <Card title="MCP Integration" icon="plug" href="/agent-builders/mcp-integration">
     Learn how credential management works with MCP and agent frameworks
   </Card>
-  <Card
-    title="SDK Integration"
-    href="/agent-builders/sdk-integration"
-    icon="code"
-  >
+  <Card title="SDK Integration" icon="code" href="/agent-builders/sdk-integration">
     See examples of credential management in custom applications
   </Card>
-  <Card title="Self-Hosting" href="/guides/self-hosting" icon="server">
+  <Card title="Self-Hosting" icon="server" href="/guides/self-hosting">
     Set up your own Superglue instance with full credential control
   </Card>
-  <Card title="OAuth Guide" href="/guides/oauth-integrations" icon="key">
+  <Card title="OAuth Guide" icon="key" href="/guides/oauth-integrations">
     Deep dive into OAuth integrations and token management
   </Card>
 </CardGroup>
