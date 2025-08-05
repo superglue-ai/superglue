@@ -1,54 +1,115 @@
 ---
-title: "Welcome to superglue 🍯"
-description: "One SDK to manage all your data pipelines."
+title: "Welcome to Superglue 🔗"
+description: "Natural language API integration and orchestration for humans and agents"
 ---
 
-superglue bundles your pipelines into one stable, self-healing endpoint. Comes with automated schema-drift detection, retries and remappings so your data keeps moving no matter what - no connector maintenance, no rewrites. You can deploy it as a proxy between you and any SaaS app, API and data source and always get the data that you want in the format you expect.
+<Card title="What is Superglue?" icon="lightbulb" iconType="duotone">
+  Superglue uses **natural language** to integrate and orchestrate APIs so
+  humans can build faster, and agents can reliably execute across apps and data
+  sources.
+</Card>
 
-- Drop‑in proxy: point it at any REST / GraphQL / SQL / file endpoint.
-- LLM‑assisted mapping at setup; cached JSONata transforms at runtime (no LLM latency).
-- Self‑healing drift detector: when the upstream schema changes, superglue regenerates the transform, bumps a version, and keeps the pipeline running.
-- Security‑first: zero data stored; run fully on‑prem or use our hosted version.
-- Agent‑ready: every pipeline is exposed as a single, deterministic endpoint that LangChain, Retool or internal no‑code tools can call without knowing the ugly stuff underneath.
+Instead of writing complex integration code, you describe what you want in plain English. Superglue figures out how to connect APIs, transform data, handle errors, and keep everything running smoothly.
 
-It's open source and easy to run in your own infra.
+<iframe
+  className="w-full aspect-video"
+  src="https://www.youtube.com/embed/bWO-yp6yLXo"
+  title="YouTube video player"
+  frameborder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowfullscreen
+/>
 
-<iframe className="w-full aspect-video" src="https://www.youtube.com/embed/bWO-yp6yLXo" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen />
+## How It Works
 
-## Core Functionality
+1. **Connect**: Add integrations (Stripe, HubSpot, databases, etc.) with credentials and documentation
+2. **Build**: Describe workflows in natural language - Superglue creates the API orchestration
+3. **Run**: Execute workflows that automatically handle authentication, data transformation, and error recovery
 
-- Understands schema and format of data source
-- Transforms data sources into your target schema
-- Handles extraction, validation, and transformation automatically
-- Creates deterministic transformation instructions using LLMs
-- Validates output against JSON schemas
-- Supports monitoring, error handling, self-healing out of the box
-- Real-time log streaming via GraphQL subscriptions
-- Use as a drop-in replacement for any API integration or as lightweight ETL
+## Choose Your Path
 
-## What People Build with superglue
+<CardGroup cols={2}>
+  <Card
+    title="Agent & AI App Builders"
+    icon="robot"
+    href="/agent-builders/quickstart"
+  >
+    Build AI agents and applications that can reliably execute across APIs and
+    data sources **Perfect for:** - AI agent developers - AI application
+    builders - No-code/low-code developers **Get started with:** - MCP
+    integration for agent frameworks - SDK for custom AI applications
+  </Card>
 
-- Ship connectors 10x faster, without the maintenance overhead
-- Simple interface for legacy API pipelines
-- CMS or cloud migration
-- Transforming SQL queries into Rest API calls
-- Data lake consolidation
-- Track data lineage
-- And many more...
+  <Card
+    title="Data & Integration Engineers"
+    icon="database"
+    href="/data-engineers/quickstart"
+  >
+    Build robust data pipelines and API integrations without the traditional
+    complexity **Perfect for:** - Data engineers - Integration specialists -
+    Backend developers **Get started with:** - UI/Chat interface for rapid
+    prototyping - SDK for production implementations
+  </Card>
+</CardGroup>
 
-## Next Steps
+## Why Superglue?
 
-- Read our [Quick Start Guide](/docs/quickstart) to set up superglue for your usecase
-- Check out our guides, e.g. on [Hubspot](/guides/hubspot), to learn common patterns
-- Learn about [advanced configuration](/api-reference/overview)
+<AccordionGroup>
+  <Accordion title="🧠 AI-Native Integration" icon="brain">
+    - Natural language workflow creation - Automatic schema understanding and
+    adaptation - Self-healing when APIs change
+  </Accordion>
 
-## Support & Resources
+<Accordion title="⚡ Built for Speed" icon="bolt">
+  - 30-second setup for common integrations - Pre-built connectors for popular
+  APIs - [10x faster than traditional coding](https://superglue.ai/api-ranking/)
+</Accordion>
 
-- [API Reference](/api-reference/overview)
-- [GitHub Repository](https://github.com/superglue-ai/superglue)
-- [Discord Community](https://discord.gg/vUKnuhHtfW)
+<Accordion title="🔒 Enterprise Ready" icon="shield">
+  - Bring your own credentials or use our secure storage - Self-hosting options
+  available - Zero data retention by default
+</Accordion>
+
+  <Accordion title="🤖 Agent Optimized" icon="robot">
+    - Deterministic, reliable execution for AI agents - Universal MCP tool for
+    any API or database - Handles complex multi-step workflows automatically
+  </Accordion>
+</AccordionGroup>
+
+## What You Can Build
+
+<CardGroup cols={3}>
+  <Card title="AI Agents" icon="robot">
+    Give your agents reliable access to any API or database through MCP
+    integration
+  </Card>
+  <Card title="Data Pipelines" icon="pipe">
+    Build robust ETL processes that adapt to schema changes automatically
+  </Card>
+  <Card title="API Orchestration" icon="workflow">
+    Chain multiple APIs together with natural language descriptions
+  </Card>
+  <Card title="Legacy Modernization" icon="arrows-rotate">
+    Wrap legacy systems with modern, AI-friendly interfaces
+  </Card>
+  <Card title="Real-time Sync" icon="sync">
+    Keep data synchronized across multiple platforms and databases
+  </Card>
+  <Card title="Custom Integrations" icon="plug">
+    Build integrations for any REST, GraphQL, or SQL endpoint
+  </Card>
+</CardGroup>
+
+---
+
+<Card title="Ready to get started?" icon="rocket">
+  Choose your path above, or [try the hosted
+  version](https://app.superglue.cloud) right now.
+</Card>
+
+## Support & Community
+
+- [GitHub Repository](https://github.com/superglue-ai/superglue) - Open source and self-hostable
+- [Discord Community](https://discord.gg/vUKnuhHtfW) - Get help and share ideas
+- [Book a Demo](https://cal.com/superglue/superglue-demo) - Talk to our team
 - Email: [stefan@superglue.cloud](mailto:stefan@superglue.cloud)
-
----
-
-Ready to simplify your API integrations? [Get started now](https://superglue.cloud)
