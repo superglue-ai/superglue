@@ -62,7 +62,8 @@ function selectLanguageModel(): LLM {
             logMessage("warn", "⚠️  Anthropic models use a workaround for structured output generation. While enhanced for reliability, they may have higher failure rates than OpenAI/Gemini for complex schemas. Consider using OpenAI or Gemini for production workloads requiring high reliability.");
             return new AnthropicModel();
         default:
-            logMessage("info", "Using default model: " + process.env.OPENAI_MODEL);
-            return new OpenAIModel();
+            const defaultModel = new OpenAIModel();
+            logMessage("info", "Using default model: " + defaultModel.model);
+            return defaultModel;
     }
 }
