@@ -27,10 +27,11 @@ export interface DocumentationConfig {
   urlPath?: string;
   headers?: Record<string, string>;
   queryParams?: Record<string, string>;
+  keywords?: string[];
 }
 
 export class Documentation {
-  private static MAX_LENGTH = Math.min(LanguageModel.contextLength - 50000, 200000);
+  private static MAX_LENGTH = Math.min(LanguageModel.contextLength - server_defaults.DOCUMENTATION.MAX_LENGTH_OFFSET, server_defaults.DOCUMENTATION.MAX_LENGTH_ABSOLUTE);
 
   // Configuration stored per instance
   public config: DocumentationConfig;
@@ -100,7 +101,7 @@ export class Documentation {
     try {
       const response = await axios.get(this.config.openApiUrl, { timeout: server_defaults.TIMEOUTS.AXIOS });
       let data = response.data;
-      
+
       // If data is already an object (axios parsed it), check for OpenAPI links
       if (typeof data === 'object' && data !== null) {
         // Check if this is a discovery/index response with links to other OpenAPI docs
@@ -112,10 +113,10 @@ export class Documentation {
         }
         return JSON.stringify(data, null, 2);
       }
-      
+
       if (typeof data === 'string') {
         const trimmedData = data.trim();
-        
+
         // First, try to parse as JSON
         try {
           const parsed = JSON.parse(trimmedData);
@@ -146,13 +147,10 @@ export class Documentation {
           } catch (yamlError) {
             logMessage('warn', `Failed to parse content as JSON or YAML from ${this.config.openApiUrl}: ${yamlError?.message}`, this.metadata);
           }
-          
-          // If both JSON and YAML parsing failed, return original data
           return data;
         }
       }
-      
-      // Fallback: return data as string
+
       return String(data);
     } catch (error) {
       logMessage('warn', `Failed to fetch OpenAPI documentation from ${this.config.openApiUrl}: ${error?.message}`, this.metadata);
@@ -162,24 +160,22 @@ export class Documentation {
 
   private extractOpenApiUrls(data: any): string[] {
     const urls: string[] = [];
-    
+
     // Recursive function to find all OpenAPI URLs in the data structure
     const findOpenApiUrls = (obj: any) => {
       if (!obj || typeof obj !== 'object') return;
-      
+
       for (const key in obj) {
         if (!obj.hasOwnProperty(key)) continue;
-        
         const value = obj[key];
-        
-        // Look for common patterns: "openApi", "openapi", "openapiUrl", "specUrl", etc.
-        if ((key.toLowerCase().includes('openapi') || key.toLowerCase().includes('spec')) && 
-            typeof value === 'string' && 
-            value.startsWith('http')) {
+
+        if ((key.toLowerCase().includes('openapi') || key.toLowerCase().includes('spec')) &&
+          typeof value === 'string' &&
+          value.startsWith('http')) {
           urls.push(value);
         }
-        
-        // Recurse into nested objects and arrays
+
+
         if (Array.isArray(value)) {
           value.forEach(item => findOpenApiUrls(item));
         } else if (typeof value === 'object') {
@@ -187,22 +183,21 @@ export class Documentation {
         }
       }
     };
-    
+
     findOpenApiUrls(data);
     return [...new Set(urls)]; // Remove duplicates
   }
 
   private async fetchMultipleOpenApiSpecs(urls: string[]): Promise<string> {
     const specs: any[] = [];
-    const MAX_CONCURRENT_FETCHES = 5;
-    const MAX_SPECS_TO_FETCH = 100; // Limit to prevent excessive fetching
-    
-    // Limit the number of specs to fetch
+    const MAX_CONCURRENT_FETCHES = server_defaults.DOCUMENTATION.MAX_CONCURRENT_OPENAPI_FETCHES;
+    const MAX_SPECS_TO_FETCH = server_defaults.DOCUMENTATION.MAX_OPENAPI_SPECS_TO_FETCH;
+
     const urlsToFetch = urls.slice(0, MAX_SPECS_TO_FETCH);
     if (urls.length > MAX_SPECS_TO_FETCH) {
       logMessage('warn', `Found ${urls.length} OpenAPI specs but limiting to ${MAX_SPECS_TO_FETCH}`, this.metadata);
     }
-    
+
     // Fetch specs in batches to avoid overwhelming the server
     for (let i = 0; i < urlsToFetch.length; i += MAX_CONCURRENT_FETCHES) {
       const batch = urlsToFetch.slice(i, i + MAX_CONCURRENT_FETCHES);
@@ -210,7 +205,7 @@ export class Documentation {
         try {
           const response = await axios.get(url, { timeout: server_defaults.TIMEOUTS.AXIOS });
           let specData = response.data;
-          
+
           // Parse if string
           if (typeof specData === 'string') {
             try {
@@ -224,7 +219,7 @@ export class Documentation {
               }
             }
           }
-          
+
           logMessage('info', `Fetched OpenAPI spec from ${url}`, this.metadata);
           return {
             url,
@@ -235,11 +230,11 @@ export class Documentation {
           return null;
         }
       });
-      
+
       const batchResults = await Promise.all(batchPromises);
       specs.push(...batchResults.filter(result => result !== null));
     }
-    
+
     // Return combined specs
     if (specs.length === 0) {
       return "";
@@ -403,8 +398,16 @@ export class AxiosFetchingStrategy implements FetchingStrategy {
 }
 // Special strategy solely responsible for fetching page content if needed
 export class PlaywrightFetchingStrategy implements FetchingStrategy {
-  private static readonly MAX_FETCHED_LINKS = 35;
+  private static readonly MAX_FETCHED_LINKS = server_defaults.DOCUMENTATION.MAX_FETCHED_LINKS;
+  private static readonly PARALLEL_FETCH_LIMIT = server_defaults.DOCUMENTATION.PARALLEL_FETCH_LIMIT;
   private static browserInstance: playwright.Browser | null = null;
+
+  private static readonly NEGATIVE_KEYWORDS = [
+    'signup', 'login', 'pricing', 'contact', 'support', 'cookie', 'webhook', 'webhooks',
+    'privacy', 'terms', 'legal', 'policy', 'status', 'help', 'blog',
+    'careers', 'about', 'press', 'news', 'events', 'partners', 'changelog',
+    'changelogs', 'release notes', 'releases', 'updates', 'upgrade', 'upgrade notes',
+  ];
 
   private static async getBrowser(): Promise<playwright.Browser> {
     if (!PlaywrightFetchingStrategy.browserInstance) {
@@ -467,23 +470,112 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
         return links;
       });
 
-      await page.evaluate(() => {
+      await page.evaluate((textPatternMaxLength) => {
         const selectorsToRemove = [
+          // Navigation & Layout
           'nav', 'header', 'footer', '.nav', '.navbar', '.header', '.footer',
+          '.sidebar', '.menu', '[role="navigation"]', '[role="banner"]',
+          '[role="contentinfo"]', '.site-header', '.site-footer', '#navbar',
+          '.top-bar', '.bottom-bar', '.breadcrumb', '.breadcrumbs',
+
+          // Cookie & Privacy
           '.cookie-banner', '.cookie-consent', '.cookies', '#cookie-banner',
-          '.cookie-notice', '.sidebar', '.menu', '[role="navigation"]',
-          '[role="banner"]', '[role="dialog"]', '[role="contentinfo"]', 'script', 'style', // Also remove scripts/styles
+          '.cookie-notice', '.cookie-policy', '.privacy-notice', '.gdpr',
+          '.cc-banner', '.cookiebar', '.cookie-bar', '#cookieConsent',
+          '.cookie-popup', '.cookie-modal', '[class*="cookie"]', '[id*="cookie"]',
+          '.consent-banner', '.consent-notice', '[data-cookie]', '[data-consent]',
+
+          // Popups & Modals
+          '[role="dialog"]', '.modal', '.popup', '.overlay', '.lightbox',
+          '.newsletter', '.subscribe', '.subscription', '.email-signup',
+          '.exit-popup', '.exit-intent', '.promotion', '.promo-banner',
+          '.notification-bar', '.alert-banner', '.announcement-bar',
+
+          // Social & Sharing
+          '.social', '.share', '.sharing', '.social-media', '.social-links',
+          '.share-buttons', '.social-buttons', '[class*="share"]', '[class*="social"]',
+          '.follow-us', '.connect', '.facebook', '.twitter', '.linkedin',
+
+          // Support & Chat
+          '.chat', '.chat-widget', '.chatbot', '.live-chat', '.support-chat',
+          '.help-widget', '.feedback', '.feedback-widget', '[id*="chat"]',
+          '.intercom', '.drift', '.zendesk', '.freshchat', '.tawk',
+
+          // Ads & Marketing
+          '.ad', '.ads', '.advertisement', '.banner-ad', '.sponsored',
+          '.marketing', '.cta-banner', '.call-to-action', '[class*="ad-"]',
+          '.demo-request', '.free-trial', '.pricing-banner', '.upgrade-banner',
+
+          // Comments & Reviews
+          '.comments', '.comment-section', '.reviews', '.testimonials',
+          '.disqus', '#disqus_thread', '.discourse', '.rating',
+
+          // Media & Embeds
+          '.video-player', '.youtube', '.vimeo', 'iframe[src*="youtube"]',
+          'iframe[src*="vimeo"]', '.embed', '.media-embed',
+
+          // Misc UI Elements
+          '.search', '.search-box', '.search-bar', '#search', '[role="search"]',
+          '.language-selector', '.locale-selector', '.country-selector',
+          '.back-to-top', '.scroll-to-top', '.floating-button',
+          '.survey', '.survey-widget', '.nps', '.feedback-survey',
+          '.banner:not(.info-banner)', '.ribbon', '.badge:not(.version-badge)',
+
+          // Scripts & Styles
+          'script', 'style', 'link[rel="stylesheet"]', 'noscript',
+
+          // Data attributes commonly used for tracking/analytics
+          '[data-ga]', '[data-gtm]', '[data-analytics]', '[data-track]',
+          '[data-beacon]', '[data-segment]', '[data-heap]'
         ];
+
         selectorsToRemove.forEach(selector => {
           document.querySelectorAll(selector).forEach(element => {
-            try { element.remove(); }
-            catch (e) {
-              // Cannot use logMessage directly here as it's inside page.evaluate
+            try {
+              element.remove();
+            } catch (e) {
               console.warn("Failed to remove element:", e?.message);
             }
           });
         });
-      });
+
+        const textPatternsToRemove = [
+          /accept.*cookies?/i,
+          /cookie.*policy/i,
+          /privacy.*policy/i,
+          /subscribe.*newsletter/i,
+          /sign.*up.*updates/i,
+          /follow.*us/i,
+          /connect.*with.*us/i,
+          /share.*article/i,
+          /was.*this.*helpful/i,
+          /rate.*this/i,
+          /leave.*feedback/i
+        ];
+
+        const allElements = document.querySelectorAll('*');
+        allElements.forEach(element => {
+          const text = element.textContent || '';
+          if (text.length < textPatternMaxLength && textPatternsToRemove.some(pattern => pattern.test(text))) {
+            try {
+              element.remove();
+            } catch (e) {
+              console.warn("Failed to remove element by text pattern:", e?.message);
+            }
+          }
+        });
+
+        // Remove empty containers that might have held removed content
+        document.querySelectorAll('div, section, aside').forEach(element => {
+          if (element.innerHTML.trim() === '' && !element.querySelector('*')) {
+            try {
+              element.remove();
+            } catch (e) {
+              console.warn("Failed to remove empty container:", e?.message);
+            }
+          }
+        });
+      }, server_defaults.DOCUMENTATION.TEXT_PATTERN_REMOVAL_MAX_LENGTH);
 
       const content = await page.content();
       logMessage('info', `Successfully fetched content for ${urlString}`, metadata);
@@ -500,25 +592,332 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     }
   }
 
+  private async discoverSitemapUrls(baseUrl: string): Promise<string[]> {
+    const candidates: string[] = [];
+    try {
+      const url = new URL(baseUrl);
+      const origin = url.origin;
+      const pathname = url.pathname;
+
+      // First, try sitemaps specific to the documentation path
+      if (pathname && pathname !== '/') {
+        // Try sitemap at the exact path
+        candidates.push(`${baseUrl}/sitemap.xml`);
+
+        // Try sitemap at parent directories
+        const pathParts = pathname.split('/').filter(p => p);
+        for (let i = pathParts.length; i > 0; i--) {
+          const parentPath = '/' + pathParts.slice(0, i).join('/');
+          candidates.push(`${origin}${parentPath}/sitemap.xml`);
+        }
+      }
+
+      // Then try common sitemap locations at the root
+      candidates.push(
+        `${origin}/sitemap.xml`,
+        `${origin}/sitemap_index.xml`,
+        `${origin}/sitemaps/sitemap.xml`,
+        `${origin}/sitemap/index.xml`,
+        `${origin}/docs/sitemap.xml`,
+        `${origin}/api/sitemap.xml`
+      );
+    } catch {
+      // Invalid URL
+    }
+    // Remove duplicates while preserving order
+    return [...new Set(candidates)];
+  }
+
+  private async fetchSitemapContent(sitemapUrl: string, config: DocumentationConfig): Promise<string | null> {
+    try {
+      const response = await axios.get(sitemapUrl, {
+        headers: config.headers,
+        timeout: server_defaults.TIMEOUTS.SITEMAP_FETCH,
+        validateStatus: (status) => status === 200
+      });
+
+      const content = response.data;
+      if (typeof content !== 'string') return null;
+
+      const trimmed = content.trim();
+      if (!trimmed.startsWith('<?xml') && !trimmed.startsWith('<urlset') && !trimmed.startsWith('<sitemapindex')) {
+        return null;
+      }
+
+      if (!content.includes('<loc>') || (!content.includes('<url>') && !content.includes('<sitemap>'))) {
+        return null;
+      }
+
+      return content;
+    } catch {
+      return null;
+    }
+  }
+
+  private parseSitemapContent(content: string, baseUrl: string): { urls: string[], sitemaps: string[] } {
+    const urls: string[] = [];
+    const sitemaps: string[] = [];
+
+    try {
+      const hasXmlTags = content.includes('<loc>') && content.includes('</loc>');
+
+      if (hasXmlTags) {
+        const locMatches = content.matchAll(/<loc>([^<]+)<\/loc>/gi);
+        const allLocs: string[] = [];
+        for (const match of locMatches) {
+          const url = match[1].trim();
+          if (url.startsWith('http')) {
+            allLocs.push(url);
+          }
+        }
+
+        for (const loc of allLocs) {
+          const locIndex = content.indexOf(`<loc>${loc}</loc>`);
+          if (locIndex === -1) continue;
+
+          const precedingContent = content.substring(Math.max(0, locIndex - 200), locIndex);
+          if (precedingContent.match(/<sitemap[^>]*>/i)) {
+            sitemaps.push(loc);
+          } else {
+            urls.push(loc);
+          }
+        }
+
+        if (urls.length === 0 && sitemaps.length === 0 && allLocs.length > 0) {
+          urls.push(...allLocs);
+        }
+      } else {
+        const potentialUrls = content.split(/\s+/);
+        for (const potentialUrl of potentialUrls) {
+          const trimmed = potentialUrl.trim();
+          if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+            try {
+              new URL(trimmed);
+              urls.push(trimmed);
+            } catch {
+              // Invalid URL
+            }
+          }
+        }
+      }
+    } catch {
+      // Parsing error
+    }
+
+    return { urls, sitemaps };
+  }
+
+  private async collectSitemapUrls(config: DocumentationConfig, metadata: Metadata): Promise<string[]> {
+    if (!config.documentationUrl) return [];
+
+    const sitemapCandidates = await this.discoverSitemapUrls(config.documentationUrl);
+    const allUrls: string[] = [];
+    const processedSitemaps = new Set<string>();
+    const sitemapQueue: string[] = [];
+
+    // Parse the documentation URL to get the base path for filtering
+    let docUrlBase: string;
+    try {
+      const docUrl = new URL(config.documentationUrl);
+      // Remove trailing slash for consistent comparison
+      docUrlBase = docUrl.href.replace(/\/$/, '');
+    } catch {
+      logMessage('warn', `Invalid documentation URL: ${config.documentationUrl}`, metadata);
+      return [];
+    }
+
+    for (const candidate of sitemapCandidates) {
+      const content = await this.fetchSitemapContent(candidate, config);
+      if (content) {
+        logMessage('info', `Found sitemap at: ${candidate}`, metadata);
+        sitemapQueue.push(candidate);
+        break;
+      }
+    }
+
+    if (sitemapQueue.length === 0) {
+      logMessage('debug', `No sitemap found. Tried: ${sitemapCandidates.slice(0, 5).join(', ')}...`, metadata);
+    }
+
+    const MAX_SITEMAP_DEPTH = server_defaults.DOCUMENTATION.MAX_SITEMAP_DEPTH;
+    let depth = 0;
+
+    while (sitemapQueue.length > 0 && depth < MAX_SITEMAP_DEPTH) {
+      const currentBatch = [...sitemapQueue];
+      sitemapQueue.length = 0;
+      depth++;
+
+      for (const sitemapUrl of currentBatch) {
+        if (processedSitemaps.has(sitemapUrl)) continue;
+        processedSitemaps.add(sitemapUrl);
+
+        const content = await this.fetchSitemapContent(sitemapUrl, config);
+        if (!content) continue;
+
+        const { urls, sitemaps } = this.parseSitemapContent(content, sitemapUrl);
+
+        // Log sample URLs for debugging
+        if (urls.length > 0) {
+          logMessage('debug', `Found ${urls.length} total URLs in sitemap. First few: ${urls.slice(0, 3).join(', ')}`, metadata);
+        }
+
+        // Filter URLs to only include those under the documentation URL path
+        const filteredUrls = urls.filter(url => {
+          try {
+            const urlWithoutTrailingSlash = url.replace(/\/$/, '');
+            const docUrlBaseWithoutTrailing = docUrlBase.replace(/\/$/, '');
+
+            // Check if the URL starts with the documentation URL (is nested under it)
+            // Also handle cases where the URL might have different protocols or www
+            const urlObj = new URL(urlWithoutTrailingSlash);
+            const docUrlObj = new URL(docUrlBaseWithoutTrailing);
+
+            // Check if it's the same host and the path starts with the doc path
+            return urlObj.hostname === docUrlObj.hostname &&
+              urlObj.pathname.startsWith(docUrlObj.pathname);
+          } catch {
+            return false;
+          }
+        });
+
+        if (urls.length > 0 && filteredUrls.length === 0) {
+          logMessage('debug', `Filtered out all ${urls.length} URLs. docUrlBase: ${docUrlBase}`, metadata);
+        }
+
+        allUrls.push(...filteredUrls);
+        sitemapQueue.push(...sitemaps.filter(s => !processedSitemaps.has(s)));
+      }
+    }
+
+    const uniqueUrls = [...new Set(allUrls)];
+    logMessage('info', `Collected ${uniqueUrls.length} URLs under ${docUrlBase} from sitemap(s)`, metadata);
+    return uniqueUrls;
+  }
+
+  private async fetchPagesInParallel(
+    urls: string[],
+    config: DocumentationConfig,
+    metadata: Metadata
+  ): Promise<string> {
+    let combinedContent = "";
+    const BATCH_SIZE = PlaywrightFetchingStrategy.PARALLEL_FETCH_LIMIT;
+
+    for (let i = 0; i < urls.length && i < PlaywrightFetchingStrategy.MAX_FETCHED_LINKS; i += BATCH_SIZE) {
+      const batch = urls.slice(i, Math.min(i + BATCH_SIZE, PlaywrightFetchingStrategy.MAX_FETCHED_LINKS));
+
+      const batchPromises = batch.map(url =>
+        this.fetchPageContentWithPlaywright(url, config, metadata)
+      );
+
+      const results = await Promise.all(batchPromises);
+
+      for (const result of results) {
+        if (result?.content) {
+          combinedContent += combinedContent ? `\n\n${result.content}` : result.content;
+        }
+      }
+    }
+
+    return combinedContent;
+  }
+
   async tryFetch(config: DocumentationConfig, metadata: Metadata): Promise<string | null> {
+    if (!config?.documentationUrl) return null;
+
+    try {
+      const sitemapPromise = (async () => {
+        const sitemapUrls = await this.collectSitemapUrls(config, metadata);
+
+        if (sitemapUrls.length > 0) {
+          logMessage('info', `Found ${sitemapUrls.length} URLs from sitemap(s)`, metadata);
+
+          const keywords = this.getMergedKeywords(config.keywords);
+          const rankedUrls = this.rankUrls(sitemapUrls, keywords);
+
+          const topUrls = rankedUrls.slice(0, PlaywrightFetchingStrategy.MAX_FETCHED_LINKS);
+          const content = await this.fetchPagesInParallel(topUrls, config, metadata);
+
+          if (content) {
+            return content;
+          }
+        }
+        return null;
+      })();
+
+      const timeoutPromise = new Promise<null>((resolve) => {
+        setTimeout(() => {
+          logMessage('warn', 'Sitemap processing timed out, falling back to legacy crawling', metadata);
+          resolve(null);
+        }, server_defaults.TIMEOUTS.SITEMAP_PROCESSING_TOTAL);
+      });
+
+      const result = await Promise.race([sitemapPromise, timeoutPromise]);
+
+      if (result) {
+        return result;
+      }
+    } catch (error) {
+      logMessage('warn', `Sitemap processing failed: ${error?.message}, falling back to legacy crawling`, metadata);
+    }
+
+    return this.legacyTryFetch(config, metadata);
+  }
+
+  private getDefaultKeywords(): string[] {
+    return [
+      "authentication", "authorization", "bearer", "token",
+      "getting started", "quickstart", "guides", "tutorial", "how to", "api", "api-reference",
+      "objects", "data-objects", "properties", "values", "fields", "attributes", "parameters", "schema",
+      "rest", "openapi", "open-api", "swagger", "endpoints", "reference", "query", "methods",
+      "pagination", "response", "errors", "filtering", "sorting", "searching", "filter", "sort", "search",
+      "get", "post", "put", "delete", "patch",
+    ];
+  }
+
+  private getMergedKeywords(inputKeywords?: string[] | null): string[] {
+    const defaultKeywords = this.getDefaultKeywords();
+
+    if (!inputKeywords || inputKeywords.length === 0) {
+      return defaultKeywords;
+    }
+
+    // Merge input keywords with defaults, removing duplicates
+    const mergedSet = new Set([...inputKeywords, ...defaultKeywords]);
+    return Array.from(mergedSet);
+  }
+
+  private rankUrls(urls: string[], keywords: string[]): string[] {
+    const scored = urls.map(url => {
+      const urlLower = url.toLowerCase();
+      let score = 0;
+
+      for (const keyword of keywords) {
+        if (urlLower.includes(keyword.toLowerCase())) {
+          score++;
+        }
+      }
+
+      for (const negKeyword of PlaywrightFetchingStrategy.NEGATIVE_KEYWORDS) {
+        if (urlLower.includes(negKeyword)) {
+          score -= 2;
+        }
+      }
+
+      return { url, score };
+    });
+
+    return scored
+      .sort((a, b) => b.score - a.score)
+      .map(item => item.url);
+  }
+
+  async legacyTryFetch(config: DocumentationConfig, metadata: Metadata): Promise<string | null> {
     if (!config?.documentationUrl) return null;
 
     const fetchedLinks = new Set<string>();
     let combinedContent = "";
 
-    // Expanded keywords to catch more relevant documentation pages
-    const requiredKeywords = [
-      // Auth related
-      "authentication", "authorization", "bearer", "basic", "token", "api key", "oauth", "private app",
-      // Getting started
-      "introduction", "getting started", "quickstart", "guide", "guides", "tutorial", "how to", "how-to",
-      // API specific
-      "rest", "graphql", "openapi", "open-api", "swagger", "endpoints", "reference", "query", "methods",
-      // HTTP methods
-      "get", "post", "put", "delete", "patch",
-      // Common API concepts
-      "rate limit", "pagination", "webhook", "callback", "error", "response", "errors", "filtering", "sorting", "searching", "filter", "sort", "search"
-    ];
+    const keywords = this.getMergedKeywords(config.keywords);
 
     // Pool of all discovered links (array allows duplicates with different text)
     const linkPool: { linkText: string, href: string; }[] = [];
@@ -530,7 +929,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     });
 
     while (fetchedLinks.size < PlaywrightFetchingStrategy.MAX_FETCHED_LINKS && linkPool.length > 0) {
-      const rankedLinks = this.rankLinks(linkPool, requiredKeywords, fetchedLinks);
+      const rankedLinks = this.rankLinks(linkPool, keywords, fetchedLinks);
 
       if (rankedLinks.length === 0) break;
       const nextLink = rankedLinks[0];
@@ -579,7 +978,6 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     for (const link of links) {
       if (fetchedLinks.has(link.href)) continue;
 
-      // Count keyword matches
       let matchCount = 0;
       const linkTextLower = link.linkText.toLowerCase();
       const hrefLower = link.href.toLowerCase();
@@ -589,10 +987,16 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
           matchCount++;
         }
       }
+
+      for (const negKeyword of PlaywrightFetchingStrategy.NEGATIVE_KEYWORDS) {
+        if (linkTextLower.includes(negKeyword) || hrefLower.includes(negKeyword)) {
+          matchCount -= 2;
+        }
+      }
+
       rankedLinks.push({ linkText: link.linkText, href: link.href, matchCount });
     }
 
-    // Sort by match count (highest first)
     return rankedLinks.sort((a, b) => b.matchCount - a.matchCount);
   }
 }

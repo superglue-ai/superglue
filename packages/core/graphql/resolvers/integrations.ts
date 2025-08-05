@@ -95,6 +95,7 @@ export const upsertIntegrationResolver = async (
       documentationPending: shouldFetchDoc ? true : (existingIntegrationOrNull?.documentationPending || false),
       credentials: resolveField(input.credentials, existingIntegrationOrNull?.credentials, {}),
       specificInstructions: resolveField(input.specificInstructions?.trim(), existingIntegrationOrNull?.specificInstructions, ''),
+      documentationKeywords: uniqueKeywords(resolveField(input.documentationKeywords, existingIntegrationOrNull?.documentationKeywords, [])),
       createdAt: existingIntegrationOrNull?.createdAt || now,
       updatedAt: now
     };
@@ -149,12 +150,18 @@ function enrichWithTemplate(input: Integration): Integration {
     return input;
   }
 
+  const mergedKeywords = [
+    ...(input.documentationKeywords || []),
+    ...(matchingTemplate.keywords || [])
+  ];
+
   return {
-    openApiUrl: matchingTemplate.openApiUrl,
-    openApiSchema: matchingTemplate.openApiSchema,
-    documentationUrl: matchingTemplate.docsUrl,
-    urlHost: matchingTemplate.apiUrl,
     ...input,
+    openApiUrl: input.openApiUrl || matchingTemplate.openApiUrl,
+    openApiSchema: input.openApiSchema || matchingTemplate.openApiSchema,
+    documentationUrl: input.documentationUrl || matchingTemplate.docsUrl,
+    urlHost: input.urlHost || matchingTemplate.apiUrl,
+    documentationKeywords: uniqueKeywords(mergedKeywords),
   } as Integration;
 }
 
@@ -201,6 +208,7 @@ async function triggerAsyncDocumentationFetch(
         urlPath: enrichedInput.urlPath,
         documentationUrl: enrichedInput.documentationUrl,
         openApiUrl: enrichedInput.openApiUrl,
+        keywords: uniqueKeywords(enrichedInput.documentationKeywords),
       },
       enrichedInput.credentials || {},
       { orgId: context.orgId }
@@ -253,4 +261,9 @@ async function triggerAsyncDocumentationFetch(
       logMessage('error', `Failed to reset documentationPending for integration ${input.id}: ${String(resetError)}`, { orgId: context.orgId });
     }
   }
+}
+
+function uniqueKeywords(keywords: string[] | undefined): string[] {
+  if (!keywords || keywords.length === 0) return [];
+  return [...new Set(keywords)];
 }
