@@ -415,8 +415,8 @@ if (result.success) {
     Learn about secure credential storage and runtime credential passing
   </Card>
   <Card
-    title="MCP Integration"
-    href="/agent-builders/mcp-integration"
+    title="Complete MCP Guide"
+    href="/mcp/mcp"
     icon="plug"
   >
     Compare SDK approach with MCP for different use cases

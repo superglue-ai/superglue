@@ -99,14 +99,23 @@ With MCP, credentials are managed through the web interface and automatically us
   "mcpServers": {
     "superglue": {
       "command": "npx",
-      "args": ["@superglue/mcp-server"],
+      "args": [
+        "mcp-remote",
+        "https://mcp.superglue.ai",
+        "--header",
+        "Authorization:${AUTH_HEADER}"
+      ],
       "env": {
-        "SUPERGLUE_API_KEY": "your_superglue_api_key"
+        "AUTH_HEADER": "Bearer YOUR_SUPERGLUE_API_KEY"
       }
     }
   }
 }
 ```
+
+<Tip>
+**Self-hosting?** Replace `https://mcp.superglue.ai` with `http://localhost:3000/mcp` (or your instance URL)
+</Tip>
 
 Then in Claude Desktop:
 
@@ -416,8 +425,8 @@ const result = await superglue.executeWorkflow({
 
 <CardGroup cols={2}>
   <Card
-    title="MCP Integration"
-    href="/agent-builders/mcp-integration"
+    title="Complete MCP Guide"
+    href="/mcp/mcp"
     icon="plug"
   >
     Learn how credential management works with MCP and agent frameworks

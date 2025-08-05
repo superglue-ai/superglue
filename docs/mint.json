@@ -48,7 +48,6 @@
       "group": "For Agent & AI App Builders",
       "pages": [
         "agent-builders/quickstart",
-        "agent-builders/mcp-integration",
         "agent-builders/sdk-integration",
         "agent-builders/credential-management",
         "mcp/mcp",
@@ -73,8 +72,6 @@
         "guides/architecture",
         "guides/oauth-integrations",
         "guides/webhooks",
-        "guides/shopify",
-        "guides/jira",
         "guides/hubspot",
         "guides/google-ads",
         "guides/instagram-business",

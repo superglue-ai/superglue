@@ -15,20 +15,28 @@ Superglue acts as a **universal MCP tool** that gives your agents reliable acces
       <Tab title="MCP (Recommended for Agents)">
         Perfect for Claude Desktop, agent frameworks, and any MCP-compatible system.
 
-        ```bash
-        # Add to your MCP settings
+        ```json
         {
           "mcpServers": {
             "superglue": {
               "command": "npx",
-              "args": ["@superglue/mcp-server"],
+              "args": [
+                "mcp-remote",
+                "https://mcp.superglue.ai",
+                "--header",
+                "Authorization:${AUTH_HEADER}"
+              ],
               "env": {
-                "SUPERGLUE_API_KEY": "your_api_key_here"
+                "AUTH_HEADER": "Bearer YOUR_SUPERGLUE_API_KEY"
               }
             }
           }
         }
         ```
+        
+        <Tip>
+        **Self-hosting?** Replace `https://mcp.superglue.ai` with `http://localhost:3000/mcp` (or your instance URL)
+        </Tip>
       </Tab>
       <Tab title="SDK (For Custom Apps)">
         Perfect for building custom AI applications with full control.
@@ -147,7 +155,7 @@ Superglue acts as a **universal MCP tool** that gives your agents reliable acces
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="MCP Integration" icon="plug" href="/agent-builders/mcp-integration">
+  <Card title="Complete MCP Guide" icon="plug" href="/mcp/mcp">
     Deep dive into using Superglue with Claude Desktop, agent frameworks, and
     MCP
   </Card>
