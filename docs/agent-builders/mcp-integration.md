@@ -4,9 +4,7 @@ description: "Deep dive into using Superglue with Claude Desktop, agent framewor
 ---
 
 <Info>
-  MCP (Model Context Protocol) is the easiest way to give AI agents access to
-  external tools and data sources. Superglue provides a universal MCP server
-  that connects to any API.
+  MCP (Model Context Protocol) is the easiest way to give AI agents access to external tools and data sources. superglue provides a universal MCP server that connects to any API.
 </Info>
 
 ## What You Get with MCP
@@ -38,10 +36,9 @@ description: "Deep dive into using Superglue with Claude Desktop, agent framewor
     npm install -g @superglue/mcp-server
     ```
   </Step>
-  
   <Step title="Configure Claude Desktop">
     Add to your Claude Desktop MCP settings (`~/Library/Application Support/Claude/claude_desktop_config.json`):
-    
+
     ```json
     {
       "mcpServers": {
@@ -56,12 +53,11 @@ description: "Deep dive into using Superglue with Claude Desktop, agent framewor
       }
     }
     ```
-    
+
     <Tip>
-    **Self-hosting?** Set `SUPERGLUE_BASE_URL` to your instance URL and omit the API key if auth is disabled.
+      **Self-hosting?** Set `SUPERGLUE_BASE_URL` to your instance URL and omit the API key if auth is disabled.
     </Tip>
   </Step>
-  
   <Step title="Restart Claude Desktop">
     Close and reopen Claude Desktop. You should see "Superglue" connected in the MCP status.
   </Step>
@@ -73,33 +69,29 @@ The Superglue MCP server provides these tools to your agent:
 
 <AccordionGroup>
   <Accordion title="superglue_find_integrations" icon="search">
-    **Purpose:** Discover available integrations for your task **Usage:** >
+    **Purpose:** Discover available integrations for your task **Usage:** \>
     "Find integrations for social media posting" **What it does:** Returns
     available integrations like Twitter, LinkedIn, Facebook with their
     capability descriptions.
   </Accordion>
-
-<Accordion title="superglue_build_and_run_workflow" icon="play">
-  **Purpose:** Build and execute workflows in natural language **Usage:** > "Get
-  my latest Stripe transactions and create a summary report" **What it does:**
-  Creates the workflow, handles authentication, executes API calls, and returns
-  formatted results.
-</Accordion>
-
-<Accordion title="superglue_save_workflow" icon="save">
-  **Purpose:** Save successful workflows for reuse **Usage:** > "Save this
-  workflow as 'daily-stripe-report'" **What it does:** Persists the workflow for
-  future execution with the same reliability.
-</Accordion>
-
-<Accordion title="superglue_execute_workflow" icon="refresh">
-  **Purpose:** Run previously saved workflows **Usage:** > "Run the
-  daily-stripe-report workflow" **What it does:** Executes the saved workflow
-  with current data.
-</Accordion>
-
+  <Accordion title="superglue_build_and_run_workflow" icon="play">
+    **Purpose:** Build and execute workflows in natural language **Usage:** \> "Get
+    my latest Stripe transactions and create a summary report" **What it does:**
+    Creates the workflow, handles authentication, executes API calls, and returns
+    formatted results.
+  </Accordion>
+  <Accordion title="superglue_save_workflow" icon="save">
+    **Purpose:** Save successful workflows for reuse **Usage:** \> "Save this
+    workflow as 'daily-stripe-report'" **What it does:** Persists the workflow for
+    future execution with the same reliability.
+  </Accordion>
+  <Accordion title="superglue_execute_workflow" icon="refresh">
+    **Purpose:** Run previously saved workflows **Usage:** \> "Run the
+    daily-stripe-report workflow" **What it does:** Executes the saved workflow
+    with current data.
+  </Accordion>
   <Accordion title="superglue_create_integration" icon="plus">
-    **Purpose:** Add new integrations on-the-fly **Usage:** > "Connect to my
+    **Purpose:** Add new integrations on-the-fly **Usage:** \> "Connect to my
     company's internal API at api.company.com" **What it does:** Adds new API
     integrations with credentials and documentation.
   </Accordion>
@@ -157,33 +149,32 @@ data_agent = Agent(
     Google Analytics" **Agent:** "I'll help you analyze your business
     performance across those platforms. Let me gather the data from each source
     and create a comprehensive analysis. First, let me find the available
-    integrations..." *[Agent uses superglue_find_integrations]* "Great! I can
+    integrations..." _[Agent uses superglue_find_integrations]_ "Great\! I can
     see you have Stripe, HubSpot, and Google Analytics connected. Now I'll build
-    a workflow to gather data from all three sources..." *[Agent uses
-    superglue_build_and_run_workflow]* "Here's your business performance
+    a workflow to gather data from all three sources..." _[Agent uses
+    superglue_build_and_run_workflow]_ "Here's your business performance
     analysis: [detailed results with revenue trends, lead conversion, traffic
     patterns]"
   </Tab>
+  <Tab title="Multi-Step Workflow">
+    **Human:** "When someone subscribes to my Stripe plan, add them to HubSpot and
+    send a Slack notification" **Agent:** "I'll create an automated workflow that
+    triggers when someone subscribes. Let me build this integration... _[Agent
+    uses superglue_build_and_run_workflow with webhook setup]_ This workflow will:
 
-<Tab title="Multi-Step Workflow">
-  **Human:** "When someone subscribes to my Stripe plan, add them to HubSpot and
-  send a Slack notification" **Agent:** "I'll create an automated workflow that
-  triggers when someone subscribes. Let me build this integration... *[Agent
-  uses superglue_build_and_run_workflow with webhook setup]* This workflow will:
-  1. Monitor Stripe for new subscriptions 2. Automatically add new subscribers
-  to HubSpot as contacts 3. Send a formatted Slack notification to your team
-  Would you like me to save this workflow for ongoing use?"
-</Tab>
-
+    1. Monitor Stripe for new subscriptions 2. Automatically add new subscribers
+       to HubSpot as contacts 3. Send a formatted Slack notification to your team
+       Would you like me to save this workflow for ongoing use?"
+  </Tab>
   <Tab title="Custom Integration">
     **Human:** "Connect to my company's internal inventory API and get current
     stock levels" **Agent:** "I'll need to add your internal API as a new
-    integration first. Let me set that up... *[Agent uses
-    superglue_create_integration]* I've added your inventory API. What
+    integration first. Let me set that up... _[Agent uses
+    superglue_create_integration]_ I've added your inventory API. What
     authentication does it require? API key, OAuth, or something else?"
     **Human:** "It uses an API key in the Authorization header" **Agent:**
-    "Perfect! Now let me fetch your current stock levels... *[Agent uses
-    superglue_build_and_run_workflow]* Here are your current stock levels:
+    "Perfect\! Now let me fetch your current stock levels... _[Agent uses
+    superglue_build_and_run_workflow]_ Here are your current stock levels:
     [formatted inventory data]"
   </Tab>
 </Tabs>
@@ -193,13 +184,12 @@ data_agent = Agent(
 <CardGroup cols={2}>
   <Card title="Be Specific" icon="target">
     **Good:** "Get Stripe customers created in the last 7 days with email and subscription status"
-    
+
     **Better:** "Get active Stripe customers created in the last 7 days, include email, name, subscription status, and MRR"
   </Card>
-  
   <Card title="Use Response Schemas" icon="code">
     When building workflows, specify the output format:
-    
+
     ```json
     {
       "type": "object",  
@@ -218,17 +208,15 @@ data_agent = Agent(
     }
     ```
   </Card>
-  
   <Card title="Handle Errors Gracefully" icon="shield">
     Superglue automatically handles most errors, but help your agent understand what went wrong:
-    
+
     > "If the API is rate limited, wait and try again. If credentials are invalid, ask me to update them."
   </Card>
-  
   <Card title="Save Successful Workflows" icon="save">
     When a workflow works well, save it for reuse:
-    
-    > "This worked perfectly! Save it as 'weekly-revenue-report' so I can run it regularly."
+
+    > "This worked perfectly\! Save it as 'weekly-revenue-report' so I can run it regularly."
   </Card>
 </CardGroup>
 
@@ -240,17 +228,15 @@ data_agent = Agent(
     disconnected **Solutions:** 1. Verify `@superglue/mcp-server` is installed:
     `npm list -g @superglue/mcp-server` 2. Check your API key is correct in the
     config 3. Restart Claude Desktop completely 4. Check the logs: `tail -f
-    ~/Library/Logs/Claude/mcp-*.log`
+        ~/Library/Logs/Claude/mcp-*.log`
   </Accordion>
-
-<Accordion title="Workflow Building Fails" icon="exclamation-triangle">
-  **Symptoms:** Agent says it can't understand the integration or API calls fail
-  **Solutions:** 1. Be more specific about what data you want 2. Check if the
-  integration exists: ask agent to "find integrations for [service]" 3. Verify
-  your credentials are still valid 4. Try breaking complex requests into smaller
-  steps
-</Accordion>
-
+  <Accordion title="Workflow Building Fails" icon="exclamation-triangle">
+    **Symptoms:** Agent says it can't understand the integration or API calls fail
+    **Solutions:** 1. Be more specific about what data you want 2. Check if the
+    integration exists: ask agent to "find integrations for [service]" 3. Verify
+    your credentials are still valid 4. Try breaking complex requests into smaller
+    steps
+  </Accordion>
   <Accordion title="Authentication Issues" icon="key">
     **Symptoms:** API calls return 401 or 403 errors **Solutions:** 1. Update
     credentials in the Superglue dashboard 2. Check if API keys have expired or
@@ -262,24 +248,16 @@ data_agent = Agent(
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card
-    title="SDK Integration"
-    href="/agent-builders/sdk-integration"
-    icon="code"
-  >
+  <Card title="SDK Integration" icon="code" href="/agent-builders/sdk-integration">
     Build custom AI applications with full programmatic control
   </Card>
-  <Card
-    title="Credential Management"
-    href="/agent-builders/credential-management"
-    icon="key"
-  >
+  <Card title="Credential Management" icon="key" href="/agent-builders/credential-management">
     Learn about secure credential storage and runtime credential passing
   </Card>
-  <Card title="MCP Tools Reference" href="/mcp/mcp-tools" icon="tools">
+  <Card title="MCP Tools Reference" icon="tools" href="/mcp/mcp-tools">
     Complete reference of all available MCP tools and parameters
   </Card>
-  <Card title="Example Workflows" href="/guides/hubspot" icon="workflow">
+  <Card title="Example Workflows" icon="workflow" href="/guides/hubspot">
     See real examples of agent workflows with popular integrations
   </Card>
 </CardGroup>
