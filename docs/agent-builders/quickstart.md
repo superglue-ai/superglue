@@ -3,11 +3,6 @@ title: "30-Second Setup for Agent Builders"
 description: "Get your AI agents connected to any API in under 30 seconds"
 ---
 
-<Info>
-  **You're an Agent Builder if:** You're building AI agents or AI applications
-  that need to interact with external APIs and data sources.
-</Info>
-
 ## What Superglue Does for You
 
 Superglue acts as a **universal MCP tool** that gives your agents reliable access to any API or database. Instead of building custom tools for each integration, your agent gets one powerful tool that can connect to anything.
@@ -62,7 +57,7 @@ Superglue acts as a **universal MCP tool** that gives your agents reliable acces
   <Step title="Test with Your First Workflow">
     <Tabs>
       <Tab title="Via MCP">
-        Create a custom [GitHub api key](https://github.com/settings/personal-access-tokens/new) for superglue.
+        Create a custom [GitHub API key](https://github.com/settings/personal-access-tokens/new) for superglue.
 
         In Claude Desktop or your agent framework:
 
@@ -72,7 +67,7 @@ Superglue acts as a **universal MCP tool** that gives your agents reliable acces
 
         Alternatively, you can use an API that does not need any authentication:
 
-        > "Use Superglue to get the latest issues from the GitHub repository microsoft/vscode and summarize the top 3. My api key is ...."
+        > "Use superglue to get all products from https://timbuk2.com/products.json."
       </Tab>
       <Tab title="Via SDK">
         ```typescript
@@ -114,7 +109,7 @@ Superglue acts as a **universal MCP tool** that gives your agents reliable acces
     transformation automatically.
   </Card>
   <Card title="Any API or Database" icon="database">
-    Works with REST, GraphQL, SQL databases - anything with an HTTP endpoint.
+    Works with REST, GraphQL, SQL databases, even SOAP/XML - anything with an endpoint.
   </Card>
   <Card title="Reliable & Deterministic" icon="check">
     Built for production agent workflows with consistent, predictable results.
@@ -124,14 +119,14 @@ Superglue acts as a **universal MCP tool** that gives your agents reliable acces
 ## Credential Management Options
 
 <Tabs>
-  <Tab title="Superglue Manages Credentials">
-    **Easiest option:** Store credentials securely in Superglue.
+  <Tab title="superglue manages credentials">
+    **Easiest option:** Store credentials securely in superglue.
 
-    - Add integrations through the [web interface](https://app.superglue.cloud)
-    - Credentials are encrypted and never logged
-    - Perfect for development and trusted environments
+    - Add integrations through the web interface or the chat agent and add your credentials.
+    - Credentials are encrypted and never logged.
+    - Perfect for development and trusted environments.
   </Tab>
-  <Tab title="You Manage Credentials">
+  <Tab title="You manage credentials">
     **Maximum security:** Pass credentials at runtime.
 
     ```typescript
