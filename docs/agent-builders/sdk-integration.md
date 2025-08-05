@@ -48,6 +48,15 @@ const superglue = new SuperglueClient({
 
 ### Building and Running Workflows
 
+The Superglue SDK uses a two-step process for workflows:
+
+1. **`buildWorkflow()`** - Creates a workflow from your instruction and integrations
+2. **`executeWorkflow()`** - Executes a workflow (either by ID or by passing the workflow object)
+
+<Tip>
+  This separation gives you flexibility: build once, execute many times with different payloads, or save workflows for later use.
+</Tip>
+
 The most powerful method for AI applications - describe what you want and get it done:
 
 ```typescript
@@ -96,7 +105,7 @@ const result = await superglue.executeWorkflow({ workflow });
 ```typescript
 // Execute a previously saved workflow
 const execution = await superglue.executeWorkflow({
-  workflowId: "customer-subscription-report",
+  id: "customer-subscription-report",
   payload: {
     limit: 100,
     created_after: "2024-01-01",
@@ -196,7 +205,7 @@ class DataPipelineManager {
   async syncCustomerData() {
     try {
       // Multi-step data pipeline
-      const result = await this.superglue.buildAndExecuteWorkflow({
+      const workflow = await this.superglue.buildWorkflow({
         instruction: `Daily customer data sync:
           1. Get new Stripe customers from last 24 hours
           2. Enrich with HubSpot contact data  
@@ -211,6 +220,12 @@ class DataPipelineManager {
             notification_sent: { type: "boolean" },
           },
         },
+        save: false, // Don't save, just build and execute
+      });
+
+      // Execute the built workflow
+      const result = await this.superglue.executeWorkflow({
+        workflow: workflow,
       });
 
       if (result.success) {
@@ -253,7 +268,7 @@ class AgentOrchestrator {
     const integrations = await this.superglue.findRelevantIntegrations(task);
 
     // Build and execute the workflow
-    const result = await this.superglue.buildAndExecuteWorkflow({
+    const workflow = await this.superglue.buildWorkflow({
       instruction: task,
       integrationIds: integrations.map((i) => i.id),
       responseSchema: {
@@ -267,6 +282,11 @@ class AgentOrchestrator {
           },
         },
       },
+      save: false,
+    });
+
+    const result = await this.superglue.executeWorkflow({
+      workflow: workflow,
     });
 
     if (result.success && result.data.next_actions?.length > 0) {
@@ -290,9 +310,14 @@ async function robustWorkflowExecution() {
 
   while (attempt < maxRetries) {
     try {
-      const result = await superglue.buildAndExecuteWorkflow({
+      const workflow = await superglue.buildWorkflow({
         instruction: "Get customer data from Stripe",
         integrationIds: ["stripe"],
+        save: false,
+      });
+
+      const result = await superglue.executeWorkflow({
+        workflow: workflow,
         // Optional: Configure timeout and retry behavior
         options: {
           timeout: 30000, // 30 seconds
@@ -343,12 +368,16 @@ const superglue = new SuperglueClient({
 
 ```typescript
 // Set up webhooks for long-running workflows
-const webhookResult = await superglue.buildAndExecuteWorkflow({
+const workflow = await superglue.buildWorkflow({
   instruction: "Process large dataset from database",
   integrationIds: ["postgresql"],
+  save: false,
+});
+
+const webhookResult = await superglue.executeWorkflow({
+  workflow: workflow,
   options: {
     webhookUrl: "https://your-app.com/webhooks/superglue",
-    async: true,
   },
 });
 
@@ -379,7 +408,7 @@ import {
 } from "@superglue/client";
 
 // All responses are properly typed
-const result: WorkflowResult = await superglue.buildAndExecuteWorkflow({
+const workflow = await superglue.buildWorkflow({
   instruction: "Get Stripe customers",
   integrationIds: ["stripe"],
   responseSchema: {
@@ -397,6 +426,11 @@ const result: WorkflowResult = await superglue.buildAndExecuteWorkflow({
       },
     },
   },
+  save: false,
+});
+
+const result: WorkflowResult = await superglue.executeWorkflow({
+  workflow: workflow,
 });
 
 // TypeScript knows the shape of result.data

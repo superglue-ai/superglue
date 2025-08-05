@@ -39,9 +39,14 @@ Superglue eliminates the complexity of API integrations and data transformations
           "mcpServers": {
             "superglue": {
               "command": "npx",
-              "args": ["@superglue/mcp-server"],
+              "args": [
+                "mcp-remote",
+                "https://mcp.superglue.ai",
+                "--header",
+                "Authorization:${AUTH_HEADER}"
+              ],
               "env": {
-                "SUPERGLUE_API_KEY": "your_api_key_here"
+                "AUTH_HEADER": "Bearer your_api_key_here"
               }
             }
           }

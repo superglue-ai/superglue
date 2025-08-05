@@ -99,9 +99,14 @@ With MCP, credentials are managed through the web interface and automatically us
   "mcpServers": {
     "superglue": {
       "command": "npx",
-      "args": ["@superglue/mcp-server"],
+      "args": [
+        "mcp-remote",
+        "https://mcp.superglue.ai",
+        "--header",
+        "Authorization:${AUTH_HEADER}"
+      ],
       "env": {
-        "SUPERGLUE_API_KEY": "your_superglue_api_key"
+        "AUTH_HEADER": "Bearer your_superglue_api_key"
       }
     }
   }
