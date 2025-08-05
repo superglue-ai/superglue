@@ -19,7 +19,7 @@ Superglue acts as a **universal MCP tool** that gives your agents reliable acces
     <Tabs>
       <Tab title="MCP (Recommended for Agents)">
         Perfect for Claude Desktop, agent frameworks, and any MCP-compatible system.
-        
+
         ```bash
         # Add to your MCP settings
         {
@@ -37,11 +37,11 @@ Superglue acts as a **universal MCP tool** that gives your agents reliable acces
       </Tab>
       <Tab title="SDK (For Custom Apps)">
         Perfect for building custom AI applications with full control.
-        
+
         ```bash
         npm install @superglue/client
         ```
-        
+
         ```typescript
         import { SuperglueClient } from "@superglue/client";
         
@@ -52,23 +52,27 @@ Superglue acts as a **universal MCP tool** that gives your agents reliable acces
       </Tab>
     </Tabs>
   </Step>
-  
   <Step title="Get Your API Key">
     Get your free API key from [app.superglue.cloud](https://app.superglue.cloud) in 10 seconds.
-    
+
     <Tip>
-    **Self-hosting?** Skip the API key and [deploy locally](/guides/self-hosting) instead.
+      **Self-hosting?** Skip the API key and [deploy locally](/guides/self-hosting) instead.
     </Tip>
   </Step>
-  
   <Step title="Test with Your First Workflow">
     <Tabs>
       <Tab title="Via MCP">
+        Create a custom [GitHub api key](https://github.com/settings/personal-access-tokens/new) for superglue.
+
         In Claude Desktop or your agent framework:
-        
-        > "Use Superglue to get the latest issues from the GitHub repository microsoft/vscode and summarize the top 3"
-        
-        That's it! Superglue will automatically handle the GitHub API integration.
+
+        > "Use Superglue to get the latest issues from the GitHub repository microsoft/vscode and summarize the top 3. My api key is ...."
+
+        That's it\! Superglue will automatically handle the GitHub API integration.
+
+        Alternatively, you can use an API that does not need any authentication:
+
+        > "Use Superglue to get the latest issues from the GitHub repository microsoft/vscode and summarize the top 3. My api key is ...."
       </Tab>
       <Tab title="Via SDK">
         ```typescript
@@ -122,14 +126,14 @@ Superglue acts as a **universal MCP tool** that gives your agents reliable acces
 <Tabs>
   <Tab title="Superglue Manages Credentials">
     **Easiest option:** Store credentials securely in Superglue.
-    
+
     - Add integrations through the [web interface](https://app.superglue.cloud)
     - Credentials are encrypted and never logged
     - Perfect for development and trusted environments
   </Tab>
   <Tab title="You Manage Credentials">
     **Maximum security:** Pass credentials at runtime.
-    
+
     ```typescript
     // Via SDK
     await superglue.executeWorkflow({
@@ -140,7 +144,7 @@ Superglue acts as a **universal MCP tool** that gives your agents reliable acces
       }
     });
     ```
-    
+
     Perfect for production environments with strict security requirements.
   </Tab>
 </Tabs>
@@ -148,29 +152,17 @@ Superglue acts as a **universal MCP tool** that gives your agents reliable acces
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card
-    title="MCP Integration"
-    href="/agent-builders/mcp-integration"
-    icon="plug"
-  >
+  <Card title="MCP Integration" icon="plug" href="/agent-builders/mcp-integration">
     Deep dive into using Superglue with Claude Desktop, agent frameworks, and
     MCP
   </Card>
-  <Card
-    title="SDK Integration"
-    href="/agent-builders/sdk-integration"
-    icon="code"
-  >
+  <Card title="SDK Integration" icon="code" href="/agent-builders/sdk-integration">
     Build custom AI applications with the Superglue SDK
   </Card>
-  <Card
-    title="Credential Management"
-    href="/agent-builders/credential-management"
-    icon="key"
-  >
+  <Card title="Credential Management" icon="key" href="/agent-builders/credential-management">
     Learn about different approaches to managing API credentials
   </Card>
-  <Card title="MCP Tools Reference" href="/mcp/mcp-tools" icon="wrench">
+  <Card title="MCP Tools Reference" icon="wrench" href="/mcp/mcp-tools">
     Complete reference of all available MCP tools and capabilities
   </Card>
 </CardGroup>

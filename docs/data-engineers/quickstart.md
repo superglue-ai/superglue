@@ -3,16 +3,11 @@ title: "30-Second Setup for Data Engineers"
 description: "Build robust data pipelines and API integrations 10x faster than traditional coding"
 ---
 
-<Info>
-  **You're a Data Engineer if:** You're building data pipelines, API
-  integrations, or ETL processes for production systems.
-</Info>
-
 ## What Superglue Does for You
 
 Superglue eliminates the complexity of API integrations and data transformations. Instead of writing boilerplate code for each API, handling schema changes, and managing error cases, you describe what you want in natural language.
 
-**[We're 10x faster than traditional coding →](https://superglue.ai/api-ranking/)**
+[**We're 50% more reliable than LLMs in writing integration code →**](https://superglue.ai/api-ranking/)
 
 ## 30-Second Setup
 
@@ -21,23 +16,23 @@ Superglue eliminates the complexity of API integrations and data transformations
     <Tabs>
       <Tab title="UI/Chat (Fastest Prototyping)">
         Perfect for rapid prototyping and testing integrations.
-        
+
         1. Go to [app.superglue.cloud](https://app.superglue.cloud)
         2. Sign up for free account
         3. Start building workflows in the chat interface
       </Tab>
-      <Tab title="SDK (Production Ready)">
+      <Tab title="SDK (For Full Control)">
         Perfect for production implementations and CI/CD pipelines.
-        
+
         ```bash
         npm install @superglue/client
         ```
-        
+
         Get your API key from [app.superglue.cloud](https://app.superglue.cloud)
       </Tab>
       <Tab title="Cursor via MCP">
         Perfect for coding with AI assistance directly in your IDE.
-        
+
         ```bash
         # Add to your MCP settings  
         {
@@ -55,14 +50,13 @@ Superglue eliminates the complexity of API integrations and data transformations
       </Tab>
     </Tabs>
   </Step>
-  
   <Step title="Create Your First Integration">
     <Tabs>
       <Tab title="Via UI/Chat">
         In the chat interface:
-        
+
         > "Connect to Stripe API and get all customers created in the last 30 days, transform the data to include only email, name, and subscription status"
-        
+
         Superglue will guide you through adding credentials and testing the integration.
       </Tab>
       <Tab title="Via SDK">
@@ -73,7 +67,17 @@ Superglue eliminates the complexity of API integrations and data transformations
           apiKey: "your_api_key_here"
         });
         
-        const result = await superglue.buildAndExecuteWorkflow({
+        const integration = await superglue.upsertIntegration({
+        	id: "stripe",
+        	urlHost: "https://api.stripe.com",
+        	documentationUrl: "https://docs.stripe.com/api",
+        	credentials: {
+        		apiKey: "sk_......."
+        	}
+        });
+        
+        const workflow = await superglue.buildWorkflow({
+          id: "stripe-customers"
           instruction: "Get Stripe customers from last 30 days with email, name, and subscription status",
           integrationIds: ["stripe"],
           responseSchema: {
@@ -93,27 +97,24 @@ Superglue eliminates the complexity of API integrations and data transformations
             }
           }
         });
+        
+        const result = await superglue.executeWorkflow({ workflow });
         ```
       </Tab>
     </Tabs>
   </Step>
-  
   <Step title="Save & Deploy">
     <Tabs>
       <Tab title="Save for Reuse">
         After testing, save your workflow for production use:
-        
+
         ```typescript
-        const savedWorkflow = await superglue.saveWorkflow({
-          id: "stripe-customer-sync",
-          name: "Daily Customer Sync",
-          workflow: result.workflow
-        });
+        const savedWorkflow = await superglue.upsertWorkflow(workflow.id, result.workflow);
         ```
       </Tab>
       <Tab title="Run in Production">
         Execute saved workflows reliably:
-        
+
         ```typescript
         const production = await superglue.executeWorkflow({
           workflowId: "stripe-customer-sync",
@@ -132,23 +133,21 @@ Superglue eliminates the complexity of API integrations and data transformations
 <CardGroup cols={2}>
   <Card title="10x Faster Development" icon="rocket">
     **Traditional:** Write API clients, handle pagination, manage schemas, build
-    error handling **Superglue:** Describe what you want in natural language
-    [See our benchmark →](https://superglue.ai/api-ranking/)
+    error handling 
+
+    **superglue:** Describe your requirements in natural language 
   </Card>
-
-<Card title="Self-Healing Pipelines" icon="heart">
-  **Traditional:** Breaks when APIs change, requires manual fixes **Superglue:**
-  Automatically adapts to schema changes and API updates
-</Card>
-
-<Card title="Built-in Best Practices" icon="shield">
-  **Traditional:** You implement retries, rate limiting, error handling
-  **Superglue:** All reliability features included by default
-</Card>
-
-  <Card title="Any API or Database" icon="database">
-    **Traditional:** Different code for REST, GraphQL, SQL **Superglue:** One
-    interface for all data sources
+  <Card title="Self-Healing Pipelines" icon="heart">
+    **Traditional:** Breaks when APIs change, requires manual fixes \
+    **superglue:** Automatically adapts to schema changes and API updates
+  </Card>
+  <Card title="Built-in Resilience" icon="shield">
+    **Traditional:** You implement retries, rate limiting, error handling
+    **superglue:** All reliability features included
+  </Card>
+  <Card title="Universal Access" icon="database">
+    **Traditional:** Different code for REST, GraphQL, SQL, CSV, SOAP/XML \
+    **superglue:** One interface for all data sources
   </Card>
 </CardGroup>
 
@@ -159,7 +158,7 @@ Superglue eliminates the complexity of API integrations and data transformations
     Describe your data pipeline in natural language. Superglue figures out the
     API calls, transformations, and error handling.
   </Step>
-  <Step title="Test & Iterate" icon="test-tube">
+  <Step title="Test & Iterate" icon="map">
     Run and refine your workflow. See exactly what's happening with real-time
     logs and debugging.
   </Step>
@@ -175,7 +174,8 @@ Superglue eliminates the complexity of API integrations and data transformations
   <Tab title="Data Pipelines">
     ```typescript
     // Sync HubSpot contacts to your database daily
-    await superglue.buildAndExecuteWorkflow({
+    await superglue.buildWorkflow({
+      id: "hubspot-contacts",
       instruction: "Get all HubSpot contacts updated in last 24 hours and insert into PostgreSQL customers table",
       integrationIds: ["hubspot", "postgresql"]
     });
@@ -184,7 +184,8 @@ Superglue eliminates the complexity of API integrations and data transformations
   <Tab title="API Orchestration">
     ```typescript
     // Multi-step workflow across different APIs
-    await superglue.buildAndExecuteWorkflow({
+    await superglue.buildWorkflow({
+      id: "account-flow",
       instruction: "Get Stripe customers, enrich with HubSpot data, and create Jira tickets for high-value accounts",
       integrationIds: ["stripe", "hubspot", "jira"]
     });
@@ -193,7 +194,8 @@ Superglue eliminates the complexity of API integrations and data transformations
   <Tab title="Legacy Modernization">
     ```typescript
     // Wrap legacy SOAP APIs with modern interfaces
-    await superglue.buildAndExecuteWorkflow({
+    await superglue.buildWorkflow({
+      id: "soap-migration",
       instruction: "Query legacy inventory system and transform to modern REST API format",
       integrationIds: ["legacy-soap"]
     });
@@ -204,28 +206,16 @@ Superglue eliminates the complexity of API integrations and data transformations
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card
-    title="UI vs SDK Comparison"
-    href="/data-engineers/ui-vs-sdk"
-    icon="balance-scale"
-  >
+  <Card title="UI vs SDK Comparison" icon="balance-scale" href="/data-engineers/ui-vs-sdk">
     When to use the chat interface vs the SDK for different scenarios
   </Card>
-  <Card
-    title="API Ranking Benchmark"
-    href="/data-engineers/api-ranking"
-    icon="trophy"
-  >
+  <Card title="API Ranking Benchmark" icon="trophy" href="/data-engineers/api-ranking">
     See how Superglue compares to traditional coding approaches
   </Card>
-  <Card
-    title="Data Pipeline Patterns"
-    href="/data-engineers/data-pipelines"
-    icon="pipe"
-  >
+  <Card title="Data Pipeline Patterns" icon="pipe" href="/data-engineers/data-pipelines">
     Common patterns for ETL, real-time sync, and data transformation
   </Card>
-  <Card title="Self-Hosting Guide" href="/guides/self-hosting" icon="server">
+  <Card title="Self-Hosting Guide" icon="server" href="/guides/self-hosting">
     Deploy Superglue in your own infrastructure
   </Card>
 </CardGroup>
