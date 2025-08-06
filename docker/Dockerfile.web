@@ -1,14 +1,14 @@
 # Build stage
 FROM node:22-slim AS builder
- 
+
 WORKDIR /usr/src/app
 
-# Copy package files first to leverage layer caching
+# Copy package files first to leverage Docker layer caching
 COPY package*.json ./
 COPY turbo.json ./
 COPY api.graphql ./
 
-# Copy all package.json files
+# Copy relevant package.json files
 COPY packages/web/package*.json ./packages/web/
 COPY packages/shared/package*.json ./packages/shared/
 
@@ -22,10 +22,11 @@ RUN npm install && \
     npm install -g typescript next turbo
 
 # Copy source code
-COPY . .
+COPY packages/web ./packages/web
+COPY packages/shared ./packages/shared
 
-# After copying files but before building
-RUN npx turbo run build --filter=@superglue/web
+# Build web and shared packages
+RUN npx turbo run build --filter=@superglue/web --filter=@superglue/shared
 
 # Production stage
 FROM node:22-slim
@@ -36,21 +37,21 @@ WORKDIR /usr/src/app
 COPY package*.json ./
 COPY turbo.json ./
 COPY api.graphql ./
+
+# Copy relevant package.json files
 COPY packages/web/package*.json ./packages/web/
 COPY packages/shared/package*.json ./packages/shared/
 
-# Install production dependencies and Playwright
-RUN npm ci --omit=dev && \
-    npm install -g next turbo cross-env && \
-    apt-get update
+# Install production dependencies
+RUN npm ci --omit=dev
 
 # Copy built files from builder stage
 COPY --from=builder /usr/src/app/packages/web/.next ./packages/web/.next
 COPY --from=builder /usr/src/app/packages/web/public ./packages/web/public
 COPY --from=builder /usr/src/app/packages/shared/dist ./packages/shared/dist
 
-# Expose ports for both servers
+# Expose port for the web server
 EXPOSE 3001
 
-# Start both servers using turbo
-CMD ["npm", "run", "start"]
+# Start the web server
+CMD ["npx", "turbo", "run", "start", "--filter=@superglue/web"]
