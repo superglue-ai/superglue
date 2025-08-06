@@ -408,11 +408,13 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
   private static readonly PARALLEL_FETCH_LIMIT = server_defaults.DOCUMENTATION.PARALLEL_FETCH_LIMIT;
   private static browserInstance: playwright.Browser | null = null;
 
-  public static readonly NEGATIVE_KEYWORDS = [
-    'signup', 'login', 'pricing', 'contact', 'support', 'cookie', 'webhooks',
+  // Keywords that indicate non-documentation links (support, legal, marketing, etc.)
+  public static readonly EXCLUDED_LINK_KEYWORDS = [
+    'signup', 'login', 'pricing', 'contact', 'support', 'cookie',
     'privacy', 'terms', 'legal', 'policy', 'status', 'help', 'blog',
     'careers', 'about', 'press', 'news', 'events', 'partners',
-    'changelogs', 'release notes', 'updates', 'upgrade',
+    'changelog', 'release-notes', 'updates', 'upgrade', 'register',
+    'signin', 'sign-in', 'sign-up', 'trial', 'demo', 'sales'
   ];
 
 
@@ -760,12 +762,23 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
 
         const { urls, sitemaps } = this.parseSitemapContent(content, sitemapUrl);
 
+        // Filter out URLs with excluded keywords before adding
+        const filteredUrls = urls.filter(url => {
+          const urlLower = url.toLowerCase();
+          for (const excludedKeyword of PlaywrightFetchingStrategy.EXCLUDED_LINK_KEYWORDS) {
+            if (urlLower.includes(excludedKeyword)) {
+              return false;
+            }
+          }
+          return true;
+        });
+
         // Log sample URLs for debugging
-        if (urls.length > 0) {
-          logMessage('debug', `Found ${urls.length} total URLs in sitemap. First few: ${urls.slice(0, 3).join(', ')}`, metadata);
+        if (filteredUrls.length > 0) {
+          logMessage('debug', `Found ${urls.length} total URLs in sitemap, ${filteredUrls.length} after filtering. First few: ${filteredUrls.slice(0, 3).join(', ')}`, metadata);
         }
 
-        allSitemapUrls.push(...urls);
+        allSitemapUrls.push(...filteredUrls);
 
         // Filter sitemaps to only include relevant ones based on the documentation URL
         const relevantSitemaps = sitemaps.filter(s => {
@@ -1008,34 +1021,38 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
 
     const scored = itemsToRank.map(item => {
       const combined = `${item.text} ${item.url}`.toLowerCase();
-      let positiveScore = 0;
-      let negativeScore = 0;
 
-      // Simple keyword matching without fuzzy search
+      // Filter out links containing excluded keywords
+      for (const excludedKeyword of PlaywrightFetchingStrategy.EXCLUDED_LINK_KEYWORDS) {
+        if (combined.includes(excludedKeyword)) {
+          return {
+            item: item.original,
+            score: 0  // Set score to 0 for excluded links
+          };
+        }
+      }
+
+      // Count keyword matches
+      let matchCount = 0;
       for (const keyword of keywords) {
         const keywordLower = keyword.toLowerCase();
         if (combined.includes(keywordLower)) {
-          // Length penalty to prefer shorter, more focused URLs
-          const lengthPenalty = 1 / (item.url.length + item.text.length || 1);
-          positiveScore += lengthPenalty;
+          matchCount++;
         }
       }
 
-      // Negative scoring for unwanted keywords
-      for (const negKeyword of PlaywrightFetchingStrategy.NEGATIVE_KEYWORDS) {
-        if (combined.includes(negKeyword)) {
-          negativeScore += 2;
-        }
-      }
+      // Simple scoring: match count divided by URL length to avoid bias towards long URLs
+      const score = matchCount / Math.max(item.url.length, 1);
 
       return {
         item: item.original,
-        score: positiveScore - negativeScore
+        score: score
       };
     });
 
-    // Sort by score and return the original items
+    // Filter out items with score 0 (excluded links), sort by score, and return the original items
     return scored
+      .filter(s => s.score > 0)
       .sort((a, b) => b.score - a.score)
       .map(s => s.item);
   }
@@ -1063,6 +1080,12 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       if (rankedLinks.length === 0) break;
       const nextLink = rankedLinks[0];
 
+      // Remove the selected link from the pool to free memory
+      const linkIndex = linkPool.findIndex(l => l.href === nextLink.href);
+      if (linkIndex > -1) {
+        linkPool.splice(linkIndex, 1);
+      }
+
       try {
         const linkResult = await this.fetchPageContentWithPlaywright(nextLink.href, config, metadata);
         fetchedLinks.add(nextLink.href);
@@ -1082,25 +1105,22 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
         logMessage('warn', `Failed to fetch link ${nextLink.href}: ${error?.message}`, metadata);
       }
     }
-
+    linkPool.length = 0;
     return combinedContent;
   }
 
   private shouldSkipLink(linkText: string, href: string, documentationUrl?: string): boolean {
     // Basic content filtering
-    if (!linkText || href.includes('signup') ||
-      href.includes('login') ||
-      href.includes('pricing') ||
-      href.includes('contact') ||
-      href.includes('support') ||
-      href.includes('cookie') ||
-      href.includes('privacy') ||
-      href.includes('terms') ||
-      href.includes('legal') ||
-      href.includes('policy') ||
-      href.includes('status') ||
-      href.includes('help')) {
+    if (!linkText) {
       return true;
+    }
+
+    // Check if link contains any excluded keywords
+    const hrefLower = href.toLowerCase();
+    for (const excludedKeyword of PlaywrightFetchingStrategy.EXCLUDED_LINK_KEYWORDS) {
+      if (hrefLower.includes(excludedKeyword)) {
+        return true;
+      }
     }
 
     // Domain and path filtering to stay within relevant documentation scope

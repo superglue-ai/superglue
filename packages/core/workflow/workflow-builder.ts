@@ -52,143 +52,55 @@ export class WorkflowBuilder {
   }
 
   private generateIntegrationDescriptions(): string {
-    // Total documentation budget (conservative to leave room for prompts, responses, etc.)
-    const MAX_TOTAL_DOC_LENGTH = 60000; // ~60k chars total for all integrations
-    const MIN_DOC_LENGTH_PER_INTEGRATION = 2000; // Minimum useful documentation per integration
-
-    const integrationCount = Object.keys(this.integrations).length;
-
-    // Calculate per-integration budget
-    let maxDocLengthPerIntegration: number;
-    if (integrationCount === 0) {
-      return '';
-    } else if (integrationCount === 1) {
-      maxDocLengthPerIntegration = MAX_TOTAL_DOC_LENGTH;
-    } else {
-      // Distribute available space among integrations
-      maxDocLengthPerIntegration = Math.floor(MAX_TOTAL_DOC_LENGTH / integrationCount);
-      // But cap at a reasonable maximum to avoid one integration taking too much
-      maxDocLengthPerIntegration = Math.min(maxDocLengthPerIntegration, 15000);
-      // And ensure minimum useful amount
-      maxDocLengthPerIntegration = Math.max(maxDocLengthPerIntegration, MIN_DOC_LENGTH_PER_INTEGRATION);
-    }
-
-    const integrationDocs: string[] = [];
-    let totalLength = 0;
-
-    for (const int of Object.values(this.integrations)) {
+    return Object.values(this.integrations).map(int => {
       const baseInfo = `
 <${int.id}>
   Base URL: ${composeUrl(int.urlHost, int.urlPath)}`
 
       if (!int.documentation) {
-        const noDocs = baseInfo + `
+        return baseInfo + `
   <documentation>
   No documentation content available.
   </documentation>
 </${int.id}>`;
-        integrationDocs.push(noDocs);
-        totalLength += noDocs.length;
-        continue;
       }
-
-      // Dynamically adjust section sizes based on available budget
-      const remainingBudget = MAX_TOTAL_DOC_LENGTH - totalLength;
-      const currentIntegrationBudget = Math.min(maxDocLengthPerIntegration, remainingBudget);
-
-      // Allocate budget proportionally to different sections
-      const authBudget = Math.floor(currentIntegrationBudget * 0.15); // 15% for auth
-      const paginationBudget = Math.floor(currentIntegrationBudget * 0.15); // 15% for pagination
-      const generalBudget = Math.floor(currentIntegrationBudget * 0.6); // 60% for general
-      // 10% reserved for structure/overhead
-
-      // Extract relevant sections with budget-aware sizing
       const authSection = Documentation.extractRelevantSections(
         int.documentation,
         "authentication authorization api key token bearer basic oauth credentials access private app secret",
-        3,  // max 3 sections for auth
-        Math.floor(authBudget / 3) // section size based on budget
+        3,  // fewer sections needed for auth
+        2000 // should be detailed though
       );
 
       const paginationSection = Documentation.extractRelevantSections(
         int.documentation,
         "pagination page offset cursor limit per_page pageSize after next previous paging paginated results list",
-        3,  // max 3 sections for pagination
-        Math.floor(paginationBudget / 3) // section size based on budget
+        3,  // max 3 sections
+        2000 // same logic applies here
       );
-
       const generalSection = Documentation.extractRelevantSections(
         int.documentation,
-        this.instruction + " reference object endpoints methods properties values fields enums search query filter list create update delete get put post patch",
-        Math.min(15, Math.floor(generalBudget / 500)), // dynamic section count
-        Math.min(1000, Math.floor(generalBudget / 10)) // dynamic section size
+        this.instruction + "reference object endpoints methods properties values fields enums search query filter list create update delete get put post patch",
+        20,  // max 20 sections
+        1000 // should cover examples, endpoints etc.
       );
 
-      // Combine sections
-      let combinedDocs = baseInfo + `
-  <documentation>`;
-
-      if (authSection) {
-        combinedDocs += `
+      return baseInfo + `
+  <documentation>
     <authentication>
-    ${authSection}
-    </authentication>`;
-      }
-
-      if (paginationSection) {
-        combinedDocs += `
+    ${authSection || 'No authentication information found.'}
+    </authentication>
     
     <pagination>
     IMPORTANT: If the documentation does not mention pagination or the pagination section below is incomplete or unclear, DO NOT configure pagination.
-    ${paginationSection}
-    </pagination>`;
-      }
-
-      if (generalSection) {
-        combinedDocs += `
+    ${paginationSection || 'No pagination information found.'}
+    </pagination>
     
     <context_relevant_to_user_instruction>
-    ${generalSection}
-    </context_relevant_to_user_instruction>`;
-      }
-
-      combinedDocs += `
+    ${generalSection || 'No general documentation found.'}
+    </context_relevant_to_user_instruction>
   </documentation>
 </${int.id}>`;
-
-      // Final truncation if still exceeds budget
-      if (combinedDocs.length > currentIntegrationBudget) {
-        const truncationPoint = combinedDocs.lastIndexOf('</context_relevant_to_user_instruction>');
-        if (truncationPoint > 0 && truncationPoint > currentIntegrationBudget - 1000) {
-          combinedDocs = combinedDocs.substring(0, currentIntegrationBudget - 200) + `...[truncated]</context_relevant_to_user_instruction>
-  </documentation>
-</${int.id}>`;
-        } else {
-          combinedDocs = combinedDocs.substring(0, currentIntegrationBudget - 100) + `...[truncated]
-  </documentation>
-</${int.id}>`;
-        }
-      }
-
-      integrationDocs.push(combinedDocs);
-      totalLength += combinedDocs.length;
-
-      // Stop if we're approaching the total limit
-      if (totalLength > MAX_TOTAL_DOC_LENGTH * 0.95) {
-        logMessage('warn', `Approaching documentation size limit. Processed ${integrationDocs.length} of ${integrationCount} integrations.`, this.metadata);
-        break;
-      }
-    }
-
-    const result = integrationDocs.join("\n");
-
-    // Final safety check
-    if (result.length > MAX_TOTAL_DOC_LENGTH) {
-      logMessage('warn', `Total documentation length ${result.length} exceeds limit ${MAX_TOTAL_DOC_LENGTH}, truncating.`, this.metadata);
-      return result.substring(0, MAX_TOTAL_DOC_LENGTH - 50) + '\n...[truncated]';
-    }
-
-    return result;
+    }).join("\n");
   }
 
   private generatePayloadDescription(maxLength: number = 1000): string {

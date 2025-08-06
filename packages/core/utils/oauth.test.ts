@@ -131,7 +131,7 @@ describe('OAuth Utilities', () => {
             };
 
             const result = await refreshOAuthToken(integration);
-            expect(result).toBe(false);
+            expect(result.success).toBe(false);
             expect(logs.logMessage).toHaveBeenCalledWith(
                 'error',
                 'Missing required credentials for token refresh',
@@ -164,7 +164,7 @@ describe('OAuth Utilities', () => {
 
             const result = await refreshOAuthToken(integration);
             
-            expect(result).toBe(true);
+            expect(result.success).toBe(true);
             expect(integration.credentials.access_token).toBe('new-access-token');
             expect(integration.credentials.refresh_token).toBe('new-refresh-token');
             expect(integration.credentials.token_type).toBe('Bearer');
@@ -190,7 +190,7 @@ describe('OAuth Utilities', () => {
 
             const result = await refreshOAuthToken(integration);
             
-            expect(result).toBe(false);
+            expect(result.success).toBe(false);
             expect(logs.logMessage).toHaveBeenCalledWith(
                 'error',
                 'Error refreshing OAuth token',
