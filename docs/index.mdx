@@ -13,23 +13,41 @@ Instead of writing integration code or custom tools for each API, you describe w
 
 ## How It Works
 
-superglue has two core building blocks:
+<CardGroup cols={2}>
+  <Card title="1. Connect Integrations" icon="plug" iconType="duotone">
+    **Individual API connections** with credentials and documentation
+    **Example:** - Add Stripe integration with your API key - Add HubSpot
+    integration with OAuth - Connect to your PostgreSQL database
+  </Card>
 
-- **Integrations** = Individual API connections (Stripe, HubSpot, databases, etc.) with credentials and documentation
-- **Workflows** = Multi-step orchestrations that use one or more integrations to accomplish tasks
+  <Card title="2. Build Workflows" icon="workflow" iconType="duotone">
+    **Multi-step orchestrations** described in natural language **Example:** ```
+    "Get all customers from Stripe created in the last 30 days" ``` superglue
+    automatically handles authentication, data transformation, and error
+    recovery.
+  </Card>
+</CardGroup>
 
-To set up superglue:
+<Card title="Cross-Integration Workflows" icon="link" iconType="duotone">
+  **Workflows can span multiple integrations** for complex automation
+  **Example:** ``` "Get new Stripe customers and add them to HubSpot as
+  contacts, then send a Slack notification with the count" ``` This single
+  workflow uses Stripe, HubSpot, and Slack integrations automatically.
+</Card>
 
-1. **Connect**: Add integrations for each API or database you want to use
-2. **Build**: Describe workflows in natural language - superglue creates the orchestration
-3. **Run**: Execute workflows that automatically handle authentication, data transformation, and error recovery
+### Quick Setup Process
 
-### Example
-
-- **Integration**: Stripe API connection with your API key
-- **Workflow**: "Get all customers from Stripe created in the last 30 days"
-
-Workflows can span multiple integrations - for example: "Get new Stripe customers and add them to HubSpot as contacts" would use both your Stripe and HubSpot integrations in a single workflow.
+<CardGroup cols={3}>
+  <Card title="Connect" icon="plug">
+    Add integrations for each API or database you want to use
+  </Card>
+  <Card title="Build" icon="wand-magic-sparkles">
+    Describe workflows in natural language - superglue creates the orchestration
+  </Card>
+  <Card title="Run" icon="play">
+    Execute workflows that automatically handle everything
+  </Card>
+</CardGroup>
 
 ## Select your Usecase
 
