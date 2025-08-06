@@ -8,7 +8,7 @@ Turn any API into workflows so your agents can get things done reliably.
 **superglue MCP** provides a universal tool that lets agents build reliable, validated workflows for any app, database or API, simply by requesting them in natural language.
 
 <Info>
-MCP (Model Context Protocol) is the easiest way to give AI agents access to external tools and data sources. superglue provides a universal MCP server that connects to any API.
+  MCP (Model Context Protocol) is the easiest way to give AI agents access to external tools and data sources. superglue provides a universal MCP server that connects to any API.
 </Info>
 
 ## What You Get with MCP
@@ -32,21 +32,19 @@ MCP (Model Context Protocol) is the easiest way to give AI agents access to exte
 
 Instead of building separate MCP tools for each API, superglue provides one powerful MCP server that:
 
-1. **Merges multiple endpoints and APIs into custom workflows** 
+1. **Merges multiple endpoints and APIs into custom workflows**
 2. **Exposes them via one server** that abstracts away endpoints and API calls
 3. **Acts like a repository pattern** that stays stable even as upstream APIs or mappings change
 
 ### What You Can Build
 
 <CardGroup cols={3}>
-  <Card title="Cross-API Workflows" icon="microchip">
+  <Card title="Cross-API Workflows" icon="workflow">
     **Stitch Stripe and HubSpot together**: Build reliable workflows like fetching transactions in Stripe and updating them in HubSpot.
   </Card>
-  
   <Card title="Ambient Agents" icon="robot">
     **Create reactive agents**: Build agents that monitor your systems and respond automatically to events, triggers and webhooks.
   </Card>
-  
   <Card title="Internal API Access" icon="code">
     **Wrap your own APIs**: Make your internal APIs and services accessible by any agent with built-in validation and error handling.
   </Card>
@@ -60,7 +58,6 @@ Instead of building separate MCP tools for each API, superglue provides one powe
   <Step title="Get Your API Key">
     Get your API key from [app.superglue.cloud](https://app.superglue.cloud) or use your self-hosted instance.
   </Step>
-  
   <Step title="Configure Claude Desktop">
     Add to your Claude Desktop MCP settings (`~/Library/Application Support/Claude/claude_desktop_config.json`):
 
@@ -86,12 +83,10 @@ Instead of building separate MCP tools for each API, superglue provides one powe
     <Tip>
       **Self-hosting?** Replace `https://mcp.superglue.ai` with `http://<your-superglue-host>:<port>/mcp` (e.g., `http://localhost:3000/mcp`)
     </Tip>
-    
     <Warning>
       The `AUTH_HEADER` format is used because Cursor/Claude Desktop doesn't allow spaces in the args array, but does allow them in environment variables.
     </Warning>
   </Step>
-  
   <Step title="Restart Claude Desktop">
     Close and reopen Claude Desktop. You should see "superglue" connected in the MCP status.
   </Step>
@@ -102,48 +97,49 @@ Instead of building separate MCP tools for each API, superglue provides one powe
 The superglue MCP server provides these tools to your agent:
 
 <AccordionGroup>
-  <Accordion title="superglue_find_integrations" icon="magnifying-glass">
+  <Accordion title="superglue_find_integrations" icon="search">
     **Purpose:** Discover available integrations for your task
-    
-    **Usage:** 
+
+    **Usage:**
+
     > "Find integrations for social media posting"
-    
+
     **What it does:** Returns available integrations like Twitter, LinkedIn, Facebook with their capability descriptions.
   </Accordion>
-  
   <Accordion title="superglue_build_and_run_workflow" icon="play">
     **Purpose:** Build and execute workflows in natural language
-    
+
     **Usage:**
+
     > "Get my latest Stripe transactions and create a summary report"
-    
+
     **What it does:** Creates the workflow, handles authentication, executes API calls, and returns formatted results.
   </Accordion>
-  
-  <Accordion title="superglue_save_workflow" icon="floppy-disk">
+  <Accordion title="superglue_save_workflow" icon="save">
     **Purpose:** Save successful workflows for reuse
-    
+
     **Usage:**
+
     > "Save this workflow as 'daily-stripe-report'"
-    
+
     **What it does:** Persists the workflow for future execution with the same reliability.
   </Accordion>
-  
-  <Accordion title="superglue_execute_workflow" icon="person-running">
+  <Accordion title="superglue_execute_workflow" icon="refresh">
     **Purpose:** Run previously saved workflows
-    
+
     **Usage:**
+
     > "Run the daily-stripe-report workflow"
-    
+
     **What it does:** Executes the saved workflow with current data.
   </Accordion>
-  
   <Accordion title="superglue_create_integration" icon="plus">
     **Purpose:** Add new integrations on-the-fly
-    
+
     **Usage:**
+
     > "Connect to my company's internal API at api.company.com"
-    
+
     **What it does:** Adds new API integrations with credentials and documentation.
   </Accordion>
 </AccordionGroup>
@@ -220,50 +216,49 @@ For coding assistants, use the same configuration in your MCP settings:
 <Tabs>
   <Tab title="Data Analysis">
     **Human:** "Analyze my business performance across Stripe, HubSpot, and Google Analytics"
-    
+
     **Agent:** "I'll help you analyze your business performance across those platforms. Let me gather the data from each source and create a comprehensive analysis.
-    
+
     First, let me find the available integrations..."
-    
-    *[Agent uses superglue_find_integrations]*
-    
-    "Great! I can see you have Stripe, HubSpot, and Google Analytics connected. Now I'll build a workflow to gather data from all three sources..."
-    
-    *[Agent uses superglue_build_and_run_workflow]*
-    
+
+    _[Agent uses superglue_find_integrations]_
+
+    "Great\! I can see you have Stripe, HubSpot, and Google Analytics connected. Now I'll build a workflow to gather data from all three sources..."
+
+    _[Agent uses superglue_build_and_run_workflow]_
+
     "Here's your business performance analysis: [detailed results with revenue trends, lead conversion, traffic patterns]"
   </Tab>
-  
   <Tab title="Multi-Step Workflow">
     **Human:** "When someone subscribes to my Stripe plan, add them to HubSpot and send a Slack notification"
-    
+
     **Agent:** "I'll create an automated workflow that triggers when someone subscribes. Let me build this integration...
-    
-    *[Agent uses superglue_build_and_run_workflow with webhook setup]*
-    
+
+    _[Agent uses superglue_build_and_run_workflow with webhook setup]_
+
     This workflow will:
+
     1. Monitor Stripe for new subscriptions
     2. Automatically add new subscribers to HubSpot as contacts
     3. Send a formatted Slack notification to your team
-    
+
     Would you like me to save this workflow for ongoing use?"
   </Tab>
-  
   <Tab title="Custom Integration">
     **Human:** "Connect to my company's internal inventory API and get current stock levels"
-    
+
     **Agent:** "I'll need to add your internal API as a new integration first. Let me set that up...
-    
-    *[Agent uses superglue_create_integration]*
-    
+
+    _[Agent uses superglue_create_integration]_
+
     I've added your inventory API. What authentication does it require? API key, OAuth, or something else?"
-    
+
     **Human:** "It uses an API key in the Authorization header"
-    
-    **Agent:** "Perfect! Now let me fetch your current stock levels...
-    
-    *[Agent uses superglue_build_and_run_workflow]*
-    
+
+    **Agent:** "Perfect\! Now let me fetch your current stock levels...
+
+    _[Agent uses superglue_build_and_run_workflow]_
+
     Here are your current stock levels: [formatted inventory data]"
   </Tab>
 </Tabs>
@@ -271,15 +266,14 @@ For coding assistants, use the same configuration in your MCP settings:
 ## Best Practices
 
 <CardGroup cols={2}>
-  <Card title="Be Specific" icon="bullseye">
+  <Card title="Be Specific" icon="target">
     **Good:** "Get Stripe customers created in the last 7 days with email and subscription status"
-    
+
     **Better:** "Get active Stripe customers created in the last 7 days, include email, name, subscription status, and MRR"
   </Card>
-  
   <Card title="Use Response Schemas" icon="code">
     When building workflows, you can specify the output format:
-    
+
     ```json
     {
       "type": "object",  
@@ -298,17 +292,15 @@ For coding assistants, use the same configuration in your MCP settings:
     }
     ```
   </Card>
-  
   <Card title="Add context" icon="shield">
     You can improve the performance of your agent by adding context to the workflow:
-    
+
     > "You need to get an auth token first before each request to get the data."
   </Card>
-  
-  <Card title="Save Successful Workflows" icon="floppy-disk">
+  <Card title="Save Successful Workflows" icon="save">
     When a workflow works well, save it for reuse:
-    
-    > "This worked perfectly! Save it as 'weekly-revenue-report' so I can run it regularly."
+
+    > "This worked perfectly\! Save it as 'weekly-revenue-report' so I can run it regularly."
   </Card>
 </CardGroup>
 
@@ -322,31 +314,32 @@ The superglue MCP server uses key-based authentication and session management:
 ## Troubleshooting
 
 <AccordionGroup>
-  <Accordion title="MCP Server Not Connecting" icon="xmark">
+  <Accordion title="MCP Server Not Connecting" icon="exclamation-triangle">
     **Symptoms:** Claude says "superglue not available" or MCP status shows disconnected
-    
+
     **Solutions:**
+
     1. Verify `mcp-remote` is available: `npx mcp-remote --version`
     2. Check your API key is correct in the `AUTH_HEADER` environment variable
     3. Test the endpoint: `curl -H "Authorization: Bearer YOUR_API_KEY" https://mcp.superglue.ai`
     4. Restart Claude Desktop completely
     5. Check the logs: `tail -f ~/Library/Logs/Claude/mcp-*.log`
   </Accordion>
-  
-  <Accordion title="Workflow Building Fails" icon="bug">
+  <Accordion title="Workflow Building Fails" icon="exclamation-triangle">
     **Symptoms:** Agent says it can't understand the integration or API calls fail
-    
+
     **Solutions:**
+
     1. Be more specific about what data you want
     2. Check if the integration exists: ask agent to "find integrations for [service]"
     3. Verify your credentials are still valid in the superglue dashboard
     4. Try breaking complex requests into smaller steps
   </Accordion>
-  
   <Accordion title="Authentication Issues" icon="key">
     **Symptoms:** API calls return 401 or 403 errors
-    
+
     **Solutions:**
+
     1. Check if integration API keys have expired or been revoked
     2. Verify the integration has the right permissions/scopes
     3. Test credentials directly with the API provider
@@ -356,16 +349,16 @@ The superglue MCP server uses key-based authentication and session management:
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="MCP Tools Reference" href="/mcp/mcp-tools" icon="wrench">
+  <Card title="MCP Tools Reference" icon="tools" href="/mcp/mcp-tools">
     Complete reference of all available MCP tools and parameters
   </Card>
-  <Card title="SDK Integration" href="/agent-builders/sdk-integration" icon="code">
+  <Card title="SDK Integration" icon="code" href="/agent-builders/sdk-integration">
     Build custom AI applications with full programmatic control
   </Card>
-  <Card title="Credential Management" href="/agent-builders/credential-management" icon="key">
+  <Card title="Credential Management" icon="key" href="/agent-builders/credential-management">
     Learn about secure credential storage and runtime credential passing
   </Card>
-  <Card title="Example Workflows" href="/guides/hubspot" icon="chart-diagram">
+  <Card title="Example Workflows" icon="workflow" href="/guides/hubspot">
     See real examples of agent workflows with popular integrations
   </Card>
 </CardGroup>
