@@ -1388,13 +1388,13 @@ export const integrations: Record<string, IntegrationConfig> = {
     icon: "discord",
     docsUrl: "https://discord.com/developers/docs/intro",
     openApiUrl: "https://raw.githubusercontent.com/discord/discord-api-spec/refs/heads/main/specs/openapi.json",
-    preferredAuthType: "oauth",
+    preferredAuthType: "apikey",
     oauth: {
       authUrl: "https://discord.com/api/oauth2/authorize",
       tokenUrl: "https://discord.com/api/oauth2/token",
       scopes: "identify email guilds guilds.join connections bot applications.commands applications.commands.update guilds.members.read messages.read webhook.incoming role_connections.write dm_channels.read voice"
     },
-    keywords: ["guilds", "channels", "messages", "users", "members", "roles", "permissions", "emojis", "reactions", "voice", "invites", "bans", "audit logs", "slash commands", "interactions", "oauth"]
+    keywords: ["guilds", "channels", "messages", "bots", "users", "members", "roles", "permissions", "emojis", "reactions", "voice", "invites", "bans", "audit logs", "slash commands", "interactions", "api key"]
   },
   telegram: {
     apiUrl: "https://api.telegram.org",
