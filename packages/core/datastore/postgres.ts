@@ -146,8 +146,8 @@ export class PostgresService implements DataStore {
     )
   `);
 
-            // New table for large integration fields
-            await client.query(`
+        // New table for large integration fields
+        await client.query(`
     CREATE TABLE IF NOT EXISTS integration_details (
       integration_id VARCHAR(255) NOT NULL,
       org_id VARCHAR(255),

@@ -157,8 +157,8 @@ function enrichWithTemplate(input: Integration): Integration {
 
   return {
     ...input,
-    openApiUrl: input.openApiUrl || matchingTemplate.openApiUrl,
-    openApiSchema: input.openApiSchema || matchingTemplate.openApiSchema,
+    openApiUrl: matchingTemplate.openApiUrl,
+    openApiSchema: matchingTemplate.openApiSchema,
     documentationUrl: input.documentationUrl || matchingTemplate.docsUrl,
     urlHost: input.urlHost || matchingTemplate.apiUrl,
     documentationKeywords: uniqueKeywords(mergedKeywords),

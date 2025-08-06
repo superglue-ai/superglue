@@ -67,21 +67,21 @@ export class WorkflowBuilder {
       const authSection = Documentation.extractRelevantSections(
         int.documentation,
         "authentication authorization api key token bearer basic oauth credentials access private app secret",
-        5,  // max 5 sections
-        400 // smaller sections for targeted info
+        3,  // fewer sections needed for auth
+        2000 // should be detailed though
       );
 
       const paginationSection = Documentation.extractRelevantSections(
         int.documentation,
         "pagination page offset cursor limit per_page pageSize after next previous paging paginated results list",
-        5,  // max 5 sections
-        400 // smaller sections for targeted info
+        3,  // max 3 sections
+        2000 // same logic applies here
       );
       const generalSection = Documentation.extractRelevantSections(
         int.documentation,
-        this.instruction + "api endpoints methods search query filter",
-        10,  // max 10 sections
-        1000 // larger sections for context
+        this.instruction + "reference object endpoints methods properties values fields enums search query filter list create update delete get put post patch",
+        20,  // max 20 sections
+        1000 // should cover examples, endpoints etc.
       );
 
       return baseInfo + `

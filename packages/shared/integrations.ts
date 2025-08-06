@@ -331,7 +331,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   gmail: {
     apiUrl: "https://gmail.googleapis.com/gmail/v1",
-    regex: "^.*(gmail|mail\\.google).*$",
+    regex: "^.*(gmail\\.googleapis|developers\\.google\\.com/gmail|mail\\.google).*$",
     icon: "gmail",
     docsUrl: "https://developers.google.com/gmail/api/reference/rest",
     openApiUrl: "https://www.googleapis.com/discovery/v1/apis/gmail/v1/rest",
@@ -345,7 +345,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   googleDrive: {
     apiUrl: "https://www.googleapis.com/drive/v3",
-    regex: "^.*(drive|googleapis\\.com/drive).*$",
+    regex: "^.*(googleapis\\.com/drive|developers\\.google\\.com/drive|drive\\.google).*$",
     icon: "googledrive",
     docsUrl: "https://developers.google.com/drive/api/v3/reference",
     openApiUrl: "https://www.googleapis.com/discovery/v1/apis/drive/v3/rest",
@@ -359,7 +359,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   googleCalendar: {
     apiUrl: "https://www.googleapis.com/calendar/v3",
-    regex: "^.*(calendar|googleapis\\.com/calendar).*$",
+    regex: "^.*(googleapis\\.com/calendar|developers\\.google\\.com/calendar|calendar\\.google).*$",
     icon: "googlecalendar",
     docsUrl: "https://developers.google.com/calendar/api/v3/reference",
     openApiUrl: "https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest",
@@ -373,7 +373,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   googleSheets: {
     apiUrl: "https://sheets.googleapis.com/v4",
-    regex: "^.*(sheets|googleapis\\.com/.*sheets).*$",
+    regex: "^.*(sheets\\.googleapis|developers\\.google\\.com/sheets|sheets\\.google).*$",
     icon: "googlesheets",
     docsUrl: "https://developers.google.com/sheets/api/reference/rest",
     openApiUrl: "https://www.googleapis.com/discovery/v1/apis/sheets/v4/rest",
@@ -1431,7 +1431,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   googleAds: {
     apiUrl: "https://googleads.googleapis.com/v20",
-    regex: "^.*(googleads|adwords|googleapis\\.com.*(ads|adwords)).*$",
+    regex: "^.*(googleads\\.googleapis|developers\\.google\\.com/google-ads|adwords\\.google).*$",
     icon: "googleads",
     docsUrl: "https://developers.google.com/google-ads/api/docs/concepts/overview",
     preferredAuthType: "oauth",
@@ -1444,7 +1444,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   google: {
     apiUrl: "https://googleapis.com",
-    regex: "^.*google.*$",
+    regex: "^.*(googleapis\\.com(?!/(?:gmail|drive|calendar|sheets|googleads))|developers\\.google\\.com(?!/(?:gmail|drive|calendar|sheets|google-ads))).*$",
     icon: "google",
     docsUrl: "https://developers.google.com/apis-explorer",
     preferredAuthType: "oauth",
@@ -1474,17 +1474,25 @@ export function findMatchingIntegration(url: string): { key: string; integration
   // Ensure URL has a scheme for proper matching
   const urlForMatching = url.startsWith('http') ? url : `https://${url}`;
 
+  const matches: { key: string; integration: IntegrationConfig; specificity: number }[] = [];
+
   for (const [key, integration] of Object.entries(integrations)) {
     try {
       if (new RegExp(integration.regex).test(urlForMatching)) {
-        return { key, integration };
+        // Calculate specificity: longer, more specific regexes get higher scores
+        const specificity = integration.regex.length + (integration.regex.includes('(?!') ? 100 : 0);
+        matches.push({ key, integration, specificity });
       }
     } catch (e) {
       console.error(`Invalid regex pattern for integration: ${key}`);
     }
   }
 
-  return null;
+  if (matches.length === 0) return null;
+
+  // Return the most specific match (highest specificity score)
+  const bestMatch = matches.sort((a, b) => b.specificity - a.specificity)[0];
+  return { key: bestMatch.key, integration: bestMatch.integration };
 }
 
 /**

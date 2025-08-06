@@ -33,6 +33,27 @@ export interface DocumentationConfig {
 
 export class Documentation {
   public static MAX_LENGTH = Math.min(LanguageModel.contextLength - server_defaults.DOCUMENTATION.MAX_LENGTH_OFFSET, server_defaults.DOCUMENTATION.MAX_LENGTH_ABSOLUTE);
+  public static readonly FUSE_CONFIGS = {
+    // For URL/link ranking - high precision matching
+    URL_RANKING: {
+      includeScore: true,        // Return match scores with results
+      threshold: 0.3,           // Strict threshold for precise URL matching
+      minMatchCharLength: 3,    // Minimum characters to trigger a match
+      shouldSort: true,         // Sort results by score
+      ignoreLocation: true,     // Position in string doesn't matter for URLs
+      useExtendedSearch: false  // Keep simple search syntax
+    },
+
+    // For section extraction - semantic search behavior
+    SECTION_EXTRACTION: {
+      keys: ['contentLower'],   // Search in the contentLower field
+      includeScore: true,       // Return match scores with results
+      threshold: 0.5,          // More lenient for content matching
+      ignoreLocation: true,    // Position in content doesn't matter
+      minMatchCharLength: 3,   // Minimum characters to trigger a match
+      useExtendedSearch: false // Keep simple for maintainability
+    }
+  };
 
   // Configuration stored per instance
   public config: DocumentationConfig;
@@ -108,7 +129,7 @@ export class Documentation {
         // Check if this is a discovery/index response with links to other OpenAPI docs
         const openApiUrls = this.extractOpenApiUrls(data);
         if (openApiUrls.length > 0) {
-          logMessage('info', `Found ${openApiUrls.length} OpenAPI specification links in response`, this.metadata);
+          logMessage('debug', `Found ${openApiUrls.length} OpenAPI specification links in response`, this.metadata);
           const allSpecs = await this.fetchMultipleOpenApiSpecs(openApiUrls);
           return allSpecs;
         }
@@ -124,7 +145,7 @@ export class Documentation {
           // Check for OpenAPI links in parsed JSON
           const openApiUrls = this.extractOpenApiUrls(parsed);
           if (openApiUrls.length > 0) {
-            logMessage('info', `Found ${openApiUrls.length} OpenAPI specification links in response`, this.metadata);
+            logMessage('debug', `Found ${openApiUrls.length} OpenAPI specification links in response`, this.metadata);
             const allSpecs = await this.fetchMultipleOpenApiSpecs(openApiUrls);
             return allSpecs;
           }
@@ -139,7 +160,7 @@ export class Documentation {
               // Check for OpenAPI links in parsed YAML
               const openApiUrls = this.extractOpenApiUrls(parsed);
               if (openApiUrls.length > 0) {
-                logMessage('info', `Found ${openApiUrls.length} OpenAPI specification links in response`, this.metadata);
+                logMessage('debug', `Found ${openApiUrls.length} OpenAPI specification links in response`, this.metadata);
                 const allSpecs = await this.fetchMultipleOpenApiSpecs(openApiUrls);
                 return allSpecs;
               }
@@ -285,13 +306,7 @@ export class Documentation {
       });
     }
 
-    const fuse = new Fuse(sections, {
-      keys: ['contentLower'],
-      includeScore: true,
-      threshold: 0.5,
-      ignoreLocation: true,
-      minMatchCharLength: 3
-    });
+    const fuse = new Fuse(sections, Documentation.FUSE_CONFIGS.SECTION_EXTRACTION);
 
     const scoredSections = sections.map(section => {
       let totalScore = 0;
@@ -392,7 +407,6 @@ export class AxiosFetchingStrategy implements FetchingStrategy {
 
       const response = await axios.get(url.toString(), { headers: config.headers, timeout: server_defaults.TIMEOUTS.AXIOS });
       let data = response.data;
-      logMessage('info', `Successfully fetched content with axios for ${config.documentationUrl}`, metadata);
       return data;
     } catch (error) {
       logMessage('warn', `Axios fetch failed for ${config.documentationUrl}: ${error?.message}`, metadata);
@@ -412,6 +426,8 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     'careers', 'about', 'press', 'news', 'events', 'partners',
     'changelogs', 'release notes', 'updates', 'upgrade',
   ];
+
+
 
   private static async getBrowser(): Promise<playwright.Browser> {
     if (!PlaywrightFetchingStrategy.browserInstance) {
@@ -578,7 +594,6 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       }, server_defaults.DOCUMENTATION.TEXT_PATTERN_REMOVAL_MAX_LENGTH);
 
       const content = await page.content();
-      logMessage('info', `Successfully fetched content for ${urlString}`, metadata);
       return {
         content,
         links
@@ -727,7 +742,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     for (const candidate of sitemapCandidates) {
       const content = await this.fetchSitemapContent(candidate, config);
       if (content) {
-        logMessage('info', `Found sitemap at: ${candidate}`, metadata);
+        logMessage('debug', `Found sitemap at: ${candidate}`, metadata);
         sitemapQueue.push(candidate);
         break;
       }
@@ -814,7 +829,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       });
 
       if (filteredUrls.length > 0) {
-        logMessage('info', `Collected ${filteredUrls.length} URLs under ${docUrl.origin}${filterPath} from sitemap(s)`, metadata);
+        logMessage('debug', `Collected ${filteredUrls.length} URLs under ${docUrl.origin}${filterPath} from sitemap(s)`, metadata);
 
         // If we have enough URLs or this is the last filter, use these URLs
         if (filteredUrls.length >= PlaywrightFetchingStrategy.MAX_FETCHED_LINKS || filterPath === '/') {
@@ -827,7 +842,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     }
 
     // If we get here, no URLs were found at all
-    logMessage('info', `No matching URLs found in sitemap(s) for ${config.documentationUrl}`, metadata);
+    logMessage('debug', `No matching URLs found in sitemap(s) for ${config.documentationUrl}`, metadata);
     return [];
   }
 
@@ -850,7 +865,6 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
         try {
           if (result.content.slice(0, 500).toLowerCase().includes("<html")) {
             const markdown = NodeHtmlMarkdown.translate(result.content);
-            logMessage('debug', `Converted HTML to Markdown for ${url}`, metadata);
             return markdown;
           } else {
             // Not HTML, return as-is
@@ -883,7 +897,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       let timeoutHandle: NodeJS.Timeout;
       const timeoutPromise = new Promise<string[]>((resolve) => {
         timeoutHandle = setTimeout(() => {
-          logMessage('warn', 'Sitemap URL collection timed out, falling back to legacy crawling', metadata);
+          logMessage('warn', 'Sitemap URL collection timed out, falling back to iterative crawling', metadata);
           resolve([]);
         }, server_defaults.TIMEOUTS.SITEMAP_PROCESSING_TOTAL);
       });
@@ -896,7 +910,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       }
 
       if (sitemapUrls.length > 0) {
-        logMessage('info', `Found ${sitemapUrls.length} URLs from sitemap(s)`, metadata);
+        logMessage('debug', `Found ${sitemapUrls.length} URLs from sitemap(s)`, metadata);
 
         const keywords = this.getMergedKeywords(config.keywords);
         const rankedUrls = this.rankUrls(sitemapUrls, keywords);
@@ -922,7 +936,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       "authentication", "authorization", "bearer", "token",
       "getting started", "quickstart", "guides", "tutorial", "api", "api-reference", "open api",
       "objects", "data-objects", "properties", "values", "fields", "attributes", "parameters", "slugs", "schema", "lists", "query", "rest", "endpoints", "reference", "methods",
-      "pagination", "response", "errors", "filtering", "sorting", "searching", "filter", "sort", "search",
+      "pagination", "response", "filtering", "sorting", "searching", "filter", "sort", "search",
       "get", "post", "put", "delete", "patch",
     ];
   }
@@ -940,15 +954,12 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
   }
 
   private createFuseInstance<T>(items: T[], keys: string[], options?: any): Fuse<T> {
-    const defaultOptions = {
-      includeScore: true,        // Return match scores with results
-      threshold: 0.2,           // Match threshold (0.0 = exact, 1.0 = match anything)
-      minMatchCharLength: 3,    // Minimum characters to trigger a match
-      shouldSort: true,         // Sort results by score
-      ignoreLocation: true,    // Whether to ignore location/distance
-      useExtendedSearch: false  // Use advanced search syntax, e.g. fuse.search("'Man 'Old | Artist$") will match items that include "Man" and "Old" or end with "Artist"
-    }
-    return new Fuse(items, defaultOptions);
+    const mergedOptions = {
+      ...Documentation.FUSE_CONFIGS.URL_RANKING,
+      keys,
+      ...options
+    };
+    return new Fuse(items, mergedOptions);
   }
 
   private rankUrls(urls: string[], keywords: string[]): string[] {
@@ -964,10 +975,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
           positiveScore += lengthPenalty;
         } else {
           // Fuzzy match with single-item Fuse
-          const fuse = this.createFuseInstance([{ url, urlLower }], ['urlLower'], {
-            threshold: 0.4,
-            ignoreLocation: true
-          });
+          const fuse = this.createFuseInstance([{ url, urlLower }], ['urlLower']);
           const results = fuse.search(keywordLower);
           if (results.length > 0) {
             const lengthPenalty = 1 / url.length;
@@ -1025,7 +1033,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
         if (!linkResult.links) continue;
 
         for (const [linkText, href] of Object.entries(linkResult.links)) {
-          if (this.shouldSkipLink(linkText, href)) continue;
+          if (this.shouldSkipLink(linkText, href, config.documentationUrl)) continue;
           linkPool.push({ linkText, href });
         }
       } catch (error) {
@@ -1036,8 +1044,9 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     return combinedContent;
   }
 
-  private shouldSkipLink(linkText: string, href: string): boolean {
-    return !linkText || href.includes('signup') ||
+  private shouldSkipLink(linkText: string, href: string, documentationUrl?: string): boolean {
+    // Basic content filtering
+    if (!linkText || href.includes('signup') ||
       href.includes('login') ||
       href.includes('pricing') ||
       href.includes('contact') ||
@@ -1048,7 +1057,44 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       href.includes('legal') ||
       href.includes('policy') ||
       href.includes('status') ||
-      href.includes('help');
+      href.includes('help')) {
+      return true;
+    }
+
+    // Domain and path filtering to stay within relevant documentation scope
+    if (documentationUrl) {
+      try {
+        const docUrl = new URL(documentationUrl);
+        const linkUrl = new URL(href);
+
+        // Skip if different hostname (domain)
+        if (linkUrl.hostname !== docUrl.hostname) {
+          return true;
+        }
+
+        // Get the base path from documentation URL for path filtering
+        // e.g., https://discord.com/developers/docs/reference -> /developers
+        const docPathParts = docUrl.pathname.split('/').filter(p => p);
+        const linkPathParts = linkUrl.pathname.split('/').filter(p => p);
+
+        // If documentation URL has a meaningful path structure, enforce it
+        if (docPathParts.length >= 2) {
+          // For URLs like /developers/docs/*, we want to stay under /developers
+          const requiredBasePath = '/' + docPathParts.slice(0, -1).join('/');
+
+          // Allow same path or deeper under the base path
+          if (!linkUrl.pathname.startsWith(requiredBasePath)) {
+            return true;
+          }
+        }
+        // If documentation URL is at root or shallow (e.g., /docs), allow any path on same domain
+      } catch (error) {
+        // Invalid URL, skip it
+        return true;
+      }
+    }
+
+    return false;
   }
 
   private rankLinks(links: { linkText: string, href: string; }[], keywords: string[], fetchedLinks: Set<string>): { linkText: string, href: string, matchCount: number; }[] {
@@ -1066,10 +1112,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
           positiveScore += lengthPenalty;
         } else {
           // Fuzzy match
-          const fuse = this.createFuseInstance([{ combined }], ['combined'], {
-            threshold: 0.4,
-            ignoreLocation: true
-          });
+          const fuse = this.createFuseInstance([{ combined }], ['combined']);
           const results = fuse.search(keywordLower);
           if (results.length > 0) {
             const lengthPenalty = 1 / (link.href.length + link.linkText.length);
