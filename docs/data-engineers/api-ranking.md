@@ -1,10 +1,10 @@
 ---
 title: "API Integration Benchmark: 10x Faster Development"
-description: "See how Superglue compares to traditional coding approaches with real data"
+description: "See how superglue compares to traditional coding approaches with real data"
 ---
 
 <Info>
-  We benchmarked Superglue against traditional API integration approaches across
+  We benchmarked superglue against traditional API integration approaches across
   50+ real-world scenarios. The results show **10x faster development** with
   higher reliability.
 </Info>
@@ -18,7 +18,7 @@ description: "See how Superglue compares to traditional coding approaches with r
   </Card>
 
 <Card title="95% Less Code" icon="code" color="blue">
-  **Lines of Code** Superglue: Natural language description Traditional: 200-500
+  **Lines of Code** superglue: Natural language description Traditional: 200-500
   lines of code
 </Card>
 
@@ -40,20 +40,20 @@ We tested real integration scenarios across different complexity levels:
   <Tab title="Simple Integrations">
     **Examples:** - Fetch customer list from Stripe - Get contact details from
     HubSpot - Query user data from database **Traditional approach:** 30-60
-    minutes **Superglue approach:** 2-5 minutes **Speedup:** 10-15x
+    minutes **superglue approach:** 2-5 minutes **Speedup:** 10-15x
   </Tab>
 
 <Tab title="Medium Integrations">
   **Examples:** - Sync Stripe customers to HubSpot with data transformation -
   Extract Salesforce opportunities and enrich with external data - Multi-step
-  workflow with error handling **Traditional approach:** 2-4 hours **Superglue
+  workflow with error handling **Traditional approach:** 2-4 hours **superglue
   approach:** 10-20 minutes **Speedup:** 8-12x
 </Tab>
 
   <Tab title="Complex Integrations">
     **Examples:** - Multi-API orchestration with conditional logic - Real-time
     data pipeline with transformations - Legacy system modernization with schema
-    mapping **Traditional approach:** 1-3 days **Superglue approach:** 1-3 hours
+    mapping **Traditional approach:** 1-3 days **superglue approach:** 1-3 hours
     **Speedup:** 8-24x
   </Tab>
 </Tabs>
@@ -202,11 +202,11 @@ Let's break down a real example: syncing Stripe customers to a CRM system.
 
 **Total: 2.5 hours + ongoing maintenance**
 
-### Superglue Approach: 15 Minutes
+### superglue Approach: 15 Minutes
 
 <Steps>
   <Step title="Connect Integrations (5 mins)">
-    In the Superglue UI or via API:
+    In the superglue UI or via API:
     - Add Stripe integration with API key
     - Add CRM integration with credentials
     - Test connections automatically
@@ -260,12 +260,12 @@ Let's break down a real example: syncing Stripe customers to a CRM system.
 
 **Total: 15 minutes + zero maintenance**
 
-## What Makes Superglue 10x Faster?
+## What Makes superglue 10x Faster?
 
 <CardGroup cols={2}>
   <Card title="Automatic API Understanding" icon="brain">
     **Traditional:** You read docs, understand endpoints, handle auth
-    **Superglue:** AI reads docs automatically, figures out the right API calls
+    **superglue:** AI reads docs automatically, figures out the right API calls
     ```typescript // This automatically handles: // - Stripe pagination // -
     Rate limiting // - Authentication // - Data transformation // - Error
     retries instruction: "Get Stripe customers with subscription details" ```
@@ -273,13 +273,13 @@ Let's break down a real example: syncing Stripe customers to a CRM system.
 
 <Card title="Built-in Best Practices" icon="shield">
   **Traditional:** You implement retries, rate limiting, error handling
-  **Superglue:** All reliability features included by default - Exponential
+  **superglue:** All reliability features included by default - Exponential
   backoff retries - Rate limit handling - Circuit breakers - Automatic
   pagination - Data validation
 </Card>
 
 <Card title="Schema-Aware Transformations" icon="arrows-rotate">
-  **Traditional:** You write custom transformation code **Superglue:** AI
+  **Traditional:** You write custom transformation code **superglue:** AI
   understands source and target schemas, creates optimal transformations
   ```typescript // Automatically maps: // stripe.customer.id → crm.external_id
   // stripe.customer.email → crm.email // stripe.customer.created →
@@ -288,7 +288,7 @@ Let's break down a real example: syncing Stripe customers to a CRM system.
 
   <Card title="Self-Healing Maintenance" icon="heart">
     **Traditional:** Breaks when APIs change, requires manual fixes
-    **Superglue:** Detects changes, automatically adapts workflows - Schema
+    **superglue:** Detects changes, automatically adapts workflows - Schema
     drift detection - Automatic transformation updates - Version management -
     Backwards compatibility
   </Card>
@@ -299,7 +299,7 @@ Let's break down a real example: syncing Stripe customers to a CRM system.
 <Tabs>
   <Tab title="E-commerce Company">
     **Challenge:** Sync product data between Shopify, inventory system, and
-    marketing tools **Traditional estimate:** 2 weeks of development **Superglue
+    marketing tools **Traditional estimate:** 2 weeks of development **superglue
     actual:** 3 hours **Results:** - 40x faster implementation - Zero
     maintenance issues in 6 months - Handles 10k+ products daily - Automatic
     adaptation to Shopify API changes
@@ -308,14 +308,14 @@ Let's break down a real example: syncing Stripe customers to a CRM system.
 <Tab title="SaaS Startup">
   **Challenge:** Customer onboarding automation across Stripe, HubSpot, and
   internal tools **Traditional estimate:** 1 week per integration (3 weeks
-  total) **Superglue actual:** 4 hours **Results:** - 30x faster development -
+  total) **superglue actual:** 4 hours **Results:** - 30x faster development -
   Reduced onboarding time from 2 days to 2 hours - Automatic error recovery and
   retry logic - Easy iteration and workflow updates
 </Tab>
 
   <Tab title="Enterprise Company">
     **Challenge:** Legacy system modernization - expose SOAP APIs as REST
-    **Traditional estimate:** 3 months of development **Superglue actual:** 2
+    **Traditional estimate:** 3 months of development **superglue actual:** 2
     weeks **Results:** - 6x faster delivery - Modern API interface for legacy
     systems - Built-in rate limiting and caching - Easy to add new endpoints
   </Tab>
@@ -359,7 +359,7 @@ Let's break down a real example: syncing Stripe customers to a CRM system.
     }
     ```
     
-    **Superglue (1 line):**
+    **superglue (1 line):**
     ```typescript
     instruction: "Get Stripe customers with ID, email, name, and creation date"
     ```
@@ -387,7 +387,7 @@ Let's break down a real example: syncing Stripe customers to a CRM system.
     async function fullSync() { /* 20 lines */ }
     ```
     
-    **Superglue (5 lines):**
+    **superglue (5 lines):**
     ```typescript
     const workflow = await superglue.buildWorkflow({
       instruction: "Sync all Stripe customers to CRM with proper data transformation and error handling"
@@ -402,7 +402,7 @@ Let's break down a real example: syncing Stripe customers to a CRM system.
 
 <CardGroup cols={2}>
   <Card title="Development Time" icon="clock">
-    | Integration Type | Traditional | Superglue | Speedup |
+    | Integration Type | Traditional | superglue | Speedup |
     |------------------|-------------|-----------|---------| | Simple API call |
     30 min | 3 min | 10x | | Data transformation | 2 hours | 10 min | 12x | |
     Multi-API workflow | 6 hours | 30 min | 12x | | Error handling | 1 hour | 0
@@ -410,7 +410,7 @@ Let's break down a real example: syncing Stripe customers to a CRM system.
   </Card>
 
   <Card title="Ongoing Maintenance" icon="tools">
-    | Maintenance Task | Traditional | Superglue |
+    | Maintenance Task | Traditional | superglue |
     |------------------|-------------|-----------| | API version updates | 2-4
     hours | 0 min | | Schema changes | 1-2 hours | 0 min | | Rate limit
     adjustments | 30 min | 0 min | | Error monitoring | Ongoing | 0 min | |
@@ -421,7 +421,7 @@ Let's break down a real example: syncing Stripe customers to a CRM system.
 ## When Traditional Coding Still Makes Sense
 
 <Info>
-  Superglue isn't always the best choice. Here's when you might still want
+  superglue isn't always the best choice. Here's when you might still want
   traditional coding:
 </Info>
 
@@ -434,7 +434,7 @@ Let's break down a real example: syncing Stripe customers to a CRM system.
     protocols)
   </Tab>
 
-  <Tab title="Use Superglue When">
+  <Tab title="Use superglue When">
     ✅ **Standard API integrations** (REST, GraphQL, SQL) ✅ **Data
     transformation and ETL** workflows ✅ **Business process automation** across
     multiple systems ✅ **Rapid prototyping** and development ✅ **Team includes
@@ -453,10 +453,10 @@ Let's break down a real example: syncing Stripe customers to a CRM system.
 - Maintenance time: 200 hours @ $100/hour = $20,000
 - **Total: $70,000**
 
-**Superglue Approach (Annual):**
+**superglue Approach (Annual):**
 
 - Development time: 50 hours @ $100/hour = $5,000
-- Superglue subscription: $12,000
+- superglue subscription: $12,000
 - Maintenance time: 0 hours
 - **Total: $17,000**
 
@@ -470,10 +470,10 @@ Let's break down a real example: syncing Stripe customers to a CRM system.
 - Maintenance: 800 hours @ $120/hour = $96,000
 - **Total: $336,000**
 
-**Superglue Approach (Annual):**
+**superglue Approach (Annual):**
 
 - Development: 200 hours @ $120/hour = $24,000
-- Superglue subscription: $48,000
+- superglue subscription: $48,000
 - **Total: $72,000**
 
 **Savings: $264,000 per year (79% reduction)**
@@ -491,8 +491,8 @@ Let's break down a real example: syncing Stripe customers to a CRM system.
   Documentation
 </Step>
 
-<Step title="Time the Superglue Approach">
-  [Start with Superglue](https://app.superglue.cloud) and see how long the same
+<Step title="Time the superglue Approach">
+  [Start with superglue](https://app.superglue.cloud) and see how long the same
   integration takes
 </Step>
 
@@ -509,7 +509,7 @@ Let's break down a real example: syncing Stripe customers to a CRM system.
     href="https://app.superglue.cloud"
     icon="rocket"
   >
-    Try Superglue with your real integration challenges and measure the
+    Try superglue with your real integration challenges and measure the
     difference
   </Card>
 

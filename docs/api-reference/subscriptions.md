@@ -3,7 +3,7 @@ title: "Subscriptions"
 description: "GraphQL subscriptions for real-time updates."
 ---
 
-Subscriptions allow you to receive real-time updates from Superglue. Currently, only log streaming is supported.
+Subscriptions allow you to receive real-time updates from superglue. Currently, only log streaming is supported.
 
 ## Logs
 

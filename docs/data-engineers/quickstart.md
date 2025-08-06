@@ -3,9 +3,9 @@ title: "30-Second Setup for Data Engineers"
 description: "Build robust data pipelines and API integrations 10x faster than traditional coding"
 ---
 
-## What Superglue Does for You
+## What superglue Does for You
 
-Superglue eliminates the complexity of API integrations and data transformations. Instead of writing boilerplate code for each API, handling schema changes, and managing error cases, you describe what you want in natural language.
+superglue eliminates the complexity of API integrations and data transformations. Instead of writing boilerplate code for each API, handling schema changes, and managing error cases, you describe what you want in natural language.
 
 [**We're 50% more reliable than LLMs in writing integration code →**](https://superglue.ai/api-ranking/)
 
@@ -62,7 +62,7 @@ Superglue eliminates the complexity of API integrations and data transformations
 
         > "Connect to Stripe API and get all customers created in the last 30 days, transform the data to include only email, name, and subscription status"
 
-        Superglue will guide you through adding credentials and testing the integration.
+        superglue will guide you through adding credentials and testing the integration.
       </Tab>
       <Tab title="Via SDK">
         ```typescript
@@ -133,7 +133,7 @@ Superglue eliminates the complexity of API integrations and data transformations
   </Step>
 </Steps>
 
-## Why Use Superglue vs Traditional Coding
+## Why Use superglue vs Traditional Coding
 
 <CardGroup cols={2}>
   <Card title="10x Faster Development" icon="rocket">
@@ -160,7 +160,7 @@ Superglue eliminates the complexity of API integrations and data transformations
 
 <Steps>
   <Step title="Build" icon="hammer">
-    Describe your data pipeline in natural language. Superglue figures out the
+    Describe your data pipeline in natural language. superglue figures out the
     API calls, transformations, and error handling.
   </Step>
   <Step title="Test & Iterate" icon="map">
@@ -230,5 +230,5 @@ Superglue eliminates the complexity of API integrations and data transformations
 <Card title="Ready to move beyond traditional API integration?" icon="rocket">
   [Start building in the UI](https://app.superglue.cloud) or [book a
   demo](https://cal.com/superglue/superglue-demo) to see how others are using
-  Superglue.
+  superglue.
 </Card>

@@ -1,5 +1,5 @@
 ---
-title: "Superglue MCP Integration"
+title: "superglue MCP Integration"
 description: "Universal MCP tool for reliable agent workflows across any API"
 ---
 
@@ -8,14 +8,14 @@ Turn any API into workflows so your agents can get things done reliably.
 **superglue MCP** provides a universal tool that lets agents build reliable, validated workflows for any app, database or API, simply by requesting them in natural language.
 
 <Info>
-MCP (Model Context Protocol) is the easiest way to give AI agents access to external tools and data sources. Superglue provides a universal MCP server that connects to any API.
+MCP (Model Context Protocol) is the easiest way to give AI agents access to external tools and data sources. superglue provides a universal MCP server that connects to any API.
 </Info>
 
 ## What You Get with MCP
 
 <CardGroup cols={2}>
   <Card title="One Tool, Any API" icon="universal-access">
-    Instead of building separate MCP tools for each API, Superglue gives your agent one powerful tool that connects to everything.
+    Instead of building separate MCP tools for each API, superglue gives your agent one powerful tool that connects to everything.
   </Card>
   <Card title="Natural Language" icon="comment">
     Your agent can describe integrations in plain English - no need to learn specific API syntax.
@@ -24,7 +24,7 @@ MCP (Model Context Protocol) is the easiest way to give AI agents access to exte
     Automatic retries, error handling, and rate limiting built into every API call.
   </Card>
   <Card title="Self-Healing" icon="heart">
-    When APIs change, Superglue adapts automatically - your agent workflows keep working.
+    When APIs change, superglue adapts automatically - your agent workflows keep working.
   </Card>
 </CardGroup>
 
@@ -93,13 +93,13 @@ Instead of building separate MCP tools for each API, superglue provides one powe
   </Step>
   
   <Step title="Restart Claude Desktop">
-    Close and reopen Claude Desktop. You should see "Superglue" connected in the MCP status.
+    Close and reopen Claude Desktop. You should see "superglue" connected in the MCP status.
   </Step>
 </Steps>
 
 ## Available MCP Tools
 
-The Superglue MCP server provides these tools to your agent:
+The superglue MCP server provides these tools to your agent:
 
 <AccordionGroup>
   <Accordion title="superglue_find_integrations" icon="search">
@@ -152,13 +152,13 @@ The Superglue MCP server provides these tools to your agent:
 
 ### LangChain
 
-You can use Superglue with LangChain agents that support MCP:
+You can use superglue with LangChain agents that support MCP:
 
 ```python
 from langchain_community.tools import MCPTool
 from langchain.agents import initialize_agent
 
-# Initialize MCP connection to Superglue
+# Initialize MCP connection to superglue
 superglue_tools = MCPTool.from_server(
     server_command=["npx", "mcp-remote", "https://mcp.superglue.ai", "--header", "Authorization:Bearer YOUR_API_KEY"]
 )
@@ -177,7 +177,7 @@ agent = initialize_agent(
 from crewai import Agent, Task, Crew
 from crewai_tools import MCPTool
 
-# Create Superglue tool
+# Create superglue tool
 superglue = MCPTool(
     server_command=["npx", "mcp-remote", "https://mcp.superglue.ai", "--header", "Authorization:Bearer YOUR_API_KEY"]
 )
@@ -314,16 +314,16 @@ For coding assistants, use the same configuration in your MCP settings:
 
 ## Authentication & Session Management
 
-The Superglue MCP server uses key-based authentication and session management:
+The superglue MCP server uses key-based authentication and session management:
 
-- **Authentication**: All requests require a valid Superglue API key in the Authorization header
+- **Authentication**: All requests require a valid superglue API key in the Authorization header
 - **Sessions**: MCP interactions are session-based to maintain context across requests
 
 ## Troubleshooting
 
 <AccordionGroup>
   <Accordion title="MCP Server Not Connecting" icon="exclamation-triangle">
-    **Symptoms:** Claude says "Superglue not available" or MCP status shows disconnected
+    **Symptoms:** Claude says "superglue not available" or MCP status shows disconnected
     
     **Solutions:**
     1. Verify `mcp-remote` is available: `npx mcp-remote --version`
@@ -339,7 +339,7 @@ The Superglue MCP server uses key-based authentication and session management:
     **Solutions:**
     1. Be more specific about what data you want
     2. Check if the integration exists: ask agent to "find integrations for [service]"
-    3. Verify your credentials are still valid in the Superglue dashboard
+    3. Verify your credentials are still valid in the superglue dashboard
     4. Try breaking complex requests into smaller steps
   </Accordion>
   

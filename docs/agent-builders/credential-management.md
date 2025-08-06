@@ -1,12 +1,12 @@
 ---
 title: "Credential Management"
-description: "Secure approaches to managing API credentials with Superglue"
+description: "Secure approaches to managing API credentials with superglue"
 ---
 
 superglue handles credential management primarily through its encrypted vault. You can also pass credentials at runtime, which is useful for multi-user scenarios.
 
 <Note>
-**Flexible Credential Naming**: The exact naming of credentials, except for OAuth cases, is not vital, since Superglue maps credentials to the request automatically. This means that e.g. if the token has to be passed as a `X-SERVICE-API-KEY`, it is acceptable to name the token "api_key". Given documentation and context, Superglue will figure out how to place the API key to successfully complete the request.
+**Flexible Credential Naming**: The exact naming of credentials, except for OAuth cases, is not vital, since superglue maps credentials to the request automatically. This means that e.g. if the token has to be passed as a `X-SERVICE-API-KEY`, it is acceptable to name the token "api_key". Given documentation and context, superglue will figure out how to place the API key to successfully complete the request.
 </Note>
 
 ## Two Approaches
@@ -17,7 +17,7 @@ superglue handles credential management primarily through its encrypted vault. Y
 
     **How it works:** 
 
-    - - Store credentials securely in Superglue's encrypted vault 
+    - - Store credentials securely in superglue's encrypted vault 
 
     - Credentials are automatically used for integrations 
 
@@ -35,13 +35,13 @@ superglue handles credential management primarily through its encrypted vault. Y
 
     - Pass credentials at runtime with each workflow execution
 
-    - Superglue never stores your credentials
+    - superglue never stores your credentials
 
     - Supports 1:n integration:user scenarios.
   </Card>
 </CardGroup>
 
-## Approach 1: Superglue-Managed Credentials
+## Approach 1: superglue-Managed Credentials
 
 ### Setup via Web Interface
 
@@ -57,7 +57,7 @@ superglue handles credential management primarily through its encrypted vault. Y
     Provide your API keys, OAuth tokens, or database connection strings
   </Step>
   <Step title="Save Securely" stepNumber={3}>
-    Credentials are encrypted and stored securely in Superglue's vault
+    Credentials are encrypted and stored securely in superglue's vault
   </Step>
 </Steps>
 
@@ -133,7 +133,7 @@ Then in Claude Desktop:
 
 > "Connect to my Stripe account and get recent transactions"
 
-Superglue will use the stored Stripe credentials automatically.
+superglue will use the stored Stripe credentials automatically.
 
 ## Approach 2: Runtime Credential Passing
 
@@ -204,10 +204,10 @@ class SecureWorkflowExecutor {
 ### OAuth Token Management
 
 <Info>
-  **Superglue handles OAuth automatically\!** Token refresh, expiration management, and OAuth flows are all managed by Superglue. You just need to provide the initial OAuth credentials.
+  **superglue handles OAuth automatically\!** Token refresh, expiration management, and OAuth flows are all managed by superglue. You just need to provide the initial OAuth credentials.
 </Info>
 
-**What Superglue handles for you:**
+**What superglue handles for you:**
 
 - ✅ Token refresh when expired
 - ✅ OAuth flow management
@@ -222,7 +222,7 @@ class SecureWorkflowExecutor {
 - Authorization URL (if not using templates)
 
 ```typescript
-// Simple OAuth setup - Superglue does the rest
+// Simple OAuth setup - superglue does the rest
 await superglue.upsertIntegration("hubspot-oauth", {
   id: "hubspot-oauth",
   name: "HubSpot OAuth",
@@ -230,7 +230,7 @@ await superglue.upsertIntegration("hubspot-oauth", {
   credentials: {
     client_id: "your_hubspot_client_id",
     client_secret: "your_hubspot_client_secret",
-    // Superglue handles token refresh automatically
+    // superglue handles token refresh automatically
   },
   specificInstructions: "Use OAuth2 with contacts and deals scopes"
 });
@@ -313,7 +313,7 @@ const result = await superglue.executeWorkflow({
 
 <Tabs>
   <Tab title="Single User Scenarios">
-    **Use Superglue-managed credentials:**
+    **Use superglue-managed credentials:**
 
     ✅ Faster setup and iteration\
     ✅ No credential management complexity\
@@ -366,7 +366,7 @@ const result = await superglue.executeWorkflow({
     See examples of credential management in custom applications
   </Card>
   <Card title="Self-Hosting" icon="server" href="/guides/self-hosting">
-    Set up your own Superglue instance with full credential control
+    Set up your own superglue instance with full credential control
   </Card>
   <Card title="OAuth Guide" icon="key" href="/guides/oauth-integrations">
     Deep dive into OAuth integrations and token management

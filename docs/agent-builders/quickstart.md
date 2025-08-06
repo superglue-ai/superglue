@@ -3,9 +3,9 @@ title: "30-Second Setup for Agent Builders"
 description: "Get your AI agents connected to any API in under 30 seconds"
 ---
 
-## What Superglue Does for You
+## What superglue Does for You
 
-Superglue acts as a **universal MCP tool** that gives your agents reliable access to any API or database. Instead of building custom tools for each integration, your agent gets one powerful tool that can connect to anything.
+superglue acts as a **universal MCP tool** that gives your agents reliable access to any API or database. Instead of building custom tools for each integration, your agent gets one powerful tool that can connect to anything.
 
 ## 30-Second Setup
 
@@ -69,9 +69,9 @@ Superglue acts as a **universal MCP tool** that gives your agents reliable acces
 
         In Claude Desktop or your agent framework:
 
-        > "Use Superglue to get the latest issues from the GitHub repository microsoft/vscode and summarize the top 3. My api key is ...."
+        > "Use superglue to get the latest issues from the GitHub repository microsoft/vscode and summarize the top 3. My api key is ...."
 
-        That's it\! Superglue will automatically handle the GitHub API integration.
+        That's it\! superglue will automatically handle the GitHub API integration.
 
         Alternatively, you can use an API that does not need any authentication:
 
@@ -117,7 +117,7 @@ Superglue acts as a **universal MCP tool** that gives your agents reliable acces
     what you want in natural language.
   </Card>
   <Card title="Automatic Error Handling" icon="shield">
-    Superglue handles authentication, rate limits, retries, and data
+    superglue handles authentication, rate limits, retries, and data
     transformation automatically.
   </Card>
   <Card title="Any API or Database" icon="database">
@@ -160,11 +160,11 @@ Superglue acts as a **universal MCP tool** that gives your agents reliable acces
 
 <CardGroup cols={2}>
   <Card title="Complete MCP Guide" icon="plug" href="/mcp/mcp">
-    Deep dive into using Superglue with Claude Desktop, agent frameworks, and
+    Deep dive into using superglue with Claude Desktop, agent frameworks, and
     MCP
   </Card>
   <Card title="SDK Integration" icon="code" href="/agent-builders/sdk-integration">
-    Build custom AI applications with the Superglue SDK
+    Build custom AI applications with the superglue SDK
   </Card>
   <Card title="Credential Management" icon="key" href="/agent-builders/credential-management">
     Learn about different approaches to managing API credentials

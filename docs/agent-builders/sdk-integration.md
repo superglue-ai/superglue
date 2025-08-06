@@ -1,10 +1,10 @@
 ---
 title: "SDK Integration Guide"
-description: "Build custom AI applications with the Superglue SDK"
+description: "Build custom AI applications with the superglue SDK"
 ---
 
 <Info>
-  The Superglue SDK gives you full programmatic control for building custom AI
+  The superglue SDK gives you full programmatic control for building custom AI
   applications that need reliable API integrations.
 </Info>
 
@@ -48,7 +48,7 @@ const superglue = new SuperglueClient({
 
 ### Building and Running Workflows
 
-The Superglue SDK uses a two-step process for workflows:
+The superglue SDK uses a two-step process for workflows:
 
 1. **`buildWorkflow()`** - Creates a workflow from your instruction and integrations
 2. **`executeWorkflow()`** - Executes a workflow (either by ID or by passing the workflow object)

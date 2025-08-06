@@ -4,7 +4,7 @@ description: "Choose the right interface for your data integration projects"
 ---
 
 <Info>
-  Superglue offers multiple interfaces for different workflows. Choose based on
+  superglue offers multiple interfaces for different workflows. Choose based on
   your use case, team, and deployment requirements.
 </Info>
 
@@ -65,26 +65,26 @@ The UI/Chat interface is like having a data engineer AI assistant that understan
     # Format output
     ```
 
-    **Superglue UI approach:**
+    **superglue UI approach:**
 
     > "Get all Stripe customers created in 2024, show me their email, subscription status, and total revenue"
 
-    That's it. Superglue handles the API calls, pagination, transformations, and formatting.
+    That's it. superglue handles the API calls, pagination, transformations, and formatting.
   </Tab>
   <Tab title="Interactive Development">
     **Iterative refinement:**
 
     **You:** "Get HubSpot contacts from this year"
 
-    **Superglue:** _Returns 1,247 contacts with basic info_
+    **superglue:** _Returns 1,247 contacts with basic info_
 
     **You:** "Actually, I only need contacts with 'Enterprise' in their company name and their deal values"
 
-    **Superglue:** _Refines the query and returns filtered results_
+    **superglue:** _Refines the query and returns filtered results_
 
     **You:** "Perfect\! Now save this as a workflow called 'enterprise-contacts'"
 
-    **Superglue:** _Saves the workflow for future use_
+    **superglue:** _Saves the workflow for future use_
   </Tab>
   <Tab title="Automatic Documentation">
     The UI automatically captures and documents your workflows:
@@ -105,7 +105,7 @@ The UI/Chat interface is like having a data engineer AI assistant that understan
   <Accordion title="Data Exploration" icon="magnifying-glass">
     **Scenario:** You need to understand what data is available in a new system.
     **Traditional:** Read API docs, write test scripts, examine responses **With
-    Superglue UI:** \> "Show me what data is available in our Salesforce
+    superglue UI:** \> "Show me what data is available in our Salesforce
     instance" \> "What are the different types of HubSpot deals and their
     properties?" \> "Give me a sample of our PostgreSQL customers table" Get
     immediate answers with actual data samples.
@@ -127,7 +127,7 @@ The UI/Chat interface is like having a data engineer AI assistant that understan
   <Accordion title="Learning & Training" icon="graduation-cap">
     **Scenario:** Team members need to learn about APIs and integrations.
     **Natural learning progression:** 1. Start with simple queries in natural
-    language 2. See how Superglue translates them to API calls 3. Understand the
+    language 2. See how superglue translates them to API calls 3. Understand the
     data structures and transformations 4. Graduate to using the SDK for
     production Perfect for onboarding new team members.
   </Accordion>
@@ -569,7 +569,7 @@ The UI/Chat interface is like having a data engineer AI assistant that understan
     productionize it with the SDK
   </Card>
   <Card title="API Ranking Benchmark" icon="trophy" href="/data-engineers/api-ranking">
-    See concrete performance comparisons between Superglue and traditional
+    See concrete performance comparisons between superglue and traditional
     approaches
   </Card>
   <Card title="Data Pipeline Patterns" icon="pipe" href="/data-engineers/data-pipelines">
