@@ -1,5 +1,5 @@
 ---
-title: "30-Second Setup for Agent Builders"
+title: "Setup for Agent & AI App Builders"
 description: "Get your AI agents connected to any API in under 30 seconds"
 ---
 

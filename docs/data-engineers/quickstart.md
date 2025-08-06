@@ -1,5 +1,5 @@
 ---
-title: "30-Second Setup for Data Engineers"
+title: "Setup for Integration & Data Engineers"
 description: "Build robust data pipelines and API integrations 10x faster than traditional coding"
 ---
 
