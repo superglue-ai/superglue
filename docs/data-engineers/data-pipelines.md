@@ -509,7 +509,3 @@ class PipelineMonitor {
 </CardGroup>
 
 ---
-
-<Info>
-  **Ready to transform your data pipelines?** These patterns represent battle-tested approaches used by teams processing millions of records daily. Start with simple patterns and gradually adopt more advanced techniques as your needs grow.
-</Info>
