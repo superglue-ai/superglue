@@ -111,24 +111,25 @@ superglue eliminates the complexity of API integrations and data transformations
   </Step>
   <Step title="Save & Deploy">
     <Tabs>
-      <Tab title="Save for Reuse">
+      <Tab title="Save via Chat">
+        After testing, save your workflow for production use:
+
+        > "Save this workflow with id stripe-customer-sync"
+      </Tab>
+      <Tab title="Save via SDK">
         After testing, save your workflow for production use:
 
         ```typescript
         const savedWorkflow = await superglue.upsertWorkflow(workflow.id, result.workflow);
         ```
-      </Tab>
-      <Tab title="Run in Production">
-        Execute saved workflows reliably:
+        Execute saved workflows:
 
         ```typescript
-        const production = await superglue.executeWorkflow({
-          workflowId: "stripe-customer-sync",
-          credentials: {
-            stripe_key: process.env.STRIPE_SECRET_KEY
-          }
+        const result = await superglue.executeWorkflow({
+          id: "stripe-customer-sync"
         });
         ```
+
       </Tab>
     </Tabs>
   </Step>
