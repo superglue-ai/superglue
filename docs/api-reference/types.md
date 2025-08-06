@@ -24,25 +24,25 @@ type ApiConfig implements BaseConfig {
   createdAt: DateTime
   updatedAt: DateTime
   
-  urlHost: String                   # Base URL for the API
-  urlPath: String                   # Path component of the URL
-  method: HttpMethod                # HTTP method to use
-  headers: JSON                     # Request headers
-  queryParams: JSON                 # URL query parameters
-  body: String                      # Request body
-  instruction: String               # Natural language description of the transformation
-  authentication: AuthType          # Authentication method
-  responseSchema: JSONSchema        # Expected response format
-  responseMapping: JSONata         # JSONata transformation expression
-  pagination: Pagination           # Pagination configuration
-  dataPath: String                 # Path to data in response
-  documentationUrl: String
+  urlHost: String                   # Base URL for the API (e.g., "https://api.stripe.com")
+  urlPath: String                   # Path component of the URL (e.g., "/v1/customers")
+  method: HttpMethod                # HTTP method to use (default: GET)
+  headers: JSON                     # Request headers (default: {})
+  queryParams: JSON                 # URL query parameters (default: {})
+  body: String                      # Request body for POST/PUT/PATCH requests
+  instruction: String               # Natural language description of what this API does
+  authentication: AuthType          # Authentication method (default: NONE)
+  responseSchema: JSONSchema        # Expected response format (auto-generated if not provided)
+  responseMapping: JSONata         # JSONata transformation expression (optional)
+  pagination: Pagination           # Pagination configuration (default: DISABLED)
+  dataPath: String                 # JSONPath to extract data from response (e.g., "$.data")
+  documentationUrl: String         # URL to API documentation for auto-configuration
 }
 ```
 
 ### ExtractConfig
 
-Configuration for data extraction. Inherits from [BaseConfig](overview.md#base-types).
+Configuration for data extraction from files or APIs. Inherits from [BaseConfig](overview.md#base-types).
 
 ```graphql
 type ExtractConfig implements BaseConfig {
@@ -51,18 +51,18 @@ type ExtractConfig implements BaseConfig {
   createdAt: DateTime
   updatedAt: DateTime
   
-  urlHost: String                   # Source URL or file location
-  urlPath: String                   # Path component of the URL
-  method: HttpMethod                # HTTP method for API sources
-  headers: JSON                     # Request headers
-  queryParams: JSON                 # URL query parameters
-  body: String                      # Request body
-  instruction: String               # Natural language description
-  authentication: AuthType          # Authentication method
-  fileType: FileType                # Format of the source file
-  decompressionMethod: DecompressionMethod  # Decompression algorithm
-  dataPath: String                  # Path to data in file/response
-  documentationUrl: String
+  urlHost: String                   # Source URL or file location (e.g., "https://api.example.com" or "s3://bucket")
+  urlPath: String                   # Path component of the URL or file path
+  method: HttpMethod                # HTTP method for API sources (default: GET)
+  headers: JSON                     # Request headers for API sources (default: {})
+  queryParams: JSON                 # URL query parameters for API sources (default: {})
+  body: String                      # Request body for API sources
+  instruction: String               # Natural language description of what to extract
+  authentication: AuthType          # Authentication method for API sources (default: NONE)
+  fileType: FileType                # Format of the source file (default: AUTO)
+  decompressionMethod: DecompressionMethod  # Decompression algorithm (default: AUTO)
+  dataPath: String                  # JSONPath to extract specific data (e.g., "$.records")
+  documentationUrl: String         # URL to API/file format documentation
 }
 ```
 
@@ -77,7 +77,7 @@ type TransformConfig implements BaseConfig {
   createdAt: DateTime
   updatedAt: DateTime
   
-  instruction: String               # Natural language description
+  instruction: String               # Natural language description of desired transformation
   responseSchema: JSONSchema        # Target data format
   responseMapping: JSONata         # Transformation expression
 }
@@ -228,13 +228,22 @@ type Log {
 
 ### Pagination
 
+Configuration for automatic pagination handling.
+
 ```graphql
 type Pagination {
-  type: PaginationType!
-  pageSize: String
-  cursorPath: String
+  type: PaginationType!             # Pagination strategy (OFFSET_BASED, PAGE_BASED, CURSOR_BASED, DISABLED)
+  pageSize: String                  # Number of items per page (default: "100")
+  cursorPath: String                # JSONPath to cursor field for cursor-based pagination (e.g., "$.next_cursor")
+  stopCondition: String             # Condition to stop pagination (optional)
 }
 ```
+
+**Pagination Types:**
+- `OFFSET_BASED`: Uses offset/limit parameters
+- `PAGE_BASED`: Uses page number and page size
+- `CURSOR_BASED`: Uses cursor tokens for navigation
+- `DISABLED`: No automatic pagination (default)
 
 ## List Types
 
@@ -396,7 +405,82 @@ subscription {
 - `timestamp`: DateTime
 - `runId`: ID of the related run (optional)
 
-See also:
+### WorkflowResult
+
+Result of workflow execution with detailed step results.
+
+```graphql
+type WorkflowResult {
+  id: ID!
+  success: Boolean!
+  data: JSON
+  error: String
+  startedAt: DateTime!
+  completedAt: DateTime!
+  config: Workflow
+  stepResults: [WorkflowStepResult!]
+}
+```
+
+- `stepResults`: Array of individual step results within the workflow
+
+### WorkflowStepResult
+
+Result of an individual step within a workflow execution.
+
+```graphql
+type WorkflowStepResult {
+  stepId: String!
+  success: Boolean!
+  rawData: JSON
+  transformedData: JSON
+  error: String
+}
+```
+
+- `stepId`: Identifier of the step within the workflow
+- `rawData`: Raw response data before transformation
+- `transformedData`: Data after applying transformations
+
+### ExecutionStep
+
+Configuration for a single step within a workflow.
+
+```graphql
+type ExecutionStep {
+  id: String!
+  apiConfig: ApiConfig!
+  integrationId: ID
+  executionMode: String     # DIRECT | LOOP
+  loopSelector: JSONata
+  loopMaxIters: Int
+  inputMapping: JSONata
+  responseMapping: JSONata
+}
+```
+
+- `executionMode`: How to execute the step (DIRECT for single execution, LOOP for batch processing)
+- `loopSelector`: JSONata expression to select items for looping
+- `loopMaxIters`: Maximum iterations for loop mode (default: 100)
+- `inputMapping`: JSONata expression to map workflow data to step input
+- `responseMapping`: JSONata expression to transform step output
+
+### SuggestedIntegration
+
+Suggested integration returned by `findRelevantIntegrations` query.
+
+```graphql
+type SuggestedIntegration {
+  id: String!
+  reason: String!
+  savedCredentials: [String!]!
+}
+```
+
+- `reason`: Explanation of why this integration was suggested
+- `savedCredentials`: Names of credentials already saved for this integration
+
+ See also:
 
 - [Overview](overview.md) for common parameters
 - [Mutations](mutations.md) for operations using these types
