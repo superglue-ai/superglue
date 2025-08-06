@@ -1075,7 +1075,10 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     });
 
     while (fetchedLinks.size < PlaywrightFetchingStrategy.MAX_FETCHED_LINKS && linkPool.length > 0) {
-      const rankedLinks = this.rankItems(linkPool, keywords, fetchedLinks) as { linkText: string, href: string }[];
+      const rankedLinks = 
+        linkPool.length > 1 ? 
+        this.rankItems(linkPool, keywords, fetchedLinks) as { linkText: string, href: string }[] 
+        : linkPool;
 
       if (rankedLinks.length === 0) break;
       const nextLink = rankedLinks[0];

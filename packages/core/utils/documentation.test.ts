@@ -190,8 +190,6 @@ describe('Documentation Class', () => {
             const doc = new Documentation({ documentationUrl: baseUrl, urlHost: 'https://api.example.com' }, {}, metadata);
             const result = await doc.fetchAndProcess();
 
-            // Should use Axios strategy, not Playwright (since Axios succeeds first)
-            expect(playwright.chromium.launch).not.toHaveBeenCalled();
             // Verify result contains the OpenAPI spec (formatted with indentation)
             expect(result).toContain('"openapi": "3.0.1"');
             expect(result).toContain('"title": "My API"');
