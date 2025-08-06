@@ -215,7 +215,7 @@ For coding assistants, use the same configuration in your MCP settings:
 
 ## Example Agent Conversations
 
-<video autoPlay muted loop playsInline className="w-full aspect-video" src="https://superglue.cloud/files/mcp-short.mp4" />
+<video autoPlay muted loop playsInline className="w-full aspect-video" src="https://superglue.cloud/files/hubspot.mp4" />
 
 <Tabs>
   <Tab title="Data Analysis">
@@ -278,7 +278,7 @@ For coding assistants, use the same configuration in your MCP settings:
   </Card>
   
   <Card title="Use Response Schemas" icon="code">
-    When building workflows, specify the output format:
+    When building workflows, you can specify the output format:
     
     ```json
     {
@@ -299,10 +299,10 @@ For coding assistants, use the same configuration in your MCP settings:
     ```
   </Card>
   
-  <Card title="Handle Errors Gracefully" icon="shield">
-    Superglue automatically handles most errors, but help your agent understand what went wrong:
+  <Card title="Add context" icon="shield">
+    You can improve the performance of your agent by adding context to the workflow:
     
-    > "If the API is rate limited, wait and try again. If credentials are invalid, ask me to update them."
+    > "You need to get an auth token first before each request to get the data."
   </Card>
   
   <Card title="Save Successful Workflows" icon="save">
@@ -318,7 +318,6 @@ The Superglue MCP server uses key-based authentication and session management:
 
 - **Authentication**: All requests require a valid Superglue API key in the Authorization header
 - **Sessions**: MCP interactions are session-based to maintain context across requests
-- **Session ID**: The server generates a UUID for each session, maintained via the `mcp-session-id` header
 
 ## Troubleshooting
 
@@ -348,11 +347,9 @@ The Superglue MCP server uses key-based authentication and session management:
     **Symptoms:** API calls return 401 or 403 errors
     
     **Solutions:**
-    1. Verify your Superglue API key is valid and not expired
-    2. Update credentials in the Superglue dashboard at [app.superglue.cloud](https://app.superglue.cloud)
-    3. Check if integration API keys have expired or been revoked
-    4. Verify the integration has the right permissions/scopes
-    5. Test credentials directly with the API provider
+    1. Check if integration API keys have expired or been revoked
+    2. Verify the integration has the right permissions/scopes
+    3. Test credentials directly with the API provider
   </Accordion>
 </AccordionGroup>
 

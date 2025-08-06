@@ -10,21 +10,19 @@ description: "Secure approaches to managing API credentials with Superglue"
 
 ## Two Approaches
 
-<Tabs>
-  <Tab title="Superglue Manages Credentials">
-    **Best for:** Development, prototyping, trusted environments **How it
+<CardGroup cols={2}>
+  <Card title="Store credentials in integration" icon="key">
+    **Best for:** Single-user environments / one integration per user setups **How it
     works:** - Store credentials securely in Superglue's encrypted vault -
     Credentials are automatically used for integrations - No need to pass
-    credentials with each API call - Perfect for rapid development and testing
-  </Tab>
-  <Tab title="You Manage Credentials">
-    **Best for:** Production, high-security environments, compliance
-    requirements **How it works:** - Keep credentials in your own secure storage
+    credentials with each API call - Oauth integrations are automatically managed
+  </Card>
+  <Card title="Provide credentials at runtime" icon="key">
+    **Best for:** Complex multi-user scenarios **How it works:** - Keep credentials in your own secure storage  
     (environment variables, vault, etc.) - Pass credentials at runtime with each
-    workflow execution - Superglue never stores your credentials - Full auditing
-    and control over credential access
-  </Tab>
-</Tabs>
+    workflow execution - Superglue never stores your credentials
+  </Card>
+</CardGroup>
 
 ## Approach 1: Superglue-Managed Credentials
 
@@ -74,8 +72,8 @@ await superglue.upsertIntegration({
 ### Using Stored Credentials
 
 ```typescript
-// No need to pass credentials - they're automatically used
-const result = await superglue.buildAndExecuteWorkflow({
+// First build the workflow
+const workflow = await superglue.buildWorkflow({
   instruction: "Get all Stripe customers from last month",
   integrationIds: ["my-stripe"], // Uses stored credentials automatically
   responseSchema: {
@@ -87,6 +85,11 @@ const result = await superglue.buildAndExecuteWorkflow({
       },
     },
   },
+});
+
+// Then execute it
+const result = await superglue.executeWorkflow({
+  workflow,
 });
 ```
 
@@ -129,10 +132,15 @@ process.env.STRIPE_SECRET_KEY = "sk_live_...";
 process.env.HUBSPOT_API_KEY = "pat-...";
 process.env.DATABASE_URL = "postgresql://...";
 
-// Pass at runtime
-const result = await superglue.buildAndExecuteWorkflow({
+// First build the workflow
+const workflow = await superglue.buildWorkflow({
   instruction: "Sync Stripe customers to database via HubSpot",
   integrationIds: ["stripe", "hubspot", "postgresql"],
+});
+
+// Then execute with credentials passed at runtime
+const result = await superglue.executeWorkflow({
+  workflow,
   credentials: {
     stripe_secret_key: process.env.STRIPE_SECRET_KEY,
     hubspot_api_key: process.env.HUBSPOT_API_KEY,
@@ -182,101 +190,96 @@ class SecureWorkflowExecutor {
 
 ### OAuth Token Management
 
+<Info>
+**Superglue handles OAuth automatically!** Token refresh, expiration management, and OAuth flows are all managed by Superglue. You just need to provide the initial OAuth credentials.
+</Info>
+
+**What Superglue handles for you:**
+- ✅ Token refresh when expired
+- ✅ OAuth flow management  
+- ✅ Scope validation
+- ✅ Rate limiting with OAuth APIs
+- ✅ Error handling for token issues
+
+**What you need to provide:**
+- Client ID and Client Secret
+- Scopes (if custom)
+- Authorization URL (if not using templates)
+
 ```typescript
-class OAuthCredentialManager {
-  private tokenStore: TokenStore;
-  private superglue: SuperglueClient;
+// Simple OAuth setup - Superglue does the rest
+await superglue.upsertIntegration("hubspot-oauth", {
+  id: "hubspot-oauth",
+  name: "HubSpot OAuth",
+  urlHost: "https://api.hubapi.com",
+  credentials: {
+    client_id: "your_hubspot_client_id",
+    client_secret: "your_hubspot_client_secret",
+    // Superglue handles token refresh automatically
+  },
+  specificInstructions: "Use OAuth2 with contacts and deals scopes"
+});
 
-  async executeWithOAuth(userId: string, instruction: string) {
-    // Get fresh OAuth tokens
-    const tokens = await this.tokenStore.getValidTokens(userId);
+// Use it in workflows - no token management needed
+const workflow = await superglue.buildWorkflow({
+  instruction: "Get all HubSpot contacts created this month",
+  integrationIds: ["hubspot-oauth"]
+});
 
-    // Check if tokens need refresh
-    if (this.isTokenExpiring(tokens.hubspot_token)) {
-      tokens.hubspot_token = await this.refreshToken(tokens.refresh_token);
-    }
-
-    // Execute with fresh tokens
-    return await this.superglue.buildAndExecuteWorkflow({
-      instruction,
-      integrationIds: ["hubspot", "google-ads"],
-      credentials: {
-        hubspot_token: tokens.hubspot_token,
-        google_ads_token: tokens.google_ads_token,
-      },
-    });
-  }
-
-  private isTokenExpiring(token: string): boolean {
-    // Your token expiration logic
-    return false;
-  }
-
-  private async refreshToken(refreshToken: string): Promise<string> {
-    // Your token refresh logic
-    return "new_token";
-  }
-}
+const result = await superglue.executeWorkflow({ workflow });
 ```
+
+<Note>
+We have pre-built OAuth templates for popular APIs like HubSpot, Google Ads, Salesforce, and more. You can create a new integration and check the templates to see what is available. If an integration is not available, you can always create it manually and add auth url and scopes. Talk to us if you need help with this.
+</Note>
 
 ## Integration-Specific Credential Patterns
-
-### Stripe
-
-```typescript
-// Stored credentials approach
-await superglue.createIntegration({
-  id: "stripe-prod",
-  credentials: {
-    secret_key: "sk_live_...",
-    publishable_key: "pk_live_...",
-    webhook_secret: "whsec_...", // For webhook verification
-  },
-});
-
-// Runtime credentials approach
-const result = await superglue.executeWorkflow({
-  workflowId: "stripe-report",
-  credentials: {
-    stripe_secret_key: process.env.STRIPE_SECRET_KEY,
-  },
-});
-```
 
 ### Database Connections
 
 ```typescript
 // Stored credentials (connection string)
-await superglue.createIntegration({
+await superglue.upsertIntegration({
   id: "main-db",
-  urlHost: "postgresql://host:5432",
-  urlPath: "/production_db",
+  urlHost: "postgresql://<<user>>:<<password>>@<<host>>:<<port>>",
+  urlPath: "/<<database_name>>",
   credentials: {
-    connection_string: "postgresql://user:pass@host:5432/db",
+    user: "user",
+    password: "pass",
+    host: "host",
+    port: 5432,
+    database: "db",
   },
 });
+const result = await superglue.executeWorkflow({
+  workflowId: "db-query",
+  integrationIds: ["main-db"]
+});
 
-// Runtime credentials (separate components)
+// Runtime credentials - this can be useful if you want to connect to different databases with one workflow (e.g. one set of credentials for each user)
 const result = await superglue.executeWorkflow({
   workflowId: "db-query",
   credentials: {
-    db_host: process.env.DB_HOST,
-    db_user: process.env.DB_USER,
-    db_password: process.env.DB_PASSWORD,
-    db_name: process.env.DB_NAME,
-  },
+    user: "user",
+    password: "pass",
+    host: "host",
+    port: 5432,
+    database: "db",
+  }
 });
 ```
 
 ### OAuth APIs (HubSpot, Google, etc.)
 
+For oauth integrations, you might need to authenticate the user through the web interface. To do so, set the client id and client secret, then open the integration in the web interface and click "Save" to open the authentication flow. Alternatively, you can set access token and refresh token manually:
+
 ```typescript
 // Stored OAuth tokens
-await superglue.createIntegration({
+await superglue.upsertIntegration({
   id: "hubspot-crm",
   credentials: {
-    access_token: "pat-na1-...",
-    refresh_token: "refresh_token_here", // For automatic refresh
+    access_token: "pat-na1-...", // optional - alternatively create a new integration in the browser and authenticate there
+    refresh_token: "refresh_token_here", // optional
     client_id: "your_app_client_id",
     client_secret: "your_app_client_secret",
   },
@@ -291,76 +294,11 @@ const result = await superglue.executeWorkflow({
 });
 ```
 
-## Security Best Practices
-
-<CardGroup cols={2}>
-  <Card title="Credential Rotation" icon="rotate">
-    **For stored credentials:**
-
-    - Update credentials in Superglue when they rotate
-    - Use webhooks to automate credential updates
-
-    **For runtime credentials:**
-
-    - Implement automatic token refresh
-    - Monitor credential expiration
-  </Card>
-  <Card title="Least Privilege" icon="shield">
-    **For all approaches:**
-
-    - Only grant necessary API permissions
-    - Use read-only keys when possible
-    - Regularly audit credential usage
-
-    ```typescript
-    // Example: Read-only Stripe key for reports
-    credentials: {
-      stripe_secret_key: "rk_live_..." // Restricted key
-    }
-    ```
-  </Card>
-  <Card title="Environment Separation" icon="building">
-    **Development:**
-
-    - Use test/sandbox credentials
-    - Store in Superglue for convenience
-
-    **Production:**
-
-    - Use runtime credential passing
-    - Store in secure vault/environment
-
-    ```typescript
-    const isProduction = process.env.NODE_ENV === 'production';
-    const credentials = isProduction ? 
-      await vault.getCredentials() : 
-      undefined; // Use stored dev credentials
-    ```
-  </Card>
-  <Card title="Audit & Monitoring" icon="eye">
-    **Track credential usage:**
-
-    - Log all API calls (without credentials)
-    - Monitor for unusual access patterns
-    - Set up alerts for failed authentications
-
-    ```typescript
-    const result = await superglue.executeWorkflow({
-      workflowId: "audit-workflow",
-      credentials,
-      options: {
-        trackUsage: true,
-        userId: currentUser.id
-      }
-    });
-    ```
-  </Card>
-</CardGroup>
 
 ## Choosing the Right Approach
 
 <Tabs>
-  <Tab title="Development & Prototyping">
+  <Tab title="Single User Scenarios">
     **Use Superglue-managed credentials:**
 
     ✅ Faster setup and iteration\
@@ -369,23 +307,32 @@ const result = await superglue.executeWorkflow({
     ✅ Built-in credential validation
 
     ```typescript
-    // Simple development setup
-    await superglue.buildAndExecuteWorkflow({
+    const workflow = await superglue.buildWorkflow({
       instruction: "Test Stripe integration",
       integrationIds: ["stripe-dev"] // Uses stored test credentials
     });
+    
+    await superglue.executeWorkflow({ workflow });
     ```
   </Tab>
-  <Tab title="Production & Enterprise">
-    **Use runtime credential passing:**
+  <Tab title="Multi-user Scenarios">
+    **Either: Create a new integration for each user or use a single integration with runtime credentials**
 
-    ✅ Maximum security control\
-    ✅ Compliance with security policies\
-    ✅ Full audit trail\
-    ✅ Integration with existing credential systems
+    ✅ Maximum authentication control\
+    ✅ Isolation of credentials
 
     ```typescript
-    // Production setup with vault integration
+    // One integration per user
+    const workflow = await superglue.buildWorkflow({
+      instruction: "Test Stripe integration",
+      integrationIds: [`stripe-dev-${userId}`] // Uses user-specific test credentials
+    });
+    
+    await superglue.executeWorkflow({ workflow });
+    ```
+
+    ```typescript
+    // Alternatively, use runtime credentials
     const credentials = await vault.getCredentials(userId);
     await superglue.executeWorkflow({
       workflowId: savedWorkflow.id,
@@ -393,35 +340,12 @@ const result = await superglue.executeWorkflow({
     });
     ```
   </Tab>
-  <Tab title="Hybrid Approach">
-    **Use both approaches strategically:**
-
-    ```typescript
-    const isDevelopment = process.env.NODE_ENV === 'development';
-    
-    const executionOptions = {
-      instruction: "Sync customer data",
-      integrationIds: ["stripe", "hubspot"]
-    };
-    
-    if (isDevelopment) {
-      // Use stored credentials for development
-      await superglue.buildAndExecuteWorkflow(executionOptions);
-    } else {
-      // Use runtime credentials for production
-      await superglue.buildAndExecuteWorkflow({
-        ...executionOptions,
-        credentials: await getProductionCredentials()
-      });
-    }
-    ```
-  </Tab>
 </Tabs>
 
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="MCP Integration" icon="plug" href="/agent-builders/mcp-integration">
+  <Card title="MCP Integration" icon="plug" href="/mcp/mcp">
     Learn how credential management works with MCP and agent frameworks
   </Card>
   <Card title="SDK Integration" icon="code" href="/agent-builders/sdk-integration">

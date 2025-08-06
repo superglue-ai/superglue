@@ -214,7 +214,8 @@ Let's break down a real example: syncing Stripe customers to a CRM system.
   
   <Step title="Describe What You Want (2 mins)">
     ```typescript
-    const result = await superglue.buildAndExecuteWorkflow({
+    // First build the workflow
+    const workflow = await superglue.buildWorkflow({
       instruction: `Get Stripe customers created in the last 30 days and sync them to our CRM. 
       Include email, name, subscription status, and calculate lifetime value from their payment history.`,
       integrationIds: ["stripe", "internal-crm"],
@@ -230,28 +231,29 @@ Let's break down a real example: syncing Stripe customers to a CRM system.
         }
       }
     });
+
+    // Then execute it
+    const result = await superglue.executeWorkflow({ workflow });
     ```
   </Step>
   
   <Step title="Test & Refine (5 mins)">
     Review results, adjust if needed:
     ```typescript
-    // If you need adjustments:
-    const refinedResult = await superglue.buildAndExecuteWorkflow({
+    // If you need adjustments, build and execute a refined workflow:
+    const refinedWorkflow = await superglue.buildWorkflow({
       instruction: `Same as before, but also include the customer's latest invoice amount 
       and mark customers with failed payments as 'at_risk'`,
       integrationIds: ["stripe", "internal-crm"]
     });
+    
+    const refinedResult = await superglue.executeWorkflow({ workflow: refinedWorkflow });
     ```
   </Step>
   
   <Step title="Save for Production (3 mins)">
     ```typescript
-    await superglue.saveWorkflow({
-      id: "stripe-crm-sync",
-      name: "Daily Stripe to CRM Sync",
-      workflow: result.workflow
-    });
+    await superglue.upsertWorkflow(result.workflow.id, result.workflow);
     ```
   </Step>
 </Steps>
@@ -385,11 +387,13 @@ Let's break down a real example: syncing Stripe customers to a CRM system.
     async function fullSync() { /* 20 lines */ }
     ```
     
-    **Superglue (3 lines):**
+    **Superglue (5 lines):**
     ```typescript
-    const result = await superglue.buildAndExecuteWorkflow({
+    const workflow = await superglue.buildWorkflow({
       instruction: "Sync all Stripe customers to CRM with proper data transformation and error handling"
     });
+    
+    const result = await superglue.executeWorkflow({ workflow });
     ```
   </Tab>
 </Tabs>

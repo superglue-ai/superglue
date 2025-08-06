@@ -79,7 +79,8 @@ Superglue acts as a **universal MCP tool** that gives your agents reliable acces
       </Tab>
       <Tab title="Via SDK">
         ```typescript
-        const result = await superglue.buildAndExecuteWorkflow({
+        // First build the workflow
+        const workflow = await superglue.buildWorkflow({
           instruction: "Get the latest issues from GitHub repo microsoft/vscode",
           integrationIds: ["github"],
           responseSchema: {
@@ -99,6 +100,9 @@ Superglue acts as a **universal MCP tool** that gives your agents reliable acces
             }
           }
         });
+
+        // Then execute it
+        const result = await superglue.executeWorkflow({ workflow });
         ```
       </Tab>
     </Tabs>
