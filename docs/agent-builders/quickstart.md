@@ -139,7 +139,7 @@ superglue acts as a **universal MCP tool** that gives your agents reliable acces
     - Perfect for development and trusted environments.
   </Tab>
   <Tab title="You manage credentials">
-    **Maximum security:** Pass credentials at runtime.
+    **Maximum flexibility:** Pass credentials at runtime.
 
     ```typescript
     // Via SDK
@@ -152,7 +152,7 @@ superglue acts as a **universal MCP tool** that gives your agents reliable acces
     });
     ```
 
-    Perfect for production environments with strict security requirements.
+    Perfect for complex environments with specific requirements.
   </Tab>
 </Tabs>
 

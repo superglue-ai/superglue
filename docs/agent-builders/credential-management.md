@@ -25,7 +25,7 @@ superglue handles credential management primarily through its encrypted vault. Y
 
     - superglue manages oauth
   </Card>
-  <Card title="Provide credentials at runtime" icon="key">
+  <Card title="Provide credentials at runtime" icon="universal-access">
     **Best for:** Complex multi-user scenarios and SDK setups.
 
     **How it works:** 

@@ -39,7 +39,7 @@ Instead of building separate MCP tools for each API, superglue provides one powe
 ### What You Can Build
 
 <CardGroup cols={3}>
-  <Card title="Cross-API Workflows" icon="workflow">
+  <Card title="Cross-API Workflows" icon="microchip">
     **Stitch Stripe and HubSpot together**: Build reliable workflows like fetching transactions in Stripe and updating them in HubSpot.
   </Card>
   
@@ -102,7 +102,7 @@ Instead of building separate MCP tools for each API, superglue provides one powe
 The superglue MCP server provides these tools to your agent:
 
 <AccordionGroup>
-  <Accordion title="superglue_find_integrations" icon="search">
+  <Accordion title="superglue_find_integrations" icon="magnifying-glass">
     **Purpose:** Discover available integrations for your task
     
     **Usage:** 
@@ -120,7 +120,7 @@ The superglue MCP server provides these tools to your agent:
     **What it does:** Creates the workflow, handles authentication, executes API calls, and returns formatted results.
   </Accordion>
   
-  <Accordion title="superglue_save_workflow" icon="save">
+  <Accordion title="superglue_save_workflow" icon="floppy-disk">
     **Purpose:** Save successful workflows for reuse
     
     **Usage:**
@@ -129,7 +129,7 @@ The superglue MCP server provides these tools to your agent:
     **What it does:** Persists the workflow for future execution with the same reliability.
   </Accordion>
   
-  <Accordion title="superglue_execute_workflow" icon="refresh">
+  <Accordion title="superglue_execute_workflow" icon="person-running">
     **Purpose:** Run previously saved workflows
     
     **Usage:**
@@ -271,7 +271,7 @@ For coding assistants, use the same configuration in your MCP settings:
 ## Best Practices
 
 <CardGroup cols={2}>
-  <Card title="Be Specific" icon="target">
+  <Card title="Be Specific" icon="bullseye">
     **Good:** "Get Stripe customers created in the last 7 days with email and subscription status"
     
     **Better:** "Get active Stripe customers created in the last 7 days, include email, name, subscription status, and MRR"
@@ -305,7 +305,7 @@ For coding assistants, use the same configuration in your MCP settings:
     > "You need to get an auth token first before each request to get the data."
   </Card>
   
-  <Card title="Save Successful Workflows" icon="save">
+  <Card title="Save Successful Workflows" icon="floppy-disk">
     When a workflow works well, save it for reuse:
     
     > "This worked perfectly! Save it as 'weekly-revenue-report' so I can run it regularly."
@@ -322,7 +322,7 @@ The superglue MCP server uses key-based authentication and session management:
 ## Troubleshooting
 
 <AccordionGroup>
-  <Accordion title="MCP Server Not Connecting" icon="exclamation-triangle">
+  <Accordion title="MCP Server Not Connecting" icon="xmark">
     **Symptoms:** Claude says "superglue not available" or MCP status shows disconnected
     
     **Solutions:**
@@ -333,7 +333,7 @@ The superglue MCP server uses key-based authentication and session management:
     5. Check the logs: `tail -f ~/Library/Logs/Claude/mcp-*.log`
   </Accordion>
   
-  <Accordion title="Workflow Building Fails" icon="exclamation-triangle">
+  <Accordion title="Workflow Building Fails" icon="bug">
     **Symptoms:** Agent says it can't understand the integration or API calls fail
     
     **Solutions:**
@@ -356,7 +356,7 @@ The superglue MCP server uses key-based authentication and session management:
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="MCP Tools Reference" href="/mcp/mcp-tools" icon="tools">
+  <Card title="MCP Tools Reference" href="/mcp/mcp-tools" icon="wrench">
     Complete reference of all available MCP tools and parameters
   </Card>
   <Card title="SDK Integration" href="/agent-builders/sdk-integration" icon="code">
@@ -365,7 +365,7 @@ The superglue MCP server uses key-based authentication and session management:
   <Card title="Credential Management" href="/agent-builders/credential-management" icon="key">
     Learn about secure credential storage and runtime credential passing
   </Card>
-  <Card title="Example Workflows" href="/guides/hubspot" icon="workflow">
+  <Card title="Example Workflows" href="/guides/hubspot" icon="chart-diagram">
     See real examples of agent workflows with popular integrations
   </Card>
 </CardGroup>

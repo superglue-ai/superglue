@@ -11,7 +11,7 @@ description: "Choose the right interface for your data integration projects"
 ## Quick Decision Guide
 
 <CardGroup cols={2}>
-  <Card title="Use UI/Chat When" icon="chat" color="green">
+  <Card title="Use UI/Chat When" icon="comment" color="green">
     ✅ **Prototyping** new integrations 
 
     ✅ **Exploring** APIs and data sources 
@@ -110,14 +110,14 @@ The UI/Chat interface is like having a data engineer AI assistant that understan
     properties?" \> "Give me a sample of our PostgreSQL customers table" Get
     immediate answers with actual data samples.
   </Accordion>
-  <Accordion title="Stakeholder Demos" icon="presentation">
+  <Accordion title="Stakeholder Demos" icon="person-chalkboard">
     **Scenario:** You need to show business stakeholders what data integration is
     possible. **Demo in real-time:** \> "Let me show you what customer data we can
     pull from Stripe..." \> "Here's how we could sync this with our CRM..." \> "And
     we could automatically generate reports like this..." Non-technical
     stakeholders can see exactly what's possible without looking at code.
   </Accordion>
-  <Accordion title="Quick Data Fixes" icon="tools">
+  <Accordion title="Quick Data Fixes" icon="wrench">
     **Scenario:** You need to extract or fix data quickly. **Emergency data
     request:** \> "I need all customers who signed up yesterday but didn't receive
     welcome emails" \> "Update all HubSpot contacts missing phone numbers with data
@@ -137,7 +137,7 @@ The UI/Chat interface is like having a data engineer AI assistant that understan
 
 ### Production-Grade Features
 
-<CardGroup cols={2}>
+<CardGroup cols={1}>
   <Card title="Programmatic Control" icon="sliders">
     ```typescript
     // Full control over execution
@@ -238,7 +238,7 @@ The UI/Chat interface is like having a data engineer AI assistant that understan
 ### SDK Use Cases
 
 <AccordionGroup>
-  <Accordion title="Automated Data Pipelines" icon="pipe">
+  <Accordion title="Automated Data Pipelines" icon="timeline">
     **Requirements:**
 
     - Runs on schedule (hourly, daily, etc.)
@@ -572,7 +572,7 @@ The UI/Chat interface is like having a data engineer AI assistant that understan
     See concrete performance comparisons between superglue and traditional
     approaches
   </Card>
-  <Card title="Data Pipeline Patterns" icon="pipe" href="/data-engineers/data-pipelines">
+  <Card title="Data Pipeline Patterns" icon="timeline" href="/data-engineers/data-pipelines">
     Learn common patterns for different types of data integration projects
   </Card>
   <Card title="Production Examples" icon="code" href="/guides/hubspot">

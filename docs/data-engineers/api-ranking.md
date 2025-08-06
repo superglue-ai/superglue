@@ -1,5 +1,5 @@
 ---
-title: "API Integration Benchmark: 10x Faster Development"
+title: "Benchmarking superglue for API integrations"
 description: "See how Superglue compares to traditional coding approaches with real data"
 ---
 
@@ -443,7 +443,7 @@ Superglue isn't always the best choice. Here's when you might still want traditi
     Try Superglue with your real integration challenges and measure the
     difference
   </Card>
-  <Card title="Data Pipeline Patterns" icon="pipe" href="/data-engineers/data-pipelines">
+  <Card title="Data Pipeline Patterns" icon="timeline" href="/data-engineers/data-pipelines">
     Learn common patterns that make integration development even faster
   </Card>
   <Card title="Book a Demo" icon="calendar" href="https://cal.com/superglue/superglue-demo">
