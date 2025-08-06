@@ -49,7 +49,7 @@ export class PostgresService implements DataStore {
             if (includeDocs) {
                 query = `SELECT i.id, i.name, i.type, i.url_host, i.url_path, i.credentials, 
                         i.documentation_url, i.documentation_pending,
-                        i.open_api_url, i.specific_instructions, i.icon, i.version, i.created_at, i.updated_at,
+                        i.open_api_url, i.specific_instructions, i.documentation_keywords, i.icon, i.version, i.created_at, i.updated_at,
                         d.documentation, d.open_api_schema
                  FROM integrations i
                  LEFT JOIN integration_details d ON i.id = d.integration_id AND i.org_id = d.org_id
@@ -57,12 +57,12 @@ export class PostgresService implements DataStore {
             } else {
                 query = `SELECT id, name, type, url_host, url_path, credentials, 
                         documentation_url, documentation_pending,
-                        open_api_url, specific_instructions, icon, version, created_at, updated_at
+                        open_api_url, specific_instructions, documentation_keywords, icon, version, created_at, updated_at
                  FROM integrations WHERE id = ANY($1) AND org_id = $2`;
             }
-            
+
             const result = await client.query(query, [ids, orgId || '']);
-            
+
             return result.rows.map((row: any) => {
                 const integration: Integration = {
                     id: row.id,
@@ -77,12 +77,13 @@ export class PostgresService implements DataStore {
                     openApiUrl: row.open_api_url,
                     openApiSchema: includeDocs ? row.open_api_schema : undefined,
                     specificInstructions: row.specific_instructions,
+                    documentationKeywords: row.documentation_keywords,
                     icon: row.icon,
                     version: row.version,
                     createdAt: row.created_at,
                     updatedAt: row.updated_at
                 };
-                
+
                 return integration;
             });
         } finally {
@@ -136,6 +137,7 @@ export class PostgresService implements DataStore {
       documentation_pending BOOLEAN DEFAULT FALSE,
       open_api_url VARCHAR(1000),
       specific_instructions TEXT,
+      documentation_keywords TEXT[],
       icon VARCHAR(255),
       version VARCHAR(50),
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -187,9 +189,9 @@ export class PostgresService implements DataStore {
 
     private parseDates(data: any): any {
         if (!data) return data;
-        
+
         const result = { ...data };
-        
+
         if (result.createdAt && typeof result.createdAt === 'string') {
             result.createdAt = new Date(result.createdAt);
         }
@@ -202,12 +204,12 @@ export class PostgresService implements DataStore {
         if (result.completedAt && typeof result.completedAt === 'string') {
             result.completedAt = new Date(result.completedAt);
         }
-        
+
         // Parse dates in nested config object
         if (result.config) {
             result.config = this.parseDates(result.config);
         }
-        
+
         return result;
     }
 
@@ -488,7 +490,7 @@ export class PostgresService implements DataStore {
             if (includeDocs) {
                 query = `SELECT i.id, i.name, i.type, i.url_host, i.url_path, i.credentials, 
                         i.documentation_url, i.documentation_pending,
-                        i.open_api_url, i.specific_instructions, i.icon, i.version, i.created_at, i.updated_at,
+                        i.open_api_url, i.specific_instructions, i.documentation_keywords, i.icon, i.version, i.created_at, i.updated_at,
                         d.documentation, d.open_api_schema
                  FROM integrations i
                  LEFT JOIN integration_details d ON i.id = d.integration_id AND i.org_id = d.org_id
@@ -496,13 +498,13 @@ export class PostgresService implements DataStore {
             } else {
                 query = `SELECT id, name, type, url_host, url_path, credentials, 
                         documentation_url, documentation_pending,
-                        open_api_url, specific_instructions, icon, version, created_at, updated_at
+                        open_api_url, specific_instructions, documentation_keywords, icon, version, created_at, updated_at
                  FROM integrations WHERE id = $1 AND org_id = $2`;
             }
-            
+
             const result = await client.query(query, [id, orgId || '']);
             if (!result.rows[0]) return null;
-            
+
             const row = result.rows[0] as any;
             const integration: Integration = {
                 id: row.id,
@@ -517,12 +519,13 @@ export class PostgresService implements DataStore {
                 openApiUrl: row.open_api_url,
                 openApiSchema: includeDocs ? row.open_api_schema : undefined,
                 specificInstructions: row.specific_instructions,
+                documentationKeywords: row.documentation_keywords,
                 icon: row.icon,
                 version: row.version,
                 createdAt: row.created_at,
                 updatedAt: row.updated_at
             };
-            
+
             return integration;
         } finally {
             client.release();
@@ -543,7 +546,7 @@ export class PostgresService implements DataStore {
             if (includeDocs) {
                 query = `SELECT i.id, i.name, i.type, i.url_host, i.url_path, i.credentials, 
                         i.documentation_url, i.documentation_pending,
-                        i.open_api_url, i.specific_instructions, i.icon, i.version, i.created_at, i.updated_at,
+                        i.open_api_url, i.specific_instructions, i.documentation_keywords, i.icon, i.version, i.created_at, i.updated_at,
                         d.documentation, d.open_api_schema
                  FROM integrations i
                  LEFT JOIN integration_details d ON i.id = d.integration_id AND i.org_id = d.org_id
@@ -552,7 +555,7 @@ export class PostgresService implements DataStore {
             } else {
                 query = `SELECT id, name, type, url_host, url_path, credentials, 
                         documentation_url, documentation_pending,
-                        open_api_url, specific_instructions, icon, version, created_at, updated_at
+                        open_api_url, specific_instructions, documentation_keywords, icon, version, created_at, updated_at
                  FROM integrations WHERE org_id = $1 
                  ORDER BY created_at DESC LIMIT $2 OFFSET $3`;
             }
@@ -573,12 +576,13 @@ export class PostgresService implements DataStore {
                     openApiUrl: row.open_api_url,
                     openApiSchema: includeDocs ? row.open_api_schema : undefined,
                     specificInstructions: row.specific_instructions,
+                    documentationKeywords: row.documentation_keywords,
                     icon: row.icon,
                     version: row.version,
                     createdAt: row.created_at,
                     updatedAt: row.updated_at
                 };
-                
+
                 return integration;
             });
             return { items, total };
@@ -595,18 +599,18 @@ export class PostgresService implements DataStore {
             await client.query('BEGIN');
 
             // Encrypt credentials if provided
-            const encryptedCredentials = integration.credentials 
+            const encryptedCredentials = integration.credentials
                 ? credentialEncryption.encrypt(integration.credentials)
                 : null;
-            
+
             // Insert/update main integration record
             await client.query(`
         INSERT INTO integrations (
             id, org_id, name, type, url_host, url_path, credentials,
             documentation_url, documentation_pending,
-            open_api_url, specific_instructions, icon, version, created_at, updated_at
+            open_api_url, specific_instructions, documentation_keywords, icon, version, created_at, updated_at
         ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
         )
         ON CONFLICT (id, org_id) 
         DO UPDATE SET 
@@ -619,9 +623,10 @@ export class PostgresService implements DataStore {
             documentation_pending = $9,
             open_api_url = $10,
             specific_instructions = $11,
-            icon = $12,
-            version = $13,
-            updated_at = $15
+            documentation_keywords = $12,
+            icon = $13,
+            version = $14,
+            updated_at = $16
       `, [
                 id,
                 orgId || '',
@@ -634,6 +639,7 @@ export class PostgresService implements DataStore {
                 integration.documentationPending,
                 integration.openApiUrl,
                 integration.specificInstructions,
+                integration.documentationKeywords,
                 integration.icon,
                 integration.version,
                 integration.createdAt || new Date(),

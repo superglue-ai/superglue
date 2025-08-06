@@ -277,6 +277,7 @@ input IntegrationInput {
   documentation: String
   documentationPending: Boolean
   specificInstructions: String
+  documentationKeywords: [String!]
 }
 
 type Log {
@@ -465,6 +466,7 @@ type Integration {
   openApiUrl: String
   openApiSchema: String
   specificInstructions: String
+  documentationKeywords: [String!]
   icon: String
   version: String
   createdAt: DateTime

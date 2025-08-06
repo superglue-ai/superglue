@@ -66,7 +66,7 @@ export const searchDocumentationToolImplementation: ToolImplementation<WorkflowE
         const searchResults = Documentation.extractRelevantSections(
             integration.documentation,
             query,
-            5,
+            10,
             400
         );
 

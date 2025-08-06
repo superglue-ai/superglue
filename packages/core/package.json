@@ -31,7 +31,7 @@
     "test-no-watch": "vitest run --exclude '**/tests/integration.test.ts'",
     "test:coverage": "vitest run --coverage --exclude '**/tests/integration.test.ts'",
     "test:workflow": "vitest run -t ApiWorkflowOrchestrator-dog",
-    "test:integration": "vitest run eval/integration-testing/integration.test.ts",
+    "test:integration": "NODE_OPTIONS='--max-old-space-size=12000' vitest run eval/integration-testing/integration.test.ts",
     "generate-ranking": "tsc && node dist/eval/api-ranking/generate-api-ranking.js"
   },
   "type": "module",
@@ -40,7 +40,7 @@
     "@apollo/server": "^4.11.3",
     "@google/generative-ai": "^0.24.1",
     "@modelcontextprotocol/sdk": "1.12.1",
-    "@superglue/client": "^2.3.44",
+    "@superglue/client": "^2.3.46",
     "@superglue/shared": "file:../shared",
     "@types/js-yaml": "^4.0.9",
     "axios": "^1.8.2",

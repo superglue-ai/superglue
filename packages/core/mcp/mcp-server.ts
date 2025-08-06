@@ -98,6 +98,7 @@ export const CreateIntegrationInputSchema = {
   documentationUrl: z.string().optional().describe("URL to the API documentation."),
   documentation: z.string().optional().describe("API documentation content, if provided directly."),
   specificInstructions: z.string().optional().describe("Specific guidance on how to use this integration (e.g., rate limits, special endpoints, authentication details). Max 2000 characters."),
+  documentationKeywords: z.array(z.string()).optional().describe("Keywords to help with documentation search and ranking (e.g., endpoint names, data objects, key concepts)."),
   credentials: z.record(z.string()).describe("Credentials for accessing the integration. Provide an empty object if no credentials are needed / given. Can be referenced by brackets: <<{integration_id}_{credential_name}>>. "),
 };
 
@@ -723,6 +724,7 @@ export const toolDefinitions: Record<string, any> = {
       - Always split information clearly: urlHost (without secrets), urlPath, credentials (with secrets), etc.
       - Providing a documentationUrl will trigger asynchronous API documentation processing.
       - When users mention API constraints (rate limits, special endpoints, auth requirements, etc.), capture them in 'specificInstructions' to guide workflow building.
+      - Include relevant keywords in 'documentationKeywords' to improve documentation search (e.g., endpoint names, data objects, key concepts mentioned in conversation).
     </important_notes>
     `,
     inputSchema: CreateIntegrationInputSchema,
@@ -821,12 +823,12 @@ BEST PRACTICES:
           properties: {
             toolName: toolName,
             orgId: orgId,
-            args: { 
-              instruction: args?.instruction, 
+            args: {
+              instruction: args?.instruction,
               integrationIds: args?.integrationIds
             }
           }
-        });      
+        });
         return {
           content: [
             {

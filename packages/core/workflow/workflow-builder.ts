@@ -67,21 +67,21 @@ export class WorkflowBuilder {
       const authSection = Documentation.extractRelevantSections(
         int.documentation,
         "authentication authorization api key token bearer basic oauth credentials access private app secret",
-        5,  // max 5 sections
-        400 // smaller sections for targeted info
+        3,  // fewer sections needed for auth
+        2000 // should be detailed though
       );
 
       const paginationSection = Documentation.extractRelevantSections(
         int.documentation,
         "pagination page offset cursor limit per_page pageSize after next previous paging paginated results list",
-        5,  // max 5 sections
-        400 // smaller sections for targeted info
+        3,  // max 3 sections
+        2000 // same logic applies here
       );
       const generalSection = Documentation.extractRelevantSections(
         int.documentation,
-        this.instruction + "api endpoints methods search query filter",
-        10,  // max 10 sections
-        1000 // larger sections for context
+        this.instruction + "reference object endpoints methods properties values fields enums search query filter list create update delete get put post patch",
+        20,  // max 20 sections
+        1000 // should cover examples, endpoints etc.
       );
 
       return baseInfo + `
@@ -227,7 +227,7 @@ Your finalTransform function MUST transform the collected data from all steps to
     for (const step of steps) {
       // Get the integration for this step
       const integration = this.integrations[step.integrationId];
-      
+
       if (!integration) {
         logMessage('warn', `Integration ${step.integrationId} not found for step ${step.id}`, this.metadata);
         // Add a generic schema for this step
@@ -250,7 +250,7 @@ Your finalTransform function MUST transform the collected data from all steps to
           const openApiDoc = await this.parseOpenApiDocumentation(integration.openApiSchema, step.apiConfig);
           if (openApiDoc) {
             stepResponseSchema = openApiDoc;
-          } 
+          }
         } catch (error) {
           logMessage('debug', `Failed to extract OpenAPI schema for step ${step.id}: ${error}`, this.metadata);
         }
@@ -325,17 +325,17 @@ Your finalTransform function MUST transform the collected data from all steps to
         const methodConfig = pathConfig[method.toLowerCase()];
         if (methodConfig?.responses) {
           // Get the successful response schema (200, 201, etc.)
-          const successResponse = methodConfig.responses['200'] || 
-                                methodConfig.responses['201'] || 
-                                methodConfig.responses['2XX'] ||
-                                methodConfig.responses['default'];
-          
+          const successResponse = methodConfig.responses['200'] ||
+            methodConfig.responses['201'] ||
+            methodConfig.responses['2XX'] ||
+            methodConfig.responses['default'];
+
           if (successResponse?.content) {
             // Extract schema from content type
-            const content = successResponse.content['application/json'] || 
-                          successResponse.content['*/*'] ||
-                          Object.values(successResponse.content)[0];
-            
+            const content = successResponse.content['application/json'] ||
+              successResponse.content['*/*'] ||
+              Object.values(successResponse.content)[0];
+
             if (content?.schema) {
               pathSchema = this.resolveOpenApiSchema(content.schema, openApiSpec);
               break;
@@ -404,7 +404,7 @@ Your finalTransform function MUST transform the collected data from all steps to
     // Google Discovery refs are direct schema names
     const schemas = spec.schemas || {};
     const schema = schemas[ref];
-    
+
     if (!schema) {
       logMessage('debug', `Google Discovery schema reference '${ref}' not found in schemas`, this.metadata);
       // Return a generic object schema as fallback
@@ -488,7 +488,7 @@ Your finalTransform function MUST transform the collected data from all steps to
     const regexPattern = openApiPath
       .replace(/\{[^}]+\}/g, '[^/]+')
       .replace(/\//g, '\\/');
-    
+
     const regex = new RegExp(`^${regexPattern}$`, 'i');
     return regex.test(cleanPath);
   }
