@@ -170,7 +170,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     apiUrl: "https://api.sendgrid.com",
     regex: "^.*sendgrid.*$",
     icon: "sendgrid",
-    docsUrl: "https://docs.sendgrid.com/api-reference",
+    docsUrl: "https://www.twilio.com/docs/sendgrid/api-reference",
     openApiUrl: "https://raw.githubusercontent.com/sendgrid/sendgrid-oai/main/oai.json",
     preferredAuthType: "apikey",
     keywords: [
