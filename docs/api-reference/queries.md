@@ -9,6 +9,11 @@ description: "Queries are used to retrieve configs, logs, and workflow info."
 
 Returns a paginated list of execution runs.
 
+**Parameters:**
+- `limit`: Int - Number of items to return (default: 10, max: 100)
+- `offset`: Int - Number of items to skip (default: 0)
+- `configId`: ID - Filter runs by specific configuration ID (optional)
+
 <Tabs>
   <Tab title="GraphQL">
     ```graphql
@@ -231,6 +236,7 @@ Returns a paginated list of integration configurations.
           documentationUrl
           documentation
           documentationPending
+          specificInstructions
           icon
           version
           createdAt
@@ -471,6 +477,7 @@ Retrieves a specific integration configuration by ID.
         documentationUrl
         documentation
         documentationPending
+        specificInstructions
         icon
         version
         createdAt
@@ -490,7 +497,11 @@ Retrieves a specific integration configuration by ID.
 
 ### generateSchema
 
-Generates a JSON schema based on instructions and optional response data.
+Generates a JSON schema based on instructions and optional response data. Useful for creating response schemas for workflows.
+
+**Parameters:**
+- `instruction`: String! - Natural language description of the desired schema (required)
+- `responseData`: String - Sample JSON data to infer schema from (optional)
 
 <Tabs>
   <Tab title="GraphQL">
@@ -512,7 +523,10 @@ Generates a JSON schema based on instructions and optional response data.
 
 ### generateInstructions
 
-Generates natural language instructions based on integration configurations.
+Generates natural language instructions based on integration configurations. Helps create workflow instructions from available integrations.
+
+**Parameters:**
+- `integrations`: [IntegrationInput!]! - List of integrations to generate instructions for (required)
 
 <Tabs>
   <Tab title="GraphQL">
@@ -560,7 +574,10 @@ Retrieves tenant account information.
 
 ### findRelevantIntegrations
 
-Finds integrations relevant to a given natural language instruction.
+Finds integrations relevant to a given natural language instruction. Returns suggested integrations with explanations.
+
+**Parameters:**
+- `instruction`: String - Natural language description of what you want to do (optional, returns all integrations if not provided)
 
 <Tabs>
   <Tab title="GraphQL">

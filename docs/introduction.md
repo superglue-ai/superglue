@@ -13,9 +13,23 @@ Instead of writing integration code or custom tools for each API, you describe w
 
 ## How It Works
 
-1. **Connect**: Add integrations (Stripe, HubSpot, databases, etc.) with credentials and documentation
-2. **Build**: Describe workflows in natural language - Superglue creates the API orchestration
+Superglue has two core building blocks:
+
+- **Integrations** = Individual API connections (Stripe, HubSpot, databases, etc.) with credentials and documentation
+- **Workflows** = Multi-step orchestrations that use one or more integrations to accomplish tasks
+
+To set up superglue:
+
+1. **Connect**: Add integrations for each API or database you want to use
+2. **Build**: Describe workflows in natural language - Superglue creates the orchestration
 3. **Run**: Execute workflows that automatically handle authentication, data transformation, and error recovery
+
+### Example
+
+- **Integration**: Stripe API connection with your API key
+- **Workflow**: "Get all customers from Stripe created in the last 30 days"
+
+Workflows can span multiple integrations - for example: "Get new Stripe customers and add them to HubSpot as contacts" would use both your Stripe and HubSpot integrations in a single workflow.
 
 ## Select your Usecase
 

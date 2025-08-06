@@ -3,10 +3,11 @@ title: "Credential Management"
 description: "Secure approaches to managing API credentials with Superglue"
 ---
 
-<Info>
-  Superglue offers flexible credential management - you can store credentials
-  securely in Superglue or pass them at runtime for maximum security control.
-</Info>
+superglue handles credential management primarily through its encrypted vault. You can also pass credentials at runtime, which is useful for multi-user scenarios.
+
+<Note>
+**Flexible Credential Naming**: The exact naming of credentials, except for OAuth cases, is not vital, since Superglue maps credentials to the request automatically. This means that e.g. if the token has to be passed as a `X-SERVICE-API-KEY`, it is acceptable to name the token "api_key". Given documentation and context, Superglue will figure out how to place the API key to successfully complete the request.
+</Note>
 
 ## Two Approaches
 

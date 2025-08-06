@@ -9,6 +9,12 @@ description: "Mutations are used to execute operations and manage configs."
 
 Executes an API call with the given configuration. Supports both one-time configurations and saved endpoints.
 
+**Parameters:**
+- `input`: ApiInputRequest! - Either an endpoint configuration or a saved endpoint ID
+- `payload`: JSON - Data to pass to the API (optional)
+- `credentials`: JSON - Runtime credentials (optional, overrides stored credentials)
+- `options`: RequestOptions - Execution options (optional, see [RequestOptions defaults](overview.md#requestoptions))
+
 <Tabs>
   <Tab title="GraphQL">
     ```graphql
@@ -92,6 +98,12 @@ Executes an API call with the given configuration. Supports both one-time config
 
 Extracts data from a file or API response. Handles decompression and parsing of various file formats.
 
+**Parameters:**
+- `input`: ExtractInputRequest! - Either an extraction configuration, file upload, or saved extraction ID
+- `payload`: JSON - Additional data for the extraction (optional)
+- `credentials`: JSON - Runtime credentials for API sources (optional)
+- `options`: RequestOptions - Execution options (optional, see [RequestOptions defaults](overview.md#requestoptions))
+
 <Tabs>
   <Tab title="GraphQL">
     ```graphql
@@ -143,6 +155,11 @@ Extracts data from a file or API response. Handles decompression and parsing of 
 ### transform
 
 Transforms data using JSONata expressions and validates against a schema.
+
+**Parameters:**
+- `input`: TransformInputRequest! - Either a transformation configuration or saved transform ID
+- `data`: JSON! - Input data to transform (required)
+- `options`: RequestOptions - Execution options (optional, see [RequestOptions defaults](overview.md#requestoptions))
 
 <Tabs>
   <Tab title="GraphQL">
@@ -197,7 +214,15 @@ Transforms data using JSONata expressions and validates against a schema.
 
 ### executeWorkflow
 
-Executes a workflow (multiple APIs or Endpoints) in a single call.
+Executes a workflow (multiple APIs or Endpoints) in a single call. Returns detailed step-by-step results.
+
+**Parameters:**
+- `input`: WorkflowInputRequest! - Either a workflow configuration or saved workflow ID
+- `payload`: JSON - Input data for the workflow (optional)
+- `credentials`: JSON - Runtime credentials for integrations (optional)
+- `options`: RequestOptions - Execution options (optional, see [RequestOptions defaults](overview.md#requestoptions))
+
+**Returns:** `WorkflowResult` with individual step results and final output
 
 <Tabs>
   <Tab title="GraphQL">
@@ -244,7 +269,15 @@ Executes a workflow (multiple APIs or Endpoints) in a single call.
 
 ### buildWorkflow
 
-Builds a workflow automatically based on instructions and available integrations.
+Builds a workflow automatically based on instructions and available integrations. Uses AI to determine the optimal sequence of API calls and data transformations.
+
+**Parameters:**
+- `instruction`: String! - Natural language description of what the workflow should do (required)
+- `payload`: JSON - Sample input data to help with workflow generation (optional)
+- `integrationIds`: [ID!]! - List of integration IDs to use in the workflow (required)
+- `responseSchema`: JSONSchema - Desired output format (optional, auto-generated if not provided)
+
+**Returns:** Complete `Workflow` configuration ready for execution
 
 <Tabs>
   <Tab title="GraphQL">
@@ -581,7 +614,11 @@ Deletes a workflow configuration. Returns `true` if successful.
 
 ### upsertIntegration
 
-Creates or updates an integration configuration.
+Creates or updates an integration configuration. Integrations represent connections to external APIs or databases.
+
+**Parameters:**
+- `input`: IntegrationInput! - Integration configuration (required)
+- `mode`: UpsertMode - CREATE, UPDATE, or UPSERT (default: UPSERT)
 
 <Tabs>
   <Tab title="GraphQL">
@@ -597,6 +634,7 @@ Creates or updates an integration configuration.
         documentationUrl
         documentation
         documentationPending
+        specificInstructions
         icon
         version
         createdAt
@@ -614,7 +652,8 @@ Creates or updates an integration configuration.
       credentials: {
         token: "ghp_..."
       },
-      documentationUrl: "https://docs.github.com/en/rest"
+      documentationUrl: "https://docs.github.com/en/rest",
+      specificInstructions: "Use GitHub's REST API v4 with rate limiting"
     }, "UPSERT");
     ```
   </Tab>
