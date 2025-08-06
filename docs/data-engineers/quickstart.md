@@ -14,7 +14,7 @@ superglue eliminates the complexity of API integrations and data transformations
 <Steps>
   <Step title="Choose Your Interface">
     <Tabs>
-      <Tab title="UI/Chat (Fastest Prototyping)">
+      <Tab title="UI/Chat (Fastest)">
         Perfect for rapid prototyping and testing integrations.
 
         1. Go to [app.superglue.cloud](https://app.superglue.cloud)
@@ -54,6 +54,7 @@ superglue eliminates the complexity of API integrations and data transformations
         ```
       </Tab>
     </Tabs>
+    ![Screenshot 2025-08-06 at 11.50.13.png](/docs/images/Screenshot2025-08-06at11.50.13.png)
   </Step>
   <Step title="Create Your First Integration">
     <Tabs>
