@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 import { integrations } from '@superglue/shared';
 import fs from 'fs/promises';
-import Fuse from 'fuse.js';
 import path from 'path';
-import { Documentation } from '../utils/documentation.js';
+import { Documentation, PlaywrightFetchingStrategy } from '../utils/documentation.js';
 import { ConfigLoader } from './utils/config-loader.js';
 import { SetupManager } from './utils/setup-manager.js';
 
@@ -16,7 +15,6 @@ interface RankingTestResult {
     rankedUrls: string[];
     documentationLength: number;
     debugLogs: string[];
-    fuseOptions?: any;
 }
 
 // Hook into log messages to capture fetched URLs
@@ -73,7 +71,7 @@ const logCapture = new LogCapture();
 // Import log emitter to intercept logs - same as integration testing framework
 import { logEmitter } from '../utils/logs.js';
 
-async function testRealUrlRanking(fuseOptions?: any) {
+async function testRealUrlRanking() {
     const configLoader = new ConfigLoader();
     const config = await configLoader.loadIntegrationTestConfig();
     const setupManager = new SetupManager('./.test-url-ranking-data', 'test-url-ranking-org', 'system');
@@ -86,7 +84,7 @@ async function testRealUrlRanking(fuseOptions?: any) {
         const enabledIntegrations = configLoader.getEnabledIntegrations(config);
 
         console.log(`\n🚀 Testing URL ranking for ${enabledIntegrations.length} integrations\n`);
-        console.log(`Fuse options being tested:`, fuseOptions || 'default');
+        console.log(`Using core documentation ranking logic (no fuzzy matching)`);
         console.log('='.repeat(80));
 
         // Process each integration individually to capture URLs
@@ -199,8 +197,8 @@ async function testRealUrlRanking(fuseOptions?: any) {
             // Now test ranking with the fetched URLs
             let rankedUrls: string[] = [];
             if (fetchedUrls.length > 0) {
-                // Create a simple ranking test
-                rankedUrls = rankUrlsWithFuse(fetchedUrls, keywords, fuseOptions);
+                // Use the actual core ranking logic
+                rankedUrls = rankUrlsUsingCoreLogic(fetchedUrls, keywords);
 
                 // Show top ranked URLs
                 console.log(`   🎯 Top 5 ranked URLs:`);
@@ -218,13 +216,12 @@ async function testRealUrlRanking(fuseOptions?: any) {
                 fetchedUrls: fetchedUrls,
                 rankedUrls: rankedUrls,
                 documentationLength: docLength,
-                debugLogs: debugLogs,
-                fuseOptions: fuseOptions
+                debugLogs: debugLogs
             });
         }
 
         // Generate report
-        await generateReport(results, fuseOptions);
+        await generateReport(results);
 
     } finally {
         // Cleanup
@@ -233,65 +230,21 @@ async function testRealUrlRanking(fuseOptions?: any) {
     }
 }
 
-function rankUrlsWithFuse(urls: string[], keywords: string[], customOptions?: any): string[] {
-    const defaultOptions = {
-        includeScore: true,
-        threshold: 0.3,
-        minMatchCharLength: 3,
-        shouldSort: true,
-        ignoreLocation: true,
-        useExtendedSearch: false,
-        ...customOptions
-    };
+function rankUrlsUsingCoreLogic(urls: string[], keywords: string[]): string[] {
+    // Create an instance of PlaywrightFetchingStrategy to use its ranking method
+    const strategy = new PlaywrightFetchingStrategy();
 
-    const NEGATIVE_KEYWORDS = [
-        'signup', 'login', 'pricing', 'contact', 'support', 'cookie', 'webhook', 'webhooks',
-        'privacy', 'terms', 'legal', 'policy', 'status', 'help', 'blog',
-        'careers', 'about', 'press', 'news', 'events', 'partners', 'changelog',
-        'changelogs', 'release notes', 'releases', 'updates', 'upgrade', 'upgrade notes',
-    ];
+    // Use the actual getMergedKeywords method to combine with defaults
+    const mergedKeywords = strategy.getMergedKeywords(keywords);
 
-    const scored = urls.map(url => {
-        const urlLower = url.toLowerCase();
-        let positiveScore = 0;
-        let negativeScore = 0;
+    // Use the actual rankItems method from the core implementation
+    const rankedItems = strategy.rankItems(urls, mergedKeywords);
 
-        for (const keyword of keywords) {
-            const keywordLower = keyword.toLowerCase();
-            if (urlLower.includes(keywordLower)) {
-                const lengthPenalty = 1 / url.length;
-                positiveScore += lengthPenalty;
-            } else {
-                // Fuzzy match with single-item Fuse
-                const fuse = new Fuse([{ url, urlLower }], {
-                    keys: ['urlLower'],
-                    ...defaultOptions,
-                    threshold: customOptions?.threshold || 0.4,
-                    ignoreLocation: true
-                });
-                const results = fuse.search(keywordLower);
-                if (results.length > 0) {
-                    const lengthPenalty = 1 / url.length;
-                    positiveScore += (1 - (results[0].score || 0)) * lengthPenalty * 0.5;
-                }
-            }
-        }
-
-        for (const negKeyword of NEGATIVE_KEYWORDS) {
-            if (urlLower.includes(negKeyword)) {
-                negativeScore += 2;
-            }
-        }
-
-        return { url, score: positiveScore - negativeScore };
-    });
-
-    return scored
-        .sort((a, b) => b.score - a.score)
-        .map(item => item.url);
+    // rankedItems returns the URLs in ranked order
+    return rankedItems as string[];
 }
 
-async function generateReport(results: RankingTestResult[], fuseOptions?: any) {
+async function generateReport(results: RankingTestResult[]) {
     const timestamp = new Date().toISOString();
     const reportDir = path.join(process.cwd(), 'test-reports');
     await fs.mkdir(reportDir, { recursive: true });
@@ -299,7 +252,7 @@ async function generateReport(results: RankingTestResult[], fuseOptions?: any) {
     // Generate JSON report
     const jsonReport = {
         timestamp,
-        fuseOptions: fuseOptions || 'default',
+        rankingMethod: 'Core documentation ranking (exact keyword matching)',
         totalIntegrations: results.length,
         totalUrlsFetched: results.reduce((sum, r) => sum + r.fetchedUrls.length, 0),
         results: results.map(r => ({
@@ -315,7 +268,7 @@ async function generateReport(results: RankingTestResult[], fuseOptions?: any) {
     // Generate Markdown report
     let markdown = `# Real URL Ranking Test Report\n\n`;
     markdown += `**Generated:** ${timestamp}\n\n`;
-    markdown += `**Fuse Options:** ${JSON.stringify(fuseOptions || 'default', null, 2)}\n\n`;
+    markdown += `**Ranking Method:** Core documentation ranking (exact keyword matching)\n\n`;
     markdown += `**Total Integrations:** ${results.length}\n`;
     markdown += `**Total URLs Fetched:** ${results.reduce((sum, r) => sum + r.fetchedUrls.length, 0)}\n\n`;
 
@@ -361,27 +314,5 @@ async function generateReport(results: RankingTestResult[], fuseOptions?: any) {
     console.log(`   - ${mdPath}`);
 }
 
-// Parse command line arguments for custom Fuse options
-function parseArgs(): any {
-    const args = process.argv.slice(2);
-    if (args.length === 0) return undefined;
-
-    const options: any = {};
-
-    for (let i = 0; i < args.length; i += 2) {
-        const key = args[i].replace('--', '');
-        const value = args[i + 1];
-
-        // Parse boolean and numeric values
-        if (value === 'true') options[key] = true;
-        else if (value === 'false') options[key] = false;
-        else if (!isNaN(Number(value))) options[key] = Number(value);
-        else options[key] = value;
-    }
-
-    return Object.keys(options).length > 0 ? options : undefined;
-}
-
 // Main execution
-const fuseOptions = parseArgs();
-testRealUrlRanking(fuseOptions).catch(console.error);
+testRealUrlRanking().catch(console.error);

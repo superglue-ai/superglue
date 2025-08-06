@@ -150,19 +150,17 @@ function enrichWithTemplate(input: Integration): Integration {
     return input;
   }
 
-  const mergedKeywords = [
+  const mergedUniqueKeywords = uniqueKeywords([
     ...(input.documentationKeywords || []),
     ...(matchingTemplate.keywords || [])
-  ];
+  ]);
 
-  return {
-    ...input,
-    openApiUrl: matchingTemplate.openApiUrl,
-    openApiSchema: matchingTemplate.openApiSchema,
-    documentationUrl: input.documentationUrl || matchingTemplate.docsUrl,
-    urlHost: input.urlHost || matchingTemplate.apiUrl,
-    documentationKeywords: uniqueKeywords(mergedKeywords),
-  } as Integration;
+  input.openApiUrl = matchingTemplate.openApiUrl;
+  input.openApiSchema = matchingTemplate.openApiSchema;
+  input.documentationUrl = input.documentationUrl || matchingTemplate.docsUrl;
+  input.urlHost = input.urlHost || matchingTemplate.apiUrl;
+  input.documentationKeywords = mergedUniqueKeywords;
+  return input;
 }
 
 function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined, defaultValue?: T): T | undefined {

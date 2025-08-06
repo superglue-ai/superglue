@@ -2,12 +2,10 @@ import playwright from '@playwright/test';
 import { ApiConfig } from "@superglue/client";
 import { Metadata } from "@superglue/shared";
 import axios from "axios";
-import Fuse from 'fuse.js';
 import { getIntrospectionQuery } from "graphql";
 import * as yaml from 'js-yaml';
 import { NodeHtmlMarkdown } from "node-html-markdown";
 import { server_defaults } from '../default.js';
-import { LanguageModel } from "../llm/llm.js";
 import { logMessage } from "./logs.js";
 import { callPostgres } from './postgres.js';
 import { composeUrl } from "./tools.js";
@@ -32,29 +30,6 @@ export interface DocumentationConfig {
 }
 
 export class Documentation {
-  public static MAX_LENGTH = Math.min(LanguageModel.contextLength - server_defaults.DOCUMENTATION.MAX_LENGTH_OFFSET, server_defaults.DOCUMENTATION.MAX_LENGTH_ABSOLUTE);
-  public static readonly FUSE_CONFIGS = {
-    // For URL/link ranking - high precision matching
-    URL_RANKING: {
-      includeScore: true,        // Return match scores with results
-      threshold: 0.3,           // Strict threshold for precise URL matching
-      minMatchCharLength: 3,    // Minimum characters to trigger a match
-      shouldSort: true,         // Sort results by score
-      ignoreLocation: true,     // Position in string doesn't matter for URLs
-      useExtendedSearch: false  // Keep simple search syntax
-    },
-
-    // For section extraction - semantic search behavior
-    SECTION_EXTRACTION: {
-      keys: ['contentLower'],   // Search in the contentLower field
-      includeScore: true,       // Return match scores with results
-      threshold: 0.5,          // More lenient for content matching
-      ignoreLocation: true,    // Position in content doesn't matter
-      minMatchCharLength: 3,   // Minimum characters to trigger a match
-      useExtendedSearch: false // Keep simple for maintainability
-    }
-  };
-
   // Configuration stored per instance
   public config: DocumentationConfig;
   private readonly credentials?: Record<string, any>;
@@ -278,62 +253,74 @@ export class Documentation {
     documentation: string,
     searchQuery: string,
     maxSections: number = 20,
-    sectionSize: number = 0
+    sectionSize: number = 200
   ): string {
-    if (documentation.length <= Documentation.MAX_LENGTH) {
+    if (!documentation || documentation.length === 0) {
+      return '';
+    }
+
+    // Validate and adjust maxSections
+    maxSections = Math.max(1, Math.min(maxSections, 100)); // Between 1 and 100
+    sectionSize = Math.max(200, Math.min(sectionSize, 10000)); // Between 200 and 10000
+
+    // If document is smaller than one section, return the whole thing
+    if (documentation.length <= sectionSize) {
       return documentation;
     }
-    if (sectionSize <= 0) {
-      sectionSize = Math.floor(Documentation.MAX_LENGTH / maxSections);
-    }
-    const MIN_SEARCH_TERM_LENGTH = server_defaults.DOCUMENTATION_MIN_SEARCH_TERM_LENGTH;
 
-    // Split on whitespace but preserve underscores, hyphens, and other meaningful chars
-    const searchTerms = searchQuery?.toLowerCase()?.split(/\s+/)
+    const MIN_SEARCH_TERM_LENGTH = server_defaults.DOCUMENTATION_MIN_SEARCH_TERM_LENGTH || 3;
+
+    // Extract search terms from query - split on non-alphanumeric characters
+    const searchTerms = searchQuery?.toLowerCase()?.split(/[^a-z0-9]/)
       .map(term => term.trim())
       .filter(term => term.length >= MIN_SEARCH_TERM_LENGTH) || [];
 
-    if (maxSections >= 10) {
-      searchTerms.push('pagination', 'authorization', 'authentication');
+    // If no valid search terms, return empty string
+    if (searchTerms.length === 0) {
+      return '';
     }
 
-    const sections: { content: string; contentLower: string; index: number; }[] = [];
+    const sections: { content: string; score: number; index: number; }[] = [];
+
+    // Create sections of the specified size
     for (let i = 0; i < documentation.length; i += sectionSize) {
-      const content = documentation.slice(i, i + sectionSize);
+      const section = documentation.slice(i, Math.min(i + sectionSize, documentation.length));
+      const sectionLower = section.toLowerCase();
+
+      // Score section based on search term matches
+      let score = 0;
+      for (const term of searchTerms) {
+        // Count occurrences of each term in the section
+        const matches = (sectionLower.match(new RegExp(term, 'g')) || []).length;
+        score += matches;
+      }
+
       sections.push({
-        content,
-        contentLower: content.toLowerCase(),
+        content: section,
+        score,
         index: i
       });
     }
 
-    const fuse = new Fuse(sections, Documentation.FUSE_CONFIGS.SECTION_EXTRACTION);
-
-    const scoredSections = sections.map(section => {
-      let totalScore = 0;
-      for (const term of searchTerms) {
-        const results = fuse.search(term);
-        const match = results.find(r => r.item.index === section.index);
-        if (match) {
-          totalScore += (1 - (match.score || 0));
-        }
-      }
-      return { ...section, score: totalScore };
-    });
-
-    const topSections = scoredSections
+    // Sort by score (highest first) and take top sections
+    const topSections = sections
       .sort((a, b) => b.score - a.score)
       .slice(0, maxSections);
 
+    // If no sections have matches, return empty string
     if (topSections.every(section => section.score === 0)) {
-      return documentation.slice(0, Documentation.MAX_LENGTH);
+      return '';
     }
 
+    // Sort selected sections by their original position to maintain document order
     topSections.sort((a, b) => a.index - b.index);
+
     const result = topSections.map(section => section.content).join('\n\n');
 
-    return result.length > Documentation.MAX_LENGTH
-      ? result.slice(0, Documentation.MAX_LENGTH)
+    // Ensure we don't exceed the maximum expected length
+    const maxExpectedLength = maxSections * sectionSize;
+    return result.length > maxExpectedLength
+      ? result.slice(0, maxExpectedLength)
       : result;
   }
 }
@@ -421,7 +408,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
   private static readonly PARALLEL_FETCH_LIMIT = server_defaults.DOCUMENTATION.PARALLEL_FETCH_LIMIT;
   private static browserInstance: playwright.Browser | null = null;
 
-  private static readonly NEGATIVE_KEYWORDS = [
+  public static readonly NEGATIVE_KEYWORDS = [
     'signup', 'login', 'pricing', 'contact', 'support', 'cookie', 'webhooks',
     'privacy', 'terms', 'legal', 'policy', 'status', 'help', 'blog',
     'careers', 'about', 'press', 'news', 'events', 'partners',
@@ -595,6 +582,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       }, server_defaults.DOCUMENTATION.TEXT_PATTERN_REMOVAL_MAX_LENGTH);
 
       const content = await page.content();
+      logMessage('info', `Successfully fetched content for ${urlString}`, metadata);
       return {
         content,
         links
@@ -778,7 +766,60 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
         }
 
         allSitemapUrls.push(...urls);
-        sitemapQueue.push(...sitemaps.filter(s => !processedSitemaps.has(s)));
+
+        // Filter sitemaps to only include relevant ones based on the documentation URL
+        const relevantSitemaps = sitemaps.filter(s => {
+          if (processedSitemaps.has(s)) return false;
+
+          try {
+            const sitemapUrl = new URL(s);
+
+            // Must be same host
+            if (sitemapUrl.hostname !== docUrl.hostname) {
+              return false;
+            }
+
+            // Check if sitemap path is relevant to documentation path
+            const docPath = docUrl.pathname.replace(/\/$/, '');
+            const sitemapPath = sitemapUrl.pathname.replace(/\/$/, '');
+
+            // Accept sitemap if:
+            // 1. It's at root level (applies to everything)
+            if (sitemapPath === '/sitemap.xml' || sitemapPath === '/sitemap_index.xml') {
+              return true;
+            }
+
+            // 2. It shares a common path prefix with the documentation URL
+            if (docPath && docPath !== '/') {
+              const docParts = docPath.split('/').filter(p => p);
+              const sitemapParts = sitemapPath.split('/').filter(p => p);
+
+              // Check if sitemap is under same path hierarchy
+              for (let i = 0; i < Math.min(docParts.length, sitemapParts.length - 1); i++) {
+                if (docParts[i] === sitemapParts[i]) {
+                  return true; // Share common path prefix
+                }
+              }
+            }
+
+            // 3. It contains documentation-related keywords in the path
+            const relevantKeywords = ['docs', 'api', 'reference', 'guide', 'documentation'];
+            const sitemapLower = sitemapPath.toLowerCase();
+            if (relevantKeywords.some(keyword => sitemapLower.includes(keyword))) {
+              return true;
+            }
+
+            return false; // Skip irrelevant sitemaps
+          } catch {
+            return false; // Invalid URL
+          }
+        });
+
+        if (relevantSitemaps.length > 0) {
+          logMessage('debug', `Adding ${relevantSitemaps.length} relevant sitemaps to queue (filtered from ${sitemaps.length} total)`, metadata);
+        }
+
+        sitemapQueue.push(...relevantSitemaps);
       }
     }
 
@@ -837,12 +878,10 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
           return filteredUrls;
         }
 
-        // If we don't have enough URLs yet, continue to the next (broader) filter
         logMessage('debug', `Only found ${filteredUrls.length} URLs under ${filterPath}, trying broader filter...`, metadata);
       }
     }
 
-    // If we get here, no URLs were found at all
     logMessage('debug', `No matching URLs found in sitemap(s) for ${config.documentationUrl}`, metadata);
     return [];
   }
@@ -911,10 +950,8 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       }
 
       if (sitemapUrls.length > 0) {
-        logMessage('debug', `Found ${sitemapUrls.length} URLs from sitemap(s)`, metadata);
-
         const keywords = this.getMergedKeywords(config.keywords);
-        const rankedUrls = this.rankUrls(sitemapUrls, keywords);
+        const rankedUrls = this.rankItems(sitemapUrls, keywords) as string[];
 
         const topUrls = rankedUrls.slice(0, PlaywrightFetchingStrategy.MAX_FETCHED_LINKS);
 
@@ -932,7 +969,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     return this.legacyTryFetch(config, metadata);
   }
 
-  private getDefaultKeywords(): string[] {
+  public getDefaultKeywords(): string[] {
     return [
       "authentication", "authorization", "bearer", "token",
       "getting started", "quickstart", "guides", "tutorial", "api", "api-reference", "open api",
@@ -942,7 +979,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     ];
   }
 
-  private getMergedKeywords(inputKeywords?: string[] | null): string[] {
+  public getMergedKeywords(inputKeywords?: string[] | null): string[] {
     const defaultKeywords = this.getDefaultKeywords();
 
     if (!inputKeywords || inputKeywords.length === 0) {
@@ -954,49 +991,53 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     return Array.from(mergedSet);
   }
 
-  private createFuseInstance<T>(items: T[], keys: string[], options?: any): Fuse<T> {
-    const mergedOptions = {
-      ...Documentation.FUSE_CONFIGS.URL_RANKING,
-      keys,
-      ...options
-    };
-    return new Fuse(items, mergedOptions);
-  }
+  public rankItems(items: string[] | { linkText: string, href: string }[], keywords: string[], fetchedLinks?: Set<string>): any[] {
+    // Normalize items to a common format
+    const normalizedItems = items.map(item => {
+      if (typeof item === 'string') {
+        return { url: item, text: '', original: item };
+      } else {
+        return { url: item.href, text: item.linkText, original: item };
+      }
+    });
 
-  private rankUrls(urls: string[], keywords: string[]): string[] {
-    const scored = urls.map(url => {
-      const urlLower = url.toLowerCase();
+    // Filter out already fetched links if provided
+    const itemsToRank = fetchedLinks
+      ? normalizedItems.filter(item => !fetchedLinks.has(item.url))
+      : normalizedItems;
+
+    const scored = itemsToRank.map(item => {
+      const combined = `${item.text} ${item.url}`.toLowerCase();
       let positiveScore = 0;
       let negativeScore = 0;
 
+      // Simple keyword matching without fuzzy search
       for (const keyword of keywords) {
         const keywordLower = keyword.toLowerCase();
-        if (urlLower.includes(keywordLower)) {
-          const lengthPenalty = 1 / url.length;
+        if (combined.includes(keywordLower)) {
+          // Length penalty to prefer shorter, more focused URLs
+          const lengthPenalty = 1 / (item.url.length + item.text.length || 1);
           positiveScore += lengthPenalty;
-        } else {
-          // Fuzzy match with single-item Fuse
-          const fuse = this.createFuseInstance([{ url, urlLower }], ['urlLower']);
-          const results = fuse.search(keywordLower);
-          if (results.length > 0) {
-            const lengthPenalty = 1 / url.length;
-            positiveScore += (1 - (results[0].score || 0)) * lengthPenalty * 0.5;
-          }
         }
       }
 
+      // Negative scoring for unwanted keywords
       for (const negKeyword of PlaywrightFetchingStrategy.NEGATIVE_KEYWORDS) {
-        if (urlLower.includes(negKeyword)) {
+        if (combined.includes(negKeyword)) {
           negativeScore += 2;
         }
       }
 
-      return { url, score: positiveScore - negativeScore };
+      return {
+        item: item.original,
+        score: positiveScore - negativeScore
+      };
     });
 
+    // Sort by score and return the original items
     return scored
       .sort((a, b) => b.score - a.score)
-      .map(item => item.url);
+      .map(s => s.item);
   }
 
   async legacyTryFetch(config: DocumentationConfig, metadata: Metadata): Promise<string | null> {
@@ -1017,7 +1058,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     });
 
     while (fetchedLinks.size < PlaywrightFetchingStrategy.MAX_FETCHED_LINKS && linkPool.length > 0) {
-      const rankedLinks = this.rankLinks(linkPool, keywords, fetchedLinks);
+      const rankedLinks = this.rankItems(linkPool, keywords, fetchedLinks) as { linkText: string, href: string }[];
 
       if (rankedLinks.length === 0) break;
       const nextLink = rankedLinks[0];
@@ -1098,41 +1139,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     return false;
   }
 
-  private rankLinks(links: { linkText: string, href: string; }[], keywords: string[], fetchedLinks: Set<string>): { linkText: string, href: string, matchCount: number; }[] {
-    const unfetchedLinks = links.filter(link => !fetchedLinks.has(link.href));
 
-    const scored = unfetchedLinks.map(link => {
-      const combined = `${link.linkText} ${link.href}`.toLowerCase();
-      let positiveScore = 0;
-      let negativeScore = 0;
-
-      for (const keyword of keywords) {
-        const keywordLower = keyword.toLowerCase();
-        if (combined.includes(keywordLower)) {
-          const lengthPenalty = 1 / (link.href.length + link.linkText.length);
-          positiveScore += lengthPenalty;
-        } else {
-          // Fuzzy match
-          const fuse = this.createFuseInstance([{ combined }], ['combined']);
-          const results = fuse.search(keywordLower);
-          if (results.length > 0) {
-            const lengthPenalty = 1 / (link.href.length + link.linkText.length);
-            positiveScore += (1 - (results[0].score || 0)) * lengthPenalty * 0.5;
-          }
-        }
-      }
-
-      for (const negKeyword of PlaywrightFetchingStrategy.NEGATIVE_KEYWORDS) {
-        if (combined.includes(negKeyword)) {
-          negativeScore += 2;
-        }
-      }
-
-      return { ...link, matchCount: positiveScore - negativeScore };
-    });
-
-    return scored.sort((a, b) => b.matchCount - a.matchCount);
-  }
 }
 
 class PostgreSqlStrategy implements ProcessingStrategy {
@@ -1320,7 +1327,6 @@ class HtmlMarkdownStrategy implements ProcessingStrategy {
     const hasHtmlIndicators = contentStart.includes("<html") || contentStart.includes("<!doctype");
 
     if (hasMarkdownIndicators && !hasHtmlIndicators) {
-      logMessage('info', "Content already appears to be in Markdown format.", metadata);
       return content;
     }
 
