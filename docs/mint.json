@@ -41,17 +41,28 @@
     {
       "group": "Getting Started",
       "pages": [
-        "introduction",
-        "quickstart"
+        "introduction"
       ]
     },
     {
-      "group": "superglue for Agents",
+      "group": "For Agent & AI App Builders",
       "pages": [
+        "agent-builders/quickstart",
+        "agent-builders/sdk-integration",
+        "agent-builders/credential-management",
         "mcp/mcp",
         "mcp/mcp-guide",
         "mcp/mcp-db",
         "mcp/mcp-tools"
+      ]
+    },
+    {
+      "group": "For Data & Integration Engineers", 
+      "pages": [
+        "data-engineers/quickstart",
+        "data-engineers/ui-vs-sdk",
+        "data-engineers/api-ranking",
+        "data-engineers/data-pipelines"
       ]
     },
     {
@@ -61,11 +72,10 @@
         "guides/architecture",
         "guides/oauth-integrations",
         "guides/webhooks",
-        "guides/shopify",
-        "guides/jira",
         "guides/hubspot",
         "guides/google-ads",
-        "guides/instagram-business"
+        "guides/instagram-business",
+        "guides/api-testing"
       ]
     },
     {

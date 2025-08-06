@@ -8,7 +8,7 @@ import { LLM, LLMObjectResponse, LLMResponse } from "./llm.js";
 export class OpenAIModel implements LLM {
   public contextLength: number = 128000;
   private client: OpenAI;
-  private model: string;
+  readonly model: string;
 
   constructor(model: string = null) {
     this.model = model || process.env.OPENAI_MODEL || "gpt-4.1";

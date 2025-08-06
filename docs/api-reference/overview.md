@@ -5,11 +5,18 @@ description: 'Overview of the superglue GraphQL API'
 
 The Core API provides GraphQL endpoints for managing API configurations, data extraction, transformations, and workflows. Main concepts:
 
-* **API Calls**: Execute and transform API requests
-* **Extractions**: Process and parse files/responses
-* **Transformations**: Convert data between formats
-* **Workflows**: Chain multiple steps into a single execution
+* **Workflows**: Chain multiple steps into a single execution (recommended)
 * **Integrations**: Manage integrations (e.g. Stripe, Hubspot) and their credentials
+
+## Deprecated Operations
+
+**⚠️ The following operations are deprecated:**
+* **API Calls**: Individual `call` operations - use `executeWorkflow` instead
+* **Extractions**: Individual `extract` operations - use `executeWorkflow` instead  
+* **Transformations**: Individual `transform` operations - use `executeWorkflow` instead
+* **Legacy Config Management**: `upsertApi`, `upsertExtract`, `upsertTransform` - use workflow-based operations instead
+
+These deprecated operations are still available but moved to the bottom of the documentation. Use workflows for better performance, reliability, and capabilities.
 
 ## Endpoint
 
@@ -96,20 +103,47 @@ union ConfigType = ApiConfig | ExtractConfig | TransformConfig | Workflow
 - credentials: JSON
 - documentationUrl: String
 - documentation: String
-- documentationPending: Boolean
+- documentationPending: Boolean (default: false)
+- specificInstructions: String
 
 ### RequestOptions
-- selfHealing: SelfHealingMode
-- cacheMode: CacheMode
-- timeout: Int
-- retries: Int
-- retryDelay: Int
-- webhookUrl: String
+
+Control how operations are executed with fine-grained options.
+
+```json
+{
+  "selfHealing": "ENABLED",     // Default: ENABLED
+  "cacheMode": "READONLY",       // Deprecated, Default: READONLY
+  "timeout": 300000,             // Default: 300000ms (5 minutes)
+  "retries": 10,                 // Default: 10 attempts
+  "retryDelay": 0,           // Default: 0ms (no delay)
+  "webhookUrl": null,           // Deprecated, Default: null (no webhooks) - this only works for calls, not for workflows.
+  "testMode": false             // Default: false - if this is true, superglue will validate the request after each execution. This is useful for building, testing and debugging.
+}
+```
+
+**Field Explanations:**
+- `selfHealing`: If it should auto-fix issues
+  - `ENABLED`: Full auto-healing (recommended)
+  - `TRANSFORM_ONLY`: Only fix data transformation issues
+  - `REQUEST_ONLY`: Only fix API request issues  
+  - `DISABLED`: No auto-healing
+- `cacheMode`: Deprecated - If it should use the saved configuration and update it if self-healing is performed. this only works for calls, not for workflows.
+  - `ENABLED`: Cache reads and writes
+  - `READONLY`: Only read from cache, don't write (Default)
+  - `WRITEONLY`: Only write to cache, don't read
+  - `DISABLED`: No caching
+- `timeout`: Maximum time to wait (milliseconds)
+- `retries`: Number of retry attempts on failure
+- `retryDelay`: Delay between retries (milliseconds)
+- `webhookUrl`: POST endpoint for async notifications - this only works for calls, not for workflows.
+- `testMode`: If true, validate each request after execution. This is useful for building, testing and debugging.
 
 ### PaginationInput
 - type: PaginationType!
-- pageSize: String
+- pageSize: String (default: "50")
 - cursorPath: String
+- stopCondition: String
 
 ### SystemInput
 - id: String!
@@ -150,7 +184,13 @@ CREATE, UPDATE, UPSERT
 
 ## Common Parameters
 
-All execution operations (`call`, `extract`, `transform`, `executeWorkflow`) accept a `RequestOptions` object.
+All execution operations (`executeWorkflow`) accept a `RequestOptions` object.
+
+### Default Query Parameters
+
+Most list operations support:
+- `limit: Int` (default: 50)
+- `offset: Int` (default: 0)
 
 ## Error Handling
 
