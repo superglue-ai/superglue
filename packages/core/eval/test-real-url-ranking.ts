@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { integrations } from '@superglue/shared';
 import fs from 'fs/promises';
+import Fuse from 'fuse.js';
 import path from 'path';
 import { Documentation } from '../utils/documentation.js';
 import { ConfigLoader } from './utils/config-loader.js';
@@ -69,42 +70,8 @@ class LogCapture {
 
 const logCapture = new LogCapture();
 
-// Import log emitter to intercept logs
-import { LogEntry } from '@superglue/shared';
+// Import log emitter to intercept logs - same as integration testing framework
 import { logEmitter } from '../utils/logs.js';
-
-// Set up log listener
-logEmitter.on('log', (logEntry: LogEntry) => {
-    // Capture URLs from log messages
-    if ((logCapture as any).currentIntegration) {
-        const message = logEntry.message;
-        const level = logEntry.level;
-
-        // Only capture from "Successfully fetched content for" messages
-        if (level === 'info' && message.includes('Successfully fetched content for')) {
-            const urlMatch = message.match(/Successfully fetched content for (.+)$/);
-            if (urlMatch && urlMatch[1].startsWith('http')) {
-                logCapture.captureUrl(urlMatch[1].trim());
-            }
-        }
-
-        // Capture debug logs about sitemaps and URL discovery
-        if (level === 'debug' || level === 'info') {
-            if (message.includes('sitemap') ||
-                message.includes('URLs from sitemap') ||
-                message.includes('URLs under') ||
-                message.includes('Found') && message.includes('URLs') ||
-                message.includes('Collected') && message.includes('URLs')) {
-                logCapture.captureDebugLog(`[${level.toUpperCase()}] ${message}`);
-            }
-        }
-
-        // Capture warnings about sitemap timeouts or failures
-        if (level === 'warn' && (message.includes('sitemap') || message.includes('Sitemap'))) {
-            logCapture.captureDebugLog(`[WARN] ${message}`);
-        }
-    }
-});
 
 async function testRealUrlRanking(fuseOptions?: any) {
     const configLoader = new ConfigLoader();
@@ -140,6 +107,36 @@ async function testRealUrlRanking(fuseOptions?: any) {
             // Start capturing URLs for this integration
             logCapture.startCapture(integrationConfig.id);
 
+            // Set up log collection similar to WorkflowRunner
+            const collectedLogs: any[] = [];
+            const logListener = (entry: any) => {
+                // Capture all debug logs
+                if (entry.level === 'DEBUG') {
+                    logCapture.captureDebugLog(`[DEBUG] ${entry.message}`);
+                }
+                // Capture info logs with "Successfully fetched content for"
+                if (entry.level === 'INFO' && entry.message?.includes('Successfully fetched content for')) {
+                    const urlMatch = entry.message.match(/Successfully fetched content for (.+)$/);
+                    if (urlMatch && urlMatch[1].startsWith('http')) {
+                        logCapture.captureUrl(urlMatch[1].trim());
+                    }
+                }
+                // Also capture sitemap-related info/warn logs for debug
+                if ((entry.level === 'INFO' || entry.level === 'WARN') &&
+                    (entry.message?.includes('sitemap') ||
+                        entry.message?.includes('URLs from sitemap') ||
+                        entry.message?.includes('URLs under') ||
+                        entry.message?.includes('Found') && entry.message?.includes('URLs') ||
+                        entry.message?.includes('Collected') && entry.message?.includes('URLs'))) {
+                    logCapture.captureDebugLog(`[${entry.level.toUpperCase()}] ${entry.message}`);
+                }
+                collectedLogs.push(entry);
+            };
+
+            // Start listening to logs
+            logEmitter.on('log', logListener);
+
+            let docLength = 0;
             try {
                 // Create Documentation instance with custom Fuse options if provided
                 const docFetcher = new Documentation(
@@ -158,78 +155,59 @@ async function testRealUrlRanking(fuseOptions?: any) {
                 const startTime = Date.now();
                 const docString = await docFetcher.fetchAndProcess();
                 const fetchTime = Date.now() - startTime;
+                docLength = docString?.length || 0;
 
-                // Stop capturing for this integration
-
-                // Get captured URLs and debug logs
-                const fetchedUrls = logCapture.getUrls(integrationConfig.id);
-                const debugLogs = logCapture.getDebugLogs(integrationConfig.id);
-
-                console.log(`   ✅ Fetched ${fetchedUrls.length} URLs in ${fetchTime}ms`);
-                console.log(`   📄 Documentation length: ${docString?.length || 0} characters`);
-
-                // Show relevant debug info
-                const sitemapLogs = debugLogs.filter(log =>
-                    log.includes('Found') || log.includes('Collected') || log.includes('sitemap'));
-                if (sitemapLogs.length > 0) {
-                    console.log(`   📋 Sitemap info:`);
-                    sitemapLogs.slice(0, 3).forEach(log => {
-                        console.log(`      ${log.substring(0, 100)}${log.length > 100 ? '...' : ''}`);
-                    });
-                }
-
-                // Now test ranking with the fetched URLs
-                if (fetchedUrls.length > 0) {
-                    // Create a simple ranking test
-                    const rankedUrls = rankUrlsWithFuse(fetchedUrls, keywords, fuseOptions);
-
-                    results.push({
-                        integrationId: integrationConfig.id,
-                        integrationName: integrationConfig.name,
-                        documentationUrl: integrationConfig.documentationUrl,
-                        keywords: keywords,
-                        fetchedUrls: fetchedUrls,
-                        rankedUrls: rankedUrls,
-                        documentationLength: docString?.length || 0,
-                        debugLogs: debugLogs,
-                        fuseOptions: fuseOptions
-                    });
-
-                    // Show top ranked URLs
-                    console.log(`   🎯 Top 5 ranked URLs:`);
-                    rankedUrls.slice(0, 5).forEach((url, idx) => {
-                        console.log(`      ${idx + 1}. ${url}`);
-                    });
-                } else {
-                    // Still save results even if no URLs fetched
-                    results.push({
-                        integrationId: integrationConfig.id,
-                        integrationName: integrationConfig.name,
-                        documentationUrl: integrationConfig.documentationUrl,
-                        keywords: keywords,
-                        fetchedUrls: [],
-                        rankedUrls: [],
-                        documentationLength: docString?.length || 0,
-                        debugLogs: debugLogs,
-                        fuseOptions: fuseOptions
-                    });
-                }
+                console.log(`   ✅ Completed in ${fetchTime}ms`);
+                console.log(`   📄 Documentation length: ${docLength} characters`);
 
             } catch (error) {
                 console.log(`   ❌ Error: ${error}`);
-                const debugLogs = logCapture.getDebugLogs(integrationConfig.id);
-                results.push({
-                    integrationId: integrationConfig.id,
-                    integrationName: integrationConfig.name,
-                    documentationUrl: integrationConfig.documentationUrl,
-                    keywords: keywords,
-                    fetchedUrls: [],
-                    rankedUrls: [],
-                    documentationLength: 0,
-                    debugLogs: debugLogs,
-                    fuseOptions: fuseOptions
+            } finally {
+                // Clean up log listener
+                logEmitter.off('log', logListener);
+            }
+
+            // Get captured data after cleaning up listener
+            const fetchedUrls = logCapture.getUrls(integrationConfig.id);
+            const debugLogs = logCapture.getDebugLogs(integrationConfig.id);
+
+            console.log(`   📊 Captured ${fetchedUrls.length} URLs from logs`);
+
+            // Show relevant debug info
+            const sitemapLogs = debugLogs.filter(log =>
+                log.includes('Found') || log.includes('Collected') || log.includes('sitemap'));
+            if (sitemapLogs.length > 0) {
+                console.log(`   📋 Sitemap info:`);
+                sitemapLogs.slice(0, 3).forEach(log => {
+                    console.log(`      ${log.substring(0, 100)}${log.length > 100 ? '...' : ''}`);
                 });
             }
+
+            // Now test ranking with the fetched URLs
+            let rankedUrls: string[] = [];
+            if (fetchedUrls.length > 0) {
+                // Create a simple ranking test
+                rankedUrls = rankUrlsWithFuse(fetchedUrls, keywords, fuseOptions);
+
+                // Show top ranked URLs
+                console.log(`   🎯 Top 5 ranked URLs:`);
+                rankedUrls.slice(0, 5).forEach((url, idx) => {
+                    console.log(`      ${idx + 1}. ${url}`);
+                });
+            }
+
+            // Save results
+            results.push({
+                integrationId: integrationConfig.id,
+                integrationName: integrationConfig.name,
+                documentationUrl: integrationConfig.documentationUrl,
+                keywords: keywords,
+                fetchedUrls: fetchedUrls,
+                rankedUrls: rankedUrls,
+                documentationLength: docLength,
+                debugLogs: debugLogs,
+                fuseOptions: fuseOptions
+            });
         }
 
         // Generate report
@@ -243,17 +221,12 @@ async function testRealUrlRanking(fuseOptions?: any) {
 }
 
 function rankUrlsWithFuse(urls: string[], keywords: string[], customOptions?: any): string[] {
-    // Import Fuse
-    const Fuse = require('fuse.js');
-
     const defaultOptions = {
         includeScore: true,
-        threshold: 0.4,
-        location: 0,
-        distance: 100,
+        threshold: 0.3,
         minMatchCharLength: 3,
         shouldSort: true,
-        ignoreLocation: false,
+        ignoreLocation: true,
         useExtendedSearch: false,
         ...customOptions
     };
@@ -273,7 +246,7 @@ function rankUrlsWithFuse(urls: string[], keywords: string[], customOptions?: an
         for (const keyword of keywords) {
             const keywordLower = keyword.toLowerCase();
             if (urlLower.includes(keywordLower)) {
-                const lengthPenalty = 50 / Math.max(url.length, 50);
+                const lengthPenalty = 1 / url.length;
                 positiveScore += lengthPenalty;
             } else {
                 // Fuzzy match with single-item Fuse
@@ -285,7 +258,7 @@ function rankUrlsWithFuse(urls: string[], keywords: string[], customOptions?: an
                 });
                 const results = fuse.search(keywordLower);
                 if (results.length > 0) {
-                    const lengthPenalty = 50 / Math.max(url.length, 50);
+                    const lengthPenalty = 1 / url.length;
                     positiveScore += (1 - (results[0].score || 0)) * lengthPenalty * 0.5;
                 }
             }

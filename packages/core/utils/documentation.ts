@@ -842,15 +842,31 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     for (let i = 0; i < urls.length && i < PlaywrightFetchingStrategy.MAX_FETCHED_LINKS; i += BATCH_SIZE) {
       const batch = urls.slice(i, Math.min(i + BATCH_SIZE, PlaywrightFetchingStrategy.MAX_FETCHED_LINKS));
 
-      const batchPromises = batch.map(url =>
-        this.fetchPageContentWithPlaywright(url, config, metadata)
-      );
+      const batchPromises = batch.map(async (url) => {
+        const result = await this.fetchPageContentWithPlaywright(url, config, metadata);
+        if (!result?.content) return null;
+
+        // Convert HTML to Markdown immediately for each page
+        try {
+          if (result.content.slice(0, 500).toLowerCase().includes("<html")) {
+            const markdown = NodeHtmlMarkdown.translate(result.content);
+            logMessage('debug', `Converted HTML to Markdown for ${url}`, metadata);
+            return markdown;
+          } else {
+            // Not HTML, return as-is
+            return result.content;
+          }
+        } catch (translateError) {
+          logMessage('warn', `Failed to convert HTML to Markdown for ${url}: ${translateError?.message}`, metadata);
+          return result.content; // Fallback to raw content
+        }
+      });
 
       const results = await Promise.all(batchPromises);
 
-      for (const result of results) {
-        if (result?.content) {
-          combinedContent += combinedContent ? `\n\n${result.content}` : result.content;
+      for (const content of results) {
+        if (content) {
+          combinedContent += combinedContent ? `\n\n${content}` : content;
         }
       }
     }
@@ -925,16 +941,13 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
 
   private createFuseInstance<T>(items: T[], keys: string[], options?: any): Fuse<T> {
     const defaultOptions = {
-      includeScore: true,
-      threshold: 0.4,
-      location: 0,
-      distance: 100,
-      minMatchCharLength: 3,
-      shouldSort: true,
-      ignoreLocation: false,
-      useExtendedSearch: false,
-      ...options
-    };
+      includeScore: true,        // Return match scores with results
+      threshold: 0.2,           // Match threshold (0.0 = exact, 1.0 = match anything)
+      minMatchCharLength: 3,    // Minimum characters to trigger a match
+      shouldSort: true,         // Sort results by score
+      ignoreLocation: true,    // Whether to ignore location/distance
+      useExtendedSearch: false  // Use advanced search syntax, e.g. fuse.search("'Man 'Old | Artist$") will match items that include "Man" and "Old" or end with "Artist"
+    }
     return new Fuse(items, defaultOptions);
   }
 
@@ -947,7 +960,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       for (const keyword of keywords) {
         const keywordLower = keyword.toLowerCase();
         if (urlLower.includes(keywordLower)) {
-          const lengthPenalty = 50 / Math.max(url.length, 50);
+          const lengthPenalty = 1 / url.length;
           positiveScore += lengthPenalty;
         } else {
           // Fuzzy match with single-item Fuse
@@ -957,7 +970,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
           });
           const results = fuse.search(keywordLower);
           if (results.length > 0) {
-            const lengthPenalty = 50 / Math.max(url.length, 50);
+            const lengthPenalty = 1 / url.length;
             positiveScore += (1 - (results[0].score || 0)) * lengthPenalty * 0.5;
           }
         }
@@ -1049,7 +1062,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       for (const keyword of keywords) {
         const keywordLower = keyword.toLowerCase();
         if (combined.includes(keywordLower)) {
-          const lengthPenalty = 80 / Math.max(link.href.length + link.linkText.length, 80);
+          const lengthPenalty = 1 / (link.href.length + link.linkText.length);
           positiveScore += lengthPenalty;
         } else {
           // Fuzzy match
@@ -1059,7 +1072,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
           });
           const results = fuse.search(keywordLower);
           if (results.length > 0) {
-            const lengthPenalty = 80 / Math.max(link.href.length + link.linkText.length, 80);
+            const lengthPenalty = 1 / (link.href.length + link.linkText.length);
             positiveScore += (1 - (results[0].score || 0)) * lengthPenalty * 0.5;
           }
         }
@@ -1254,8 +1267,21 @@ class HtmlMarkdownStrategy implements ProcessingStrategy {
     if (typeof content !== 'string') {
       content = JSON.stringify(content, null, 2);
     }
+
+    // Check if content is already Markdown (from individual page conversion)
+    const contentStart = content.slice(0, 1000).toLowerCase();
+    const hasMarkdownIndicators = contentStart.includes('##') || contentStart.includes('###') ||
+      contentStart.includes('```') || contentStart.includes('- ') ||
+      contentStart.includes('* ');
+    const hasHtmlIndicators = contentStart.includes("<html") || contentStart.includes("<!doctype");
+
+    if (hasMarkdownIndicators && !hasHtmlIndicators) {
+      logMessage('info', "Content already appears to be in Markdown format.", metadata);
+      return content;
+    }
+
     // Only apply if content looks like HTML
-    if (!content.slice(0, 500).toLowerCase().includes("<html")) {
+    if (!hasHtmlIndicators) {
       return null;
     }
 

@@ -1440,7 +1440,7 @@ export const integrations: Record<string, IntegrationConfig> = {
       tokenUrl: "https://oauth2.googleapis.com/token",
       scopes: "https://www.googleapis.com/auth/adwords https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid"
     },
-    keywords: ["campaigns", "ad groups", "ads", "keywords", "budgets", "bidding", "conversions", "audiences", "extensions", "reports", "accounts", "billing", "targeting", "oauth"]
+    keywords: ["campaigns", "ad groups", "ads", "keywords", "GAQL", "budgets", "bidding", "conversions", "audiences", "extensions", "reports", "accounts", "billing", "targeting", "oauth"]
   },
   google: { // catch all google api
     apiUrl: "https://googleapis.com",
@@ -1453,7 +1453,15 @@ export const integrations: Record<string, IntegrationConfig> = {
       tokenUrl: "https://oauth2.googleapis.com/token",
       scopes: "https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid"
     },
-    keywords: ["apis", "services", "resources", "methods", "scopes", "projects", "quotas", "usage", "oauth"]
+    keywords: ["apis", "services", "resources", "GAQL", "methods", "scopes", "projects", "quotas", "usage", "oauth"]
+  },
+  posthog: {
+    apiUrl: "https://us.posthog.com/api",
+    regex: "^(.*\\.)?posthog\\.com(/.*)?$",
+    icon: "posthog",
+    docsUrl: "https://posthog.com/docs/api",
+    preferredAuthType: "apikey",
+    keywords: ["events", "users", "products", "dashboard", "properties", "cohorts", "funnels", "retention", "insights", "engage", "import", "export", "jql", "query", "segmentation", "track", "api key"]
   },
 }
 
