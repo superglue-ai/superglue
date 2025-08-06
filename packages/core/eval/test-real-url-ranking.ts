@@ -95,8 +95,21 @@ async function testRealUrlRanking(fuseOptions?: any) {
             const template = integrations[integrationConfig.id.toLowerCase()];
             const keywords = template?.keywords || [];
 
+            // Debug logging for PostHog specifically
+            if (integrationConfig.id.toLowerCase() === 'posthog') {
+                console.log(`\n🔍 DEBUG PostHog:`);
+                console.log(`   Integration ID: ${integrationConfig.id}`);
+                console.log(`   Documentation URL: ${integrationConfig.documentationUrl}`);
+                console.log(`   Template found: ${!!template}`);
+                console.log(`   Keywords length: ${keywords.length}`);
+                console.log(`   Keywords: ${keywords.slice(0, 3).join(', ')}`);
+            }
+
             if (!integrationConfig.documentationUrl || keywords.length === 0) {
                 console.log(`\n⏭️  Skipping ${integrationConfig.name} - no doc URL or keywords`);
+                if (integrationConfig.id.toLowerCase() === 'posthog') {
+                    console.log(`   PostHog skip reason: docUrl=${!!integrationConfig.documentationUrl}, keywords=${keywords.length}`);
+                }
                 continue;
             }
 

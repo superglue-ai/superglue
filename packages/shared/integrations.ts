@@ -16,7 +16,7 @@ export interface IntegrationConfig {
 export const integrations: Record<string, IntegrationConfig> = {
   stripe: {
     apiUrl: "https://api.stripe.com",
-    regex: "^(.*\\.)?stripe\\.com(/.*)?$",
+    regex: "^.*stripe.*$",
     icon: "stripe",
     docsUrl: "https://docs.stripe.com/api",
     openApiUrl: "https://raw.githubusercontent.com/stripe/openapi/master/openapi/spec3.json",
@@ -48,7 +48,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   shopify: {
     apiUrl: "https://admin.shopify.com",
-    regex: "^(.*\\.)?myshopify\\.com(/.*)?$",
+    regex: "^.*(shopify|myshopify).*$",
     icon: "shopify",
     docsUrl: "https://shopify.dev/docs/api",
     preferredAuthType: "apikey",
@@ -78,7 +78,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   hubspot: {
     apiUrl: "https://api.hubapi.com/crm/v3",
-    regex: "^(.*\\.)?(hubapi|hubspot)\\.com(/.*)?$",
+    regex: "^.*(hubapi|hubspot).*$",
     icon: "hubspot",
     docsUrl: "https://developers.hubspot.com/docs/api/overview",
     openApiUrl: "https://api.hubspot.com/public/api/spec/v1/specs",
@@ -113,7 +113,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   attio: {
     apiUrl: "https://api.attio.com/v2/",
-    regex: "^(.*\\.)?attio\\.com(/.*)?$",
+    regex: "^.*attio.*$",
     icon: "attio",
     docsUrl: "https://api.attio.com/openapi/api",
     openApiUrl: "https://api.attio.com/openapi/api",
@@ -141,7 +141,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   twilio: {
     apiUrl: "https://api.twilio.com",
-    regex: "^(.*\\.)?twilio\\.com(/.*)?$",
+    regex: "^.*twilio.*$",
     icon: "twilio",
     docsUrl: "https://www.twilio.com/docs/api",
     openApiUrl: "https://raw.githubusercontent.com/twilio/twilio-oai/refs/heads/main/spec/json/twilio_api_v2010.json",
@@ -168,7 +168,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   sendgrid: {
     apiUrl: "https://api.sendgrid.com",
-    regex: "^(.*\\.)?sendgrid\\.com(/.*)?$",
+    regex: "^.*sendgrid.*$",
     icon: "sendgrid",
     docsUrl: "https://docs.sendgrid.com/api-reference",
     openApiUrl: "https://raw.githubusercontent.com/sendgrid/sendgrid-oai/main/oai.json",
@@ -193,7 +193,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   github: {
     apiUrl: "https://api.github.com",
-    regex: "^(.*\\.)?github\\.com(/.*)?$",
+    regex: "^.*github.*$",
     icon: "github",
     docsUrl: "https://docs.github.com/en/rest",
     openApiUrl: "https://raw.githubusercontent.com/github/rest-api-description/main/descriptions/api.github.com/api.github.com.json",
@@ -224,7 +224,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   gitlab: {
     apiUrl: "https://api.gitlab.com",
-    regex: "^(.*\\.)?gitlab\\.com(/.*)?$",
+    regex: "^.*gitlab.*$",
     icon: "gitlab",
     docsUrl: "https://docs.gitlab.com/ee/api/",
     openApiUrl: "https://gitlab.com/gitlab-org/gitlab/-/raw/master/doc/api/openapi/openapi.yaml",
@@ -256,7 +256,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   bitbucket: {
     apiUrl: "https://api.bitbucket.org",
-    regex: "^(.*\\.)?bitbucket\\.org(/.*)?$",
+    regex: "^.*bitbucket.*$",
     icon: "bitbucket",
     docsUrl: "https://developer.atlassian.com/cloud/bitbucket/rest",
     openApiUrl: "https://api.bitbucket.org/swagger.json",
@@ -287,7 +287,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   slack: {
     apiUrl: "https://api.slack.com",
-    regex: "^(.*\\.)?slack\\.com(/.*)?$",
+    regex: "^.*slack.*$",
     icon: "slack",
     docsUrl: "https://api.slack.com/docs",
     openApiUrl: "https://raw.githubusercontent.com/slackapi/slack-api-specs/master/web-api/slack_web_openapi_v2.json",
@@ -318,7 +318,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   airtable: {
     apiUrl: "https://api.airtable.com",
-    regex: "^(.*\\.)?airtable\\.com(/.*)?$",
+    regex: "^.*airtable.*$",
     icon: "airtable",
     docsUrl: "https://airtable.com/developers/web/api",
     preferredAuthType: "apikey",
@@ -331,7 +331,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   gmail: {
     apiUrl: "https://gmail.googleapis.com/gmail/v1",
-    regex: "^(.*\\.)?(gmail\\.googleapis\\.com|mail\\.google\\.com)(/.*)?$",
+    regex: "^.*(gmail|mail\\.google).*$",
     icon: "gmail",
     docsUrl: "https://developers.google.com/gmail/api/reference/rest",
     openApiUrl: "https://www.googleapis.com/discovery/v1/apis/gmail/v1/rest",
@@ -345,7 +345,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   googleDrive: {
     apiUrl: "https://www.googleapis.com/drive/v3",
-    regex: "^(.*\\.)?drive\\.google\\.com(/.*)?$",
+    regex: "^.*(drive|googleapis\\.com/drive).*$",
     icon: "googledrive",
     docsUrl: "https://developers.google.com/drive/api/v3/reference",
     openApiUrl: "https://www.googleapis.com/discovery/v1/apis/drive/v3/rest",
@@ -359,7 +359,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   googleCalendar: {
     apiUrl: "https://www.googleapis.com/calendar/v3",
-    regex: "^(.*\\.)?calendar\\.google\\.com(/.*)?$",
+    regex: "^.*(calendar|googleapis\\.com/calendar).*$",
     icon: "googlecalendar",
     docsUrl: "https://developers.google.com/calendar/api/v3/reference",
     openApiUrl: "https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest",
@@ -373,7 +373,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   googleSheets: {
     apiUrl: "https://sheets.googleapis.com/v4",
-    regex: "^(.*\\.)?sheets\\.googleapis\\.com(/.*)?$",
+    regex: "^.*(sheets|googleapis\\.com/.*sheets).*$",
     icon: "googlesheets",
     docsUrl: "https://developers.google.com/sheets/api/reference/rest",
     openApiUrl: "https://www.googleapis.com/discovery/v1/apis/sheets/v4/rest",
@@ -387,7 +387,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   googleAnalytics: {
     apiUrl: "https://analytics.google.com",
-    regex: "^(.*\\.)?(analytics\\.google\\.com|analyticsdata\\.googleapis\\.com)(/.*)?$",
+    regex: "^.*(analytics|analyticsdata).*$",
     icon: "googleAnalytics",
     docsUrl: "https://developers.google.com/analytics/devguides/reporting/data/v1",
     openApiUrl: "https://analyticsdata.googleapis.com/$discovery/rest?version=v1beta",
@@ -401,7 +401,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   youtube: {
     apiUrl: "https://youtube.googleapis.com",
-    regex: "^(.*\\.)?(youtube\\.com|youtube\\.googleapis\\.com)(/.*)?$",
+    regex: "^.*youtube.*$",
     icon: "youtube",
     docsUrl: "https://developers.google.com/youtube/v3/docs",
     openApiUrl: "https://www.googleapis.com/discovery/v1/apis/youtube/v3/rest",
@@ -415,7 +415,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   aws: {
     apiUrl: "https://amazonaws.com",
-    regex: "^(.*\\.)?amazonaws\\.com(/.*)?$",
+    regex: "^.*(aws|amazonaws).*$",
     icon: "amazonAWS",
     docsUrl: "https://docs.aws.amazon.com/index.html",
     preferredAuthType: "apikey",
@@ -423,7 +423,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   googleCloud: {
     apiUrl: "https://cloud.google.com",
-    regex: "^(.*\\.)?cloud\\.google\\.com(/.*)?$",
+    regex: "^.*(cloud\\.google|gcp|googlecloud).*$",
     icon: "googleCloud",
     docsUrl: "https://cloud.google.com/apis/docs/overview",
     preferredAuthType: "oauth",
@@ -436,7 +436,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   firebase: {
     apiUrl: "https://firestore.googleapis.com",
-    regex: "^(.*\\.)?(firebase\\.google\\.com|firebaseio\\.com|firestore\\.googleapis\\.com)(/.*)?$",
+    regex: "^.*(firebase|firestore).*$",
     icon: "firebase",
     docsUrl: "https://firebase.google.com/docs/reference/firebase-management/rest",
     openApiUrl: "https://firestore.googleapis.com/$discovery/rest?version=v1",
@@ -450,7 +450,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   salesforce: {
     apiUrl: "https://api.salesforce.com",
-    regex: "^(.*\\.)?salesforce\\.com(/.*)?$",
+    regex: "^.*salesforce.*$",
     icon: "salesforce",
     docsUrl: "https://developer.salesforce.com/docs/atlas.en-us.api_rest.meta/api_rest/intro_rest.htm",
     preferredAuthType: "oauth",
@@ -463,7 +463,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   facebook: {
     apiUrl: "https://graph.facebook.com",
-    regex: "^(.*\\.)?facebook\\.com(/.*)?$",
+    regex: "^.*facebook.*$",
     icon: "facebook",
     docsUrl: "https://developers.facebook.com/docs/graph-api",
     preferredAuthType: "oauth",
@@ -476,7 +476,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   instagram: {
     apiUrl: "https://graph.facebook.com/v23.0/",
-    regex: "^(.*\\.)?instagram\\.com(/.*)?$",
+    regex: "^.*instagram.*$",
     icon: "instagram",
     docsUrl: "https://developers.facebook.com/docs/graph-api/overview",
     preferredAuthType: "oauth",
@@ -489,7 +489,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   twitter: {
     apiUrl: "https://api.twitter.com",
-    regex: "^(.*\\.)?twitter\\.com(/.*)?$",
+    regex: "^.*(twitter|x\\.com).*$",
     icon: "x",
     docsUrl: "https://developer.twitter.com/en/docs/twitter-api",
     openApiUrl: "https://api.twitter.com/2/openapi.json",
@@ -503,7 +503,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   linkedin: {
     apiUrl: "https://api.linkedin.com",
-    regex: "^(.*\\.)?linkedin\\.com(/.*)?$",
+    regex: "^.*linkedin.*$",
     icon: "linkedin",
     docsUrl: "https://developer.linkedin.com/docs",
     preferredAuthType: "oauth",
@@ -516,7 +516,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   paypal: {
     apiUrl: "https://api.paypal.com",
-    regex: "^(.*\\.)?paypal\\.com(/.*)?$",
+    regex: "^.*paypal.*$",
     icon: "paypal",
     docsUrl: "https://developer.paypal.com/api/rest",
     preferredAuthType: "apikey",
@@ -524,7 +524,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   square: {
     apiUrl: "https://connect.squareup.com",
-    regex: "^(.*\\.)?square\\.com(/.*)?$",
+    regex: "^.*(square|squareup).*$",
     icon: "square",
     docsUrl: "https://developer.squareup.com/reference/square",
     openApiUrl: "https://raw.githubusercontent.com/square/connect-api-specification/refs/heads/master/api.json",
@@ -538,7 +538,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   adyen: {
     apiUrl: "https://checkout-test.adyen.com",
-    regex: "^(.*\\.)?adyen\\.com(/.*)?$",
+    regex: "^.*adyen.*$",
     icon: "adyen",
     docsUrl: "https://docs.adyen.com/api-explorer",
     openApiUrl: "https://raw.githubusercontent.com/Adyen/adyen-openapi/main/yaml/CheckoutService-v71.yaml",
@@ -564,7 +564,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   razorpay: {
     apiUrl: "https://api.razorpay.com",
-    regex: "^(.*\\.)?razorpay\\.com(/.*)?$",
+    regex: "^.*razorpay.*$",
     icon: "razorpay",
     docsUrl: "https://razorpay.com/docs/api",
     preferredAuthType: "apikey",
@@ -588,7 +588,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   plaid: {
     apiUrl: "https://production.plaid.com",
-    regex: "^(.*\\.)?plaid\\.com(/.*)?$",
+    regex: "^.*plaid.*$",
     icon: "plaid",
     docsUrl: "https://plaid.com/docs/api",
     openApiUrl: "https://raw.githubusercontent.com/plaid/plaid-openapi/master/2020-09-14.yml",
@@ -614,7 +614,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   zendesk: {
     apiUrl: "https://api.zendesk.com",
-    regex: "^(.*\\.)?zendesk\\.com(/.*)?$",
+    regex: "^.*zendesk.*$",
     icon: "zendesk",
     docsUrl: "https://developer.zendesk.com/api-reference",
     openApiUrl: "https://developer.zendesk.com/zendesk/oas.yaml",
@@ -628,7 +628,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   freshdesk: {
     apiUrl: "https://{domain}.freshdesk.com/api/v2",
-    regex: "^(.*\\.)?freshdesk\\.com(/.*)?$",
+    regex: "^.*freshdesk.*$",
     icon: "freshdesk",
     docsUrl: "https://developers.freshdesk.com/api",
     preferredAuthType: "apikey",
@@ -636,7 +636,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   freshworks: {
     apiUrl: "https://{domain}.freshservice.com/api/v2",
-    regex: "^(.*\\.)?freshservice\\.com(/.*)?$",
+    regex: "^.*(freshworks|freshservice).*$",
     icon: "freshworks",
     docsUrl: "https://api.freshservice.com",
     preferredAuthType: "apikey",
@@ -644,7 +644,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   servicenow: {
     apiUrl: "https://{instance}.service-now.com/api",
-    regex: "^(.*\\.)?(service-now\\.com|servicenow\\.com)(/.*)?$",
+    regex: "^.*(servicenow|service-now).*$",
     icon: "servicenow",
     docsUrl: "https://developer.servicenow.com/dev.do#!/reference/api/latest/rest",
     preferredAuthType: "apikey",
@@ -652,7 +652,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   helpscout: {
     apiUrl: "https://api.helpscout.net",
-    regex: "^(.*\\.)?helpscout\\.net(/.*)?$",
+    regex: "^.*helpscout.*$",
     icon: "helpscout",
     docsUrl: "https://developer.helpscout.com/mailbox-api",
     preferredAuthType: "apikey",
@@ -660,7 +660,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   dropbox: {
     apiUrl: "https://api.dropboxapi.com",
-    regex: "^(.*\\.)?dropbox\\.com(/.*)?$",
+    regex: "^.*dropbox.*$",
     icon: "dropbox",
     docsUrl: "https://www.dropbox.com/developers/documentation/http/documentation",
     preferredAuthType: "oauth",
@@ -673,7 +673,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   mailchimp: {
     apiUrl: "https://api.mailchimp.com",
-    regex: "^(.*\\.)?mailchimp\\.com(/.*)?$",
+    regex: "^.*mailchimp.*$",
     icon: "mailchimp",
     docsUrl: "https://mailchimp.com/developer/marketing/api",
     openApiUrl: "https://api.mailchimp.com/schema/3.0/Swagger.json",
@@ -687,7 +687,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   jira: {
     apiUrl: "https://{your-domain}.atlassian.net/rest/api",
-    regex: "^(.*\\.)?(jira\\.com|atlassian\\.net|atlassian\\.com)(/.*)?$",
+    regex: "^.*(jira|atlassian).*$",
     icon: "jira",
     docsUrl: "https://developer.atlassian.com/cloud/jira/platform/rest/v3",
     openApiUrl: "https://developer.atlassian.com/cloud/jira/platform/swagger-v3.json",
@@ -701,7 +701,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   confluence: {
     apiUrl: "https://{your-domain}.atlassian.net/wiki/rest/api",
-    regex: "^(.*\\.)?(confluence\\.com|atlassian\\.net|atlassian\\.com)(/.*)?$",
+    regex: "^.*(confluence|atlassian).*$",
     icon: "confluence",
     docsUrl: "https://developer.atlassian.com/cloud/confluence/rest",
     openApiUrl: "https://developer.atlassian.com/cloud/confluence/openapi.json",
@@ -715,7 +715,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   quickbooks: {
     apiUrl: "https://quickbooks.api.intuit.com",
-    regex: "^(.*\\.)?quickbooks\\.com(/.*)?$",
+    regex: "^.*(quickbooks|intuit).*$",
     icon: "quickbooks",
     docsUrl: "https://developer.intuit.com/app/developer/qbo/docs/api/accounting/most-commonly-used/account",
     preferredAuthType: "oauth",
@@ -728,7 +728,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   xero: {
     apiUrl: "https://api.xero.com",
-    regex: "^(.*\\.)?xero\\.com(/.*)?$",
+    regex: "^.*xero.*$",
     icon: "xero",
     docsUrl: "https://developer.xero.com/documentation/api/api-overview",
     openApiUrl: "https://raw.githubusercontent.com/XeroAPI/Xero-OpenAPI/master/xero_accounting.yaml",
@@ -742,7 +742,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   docusign: {
     apiUrl: "https://api.docusign.com",
-    regex: "^(.*\\.)?docusign\\.com(/.*)?$",
+    regex: "^.*docusign.*$",
     icon: "docusign",
     docsUrl: "https://developers.docusign.com/docs/esign-rest-api",
     openApiUrl: "https://raw.githubusercontent.com/docusign/OpenAPI-Specifications/refs/heads/master/esignature.rest.swagger-v2.1.json",
@@ -756,7 +756,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   intercom: {
     apiUrl: "https://api.intercom.io",
-    regex: "^(.*\\.)?intercom\\.com(/.*)?$",
+    regex: "^.*intercom.*$",
     icon: "intercom",
     docsUrl: "https://developers.intercom.com/intercom-api-reference",
     openApiUrl: "https://raw.githubusercontent.com/intercom/Intercom-OpenAPI/refs/heads/main/descriptions/2.9/api.intercom.io.yaml",
@@ -770,7 +770,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   asana: {
     apiUrl: "https://app.asana.com/api",
-    regex: "^(.*\\.)?asana\\.com(/.*)?$",
+    regex: "^.*asana.*$",
     icon: "asana",
     docsUrl: "https://developers.asana.com/docs",
     openApiUrl: "https://raw.githubusercontent.com/Asana/openapi/master/defs/asana_oas.yaml",
@@ -784,7 +784,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   trello: {
     apiUrl: "https://api.trello.com",
-    regex: "^(.*\\.)?trello\\.com(/.*)?$",
+    regex: "^.*trello.*$",
     icon: "trello",
     docsUrl: "https://developer.atlassian.com/cloud/trello/rest",
     openApiUrl: "https://developer.atlassian.com/cloud/trello/swagger.v3.json",
@@ -793,7 +793,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   notion: {
     apiUrl: "https://api.notion.com",
-    regex: "^(.*\\.)?notion\\.so(/.*)?$",
+    regex: "^.*notion.*$",
     icon: "notion",
     docsUrl: "https://developers.notion.com",
     openApiUrl: "https://raw.githubusercontent.com/cameronking4/notion-openapi-chatgpt-action/refs/heads/main/public/notion-openapi.json",
@@ -807,7 +807,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   digitalocean: {
     apiUrl: "https://api.digitalocean.com",
-    regex: "^(.*\\.)?digitalocean\\.com(/.*)?$",
+    regex: "^.*digitalocean.*$",
     icon: "digitalocean",
     docsUrl: "https://docs.digitalocean.com/reference/api",
     openApiUrl: "https://raw.githubusercontent.com/digitalocean/openapi/refs/heads/main/specification/DigitalOcean-public.v2.yaml",
@@ -839,7 +839,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   heroku: {
     apiUrl: "https://api.heroku.com",
-    regex: "^(.*\\.)?heroku\\.com(/.*)?$",
+    regex: "^.*heroku.*$",
     icon: "heroku",
     docsUrl: "https://devcenter.heroku.com/categories/platform-api",
     preferredAuthType: "apikey",
@@ -869,7 +869,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   huggingface: {
     apiUrl: "https://huggingface.co",
-    regex: "^(.*\\.)?huggingface\\.co(/.*)?$",
+    regex: "^.*huggingface.*$",
     icon: "huggingface",
     docsUrl: "https://huggingface.co/docs/hub/en/api",
     preferredAuthType: "apikey",
@@ -877,7 +877,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   circleci: {
     apiUrl: "https://circleci.com/api",
-    regex: "^(.*\\.)?circleci\\.com(/.*)?$",
+    regex: "^.*circleci.*$",
     icon: "circleci",
     docsUrl: "https://circleci.com/docs/api",
     openApiUrl: "https://circleci.com/api/v2/openapi.json",
@@ -900,7 +900,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   travisci: {
     apiUrl: "https://api.travis-ci.com",
-    regex: "^(.*\\.)?travis-ci\\.com(/.*)?$",
+    regex: "^.*(travis|travis-ci).*$",
     icon: "travisCI",
     docsUrl: "https://docs.travis-ci.com/api",
     preferredAuthType: "apikey",
@@ -921,7 +921,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   wordpress: {
     apiUrl: "https://{your-site.com}/wp-json/wp/v2",
-    regex: "^(.*\\.)?(wordpress\\.com|wordpress\\.org)(/.*)?$",
+    regex: "^.*wordpress.*$",
     icon: "wordpress",
     docsUrl: "https://developer.wordpress.org/rest-api",
     openApiUrl: "https://developer.wordpress.com/docs/api/",
@@ -945,7 +945,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   cloudflare: {
     apiUrl: "https://api.cloudflare.com",
-    regex: "^(.*\\.)?cloudflare\\.com(/.*)?$",
+    regex: "^.*cloudflare.*$",
     icon: "cloudflare",
     docsUrl: "https://developers.cloudflare.com/api",
     openApiUrl: "https://raw.githubusercontent.com/cloudflare/api-schemas/refs/heads/main/openapi.json",
@@ -968,7 +968,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   bigcommerce: {
     apiUrl: "https://api.bigcommerce.com",
-    regex: "^(.*\\.)?bigcommerce\\.com(/.*)?$",
+    regex: "^.*bigcommerce.*$",
     icon: "bigcommerce",
     docsUrl: "https://developer.bigcommerce.com/docs/rest-management",
     preferredAuthType: "apikey",
@@ -991,7 +991,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   woocommerce: {
     apiUrl: "https://{yourstore.com}/wp-json/wc/v3",
-    regex: "^(.*\\.)?woocommerce\\.com(/.*)?$",
+    regex: "^.*woocommerce.*$",
     icon: "woocommerce",
     docsUrl: "https://woocommerce.github.io/woocommerce-rest-api-docs",
     preferredAuthType: "apikey",
@@ -1014,7 +1014,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   prestashop: {
     apiUrl: "https://{yourstore.com}/api",
-    regex: "^(.*\\.)?prestashop\\.com(/.*)?$",
+    regex: "^.*prestashop.*$",
     icon: "prestashop",
     docsUrl: "https://devdocs.prestashop-project.org/8/webservice",
     preferredAuthType: "apikey",
@@ -1037,7 +1037,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   squarespace: {
     apiUrl: "https://api.squarespace.com",
-    regex: "^(.*\\.)?squarespace\\.com(/.*)?$",
+    regex: "^.*squarespace.*$",
     icon: "squarespace",
     docsUrl: "https://developers.squarespace.com/commerce-apis",
     preferredAuthType: "oauth",
@@ -1063,7 +1063,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   monday: {
     apiUrl: "https://api.monday.com/v2",
-    regex: "^(.*\\.)?monday\\.com(/.*)?$",
+    regex: "^.*monday.*$",
     icon: "monday",
     docsUrl: "https://developer.monday.com/api-reference/docs",
     preferredAuthType: "apikey",
@@ -1076,7 +1076,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   clickup: {
     apiUrl: "https://api.clickup.com/api/v2",
-    regex: "^(.*\\.)?clickup\\.com(/.*)?$",
+    regex: "^.*clickup.*$",
     icon: "clickup",
     docsUrl: "https://clickup.com/api",
     openApiUrl: "https://developer.clickup.com/openapi/673cf4cfdca96a0019533cad",
@@ -1090,7 +1090,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   typeform: {
     apiUrl: "https://api.typeform.com",
-    regex: "^(.*\\.)?typeform\\.com(/.*)?$",
+    regex: "^.*typeform.*$",
     icon: "typeform",
     docsUrl: "https://developer.typeform.com",
     preferredAuthType: "oauth",
@@ -1250,7 +1250,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   openai: {
     apiUrl: "https://api.openai.com",
-    regex: "^(.*\\.)?openai\\.com(/.*)?$",
+    regex: "^.*openai.*$",
     icon: "openai",
     docsUrl: "https://platform.openai.com/docs/api-reference",
     openApiUrl: "https://app.stainless.com/api/spec/documented/openai/openapi.documented.yml",
@@ -1259,7 +1259,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   anthropic: {
     apiUrl: "https://api.anthropic.com",
-    regex: "^(.*\\.)?anthropic\\.com(/.*)?$",
+    regex: "^.*anthropic.*$",
     icon: "anthropic",
     docsUrl: "https://docs.anthropic.com/claude/reference",
     preferredAuthType: "apikey",
@@ -1289,7 +1289,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   microsoft: {
     apiUrl: "https://graph.microsoft.com",
-    regex: "^(.*\\.)?microsoft\\.com(/.*)?$",
+    regex: "^.*(microsoft|graph\\.microsoft|office|outlook|live\\.com).*$",
     icon: "microsoft",
     docsUrl: "https://learn.microsoft.com/en-us/graph/api/overview",
     preferredAuthType: "oauth",
@@ -1361,7 +1361,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   auth0: {
     apiUrl: "https://{your-domain}.auth0.com/api/v2",
-    regex: "^(.*\\.)?auth0\\.com(/.*)?$",
+    regex: "^.*auth0.*$",
     icon: "auth0",
     docsUrl: "https://auth0.com/docs/api/management/v2",
     openApiUrl: "https://auth0.com/docs/api/management/openapi.json",
@@ -1384,7 +1384,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   discord: {
     apiUrl: "https://discord.com/api",
-    regex: "^(.*\\.)?discord\\.com(/.*)?$",
+    regex: "^.*discord.*$",
     icon: "discord",
     docsUrl: "https://discord.com/developers/docs/intro",
     openApiUrl: "https://raw.githubusercontent.com/discord/discord-api-spec/refs/heads/main/specs/openapi.json",
@@ -1431,7 +1431,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   googleAds: {
     apiUrl: "https://googleads.googleapis.com/v20",
-    regex: "^(.*\\.)?googleapis\\.com(/.*)?$",
+    regex: "^.*(googleads|adwords|googleapis\\.com.*(ads|adwords)).*$",
     icon: "googleads",
     docsUrl: "https://developers.google.com/google-ads/api/docs/concepts/overview",
     preferredAuthType: "oauth",
@@ -1442,9 +1442,9 @@ export const integrations: Record<string, IntegrationConfig> = {
     },
     keywords: ["campaigns", "ad groups", "ads", "keywords", "GAQL", "budgets", "bidding", "conversions", "audiences", "extensions", "reports", "accounts", "billing", "targeting", "oauth"]
   },
-  google: { // catch all google api
+  google: {
     apiUrl: "https://googleapis.com",
-    regex: "^(.*\\.)?google\\.com(/.*)?$",
+    regex: "^.*google.*$",
     icon: "google",
     docsUrl: "https://developers.google.com/apis-explorer",
     preferredAuthType: "oauth",
@@ -1457,7 +1457,7 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   posthog: {
     apiUrl: "https://us.posthog.com/api",
-    regex: "^(.*\\.)?posthog\\.com(/.*)?$",
+    regex: "^.*posthog.*$",
     icon: "posthog",
     docsUrl: "https://posthog.com/docs/api",
     preferredAuthType: "apikey",
