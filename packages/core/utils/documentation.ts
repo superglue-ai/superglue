@@ -288,7 +288,8 @@ export class Documentation {
     }
     const MIN_SEARCH_TERM_LENGTH = server_defaults.DOCUMENTATION_MIN_SEARCH_TERM_LENGTH;
 
-    const searchTerms = searchQuery?.toLowerCase()?.split(/[^a-z0-9]/)
+    // Split on whitespace but preserve underscores, hyphens, and other meaningful chars
+    const searchTerms = searchQuery?.toLowerCase()?.split(/\s+/)
       .map(term => term.trim())
       .filter(term => term.length >= MIN_SEARCH_TERM_LENGTH) || [];
 
