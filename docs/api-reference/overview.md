@@ -5,11 +5,18 @@ description: 'Overview of the superglue GraphQL API'
 
 The Core API provides GraphQL endpoints for managing API configurations, data extraction, transformations, and workflows. Main concepts:
 
-* **API Calls**: Execute and transform API requests
-* **Extractions**: Process and parse files/responses
-* **Transformations**: Convert data between formats
-* **Workflows**: Chain multiple steps into a single execution
+* **Workflows**: Chain multiple steps into a single execution (recommended)
 * **Integrations**: Manage integrations (e.g. Stripe, Hubspot) and their credentials
+
+## Deprecated Operations
+
+**⚠️ The following operations are deprecated:**
+* **API Calls**: Individual `call` operations - use `executeWorkflow` instead
+* **Extractions**: Individual `extract` operations - use `executeWorkflow` instead  
+* **Transformations**: Individual `transform` operations - use `executeWorkflow` instead
+* **Legacy Config Management**: `upsertApi`, `upsertExtract`, `upsertTransform` - use workflow-based operations instead
+
+These deprecated operations are still available but moved to the bottom of the documentation. Use workflows for better performance, reliability, and capabilities.
 
 ## Endpoint
 
@@ -177,7 +184,7 @@ CREATE, UPDATE, UPSERT
 
 ## Common Parameters
 
-All execution operations (`call`, `extract`, `transform`, `executeWorkflow`) accept a `RequestOptions` object.
+All execution operations (`executeWorkflow`) accept a `RequestOptions` object.
 
 ### Default Query Parameters
 
