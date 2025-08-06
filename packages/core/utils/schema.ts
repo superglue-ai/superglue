@@ -13,7 +13,7 @@ export async function generateSchema(instruction: string, responseData: string, 
     },
     {
       role: "user",
-      content: `Instruction: ${instruction}\n\nResponse Data: ${responseData}`
+      content: `Instruction: ${instruction}${responseData ? `\n\nResponse Data: ${responseData}` : ""}`
     }
   ];
   const MAX_RETRIES = 3;

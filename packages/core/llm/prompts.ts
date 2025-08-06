@@ -245,8 +245,8 @@ THE FUNCTION MUST BE VALID JAVASCRIPT that can be executed with eval().
 `;
 
 
-export const GENERATE_SCHEMA_PROMPT = `You are a json schema generator assistant. Generate a JSON schema based on instructions and response data.
-If the response data is an array, make the schema an array of objects and name the array object "results".
+export const GENERATE_SCHEMA_PROMPT = `You are a json schema generator assistant. Generate a JSON schema based on instructions.
+If the response data is an array, make the schema an array of objects and name the array object "results". If no response data is provided, still generate a schema based on the instruction..
 
 Make the schema as simple as possible. No need to include every possible field, just the ones relevant to the query.
 
@@ -279,9 +279,7 @@ Schema:
   }
 }
 
-Make this fast and do not think too hard, this is just an approximation.
-Important: Your model output must be just the valid JSON, nothing else.
-`;
+Make this fast and do not think too hard, this is just an approximation.`;
 
 export const BUILD_WORKFLOW_SYSTEM_PROMPT = `You are an expert AI assistant responsible for building executable workflows from user instructions.
 Your goal is to analyze the user's request, break it down into logical steps, and create a complete executable workflow with fully populated API configurations.
@@ -538,12 +536,7 @@ CRM platform for managing contacts, deals, and companies. Endpoints: GET /crm/v3
     }
   ]
 }
-</EXAMPLE_OUTPUT>
-
-<OUTPUT_FORMAT>
-Important: Your model output must be just the valid JSON without line breaks and tabs, nothing else. The JSON object must strictly adhere to the provided schema.
-</OUTPUT_FORMAT>
-`;
+</EXAMPLE_OUTPUT>`;
 
 export const SELF_HEALING_API_AGENT_PROMPT = `You are an API configuration and execution agent. Your task is to successfully execute an API call by generating and refining API configurations based on the provided context and any errors encountered. Generate tool calls and their arguments only, do not include any other text unless explictly instructed to.
 
