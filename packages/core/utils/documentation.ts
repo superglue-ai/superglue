@@ -2,6 +2,7 @@ import playwright from '@playwright/test';
 import { ApiConfig } from "@superglue/client";
 import { Metadata } from "@superglue/shared";
 import axios from "axios";
+import Fuse from 'fuse.js';
 import { getIntrospectionQuery } from "graphql";
 import * as yaml from 'js-yaml';
 import { NodeHtmlMarkdown } from "node-html-markdown";
@@ -31,7 +32,7 @@ export interface DocumentationConfig {
 }
 
 export class Documentation {
-  private static MAX_LENGTH = Math.min(LanguageModel.contextLength - server_defaults.DOCUMENTATION.MAX_LENGTH_OFFSET, server_defaults.DOCUMENTATION.MAX_LENGTH_ABSOLUTE);
+  public static MAX_LENGTH = Math.min(LanguageModel.contextLength - server_defaults.DOCUMENTATION.MAX_LENGTH_OFFSET, server_defaults.DOCUMENTATION.MAX_LENGTH_ABSOLUTE);
 
   // Configuration stored per instance
   public config: DocumentationConfig;
@@ -266,52 +267,55 @@ export class Documentation {
     }
     const MIN_SEARCH_TERM_LENGTH = server_defaults.DOCUMENTATION_MIN_SEARCH_TERM_LENGTH;
 
-    // Extract search terms from query
     const searchTerms = searchQuery?.toLowerCase()?.split(/[^a-z0-9]/)
       .map(term => term.trim())
       .filter(term => term.length >= MIN_SEARCH_TERM_LENGTH) || [];
 
-    // Add common auth-related terms for API context (only for broad searches)
     if (maxSections >= 10) {
       searchTerms.push('pagination', 'authorization', 'authentication');
     }
 
-    const sections: { content: string; score: number; index: number; }[] = [];
-
+    const sections: { content: string; contentLower: string; index: number; }[] = [];
     for (let i = 0; i < documentation.length; i += sectionSize) {
-      const section = documentation.slice(i, i + sectionSize);
-      const sectionLower = section.toLowerCase();
-
-      // Score section based on search term matches
-      let score = 0;
-      for (const term of searchTerms) {
-        const matches = (sectionLower.match(new RegExp(term, 'g')) || []).length;
-        score += matches;
-      }
-
+      const content = documentation.slice(i, i + sectionSize);
       sections.push({
-        content: section,
-        score,
+        content,
+        contentLower: content.toLowerCase(),
         index: i
       });
     }
 
-    // Sort by score (highest first) and take top sections
-    const topSections = sections
+    const fuse = new Fuse(sections, {
+      keys: ['contentLower'],
+      includeScore: true,
+      threshold: 0.5,
+      ignoreLocation: true,
+      minMatchCharLength: 3
+    });
+
+    const scoredSections = sections.map(section => {
+      let totalScore = 0;
+      for (const term of searchTerms) {
+        const results = fuse.search(term);
+        const match = results.find(r => r.item.index === section.index);
+        if (match) {
+          totalScore += (1 - (match.score || 0));
+        }
+      }
+      return { ...section, score: totalScore };
+    });
+
+    const topSections = scoredSections
       .sort((a, b) => b.score - a.score)
       .slice(0, maxSections);
 
-    // If no sections have matches, return first section
     if (topSections.every(section => section.score === 0)) {
       return documentation.slice(0, Documentation.MAX_LENGTH);
     }
 
-    // Sort selected sections by their original position to maintain document order
     topSections.sort((a, b) => a.index - b.index);
-
     const result = topSections.map(section => section.content).join('\n\n');
 
-    // Final trim if needed
     return result.length > Documentation.MAX_LENGTH
       ? result.slice(0, Documentation.MAX_LENGTH)
       : result;
@@ -403,15 +407,14 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
   private static browserInstance: playwright.Browser | null = null;
 
   private static readonly NEGATIVE_KEYWORDS = [
-    'signup', 'login', 'pricing', 'contact', 'support', 'cookie', 'webhook', 'webhooks',
+    'signup', 'login', 'pricing', 'contact', 'support', 'cookie', 'webhooks',
     'privacy', 'terms', 'legal', 'policy', 'status', 'help', 'blog',
-    'careers', 'about', 'press', 'news', 'events', 'partners', 'changelog',
-    'changelogs', 'release notes', 'releases', 'updates', 'upgrade', 'upgrade notes',
+    'careers', 'about', 'press', 'news', 'events', 'partners',
+    'changelogs', 'release notes', 'updates', 'upgrade',
   ];
 
   private static async getBrowser(): Promise<playwright.Browser> {
     if (!PlaywrightFetchingStrategy.browserInstance) {
-      // Consider adding metadata if logging launch errors becomes necessary
       PlaywrightFetchingStrategy.browserInstance = await playwright.chromium.launch();
     }
     return PlaywrightFetchingStrategy.browserInstance;
@@ -421,7 +424,6 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     if (PlaywrightFetchingStrategy.browserInstance) {
       const closedInstance = PlaywrightFetchingStrategy.browserInstance;
       PlaywrightFetchingStrategy.browserInstance = null;
-      // Consider adding metadata if logging close errors becomes necessary
       await closedInstance.close();
     }
   }
@@ -450,10 +452,8 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
 
       page = await browserContext.newPage();
       await page.goto(url.toString(), { timeout: server_defaults.TIMEOUTS.PLAYWRIGHT });
-      // Wait for network idle might be better for SPAs, but has risks of timeout
-      // Let's stick with domcontentloaded + short timeout
       await page.waitForLoadState('domcontentloaded', { timeout: server_defaults.TIMEOUTS.PLAYWRIGHT });
-      await page.waitForTimeout(1000); // Allow JS execution
+      await page.waitForTimeout(1000);
 
       const links: Record<string, string> = await page.evaluate(() => {
         const links = {};
@@ -716,11 +716,9 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     const sitemapQueue: string[] = [];
 
     // Parse the documentation URL to get the base path for filtering
-    let docUrlBase: string;
+    let docUrl: URL;
     try {
-      const docUrl = new URL(config.documentationUrl);
-      // Remove trailing slash for consistent comparison
-      docUrlBase = docUrl.href.replace(/\/$/, '');
+      docUrl = new URL(config.documentationUrl);
     } catch {
       logMessage('warn', `Invalid documentation URL: ${config.documentationUrl}`, metadata);
       return [];
@@ -742,6 +740,8 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     const MAX_SITEMAP_DEPTH = server_defaults.DOCUMENTATION.MAX_SITEMAP_DEPTH;
     let depth = 0;
 
+    // First, collect all URLs from sitemaps
+    const allSitemapUrls: string[] = [];
     while (sitemapQueue.length > 0 && depth < MAX_SITEMAP_DEPTH) {
       const currentBatch = [...sitemapQueue];
       sitemapQueue.length = 0;
@@ -761,37 +761,74 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
           logMessage('debug', `Found ${urls.length} total URLs in sitemap. First few: ${urls.slice(0, 3).join(', ')}`, metadata);
         }
 
-        // Filter URLs to only include those under the documentation URL path
-        const filteredUrls = urls.filter(url => {
-          try {
-            const urlWithoutTrailingSlash = url.replace(/\/$/, '');
-            const docUrlBaseWithoutTrailing = docUrlBase.replace(/\/$/, '');
-
-            // Check if the URL starts with the documentation URL (is nested under it)
-            // Also handle cases where the URL might have different protocols or www
-            const urlObj = new URL(urlWithoutTrailingSlash);
-            const docUrlObj = new URL(docUrlBaseWithoutTrailing);
-
-            // Check if it's the same host and the path starts with the doc path
-            return urlObj.hostname === docUrlObj.hostname &&
-              urlObj.pathname.startsWith(docUrlObj.pathname);
-          } catch {
-            return false;
-          }
-        });
-
-        if (urls.length > 0 && filteredUrls.length === 0) {
-          logMessage('debug', `Filtered out all ${urls.length} URLs. docUrlBase: ${docUrlBase}`, metadata);
-        }
-
-        allUrls.push(...filteredUrls);
+        allSitemapUrls.push(...urls);
         sitemapQueue.push(...sitemaps.filter(s => !processedSitemaps.has(s)));
       }
     }
 
-    const uniqueUrls = [...new Set(allUrls)];
-    logMessage('info', `Collected ${uniqueUrls.length} URLs under ${docUrlBase} from sitemap(s)`, metadata);
-    return uniqueUrls;
+    // Now apply progressive filtering
+    const uniqueSitemapUrls = [...new Set(allSitemapUrls)];
+
+    // Build a list of filter paths from most specific to least specific
+    const filterPaths: string[] = [];
+    const pathParts = docUrl.pathname.split('/').filter(p => p);
+
+    // Start with the full path
+    filterPaths.push(docUrl.pathname);
+
+    // Add progressively shorter paths
+    for (let i = pathParts.length - 1; i >= 0; i--) {
+      const parentPath = '/' + pathParts.slice(0, i).join('/');
+      if (parentPath !== '/' && !filterPaths.includes(parentPath)) {
+        filterPaths.push(parentPath);
+      }
+    }
+
+    // Finally add root
+    filterPaths.push('/');
+
+    // Try each filter path until we have enough URLs
+    for (const filterPath of filterPaths) {
+      const filteredUrls = uniqueSitemapUrls.filter(url => {
+        try {
+          const urlObj = new URL(url);
+
+          // Check if it's the same host
+          if (urlObj.hostname !== docUrl.hostname) {
+            return false;
+          }
+
+          // Check if the URL path starts with the filter path
+          const normalizedFilterPath = filterPath.replace(/\/$/, '');
+          const normalizedUrlPath = urlObj.pathname.replace(/\/$/, '');
+
+          // Special case for root path
+          if (normalizedFilterPath === '') {
+            return true; // All URLs from the same domain
+          }
+
+          return normalizedUrlPath.startsWith(normalizedFilterPath);
+        } catch {
+          return false;
+        }
+      });
+
+      if (filteredUrls.length > 0) {
+        logMessage('info', `Collected ${filteredUrls.length} URLs under ${docUrl.origin}${filterPath} from sitemap(s)`, metadata);
+
+        // If we have enough URLs or this is the last filter, use these URLs
+        if (filteredUrls.length >= PlaywrightFetchingStrategy.MAX_FETCHED_LINKS || filterPath === '/') {
+          return filteredUrls;
+        }
+
+        // If we don't have enough URLs yet, continue to the next (broader) filter
+        logMessage('debug', `Only found ${filteredUrls.length} URLs under ${filterPath}, trying broader filter...`, metadata);
+      }
+    }
+
+    // If we get here, no URLs were found at all
+    logMessage('info', `No matching URLs found in sitemap(s) for ${config.documentationUrl}`, metadata);
+    return [];
   }
 
   private async fetchPagesInParallel(
@@ -825,36 +862,37 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     if (!config?.documentationUrl) return null;
 
     try {
-      const sitemapPromise = (async () => {
-        const sitemapUrls = await this.collectSitemapUrls(config, metadata);
-
-        if (sitemapUrls.length > 0) {
-          logMessage('info', `Found ${sitemapUrls.length} URLs from sitemap(s)`, metadata);
-
-          const keywords = this.getMergedKeywords(config.keywords);
-          const rankedUrls = this.rankUrls(sitemapUrls, keywords);
-
-          const topUrls = rankedUrls.slice(0, PlaywrightFetchingStrategy.MAX_FETCHED_LINKS);
-          const content = await this.fetchPagesInParallel(topUrls, config, metadata);
-
-          if (content) {
-            return content;
-          }
-        }
-        return null;
-      })();
-
-      const timeoutPromise = new Promise<null>((resolve) => {
-        setTimeout(() => {
-          logMessage('warn', 'Sitemap processing timed out, falling back to legacy crawling', metadata);
-          resolve(null);
+      // Apply timeout only to sitemap URL collection
+      const sitemapUrlsPromise = this.collectSitemapUrls(config, metadata);
+      let timeoutHandle: NodeJS.Timeout;
+      const timeoutPromise = new Promise<string[]>((resolve) => {
+        timeoutHandle = setTimeout(() => {
+          logMessage('warn', 'Sitemap URL collection timed out, falling back to legacy crawling', metadata);
+          resolve([]);
         }, server_defaults.TIMEOUTS.SITEMAP_PROCESSING_TOTAL);
       });
 
-      const result = await Promise.race([sitemapPromise, timeoutPromise]);
+      const sitemapUrls = await Promise.race([sitemapUrlsPromise, timeoutPromise]);
 
-      if (result) {
-        return result;
+      // Clear the timeout if sitemap collection succeeded
+      if (timeoutHandle!) {
+        clearTimeout(timeoutHandle);
+      }
+
+      if (sitemapUrls.length > 0) {
+        logMessage('info', `Found ${sitemapUrls.length} URLs from sitemap(s)`, metadata);
+
+        const keywords = this.getMergedKeywords(config.keywords);
+        const rankedUrls = this.rankUrls(sitemapUrls, keywords);
+
+        const topUrls = rankedUrls.slice(0, PlaywrightFetchingStrategy.MAX_FETCHED_LINKS);
+
+        // Content fetching happens without the sitemap timeout
+        const content = await this.fetchPagesInParallel(topUrls, config, metadata);
+
+        if (content) {
+          return content;
+        }
       }
     } catch (error) {
       logMessage('warn', `Sitemap processing failed: ${error?.message}, falling back to legacy crawling`, metadata);
@@ -866,9 +904,8 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
   private getDefaultKeywords(): string[] {
     return [
       "authentication", "authorization", "bearer", "token",
-      "getting started", "quickstart", "guides", "tutorial", "how to", "api", "api-reference",
-      "objects", "data-objects", "properties", "values", "fields", "attributes", "parameters", "schema",
-      "rest", "openapi", "open-api", "swagger", "endpoints", "reference", "query", "methods",
+      "getting started", "quickstart", "guides", "tutorial", "api", "api-reference", "open api",
+      "objects", "data-objects", "properties", "values", "fields", "attributes", "parameters", "slugs", "schema", "lists", "query", "rest", "endpoints", "reference", "methods",
       "pagination", "response", "errors", "filtering", "sorting", "searching", "filter", "sort", "search",
       "get", "post", "put", "delete", "patch",
     ];
@@ -886,24 +923,53 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     return Array.from(mergedSet);
   }
 
+  private createFuseInstance<T>(items: T[], keys: string[], options?: any): Fuse<T> {
+    const defaultOptions = {
+      includeScore: true,
+      threshold: 0.4,
+      location: 0,
+      distance: 100,
+      minMatchCharLength: 3,
+      shouldSort: true,
+      ignoreLocation: false,
+      useExtendedSearch: false,
+      ...options
+    };
+    return new Fuse(items, defaultOptions);
+  }
+
   private rankUrls(urls: string[], keywords: string[]): string[] {
     const scored = urls.map(url => {
       const urlLower = url.toLowerCase();
-      let score = 0;
+      let positiveScore = 0;
+      let negativeScore = 0;
 
       for (const keyword of keywords) {
-        if (urlLower.includes(keyword.toLowerCase())) {
-          score++;
+        const keywordLower = keyword.toLowerCase();
+        if (urlLower.includes(keywordLower)) {
+          const lengthPenalty = 50 / Math.max(url.length, 50);
+          positiveScore += lengthPenalty;
+        } else {
+          // Fuzzy match with single-item Fuse
+          const fuse = this.createFuseInstance([{ url, urlLower }], ['urlLower'], {
+            threshold: 0.4,
+            ignoreLocation: true
+          });
+          const results = fuse.search(keywordLower);
+          if (results.length > 0) {
+            const lengthPenalty = 50 / Math.max(url.length, 50);
+            positiveScore += (1 - (results[0].score || 0)) * lengthPenalty * 0.5;
+          }
         }
       }
 
       for (const negKeyword of PlaywrightFetchingStrategy.NEGATIVE_KEYWORDS) {
         if (urlLower.includes(negKeyword)) {
-          score -= 2;
+          negativeScore += 2;
         }
       }
 
-      return { url, score };
+      return { url, score: positiveScore - negativeScore };
     });
 
     return scored
@@ -973,31 +1039,42 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
   }
 
   private rankLinks(links: { linkText: string, href: string; }[], keywords: string[], fetchedLinks: Set<string>): { linkText: string, href: string, matchCount: number; }[] {
-    const rankedLinks: { linkText: string, href: string, matchCount: number; }[] = [];
+    const unfetchedLinks = links.filter(link => !fetchedLinks.has(link.href));
 
-    for (const link of links) {
-      if (fetchedLinks.has(link.href)) continue;
-
-      let matchCount = 0;
-      const linkTextLower = link.linkText.toLowerCase();
-      const hrefLower = link.href.toLowerCase();
+    const scored = unfetchedLinks.map(link => {
+      const combined = `${link.linkText} ${link.href}`.toLowerCase();
+      let positiveScore = 0;
+      let negativeScore = 0;
 
       for (const keyword of keywords) {
-        if (linkTextLower.includes(keyword) || hrefLower.includes(keyword)) {
-          matchCount++;
+        const keywordLower = keyword.toLowerCase();
+        if (combined.includes(keywordLower)) {
+          const lengthPenalty = 80 / Math.max(link.href.length + link.linkText.length, 80);
+          positiveScore += lengthPenalty;
+        } else {
+          // Fuzzy match
+          const fuse = this.createFuseInstance([{ combined }], ['combined'], {
+            threshold: 0.4,
+            ignoreLocation: true
+          });
+          const results = fuse.search(keywordLower);
+          if (results.length > 0) {
+            const lengthPenalty = 80 / Math.max(link.href.length + link.linkText.length, 80);
+            positiveScore += (1 - (results[0].score || 0)) * lengthPenalty * 0.5;
+          }
         }
       }
 
       for (const negKeyword of PlaywrightFetchingStrategy.NEGATIVE_KEYWORDS) {
-        if (linkTextLower.includes(negKeyword) || hrefLower.includes(negKeyword)) {
-          matchCount -= 2;
+        if (combined.includes(negKeyword)) {
+          negativeScore += 2;
         }
       }
 
-      rankedLinks.push({ linkText: link.linkText, href: link.href, matchCount });
-    }
+      return { ...link, matchCount: positiveScore - negativeScore };
+    });
 
-    return rankedLinks.sort((a, b) => b.matchCount - a.matchCount);
+    return scored.sort((a, b) => b.matchCount - a.matchCount);
   }
 }
 

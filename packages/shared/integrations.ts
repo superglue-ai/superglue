@@ -866,7 +866,14 @@ export const integrations: Record<string, IntegrationConfig> = {
       "pipelines",
       "api key"
     ]
-
+  },
+  huggingface: {
+    apiUrl: "https://huggingface.co",
+    regex: "^(.*\\.)?huggingface\\.co(/.*)?$",
+    icon: "huggingface",
+    docsUrl: "https://huggingface.co/docs/hub/en/api",
+    preferredAuthType: "apikey",
+    keywords: ["models", "datasets", "spaces", "parameters", "inference", "fine-tuning", "files", "spaces", "accounts", "groups", "api key"]
   },
   circleci: {
     apiUrl: "https://circleci.com/api",
