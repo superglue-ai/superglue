@@ -12,15 +12,31 @@ description: "Secure approaches to managing API credentials with Superglue"
 
 <CardGroup cols={2}>
   <Card title="Store credentials in integration" icon="key">
-    **Best for:** Single-user environments / one integration per user setups **How it
-    works:** - Store credentials securely in Superglue's encrypted vault -
-    Credentials are automatically used for integrations - No need to pass
-    credentials with each API call - Oauth integrations are automatically managed
+    **Best for:** Single-user environments / one integration per user setups / MCP setups
+
+    **How it works:** 
+
+    - - Store credentials securely in Superglue's encrypted vault 
+
+    - Credentials are automatically used for integrations 
+
+    - No need to pass credentials with each API call
+
+    - superglue manages oauth
   </Card>
   <Card title="Provide credentials at runtime" icon="key">
-    **Best for:** Complex multi-user scenarios **How it works:** - Keep credentials in your own secure storage  
-    (environment variables, vault, etc.) - Pass credentials at runtime with each
-    workflow execution - Superglue never stores your credentials
+    **Best for:** Complex multi-user scenarios and SDK setups.
+
+    **How it works:** 
+
+    - Keep credentials in your own secure storage\
+    (environment variables, vault, etc.) 
+
+    - Pass credentials at runtime with each workflow execution
+
+    - Superglue never stores your credentials
+
+    - Supports 1:n integration:user scenarios.
   </Card>
 </CardGroup>
 
@@ -39,10 +55,7 @@ description: "Secure approaches to managing API credentials with Superglue"
   <Step title="Enter Credentials">
     Provide your API keys, OAuth tokens, or database connection strings
   </Step>
-  <Step title="Test Connection">
-    Superglue automatically tests the credentials to ensure they work
-  </Step>
-  <Step title="Save Securely">
+  <Step title="Save Securely" stepNumber={3}>
     Credentials are encrypted and stored securely in Superglue's vault
   </Step>
 </Steps>
@@ -62,8 +75,7 @@ await superglue.upsertIntegration({
   name: "Stripe Production",
   urlHost: "https://api.stripe.com",
   credentials: {
-    stripe_secret_key: "sk_live_...", // This gets encrypted and stored
-    publishable_key: "pk_live_...",
+    stripe_secret_key: "sk_live_..." // This gets encrypted and stored
   },
   specificInstructions: "Use live Stripe API with rate limiting",
 });
@@ -191,17 +203,19 @@ class SecureWorkflowExecutor {
 ### OAuth Token Management
 
 <Info>
-**Superglue handles OAuth automatically!** Token refresh, expiration management, and OAuth flows are all managed by Superglue. You just need to provide the initial OAuth credentials.
+  **Superglue handles OAuth automatically\!** Token refresh, expiration management, and OAuth flows are all managed by Superglue. You just need to provide the initial OAuth credentials.
 </Info>
 
 **What Superglue handles for you:**
+
 - ✅ Token refresh when expired
-- ✅ OAuth flow management  
+- ✅ OAuth flow management
 - ✅ Scope validation
 - ✅ Rate limiting with OAuth APIs
 - ✅ Error handling for token issues
 
 **What you need to provide:**
+
 - Client ID and Client Secret
 - Scopes (if custom)
 - Authorization URL (if not using templates)
@@ -230,7 +244,7 @@ const result = await superglue.executeWorkflow({ workflow });
 ```
 
 <Note>
-We have pre-built OAuth templates for popular APIs like HubSpot, Google Ads, Salesforce, and more. You can create a new integration and check the templates to see what is available. If an integration is not available, you can always create it manually and add auth url and scopes. Talk to us if you need help with this.
+  We have pre-built OAuth templates for popular APIs like HubSpot, Google Ads, Salesforce, and more. You can create a new integration and check the templates to see what is available. If an integration is not available, you can always create it manually and add auth url and scopes. Talk to us if you need help with this.
 </Note>
 
 ## Integration-Specific Credential Patterns
@@ -293,7 +307,6 @@ const result = await superglue.executeWorkflow({
   },
 });
 ```
-
 
 ## Choosing the Right Approach
 
