@@ -7,7 +7,7 @@ import { BUILD_WORKFLOW_SYSTEM_PROMPT } from "../llm/prompts.js";
 import { executeTool } from "../tools/tools.js";
 import { Documentation } from "../utils/documentation.js";
 import { logMessage } from "../utils/logs.js";
-import { composeUrl } from "../utils/tools.js";
+import { composeUrl, sample } from "../utils/tools.js";
 
 type ChatMessage = OpenAI.Chat.ChatCompletionMessageParam;
 
@@ -86,17 +86,17 @@ export class WorkflowBuilder {
 
       return baseInfo + `
   <documentation>
-    <authentication>
-    ${authSection || 'No authentication information found.'}
-    </authentication>
+${authSection ? `<authentication>
+${authSection}
+</authentication>` : ''}
     
-    <pagination>
+    ${paginationSection && paginationSection != authSection ? `<pagination>
     IMPORTANT: If the documentation does not mention pagination or the pagination section below is incomplete or unclear, DO NOT configure pagination.
-    ${paginationSection || 'No pagination information found.'}
-    </pagination>
+    ${paginationSection}
+    </pagination>` : ''}
     
     <context_relevant_to_user_instruction>
-    ${generalSection || 'No general documentation found.'}
+    ${generalSection && generalSection != authSection && generalSection != paginationSection ? generalSection : 'No general documentation found.'}
     </context_relevant_to_user_instruction>
   </documentation>
 </${int.id}>`;
@@ -108,12 +108,15 @@ export class WorkflowBuilder {
       return 'No initial payload provided';
     }
 
-    const payloadText = JSON.stringify(this.initialPayload);
-    const truncatedPayload = payloadText.length > maxLength ?
-      payloadText.slice(0, maxLength) + '...[truncated]' :
-      payloadText;
+    let payloadText = JSON.stringify(this.initialPayload);
+    if(payloadText.length > maxLength) {
+      payloadText = JSON.stringify(sample(this.initialPayload, 5), null, 2);
+    }
+    if(payloadText.length > maxLength) {
+      payloadText = payloadText.slice(0, maxLength) + '...[truncated]';
+    }
 
-    return `Initial Input Payload contains keys: ${Object.keys(this.initialPayload).join(", ")}\nPayload example: ${truncatedPayload}`;
+    return `Initial Input Payload contains keys: ${Object.keys(this.initialPayload).join(", ")}\nPayload example: ${payloadText}`;
   }
 
   private prepareBuildingContext(): ChatMessage[] {
@@ -184,11 +187,11 @@ Your finalTransform function MUST transform the collected data from all steps to
         throw new Error(result.error);
       }
 
-      if (!result.result?.fullResult?.workflow) {
+      if (!result.data || !(result.data?.id)) {
         throw new Error('No workflow generated');
       }
 
-      builtWorkflow = result.result.fullResult.workflow;
+      builtWorkflow = result.data;
 
       builtWorkflow.instruction = this.instruction;
       builtWorkflow.responseSchema = this.responseSchema;
