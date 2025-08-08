@@ -19,22 +19,22 @@ describe('Logging Module', () => {
   describe('logMessage', () => {
     it('logs messages with correct level', () => {
       logMessage('info', 'test info message', { orgId: 'test' })
-      expect(logger.info).toHaveBeenCalledWith('test info message', { orgId: 'test' })
+      expect(logger.info).toHaveBeenCalledWith({ orgId: 'test' }, 'test info message')
 
       logMessage('error', 'test error message', { orgId: 'test' })
-      expect(logger.error).toHaveBeenCalledWith('test error message', { orgId: 'test' })
+      expect(logger.error).toHaveBeenCalledWith({ orgId: 'test' }, 'test error message')
 
       logMessage('warn', 'test warn message', { orgId: 'test' })
-      expect(logger.warn).toHaveBeenCalledWith('test warn message', { orgId: 'test' })
+      expect(logger.warn).toHaveBeenCalledWith({ orgId: 'test' }, 'test warn message')
 
       logMessage('debug', 'test debug message', { orgId: 'test' })
-      expect(logger.debug).toHaveBeenCalledWith('test debug message', { orgId: 'test' })
+      expect(logger.debug).toHaveBeenCalledWith({ orgId: 'test' }, 'test debug message')
     })
 
     it('includes metadata in log message', () => {
       const metadata = { orgId: 'test-org', userId: '123' }
       logMessage('info', 'test message', metadata)
-      expect(logger.info).toHaveBeenCalledWith('test message', metadata)
+      expect(logger.info).toHaveBeenCalledWith(metadata, 'test message')
     })
   })
 
@@ -85,7 +85,7 @@ describe('Logging Module', () => {
 
       levelTests.forEach(test => {
         logMessage(test.level as any, test.message, { orgId: 'test' })
-        expect(logger[test.level]).toHaveBeenCalledWith(test.message, { orgId: 'test' })
+        expect(logger[test.level]).toHaveBeenCalledWith({ orgId: 'test' }, test.message)
       })
     })
   })
