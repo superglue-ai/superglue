@@ -43,7 +43,7 @@ export function LogSidebar() {
   const [logViewWidth, setLogViewWidth] = useState(LOG_MIN_WIDTH)
   const resizingWidthRef = useRef(logViewWidth)
   const logViewRef = useRef<HTMLDivElement | null>(null)
-  const [showDebug, setShowDebug] = useState(true)
+  const [showDebug, setShowDebug] = useState(false)
   const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set())
   const config = useConfig();
 
