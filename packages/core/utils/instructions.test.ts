@@ -59,8 +59,8 @@ describe('generateInstructionsImplementation', () => {
     generateObject.mockResolvedValueOnce({ response: expectedInstructions, messages: [] })
 
     const result = await generateInstructionsImplementation({ integrations }, { orgId: 'test-org', runId: 'test-run', integrations })
-    expect(result.fullResult.success).toBe(true)
-    expect(result.fullResult.instructions).toEqual(expectedInstructions)
+    expect(result.success).toBe(true)
+    expect(result.data).toEqual(expectedInstructions)
     expect(LanguageModel.generateObject).toHaveBeenCalledTimes(1)
   })
 
@@ -69,8 +69,8 @@ describe('generateInstructionsImplementation', () => {
     generateObject.mockResolvedValueOnce({ response: [], messages: [] })
 
     const result = await generateInstructionsImplementation({ integrations }, { orgId: 'test-org', runId: 'test-run', integrations })
-    expect(result.fullResult.success).toBe(true)
-    expect(result.fullResult.instructions).toEqual([])
+    expect(result.success).toBe(true)
+    expect(result.data).toEqual([])
   })
 
   it('should handle malformed response', async () => {
@@ -78,8 +78,8 @@ describe('generateInstructionsImplementation', () => {
     generateObject.mockResolvedValueOnce({ response: "not an array", messages: [] })
 
     const result = await generateInstructionsImplementation({ integrations }, { orgId: 'test-org', runId: 'test-run', integrations })
-    expect(result.fullResult.success).toBe(true)
-    expect(result.fullResult.instructions).toEqual(["not an array"])
+    expect(result.success).toBe(true)
+    expect(result.data).toEqual(["not an array"])
   })
 
   it('should use correct temperature', async () => {

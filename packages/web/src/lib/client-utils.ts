@@ -1,5 +1,4 @@
 import { Integration } from "@superglue/client";
-import { cleanUrl } from "./utils";
 
 export const inputErrorStyles = "!border-destructive !border-[1px] focus:!ring-0 focus:!ring-offset-0"
 
@@ -72,14 +71,24 @@ export const splitUrl = (url: string) => {
       urlPath: ''
     }
   }
-  const urlObj = cleanUrl(url);
-  if (!urlObj) return { urlHost: '', urlPath: '' };
-
-  const auth = urlObj.username && urlObj.password ? `${urlObj.username}:${urlObj.password}@` : '';
   
+  // Find the position after the protocol (://)
+  const protocolEnd = url.indexOf('://');  
+  // Find the first slash after the protocol
+  const firstSlashAfterProtocol = url.indexOf('/', protocolEnd + 3);
+  
+  if (firstSlashAfterProtocol === -1) {
+    // No path, entire URL is the host
+    return {
+      urlHost: url,
+      urlPath: ''
+    }
+  }
+  
+  // Split at the first slash after protocol
   return {
-    urlHost: urlObj.protocol + '//' + auth + urlObj.host,
-    urlPath: urlObj.pathname === '/' ? '' : urlObj.pathname
+    urlHost: url.substring(0, firstSlashAfterProtocol),
+    urlPath: url.substring(firstSlashAfterProtocol)
   }
 }
 

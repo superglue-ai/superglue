@@ -2,10 +2,9 @@
 
 import { Badge } from '@/src/components/ui/badge';
 import { Input } from '@/src/components/ui/input';
-import { Popover, PopoverContent, PopoverTrigger } from '@/src/components/ui/popover';
-import { inputErrorStyles, splitUrl } from '@/src/lib/client-utils';
+import { splitUrl } from '@/src/lib/client-utils';
+import { cn } from '@/src/lib/utils';
 import { integrations } from '@superglue/shared';
-import { cleanUrl, cn } from '@/src/lib/utils';
 import { Link } from 'lucide-react';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { SimpleIcon } from 'simple-icons';

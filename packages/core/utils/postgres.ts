@@ -29,7 +29,7 @@ export async function callPostgres(endpoint: ApiConfig, payload: Record<string, 
   const requestVars = { ...payload, ...credentials };
   let connectionString = await replaceVariables(composeUrl(endpoint.urlHost, endpoint.urlPath), requestVars);
   connectionString = sanitizeDatabaseName(connectionString);
-  const query = await replaceVariables(JSON.parse(endpoint.body).query, requestVars);
+  const query = JSON.parse(await replaceVariables(endpoint.body, requestVars)).query;
 
   const poolConfig: PoolConfig = {
     connectionString,
@@ -57,7 +57,7 @@ export async function callPostgres(endpoint: ApiConfig, payload: Record<string, 
       if (attempts > maxRetries) {
         await pool.end();
         if (error instanceof Error) {
-          throw new Error(`PostgreSQL error after ${attempts} attempts: ${error.message}`);
+          throw new Error(`PostgreSQL error: ${error.message} for query: ${query}`);
         }
         throw new Error('Unknown PostgreSQL error occurred');
       }

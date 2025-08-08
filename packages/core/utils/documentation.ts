@@ -1167,7 +1167,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
 
 class PostgreSqlStrategy implements ProcessingStrategy {
   async tryProcess(content: string, config: ApiConfig, metadata: Metadata, credentials?: Record<string, any>): Promise<string | null> {
-    if (config.urlHost?.startsWith("postgres://")) {
+    if (config.urlHost?.startsWith("postgres://") || config.urlHost?.startsWith("postgresql://")) {
       const url = composeUrl(config.urlHost, config.urlPath);
 
       // First get the schema information

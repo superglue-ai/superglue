@@ -242,20 +242,19 @@ Your response must contain ONLY the JSON object within the <json> tags, with no 
                 executionTrace.push({ toolCall, result });
 
                 // Track successful results
-                if (result.result?.resultForAgent?.success && result.result?.fullResult) {
+                if (result.success) {
                     lastSuccessfulToolCall = {
                         toolCall: toolCall,
-                        result: result.result.fullResult.data,
-                        additionalData: result.result.fullResult.config
+                        result: result.data
                     };
-                } else if (result.result?.resultForAgent?.error) {
-                    lastError = result.result.resultForAgent.error;
+                } else if (result.error) {
+                    lastError = result.error;
                 }
 
                 toolResultContents.push({
                     type: "tool_result" as const,
                     tool_use_id: toolUseBlock.id,
-                    content: JSON.stringify(result.result?.resultForAgent || null)
+                    content: JSON.stringify(result.data || null)
                 });
 
                 if (options?.shouldAbort?.({ toolCall, result })) {

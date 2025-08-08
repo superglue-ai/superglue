@@ -8,56 +8,24 @@ import { Documentation } from "../utils/documentation.js";
 import { logMessage } from "../utils/logs.js";
 
 export const searchDocumentationToolImplementation: ToolImplementation<WorkflowExecutionContext> = async (args, context) => {
-    const { integrationId, query } = args;
+    const { query } = args;
     const { integration } = context;
 
     if (!integration) {
         return {
-            resultForAgent: {
-                success: false,
-                error: "Integration not provided in context. The search_documentation tool requires an integration to be passed in the tool executor context."
-            },
-            fullResult: {
-                success: false,
-                error: "Integration not provided in context. The search_documentation tool requires an integration to be passed in the tool executor context.",
-                results: []
-            }
+            success: false,
+            error: "Integration not provided in context. The search_documentation tool requires an integration to be passed in the tool executor context."
         };
     }
 
     try {
-        if (integration.id !== integrationId) {
+        if (!integration.documentation || integration.documentation.length <= 50) {
             return {
-                resultForAgent: {
-                    success: false,
-                    error: `Integration '${integrationId}' not found. Available integration: ${integration.id}`
-                },
-                fullResult: {
-                    success: false,
-                    error: `Integration '${integrationId}' not found. Available integration: ${integration.id}`,
-                    results: []
-                }
-            };
-        }
-
-        if (!integration.documentation || integration.documentation.length <= 500) {
-            return {
-                resultForAgent: {
-                    success: true,
-                    data: {
-                        integrationId,
+                success: true,
+                data: {
+                        integrationId: integration.id,
                         query,
-                        resultsCount: 0,
-                        summary: "No documentation available for this integration. Try to execute the API call without documentation using your own knowledge. Do not use the search_documentation tool."
-                    }
-                },
-                fullResult: {
-                    success: true,
-                    integrationId,
-                    query,
-                    resultsCount: 0,
-                    results: [],
-                    summary: "No documentation available for this integration"
+                        summary: "No documentation available for this integration. Try to execute the API call without documentation using your own knowledge or web search. Do not use the search_documentation tool."
                 }
             };
         }
@@ -72,36 +40,18 @@ export const searchDocumentationToolImplementation: ToolImplementation<WorkflowE
 
         // Return the full search results
         return {
-            resultForAgent: {
-                success: true,
-                data: {
-                    integrationId,
+            success: true,
+            data: {
+                    integrationId: integration.id,
                     query,
-                    resultsCount: searchResults.split('\n\n').filter(s => s.trim().length > 0).length,
                     summary: searchResults || "No matches found for your query."
-                }
-            },
-            fullResult: {
-                success: true,
-                integrationId,
-                query,
-                resultsCount: searchResults.split('\n\n').filter(s => s.trim().length > 0).length,
-                results: searchResults.split('\n\n').filter(s => s.trim().length > 0),
-                summary: searchResults
             }
         };
 
     } catch (error) {
         return {
-            resultForAgent: {
-                success: false,
-                error: error instanceof Error ? error.message : String(error)
-            },
-            fullResult: {
-                success: false,
-                error: error instanceof Error ? error.message : String(error),
-                results: []
-            }
+            success: false,
+            error: error instanceof Error ? error.message : String(error)
         };
     }
 };
@@ -113,14 +63,8 @@ export const buildWorkflowImplementation: ToolImplementation<WorkflowBuildContex
 
     if (!messages || messages.length === 0) {
         return {
-            resultForAgent: {
-                success: false,
-                error: "No messages provided. The build_workflow tool expects the workflow context to be provided in the message history."
-            },
-            fullResult: {
-                success: false,
-                error: "No messages provided"
-            }
+            success: false,
+            error: "No messages provided. The build_workflow tool expects the workflow context to be provided in the message history."
         };
     }
 
@@ -197,20 +141,10 @@ export const buildWorkflowImplementation: ToolImplementation<WorkflowBuildContex
         };
 
         logMessage('info', `Workflow built successfully: ${workflow.id}`, context);
-
+            
         return {
-            resultForAgent: {
-                success: true,
-                data: {
-                    workflowId: workflow.id,
-                    stepCount: workflow.steps.length,
-                    integrations: workflow.integrationIds
-                }
-            },
-            fullResult: {
-                success: true,
-                workflow
-            }
+            success: true,
+            data: workflow
         };
 
     } catch (error) {
@@ -218,34 +152,24 @@ export const buildWorkflowImplementation: ToolImplementation<WorkflowBuildContex
         logMessage('error', `Failed to build workflow: ${errorMessage}`, context);
 
         return {
-            resultForAgent: {
-                success: false,
-                error: errorMessage
-            },
-            fullResult: {
-                success: false,
-                error: errorMessage
-            }
+            success: false,
+            error: errorMessage
         };
     }
 };
 
 export const searchDocumentationToolDefinition: ToolDefinition = {
     name: "search_documentation",
-    description: "Search integration documentation for specific information about API structure, endpoints, authentication patterns, etc. Use this when you need to understand how an API works, what endpoints are available, or how to authenticate. Returns relevant documentation excerpts matching your search query.",
+    description: "Search documentation for specific information about API structure, endpoints, authentication patterns, etc. Use this when you need to understand how an API works, what endpoints are available, or how to authenticate. Returns relevant documentation excerpts matching your search query.",
     arguments: {
         type: "object",
         properties: {
-            integrationId: {
-                type: "string",
-                description: "ID of the integration to search"
-            },
             query: {
                 type: "string",
                 description: "What to search for in the documentation (e.g., 'authentication', 'batch processing', 'rate limits')"
             }
         },
-        required: ["integrationId", "query"]
+        required: ["query"]
     },
     execute: searchDocumentationToolImplementation
 };

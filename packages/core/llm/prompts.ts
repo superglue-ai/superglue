@@ -329,6 +329,7 @@ Important: Avoid using LOOP mode for potentially very large data objects. If you
 - Note that the connection string and database name may be part of the connection string, or not provided at all, or only be provided in the instruction. Look at the input variables and instructions to come up with a best guess.
 - Consider that you might need additional information from tables to process the instruction. E.g. if a user asks for a list of products, you might need to join the products table with the categories table to get the category name and filter on that.
 - In case the query is unclear (user asks for all products that are in a category but you are unsure what the exact category names are), get all category names in step 1 and then create the actual query in step 2.
+- The query is a postgres statement and can contain variables. Use $$...$$ notation to paste complex fields.
 </POSTGRES>
 
 <VARIABLES>
@@ -622,6 +623,9 @@ Most modern APIs use HEADER authentication type with different header formats.
 Correct PostgreSQL configuration:
 - urlHost: "postgres://<<user>>:<<password>>@<<hostname>>:<<port>>"
 - urlPath: "<<database_name>>"
+- body: {query: "postgres statement, e.g. SELECT * FROM users WHERE age > <<(sourceData) => sourceData.age>>"}
+
+The query is a postgres statement and can contain variables. Use $$...$$ notation to paste complex fields.
 
 Common errors:
 - Duplicate or missing postgres:// prefixes in urlHost 

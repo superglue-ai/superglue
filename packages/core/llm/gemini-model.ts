@@ -252,21 +252,20 @@ export class GeminiModel implements LLM {
                 executionTrace.push({ toolCall, result: toolResult });
 
                 // Track successful results
-                if (toolResult.result?.resultForAgent?.success && toolResult.result?.fullResult) {
+                if (toolResult.success) {
                     lastSuccessfulToolCall = {
                         toolCall: toolCall,
-                        result: toolResult.result.fullResult.data,
-                        additionalData: toolResult.result.fullResult.config
+                        result: toolResult.data,
                     };
-                } else if (toolResult.result?.resultForAgent?.error) {
-                    lastError = toolResult.result.resultForAgent.error;
+                } else if (toolResult.error) {
+                    lastError = toolResult.error;
                 }
 
                 // Prepare function response for next iteration
                 pendingFunctionResponses.push({
                     functionResponse: {
                         name: fc.name,
-                        response: toolResult.result?.resultForAgent || null
+                        response: toolResult.data || null
                     }
                 });
 

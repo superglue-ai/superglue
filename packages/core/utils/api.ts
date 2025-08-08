@@ -325,6 +325,8 @@ export async function generateApiConfig({
   if(!messages) messages = [];
   
   if (messages.length === 0) {
+    const documentation = await integrationManager?.searchDocumentation(apiConfig.instruction) || 
+      (await integrationManager?.documentation)?.slice(0, LanguageModel.contextLength / 10);
     const userPrompt = `Generate API configuration for the following:
 
 <instruction>
@@ -348,7 +350,7 @@ ${integrationManager?.specificInstructions}
 </integration_instructions>
 
 <documentation>
-${await integrationManager?.searchDocumentation(apiConfig.instruction)}
+${documentation}
 </documentation>
 
 <available_credentials>

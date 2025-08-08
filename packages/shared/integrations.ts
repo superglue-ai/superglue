@@ -13,7 +13,15 @@ export interface IntegrationConfig {
   keywords?: string[];
 }
 
-export const integrations: Record<string, IntegrationConfig> = {
+export const integrations: Record<string, IntegrationConfig> = {  
+  postgres: {
+    apiUrl: "postgres://<<username>>:<<password>>@<<host>>:<<port>>/<<database>>",
+    regex: "^.*(postgres|postgresql).*$",
+    icon: "postgresql",
+    docsUrl: "",
+    preferredAuthType: "apikey",
+    keywords: ["database", "sql", "postgres", "postgresql", "api key", "tables"]
+  },
   stripe: {
     apiUrl: "https://api.stripe.com",
     regex: "^.*stripe.*$",
@@ -413,7 +421,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     },
     keywords: ["videos", "channels", "playlists", "comments", "captions", "live streams", "analytics", "thumbnails", "subscriptions", "activities", "ratings", "uploads", "members", "oauth"]
   },
-  aws: {
+  AWS: {
     apiUrl: "https://amazonaws.com",
     regex: "^.*(aws|amazonaws).*$",
     icon: "amazonAWS",
@@ -1472,7 +1480,7 @@ export const integrations: Record<string, IntegrationConfig> = {
  */
 export function findMatchingIntegration(url: string): { key: string; integration: IntegrationConfig } | null {
   // Ensure URL has a scheme for proper matching
-  const urlForMatching = url.startsWith('http') ? url : `https://${url}`;
+  const urlForMatching = url.startsWith('http') || url.startsWith('postgres') ? url : `https://${url}`;
 
   const matches: { key: string; integration: IntegrationConfig; specificity: number }[] = [];
 

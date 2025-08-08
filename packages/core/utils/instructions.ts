@@ -24,14 +24,8 @@ export const generateInstructionsImplementation: ToolImplementation<InstructionG
 
   if (!integrations || integrations.length === 0) {
     return {
-      resultForAgent: {
-        success: false,
-        error: "No integrations provided in context"
-      },
-      fullResult: {
-        success: false,
-        error: "No integrations provided in context"
-      }
+      success: false,
+      error: "No integrations provided in context"
     };
   }
 
@@ -90,14 +84,8 @@ Remember these important rules: The output MUST be a JSON array of strings, with
 
   const { response: generatedInstructions } = await LanguageModel.generateObject(messages, schema, 0.2);
   return {
-    resultForAgent: {
-      success: true,
-      instructions: sanitizeInstructionSuggestions(generatedInstructions)
-    },
-    fullResult: {
-      success: true,
-      instructions: sanitizeInstructionSuggestions(generatedInstructions)
-    }
+    success: true,
+    data: sanitizeInstructionSuggestions(generatedInstructions)
   };
 };
 

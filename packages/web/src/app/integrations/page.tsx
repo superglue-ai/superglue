@@ -486,8 +486,7 @@ export default function IntegrationsPage() {
                                                     size="icon"
                                                     className="h-8 w-8 text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
                                                     onClick={() => handleEdit(integration)}
-                                                    disabled={pendingDocIds.has(integration.id)}
-                                                    title={pendingDocIds.has(integration.id) ? "Documentation is being processed" : "Edit integration"}
+                                                    title="Edit integration"
                                                 >
                                                     <Pencil className="h-4 w-4" />
                                                 </Button>
@@ -498,8 +497,6 @@ export default function IntegrationsPage() {
                                                     onClick={() => handleRefreshDocs(integration.id)}
                                                     disabled={
                                                         pendingDocIds.has(integration.id) ||
-                                                        !integration.documentationUrl ||
-                                                        !integration.documentationUrl.trim() ||
                                                         integration.documentationUrl.startsWith('file://')
                                                     }
                                                     title={
