@@ -198,6 +198,12 @@ async function triggerAsyncDocumentationFetch(
   try {
     // Re-enrich with template to ensure we have all the fields
     const enrichedInput = enrichWithTemplate(input);
+
+    const credentials = Object.entries(input.credentials || {}).reduce((acc, [key, value]) => {
+      acc[input.id + '_' + key] = value;
+      return acc;
+    }, {} as Record<string, any>);
+
     logMessage('info', `Starting async documentation fetch for integration ${input.id}`, { orgId: context.orgId });
 
     const docFetcher = new Documentation(
@@ -208,7 +214,7 @@ async function triggerAsyncDocumentationFetch(
         openApiUrl: enrichedInput.openApiUrl,
         keywords: uniqueKeywords(enrichedInput.documentationKeywords),
       },
-      enrichedInput.credentials || {},
+      credentials,
       { orgId: context.orgId }
     );
 
