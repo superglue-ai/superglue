@@ -29,7 +29,10 @@ export async function callPostgres(endpoint: ApiConfig, payload: Record<string, 
   const requestVars = { ...payload, ...credentials };
   let connectionString = await replaceVariables(composeUrl(endpoint.urlHost, endpoint.urlPath), requestVars);
   connectionString = sanitizeDatabaseName(connectionString);
-  const query = JSON.parse(await replaceVariables(endpoint.body, requestVars)).query;
+  
+  const bodyParsed = JSON.parse(await replaceVariables(endpoint.body, requestVars));
+  const queryText = bodyParsed.query;
+  const queryParams = bodyParsed.params || bodyParsed.values; // Support both 'params' and 'values' keys
 
   const poolConfig: PoolConfig = {
     connectionString,
@@ -48,7 +51,10 @@ export async function callPostgres(endpoint: ApiConfig, payload: Record<string, 
 
   do {
     try {
-      const result = await pool.query(query);
+      // Use parameterized query if params are provided, otherwise fall back to simple query
+      const result = queryParams 
+        ? await pool.query(queryText, queryParams)
+        : await pool.query(queryText);
       await pool.end();
       return result.rows;
     } catch (error) {
@@ -57,7 +63,10 @@ export async function callPostgres(endpoint: ApiConfig, payload: Record<string, 
       if (attempts > maxRetries) {
         await pool.end();
         if (error instanceof Error) {
-          throw new Error(`PostgreSQL error: ${error.message} for query: ${query}`);
+          const errorContext = queryParams 
+            ? ` for query: ${queryText} with params: ${JSON.stringify(queryParams)}`
+            : ` for query: ${queryText}`;
+          throw new Error(`PostgreSQL error: ${error.message}${errorContext}`);
         }
         throw new Error('Unknown PostgreSQL error occurred');
       }
