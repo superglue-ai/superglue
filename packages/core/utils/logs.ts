@@ -1,6 +1,6 @@
 import { LogEntry, Metadata } from "@superglue/shared";
 import EventEmitter from "events";
-import { pino } from "pino";
+import pino from "pino";
 
 const levelMap: Record<number, 'info' | 'error' | 'warn' | 'debug'> = {
   20: 'debug',
@@ -28,25 +28,39 @@ export const logger = pino({
   },
   hooks: {
     logMethod(inputArgs: any[], method: any, level: number) {
+      // In pino v9, the first argument is the message or object
+      // The second argument (if present) is the metadata
+      let message = '';
+      let metadata: any = {};
+      
+      if (typeof inputArgs[0] === 'string') {
+        message = inputArgs[0];
+        metadata = inputArgs[1] || {};
+      } else if (typeof inputArgs[0] === 'object' && inputArgs[0] !== null) {
+        metadata = inputArgs[0];
+        message = inputArgs[1] || '';
+      }
+
       const logEntry: LogEntry = {
         id: crypto.randomUUID(),
-        message: inputArgs[0],
+        message: message,
         level: String(levelMap[level]).toUpperCase(),
         timestamp: new Date(),
-        runId: inputArgs[1]?.runId || '',
-        orgId: inputArgs[1]?.orgId || ''
+        runId: metadata.runId || '',
+        orgId: metadata.orgId || ''
       };
 
       // Emit log event
       logEmitter.emit('log', logEntry);
 
       // Continue with normal Pino logging
-      method.apply(this, inputArgs);
+      return method.apply(this, inputArgs);
     }
   }
 });
 
-// Helper function for easier logging
+// Helper function for easier logging with metadata
 export function logMessage(level: 'info' | 'error' | 'warn' | 'debug', message: string, metadata: Metadata = { orgId: '' }) {
-  logger[level](message, metadata);
+  // In pino v9, metadata should be passed as the first argument when logging
+  logger[level](metadata, message);
 }

@@ -76,7 +76,7 @@
     "openai": "^4.85.4",
     "papaparse": "^5.5.2",
     "pg": "^8.15.6",
-    "pino": "^9.6.0",
+    "pino": "^9.8.0",
     "pino-pretty": "^13.0.0",
     "posthog-node": "^4.8.1",
     "prettier": "^3.5.3",
