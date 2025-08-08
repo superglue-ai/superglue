@@ -3,6 +3,7 @@ import { ApiConfig } from "@superglue/client";
 import { Metadata } from "@superglue/shared";
 import axios from "axios";
 import { getIntrospectionQuery } from "graphql";
+
 import * as yaml from 'js-yaml';
 import { NodeHtmlMarkdown } from "node-html-markdown";
 import { server_defaults } from '../default.js';
@@ -407,6 +408,9 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
   private static readonly MAX_FETCHED_LINKS = server_defaults.DOCUMENTATION.MAX_FETCHED_LINKS;
   private static readonly PARALLEL_FETCH_LIMIT = server_defaults.DOCUMENTATION.PARALLEL_FETCH_LIMIT;
   private static browserInstance: playwright.Browser | null = null;
+  private static isCleaningUp = false;
+  private static activeContexts = 0;
+  private static readonly MAX_CONCURRENT_CONTEXTS = 10; // Global limit across all integrations
 
   // Keywords that indicate non-documentation links (support, legal, marketing, etc.)
   public static readonly EXCLUDED_LINK_KEYWORDS = [
@@ -417,10 +421,31 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     'signin', 'sign-in', 'sign-up', 'trial', 'demo', 'sales'
   ];
 
+  // Register cleanup handlers for process termination
+  static {
+    const cleanup = async (signal?: string) => {
+      if (!PlaywrightFetchingStrategy.isCleaningUp) {
+        PlaywrightFetchingStrategy.isCleaningUp = true;
+        if (signal) {
+          console.log(`\n🧹 Cleaning up Playwright browser due to ${signal}...`);
+        }
+        await PlaywrightFetchingStrategy.closeBrowser();
+      }
+    };
 
+    // Handle various termination signals
+    process.once('SIGINT', () => cleanup('SIGINT'));  // Ctrl+C
+    process.once('SIGTERM', () => cleanup('SIGTERM')); // Termination
+    process.once('exit', () => cleanup());             // Normal exit
+    process.once('uncaughtException', (err) => {
+      console.error('Uncaught exception:', err);
+      cleanup('uncaughtException');
+    });
+  }
 
   private static async getBrowser(): Promise<playwright.Browser> {
     if (!PlaywrightFetchingStrategy.browserInstance) {
+      // Simple launch like the old implementation
       PlaywrightFetchingStrategy.browserInstance = await playwright.chromium.launch();
     }
     return PlaywrightFetchingStrategy.browserInstance;
@@ -430,7 +455,21 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     if (PlaywrightFetchingStrategy.browserInstance) {
       const closedInstance = PlaywrightFetchingStrategy.browserInstance;
       PlaywrightFetchingStrategy.browserInstance = null;
-      await closedInstance.close();
+      try {
+        // Try graceful close first
+        await closedInstance.close();
+      } catch (error) {
+        console.warn('Failed to close browser gracefully:', error?.message);
+        try {
+          // Force kill if graceful close fails
+          const browserProcess = (closedInstance as any)._process;
+          if (browserProcess && !browserProcess.killed) {
+            browserProcess.kill('SIGKILL');
+          }
+        } catch (killError) {
+          console.warn('Failed to force kill browser:', killError?.message);
+        }
+      }
     }
   }
   private async fetchPageContentWithPlaywright(urlString: string, config: DocumentationConfig, metadata: Metadata): Promise<{ content: string; links: Record<string, string>; } | null> {
@@ -439,8 +478,15 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       return null;
     }
 
+    // Wait if too many contexts are active
+    while (PlaywrightFetchingStrategy.activeContexts >= PlaywrightFetchingStrategy.MAX_CONCURRENT_CONTEXTS) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
     let page: playwright.Page | null = null;
     let browserContext: playwright.BrowserContext | null = null;
+    PlaywrightFetchingStrategy.activeContexts++;
+
     try {
       const browser = await PlaywrightFetchingStrategy.getBrowser();
       browserContext = await browser.newContext();
@@ -476,114 +522,33 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
         return links;
       });
 
-      await page.evaluate((textPatternMaxLength) => {
+      await page.evaluate(() => {
         const selectorsToRemove = [
-          // Navigation & Layout
           'nav', 'header', 'footer', '.nav', '.navbar', '.header', '.footer',
-          '.sidebar', '.menu', '[role="navigation"]', '[role="banner"]',
-          '[role="contentinfo"]', '.site-header', '.site-footer', '#navbar',
-          '.top-bar', '.bottom-bar', '.breadcrumb', '.breadcrumbs',
-
-          // Cookie & Privacy
           '.cookie-banner', '.cookie-consent', '.cookies', '#cookie-banner',
-          '.cookie-notice', '.cookie-policy', '.privacy-notice', '.gdpr',
-          '.cc-banner', '.cookiebar', '.cookie-bar', '#cookieConsent',
-          '.cookie-popup', '.cookie-modal', '[class*="cookie"]', '[id*="cookie"]',
-          '.consent-banner', '.consent-notice', '[data-cookie]', '[data-consent]',
-
-          // Popups & Modals
-          '[role="dialog"]', '.modal', '.popup', '.overlay', '.lightbox',
-          '.newsletter', '.subscribe', '.subscription', '.email-signup',
-          '.exit-popup', '.exit-intent', '.promotion', '.promo-banner',
-          '.notification-bar', '.alert-banner', '.announcement-bar',
-
-          // Social & Sharing
-          '.social', '.share', '.sharing', '.social-media', '.social-links',
-          '.share-buttons', '.social-buttons', '[class*="share"]', '[class*="social"]',
-          '.follow-us', '.connect', '.facebook', '.twitter', '.linkedin',
-
-          // Support & Chat
-          '.chat', '.chat-widget', '.chatbot', '.live-chat', '.support-chat',
-          '.help-widget', '.feedback', '.feedback-widget', '[id*="chat"]',
-          '.intercom', '.drift', '.zendesk', '.freshchat', '.tawk',
-
-          // Ads & Marketing
-          '.ad', '.ads', '.advertisement', '.banner-ad', '.sponsored',
-          '.marketing', '.cta-banner', '.call-to-action', '[class*="ad-"]',
-          '.demo-request', '.free-trial', '.pricing-banner', '.upgrade-banner',
-
-          // Comments & Reviews
-          '.comments', '.comment-section', '.reviews', '.testimonials',
-          '.disqus', '#disqus_thread', '.discourse', '.rating',
-
-          // Media & Embeds
-          '.video-player', '.youtube', '.vimeo', 'iframe[src*="youtube"]',
-          'iframe[src*="vimeo"]', '.embed', '.media-embed',
-
-          // Misc UI Elements
-          '.search', '.search-box', '.search-bar', '#search', '[role="search"]',
-          '.language-selector', '.locale-selector', '.country-selector',
-          '.back-to-top', '.scroll-to-top', '.floating-button',
-          '.survey', '.survey-widget', '.nps', '.feedback-survey',
-          '.banner:not(.info-banner)', '.ribbon', '.badge:not(.version-badge)',
-
-          // Scripts & Styles
-          'script', 'style', 'link[rel="stylesheet"]', 'noscript',
-
-          // Data attributes commonly used for tracking/analytics
-          '[data-ga]', '[data-gtm]', '[data-analytics]', '[data-track]',
-          '[data-beacon]', '[data-segment]', '[data-heap]'
+          '.cookie-notice', '.sidebar', '.menu', '[role="navigation"]',
+          '[role="banner"]', '[role="dialog"]', '[role="contentinfo"]', 'script', 'style', // Also remove scripts/styles
         ];
-
         selectorsToRemove.forEach(selector => {
           document.querySelectorAll(selector).forEach(element => {
-            try {
-              element.remove();
-            } catch (e) {
+            try { element.remove(); }
+            catch (e) {
+              // Cannot use logMessage directly here as it's inside page.evaluate
               console.warn("Failed to remove element:", e?.message);
             }
           });
         });
-
-        const textPatternsToRemove = [
-          /accept.*cookies?/i,
-          /cookie.*policy/i,
-          /privacy.*policy/i,
-          /subscribe.*newsletter/i,
-          /sign.*up.*updates/i,
-          /follow.*us/i,
-          /connect.*with.*us/i,
-          /share.*article/i,
-          /was.*this.*helpful/i,
-          /rate.*this/i,
-          /leave.*feedback/i
-        ];
-
-        const allElements = document.querySelectorAll('*');
-        allElements.forEach(element => {
-          const text = element.textContent || '';
-          if (text.length < textPatternMaxLength && textPatternsToRemove.some(pattern => pattern.test(text))) {
-            try {
-              element.remove();
-            } catch (e) {
-              console.warn("Failed to remove element by text pattern:", e?.message);
-            }
-          }
-        });
-
-        // Remove empty containers that might have held removed content
-        document.querySelectorAll('div, section, aside').forEach(element => {
-          if (element.innerHTML.trim() === '' && !element.querySelector('*')) {
-            try {
-              element.remove();
-            } catch (e) {
-              console.warn("Failed to remove empty container:", e?.message);
-            }
-          }
-        });
-      }, server_defaults.DOCUMENTATION.TEXT_PATTERN_REMOVAL_MAX_LENGTH);
+      });
 
       const content = await page.content();
+
+      // Check if page is too large (over 10MB of HTML)
+      const MAX_PAGE_SIZE = 10 * 1024 * 1024; // 10MB
+      if (content.length > MAX_PAGE_SIZE) {
+        logMessage('warn', `Page ${urlString} is too large (${Math.round(content.length / 1024 / 1024)}MB), skipping`, metadata);
+        return null;
+      }
+
       logMessage('info', `Successfully fetched content for ${urlString}`, metadata);
       return {
         content,
@@ -593,8 +558,23 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       logMessage('warn', `Playwright fetch failed for ${urlString}: ${error?.message}`, metadata);
       return null;
     } finally {
-      if (page) await page.close();
-      if (browserContext) await browserContext.close();
+      // Always clean up, even if there was an error
+      PlaywrightFetchingStrategy.activeContexts--;
+
+      if (page) {
+        try {
+          await page.close();
+        } catch (e) {
+          // Page might already be closed
+        }
+      }
+      if (browserContext) {
+        try {
+          await browserContext.close();
+        } catch (e) {
+          // Context might already be closed
+        }
+      }
     }
   }
 
@@ -895,13 +875,16 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     return uniqueSitemapUrls;
   }
 
-  private async fetchPagesInParallel(
+  private async fetchPagesInBatches(
     urls: string[],
     config: DocumentationConfig,
     metadata: Metadata
   ): Promise<string> {
     let combinedContent = "";
     const BATCH_SIZE = PlaywrightFetchingStrategy.PARALLEL_FETCH_LIMIT;
+
+    // Collect all raw HTML first (like old implementation)
+    const allHtmlContent: string[] = [];
 
     for (let i = 0; i < urls.length && i < PlaywrightFetchingStrategy.MAX_FETCHED_LINKS; i += BATCH_SIZE) {
       const batch = urls.slice(i, Math.min(i + BATCH_SIZE, PlaywrightFetchingStrategy.MAX_FETCHED_LINKS));
@@ -965,7 +948,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
         const topUrls = rankedUrls.slice(0, PlaywrightFetchingStrategy.MAX_FETCHED_LINKS);
 
         // Content fetching happens without the sitemap timeout
-        const content = await this.fetchPagesInParallel(topUrls, config, metadata);
+        const content = await this.fetchPagesInBatches(topUrls, config, metadata);
 
         if (content) {
           return content;

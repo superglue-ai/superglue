@@ -5,6 +5,7 @@ import { IntegrationTestingFramework } from './integration-testing-framework.js'
 describe('Integration Tests', () => {
     let originalDataStoreType: string | undefined;
     let originalDataStorePath: string | undefined;
+    let framework: IntegrationTestingFramework | null = null;
 
     beforeAll(async () => {
         // Load environment variables from .env file
@@ -23,6 +24,14 @@ describe('Integration Tests', () => {
     });
 
     afterAll(async () => {
+        // Clean up Playwright browser if it exists
+        try {
+            const { PlaywrightFetchingStrategy } = await import('../../utils/documentation.js');
+            await PlaywrightFetchingStrategy.closeBrowser();
+        } catch (e) {
+            // Ignore errors
+        }
+
         // Restore original environment variables
         if (originalDataStoreType !== undefined) {
             process.env.DATA_STORE_TYPE = originalDataStoreType;
