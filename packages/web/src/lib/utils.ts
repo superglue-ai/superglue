@@ -6,20 +6,6 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function cleanUrl(url: string): URL {
-  try {
-    if (!url) return new URL("https://example.com");
-    if (!url.includes('://')) {
-      url = 'https://' + url;
-    }
-
-    const urlObj = new URL(url);
-    return urlObj;
-  } catch (e) {
-    return new URL("https://example.com");
-  }
-}
-
 export function composeUrl(host: string, path: string | undefined) {
   if (!host && !path) return '';
   // Handle empty/undefined inputs
