@@ -72,6 +72,28 @@ describe('PostgreSQL Utilities', () => {
       expect(mockEnd).toHaveBeenCalled();
     });
 
+    it('should handle parameterized query errors with proper context', async () => {
+      const paramEndpoint: ApiConfig = {
+        id: '2',
+        instruction: 'test with params',
+        urlHost: 'postgres://{user}:{password}@{host}:{port}/{database}',
+        urlPath: '',
+        body: JSON.stringify({ 
+          query: 'SELECT * FROM users WHERE id = $1',
+          params: [999]
+        })
+      };
+
+      const errorMessage = 'No rows found';
+      mockQuery.mockRejectedValueOnce(new Error(errorMessage));
+
+      const options: RequestOptions = {};
+      await expect(callPostgres(paramEndpoint, {}, mockCredentials, options))
+        .rejects.toThrow(`PostgreSQL error: ${errorMessage} for query: SELECT * FROM users WHERE id = $1 with params: [999]`);
+
+      expect(mockEnd).toHaveBeenCalled();
+    });
+
     it('should respect custom timeout', async () => {
       const options: RequestOptions = {
         timeout: 5000
@@ -87,6 +109,57 @@ describe('PostgreSQL Utilities', () => {
           rejectUnauthorized: false,
         }
       });
+    });
+
+    it('should use parameterized queries when params are provided', async () => {
+      const paramEndpoint: ApiConfig = {
+        id: '2',
+        instruction: 'test with params',
+        urlHost: 'postgres://{user}:{password}@{host}:{port}/{database}',
+        urlPath: '',
+        body: JSON.stringify({ 
+          query: 'SELECT * FROM users WHERE id = $1 AND status = $2',
+          params: [123, 'active']
+        })
+      };
+
+      const mockRows = [{ id: 123, name: 'test', status: 'active' }];
+      mockQuery.mockResolvedValueOnce({ rows: mockRows });
+
+      const options: RequestOptions = {};
+      const result = await callPostgres(paramEndpoint, {}, mockCredentials, options);
+
+      expect(result).toEqual(mockRows);
+      expect(mockQuery).toHaveBeenCalledWith(
+        'SELECT * FROM users WHERE id = $1 AND status = $2',
+        [123, 'active']
+      );
+      expect(mockEnd).toHaveBeenCalled();
+    });
+
+    it('should support values key as alias for params', async () => {
+      const paramEndpoint: ApiConfig = {
+        id: '3',
+        instruction: 'test with values',
+        urlHost: 'postgres://{user}:{password}@{host}:{port}/{database}',
+        urlPath: '',
+        body: JSON.stringify({ 
+          query: 'INSERT INTO users (name, email) VALUES ($1, $2) RETURNING *',
+          values: ['John Doe', 'john@example.com']
+        })
+      };
+
+      const mockRows = [{ id: 1, name: 'John Doe', email: 'john@example.com' }];
+      mockQuery.mockResolvedValueOnce({ rows: mockRows });
+
+      const options: RequestOptions = {};
+      const result = await callPostgres(paramEndpoint, {}, mockCredentials, options);
+
+      expect(result).toEqual(mockRows);
+      expect(mockQuery).toHaveBeenCalledWith(
+        'INSERT INTO users (name, email) VALUES ($1, $2) RETURNING *',
+        ['John Doe', 'john@example.com']
+      );
     });
 
     it('should retry on failure when retries configured', async () => {

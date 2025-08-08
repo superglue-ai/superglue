@@ -329,7 +329,12 @@ Important: Avoid using LOOP mode for potentially very large data objects. If you
 - Note that the connection string and database name may be part of the connection string, or not provided at all, or only be provided in the instruction. Look at the input variables and instructions to come up with a best guess.
 - Consider that you might need additional information from tables to process the instruction. E.g. if a user asks for a list of products, you might need to join the products table with the categories table to get the category name and filter on that.
 - In case the query is unclear (user asks for all products that are in a category but you are unsure what the exact category names are), get all category names in step 1 and then create the actual query in step 2.
-- The query is a postgres statement and can contain variables. Use $$...$$ notation to paste complex fields.
+- Use parameterized queries for safer and more efficient execution, you can also use <<>> tags to access variables:
+  * body: {query: "SELECT * FROM users WHERE id = $1 AND status = $2", params: [123, "<<status>>"]}
+  * body: {query: "INSERT INTO products (name, price) VALUES ($1, $2) RETURNING *", values: ["Widget", <<(sourceData) => sourceData.price * 1.2>>]}
+  * Parameters prevent SQL injection and improve performance
+  * Use $1, $2, $3, etc. as placeholders in the query
+  * Provide values in the params or values array in the same order
 </POSTGRES>
 
 <VARIABLES>
@@ -623,9 +628,18 @@ Most modern APIs use HEADER authentication type with different header formats.
 Correct PostgreSQL configuration:
 - urlHost: "postgres://<<user>>:<<password>>@<<hostname>>:<<port>>"
 - urlPath: "<<database_name>>"
-- body: {query: "postgres statement, e.g. SELECT * FROM users WHERE age > <<(sourceData) => sourceData.age>>"}
+- body: {query: "postgres statement", params: [param1, param2]} // Recommended: parameterized query
+- body: {query: "SELECT * FROM users WHERE age > $1", params: [<<(sourceData) => sourceData.age>>]}
+- body: {query: "INSERT INTO logs (message, level) VALUES ($1, $2)", values: ["Error occurred", "<<error_level>>"]}
 
 The query is a postgres statement and can contain variables. Use $$...$$ notation to paste complex fields.
+
+PARAMETERIZED QUERIES (RECOMMENDED):
+- Use $1, $2, $3, etc. as placeholders in the query string
+- Provide corresponding values in params or values array
+- Example: {query: "SELECT * FROM users WHERE id = $1 AND status = $2", params: [userId, "active"]}
+- Benefits: Prevents SQL injection, better performance, cleaner code
+- The params/values array can contain static values or dynamic expressions using <<>> syntax
 
 Common errors:
 - Duplicate or missing postgres:// prefixes in urlHost 
@@ -633,6 +647,7 @@ Common errors:
 - Database not found: Try to extract from connection string or infer from user instruction
 - Incorrect table or column names, make sure to use the ones provided in previous explorative steps rather than guessing table or column names
 - Incorrect query logic (joins, filters, etc.)
+- Missing or incorrectly ordered parameters when using parameterized queries
 </POSTGRES>
 
 <SOAP>
