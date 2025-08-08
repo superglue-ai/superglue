@@ -67,7 +67,7 @@ describe('PostgreSQL Utilities', () => {
 
       const options: RequestOptions = {};
       await expect(callPostgres(mockEndpoint, mockPayload, mockCredentials, options))
-        .rejects.toThrow(`PostgreSQL error after 1 attempts: ${errorMessage}`);
+        .rejects.toThrow(`PostgreSQL error: ${errorMessage} for query: SELECT * FROM users`);
 
       expect(mockEnd).toHaveBeenCalled();
     });
@@ -126,7 +126,7 @@ describe('PostgreSQL Utilities', () => {
         .mockRejectedValue(new Error('Should not get here'));
 
       await expect(callPostgres(mockEndpoint, mockPayload, mockCredentials, options))
-        .rejects.toThrow('PostgreSQL error after 2 attempts: Second failure');
+        .rejects.toThrow(`PostgreSQL error: Second failure for query: SELECT * FROM users`);
 
       expect(mockQuery).toHaveBeenCalledTimes(2);
     });
