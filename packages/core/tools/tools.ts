@@ -27,16 +27,9 @@ export interface ToolCall {
 
 export interface ToolCallResult {
     toolCallId: string;
-    result: {
-        resultForAgent: {
-            success: boolean;
-            error?: string;
-            data?: any;
-            [key: string]: any; // Allow additional fields
-        };
-        fullResult?: any;
-    } | null;
+    success: boolean;
     error?: string;
+    data?: any;
 }
 
 // Base context with common metadata
@@ -64,13 +57,9 @@ export type ToolImplementation<TContext extends BaseToolContext = BaseToolContex
     args: any,
     context: TContext
 ) => Promise<{
-    resultForAgent: {
-        success: boolean;
-        error?: string;
-        data?: any;
-        [key: string]: any;
-    };
-    fullResult?: any;
+    success: boolean;
+    error?: string;
+    data?: any;
 }>;
 
 const toolRegistry: Record<string, ToolImplementation<any>> = {
@@ -92,7 +81,7 @@ export async function executeTool(toolCall: ToolCall, context: BaseToolContext):
     if (!implementation) {
         return {
             toolCallId: toolCall.id,
-            result: null,
+            success: false,
             error: `Tool '${toolCall.name}' not found`
         };
     }
@@ -101,12 +90,14 @@ export async function executeTool(toolCall: ToolCall, context: BaseToolContext):
         const result = await implementation(toolCall.arguments, context);
         return {
             toolCallId: toolCall.id,
-            result: result
+            success: result.success,
+            data: result.data,
+            error: result.error
         };
     } catch (error) {
         return {
             toolCallId: toolCall.id,
-            result: null,
+            success: false,
             error: error instanceof Error ? error.message : String(error)
         };
     }

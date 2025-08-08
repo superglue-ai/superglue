@@ -62,8 +62,8 @@ export const generateInstructionsResolver = async (
       throw new Error(callResult.error);
     }
 
-    if (callResult.result?.fullResult?.success && Array.isArray(callResult.result.fullResult?.instructions)) {
-      return callResult.result.fullResult.instructions;
+    if (callResult.success && Array.isArray(callResult.data)) {
+      return callResult.data;
     }
 
     throw new Error("Failed to generate instructions");
