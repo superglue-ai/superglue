@@ -30,6 +30,10 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
   const [editedStep, setEditedStep] = useState(step);
   const [localIntegrations, setLocalIntegrations] = useState<Integration[]>([]);
   const [loadingIntegrations, setLoadingIntegrations] = useState(false);
+  const [headersText, setHeadersText] = useState('');
+  const [queryParamsText, setQueryParamsText] = useState('');
+  const [headersError, setHeadersError] = useState(false);
+  const [queryParamsError, setQueryParamsError] = useState(false);
 
   const config = useConfig();
   const { toast } = useToast();
@@ -101,13 +105,99 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
     setEditedStep(step);
   }, [step]);
 
+  // Initialize text fields when editing starts
+  useEffect(() => {
+    if (isEditing) {
+      try {
+        // Safely stringify headers - use empty object if undefined or invalid
+        const headers = editedStep.apiConfig?.headers;
+        const headersJson = headers !== undefined && headers !== null 
+          ? JSON.stringify(headers, null, 2)
+          : '{}';
+        
+        setHeadersText(headersJson);
+        
+        // Validate headers JSON
+        try {
+          JSON.parse(headersJson);
+          setHeadersError(false);
+        } catch {
+          setHeadersError(true);
+        }
+      } catch (error) {
+        // If stringify fails, use empty object
+        console.warn('Failed to stringify headers:', error);
+        setHeadersText('{}');
+        setHeadersError(false);
+      }
+      
+      try {
+        // Safely stringify queryParams - use empty object if undefined or invalid
+        const queryParams = editedStep.apiConfig?.queryParams;
+        const queryParamsJson = queryParams !== undefined && queryParams !== null
+          ? JSON.stringify(queryParams, null, 2)
+          : '{}';
+        
+        setQueryParamsText(queryParamsJson);
+        
+        // Validate queryParams JSON
+        try {
+          JSON.parse(queryParamsJson);
+          setQueryParamsError(false);
+        } catch {
+          setQueryParamsError(true);
+        }
+      } catch (error) {
+        // If stringify fails, use empty object
+        console.warn('Failed to stringify queryParams:', error);
+        setQueryParamsText('{}');
+        setQueryParamsError(false);
+      }
+    }
+  }, [isEditing, editedStep.apiConfig?.headers, editedStep.apiConfig?.queryParams]);
+
   const handleSave = () => {
+    // Validate JSON fields before saving
+    if (headersError || queryParamsError) {
+      toast({
+        title: 'Invalid JSON',
+        description: 'Please fix the JSON errors in Headers or Query Parameters before saving.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     onEdit(step.id, editedStep);
     setIsEditing(false);
   };
 
   const handleCancel = () => {
     setEditedStep(step);
+    
+    // Safely reset headers text
+    try {
+      const headers = step.apiConfig?.headers;
+      setHeadersText(headers !== undefined && headers !== null 
+        ? JSON.stringify(headers, null, 2)
+        : '{}');
+    } catch (error) {
+      console.warn('Failed to stringify headers on cancel:', error);
+      setHeadersText('{}');
+    }
+    
+    // Safely reset queryParams text
+    try {
+      const queryParams = step.apiConfig?.queryParams;
+      setQueryParamsText(queryParams !== undefined && queryParams !== null
+        ? JSON.stringify(queryParams, null, 2)
+        : '{}');
+    } catch (error) {
+      console.warn('Failed to stringify queryParams on cancel:', error);
+      setQueryParamsText('{}');
+    }
+    
+    setHeadersError(false);
+    setQueryParamsError(false);
     setIsEditing(false);
   };
 
@@ -343,20 +433,48 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
                     <HelpTooltip text="HTTP headers to include with the request. Use JSON format. Common headers include Content-Type, Authorization, etc." />
                   </Label>
                   <Textarea
-                    value={JSON.stringify(editedStep.apiConfig.headers || {}, null, 2)}
+                    value={headersText}
                     onChange={(e) => {
+                      const newValue = e.target.value;
+                      setHeadersText(newValue);
+                      
+                      // Handle empty or whitespace-only input
+                      if (!newValue.trim()) {
+                        setEditedStep(prev => ({
+                          ...prev,
+                          apiConfig: { ...prev.apiConfig, headers: {} }
+                        }));
+                        setHeadersError(false);
+                        return;
+                      }
+                      
+                      // Only update the actual data if it's valid JSON
                       try {
-                        const headers = JSON.parse(e.target.value);
+                        const headers = JSON.parse(newValue);
                         setEditedStep(prev => ({
                           ...prev,
                           apiConfig: { ...prev.apiConfig, headers }
                         }));
+                        setHeadersError(false);
                       } catch (error) {
-                        // Handle invalid JSON
+                        // Keep the text but don't update the step data
+                        // This allows typing invalid JSON temporarily
+                        setHeadersError(true);
                       }
                     }}
                     className="font-mono text-xs h-20 mt-1"
+                    placeholder="{}"
                   />
+                  {headersError && (
+                    <div className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5 bg-red-500/10 dark:bg-red-500/20 py-1.5 px-2.5 rounded-md mt-1">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="12" />
+                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                      </svg>
+                      <span>Invalid JSON format</span>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -365,20 +483,48 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
                     <HelpTooltip text='URL query parameters to append to the request. Use JSON format like {"param1": "value1", "param2": "value2"}' />
                   </Label>
                   <Textarea
-                    value={JSON.stringify(editedStep.apiConfig.queryParams || {}, null, 2)}
+                    value={queryParamsText}
                     onChange={(e) => {
+                      const newValue = e.target.value;
+                      setQueryParamsText(newValue);
+                      
+                      // Handle empty or whitespace-only input
+                      if (!newValue.trim()) {
+                        setEditedStep(prev => ({
+                          ...prev,
+                          apiConfig: { ...prev.apiConfig, queryParams: {} }
+                        }));
+                        setQueryParamsError(false);
+                        return;
+                      }
+                      
+                      // Only update the actual data if it's valid JSON
                       try {
-                        const queryParams = JSON.parse(e.target.value);
+                        const queryParams = JSON.parse(newValue);
                         setEditedStep(prev => ({
                           ...prev,
                           apiConfig: { ...prev.apiConfig, queryParams }
                         }));
+                        setQueryParamsError(false);
                       } catch (error) {
-                        // Handle invalid JSON
+                        // Keep the text but don't update the step data
+                        // This allows typing invalid JSON temporarily
+                        setQueryParamsError(true);
                       }
                     }}
                     className="font-mono text-xs h-20 mt-1"
+                    placeholder="{}"
                   />
+                  {queryParamsError && (
+                    <div className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5 bg-red-500/10 dark:bg-red-500/20 py-1.5 px-2.5 rounded-md mt-1">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="12" />
+                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                      </svg>
+                      <span>Invalid JSON format</span>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -526,11 +672,12 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
                     <div>
                       <Label className="text-xs flex items-center gap-1">
                         Max Iterations
-                        <HelpTooltip text="Maximum number of loop iterations to prevent infinite loops. Leave empty for no limit." />
+                        <HelpTooltip text="Maximum number of loop iterations to prevent infinite loops. Default is 1000." />
                       </Label>
                       <Input
                         type="number"
                         value={editedStep.loopMaxIters || ''}
+                        defaultValue={1000}
                         onChange={(e) => setEditedStep(prev => ({
                           ...prev,
                           loopMaxIters: parseInt(e.target.value) || undefined
