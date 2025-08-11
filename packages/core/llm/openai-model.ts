@@ -17,14 +17,22 @@ export class OpenAIModel implements LLM {
       baseURL: process.env.OPENAI_BASE_URL,
     });
   }
+
+  private isGpt5(): boolean {
+    return String(this.model).toLowerCase().includes("gpt-5");
+  }
+
+  private supportsTemperature(): boolean {
+    if (this.isGpt5()) return false;
+    return !String(this.model).toLowerCase().startsWith("o");
+  }
+
   async generateText(messages: ChatCompletionMessageParam[], temperature: number = 0): Promise<LLMResponse> {
-    // Prepare input messages for Responses API
     const input = messages.map(m => ({
       role: m.role,
       content: typeof m.content === 'string' ? m.content : String(m.content)
     }));
 
-    // Add date context
     const dateMessage = {
       role: "system",
       content: "The current date and time is " + new Date().toISOString()
@@ -32,15 +40,23 @@ export class OpenAIModel implements LLM {
     input.unshift(dateMessage as any);
 
     try {
-      // Call Responses API
-      const response = await (this.client.responses.create as any)({
+      const request: any = {
         model: this.model,
         input: input as any,
-        temperature: process.env.OPENAI_MODEL?.startsWith('o') ? undefined : temperature,
-        store: false  // Don't store for simple text generation
-      }) as any;
+        store: false
+      };
 
-      // Extract text response
+      if (this.supportsTemperature()) {
+        request.temperature = temperature;
+      }
+
+      if (this.isGpt5()) {
+        request.reasoning = { effort: "low" };
+        request.verbosity = "low";
+      }
+
+      const response = await (this.client.responses.create as any)(request) as any;
+
       let responseText = '';
       for (const output of response.output || []) {
         if (output.type === 'message' && output.role === 'assistant') {
@@ -56,7 +72,6 @@ export class OpenAIModel implements LLM {
         throw new Error('No text output generated');
       }
 
-      // Add response to messages history
       const updatedMessages = [...messages, {
         role: "assistant",
         content: responseText
@@ -67,12 +82,10 @@ export class OpenAIModel implements LLM {
         messages: updatedMessages
       } as LLMResponse;
     } catch (error) {
-      console.error('Error in generateText with Responses API:', error);
-      // Fall back to chat completions API
       const result = await this.client.chat.completions.create({
         messages: [dateMessage as ChatCompletionMessageParam, ...messages],
-        model: process.env.OPENAI_MODEL || "gpt-4.1",
-        temperature: process.env.OPENAI_MODEL?.startsWith('o') ? undefined : temperature
+        model: this.model || "gpt-4.1",
+        temperature: this.supportsTemperature() ? temperature : undefined
       });
 
       let responseText = result.choices[0].message.content;
@@ -92,12 +105,11 @@ export class OpenAIModel implements LLM {
   private enforceStrictSchema(schema: any, isRoot: boolean) {
     if (!schema || typeof schema !== 'object') return schema;
 
-    // wrap non-object in object with ___results key
     if (isRoot && schema.type !== 'object') {
       schema = {
         type: 'object',
         properties: {
-          ___results: { ...schema }  // Create a copy of the schema
+          ___results: { ...schema }
         },
         required: ['___results']
       };
@@ -107,10 +119,8 @@ export class OpenAIModel implements LLM {
       schema.additionalProperties = false;
       schema.strict = true;
       if (schema.properties) {
-        // Only set required for the top-level schema
         schema.required = Object.keys(schema.properties);
         delete schema.patternProperties;
-        // Recursively process nested properties
         Object.values(schema.properties).forEach(prop => this.enforceStrictSchema(prop, false));
       }
       if (schema.items) {
@@ -132,7 +142,7 @@ export class OpenAIModel implements LLM {
     const name = toolCallData.name || toolCallData.function?.name;
     const callId = toolCallData.call_id || toolCallData.id;
     const args = toolCallData.arguments || toolCallData.function?.arguments;
-    
+
     if (name === "submit") {
       let finalResult = typeof args === "string" ? JSON.parse(args) : args;
       if (finalResult.___results) {
@@ -162,13 +172,11 @@ export class OpenAIModel implements LLM {
   }
 
   async generateObject(messages: ChatCompletionMessageParam[], schema: any, temperature: number = 0, customTools?: ToolDefinition[], context?: any): Promise<LLMObjectResponse> {
-    // Prepare the schema
     schema = addNullableToOptional(schema);
     schema = this.enforceStrictSchema(schema, true);
 
-    // o models don't support temperature
-    if (process.env.OPENAI_MODEL?.startsWith('o')) {
-      temperature = undefined;
+    if (!this.supportsTemperature()) {
+      temperature = undefined as any;
     }
 
     const dateMessage = {
@@ -176,7 +184,6 @@ export class OpenAIModel implements LLM {
       content: "The current date and time is " + new Date().toISOString()
     } as ChatCompletionMessageParam;
 
-    // Create the tools configuration for Responses API
     const tools = [
       {
         type: "function" as const,
@@ -209,31 +216,31 @@ export class OpenAIModel implements LLM {
     ];
 
     try {
-      // Use the Responses API with multi-turn support
       let finalResult = null;
-      // if the first message is the date message, don't add it again
-      let conversationMessages: any = String(messages[0]?.content)?.startsWith("The current date and time is") ? 
+      let conversationMessages: any = String(messages[0]?.content)?.startsWith("The current date and time is") ?
         messages : [dateMessage, ...messages];
 
-      // Continue until the model calls submit
       while (finalResult === null) {
         const requestParams: any = {
-          model: process.env.OPENAI_MODEL || "gpt-4.1",
+          model: this.model || "gpt-4.1",
           tools: tools,
-          temperature: temperature,
-          tool_choice: "required"
+          tool_choice: "required",
+          temperature: this.supportsTemperature() ? temperature : undefined
         };
+
+        if (this.isGpt5()) {
+          requestParams.reasoning = { effort: "low" };
+          requestParams.verbosity = "low";
+        }
 
         requestParams.input = conversationMessages;
         const response = await (this.client.responses.create as any)(requestParams);
 
-        // Extract the result from the response
         const output = response.output || [];
 
         for (const item of output) {
           conversationMessages.push(item);
-          
-          // Check for direct function calls
+
           if (item?.type === "function_call") {
             const { finalResult: result, shouldBreak } = await this.processToolCall(
               item,
@@ -246,8 +253,7 @@ export class OpenAIModel implements LLM {
               break;
             }
           }
-          
-          // Check for tool calls within messages
+
           if (item?.type === "message") {
             for (const toolCall of item?.tool_calls || []) {
               const { finalResult: result, shouldBreak } = await this.processToolCall(
@@ -265,14 +271,11 @@ export class OpenAIModel implements LLM {
           }
         }
 
-        // Add a safety check to prevent infinite loops
-        // If we've made too many attempts, throw an error
         if (!finalResult && output.length === 0) {
           throw new Error("No output received from the model");
         }
       }
 
-      // Convert back to messages format for compatibility
       const updatedMessages = [...conversationMessages, {
         role: "assistant",
         content: JSON.stringify(finalResult)
@@ -283,7 +286,7 @@ export class OpenAIModel implements LLM {
         messages: updatedMessages
       } as LLMObjectResponse;
 
-    } catch (error) {
+    } catch (error: any) {
       const updatedMessages = [...messages, {
         role: "assistant",
         content: "Error: " + error.message

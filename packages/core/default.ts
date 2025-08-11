@@ -14,13 +14,13 @@ export const server_defaults = {
     DOCUMENTATION: {
         MAX_LENGTH_OFFSET: 50000,
         MAX_LENGTH_ABSOLUTE: 200000,
-        MAX_FETCHED_LINKS: 25,
-        PARALLEL_FETCH_LIMIT: 5, // Optimized for parallel fetching with proper cleanup
+        MAX_FETCHED_LINKS: 20,
+        PARALLEL_FETCH_LIMIT: 20,
         MAX_SITEMAP_DEPTH: 3,
-        MAX_CONCURRENT_OPENAPI_FETCHES: 10,
+        MAX_CONCURRENT_OPENAPI_FETCHES: 25,
         MAX_OPENAPI_SPECS_TO_FETCH: 100,
         TEXT_PATTERN_REMOVAL_MAX_LENGTH: 400,
-        MAX_PAGE_SIZE_BYTES: 150 * 1024 * 1024, // 150 MB max per page
-        PAGE_PROCESSING_TIMEOUT: 30000 // 30 seconds for content extraction
+        MAX_PAGE_SIZE_BYTES: 150 * 1024 * 1024, 
+        PAGE_PROCESSING_TIMEOUT: 30000 
     }
 }

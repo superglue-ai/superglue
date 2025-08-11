@@ -478,6 +478,11 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       return null;
     }
 
+    // Budgets and limits for pruning
+    const MAX_PAGE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB hard cap post-selection
+    const MAX_CODE_BLOCKS_PER_PAGE = 50;
+    const MAX_TABLE_ROWS_TOTAL = 5000;
+
     // Wait if too many contexts are active
     while (PlaywrightFetchingStrategy.activeContexts >= PlaywrightFetchingStrategy.MAX_CONCURRENT_CONTEXTS) {
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -508,13 +513,13 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       await page.waitForTimeout(1000);
 
       const links: Record<string, string> = await page.evaluate(() => {
-        const links = {};
+        const links: Record<string, string> = {};
         const allLinks = document.querySelectorAll('a');
         allLinks.forEach(link => {
           try {
-            const url = new URL(link?.href);
-            const key = `${link.textContent} ${url.pathname}`?.toLowerCase()?.replace(/[^a-z0-9]/g, ' ').trim();
-            links[key] = link?.href?.split('#')[0]?.trim();
+            const url = new URL((link as HTMLAnchorElement)?.href);
+            const key = `${(link as HTMLAnchorElement).textContent} ${url.pathname}`?.toLowerCase()?.replace(/[^a-z0-9]/g, ' ').trim();
+            links[key] = (link as HTMLAnchorElement)?.href?.split('#')[0]?.trim();
           } catch (e) {
             // ignore
           }
@@ -522,29 +527,110 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
         return links;
       });
 
-      await page.evaluate(() => {
-        const selectorsToRemove = [
-          'nav', 'header', 'footer', '.nav', '.navbar', '.header', '.footer',
-          '.cookie-banner', '.cookie-consent', '.cookies', '#cookie-banner',
-          '.cookie-notice', '.sidebar', '.menu', '[role="navigation"]',
-          '[role="banner"]', '[role="dialog"]', '[role="contentinfo"]', 'script', 'style', // Also remove scripts/styles
-        ];
-        selectorsToRemove.forEach(selector => {
-          document.querySelectorAll(selector).forEach(element => {
-            try { element.remove(); }
-            catch (e) {
-              // Cannot use logMessage directly here as it's inside page.evaluate
-              console.warn("Failed to remove element:", e?.message);
-            }
-          });
-        });
-      });
+      // Build pruned, main-content-only HTML snapshot from the live DOM
+      const prunedHtml = await page.evaluate(({ MAX_CODE_BLOCKS, MAX_TABLE_ROWS }) => {
+        try {
+          // Remove heavy/non-content elements
+          document.querySelectorAll('img, video, svg, canvas, iframe, picture, source').forEach(el => el.remove());
+          document.querySelectorAll('[role="banner"], [role="dialog"], [role="contentinfo"], .cookie-banner, .cookie-consent, .cookies').forEach(el => el.remove());
 
-      const content = await page.content();
+          // Limit code blocks
+          const codeBlocks: Element[] = Array.from(document.querySelectorAll('pre, code'));
+          if (codeBlocks.length > MAX_CODE_BLOCKS) {
+            for (let i = MAX_CODE_BLOCKS; i < codeBlocks.length; i++) {
+              const el = codeBlocks[i];
+              if (el && el.parentElement) el.remove();
+            }
+          }
+
+          // Limit total table rows
+          let remainingRows = MAX_TABLE_ROWS as number;
+          const tables: HTMLTableElement[] = Array.from(document.querySelectorAll('table')) as HTMLTableElement[];
+          for (const table of tables) {
+            const rows: HTMLTableRowElement[] = Array.from(table.querySelectorAll('tr')) as HTMLTableRowElement[];
+            if (rows.length <= remainingRows) {
+              remainingRows -= rows.length;
+              continue;
+            }
+            // Keep header rows if present, then truncate body rows
+            const thead = table.querySelector('thead');
+            const headerRowCount = thead ? thead.querySelectorAll('tr').length : 0;
+            const toKeep = Math.max(0, remainingRows - headerRowCount);
+            const bodyRows: HTMLTableRowElement[] = Array.from(table.querySelectorAll('tbody tr')) as HTMLTableRowElement[];
+            let kept = 0;
+            for (let i = 0; i < bodyRows.length; i++) {
+              if (kept < toKeep) {
+                kept++;
+                continue;
+              }
+              bodyRows[i].remove();
+            }
+            remainingRows = 0;
+            if (remainingRows <= 0) break;
+          }
+
+          // Prefer main content containers
+          const keepSelectors = [
+            'article',
+            'main',
+            '.theme-doc-markdown',
+            '.markdown',
+            '.md-content',
+            '[data-md-component="content"]',
+            '.docs-content',
+            '.docMainContainer',
+            '.redoc-wrap',
+            '.api-content',
+            '.docContent',
+            '.doc-content',
+            '.page-content'
+          ];
+
+          const kept: Element[] = [];
+          for (const sel of keepSelectors) {
+            document.querySelectorAll(sel).forEach(el => kept.push(el));
+          }
+
+          let bodyHtml: string;
+          if (kept.length > 0) {
+            bodyHtml = kept.map(el => (el as HTMLElement).outerHTML).join('\n');
+          } else {
+            bodyHtml = document.body ? (document.body as HTMLElement).innerHTML : '';
+          }
+
+          return `<html><body>${bodyHtml}</body></html>`;
+        } catch {
+          return null;
+        }
+      }, { MAX_CODE_BLOCKS: MAX_CODE_BLOCKS_PER_PAGE, MAX_TABLE_ROWS: MAX_TABLE_ROWS_TOTAL });
+
+      // Prefer initial network HTML if present and not an obvious skeleton; else use pruned snapshot; else full snapshot
+      let content: string | null = null;
+      try {
+        const isHtml = (ct: string | null) => ct && ct.toLowerCase().includes('text/html');
+        const contentType = (gotoResponse as any)?.headerValue ? (gotoResponse as any).headerValue('content-type') : ((gotoResponse as any)?.headers?.()['content-type']);
+        let initialHtml: string | null = null;
+        if (gotoResponse && isHtml(String(contentType || ''))) {
+          try {
+            initialHtml = await (gotoResponse as any).text();
+          } catch {
+            initialHtml = null;
+          }
+        }
+        const looksSkeleton = initialHtml ? !/(<article|<main|theme-doc-markdown|markdown|md-content|docs-content|docMainContainer|redoc-wrap|api-content|docContent)/i.test(initialHtml) : true;
+        if (initialHtml && !looksSkeleton) {
+          content = initialHtml;
+        }
+      } catch {
+        // ignore
+      }
+
+      if (!content) {
+        content = prunedHtml || await page.content();
+      }
 
       // Check if page is too large (over 10MB of HTML)
-      const MAX_PAGE_SIZE = 10 * 1024 * 1024; // 10MB
-      if (content.length > MAX_PAGE_SIZE) {
+      if (content.length > MAX_PAGE_SIZE_BYTES) {
         logMessage('warn', `Page ${urlString} is too large (${Math.round(content.length / 1024 / 1024)}MB), skipping`, metadata);
         return null;
       }
@@ -1332,6 +1418,13 @@ class HtmlMarkdownStrategy implements ProcessingStrategy {
     }
     if (typeof content !== 'string') {
       content = JSON.stringify(content, null, 2);
+    }
+
+    // Skip conversion for large content (same limit as PlaywrightFetchingStrategy)
+    const MAX_CONTENT_SIZE_FOR_CONVERSION = 15 * 1024 * 1024; // 15MB max
+    if (content.length > MAX_CONTENT_SIZE_FOR_CONVERSION) {
+      logMessage('warn', `HtmlMarkdownStrategy: Content too large for conversion (${Math.round(content.length / 1024 / 1024)}MB), skipping`, metadata);
+      return null; // Let RawPageContentStrategy handle it
     }
 
     // Check if content is already Markdown (from individual page conversion)
