@@ -70,6 +70,8 @@
       "pages": [
         "guides/self-hosting",
         "guides/architecture",
+        "guides/postgres",
+        "guides/ftp-sftp",
         "guides/oauth-integrations",
         "guides/webhooks",
         "guides/hubspot",
