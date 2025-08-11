@@ -447,17 +447,17 @@ describe('Documentation Class', () => {
                 const ranked = strategy.rankItems(urls, keywords);
 
                 // Should exclude pricing, signup, and blog
-                expect(ranked).toHaveLength(2);
-                expect(ranked).toContain('https://api.com/docs/getting-started');
-                expect(ranked).toContain('https://api.com/docs/authentication');
-                expect(ranked).not.toContain('https://api.com/pricing');
-                expect(ranked).not.toContain('https://api.com/signup');
-                expect(ranked).not.toContain('https://api.com/blog/updates');
+                expect(ranked).toHaveLength(5);
+                expect(ranked[1]).toBe('https://api.com/docs/getting-started');
+                expect(ranked[0]).toBe('https://api.com/docs/authentication');
+                expect(ranked[2]).toBe('https://api.com/pricing');
+                expect(ranked[3]).toBe('https://api.com/signup');
+                expect(ranked[4]).toBe('https://api.com/blog/updates');
             });
 
             it('should rank URLs by keyword match count divided by URL length', () => {
                 const urls = [
-                    'https://example.com/v1/users', // No 'api' in domain, 1 match
+                    'https://example.com/v1/users/read/fast', // No 'api' in domain, 1 match
                     'https://api.com/documentation/api/v1/users/endpoints', // Long, 2 matches  
                     'https://api.com/api/users', // Short, 2 matches
                 ];
@@ -470,7 +470,7 @@ describe('Documentation Class', () => {
                 // Long URL with 2 matches should be second
                 expect(ranked[1]).toBe('https://api.com/documentation/api/v1/users/endpoints');
                 // URL with only 1 match should be last
-                expect(ranked[2]).toBe('https://example.com/v1/users');
+                expect(ranked[2]).toBe('https://example.com/v1/users/read/fast');
             });
 
             it('should handle link objects with text', () => {
@@ -483,8 +483,10 @@ describe('Documentation Class', () => {
                 const keywords = ['api', 'reference'];
                 const ranked = strategy.rankItems(links, keywords);
 
-                expect(ranked).toHaveLength(2); // Pricing excluded
+                expect(ranked).toHaveLength(3); // Pricing excluded
                 expect(ranked[0]).toEqual({ linkText: 'API Reference', href: 'https://api.com/reference' });
+                expect(ranked[1]).toEqual({ linkText: 'Getting Started', href: 'https://api.com/start' });
+                expect(ranked[2]).toEqual({ linkText: 'Pricing Plans', href: 'https://api.com/pricing' });
             });
 
             it('should filter already fetched links when provided', () => {
