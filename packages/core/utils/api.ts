@@ -325,7 +325,8 @@ export async function generateApiConfig({
   if(!messages) messages = [];
   
   if (messages.length === 0) {
-    const documentation = (await integrationManager?.documentation)?.length < LanguageModel.contextLength / 4 ? (await integrationManager?.documentation) : await integrationManager?.searchDocumentation(apiConfig.instruction);
+    const fullDocs = await integrationManager?.getDocumentation();
+    const documentation = fullDocs?.content?.length < LanguageModel.contextLength / 4 ? fullDocs?.content : await integrationManager?.searchDocumentation(apiConfig.instruction);
     const userPrompt = `Generate API configuration for the following:
 
 <instruction>
@@ -344,8 +345,8 @@ ${apiConfig.pagination ? `Pagination: ${JSON.stringify(apiConfig.pagination)}` :
 ${apiConfig.method ? `Method: ${apiConfig.method}` : ''}
 </user_provided_information>
 
-<integration_instructions>
-${integrationManager?.specificInstructions}
+<integration_instructions>  
+${(await integrationManager?.getIntegration())?.specificInstructions}
 </integration_instructions>
 
 <documentation>
@@ -376,7 +377,7 @@ ${JSON.stringify(sample(payload || {}, 5)).slice(0, LanguageModel.contextLength 
     submitToolDefinition.arguments,
     temperature,
     [searchDocumentationToolDefinition],
-    { integration: await integrationManager?.toIntegration() }
+    { integration: await integrationManager?.getIntegration() }
   );
 
   if(generatedConfig?.error) {

@@ -496,7 +496,7 @@ export default function IntegrationsPage() {
                                                     className="h-8 w-8 text-muted-foreground hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
                                                     onClick={() => handleRefreshDocs(integration.id)}
                                                     disabled={
-                                                        pendingDocIds.has(integration.id) ||
+                                                        (pendingDocIds.has(integration.id) && Date.now() - new Date(integration.updatedAt).getTime() < 60000) ||
                                                         integration.documentationUrl.startsWith('file://')
                                                     }
                                                     title={

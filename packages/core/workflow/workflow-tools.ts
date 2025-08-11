@@ -140,7 +140,7 @@ export const buildWorkflowImplementation: ToolImplementation<WorkflowBuildContex
             }))
         };
 
-        logMessage('info', `Workflow built successfully: ${workflow.id}`, context);
+        logMessage('info', `Workflow built successfully: ${workflow.id}`, { orgId: context.orgId, runId: context.runId });
             
         return {
             success: true,
