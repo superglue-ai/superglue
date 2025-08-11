@@ -646,7 +646,7 @@ Common errors:
 - Duplicate or missing prefixes in urlPath (pay special attention to both error sources when using variables, and try removing or adding prefixes in case they are missing/present in the variables)
 - Database not found: Try to extract from connection string or infer from user instruction
 - Incorrect table or column names, make sure to use the ones provided in previous explorative steps rather than guessing table or column names
-- Incorrect query logic (joins, filters, etc.)
+- INSERT has more target columns than expressions for query: if there is a mismatch between query params (insert v1, v2), placeholders ($1, $2, etc.), and args. Align them carefully. 
 - Missing or incorrectly ordered parameters when using parameterized queries
 </POSTGRES>
 

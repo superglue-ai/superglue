@@ -30,7 +30,12 @@ export async function callPostgres(endpoint: ApiConfig, payload: Record<string, 
   let connectionString = await replaceVariables(composeUrl(endpoint.urlHost, endpoint.urlPath), requestVars);
   connectionString = sanitizeDatabaseName(connectionString);
   
-  const bodyParsed = JSON.parse(await replaceVariables(endpoint.body, requestVars));
+  let bodyParsed: any;
+  try {
+    bodyParsed = JSON.parse(await replaceVariables(endpoint.body, requestVars));
+  } catch (error) {
+    throw new Error(`Invalid JSON in body: ${error.message} for body: ${JSON.stringify(endpoint.body)}`);
+  }
   const queryText = bodyParsed.query;
   const queryParams = bodyParsed.params || bodyParsed.values; // Support both 'params' and 'values' keys
 
