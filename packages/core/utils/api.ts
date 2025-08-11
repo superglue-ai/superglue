@@ -9,6 +9,7 @@ import { LanguageModel } from "../llm/llm.js";
 import { SELF_HEALING_API_AGENT_PROMPT } from "../llm/prompts.js";
 import { searchDocumentationToolDefinition, submitToolDefinition } from "../workflow/workflow-tools.js";
 import { parseFile } from "./file.js";
+import { callFTP } from "./ftp.js";
 import { logMessage } from "./logs.js";
 import { callPostgres } from "./postgres.js";
 import { telemetryClient } from "./telemetry.js";
@@ -116,6 +117,16 @@ export async function callEndpoint({endpoint, payload, credentials, options}: {e
         body: processedBody
       };
       return { data: await callPostgres(postgresEndpoint, payload, credentials, options), statusCode: 200, headers: {} };
+    }
+
+    if (processedUrlHost.startsWith("ftp://") || processedUrlHost.startsWith("ftps://") || processedUrlHost.startsWith("sftp://")) {
+      const ftpEndpoint = {
+        ...endpoint,
+        urlHost: processedUrlHost,
+        urlPath: processedUrlPath,
+        body: processedBody
+      };
+      return { data: await callFTP(ftpEndpoint, payload, credentials, options), statusCode: 200, headers: {} };
     }
 
     const processedUrl = composeUrl(processedUrlHost, processedUrlPath);

@@ -337,6 +337,27 @@ Important: Avoid using LOOP mode for potentially very large data objects. If you
   * Provide values in the params or values array in the same order
 </POSTGRES>
 
+<FTP_SFTP>
+- You can use the following format to access FTP/SFTP servers:
+  * FTP: urlHost: "ftp://<<username>>:<<password>>@<<hostname>>:21", urlPath: "/basepath"
+  * FTPS (secure FTP): urlHost: "ftps://<<username>>:<<password>>@<<hostname>>:21", urlPath: "/basepath"
+  * SFTP (SSH FTP): urlHost: "sftp://<<username>>:<<password>>@<<hostname>>:22", urlPath: "/basepath"
+- The body must contain a JSON object with an 'operation' field specifying the action to perform
+- Supported operations are: list, get, put, delete, rename, mkdir, rmdir, exists, stat
+- Examples:
+  * List directory: body: {"operation": "list", "path": "/directory"}
+  * Get file (returns content as JSON if possible): body: {"operation": "get", "path": "/file.json"}
+  * Upload file: body: {"operation": "put", "path": "/upload.txt", "content": "<<fileContent>>"}
+  * Delete file: body: {"operation": "delete", "path": "/file.txt"}
+  * Rename/move: body: {"operation": "rename", "path": "/old.txt", "newPath": "/new.txt"}
+  * Create directory: body: {"operation": "mkdir", "path": "/newfolder"}
+  * Remove directory: body: {"operation": "rmdir", "path": "/folder"}
+  * Check existence: body: {"operation": "exists", "path": "/file.txt"}
+  * Get file stats: body: {"operation": "stat", "path": "/file.txt"}
+- All file operations return JSON responses
+- The 'get' operation automatically parses files and returns the parsed data
+- Path variables can use <<>> syntax: {"operation": "get", "path": "/<<folder>>/<<filename>>"}
+</FTP_SFTP>
 <VARIABLES>
 - Use <<variable>> syntax to access variables and execute JavaScript expressions wrapped in (sourceData) => ... or as a plain variable if in the payload:
    Basic variable access:
@@ -649,6 +670,32 @@ Common errors:
 - INSERT has more target columns than expressions for query: if there is a mismatch between query params (insert v1, v2), placeholders ($1, $2, etc.), and args. Align them carefully. 
 - Missing or incorrectly ordered parameters when using parameterized queries
 </POSTGRES>
+
+<FTP_SFTP>
+Correct FTP/SFTP configuration:
+- FTP: urlHost: "ftp://<<username>>:<<password>>@<<hostname>>:21", urlPath: "/basepath"
+- FTPS: urlHost: "ftps://<<username>>:<<password>>@<<hostname>>:21", urlPath: "/basepath"  
+- SFTP: urlHost: "sftp://<<username>>:<<password>>@<<hostname>>:22", urlPath: "/basepath"
+- body: Must be a JSON object with 'operation' field
+
+SUPPORTED OPERATIONS:
+- list: {"operation": "list", "path": "/directory"} - Returns array of file/directory info
+- get: {"operation": "get", "path": "/file.txt"} - Returns file content (auto-parses JSON)
+- put: {"operation": "put", "path": "/file.txt", "content": "data"} - Uploads content
+- delete: {"operation": "delete", "path": "/file.txt"} - Deletes file
+- rename: {"operation": "rename", "path": "/old.txt", "newPath": "/new.txt"} - Renames/moves
+- mkdir: {"operation": "mkdir", "path": "/newfolder"} - Creates directory
+- rmdir: {"operation": "rmdir", "path": "/folder"} - Removes directory
+- exists: {"operation": "exists", "path": "/file.txt"} - Checks if file exists
+- stat: {"operation": "stat", "path": "/file.txt"} - Gets file metadata
+
+Common errors:
+- Missing 'operation' field in body: Always include the operation type
+- Unsupported operation: Only use the 9 operations listed above
+- Missing required fields: 'get' needs 'path', 'put' needs 'path' and 'content', 'rename' needs 'path' and 'newPath'
+- Incorrect protocol in URL: Ensure ftp://, ftps://, or sftp:// prefix matches the server type
+- Path issues: Paths are relative to the base path in urlPath or absolute from root
+</FTP_SFTP>
 
 <SOAP>
 For SOAP requests:
