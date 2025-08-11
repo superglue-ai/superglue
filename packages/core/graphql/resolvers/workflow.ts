@@ -100,8 +100,8 @@ export const executeWorkflowResolver = async (
 
       // refresh oauth tokens if needed
       await Promise.all(integrationManagers.map(i => i.refreshTokenIfNeeded()));
-      const integrations = await Promise.all(integrationManagers.map(i => i.getIntegration()));
-      const integrationCreds = flattenAndNamespaceWorkflowCredentials(integrations);
+
+      const integrationCreds = flattenAndNamespaceWorkflowCredentials(integrationManagers);
 
       // Process args.credentials with variable replacement
       const processedCredentials = await Promise.all(
