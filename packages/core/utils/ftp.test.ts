@@ -1,4 +1,4 @@
-import { ApiConfig, RequestOptions } from '@superglue/client';
+import { ApiConfig, HttpMethod, RequestOptions } from '@superglue/client';
 import { describe, expect, it, vi } from 'vitest';
 
 // Mock the modules before importing callFTP
@@ -14,7 +14,7 @@ describe('callFTP', () => {
     urlHost: 'ftp://testuser:testpass@ftp.example.com',
     urlPath: '/testpath',
     body: '{"operation": "list"}',
-    method: 'GET',
+    method: HttpMethod.GET,
     instruction: 'Test FTP endpoint'
   };
 
