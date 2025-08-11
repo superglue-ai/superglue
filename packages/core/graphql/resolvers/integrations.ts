@@ -171,10 +171,10 @@ function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined
 }
 
 function shouldTriggerDocFetch(input: Integration, existingIntegration?: Integration | null): boolean {
-  // If a doc fetch is already in progress, never trigger a new one
-  if (existingIntegration?.documentationPending === true) return false;
   // Special case: Manual refresh - if input explicitly sets documentationPending to true. Manual refresh only possible when doc fetching not in progress, so no conflict with condition one.
   if (input.documentationPending === true) return true;
+  // If a doc fetch is already in progress, never trigger a new one
+  if (existingIntegration?.documentationPending === true) return false;
   // Check if documentationUrl is a file:// URL (no need to fetch)
   if (input.documentationUrl?.startsWith('file://')) return false;
   // Trigger a fetch if:
