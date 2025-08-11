@@ -325,8 +325,7 @@ export async function generateApiConfig({
   if(!messages) messages = [];
   
   if (messages.length === 0) {
-    const documentation = await integrationManager?.searchDocumentation(apiConfig.instruction) || 
-      (await integrationManager?.documentation)?.slice(0, LanguageModel.contextLength / 10);
+    const documentation = (await integrationManager?.documentation)?.length < LanguageModel.contextLength / 4 ? (await integrationManager?.documentation) : await integrationManager?.searchDocumentation(apiConfig.instruction);
     const userPrompt = `Generate API configuration for the following:
 
 <instruction>
@@ -541,9 +540,9 @@ export async function executeApiCall({
     }
     catch (error) {
       const rawErrorString = error?.message || JSON.stringify(error || {});
-      lastError = maskCredentials(rawErrorString, credentials).slice(0, 1000);
+      lastError = maskCredentials(rawErrorString, credentials).slice(0, 2000);
       if(retryCount > 0) {
-        messages.push({ role: "user", content: `There was an error with the configuration, please fix: ${rawErrorString.slice(0, 2000)}` });
+        messages.push({ role: "user", content: `There was an error with the configuration, please fix: ${rawErrorString.slice(0, 4000)}` });
         logMessage('warn', `API call failed. ${lastError}`, metadata);
       }
 
