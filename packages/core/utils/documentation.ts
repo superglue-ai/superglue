@@ -1109,12 +1109,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
 
         for (const [linkText, href] of Object.entries(linkResult.links)) {
           if (this.shouldSkipLink(linkText, href, config.documentationUrl)) continue;
-
-          // Skip if already fetched
-          if (fetchedLinks.has(href)) continue;
-
-          // Skip if already in the pool (avoid duplicates in pool)
-          if (linkPool.some(l => l.href === href)) continue;
+          if (fetchedLinks.has(href) || linkPool.some(l => l.href === href)) continue;
 
           linkPool.push({ linkText, href });
         }
