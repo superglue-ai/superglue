@@ -214,7 +214,7 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
     }
     // Fallback to URL host matching
     return step.apiConfig?.urlHost && integration.urlHost &&
-      step.apiConfig.urlHost.includes(integration.urlHost.replace(/^https?:\/\//, ''));
+      step.apiConfig.urlHost.includes(integration.urlHost.replace(/^(https?|postgres(ql)?|ftp(s)?|sftp|file):\/\//, ''));
   });
 
   // Sync integrationId with linked integration

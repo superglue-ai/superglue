@@ -284,8 +284,9 @@ export function applyAuthFormat(format: string, credentials: Record<string, stri
   });
 }
 
+// i do not think we are actually using this anywhere since we always get an id for each request
 export function generateId(host: string, path: string) {
-  const domain = host?.replace(/^https?:\/\//, '') || 'api';
+  const domain = host?.replace(/^(https?|postgres(ql)?|ftp(s)?|sftp|file):\/\//, '') || 'api';
   const lastPath = path?.split('/').filter(Boolean).pop() || '';
   const rand = Math.floor(1000 + Math.random() * 9000);
   return `${domain}-${lastPath}-${rand}`;
