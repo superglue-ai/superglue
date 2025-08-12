@@ -53,6 +53,7 @@ async function executeFTPOperation(client: FTPClient, operation: FTPOperation): 
       // Return as JSON-friendly format
       return files.map(file => ({
         name: file.name,
+        path:  operation.path + (operation.path?.endsWith("/") ? "" : "/") + file.name,
         size: file.size,
         type: file.isDirectory ? 'directory' : file.isFile ? 'file' : file.isSymbolicLink ? 'symlink' : 'unknown',
         modifyTime: file.modifiedAt?.toISOString() || null,
@@ -147,7 +148,7 @@ async function executeFTPOperation(client: FTPClient, operation: FTPOperation): 
       
       return {
         exists: true,
-        path: operation.path,
+        path:  operation.path + (operation.path?.endsWith("/") ? "" : "/") + file.name,
         name: file.name,
         size: file.size,
         type: file.isDirectory ? 'directory' : file.isFile ? 'file' : 'unknown',
@@ -171,6 +172,7 @@ async function executeSFTPOperation(client: SFTPClient, operation: FTPOperation)
       // Return as JSON-friendly format
       return files.map(file => ({
         name: file.name,
+        path:  operation.path + (operation.path?.endsWith("/") ? "" : "/") + file.name,
         size: file.size,
         type: file.type === 'd' ? 'directory' : file.type === '-' ? 'file' : file.type === 'l' ? 'symlink' : 'unknown',
         modifyTime: new Date(file.modifyTime).toISOString(),

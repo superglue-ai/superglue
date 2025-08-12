@@ -389,7 +389,7 @@ Always wrap your code in <<CODE>> and <</CODE>> tags (note the closing tag has a
             const documentation = integrations[0]?.documentation || '';
             const evaluation = await evaluateResponse({
                 data: result,
-                instruction,
+                endpoint: {instruction} as any,
                 documentation
             });
 

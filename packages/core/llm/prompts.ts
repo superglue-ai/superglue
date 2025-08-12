@@ -690,6 +690,7 @@ SUPPORTED OPERATIONS:
 - stat: {"operation": "stat", "path": "/file.txt"} - Gets file metadata
 
 Common errors:
+- Permission denied in root. This is a common security setting. Try the upload subdirectory instead.
 - Missing 'operation' field in body: Always include the operation type
 - Unsupported operation: Only use the 9 operations listed above
 - Missing required fields: 'get' needs 'path', 'put' needs 'path' and 'content', 'rename' needs 'path' and 'newPath'

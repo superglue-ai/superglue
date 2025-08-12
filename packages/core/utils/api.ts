@@ -1,7 +1,6 @@
 import { type ApiConfig, FileType, PaginationType, type RequestOptions } from "@superglue/client";
 import type { AxiosRequestConfig, AxiosResponse } from "axios";
 import OpenAI from "openai";
-import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { server_defaults } from "../default.js";
 import { Metadata } from "../graphql/types.js";
 import { IntegrationManager } from "../integrations/integration-manager.js";
@@ -420,18 +419,19 @@ ${JSON.stringify(sample(payload || {}, 5)).slice(0, LanguageModel.contextLength 
 
 export async function evaluateResponse({
   data,
-  responseSchema,
-  instruction,
+  endpoint,
   documentation
 }: {
   data: any,
-  responseSchema?: JSONSchema,
-  instruction: string,
+  endpoint: ApiConfig,
   documentation?: string
 }): Promise<{ success: boolean, refactorNeeded: boolean, shortReason: string; }> {
   let content = JSON.stringify(data);
   if (content.length > LanguageModel.contextLength / 2) {
-    content = JSON.stringify(sample(data, 10)) + "\n\n...truncated...";
+    content = JSON.stringify(sample(data, 10));
+  }
+  if(content.length > LanguageModel.contextLength / 2) {
+    content = content.slice(0, LanguageModel.contextLength / 2) + "\n\n...truncated...";
   }
 
   // Include documentation context if available
@@ -468,9 +468,12 @@ If the response reads something like [ "12/2", "22.2", "frejgeiorjgrdelo"] that 
 If the response needs to be grouped or sorted or aggregated, this will be handled in a later step, so the appropriate response for you is to return { success: true, refactorNeeded: false, shortReason: "" }.
 Refactoring is NOT needed if the response contains extra fields or needs to be grouped.
 
-Instruction: ${instruction}${documentationContext}`
+<documentation>
+${documentationContext}
+</documentation>`
     },
-    { role: "user", content: `API Response: ${content}` }
+    { role: "user", content: `<request>${JSON.stringify(endpoint)}</request>
+<api_response>${content}</api_response>` }
   ] as OpenAI.Chat.ChatCompletionMessageParam[];
 
   const response = await LanguageModel.generateObject(
@@ -538,8 +541,7 @@ export async function executeApiCall({
       if (retryCount > 0 && isSelfHealing) {
         const result = await evaluateResponse({
           data: response.data,
-          responseSchema: endpoint.responseSchema,
-          instruction: endpoint.instruction,
+          endpoint: endpoint,
           documentation: await integrationManager?.searchDocumentation(endpoint.instruction)
         });
         success = result.success;
