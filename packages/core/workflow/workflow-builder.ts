@@ -202,7 +202,6 @@ Your finalTransform function MUST transform the collected data from all steps to
       }
     } catch (error: any) {
       logMessage('error', `Error during workflow build attempt: ${error.message}`, this.metadata);
-      throw error;
     }
 
     if (!builtWorkflow) {
