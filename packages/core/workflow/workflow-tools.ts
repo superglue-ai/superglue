@@ -23,9 +23,9 @@ export const searchDocumentationToolImplementation: ToolImplementation<WorkflowE
             return {
                 success: true,
                 data: {
-                        integrationId: integration.id,
-                        query,
-                        summary: "No documentation available for this integration. Try to execute the API call without documentation using your own knowledge or web search. Do not use the search_documentation tool."
+                    integrationId: integration.id,
+                    query,
+                    summary: "No documentation available for this integration. Try to execute the API call without documentation using your own knowledge or web search. Do not use the search_documentation tool."
                 }
             };
         }
@@ -42,9 +42,9 @@ export const searchDocumentationToolImplementation: ToolImplementation<WorkflowE
         return {
             success: true,
             data: {
-                    integrationId: integration.id,
-                    query,
-                    summary: searchResults || "No matches found for your query."
+                integrationId: integration.id,
+                query,
+                summary: searchResults || "No matches found for your query."
             }
         };
 
@@ -118,34 +118,44 @@ export const buildWorkflowImplementation: ToolImplementation<WorkflowBuildContex
             0.0
         );
 
-        const workflow = {
-            ...generatedWorkflow,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            steps: generatedWorkflow.steps.map((step: any) => ({
-                ...step,
-                apiConfig: {
-                    ...step.apiConfig,
-                    queryParams: step.apiConfig.queryParams ?
-                        Object.fromEntries(step.apiConfig.queryParams.map((p: any) => [p.key, p.value])) :
-                        undefined,
-                    headers: step.apiConfig.headers ?
-                        Object.fromEntries(step.apiConfig.headers.map((p: any) => [p.key, p.value])) :
-                        undefined,
-                    id: step.id,
-                    createdAt: new Date(),
-                    updatedAt: new Date()
-                },
-                responseMapping: "$" // LEGACY: Set default response mapping
-            }))
-        };
+        try {
+            const workflow = {
+                ...generatedWorkflow,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                steps: generatedWorkflow.steps.map((step: any) => ({
+                    ...step,
+                    apiConfig: {
+                        ...step.apiConfig,
+                        queryParams: step.apiConfig.queryParams ?
+                            Object.fromEntries(step.apiConfig.queryParams.map((p: any) => [p.key, p.value])) :
+                            undefined,
+                        headers: step.apiConfig.headers ?
+                            Object.fromEntries(step.apiConfig.headers.map((p: any) => [p.key, p.value])) :
+                            undefined,
+                        id: step.id,
+                        createdAt: new Date(),
+                        updatedAt: new Date()
+                    },
+                    responseMapping: "$" // LEGACY: Set default response mapping
+                }))
+            };
 
-        logMessage('info', `Workflow built successfully: ${workflow.id}`, { orgId: context.orgId, runId: context.runId });
-            
-        return {
-            success: true,
-            data: workflow
-        };
+            logMessage('info', `Workflow built successfully: ${workflow.id}`, { orgId: context.orgId, runId: context.runId });
+
+            return {
+                success: true,
+                data: workflow
+            };
+        } catch (workflowError) {
+            const errorMsg = typeof generatedWorkflow === 'string'
+                ? generatedWorkflow
+                : JSON.stringify(generatedWorkflow);
+            return {
+                success: false,
+                error: errorMsg
+            };
+        }
 
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
