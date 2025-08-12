@@ -177,11 +177,8 @@ export async function executeAndValidateMappingCode(input: any, mappingCode: str
 
   let result: any;
   try {
-    const scriptSource = `const fn = ${mappingCode}; return JSON.stringify(fn(JSON.parse(input)));`;
+    const scriptSource = `const fn = ${mappingCode}; const result = fn(JSON.parse(input)); return result === undefined ? null : JSON.stringify(result);`;
     result = JSON.parse(await context.evalClosure(scriptSource, null, { timeout: 10000 }));
-    if (result === null || result === undefined) {
-      return { success: false, error: "Result is empty" };
-    }
     // if no schema is given, skip validation
     if (!schema) {
       return { success: true, data: result };

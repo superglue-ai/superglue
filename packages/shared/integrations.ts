@@ -46,7 +46,6 @@ export const integrations: Record<string, IntegrationConfig> = {
         "issuers",
         "plans",
         "setup_intents",
-        "disputes",
         "payouts",
         "transfers",
         "balance",
@@ -528,7 +527,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     icon: "paypal",
     docsUrl: "https://developer.paypal.com/api/rest",
     preferredAuthType: "apikey",
-    keywords: ["payments", "orders", "captures", "refunds", "payouts", "invoices", "subscriptions", "plans", "products", "disputes", "transactions", "balances", "webhooks", "checkout", "billing", "query", "search", "api key"]
+    keywords: ["payments", "orders", "captures", "refunds", "payouts", "invoices", "subscriptions", "plans", "products", "transactions", "balances", "webhooks", "checkout", "billing", "query", "search"]
   },
   square: {
     apiUrl: "https://connect.squareup.com",

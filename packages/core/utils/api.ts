@@ -325,8 +325,8 @@ export async function generateApiConfig({
   if(!messages) messages = [];
   
   if (messages.length === 0) {
-    const documentation = await integrationManager?.searchDocumentation(apiConfig.instruction) || 
-      (await integrationManager?.documentation)?.slice(0, LanguageModel.contextLength / 10);
+    const fullDocs = await integrationManager?.getDocumentation();
+    const documentation = fullDocs?.content?.length < LanguageModel.contextLength / 4 ? fullDocs?.content : await integrationManager?.searchDocumentation(apiConfig.instruction);
     const userPrompt = `Generate API configuration for the following:
 
 <instruction>
@@ -345,8 +345,8 @@ ${apiConfig.pagination ? `Pagination: ${JSON.stringify(apiConfig.pagination)}` :
 ${apiConfig.method ? `Method: ${apiConfig.method}` : ''}
 </user_provided_information>
 
-<integration_instructions>
-${integrationManager?.specificInstructions}
+<integration_instructions>  
+${(await integrationManager?.getIntegration())?.specificInstructions}
 </integration_instructions>
 
 <documentation>
@@ -377,7 +377,7 @@ ${JSON.stringify(sample(payload || {}, 5)).slice(0, LanguageModel.contextLength 
     submitToolDefinition.arguments,
     temperature,
     [searchDocumentationToolDefinition],
-    { integration: await integrationManager?.toIntegration() }
+    { integration: await integrationManager?.getIntegration() }
   );
 
   if(generatedConfig?.error) {
@@ -541,9 +541,9 @@ export async function executeApiCall({
     }
     catch (error) {
       const rawErrorString = error?.message || JSON.stringify(error || {});
-      lastError = maskCredentials(rawErrorString, credentials).slice(0, 1000);
+      lastError = maskCredentials(rawErrorString, credentials).slice(0, 2000);
       if(retryCount > 0) {
-        messages.push({ role: "user", content: `There was an error with the configuration, please fix: ${rawErrorString.slice(0, 2000)}` });
+        messages.push({ role: "user", content: `There was an error with the configuration, please fix: ${rawErrorString.slice(0, 4000)}` });
         logMessage('warn', `API call failed. ${lastError}`, metadata);
       }
 

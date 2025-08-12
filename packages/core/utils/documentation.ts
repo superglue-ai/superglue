@@ -413,7 +413,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     'signup', 'login', 'pricing', 'contact', 'support', 'cookie',
     'privacy', 'terms', 'legal', 'policy', 'status', 'help', 'blog',
     'careers', 'about', 'press', 'news', 'events', 'partners',
-    'changelog', 'release-notes', 'updates', 'upgrade', 'register',
+    'changelog', 'release-notes', 'updates', 'upgrade', 'register', 'cli',
     'signin', 'sign-in', 'sign-up', 'trial', 'demo', 'sales'
   ];
 
@@ -890,13 +890,9 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
         if (filteredUrls.length >= PlaywrightFetchingStrategy.MAX_FETCHED_LINKS || filterPath === '/') {
           return filteredUrls;
         }
-
-        logMessage('debug', `Only found ${filteredUrls.length} URLs under ${filterPath}, trying broader filter...`, metadata);
       }
     }
-
-    logMessage('debug', `No matching URLs found in sitemap(s) for ${config.documentationUrl}`, metadata);
-    return [];
+    return uniqueSitemapUrls;
   }
 
   private async fetchPagesInParallel(
@@ -932,7 +928,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       const results = await Promise.all(batchPromises);
 
       for (const content of results) {
-        if (content) {
+        if (content && !combinedContent.includes(content)) {
           combinedContent += combinedContent ? `\n\n${content}` : content;
         }
       }
@@ -984,8 +980,8 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
 
   public getDefaultKeywords(): string[] {
     return [
-      "authentication", "authorization", "bearer", "token",
-      "getting started", "quickstart", "guides", "tutorial", "api", "api-reference", "open api",
+      "authentication", "authorization", "bearer", "token", "pagination", "api",
+      "getting started", "quickstart", "guides", "tutorial", "api-reference", "open api", "swagger",
       "objects", "data-objects", "properties", "values", "fields", "attributes", "parameters", "slugs", "schema", "lists", "query", "rest", "endpoints", "reference", "methods",
       "pagination", "response", "filtering", "sorting", "searching", "filter", "sort", "search",
       "get", "post", "put", "delete", "patch",
@@ -1005,12 +1001,24 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
   }
 
   public rankItems(items: string[] | { linkText: string, href: string }[], keywords: string[], fetchedLinks?: Set<string>): any[] {
+    // Helper function to extract path from URL
+    const extractPath = (url: string): string => {
+      try {
+        const urlObj = new URL(url);
+        // Return pathname + search + hash (everything after the domain)
+        return urlObj.pathname + urlObj.search + urlObj.hash;
+      } catch {
+        // If it's not a valid URL, return as-is (might already be a path)
+        return url;
+      }
+    };
+
     // Normalize items to a common format
     const normalizedItems = items.map(item => {
       if (typeof item === 'string') {
-        return { url: item, text: '', original: item };
+        return { url: extractPath(item), text: '', original: item };
       } else {
-        return { url: item.href, text: item.linkText, original: item };
+        return { url: extractPath(item.href), text: item.linkText, original: item };
       }
     });
 
@@ -1020,7 +1028,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       : normalizedItems;
 
     const scored = itemsToRank.map(item => {
-      const combined = `${item.text} ${item.url}`.toLowerCase();
+      const combined = `${item.url} ${item.text}`.toLowerCase();
 
       // Filter out links containing excluded keywords
       for (const excludedKeyword of PlaywrightFetchingStrategy.EXCLUDED_LINK_KEYWORDS) {
@@ -1052,7 +1060,6 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
 
     // Filter out items with score 0 (excluded links), sort by score, and return the original items
     return scored
-      .filter(s => s.score > 0)
       .sort((a, b) => b.score - a.score)
       .map(s => s.item);
   }
