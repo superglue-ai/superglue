@@ -6,6 +6,90 @@ const DEFAULT_TIMEOUT = 30000; // 30 seconds
 const DEFAULT_RETRIES = 0;
 const DEFAULT_RETRY_DELAY = 1000; // 1 second
 
+// Pool cache management
+interface PoolCacheEntry {
+  pool: Pool;
+  lastUsed: number;
+  connectionString: string;
+}
+
+const poolCache = new Map<string, PoolCacheEntry>();
+const POOL_IDLE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+const POOL_CLEANUP_INTERVAL = 60 * 1000; // 1 minute
+
+// Start cleanup interval
+let cleanupInterval: NodeJS.Timeout | null = null;
+
+function startCleanupInterval() {
+  if (!cleanupInterval) {
+    cleanupInterval = setInterval(() => {
+      const now = Date.now();
+      for (const [key, entry] of poolCache.entries()) {
+        if (now - entry.lastUsed > POOL_IDLE_TIMEOUT) {
+          entry.pool.end().catch(console.error);
+          poolCache.delete(key);
+        }
+      }
+    }, POOL_CLEANUP_INTERVAL);
+    
+    // Prevent the interval from keeping the process alive
+    if (cleanupInterval.unref) {
+      cleanupInterval.unref();
+    }
+  }
+}
+
+function getOrCreatePool(connectionString: string, poolConfig: PoolConfig): Pool {
+  const cacheKey = connectionString;
+  const existingEntry = poolCache.get(cacheKey);
+  
+  if (existingEntry) {
+    existingEntry.lastUsed = Date.now();
+    return existingEntry.pool;
+  }
+  
+  const pool = new Pool({
+    ...poolConfig,
+    // Add sensible pool defaults
+    max: 10, // Maximum number of clients in the pool
+    idleTimeoutMillis: 30000, // How long a client can sit idle before being removed
+    connectionTimeoutMillis: 5000, // How long to wait for a connection
+  });
+  
+  // Add error handler to prevent unhandled errors
+  pool.on('error', (err) => {
+    console.error('Unexpected pool error:', err);
+    // Remove from cache if pool has an error
+    poolCache.delete(cacheKey);
+  });
+  
+  poolCache.set(cacheKey, {
+    pool,
+    lastUsed: Date.now(),
+    connectionString
+  });
+  
+  // Start cleanup interval if not already running
+  startCleanupInterval();
+  
+  return pool;
+}
+
+// Graceful shutdown function
+export async function closeAllPools(): Promise<void> {
+  if (cleanupInterval) {
+    clearInterval(cleanupInterval);
+    cleanupInterval = null;
+  }
+  
+  const closePromises = Array.from(poolCache.values()).map(entry => 
+    entry.pool.end().catch(console.error)
+  );
+  
+  await Promise.all(closePromises);
+  poolCache.clear();
+}
+
 function sanitizeDatabaseName(connectionString: string): string {
   // First remove any trailing slashes
   let cleanUrl = connectionString.replace(/\/+$/, '');
@@ -50,23 +134,38 @@ export async function callPostgres(endpoint: ApiConfig, payload: Record<string, 
     }
   };
 
-  const pool = new Pool(poolConfig);
+  // Get or create pool from cache
+  const pool = getOrCreatePool(connectionString, poolConfig);
   let attempts = 0;
   const maxRetries = options?.retries || DEFAULT_RETRIES;
 
   do {
+    let client = null;
     try {
+      // Get a client from the pool instead of using pool.query directly
+      // This gives us better control over connection management
+      client = await pool.connect();
+      
+      // Set statement timeout for this specific query
+      await client.query(`SET statement_timeout = ${options?.timeout || DEFAULT_TIMEOUT}`);
+      
       // Use parameterized query if params are provided, otherwise fall back to simple query
       const result = queryParams 
-        ? await pool.query(queryText, queryParams)
-        : await pool.query(queryText);
-      await pool.end();
+        ? await client.query(queryText, queryParams)
+        : await client.query(queryText);
+      
+      // Release the client back to the pool (don't end the pool!)
+      client.release();
       return result.rows;
     } catch (error) {
+      // Always release client if we have one
+      if (client) {
+        client.release();
+      }
+      
       attempts++;
 
       if (attempts > maxRetries) {
-        await pool.end();
         if (error instanceof Error) {
           const errorContext = queryParams 
             ? ` for query: ${queryText} with params: ${JSON.stringify(queryParams)}`
