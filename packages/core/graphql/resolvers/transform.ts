@@ -73,7 +73,7 @@ export const transformResolver = async (
     const completedAt = new Date();
 
     if (options?.webhookUrl) {
-      await notifyWebhook(options.webhookUrl, callId, false, undefined, error.message);
+      notifyWebhook(options.webhookUrl, callId, false, undefined, error.message);
     }
 
     return {

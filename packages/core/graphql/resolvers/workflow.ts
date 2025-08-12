@@ -8,6 +8,7 @@ import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { IntegrationManager } from "../../integrations/integration-manager.js";
 import { logMessage } from "../../utils/logs.js";
 import { replaceVariables } from "../../utils/tools.js";
+import { notifyWebhook } from "../../utils/webhook.js";
 import { WorkflowBuilder } from "../../workflow/workflow-builder.js";
 
 function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined, defaultValue?: T): T | undefined {
@@ -89,7 +90,7 @@ export const executeWorkflowResolver = async (
     if (allIntegrationIds.size > 0) {
       const requestedIds = Array.from(allIntegrationIds);
       integrationManagers = await IntegrationManager.fromIds(requestedIds, context.datastore, context.orgId);
-      
+
       const foundIds = new Set(integrationManagers.map(i => i.id));
       requestedIds.forEach(id => {
         if (!foundIds.has(id)) {
@@ -99,8 +100,8 @@ export const executeWorkflowResolver = async (
 
       // refresh oauth tokens if needed
       await Promise.all(integrationManagers.map(i => i.refreshTokenIfNeeded()));
-      const integrations = await Promise.all(integrationManagers.map(i => i.getIntegration()));
-      const integrationCreds = flattenAndNamespaceWorkflowCredentials(integrations);
+
+      const integrationCreds = flattenAndNamespaceWorkflowCredentials(integrationManagers);
 
       // Process args.credentials with variable replacement
       const processedCredentials = await Promise.all(
@@ -136,6 +137,11 @@ export const executeWorkflowResolver = async (
       orgId: context.orgId
     });
 
+    // Notify webhook if configured (fire-and-forget)
+    if (args.options?.webhookUrl) {
+      notifyWebhook(args.options.webhookUrl, runId, true, result.data);
+    }
+
     return result;
 
   } catch (error) {
@@ -151,6 +157,11 @@ export const executeWorkflowResolver = async (
     };
     // Save run to datastore
     context.datastore.createRun({ result, orgId: context.orgId });
+
+    // Notify webhook if configured (for failure, fire-and-forget)
+    if (args.options?.webhookUrl) {
+      notifyWebhook(args.options.webhookUrl, runId, false, undefined, String(error));
+    }
 
     return { ...result, data: {}, stepResults: [] } as WorkflowResult;
   }

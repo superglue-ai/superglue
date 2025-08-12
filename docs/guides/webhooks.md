@@ -243,6 +243,65 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 }
 ```
 
+## Sending Workflow Results to Webhooks
+
+You can configure superglue to automatically send workflow execution results to a webhook URL. This is useful for:
+- Notifying external systems when workflows complete
+- Triggering downstream processes (e.g. AWS Lambda functions)
+- Logging workflow results to external monitoring systems
+
+### Basic Usage
+
+Simply add a `webhookUrl` in the options when executing a workflow:
+
+```typescript
+import { SuperglueClient } from "@superglue/client";
+
+const client = new SuperglueClient({ apiKey: "your-api-key" });
+
+// Execute workflow and send results to a webhook
+const result = await client.executeWorkflow({
+  id: "your-workflow-id",
+  payload: { 
+    // your input data
+  },
+  options: {
+    webhookUrl: "https://your-webhook-endpoint.com/webhook",
+    timeout: 30000,
+    retries: 3
+  }
+});
+```
+
+### Webhook Payload Format
+
+The webhook will receive a POST request with the following JSON payload:
+
+```json
+// On success:
+{
+  "callId": "workflow-run-id",
+  "success": true,
+  "data": {
+    // your workflow output data
+  }
+}
+
+// On failure:
+{
+  "callId": "workflow-run-id", 
+  "success": false,
+  "error": "Error message describing what went wrong"
+}
+```
+
+### Important Notes
+
+- **Fire-and-forget**: Webhook notifications are sent asynchronously and won't delay the workflow response
+- **Retries**: Failed webhook deliveries are automatically retried 3 times with a 10-second delay
+- **Timeout**: Webhook requests have a 10-second timeout
+- **No blocking**: Webhook failures don't affect the workflow execution or response
+
 ## Advanced Patterns
 
 ### Workflow Chaining

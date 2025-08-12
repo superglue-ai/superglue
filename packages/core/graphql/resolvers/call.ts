@@ -98,7 +98,7 @@ export const callResolver = async (
     const maskedError = maskCredentials(error.message, credentials);
 
     if (options?.webhookUrl) {
-      await notifyWebhook(options.webhookUrl, callId, false, undefined, error.message);
+      notifyWebhook(options.webhookUrl, callId, false, undefined, error.message);
     }
     const result = {
       id: callId,

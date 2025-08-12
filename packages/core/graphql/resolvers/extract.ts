@@ -115,7 +115,7 @@ export const extractResolver = async (
     const completedAt = new Date();
 
     if (options?.webhookUrl) {
-      await notifyWebhook(options.webhookUrl, callId, false, undefined, maskedError);
+      notifyWebhook(options.webhookUrl, callId, false, undefined, maskedError);
     }
 
     return {
