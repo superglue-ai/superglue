@@ -126,7 +126,7 @@ export async function callEndpoint({endpoint, payload, credentials, options}: {e
         urlPath: processedUrlPath,
         body: processedBody
       };
-      return { data: await callFTP(ftpEndpoint, payload, credentials, options), statusCode: 200, headers: {} };
+      return { data: await callFTP({endpoint: ftpEndpoint, credentials, options}), statusCode: 200, headers: {} };
     }
 
     const processedUrl = composeUrl(processedUrlHost, processedUrlPath);

@@ -37,7 +37,7 @@ describe('callFTP', () => {
         body: 'invalid json'
       };
 
-      await expect(callFTP(endpoint, mockPayload, mockCredentials, mockOptions))
+      await expect(callFTP({endpoint, credentials: mockCredentials, options: mockOptions}))
         .rejects.toThrow('Invalid JSON in body');
     });
 
@@ -47,7 +47,7 @@ describe('callFTP', () => {
         body: '{}'
       };
 
-      await expect(callFTP(endpoint, mockPayload, mockCredentials, mockOptions))
+      await expect(callFTP({endpoint, credentials: mockCredentials, options: mockOptions}))
         .rejects.toThrow("Missing 'operation' field in request body");
     });
 
@@ -57,7 +57,7 @@ describe('callFTP', () => {
         body: '{"operation": "unsupported"}'
       };
 
-      await expect(callFTP(endpoint, mockPayload, mockCredentials, mockOptions))
+      await expect(callFTP({endpoint, credentials: mockCredentials, options: mockOptions}))
         .rejects.toThrow('Unsupported operation: \'unsupported\'');
     });
   });
@@ -75,7 +75,7 @@ describe('callFTP', () => {
         // This will fail at connection, but won't fail at operation validation
         expect(async () => {
           try {
-            await callFTP(endpoint, mockPayload, mockCredentials, mockOptions);
+            await callFTP({endpoint, credentials: mockCredentials, options: mockOptions});
           } catch (e: any) {
             // Should not be an unsupported operation error
             expect(e.message).not.toContain('Unsupported operation');
@@ -93,26 +93,9 @@ describe('callFTP', () => {
           body: JSON.stringify({ operation: op })
         };
         
-        await expect(callFTP(endpoint, mockPayload, mockCredentials, mockOptions))
+        await expect(callFTP({endpoint, credentials: mockCredentials, options: mockOptions}))
           .rejects.toThrow(`Unsupported operation: '${op}'`);
       }
-    });
-  });
-
-  describe('Variable replacement', () => {
-    it('should handle variable replacement in body', async () => {
-      const endpoint = {
-        ...mockEndpoint,
-        body: '{"operation": "{{operation}}", "path": "{{filepath}}"}'
-      };
-      const payload = { 
-        operation: 'invalidOp',
-        filepath: '/test.txt'
-      };
-
-      // Should throw for invalid operation - the error message will include the operation
-      await expect(callFTP(endpoint, payload, mockCredentials, mockOptions))
-        .rejects.toThrow(/Unsupported operation:/);
     });
   });
 });

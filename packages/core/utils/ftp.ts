@@ -3,7 +3,7 @@ import { Client as FTPClient } from "basic-ftp";
 import * as path from "path";
 import SFTPClient from "ssh2-sftp-client";
 import { URL } from "url";
-import { composeUrl, replaceVariables } from "./tools.js";
+import { composeUrl } from "./tools.js";
 
 const DEFAULT_TIMEOUT = 30000; // 30 seconds
 const DEFAULT_RETRIES = 0;
@@ -274,18 +274,14 @@ async function executeSFTPOperation(client: SFTPClient, operation: FTPOperation)
   }
 }
 
-export async function callFTP(endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions): Promise<any> {
-  const requestVars = { ...payload, ...credentials };
-  
-  // Compose and replace variables in URL
-  let connectionString = await replaceVariables(composeUrl(endpoint.urlHost, endpoint.urlPath), requestVars);
+export async function callFTP({endpoint, credentials, options}: {endpoint: ApiConfig, credentials: Record<string, any>, options: RequestOptions}): Promise<any> {
+  let connectionString = composeUrl(endpoint.urlHost, endpoint.urlPath);
   const connectionInfo = parseConnectionUrl(connectionString);
   
   // Parse operation from body
   let operation: FTPOperation;
   try {
-    const bodyStr = await replaceVariables(endpoint.body, requestVars);
-    operation = JSON.parse(bodyStr);
+    operation = JSON.parse(endpoint.body);
   } catch (error) {
     throw new Error(`Invalid JSON in body: ${error.message}. Body must be a JSON object with an 'operation' field. Supported operations: ${SUPPORTED_OPERATIONS.join(', ')}`);
   }
@@ -300,17 +296,6 @@ export async function callFTP(endpoint: ApiConfig, payload: Record<string, any>,
       `Unsupported operation: '${operation.operation}'. ` +
       `Supported operations are: ${SUPPORTED_OPERATIONS.join(', ')}`
     );
-  }
-
-  // Apply variable replacements to operation paths
-  if (operation.path) {
-    operation.path = await replaceVariables(operation.path, requestVars);
-  }
-  if (operation.newPath) {
-    operation.newPath = await replaceVariables(operation.newPath, requestVars);
-  }
-  if (operation.content && typeof operation.content === 'string') {
-    operation.content = await replaceVariables(operation.content, requestVars);
   }
 
   let attempts = 0;
