@@ -90,7 +90,7 @@ export const executeWorkflowResolver = async (
     if (allIntegrationIds.size > 0) {
       const requestedIds = Array.from(allIntegrationIds);
       integrationManagers = await IntegrationManager.fromIds(requestedIds, context.datastore, context.orgId);
-
+      
       const foundIds = new Set(integrationManagers.map(i => i.id));
       requestedIds.forEach(id => {
         if (!foundIds.has(id)) {
@@ -100,8 +100,8 @@ export const executeWorkflowResolver = async (
 
       // refresh oauth tokens if needed
       await Promise.all(integrationManagers.map(i => i.refreshTokenIfNeeded()));
-
-      const integrationCreds = flattenAndNamespaceWorkflowCredentials(integrationManagers);
+      const integrations = await Promise.all(integrationManagers.map(i => i.getIntegration()));
+      const integrationCreds = flattenAndNamespaceWorkflowCredentials(integrations);
 
       // Process args.credentials with variable replacement
       const processedCredentials = await Promise.all(
