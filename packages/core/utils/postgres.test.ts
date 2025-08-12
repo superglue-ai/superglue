@@ -4,22 +4,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { callPostgres, closeAllPools } from './postgres.js';
 
 // Create mock functions that we can reference
-const mockClientQuery = vi.fn();
-const mockClientRelease = vi.fn();
-const mockPoolConnect = vi.fn();
+const mockPoolQuery = vi.fn();
 const mockPoolEnd = vi.fn();
 const mockPoolOn = vi.fn();
-
-// Mock client object
-const mockClient = {
-  query: mockClientQuery,
-  release: mockClientRelease
-};
 
 // Mock pg Pool
 vi.mock('pg', () => ({
   Pool: vi.fn().mockImplementation(() => ({
-    connect: mockPoolConnect,
+    query: mockPoolQuery,
     end: mockPoolEnd,
     on: mockPoolOn
   }))
@@ -49,9 +41,7 @@ describe('PostgreSQL Utilities', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Setup default mock implementations
-    mockPoolConnect.mockResolvedValue(mockClient);
     mockPoolEnd.mockResolvedValue(undefined);
-    mockClientRelease.mockImplementation(() => {});
   });
 
   afterEach(async () => {
@@ -62,9 +52,7 @@ describe('PostgreSQL Utilities', () => {
   describe('callPostgres', () => {
     it('should execute query successfully', async () => {
       const mockRows = [{ id: 1, name: 'test' }];
-      mockClientQuery
-        .mockResolvedValueOnce(undefined) // For SET statement_timeout
-        .mockResolvedValueOnce({ rows: mockRows }); // For actual query
+      mockPoolQuery.mockResolvedValueOnce({ rows: mockRows });
 
       const options: RequestOptions = {};
       const result = await callPostgres(mockEndpoint, mockPayload, mockCredentials, options);
@@ -83,11 +71,8 @@ describe('PostgreSQL Utilities', () => {
         connectionTimeoutMillis: 5000
       });
       
-      // Check client operations
-      expect(mockPoolConnect).toHaveBeenCalled();
-      expect(mockClientQuery).toHaveBeenCalledWith('SET statement_timeout = 30000');
-      expect(mockClientQuery).toHaveBeenCalledWith('SELECT * FROM users');
-      expect(mockClientRelease).toHaveBeenCalled();
+      // Check query was called
+      expect(mockPoolQuery).toHaveBeenCalledWith('SELECT * FROM users');
       
       // Pool should NOT be ended (it's cached now)
       expect(mockPoolEnd).not.toHaveBeenCalled();
@@ -95,16 +80,12 @@ describe('PostgreSQL Utilities', () => {
 
     it('should handle query errors', async () => {
       const errorMessage = 'Database error';
-      mockClientQuery
-        .mockResolvedValueOnce(undefined) // For SET statement_timeout
-        .mockRejectedValueOnce(new Error(errorMessage)); // For actual query
+      mockPoolQuery.mockRejectedValueOnce(new Error(errorMessage));
 
       const options: RequestOptions = {};
       await expect(callPostgres(mockEndpoint, mockPayload, mockCredentials, options))
         .rejects.toThrow(`PostgreSQL error: ${errorMessage} for query: SELECT * FROM users`);
 
-      // Client should still be released on error
-      expect(mockClientRelease).toHaveBeenCalled();
       // Pool should NOT be ended (it's cached)
       expect(mockPoolEnd).not.toHaveBeenCalled();
     });
@@ -122,15 +103,11 @@ describe('PostgreSQL Utilities', () => {
       };
 
       const errorMessage = 'No rows found';
-      mockClientQuery
-        .mockResolvedValueOnce(undefined) // For SET statement_timeout
-        .mockRejectedValueOnce(new Error(errorMessage)); // For actual query
+      mockPoolQuery.mockRejectedValueOnce(new Error(errorMessage));
 
       const options: RequestOptions = {};
       await expect(callPostgres(paramEndpoint, {}, mockCredentials, options))
         .rejects.toThrow(`PostgreSQL error: ${errorMessage} for query: SELECT * FROM users WHERE id = $1 with params: [999]`);
-
-      expect(mockClientRelease).toHaveBeenCalled();
     });
 
     it('should respect custom timeout', async () => {
@@ -138,9 +115,7 @@ describe('PostgreSQL Utilities', () => {
         timeout: 5000
       };
 
-      mockClientQuery
-        .mockResolvedValueOnce(undefined) // For SET statement_timeout
-        .mockResolvedValueOnce({ rows: [] }); // For actual query
+      mockPoolQuery.mockResolvedValueOnce({ rows: [] });
         
       await callPostgres(mockEndpoint, mockPayload, mockCredentials, options);
 
@@ -154,8 +129,6 @@ describe('PostgreSQL Utilities', () => {
         idleTimeoutMillis: 30000,
         connectionTimeoutMillis: 5000
       });
-      
-      expect(mockClientQuery).toHaveBeenCalledWith('SET statement_timeout = 5000');
     });
 
     it('should use parameterized queries when params are provided', async () => {
@@ -171,15 +144,13 @@ describe('PostgreSQL Utilities', () => {
       };
 
       const mockRows = [{ id: 123, name: 'test', status: 'active' }];
-      mockClientQuery
-        .mockResolvedValueOnce(undefined) // For SET statement_timeout
-        .mockResolvedValueOnce({ rows: mockRows }); // For actual query
+      mockPoolQuery.mockResolvedValueOnce({ rows: mockRows });
 
       const options: RequestOptions = {};
       const result = await callPostgres(paramEndpoint, {}, mockCredentials, options);
 
       expect(result).toEqual(mockRows);
-      expect(mockClientQuery).toHaveBeenCalledWith(
+      expect(mockPoolQuery).toHaveBeenCalledWith(
         'SELECT * FROM users WHERE id = $1 AND status = $2',
         [123, 'active']
       );
@@ -198,15 +169,13 @@ describe('PostgreSQL Utilities', () => {
       };
 
       const mockRows = [{ id: 1, name: 'John Doe', email: 'john@example.com' }];
-      mockClientQuery
-        .mockResolvedValueOnce(undefined) // For SET statement_timeout
-        .mockResolvedValueOnce({ rows: mockRows }); // For actual query
+      mockPoolQuery.mockResolvedValueOnce({ rows: mockRows });
 
       const options: RequestOptions = {};
       const result = await callPostgres(paramEndpoint, {}, mockCredentials, options);
 
       expect(result).toEqual(mockRows);
-      expect(mockClientQuery).toHaveBeenCalledWith(
+      expect(mockPoolQuery).toHaveBeenCalledWith(
         'INSERT INTO users (name, email) VALUES ($1, $2) RETURNING *',
         ['John Doe', 'john@example.com']
       );
@@ -218,26 +187,15 @@ describe('PostgreSQL Utilities', () => {
         retryDelay: 100
       };
 
-      // First attempt fails
-      mockClientQuery
-        .mockResolvedValueOnce(undefined) // SET statement_timeout
-        .mockRejectedValueOnce(new Error('First failure'));
-      
-      // Second attempt fails
-      mockClientQuery
-        .mockResolvedValueOnce(undefined) // SET statement_timeout
-        .mockRejectedValueOnce(new Error('Second failure'));
-      
-      // Third attempt succeeds
-      mockClientQuery
-        .mockResolvedValueOnce(undefined) // SET statement_timeout
+      mockPoolQuery
+        .mockRejectedValueOnce(new Error('First failure'))
+        .mockRejectedValueOnce(new Error('Second failure'))
         .mockResolvedValueOnce({ rows: [{ success: true }] });
 
       const result = await callPostgres(mockEndpoint, mockPayload, mockCredentials, options);
 
       expect(result).toEqual([{ success: true }]);
-      expect(mockPoolConnect).toHaveBeenCalledTimes(3);
-      expect(mockClientRelease).toHaveBeenCalledTimes(3); // Released after each attempt
+      expect(mockPoolQuery).toHaveBeenCalledTimes(3);
     });
 
     it('should fail after max retries', async () => {
@@ -246,21 +204,14 @@ describe('PostgreSQL Utilities', () => {
         retryDelay: 100
       };
 
-      // First attempt fails
-      mockClientQuery
-        .mockResolvedValueOnce(undefined) // SET statement_timeout
-        .mockRejectedValueOnce(new Error('First failure'));
-      
-      // Second attempt fails
-      mockClientQuery
-        .mockResolvedValueOnce(undefined) // SET statement_timeout
+      mockPoolQuery
+        .mockRejectedValueOnce(new Error('First failure'))
         .mockRejectedValueOnce(new Error('Second failure'));
 
       await expect(callPostgres(mockEndpoint, mockPayload, mockCredentials, options))
         .rejects.toThrow(`PostgreSQL error: Second failure for query: SELECT * FROM users`);
 
-      expect(mockPoolConnect).toHaveBeenCalledTimes(2);
-      expect(mockClientRelease).toHaveBeenCalledTimes(2);
+      expect(mockPoolQuery).toHaveBeenCalledTimes(2);
     });
 
     it('should handle variable replacement in query', async () => {
@@ -278,19 +229,17 @@ describe('PostgreSQL Utilities', () => {
       };
 
       const mockRows = [{ id: 123, name: 'test user' }];
-      mockClientQuery
-        .mockResolvedValueOnce(undefined) // For SET statement_timeout
-        .mockResolvedValueOnce({ rows: mockRows }); // For actual query
+      mockPoolQuery.mockResolvedValueOnce({ rows: mockRows });
         
       const result = await callPostgres(customEndpoint, customPayload, mockCredentials, {});
 
       expect(result).toEqual(mockRows);
-      expect(mockClientQuery).toHaveBeenCalledWith('SELECT * FROM users WHERE id = 123');
+      expect(mockPoolQuery).toHaveBeenCalledWith('SELECT * FROM users WHERE id = 123');
     });
 
     it('should reuse cached pools for same connection string', async () => {
       const mockRows = [{ id: 1, name: 'test' }];
-      mockClientQuery.mockResolvedValue({ rows: mockRows });
+      mockPoolQuery.mockResolvedValue({ rows: mockRows });
 
       // First call
       await callPostgres(mockEndpoint, mockPayload, mockCredentials, {});
@@ -300,8 +249,8 @@ describe('PostgreSQL Utilities', () => {
 
       // Pool should only be created once
       expect(vi.mocked(Pool)).toHaveBeenCalledTimes(1);
-      // But connect should be called twice (once per query)
-      expect(mockPoolConnect).toHaveBeenCalledTimes(2);
+      // But query should be called twice
+      expect(mockPoolQuery).toHaveBeenCalledTimes(2);
     });
 
     it('should sanitize database names with invalid characters', async () => {
@@ -313,9 +262,7 @@ describe('PostgreSQL Utilities', () => {
         body: JSON.stringify({ query: 'SELECT 1' })
       };
 
-      mockClientQuery
-        .mockResolvedValueOnce(undefined) // For SET statement_timeout
-        .mockResolvedValueOnce({ rows: [{ result: 1 }] }); // For actual query
+      mockPoolQuery.mockResolvedValueOnce({ rows: [{ result: 1 }] });
 
       await callPostgres(endpointWithDirtyDb, {}, mockCredentials, {});
 
@@ -331,9 +278,7 @@ describe('PostgreSQL Utilities', () => {
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       
       // Create a pool first
-      mockClientQuery
-        .mockResolvedValueOnce(undefined) // For SET statement_timeout
-        .mockResolvedValueOnce({ rows: [] }); // For actual query
+      mockPoolQuery.mockResolvedValueOnce({ rows: [] });
       await callPostgres(mockEndpoint, mockPayload, mockCredentials, {});
 
       // Get the error handler that was registered
@@ -353,7 +298,7 @@ describe('PostgreSQL Utilities', () => {
   describe('closeAllPools', () => {
     it('should close all cached pools', async () => {
       // Create multiple pools
-      mockClientQuery.mockResolvedValue({ rows: [] });
+      mockPoolQuery.mockResolvedValue({ rows: [] });
       
       await callPostgres(mockEndpoint, mockPayload, mockCredentials, {});
       

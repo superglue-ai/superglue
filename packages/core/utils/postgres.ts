@@ -140,28 +140,14 @@ export async function callPostgres(endpoint: ApiConfig, payload: Record<string, 
   const maxRetries = options?.retries || DEFAULT_RETRIES;
 
   do {
-    let client = null;
     try {
-      // Get a client from the pool instead of using pool.query directly
-      // This gives us better control over connection management
-      client = await pool.connect();
-      
-      // Set statement timeout for this specific query
-      await client.query(`SET statement_timeout = ${options?.timeout || DEFAULT_TIMEOUT}`);
       
       // Use parameterized query if params are provided, otherwise fall back to simple query
       const result = queryParams 
-        ? await client.query(queryText, queryParams)
-        : await client.query(queryText);
-      
-      // Release the client back to the pool (don't end the pool!)
-      client.release();
-      return result.rows;
+        ? await pool.query(queryText, queryParams)
+        : await pool.query(queryText);
+        return result.rows;
     } catch (error) {
-      // Always release client if we have one
-      if (client) {
-        client.release();
-      }
       
       attempts++;
 
