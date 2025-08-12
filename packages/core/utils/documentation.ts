@@ -1082,10 +1082,10 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     });
 
     while (fetchedLinks.size < PlaywrightFetchingStrategy.MAX_FETCHED_LINKS && linkPool.length > 0) {
-      const rankedLinks = 
-        linkPool.length > 1 ? 
-        this.rankItems(linkPool, keywords, fetchedLinks) as { linkText: string, href: string }[] 
-        : linkPool;
+      const rankedLinks =
+        linkPool.length > 1 ?
+          this.rankItems(linkPool, keywords, fetchedLinks) as { linkText: string, href: string }[]
+          : linkPool;
 
       if (rankedLinks.length === 0) break;
       const nextLink = rankedLinks[0];
@@ -1109,6 +1109,13 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
 
         for (const [linkText, href] of Object.entries(linkResult.links)) {
           if (this.shouldSkipLink(linkText, href, config.documentationUrl)) continue;
+
+          // Skip if already fetched
+          if (fetchedLinks.has(href)) continue;
+
+          // Skip if already in the pool (avoid duplicates in pool)
+          if (linkPool.some(l => l.href === href)) continue;
+
           linkPool.push({ linkText, href });
         }
       } catch (error) {
