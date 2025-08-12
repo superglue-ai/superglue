@@ -137,9 +137,9 @@ export const executeWorkflowResolver = async (
       orgId: context.orgId
     });
 
-    // Notify webhook if configured
+    // Notify webhook if configured (fire-and-forget)
     if (args.options?.webhookUrl) {
-      await notifyWebhook(args.options.webhookUrl, runId, true, result.data);
+      notifyWebhook(args.options.webhookUrl, runId, true, result.data);
     }
 
     return result;
@@ -158,9 +158,9 @@ export const executeWorkflowResolver = async (
     // Save run to datastore
     context.datastore.createRun({ result, orgId: context.orgId });
 
-    // Notify webhook if configured (for failure)
+    // Notify webhook if configured (for failure, fire-and-forget)
     if (args.options?.webhookUrl) {
-      await notifyWebhook(args.options.webhookUrl, runId, false, undefined, String(error));
+      notifyWebhook(args.options.webhookUrl, runId, false, undefined, String(error));
     }
 
     return { ...result, data: {}, stepResults: [] } as WorkflowResult;

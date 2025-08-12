@@ -28,11 +28,14 @@ describe('notifyWebhook', () => {
       {
         method: 'POST',
         url: webhookUrl,
-        data: {
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        data: JSON.stringify({
           callId,
           success: true,
           data
-        }
+        })
       },
       { timeout: 10000, retries: 3, retryDelay: 10000 }
     );
@@ -49,11 +52,14 @@ describe('notifyWebhook', () => {
       {
         method: 'POST',
         url: webhookUrl,
-        data: {
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        data: JSON.stringify({
           callId,
           success: false,
           error
-        }
+        })
       },
       { timeout: 10000, retries: 3, retryDelay: 10000 }
     );
