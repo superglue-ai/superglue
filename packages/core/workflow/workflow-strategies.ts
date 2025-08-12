@@ -83,24 +83,13 @@ const loopStrategy: ExecutionStrategy = {
     }
 
     try {
-      if (!step.loopSelector) {
-        if (Array.isArray(payload)) {
-          step.loopSelector = "$";
-        } else {
-          throw new Error("loopSelector is required for LOOP execution mode");
-        }
-      }
-
       let loopItems: any[] = [];
 
-      // Apply loop selector using transformation validation to support both JSONata and JS
-      const loopSelectorResult = await transformAndValidateSchema(payload, step.loopSelector, null);
-      if (loopSelectorResult.success) {
-        loopItems = Array.isArray(loopSelectorResult.data) ? loopSelectorResult.data : [];
-      }
+      const loopSelectorResult = await transformAndValidateSchema(payload, step.loopSelector || "$", null);
+      loopItems = loopSelectorResult.data;
 
       // Regenerate selector if no items found - always generate JS going forward
-      if (!Array.isArray(loopItems) || loopItems.length === 0) {
+      if (!loopSelectorResult.success || !Array.isArray(loopItems)) {
         logMessage("error", `No input data found for '${step.id}' - regenerating data selector`, metadata);
 
         const instruction = `Create a JavaScript function that extracts the array of items to loop over for step: ${step.id}. 
@@ -123,12 +112,12 @@ The function should return an array of items that this step will iterate over.`;
         const arraySchema = { type: "array", description: "Array of items to iterate over" };
         const transformResult = await generateTransformCode(arraySchema, payload, instruction, metadata);
 
-        if (transformResult?.mappingCode) {
-          step.loopSelector = transformResult.mappingCode;
-          const retryResult = await transformAndValidateSchema(payload, step.loopSelector, null);
-          if (retryResult.success) {
-            loopItems = Array.isArray(retryResult.data) ? retryResult.data : [];
-          }
+        step.loopSelector = transformResult.mappingCode;
+        const retryResult = await transformAndValidateSchema(payload, step.loopSelector, null);
+        loopItems = retryResult.data;
+
+        if (!retryResult.success || !Array.isArray(loopItems)) {
+          throw new Error("Failed to generate loop selector");
         }
       }
 
