@@ -461,7 +461,7 @@ type ExecutionStep {
 
 - `executionMode`: How to execute the step (DIRECT for single execution, LOOP for batch processing)
 - `loopSelector`: JSONata expression to select items for looping
-- `loopMaxIters`: Maximum iterations for loop mode (default: 100)
+- `loopMaxIters`: Maximum iterations for loop mode (default: 1000)
 - `inputMapping`: JSONata expression to map workflow data to step input
 - `responseMapping`: JSONata expression to transform step output
 

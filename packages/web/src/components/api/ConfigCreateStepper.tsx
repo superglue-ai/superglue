@@ -3,12 +3,12 @@
 import { useConfig } from '@/src/app/config-context';
 import { useToast } from '@/src/hooks/use-toast';
 import { inputErrorStyles, parseCredentialsHelper, splitUrl } from '@/src/lib/client-utils';
-import { integrations } from '@superglue/shared';
 import { cn, composeUrl } from '@/src/lib/utils';
 import { ApolloClient, gql, InMemoryCache, useSubscription } from '@apollo/client';
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { Label } from '@radix-ui/react-label';
 import { ApiConfig, AuthType, CacheMode, SuperglueClient } from '@superglue/client';
+import { integrations } from '@superglue/shared';
 import { createClient } from 'graphql-ws';
 import { Copy, Loader2, Terminal, Upload, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -185,7 +185,7 @@ export function ConfigCreateStepper({ configId: initialConfigId, mode = 'create'
         // Call autofill endpoint
         const response = await superglueClient.call({
           endpoint: {
-            id: url.urlHost?.replace(/^https?:\/\//, '').replace(/\//g, '') + '-' + Math.floor(1000 + Math.random() * 9000),
+            id: url.urlHost?.replace(/^(https?|postgres(ql)?|ftp(s)?|sftp|file):\/\//, '').replace(/\//g, '') + '-' + Math.floor(1000 + Math.random() * 9000),
             urlHost: url.urlHost,
             ...(url.urlPath ? { urlPath: url.urlPath } : {}),
             ...(formData.documentationUrl ? { documentationUrl: formData.documentationUrl } : {}),
@@ -219,7 +219,7 @@ export function ConfigCreateStepper({ configId: initialConfigId, mode = 'create'
         // Apply the returned config
         const config = response.config as ApiConfig
         if (config) {
-          const id = url.urlHost?.replace(/^https?:\/\//, '').replace(/\//g, '') + '-' + Math.floor(1000 + Math.random() * 9000)
+          const id = url.urlHost?.replace(/^(https?|postgres(ql)?|ftp(s)?|sftp|file):\/\//, '').replace(/\//g, '') + '-' + Math.floor(1000 + Math.random() * 9000)
           setConfigId(id)
 
           // Save the configuration with the generated schema

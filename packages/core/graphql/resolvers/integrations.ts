@@ -9,7 +9,7 @@ import { composeUrl } from '../../utils/tools.js';
 
 export const listIntegrationsResolver = async (
   _: any,
-  { limit = 10, offset = 0 }: { limit?: number; offset?: number },
+  { limit = 100, offset = 0 }: { limit?: number; offset?: number },
   context: Context,
   info: GraphQLResolveInfo
 ) => {

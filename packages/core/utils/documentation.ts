@@ -1024,7 +1024,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
 
     // Filter out already fetched links if provided
     const itemsToRank = fetchedLinks
-      ? normalizedItems.filter(item => !fetchedLinks.has(item.url))
+      ? normalizedItems.filter(item => !fetchedLinks.has(item.original))
       : normalizedItems;
 
     const scored = itemsToRank.map(item => {
