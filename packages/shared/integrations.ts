@@ -1472,9 +1472,17 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   firecrawl: {
     apiUrl: "https://api.firecrawl.dev/v1",
-    regex: "^(.*\\.)?firecrawl\\.dev(/.*)?$",
+    regex: "^.*firecrawl.*$",
     icon: "firecrawl",
     docsUrl: "https://docs.firecrawl.dev/api-reference/introduction",
+    preferredAuthType: "apikey",
+    keywords: ["crawl", "scrape", "extract", "search", "pdf", "web", "html", "markdown", "api key"]
+  },
+  crawlbase: {
+    apiUrl: "https://api.crawlbase.com",
+    regex: "^.*crawlbase.*$",
+    icon: "crawlbase",
+    docsUrl: "https://crawlbase.com/docs/crawling-api/",
     preferredAuthType: "apikey",
     keywords: ["crawl", "scrape", "extract", "search", "pdf", "web", "html", "markdown", "api key"]
   }
