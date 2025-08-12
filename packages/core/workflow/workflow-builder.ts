@@ -109,10 +109,10 @@ ${authSection}
     }
 
     let payloadText = JSON.stringify(this.initialPayload);
-    if(payloadText.length > maxLength) {
+    if (payloadText.length > maxLength) {
       payloadText = JSON.stringify(sample(this.initialPayload, 5), null, 2);
     }
-    if(payloadText.length > maxLength) {
+    if (payloadText.length > maxLength) {
       payloadText = payloadText.slice(0, maxLength) + '...[truncated]';
     }
 

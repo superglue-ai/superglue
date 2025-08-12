@@ -1067,56 +1067,58 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
   async legacyTryFetch(config: DocumentationConfig, metadata: Metadata): Promise<string | null> {
     if (!config?.documentationUrl) return null;
 
-    const fetchedLinks = new Set<string>();
-    let combinedContent = "";
+    const visitedUrls = new Set<string>();
+    let aggregatedDocumentation = "";
 
-    const keywords = this.getMergedKeywords(config.keywords);
+    const searchKeywords = this.getMergedKeywords(config.keywords);
 
-    // Pool of all discovered links (array allows duplicates with different text)
-    const linkPool: { linkText: string, href: string; }[] = [];
+    // Queue of discovered links with their anchor text for ranking (text helps prioritize relevant pages)
+    const linkQueue: { linkText: string, href: string; }[] = [];
 
     // Add documentation URL with high priority score
-    linkPool.push({
+    linkQueue.push({
       linkText: "documentation",
       href: config.documentationUrl,
     });
 
-    while (fetchedLinks.size < PlaywrightFetchingStrategy.MAX_FETCHED_LINKS && linkPool.length > 0) {
-      const rankedLinks = 
-        linkPool.length > 1 ? 
-        this.rankItems(linkPool, keywords, fetchedLinks) as { linkText: string, href: string }[] 
-        : linkPool;
+    while (visitedUrls.size < PlaywrightFetchingStrategy.MAX_FETCHED_LINKS && linkQueue.length > 0) {
+      const prioritizedLinks =
+        linkQueue.length > 1 ?
+          this.rankItems(linkQueue, searchKeywords, visitedUrls) as { linkText: string, href: string }[]
+          : linkQueue;
 
-      if (rankedLinks.length === 0) break;
-      const nextLink = rankedLinks[0];
+      if (prioritizedLinks.length === 0) break;
+      const nextLinkToFetch = prioritizedLinks[0];
 
-      // Remove the selected link from the pool to free memory
-      const linkIndex = linkPool.findIndex(l => l.href === nextLink.href);
+      // Remove the selected link from the queue to free memory
+      const linkIndex = linkQueue.findIndex(l => l.href === nextLinkToFetch.href);
       if (linkIndex > -1) {
-        linkPool.splice(linkIndex, 1);
+        linkQueue.splice(linkIndex, 1);
       }
 
       try {
-        const linkResult = await this.fetchPageContentWithPlaywright(nextLink.href, config, metadata);
-        fetchedLinks.add(nextLink.href);
+        const fetchedPageData = await this.fetchPageContentWithPlaywright(nextLinkToFetch.href, config, metadata);
+        visitedUrls.add(nextLinkToFetch.href);
 
-        if (!linkResult?.content) continue;
+        if (!fetchedPageData?.content) continue;
 
-        combinedContent += combinedContent ? `\n\n${linkResult.content}` : linkResult.content;
+        aggregatedDocumentation += aggregatedDocumentation ? `\n\n${fetchedPageData.content}` : fetchedPageData.content;
 
-        // Add newly discovered links to the pool (allow duplicates with different text)
-        if (!linkResult.links) continue;
+        // Add newly discovered links to the queue
+        if (!fetchedPageData.links) continue;
 
-        for (const [linkText, href] of Object.entries(linkResult.links)) {
+        for (const [linkText, href] of Object.entries(fetchedPageData.links)) {
           if (this.shouldSkipLink(linkText, href, config.documentationUrl)) continue;
-          linkPool.push({ linkText, href });
+          if (visitedUrls.has(href) || linkQueue.some(l => l.href === href)) continue;
+
+          linkQueue.push({ linkText, href });
         }
       } catch (error) {
-        logMessage('warn', `Failed to fetch link ${nextLink.href}: ${error?.message}`, metadata);
+        logMessage('warn', `Failed to fetch link ${nextLinkToFetch.href}: ${error?.message}`, metadata);
       }
     }
-    linkPool.length = 0;
-    return combinedContent;
+    linkQueue.length = 0;
+    return aggregatedDocumentation;
   }
 
   private shouldSkipLink(linkText: string, href: string, documentationUrl?: string): boolean {
