@@ -88,7 +88,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const [suggestions, setSuggestions] = useState<string[]>([]); // Store multiple suggestions
 
   const [showSchemaEditor, setShowSchemaEditor] = useState(false);
-  const [showSteps, setShowSteps] = useState(false);
+  const [showSteps, setShowSteps] = useState(true);
 
   const [reviewCredentials, setReviewCredentials] = useState<string>(
     JSON.stringify((currentWorkflow && (currentWorkflow as any).credentials) || {}, null, 2)
@@ -157,13 +157,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       icon: integration.icon || "default"
     }))
   ];
-
-  // Auto-open integration form when no integrations exist and we're on the integrations step
-  useEffect(() => {
-    if (integrations.length === 0) {
-      setShowIntegrationForm(true);
-    }
-  }, [integrations.length]);
 
   // Add this helper function near the top of the component
   const highlightJson = (code: string) => {
@@ -304,8 +297,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       setIsBuilding(true);
       try {
         const freshIntegrations = integrations; // Use the updated integrations from context
-        const schema = await client.generateSchema(instruction, "");
-        setSchema(JSON.stringify(schema, null, 2));
         const parsedPayload = JSON.parse(payload || '{}');
         const response = await client.buildWorkflow({
           instruction: instruction,
