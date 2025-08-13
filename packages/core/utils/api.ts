@@ -354,7 +354,9 @@ export async function generateApiConfig({
   
   if (messages.length === 0) {
     const fullDocs = await integrationManager?.getDocumentation();
-    const documentation = fullDocs?.content?.length < LanguageModel.contextLength / 4 ? fullDocs?.content : await integrationManager?.searchDocumentation(apiConfig.instruction);
+    const documentation = fullDocs?.content?.length < LanguageModel.contextLength / 4 ? 
+      fullDocs?.content : 
+      await integrationManager?.searchDocumentation(apiConfig.urlPath || apiConfig.instruction);
     const userPrompt = `Generate API configuration for the following:
 
 <instruction>
