@@ -197,7 +197,10 @@ describe('API Utilities', () => {
         ...testEndpoint,
         pagination: {
           type: PaginationType.OFFSET_BASED,
-          pageSize: "1"
+          pageSize: "1",
+        },
+        headers: {
+          'x-superglue-test': '<<offset>>'
         }
       } as ApiConfig;
 
@@ -222,6 +225,9 @@ describe('API Utilities', () => {
         pagination: {
           type: PaginationType.OFFSET_BASED,
           pageSize: "1"
+        },
+        headers: {
+          'x-superglue-test': '<<offset>>'
         }
       } as ApiConfig;
 

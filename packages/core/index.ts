@@ -91,11 +91,11 @@ async function startServer() {
         return false;
       }
 
-      logMessage('info', `Subscription connected`);
+      logMessage('debug', `Subscription connected`);
       return { datastore, orgId: authResult.orgId };
     },
     onDisconnect(ctx, code, reason) {
-      logMessage('info', `Subscription disconnected. code=${code} reason=${reason}`);
+      logMessage('debug', `Subscription disconnected. code=${code} reason=${reason}`);
     },
   }, wsServer);
 

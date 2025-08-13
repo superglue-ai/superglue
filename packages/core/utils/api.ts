@@ -73,6 +73,24 @@ export async function callEndpoint({endpoint, payload, credentials, options}: {e
 
     const requestVars = { ...paginationVars, ...allVariables };
 
+    // check if the pagination type is configured correctly
+    if (endpoint.pagination?.type === PaginationType.PAGE_BASED) {
+      const request = JSON.stringify(endpoint);
+      if(!request.includes('page')) {
+        throw new Error(`Pagination type is ${PaginationType.PAGE_BASED} but no page parameter is provided in the request. Please provide a page parameter in the request.`);
+      }
+    } else if (endpoint.pagination?.type === PaginationType.OFFSET_BASED) {
+      const request = JSON.stringify(endpoint);
+      if(!request.includes('offset')) {
+        throw new Error(`Pagination type is ${PaginationType.OFFSET_BASED} but no offset parameter is provided in the request. Please provide an offset parameter in the request.`);
+      }
+    } else if (endpoint.pagination?.type === PaginationType.CURSOR_BASED) {
+      const request = JSON.stringify(endpoint);
+      if(!request.includes('cursor')) {
+        throw new Error(`Pagination type is ${PaginationType.CURSOR_BASED} but no cursor parameter is provided in the request. Please provide a cursor parameter in the request.`);
+      }
+    }
+
     const headersWithReplacedVars = Object.fromEntries(
       (await Promise.all(
         Object.entries(endpoint.headers || {})
@@ -238,7 +256,7 @@ config: ${maskedConfig}`;
 
         const stopEval = await evaluateStopCondition(
           (endpoint.pagination as any).stopCondition,
-          lastResponse.data,
+          lastResponse,
           pageInfo
         );
 
@@ -336,7 +354,9 @@ export async function generateApiConfig({
   
   if (messages.length === 0) {
     const fullDocs = await integrationManager?.getDocumentation();
-    const documentation = fullDocs?.content?.length < LanguageModel.contextLength / 4 ? fullDocs?.content : await integrationManager?.searchDocumentation(apiConfig.instruction);
+    const documentation = fullDocs?.content?.length < LanguageModel.contextLength / 4 ? 
+      fullDocs?.content : 
+      await integrationManager?.searchDocumentation(apiConfig.urlPath || apiConfig.instruction);
     const userPrompt = `Generate API configuration for the following:
 
 <instruction>

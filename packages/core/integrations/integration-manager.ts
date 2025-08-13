@@ -107,7 +107,7 @@ export class IntegrationManager {
         if(!documentation.openApiSchema && !documentation.content) {
             return "no documentation provided";
         }
-        const result = Documentation.extractRelevantSections(documentation.openApiSchema || documentation.content, instruction);
+        const result = Documentation.extractRelevantSections(documentation.content, instruction, 5, 4000);
         this.searchCache.set(instruction, result);
         return result;
     }

@@ -31,7 +31,7 @@ export async function applyJsonata(data: any, expr: string): Promise<any> {
     return result;
   } catch (error) {
     const errorPositions = (error as any).position ? expr.substring(error.position - 10, error.position + 10) : "";
-    throw new Error(`JSONata transformation failed: ${error.message} at ${errorPositions}.`);
+    throw new Error(`Transformation failed: ${error.message} at ${errorPositions}.`);
   }
 }
 
@@ -129,9 +129,9 @@ export async function transformAndValidateSchema(data: any, expr: string, schema
     if (!expr) {
       result = { success: true, data: data };
     }
-
-    if (expr.startsWith("(sourceData) =>") ||
-      expr.startsWith("(sourceData)=>")) {
+    const ARROW_FUNCTION_PATTERN = /^\s*\([^)]+\)\s*=>/;
+    
+    if (ARROW_FUNCTION_PATTERN.test(expr)) {
       result = await executeAndValidateMappingCode(data, expr, schema);
     } else {
       result = await applyJsonataWithValidation(data, expr, schema);
@@ -330,7 +330,7 @@ export async function replaceVariables(template: string, payload: Record<string,
       if (result.success) {
         value = result.data;
       } else {
-        throw new Error(`Failed to run JS or JSONata expression: ${path} - ${result.error}`);
+        throw new Error(`Failed to run JS expression: ${path} - ${result.error}`);
       }
     }
 
@@ -486,7 +486,7 @@ export function safeHttpMethod(method: any): HttpMethod {
 
 export async function evaluateStopCondition(
   stopConditionCode: string,
-  response: any,
+  response: AxiosResponse,
   pageInfo: { page: number; offset: number; cursor: any; totalFetched: number }
 ): Promise<{ shouldStop: boolean; error?: string }> {
 
@@ -497,7 +497,8 @@ export async function evaluateStopCondition(
     const context = await isolate.createContext();
 
     // Inject the response and pageInfo as JSON strings
-    await context.global.set('responseJSON', JSON.stringify(response));
+    // legacy support for direct response data access
+    await context.global.set('responseJSON', JSON.stringify({ data: response.data, headers: response.headers, ...response.data }));
     await context.global.set('pageInfoJSON', JSON.stringify(pageInfo));
 
     // if the stop condition code starts with return or is not a function, we need to wrap it in a function

@@ -1,140 +1,10 @@
 //LEGACY prompt
-export const PROMPT_MAPPING = `You are an AI that generates JSONata mapping expressions to transform source data structures into target structures.
-
-Very important guidelines for creating JSONata mappings:
-
-Approach:
-Define variables you need first, then return the object / result. Every single variable definition block combined with the output must be wrapped in parentheses.
-e.g.
-(
-  $date := $millis();
-  {
-    "date": $date,
-    "vars": $map($.attendees, function($att) {
-      (
-        $name := $att.name;
-        "First Name: " & $name.split(" ")[0]
-      )
-    })
-  }
-)
-Use \n where appropriate for readability.
-
-1. Source References:
-   - Use exact field paths from the source data, e.g. $.merchant_category
-   - For accessing fields with names containing spaces or special characters (like - or @ or whatever), always use backticks, e.g. $.\`merchant category\`. Never use single quotes for field names. 
-   - Do NOT use array selectors (item["name"]) to select the field since jsonata does not support this syntax.
-   - Jsonata will automatically extract all the fields from the current context. E.g. if you need all variants from all products, you can use $.products.variants. No need to do nested map reduce operations.
-   - $. The variable with no name refers to the context value at any point in the input JSON hierarchy. Never use $ without a dot, this fails the validation. E.g. if the current context is products.price, then $.currency is products.price.currency
-    GOOD: $.currency
-    GOOD: $.\`currency item\`
-    GOOD: $.\`currency-item\`
-    GOOD: {"results": $.[{"title": title}]}
-    BAD: $currency - this is for all currencies, not the current one
-    BAD: $.currency-item - field names with special characters must be wrapped in backticks
-    BAD: {"results": $[{"title": title}]} - do not use array selectors like this
-    BAD: $["currency"] - jsonata does not support this syntax
-   - %. The parent of the current context value. E.g. if the current context is products.variants.size and you want variant name, use %.name
-   - When multiple source fields could map to a target, use a maximum of 3 fallbacks:
-    GOOD: source1 ? source1 : source2 ? source2 : source3 ? source3 : 'default'
-    BAD: source1 ? source1 : source1 ? source1 : source1 (repeated fields)
-    BAD: ($number(source1) or 0) - this is a boolean test, not a number fallback. use the syntax $number(source1) ? $number(source1) : 0 instead.
-
-2. Expression Rules:
-   - Avoid unnecessary array/string operations
-   - Each mapping should be clear and concise
-   - Use proper JSONata syntax for coalesce operations
-   - Do not use ~> to execute functions. Use the functions directly with the correct arguments or use $map(arr, $function) to apply a function to each element of an array.
-
-3. Array Handling:
-   - For mapping to an array of objects, use the following patterns:
-     a) When in array scope, use $.{} to map each object:
-        Correct: $.{"id": id, "name": name}
-        Incorrect: {"id": $.id}
-     b) When outside array scope, include the source path:
-        Correct: $.items.{"id": id, "name": name}
-        Incorrect: {"id": $.items.id}
-     c) For nested arrays, chain the array operators:
-        Correct: products.variants.{"size": size, "color": color}
-        Incorrect: products.[{"size": variants.size}]
-     d) You need to use the square brackets [] to map to an array of objects, otherwise it might return an object and fail the validation.
-        Correct: variants: [variants.{"size": size, "color": color}]
-        Incorrect: variants: variants.{"size": variants.size}
-        Incorrect: variants: variants.[{"size": variants.size}]
-   - For array elements, use JSONata array operators like [0] for first element, [-1] for last element
-   - Square bracket notation [] can be used with predicates, e.g. items[type='book']
-
-4. Field Selection Priority:
-   - Prefer variant-specific fields over general fields (e.g., sizeVariants.description over sizes)
-   - Choose the most specific/detailed field available (e.g., type="shelf" over category="furniture")
-
-5. Filters:
-   - Pay special attention to filter statements in the instruction and the schema description. Add them to the generated jsonata expression.
-     Example: Get me all products with SKU 0406654608 or products: {"type": "array", description: "only products with SKU 0406654608"}
-     Generated jsonata expression: Account.Order.Product[SKU = "0406654608"].{"Description": Description}
-   - For filtering with arrays, you can use the "in" operator. E.g. library.books["Steven King" in authors]
-
-6. Data Integrity:
-   - ONLY use fields that exist in the source data structure
-   - If no matching source field exists, either:
-     a) Use a constant value if appropriate
-     b) Leave the field undefined
-   - Never invent or assume the existence of fields not present in the source data
-
-7. Function Calls:
-   - You may use the following functions if prompted:
-      $string(arg) - Converts argument to string
-      $length(str) - Returns string length
-      $substring(str, start[, length]) - Extracts substring
-      $substringBefore(str, chars) - Gets substring before specified chars
-      $substringAfter(str, chars) - Gets substring after specified chars
-      $uppercase(str) - Converts to uppercase
-      $lowercase(str) - Converts to lowercase
-      $trim(str) - Removes whitespace from both ends
-      $pad(str, width[, char]) - Pads string to specified width
-      $contains(str, substring) - Tests if string contains substring
-      $fromMillis(milliseconds) - Converts milliseconds to ISO 8601 timestamp. E.g. $fromMillis(1728873600000) => "2024-10-15T00:00:00.000Z".
-      $toMillis(timestamp [, picture]) - Converts ISO 8601 timestamp to milliseconds. E.g. $toMillis("2017-11-07T15:07:54.972Z") => 1510067274972
-      $toDate(str | number) - Converts any timestamp string to valid ISO 8601 date string. E.g. $toDate("Oct 15, 2024 12:00:00 AM UTC") => "2024-10-15T00:00:00.000Z", $toDate(1728873600000) => "2024-10-15T00:00:00.000Z"
-      $dateMax(arr) - Returns the maximum date of an array of dates. E.g. $dateMax(["2017-11-07T15:07:54.972Z", "Oct 15, 2012 12:00:00 AM UTC"]) returns "2017-11-07T15:07:54.972Z".
-      $dateMin(arr) - Returns the minimum date of an array of dates. E.g. $dateMin($.variants.created_at) returns the minimum created_at date of all variants.
-      $dateDiff(date1, date2, unit: "seconds" | "minutes" | "hours" | "days") - Returns the difference between two dates in the specified unit. E.g. $dateDiff($.order.created_at, $.order.updated_at, "days") returns the number of days between the order created_at and updated_at.
-      $now([picture [, timezone]]) - Returns current date and time in ISO 8601 format. E.g. $now() => "2017-05-15T15:12:59.152Z"
-      $split(str[, separator][, limit]) - Splits string into array
-      $join(array[, separator]) - Joins array elements into string
-      $match(str, pattern[, limit]) - Returns array of regex matches
-      $replace(str, pattern, replacement) - Replaces all occurrences of pattern. E.g. $replace("abracadabra", /a.*?a/, "*") returns "ab*ad*bra". $replace("John Smith", "John", "Marc") returns Marc Smith.
-      $number(arg) - Converts an argument to a number.
-      $min(arr) - Returns minimum number of a number array. E.g. $min($map($.variants.price, $number)) returns the minimum price of all variants.
-      $max(arr) - Returns maximum number of a number array. E.g. $max($map($.variants.price, $number)) returns the maximum price of all variants.
-      $isArray(arr) - Returns true if the argument is an array, false otherwise.
-      $isString(str) - Returns true if the argument is a string, false otherwise.
-      $isNull(arg) - Returns true if the argument is null, false otherwise.
-      $count(array) - Returns array length
-      $sort(array[, function]) - Sorts array
-      $slice(array, start[, end]) - Returns a slice of the array
-      $distinct(array) - Removes duplicates
-      $map(array, function) - Applies function to each element
-      $merge([$obj1, $obj2, ...]) - merge an array of objects into a single object
-      $filter(array, function) - Filters array based on predicate
-      & - joins two strings together into a new concatenated string. do not use this for joining objects, use $merge instead.
-
-- Important: Error handling:
-  - try to fix the root cause of the error. Examine all source data references, computations, and syntax. Make sure the syntax for accessing fields and all references and all computations are correct.
-  - If you repeatedly get the same error, try a different approach from scratch. Most likely, your syntax is incorrect.
-  - If the error is something like \"instance is not of a type(s) array or array/null\". In this case, wrap the source selector in an array to ensure it always returns an array. 
-    Good: \"result\": [$.items]
-    Bad: \"result\": $.items
-  - If the error is something like \"instance is not of a type(s) object\" or \"does not match function signaure\", make sure you REALLY create the target schema with the correct type.
-  - Specifically, the computed result / input might be wrapped in array brackets. In this case, the array brackets set in the mapping are in the wrong place.
-  - If you get an error like \"is not of a type(s) string/number/object\", try to convert the source field, but also consider that the original field or one of its parent might be null. In this case, add a default value.
-  - If an object is optional but its fields required, you can add a test and default to {}, but do not set the inner fields to default null.
-Remember: The goal is to create valid JSONata expressions that accurately transform the source data structure into the required target structure. Follow all of these guidelines or I will lose my job.`;
 
 export const PROMPT_JS_TRANSFORM = `
 You are an expert data transformation engineer specializing in workflow data transformations.
 
 Your task is to generate a single, self-contained JavaScript function (as a string) that transforms source data into a target structure based on the user's instruction and an optional target schema.
+If no target schema is provided, generate an appropriate and concise output based on the instruction - if the instruction mentions a specific output structure or fields, include them and only them.
 
 CRITICAL CONTEXT FOR WORKFLOW TRANSFORMATIONS:
 1. In workflow contexts, sourceData contains:
@@ -150,8 +20,8 @@ CRITICAL CONTEXT FOR WORKFLOW TRANSFORMATIONS:
 
 3. For LOOP execution contexts:
    - currentItem is available as the second parameter: (sourceData, currentItem) => { ... }
-   - currentItem properties are flattened with underscore prefix for use in templates
-   - Example: if currentItem = { id: 123, name: "test" }, use <<currentItem_id>> in templates
+   - currentItem properties are flattened with dot notation for use in templates
+   - Example: if currentItem = { id: 123, name: "test" }, use <<currentItem.id>> in templates
 
 Requirements:
 - Function signature: (sourceData) => { ... } or (sourceData, currentItem) => { ... } for loops
@@ -163,22 +33,17 @@ Requirements:
 
 DEFENSIVE PROGRAMMING PATTERNS:
 \`\`\`javascript
-// Safe array access
 const items = Array.isArray(sourceData.items) ? sourceData.items : [];
 
-// Safe object access with defaults
 const config = sourceData.config || {};
 const name = config.name || 'default';
 
-// Safe nested access
 const userId = sourceData.user?.profile?.id;
 
-// Filtering with validation
 const activeItems = (sourceData.items || []).filter(item => 
   item && item.status === 'active'
 );
 
-// Conditional transformation
 if (sourceData.type === 'batch') {
   return sourceData.items.map(transformItem);
 } else {
@@ -194,7 +59,6 @@ COMMON WORKFLOW TRANSFORMATIONS:
   const items = sourceData.fetchItems;
   if (!Array.isArray(items)) return [];
   
-  // Apply any filtering based on initial payload
   const excludeIds = sourceData.excludeIds || [];
   return items.filter(item => !excludeIds.includes(item.id));
 }
@@ -217,7 +81,6 @@ COMMON WORKFLOW TRANSFORMATIONS:
 (sourceData) => {
   const results = [];
   
-  // Collect results from multiple steps
   if (sourceData.step1) results.push(...sourceData.step1);
   if (sourceData.step2) results.push(...sourceData.step2);
   
@@ -246,9 +109,10 @@ THE FUNCTION MUST BE VALID JAVASCRIPT that can be executed with eval().
 
 
 export const GENERATE_SCHEMA_PROMPT = `You are a json schema generator assistant. Generate a JSON schema based on instructions.
-If the response data is an array, make the schema an array of objects and name the array object "results". If no response data is provided, still generate a schema based on the instruction..
+If the response data is an array, make the schema an array of objects. If no response data is provided, still generate a schema based on the instruction..
 
 Make the schema as simple as possible. No need to include every possible field, just the ones relevant to the query.
+Important: USE THE SUBMIT TOOL TO SUBMIT THE SCHEMA.
 
 - The schema should be a JSON schema object.
 - The schema should be valid.
@@ -258,7 +122,7 @@ Make the schema as simple as possible. No need to include every possible field, 
 Example:
 
 Instructions: Get me all characters with only their name where the species is human
-Response data: [{"name": "Rick", "species": "Human"}, {"name": "Morty", "species": "Human"}]
+Example response: [{"name": "Rick", "species": "Human"}, {"name": "Morty", "species": "Human"}]
 
 Schema:
 {
@@ -330,7 +194,7 @@ Important: Avoid using LOOP mode for potentially very large data objects. If you
 - Consider that you might need additional information from tables to process the instruction. E.g. if a user asks for a list of products, you might need to join the products table with the categories table to get the category name and filter on that.
 - In case the query is unclear (user asks for all products that are in a category but you are unsure what the exact category names are), get all category names in step 1 and then create the actual query in step 2.
 - Use parameterized queries for safer and more efficient execution, you can also use <<>> tags to access variables:
-  * body: {query: "SELECT * FROM users WHERE id = $1 AND status = $2", params: [123, "<<status>>"]}
+  * body: {query: "SELECT * FROM users WHERE id = $1 AND status = $2", params: [123, "<<(sourceData) => sourceData.status>>"]}
   * body: {query: "INSERT INTO products (name, price) VALUES ($1, $2) RETURNING *", values: ["Widget", <<(sourceData) => sourceData.price * 1.2>>]}
   * Parameters prevent SQL injection and improve performance
   * Use $1, $2, $3, etc. as placeholders in the query
@@ -359,14 +223,14 @@ Important: Avoid using LOOP mode for potentially very large data objects. If you
 - Path variables can use <<>> syntax: {"operation": "get", "path": "/<<folder>>/<<filename>>"}
 </FTP_SFTP>
 <VARIABLES>
-- Use <<variable>> syntax to access variables and execute JavaScript expressions wrapped in (sourceData) => ... or as a plain variable if in the payload:
+- Use <<variable>> syntax to access variables directly (no JS just plain variables) OR execute JavaScript expressions formatted as <<(sourceData) => sourceData.variable>>:
    Basic variable access:
-   e.g. https://api.example.com/v1/items?api_key=<<api_key>>
+   e.g. https://api.example.com/v1/items?api_key=<<integrationId_api_key>>
    e.g. headers: {
-        "Authorization": "Bearer <<access_token>>"
+        "Authorization": "Bearer <<integrationId_access_token>>"
    }
    e.g. headers: {
-        "Authorization": "Basic <<username>>:<<password>>"
+        "Authorization": "Basic <<integrationId_username>>:<<integrationId_password>>"
    }
    
    JavaScript expressions:
@@ -376,14 +240,13 @@ Important: Avoid using LOOP mode for potentially very large data objects. If you
    e.g. urlPath: /api/<<(sourceData) => sourceData.version || 'v1'>>/users
    e.g. queryParams: { "active": "<<(sourceData) => sourceData.includeInactive ? 'all' : 'true'>>" }
    
-- Note: For Basic Authentication, format as "Basic <<username>>:<<password>>" and the system will automatically convert it to Base64.
+- Note: For Basic Authentication, format as "Basic <<integrationId_username>>:<<integrationId_password>>" and the system will automatically convert it to Base64.
 - Headers provided starting with 'x-' are probably headers.
 - Credentials are prefixed with integration ID: <<integrationId_credentialName>>
 - Don't hardcode pagination values like limits in URLs or bodies - use <<>> variables when pagination is configured
 - Access previous step results via sourceData.stepId (e.g., sourceData.fetchUsers)
 - Access initial payload via sourceData (e.g., sourceData.userId)
-- Complex transformations can be done inline: <<sourceData.contacts.filter(c => c.active).map(c => c.email).join(',')>>
-- If you are accessing variables in a loop context, use the flattened 'currentItem_' prefix. For example, to access the 'id' of the current item, use the variable '<<currentItem_id>>'. DO NOT use '<<currentItem.id>>'.
+- Complex transformations can be done inline: <<(sourceData) => sourceData.contacts.filter(c => c.active).map(c => c.email).join(',')>>
 </VARIABLES>
 
 <AUTHENTICATION_PATTERNS>
@@ -425,7 +288,7 @@ For each step in the plan, you must:
 
 JAVASCRIPT EXPRESSIONS:
 Use JavaScript expressions within <<>> tags for any dynamic values:
-- Simple variable access: <<userId>>, <<currentItem_id>>
+- Simple variable access: <<userId>>, <<currentItem.id>>
 - JavaScript functions require arrow syntax: <<(sourceData) => sourceData.user.name>>
 - Array operations: <<(sourceData) => sourceData.users.map(u => u.id)>>
 - Complex transformations: <<(sourceData) => JSON.stringify({ ids: sourceData.fetchUsers.map(u => u.id) })>>
@@ -441,7 +304,7 @@ For data access in <<>> tags:
 - Initial payload fields: <<date>>, <<companies>>
 - Previous step results: <<fetchUsers>>, <<getProducts.data>>
 - Complex expressions: <<sourceData.users.filter(u => u.active).map(u => u.id)>>
-- Current item in loops: <<currentItem_id>>, <<currentItem_name>>
+- Current item in loops: <<currentItem.id>>, <<currentItem.name>>
 
 For special transformation functions:
 - loopSelector: (sourceData) => sourceData.fetchUsers.users
@@ -468,21 +331,19 @@ CRITICAL DATA ACCESS PATTERNS:
 When executionMode is "LOOP":
 1. The loopSelector extracts an array from available data: (sourceData) => sourceData.getContacts.results
 2. Each item in the array becomes available as 'currentItem' in the loop context.
-3. To access properties of the item, use the flattened 'currentItem_' prefix. For example, to access the 'id' of the current item, use the variable '<<currentItem_id>>'. DO NOT use '<<currentItem.id>>'.
+3. To access properties of the item, use dot notation. For example, to access the 'id' of the current item, use the variable '<<currentItem.id>>'.
 4. Example flow:
    - loopSelector: (sourceData) => sourceData.getAllContacts.filter(c => c.status === 'active')
-   - URL: /contacts/<<currentItem_id>>/update
-   - Body: {"status": "processed", "contactId": "<<currentItem_id>>", "updatedBy": "<<userId>>", "previousData": <<JSON.stringify(currentItem)>>}
-   - **CRITICAL**: Do NOT use dot notation like \`<<currentItem.id>>\`. This is incorrect. Use the flattened version, e.g., \`<<currentItem_id>>\`.
-   - **CRITICAL**: Do NOT invent variables like \`<<contactId>>\` or \`<<userId>>\`. Use the actual flattened currentItem properties
+   - URL: /contacts/<<currentItem.id>>/update
+   - Body: {"status": "processed", "contactId": "<<currentItem.id>>", "updatedBy": "<<userId>>", "previousData": <<JSON.stringify(currentItem)>>}
 5. You can use JavaScript expressions to transform loop data:
-   - Body with calculations: {"price": <<currentItem_price * 1.2>>, "currency": "<<currency>>"}
-   - Body with complex logic: <<JSON.stringify({ id: currentItem_id, tags: sourceData.globalTags.concat([currentItem_category]) })>>
+   - Body with calculations: {"price": <<currentItem.price * 1.2>>, "currency": "<<currency>>"}
+   - Body with complex logic: <<JSON.stringify({ id: currentItem.id, tags: sourceData.globalTags.concat([currentItem.category]) })>>
 6. Response data from all iterations is collected into an array
 </LOOP_EXECUTION>
 
 <PAGINATION_CONFIGURATION>
-Pagination is OPTIONAL. Only configure it if you have verified the exact pagination mechanism from the documentation.
+Pagination is OPTIONAL. Only configure it if you have verified the exact pagination mechanism from the documentation or know it really well.
 
 BEFORE configuring pagination:
 1. Check the documentation for pagination details
@@ -575,37 +436,15 @@ EXECUTION FLOW:
 1. Analyze the initial error and context to understand what went wrong
 2. Generate a corrected API configuration based on the error and available information
 3. Submit the configuration using submit_tool
-4. If successful (returns {success: true}), your task is complete
-5. If unsuccessful, analyze the new error:
-   - Look at previous attempts and their error messages to guide your fix and avoid the same mistakes
-   - For repeated errors or when you need more context and API specific information, use search_documentation
+3. If unsuccessful, analyze the new error:
+   - Look at previous attempts and their error messages to find the root cause of the error and fix it
+   - When you need more context and API specific information, always use search_documentation (fast, use often) or search_web (slow, use only when you cant find the information in the documentation)
    - Generate a new configuration that fixes the error, incorporating your insights from the error analysis
    - Submit again with submit_tool
 
 CRITICAL RULES:
 - ALWAYS include a tool call in your response
-- DO NOT provide or change the 'instruction' field when fixing an existing configuration - the original step purpose should be preserved
 - Learn from each error - don't repeat the same mistake
-- Don't make more than three doc searches in a row
-- When submit_tool succeeds, STOP immediately
-
-<COMMON_ERRORS>
-1. Using non-existent variables:
-   - ERROR: "undefined" in URL or response means the variable doesn't exist
-   - CHECK: Is <<variableName>> in the available variables list?
-   - FIX: Find the correct variable name from the list
-
-2. Loop context variables:
-   - WRONG: <<contactId>>, <<itemId>>, <<recordId>>, <<userId>>
-   - RIGHT: <<currentItem_id>>, <<currentItem_name>>, <<currentItem_properties_fieldname>>
-   - The pattern is ALWAYS: <<currentItem_propertyName>> with underscore separator.
-   - DO NOT use '<<currentItem.propertyName>>'.
-
-3. Response evaluation failures:
-   - This means the API call worked but returned data that doesn't match your instruction (e.g. empty array when you expected a list of items)
-   - Make your step instructions more explicit about what data that step should return
-   - For exploratory calls, be explicit about what information that step should return
-</COMMON_ERRORS>
 
 <ERROR_ANALYSIS>
 Understand what each error means:
@@ -616,7 +455,24 @@ Understand what each error means:
 - 429 Rate Limit: API is rejecting due to too many requests
 - 500 Server Error: May be temporary or request is malformed
 - "Response evaluation failed": Your step instruction doesn't match what the API returned
+
 </ERROR_ANALYSIS>
+
+<COMMON_ERRORS>
+1. Using non-existent variables:
+   - ERROR: "undefined" in URL or response means the variable doesn't exist
+   - CHECK: Is <<variableName>> in the available variables list?
+   - FIX: Find the correct variable name from the list
+
+2. Loop context variables:
+   - WRONG: <<contactId>>, <<itemId>>, <<recordId>>, <<userId>>
+   - RIGHT: <<currentItem.id>>, <<currentItem.name>>, <<currentItem.properties.fieldname>>
+
+3. Response evaluation failures:
+   - This means the API call worked but returned data that doesn't match your instruction (e.g. empty array when you expected a list of items)
+   - Make sure that we are calling the correct endpoint and requesting/expanding the correct data.
+</COMMON_ERRORS>
+
 
 <VARIABLES>
 Use variables in the API configuration with <<variable>> syntax and wrap JavaScript expressions in (sourceData) => ... or as a plain variable if in the payload:
@@ -651,13 +507,13 @@ Correct PostgreSQL configuration:
 - urlPath: "<<database_name>>"
 - body: {query: "postgres statement", params: [param1, param2]} // Recommended: parameterized query
 - body: {query: "SELECT * FROM users WHERE age > $1", params: [<<(sourceData) => sourceData.age>>]}
-- body: {query: "INSERT INTO logs (message, level) VALUES ($1, $2)", values: ["Error occurred", "<<error_level>>"]}
+- body: {query: "INSERT INTO logs (message, level) VALUES ($1, $2)", params: ["Error occurred", "<<error_level>>"]}
 
 The query is a postgres statement and can contain variables. Use $$...$$ notation to paste complex fields.
 
-PARAMETERIZED QUERIES (RECOMMENDED):
+ALWAYS USE PARAMETERIZED QUERIES:
 - Use $1, $2, $3, etc. as placeholders in the query string
-- Provide corresponding values in params or values array
+- Provide corresponding values in params array
 - Example: {query: "SELECT * FROM users WHERE id = $1 AND status = $2", params: [userId, "active"]}
 - Benefits: Prevents SQL injection, better performance, cleaner code
 - The params/values array can contain static values or dynamic expressions using <<>> syntax
@@ -710,24 +566,11 @@ When pagination is configured:
 - Variables become available: <<page>>, <<offset>>, <<limit>>, <<cursor>>
 - Don't hardcode limits - use the variables
 - Use "OFFSET_BASED", "PAGE_BASED", or "CURSOR_BASED" for the type.
-- stopCondition controls when to stop fetching pages
+- stopCondition is required and controls when to stop fetching pages
 </PAGINATION>
 
 <DOCUMENTATION_SEARCH>
-Search documentation when:
-- You get authentication errors repeatedly
-- You need to understand available endpoints
-- You need to know required/optional parameters
-- Response structure isn't what you expected
-- You need examples of proper usage
-- For databases: search for table schemas, relationships, column names
-- There may be cases where the documentation is not available, in which case you should use your knowledge of the API to understand how to use it and stop calling the search_documentation tool.
-
-Be specific in searches:
-- "authentication" for auth patterns
-- "create user required fields" for parameters
-- "list contacts filters" for query options
-- "rate limits" for throttling info
+This is keyword based so pick relevant keywords and synonyms.
 </DOCUMENTATION_SEARCH>
 
 Remember: Each attempt should incorporate lessons from previous errors. Don't just make minor tweaks - understand the root cause and make meaningful changes.`;

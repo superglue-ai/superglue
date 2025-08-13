@@ -54,7 +54,6 @@ export const executeWorkflowResolver = async (
       // Validate required workflow fields
       if (!workflow.id) throw new Error("Workflow must have an ID");
       if (!workflow.steps || !Array.isArray(workflow.steps)) throw new Error("Workflow must have steps array");
-      logMessage('info', `Executing workflow ${workflow.id}`, metadata);
     } else {
       throw new Error("Must provide either workflow ID or workflow object");
     }
