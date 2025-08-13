@@ -13,6 +13,8 @@ export class PostgresService implements DataStore {
     constructor(config: PoolConfig) {
         this.pool = new Pool({
             ...config,
+            max: 20,
+            min: 2,
             ssl: config.ssl || {
                 rejectUnauthorized: false
             }

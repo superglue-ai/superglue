@@ -50,9 +50,8 @@ function getOrCreatePool(connectionString: string, poolConfig: PoolConfig): Pool
   
   const pool = new Pool({
     ...poolConfig,
-    // Add sensible pool defaults
     max: 10, // Maximum number of clients in the pool
-    idleTimeoutMillis: 30000, // How long a client can sit idle before being removed
+    idleTimeoutMillis: POOL_IDLE_TIMEOUT, // How long a client can sit idle before being removed
     connectionTimeoutMillis: 5000, // How long to wait for a connection
   });
   
