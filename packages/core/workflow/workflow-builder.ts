@@ -53,15 +53,12 @@ export class WorkflowBuilder {
 
   private generateIntegrationDescriptions(): string {
     return Object.values(this.integrations).map(int => {
-      const baseInfo = `
-<${int.id}>
-  Base URL: ${composeUrl(int.urlHost, int.urlPath)}`
-
       if (!int.documentation) {
-        return baseInfo + `
-  <documentation>
-  No documentation content available.
-  </documentation>
+        return `<${int.id}>
+  Base URL: ${composeUrl(int.urlHost, int.urlPath)}
+  <specific_instructions>
+  ${int.specificInstructions?.length > 0 ? int.specificInstructions : "No specific instructions provided."}
+  </specific_instructions>
 </${int.id}>`;
       }
       const authSection = Documentation.extractRelevantSections(
@@ -84,7 +81,11 @@ export class WorkflowBuilder {
         1000 // should cover examples, endpoints etc.
       );
 
-      return baseInfo + `
+      return `<${int.id}>
+  Base URL: ${composeUrl(int.urlHost, int.urlPath)}
+  <specific_instructions>
+  ${int.specificInstructions?.length > 0 ? int.specificInstructions : "No specific instructions provided."}
+  </specific_instructions>
   <documentation>
 ${authSection ? `<authentication>
 ${authSection}
@@ -102,14 +103,14 @@ ${authSection}
     }).join("\n");
   }
 
-  private generatePayloadDescription(maxLength: number = 1000): string {
+  private generatePayloadDescription(maxLength: number = 4000): string {
     if (!this.initialPayload || Object.keys(this.initialPayload).length === 0) {
       return 'No initial payload provided';
     }
 
     let payloadText = JSON.stringify(this.initialPayload);
     if (payloadText.length > maxLength) {
-      payloadText = JSON.stringify(sample(this.initialPayload, 5), null, 2);
+      payloadText = JSON.stringify(sample(this.initialPayload, 3), null, 2);
     }
     if (payloadText.length > maxLength) {
       payloadText = payloadText.slice(0, maxLength) + '...[truncated]';
@@ -139,7 +140,6 @@ ${integrationDescriptions}
 </available_integrations_and_documentation>
 
 <available_variables>
-Initial payload and credentials (use in URLs, headers, body with <<variable>> syntax):
 ${availableVariables}
 </available_variables>
 
@@ -147,11 +147,7 @@ ${availableVariables}
 ${initialPayloadDescription}
 </initial_payload>
 
-${this.responseSchema && Object.keys(this.responseSchema).length > 0 ? `<expected_output_schema>
-The final workflow output must match this JSON schema:
-${JSON.stringify(this.responseSchema, null, 2)}
-Your finalTransform function MUST transform the collected data from all steps to match this exact schema.
-</expected_output_schema>` : 'No expected output schema provided, ensure that the final output matches the instruction.'}`;
+Ensure that the final output matches the instruction and you use ONLY the available integration ids.`;
 
     return [
       { role: "system", content: BUILD_WORKFLOW_SYSTEM_PROMPT },
