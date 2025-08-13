@@ -498,7 +498,7 @@ export async function evaluateStopCondition(
 
     // Inject the response and pageInfo as JSON strings
     // legacy support for direct response data access
-    await context.global.set('responseJSON', JSON.stringify({ response, ...response.data }));
+    await context.global.set('responseJSON', JSON.stringify({ data: response.data, headers: response.headers, ...response.data }));
     await context.global.set('pageInfoJSON', JSON.stringify(pageInfo));
 
     // if the stop condition code starts with return or is not a function, we need to wrap it in a function
