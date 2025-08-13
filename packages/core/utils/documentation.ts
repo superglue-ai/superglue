@@ -6,6 +6,7 @@ import { getIntrospectionQuery } from "graphql";
 import * as yaml from 'js-yaml';
 import { NodeHtmlMarkdown } from "node-html-markdown";
 import { server_defaults } from '../default.js';
+import { LanguageModel } from '../llm/llm.js';
 import { logMessage } from "./logs.js";
 import { callPostgres } from './postgres.js';
 import { composeUrl } from "./tools.js";
@@ -252,16 +253,16 @@ export class Documentation {
   public static extractRelevantSections(
     documentation: string,
     searchQuery: string,
-    maxSections: number = 20,
-    sectionSize: number = 200
+    maxSections: number = 5,
+    sectionSize: number = 2000
   ): string {
     if (!documentation || documentation.length === 0) {
       return '';
     }
 
     // Validate and adjust maxSections
-    maxSections = Math.max(1, Math.min(maxSections, 100)); // Between 1 and 100
-    sectionSize = Math.max(200, Math.min(sectionSize, 10000)); // Between 200 and 10000
+    sectionSize = Math.max(200, Math.min(sectionSize, 50000)); // Between 200 and 50000
+    maxSections = Math.max(1, Math.min(maxSections, LanguageModel.contextLength / sectionSize)); // Between 1 and ContextLength / sectionSize
 
     // If document is smaller than one section, return the whole thing
     if (documentation.length <= sectionSize) {
@@ -271,7 +272,7 @@ export class Documentation {
     const MIN_SEARCH_TERM_LENGTH = server_defaults.DOCUMENTATION_MIN_SEARCH_TERM_LENGTH || 3;
 
     // Extract search terms from query - split on non-alphanumeric characters
-    const searchTerms = searchQuery?.toLowerCase()?.split(/[^a-z0-9]/)
+    const searchTerms = searchQuery?.toLowerCase()?.split(/[^a-z0-9/]/)
       .map(term => term.trim())
       .filter(term => term.length >= MIN_SEARCH_TERM_LENGTH) || [];
 
@@ -290,9 +291,8 @@ export class Documentation {
       // Score section based on search term matches
       let score = 0;
       for (const term of searchTerms) {
-        // Count occurrences of each term in the section
-        const matches = (sectionLower.match(new RegExp(term, 'g')) || []).length;
-        score += matches;
+        const matches = sectionLower.split(term).length - 1;
+        score += matches * term.length;
       }
 
       sections.push({
