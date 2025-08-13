@@ -1,10 +1,8 @@
 import { ApiConfig, RequestOptions } from "@superglue/client";
 import { Pool, PoolConfig } from 'pg';
+import { server_defaults } from "../default.js";
 import { composeUrl, replaceVariables } from "./tools.js";
 
-const DEFAULT_TIMEOUT = 30000; // 30 seconds
-const DEFAULT_RETRIES = 0;
-const DEFAULT_RETRY_DELAY = 1000; // 1 second
 
 // Pool cache management
 interface PoolCacheEntry {
@@ -14,8 +12,6 @@ interface PoolCacheEntry {
 }
 
 const poolCache = new Map<string, PoolCacheEntry>();
-const POOL_IDLE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
-const POOL_CLEANUP_INTERVAL = 60 * 1000; // 1 minute
 
 // Start cleanup interval
 let cleanupInterval: NodeJS.Timeout | null = null;
@@ -25,12 +21,12 @@ function startCleanupInterval() {
     cleanupInterval = setInterval(() => {
       const now = Date.now();
       for (const [key, entry] of poolCache.entries()) {
-        if (now - entry.lastUsed > POOL_IDLE_TIMEOUT) {
+        if (now - entry.lastUsed > server_defaults.POSTGRES.POOL_IDLE_TIMEOUT) {
           entry.pool.end().catch(console.error);
           poolCache.delete(key);
         }
       }
-    }, POOL_CLEANUP_INTERVAL);
+    }, server_defaults.POSTGRES.POOL_CLEANUP_INTERVAL);
     
     // Prevent the interval from keeping the process alive
     if (cleanupInterval.unref) {
@@ -51,7 +47,7 @@ function getOrCreatePool(connectionString: string, poolConfig: PoolConfig): Pool
   const pool = new Pool({
     ...poolConfig,
     max: 10, // Maximum number of clients in the pool
-    idleTimeoutMillis: POOL_IDLE_TIMEOUT, // How long a client can sit idle before being removed
+    idleTimeoutMillis: server_defaults.POSTGRES.DEFAULT_TIMEOUT, // How long a client can sit idle before being removed
     connectionTimeoutMillis: 5000, // How long to wait for a connection
   });
   
@@ -124,7 +120,7 @@ export async function callPostgres(endpoint: ApiConfig, payload: Record<string, 
 
   const poolConfig: PoolConfig = {
     connectionString,
-    statement_timeout: options?.timeout || DEFAULT_TIMEOUT,
+    statement_timeout: options?.timeout || server_defaults.POSTGRES.DEFAULT_TIMEOUT,
     ssl: {
       rejectUnauthorized: false, // Set to true for production with valid certs
       // ca: fs.readFileSync('path/to/ca-cert.pem'), // Optional: CA certificate
@@ -136,7 +132,7 @@ export async function callPostgres(endpoint: ApiConfig, payload: Record<string, 
   // Get or create pool from cache
   const pool = getOrCreatePool(connectionString, poolConfig);
   let attempts = 0;
-  const maxRetries = options?.retries || DEFAULT_RETRIES;
+  const maxRetries = options?.retries || server_defaults.POSTGRES.DEFAULT_RETRIES;
 
   do {
     try {
@@ -160,7 +156,7 @@ export async function callPostgres(endpoint: ApiConfig, payload: Record<string, 
         throw new Error('Unknown PostgreSQL error occurred');
       }
 
-      const retryDelay = options?.retryDelay || DEFAULT_RETRY_DELAY;
+      const retryDelay = options?.retryDelay || server_defaults.POSTGRES.DEFAULT_RETRY_DELAY;
       await new Promise(resolve => setTimeout(resolve, retryDelay));
     }
   } while (attempts <= maxRetries);
