@@ -96,7 +96,7 @@ export class Documentation {
       return "";
     }
     try {
-      const response = await axios.get(this.config.openApiUrl, { timeout: server_defaults.TIMEOUTS.AXIOS });
+      const response = await axios.get(this.config.openApiUrl, { timeout: server_defaults.DOCUMENTATION.TIMEOUTS.AXIOS });
       let data = response.data;
 
       // If data is already an object (axios parsed it), check for OpenAPI links
@@ -200,7 +200,7 @@ export class Documentation {
       const batch = urlsToFetch.slice(i, i + MAX_CONCURRENT_FETCHES);
       const batchPromises = batch.map(async (url) => {
         try {
-          const response = await axios.get(url, { timeout: server_defaults.TIMEOUTS.AXIOS });
+          const response = await axios.get(url, { timeout: server_defaults.DOCUMENTATION.TIMEOUTS.AXIOS });
           let specData = response.data;
 
           // Parse if string
@@ -338,7 +338,7 @@ class GraphQLStrategy implements FetchingStrategy {
           query: introspectionQuery,
           operationName: 'IntrospectionQuery'
         },
-        { headers: config.headers, params: config.queryParams, timeout: server_defaults.TIMEOUTS.AXIOS }
+        { headers: config.headers, params: config.queryParams, timeout: server_defaults.DOCUMENTATION.TIMEOUTS.AXIOS }
       );
 
       if (response.data.errors) {
@@ -393,7 +393,7 @@ export class AxiosFetchingStrategy implements FetchingStrategy {
         });
       }
 
-      const response = await axios.get(url.toString(), { headers: config.headers, timeout: server_defaults.TIMEOUTS.AXIOS });
+      const response = await axios.get(url.toString(), { headers: config.headers, timeout: server_defaults.DOCUMENTATION.TIMEOUTS.AXIOS });
       let data = response.data;
       return data;
     } catch (error) {
@@ -457,8 +457,8 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       }
 
       page = await browserContext.newPage();
-      await page.goto(url.toString(), { timeout: server_defaults.TIMEOUTS.PLAYWRIGHT });
-      await page.waitForLoadState('domcontentloaded', { timeout: server_defaults.TIMEOUTS.PLAYWRIGHT });
+      await page.goto(url.toString(), { timeout: server_defaults.DOCUMENTATION.TIMEOUTS.PLAYWRIGHT });
+      await page.waitForLoadState('domcontentloaded', { timeout: server_defaults.DOCUMENTATION.TIMEOUTS.PLAYWRIGHT });
       await page.waitForTimeout(1000);
 
       const links: Record<string, string> = await page.evaluate(() => {
@@ -638,7 +638,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     try {
       const response = await axios.get(sitemapUrl, {
         headers: config.headers,
-        timeout: server_defaults.TIMEOUTS.SITEMAP_FETCH,
+        timeout: server_defaults.DOCUMENTATION.TIMEOUTS.SITEMAP_FETCH,
         validateStatus: (status) => status === 200
       });
 
@@ -948,7 +948,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
         timeoutHandle = setTimeout(() => {
           logMessage('warn', 'Sitemap URL collection timed out, falling back to iterative crawling', metadata);
           resolve([]);
-        }, server_defaults.TIMEOUTS.SITEMAP_PROCESSING_TOTAL);
+        }, server_defaults.DOCUMENTATION.TIMEOUTS.SITEMAP_PROCESSING_TOTAL);
       });
 
       const sitemapUrls = await Promise.race([sitemapUrlsPromise, timeoutPromise]);
@@ -1252,7 +1252,7 @@ class OpenApiStrategy implements ProcessingStrategy {
         const baseUrl = config.documentationUrl ? new URL(config.documentationUrl).origin : config.urlHost;
         absoluteOpenApiUrl = composeUrl(baseUrl, openApiUrl);
       }
-      const openApiResponse = await axios.get(absoluteOpenApiUrl, { headers: config.headers, timeout: server_defaults.TIMEOUTS.AXIOS });
+      const openApiResponse = await axios.get(absoluteOpenApiUrl, { headers: config.headers, timeout: server_defaults.DOCUMENTATION.TIMEOUTS.AXIOS });
       const openApiData = openApiResponse.data;
 
       if (!openApiData) return null;

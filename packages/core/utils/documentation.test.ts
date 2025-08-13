@@ -89,8 +89,8 @@ describe('Documentation Class', () => {
             expect(playwright.chromium.launch).toHaveBeenCalledTimes(1);
             expect(mockBrowser.newContext).toHaveBeenCalledTimes(1);
             expect(mockContext.newPage).toHaveBeenCalledTimes(1);
-            expect(mockPage.goto).toHaveBeenCalledWith(docUrl, { timeout: server_defaults.TIMEOUTS.PLAYWRIGHT });
-            expect(mockPage.waitForLoadState).toHaveBeenCalledWith('domcontentloaded', { timeout: server_defaults.TIMEOUTS.PLAYWRIGHT });
+            expect(mockPage.goto).toHaveBeenCalledWith(docUrl, { timeout: server_defaults.DOCUMENTATION.TIMEOUTS.PLAYWRIGHT });
+            expect(mockPage.waitForLoadState).toHaveBeenCalledWith('domcontentloaded', { timeout: server_defaults.DOCUMENTATION.TIMEOUTS.PLAYWRIGHT });
             expect(mockPage.waitForTimeout).toHaveBeenCalledWith(1000);
             expect(mockPage.evaluate).toHaveBeenCalledTimes(2); // For removing elements and getting links
             expect(mockPage.content).toHaveBeenCalledTimes(1);
@@ -137,7 +137,7 @@ describe('Documentation Class', () => {
             expect(mockedAxios.post).toHaveBeenCalledWith(
                 docUrl,
                 expect.objectContaining({ operationName: 'IntrospectionQuery' }),
-                { headers, params, timeout: server_defaults.TIMEOUTS.AXIOS }
+                { headers, params, timeout: server_defaults.DOCUMENTATION.TIMEOUTS.AXIOS }
             );
             expect(result).toBe(JSON.stringify(mockSchema.__schema));
             expect(playwright.chromium.launch).not.toHaveBeenCalled();

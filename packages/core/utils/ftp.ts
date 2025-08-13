@@ -3,11 +3,8 @@ import { Client as FTPClient } from "basic-ftp";
 import * as path from "path";
 import SFTPClient from "ssh2-sftp-client";
 import { URL } from "url";
+import { server_defaults } from "../default.js";
 import { composeUrl } from "./tools.js";
-
-const DEFAULT_TIMEOUT = 30000; // 30 seconds
-const DEFAULT_RETRIES = 0;
-const DEFAULT_RETRY_DELAY = 1000; // 1 second
 
 const SUPPORTED_OPERATIONS = ['list', 'get', 'put', 'delete', 'rename', 'mkdir', 'rmdir', 'exists', 'stat'];
 
@@ -301,15 +298,14 @@ export async function callFTP({endpoint, credentials, options}: {endpoint: ApiCo
   }
 
   let attempts = 0;
-  const maxRetries = options?.retries || DEFAULT_RETRIES;
-  const timeout = options?.timeout || DEFAULT_TIMEOUT;
+  const maxRetries = options?.retries || server_defaults.FTP.DEFAULT_RETRIES;
+  const timeout = options?.timeout || server_defaults.FTP.DEFAULT_TIMEOUT;
 
   do {
     try {
       if (connectionInfo.protocol === 'sftp') {
         // SFTP Connection
         const sftp = new SFTPClient();
-        
         try {
           await sftp.connect({
             host: connectionInfo.host,
@@ -320,7 +316,8 @@ export async function callFTP({endpoint, credentials, options}: {endpoint: ApiCo
             passphrase: credentials.passphrase,
             readyTimeout: timeout,
             retries: 1, // We handle retries at a higher level
-            retry_minTimeout: 1000
+            retry_minTimeout: 1000,
+            timeout: timeout
           });
 
           // Prepend base path if specified
@@ -376,7 +373,7 @@ export async function callFTP({endpoint, credentials, options}: {endpoint: ApiCo
         throw new Error(`Unknown ${connectionInfo.protocol.toUpperCase()} error occurred`);
       }
 
-      const retryDelay = options?.retryDelay || DEFAULT_RETRY_DELAY;
+      const retryDelay = options?.retryDelay || server_defaults.FTP.DEFAULT_RETRY_DELAY;
       await new Promise(resolve => setTimeout(resolve, retryDelay));
     }
   } while (attempts <= maxRetries);

@@ -1,6 +1,7 @@
 import { ApiConfig, RequestOptions } from '@superglue/client';
 import { Pool } from 'pg';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { server_defaults } from '../default.js';
 import { callPostgres, closeAllPools } from './postgres.js';
 
 // Create mock functions that we can reference
@@ -67,7 +68,7 @@ describe('PostgreSQL Utilities', () => {
           rejectUnauthorized: false,
         },
         max: 10,
-        idleTimeoutMillis: 30000,
+        idleTimeoutMillis: server_defaults.POSTGRES.DEFAULT_TIMEOUT,
         connectionTimeoutMillis: 5000
       });
       
@@ -126,8 +127,8 @@ describe('PostgreSQL Utilities', () => {
           rejectUnauthorized: false,
         },
         max: 10,
-        idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 5000
+        idleTimeoutMillis: server_defaults.POSTGRES.DEFAULT_TIMEOUT,
+        connectionTimeoutMillis: 5000 
       });
     });
 
