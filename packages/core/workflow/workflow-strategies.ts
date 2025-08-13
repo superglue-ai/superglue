@@ -132,8 +132,8 @@ The function should return an array of items that this step will iterate over.`;
 
         const loopPayload: Record<string, any> = {
           ...payload,
-          ...flattenObject(currentItem, 'currentItem'),
-          currentItem: currentItem
+          currentItem: currentItem,
+          ...flattenObject(currentItem, 'currentItem')
         };
 
         try {

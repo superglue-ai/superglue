@@ -91,7 +91,6 @@ ${authSection}
 </authentication>` : ''}
     
     ${paginationSection && paginationSection != authSection ? `<pagination>
-    IMPORTANT: If the documentation does not mention pagination or the pagination section below is incomplete or unclear, DO NOT configure pagination.
     ${paginationSection}
     </pagination>` : ''}
     

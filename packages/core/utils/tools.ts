@@ -486,7 +486,7 @@ export function safeHttpMethod(method: any): HttpMethod {
 
 export async function evaluateStopCondition(
   stopConditionCode: string,
-  response: any,
+  response: AxiosResponse,
   pageInfo: { page: number; offset: number; cursor: any; totalFetched: number }
 ): Promise<{ shouldStop: boolean; error?: string }> {
 
@@ -497,7 +497,8 @@ export async function evaluateStopCondition(
     const context = await isolate.createContext();
 
     // Inject the response and pageInfo as JSON strings
-    await context.global.set('responseJSON', JSON.stringify(response));
+    // legacy support for direct response data access
+    await context.global.set('responseJSON', JSON.stringify({ response, ...response.data }));
     await context.global.set('pageInfoJSON', JSON.stringify(pageInfo));
 
     // if the stop condition code starts with return or is not a function, we need to wrap it in a function

@@ -156,8 +156,8 @@ Note: Both `params` and `values` keys are supported for compatibility.
   "body": {
     "query": "INSERT INTO events (user_id, event_type, metadata) VALUES ($1, $2, $3) RETURNING id",
     "params": [
-      "<<currentItem_userId>>",
-      "<<currentItem_eventType>>",
+      "<<currentItem.userId>>",
+      "<<currentItem.eventType>>",
       "<<(sourceData, currentItem) => JSON.stringify(currentItem.metadata)>>"
     ]
   },
