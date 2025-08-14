@@ -22,6 +22,11 @@ export const server_defaults = {
         TEXT_PATTERN_REMOVAL_MAX_LENGTH: 400,
         FUSE_THRESHOLD: 0.2, // 0.0 = exact match, 1.0 = match anything
         FUSE_MIN_MATCH_LENGTH: 3, // Minimum characters to match
+        MAX_CONCURRENT_CONTEXTS: 10, // Max concurrent Playwright browser contexts
+        MAX_PAGE_SIZE_BYTES: 5 * 1024 * 1024, // 5MB hard cap per page
+        MAX_CODE_BLOCKS_PER_PAGE: 50,
+        MAX_TABLE_ROWS_TOTAL: 5000,
+        MAX_CONTENT_SIZE_FOR_CONVERSION: 5 * 1024 * 1024, // 5MB max for HTML to Markdown conversion
         TIMEOUTS: {
             AXIOS: 120000,
             PLAYWRIGHT: 120000,
