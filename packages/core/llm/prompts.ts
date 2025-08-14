@@ -166,7 +166,7 @@ Further:
 - Never make assumptions or guesses about the data you need to fetch. Always fetch all prerequisites first - this is the most common failure mode.
 - Be acutely aware that the user might not be specific about the data they want to fetch. E.g. they might say "get all leads" but they might mean "get all people in my crm that have a certain status".
 - Make sure you really really understand the structure of the available data, and fetch prerequisites first.
-- Each step must correspond to a single API call (no compound operations).
+- Each step must correspond to a single API call (no compound operations)
 - Choose the appropriate integration for each step based on the provided documentation
 - Assign descriptive stepIds in camelCase that indicate the purpose of the step
 - Make absolutely sure that each step can be achieved with a single API call (or a loop of the same call)
