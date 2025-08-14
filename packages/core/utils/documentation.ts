@@ -2,6 +2,7 @@ import playwright from '@playwright/test';
 import { ApiConfig } from "@superglue/client";
 import { Metadata } from "@superglue/shared";
 import axios from "axios";
+import Fuse from 'fuse.js';
 import { getIntrospectionQuery } from "graphql";
 
 import * as yaml from 'js-yaml';
@@ -479,7 +480,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     }
 
     // Budgets and limits for pruning
-    const MAX_PAGE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB hard cap post-selection
+    const MAX_PAGE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB hard cap post-selection
     const MAX_CODE_BLOCKS_PER_PAGE = 50;
     const MAX_TABLE_ROWS_TOTAL = 5000;
 
@@ -604,32 +605,10 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
         }
       }, { MAX_CODE_BLOCKS: MAX_CODE_BLOCKS_PER_PAGE, MAX_TABLE_ROWS: MAX_TABLE_ROWS_TOTAL });
 
-      // Prefer initial network HTML if present and not an obvious skeleton; else use pruned snapshot; else full snapshot
-      let content: string | null = null;
-      try {
-        const isHtml = (ct: string | null) => ct && ct.toLowerCase().includes('text/html');
-        const contentType = (gotoResponse as any)?.headerValue ? (gotoResponse as any).headerValue('content-type') : ((gotoResponse as any)?.headers?.()['content-type']);
-        let initialHtml: string | null = null;
-        if (gotoResponse && isHtml(String(contentType || ''))) {
-          try {
-            initialHtml = await (gotoResponse as any).text();
-          } catch {
-            initialHtml = null;
-          }
-        }
-        const looksSkeleton = initialHtml ? !/(<article|<main|theme-doc-markdown|markdown|md-content|docs-content|docMainContainer|redoc-wrap|api-content|docContent)/i.test(initialHtml) : true;
-        if (initialHtml && !looksSkeleton) {
-          content = initialHtml;
-        }
-      } catch {
-        // ignore
-      }
+      // Get the page content - use pruned HTML if available, otherwise full content
+      const content = prunedHtml || await page.content();
 
-      if (!content) {
-        content = prunedHtml || await page.content();
-      }
-
-      // Check if page is too large (over 10MB of HTML)
+      // Check if page is too large (over 5MB of HTML)
       if (content.length > MAX_PAGE_SIZE_BYTES) {
         logMessage('warn', `Page ${urlString} is too large (${Math.round(content.length / 1024 / 1024)}MB), skipping`, metadata);
         return null;
@@ -1083,11 +1062,23 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     };
 
     // Normalize items to a common format
-    const normalizedItems = items.map(item => {
+    const normalizedItems = items.map((item, index) => {
       if (typeof item === 'string') {
-        return { url: extractPath(item), text: '', original: item };
+        return {
+          url: extractPath(item),
+          text: '',
+          original: item,
+          searchableContent: extractPath(item).toLowerCase(),
+          index
+        };
       } else {
-        return { url: extractPath(item.href), text: item.linkText, original: item };
+        return {
+          url: extractPath(item.href),
+          text: item.linkText,
+          original: item,
+          searchableContent: `${extractPath(item.href)} ${item.linkText}`.toLowerCase(),
+          index
+        };
       }
     });
 
@@ -1096,30 +1087,69 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       ? normalizedItems.filter(item => !fetchedLinks.has(item.original))
       : normalizedItems;
 
-    const scored = itemsToRank.map(item => {
-      const combined = `${item.url} ${item.text}`.toLowerCase();
-
-      // Filter out links containing excluded keywords
+    // Pre-filter excluded links
+    const filteredItems = itemsToRank.filter(item => {
       for (const excludedKeyword of PlaywrightFetchingStrategy.EXCLUDED_LINK_KEYWORDS) {
-        if (combined.includes(excludedKeyword)) {
-          return {
-            item: item.original,
-            score: 0  // Set score to 0 for excluded links
-          };
+        if (item.searchableContent.includes(excludedKeyword)) {
+          return false;
         }
       }
+      return true;
+    });
 
-      // Count keyword matches
-      let matchCount = 0;
-      for (const keyword of keywords) {
-        const keywordLower = keyword.toLowerCase();
-        if (combined.includes(keywordLower)) {
-          matchCount++;
-        }
+    // If no keywords provided, return filtered items in original order
+    if (!keywords || keywords.length === 0) {
+      return filteredItems.map(item => item.original);
+    }
+
+    // Configure Fuse.js for fuzzy search
+    const fuseOptions = {
+      keys: ['searchableContent'],
+      threshold: server_defaults.DOCUMENTATION.FUSE_THRESHOLD || 0.4, // 0.0 = exact match, 1.0 = match anything
+      includeScore: true,
+      shouldSort: true,
+      minMatchCharLength: server_defaults.DOCUMENTATION.FUSE_MIN_MATCH_LENGTH || 3,
+      ignoreLocation: true, // Ignore location for simple fuzzy search
+      useExtendedSearch: false,
+      findAllMatches: true
+    };
+
+    // Create Fuse instance
+    const fuse = new Fuse(filteredItems, fuseOptions);
+
+    // Create search query from keywords
+    // Use OR logic to find items matching any keyword
+    const searchResults: Map<number, number> = new Map(); // index -> best score
+
+    for (const keyword of keywords) {
+      const results = fuse.search(keyword.toLowerCase());
+
+      for (const result of results) {
+        const currentScore = searchResults.get(result.item.index) || 1;
+        // Use the best (lowest) score for each item
+        searchResults.set(result.item.index, Math.min(currentScore, result.score || 1));
+      }
+    }
+
+    // Combine fuzzy search with URL length normalization
+    const scored = filteredItems.map(item => {
+      const fuseScore = searchResults.get(item.index);
+
+      if (fuseScore === undefined) {
+        // No keyword match found
+        return {
+          item: item.original,
+          score: 0
+        };
       }
 
-      // Simple scoring: match count divided by URL length to avoid bias towards long URLs
-      const score = matchCount / Math.max(item.url.length, 1);
+      // Convert Fuse score (0 = perfect match, 1 = no match) to match count approximation
+      // Use the inverse of the fuse score as a proxy for match quality
+      const matchQuality = 1 - fuseScore;
+
+      // Simple scoring: match quality divided by URL length to avoid bias towards long URLs
+      // This mirrors the old logic: matchCount / Math.max(item.url.length, 1)
+      const score = matchQuality / Math.max(item.url.length, 1);
 
       return {
         item: item.original,
@@ -1127,8 +1157,9 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       };
     });
 
-    // Filter out items with score 0 (excluded links), sort by score, and return the original items
+    // Sort by score (highest first) and return the original items
     return scored
+      .filter(s => s.score > 0) // Only include items with matches
       .sort((a, b) => b.score - a.score)
       .map(s => s.item);
   }
@@ -1421,7 +1452,7 @@ class HtmlMarkdownStrategy implements ProcessingStrategy {
     }
 
     // Skip conversion for large content (same limit as PlaywrightFetchingStrategy)
-    const MAX_CONTENT_SIZE_FOR_CONVERSION = 15 * 1024 * 1024; // 15MB max
+    const MAX_CONTENT_SIZE_FOR_CONVERSION = 5 * 1024 * 1024; // 5MB max
     if (content.length > MAX_CONTENT_SIZE_FOR_CONVERSION) {
       logMessage('warn', `HtmlMarkdownStrategy: Content too large for conversion (${Math.round(content.length / 1024 / 1024)}MB), skipping`, metadata);
       return null; // Let RawPageContentStrategy handle it
