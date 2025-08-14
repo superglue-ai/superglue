@@ -159,15 +159,12 @@ Ensure that the final output matches the instruction and you use ONLY the availa
     const errors: string[] = [];
     const availableIntegrationIds = Object.keys(this.integrations);
 
-    // Check each step for validation errors
     workflow.steps?.forEach((step, index) => {
-      // Assertion 1: Check if integration ID is present and available
       if (!step.integrationId) {
         errors.push(`Step ${index + 1} (${step.id}): Missing integrationId`);
       } else if (!availableIntegrationIds.includes(step.integrationId)) {
         errors.push(`Step ${index + 1} (${step.id}): Invalid integrationId '${step.integrationId}'. Available integrations: ${availableIntegrationIds.join(', ')}`);
       }
-      // Assertion 2: Check for empty / invalid workflow steps
       if (!step.apiConfig?.urlHost) {
         errors.push(`Step ${index + 1} (${step.id}): Missing URL configuration (urlHost: '${step.apiConfig?.urlHost || 'undefined'}'). Please ensure that all steps correspond to a single API call, or merge this step with the previous one.`);
       }
@@ -195,7 +192,6 @@ Ensure that the final output matches the instruction and you use ONLY the availa
           messages
         };
 
-        // Call the build_workflow tool
         const result = await executeTool(
           {
             id: `build-workflow`,
@@ -215,7 +211,6 @@ Ensure that the final output matches the instruction and you use ONLY the availa
 
         builtWorkflow = result.data;
 
-        // Validate the workflow
         const validation = this.validateWorkflow(builtWorkflow);
         if (!validation.valid) {
           const errorDetails = validation.errors.join('\n');
@@ -232,7 +227,6 @@ Ensure that the final output matches the instruction and you use ONLY the availa
           throw new Error(`Workflow validation failed:\n${errorDetails}\n\nGenerated workflow:\n${workflowSummary}`);
         }
 
-        // Validation passed, finalize the workflow
         builtWorkflow.instruction = this.instruction;
         builtWorkflow.responseSchema = this.responseSchema;
         try {
@@ -241,14 +235,12 @@ Ensure that the final output matches the instruction and you use ONLY the availa
           logMessage('warn', `Error generating original response schema: ${error}`, this.metadata);
         }
 
-        // Success - break out of retry loop
         break;
 
       } catch (error: any) {
         lastError = error.message;
         logMessage('error', `Error during workflow build attempt ${retryCount + 1}: ${error.message}`, this.metadata);
 
-        // Add error feedback to messages for next retry
         if (retryCount < maxRetries - 1) {
           messages.push({
             role: "user",
