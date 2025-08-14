@@ -2,7 +2,9 @@ import playwright from '@playwright/test';
 import { ApiConfig } from "@superglue/client";
 import { Metadata } from "@superglue/shared";
 import axios from "axios";
+import Fuse from 'fuse.js';
 import { getIntrospectionQuery } from "graphql";
+
 import * as yaml from 'js-yaml';
 import { NodeHtmlMarkdown } from "node-html-markdown";
 import { server_defaults } from '../default.js';
@@ -11,7 +13,6 @@ import { logMessage } from "./logs.js";
 import { callPostgres } from './postgres.js';
 import { composeUrl } from "./tools.js";
 
-// Strategy Interface
 interface FetchingStrategy {
   tryFetch(config: DocumentationConfig, metadata: Metadata, credentials?: Record<string, any>): Promise<string | null>;
 }
@@ -31,7 +32,6 @@ export interface DocumentationConfig {
 }
 
 export class Documentation {
-  // Configuration stored per instance
   public config: DocumentationConfig;
   private readonly credentials?: Record<string, any>;
   private readonly metadata: Metadata;
@@ -44,7 +44,6 @@ export class Documentation {
     this.metadata = metadata;
   }
 
-  // Main function to fetch and process documentation using strategies
   public async fetchAndProcess(): Promise<string> {
 
     if (this.lastResult) {
@@ -159,7 +158,6 @@ export class Documentation {
   private extractOpenApiUrls(data: any): string[] {
     const urls: string[] = [];
 
-    // Recursive function to find all OpenAPI URLs in the data structure
     const findOpenApiUrls = (obj: any) => {
       if (!obj || typeof obj !== 'object') return;
 
@@ -196,7 +194,6 @@ export class Documentation {
       logMessage('warn', `Found ${urls.length} OpenAPI specs but limiting to ${MAX_SPECS_TO_FETCH}`, this.metadata);
     }
 
-    // Fetch specs in batches to avoid overwhelming the server
     for (let i = 0; i < urlsToFetch.length; i += MAX_CONCURRENT_FETCHES) {
       const batch = urlsToFetch.slice(i, i + MAX_CONCURRENT_FETCHES);
       const batchPromises = batch.map(async (url) => {
@@ -233,7 +230,6 @@ export class Documentation {
       specs.push(...batchResults.filter(result => result !== null));
     }
 
-    // Return combined specs
     if (specs.length === 0) {
       return "";
     } else if (specs.length === 1) {
@@ -260,72 +256,92 @@ export class Documentation {
       return '';
     }
 
-    // Validate and adjust maxSections
-    sectionSize = Math.max(200, Math.min(sectionSize, 50000)); // Between 200 and 50000
-    maxSections = Math.max(1, Math.min(maxSections, LanguageModel.contextLength / sectionSize)); // Between 1 and ContextLength / sectionSize
+    sectionSize = Math.max(200, Math.min(sectionSize, 50000));
+    maxSections = Math.max(1, Math.min(maxSections, LanguageModel.contextLength / sectionSize));
 
-    // If document is smaller than one section, return the whole thing
     if (documentation.length <= sectionSize) {
       return documentation;
     }
 
     const MIN_SEARCH_TERM_LENGTH = server_defaults.DOCUMENTATION_MIN_SEARCH_TERM_LENGTH || 3;
 
-    // Extract search terms from query - split on non-alphanumeric characters
     const searchTerms = searchQuery?.toLowerCase()?.split(/[^a-z0-9/]/)
       .map(term => term.trim())
       .filter(term => term.length >= MIN_SEARCH_TERM_LENGTH) || [];
 
-    // If no valid search terms, return empty string
     if (searchTerms.length === 0) {
       return '';
     }
 
-    const sections: { content: string; score: number; index: number; }[] = [];
+    // Create sections with normalized content for searching
+    const sections: Array<{ content: string; searchableContent: string; index: number; sectionIndex: number }> = [];
 
-    // Create sections of the specified size
     for (let i = 0; i < documentation.length; i += sectionSize) {
-      const section = documentation.slice(i, Math.min(i + sectionSize, documentation.length));
-      const sectionLower = section.toLowerCase();
-
-      // Score section based on search term matches
-      let score = 0;
-      for (const term of searchTerms) {
-        const matches = sectionLower.split(term).length - 1;
-        score += matches * term.length;
-      }
-
+      const content = documentation.slice(i, Math.min(i + sectionSize, documentation.length));
       sections.push({
-        content: section,
-        score,
-        index: i
+        content,
+        searchableContent: content.toLowerCase(),
+        index: i,
+        sectionIndex: sections.length
       });
     }
 
-    // Sort by score (highest first) and take top sections
-    const topSections = sections
-      .sort((a, b) => b.score - a.score)
-      .slice(0, maxSections);
+    // Configure Fuse.js for fuzzy search on sections
+    const fuseOptions = {
+      keys: ['searchableContent'],
+      threshold: server_defaults.DOCUMENTATION.FUSE_THRESHOLD || 0.2,
+      includeScore: true,
+      shouldSort: true,
+      minMatchCharLength: server_defaults.DOCUMENTATION.FUSE_MIN_MATCH_LENGTH || 3,
+      ignoreLocation: true,
+      useExtendedSearch: false,
+      findAllMatches: true
+    };
 
-    // If no sections have matches, return empty string
-    if (topSections.every(section => section.score === 0)) {
+    const fuse = new Fuse(sections, fuseOptions);
+
+    // Collect scores for each section across all search terms
+    const sectionScores: Map<number, number> = new Map();
+
+    for (const term of searchTerms) {
+      const results = fuse.search(term);
+
+      for (const result of results) {
+        const currentScore = sectionScores.get(result.item.sectionIndex) || 0;
+        // Convert Fuse score (0 = perfect, 1 = no match) to quality score (1 = perfect, 0 = no match)
+        const matchQuality = 1 - (result.score || 1);
+        // Weight by term length to prioritize longer, more specific terms
+        const weightedScore = matchQuality * term.length;
+        sectionScores.set(result.item.sectionIndex, currentScore + weightedScore);
+      }
+    }
+
+    // Convert to array and sort by score
+    const scoredSections = sections.map(section => ({
+      ...section,
+      score: sectionScores.get(section.sectionIndex) || 0
+    }));
+
+    const topSections = scoredSections
+      .sort((a, b) => b.score - a.score)
+      .slice(0, maxSections)
+      .filter(section => section.score > 0);
+
+    if (topSections.length === 0) {
       return '';
     }
 
-    // Sort selected sections by their original position to maintain document order
+    // Sort by original position to maintain document order
     topSections.sort((a, b) => a.index - b.index);
 
     const result = topSections.map(section => section.content).join('\n\n');
 
-    // Ensure we don't exceed the maximum expected length
     const maxExpectedLength = maxSections * sectionSize;
     return result.length > maxExpectedLength
       ? result.slice(0, maxExpectedLength)
       : result;
   }
 }
-
-// --- Concrete Strategy Implementations ---
 
 class GraphQLStrategy implements FetchingStrategy {
   private async fetchGraphQLSchema(url: string, config: ApiConfig, metadata: Metadata): Promise<any | null> {
@@ -346,7 +362,6 @@ class GraphQLStrategy implements FetchingStrategy {
       }
       return response.data?.data?.__schema ?? null;
     } catch (error) {
-      // Don't log warning here, as it's expected to fail if it's not a GQL endpoint
       return null;
     }
   }
@@ -357,16 +372,14 @@ class GraphQLStrategy implements FetchingStrategy {
         .some(val => typeof val === 'string' && val.includes('IntrospectionQuery'));
   }
   async tryFetch(config: ApiConfig, metadata: Metadata): Promise<string | null> {
-    if (!config.urlHost?.startsWith("http")) return null; // Needs a valid HTTP URL
+    if (!config.urlHost?.startsWith("http")) return null;
     const endpointUrl = composeUrl(config.urlHost, config.urlPath);
 
-    // Heuristic: Check path or query params typical for GraphQL
     const urlIsLikelyGraphQL = this.isLikelyGraphQL(endpointUrl, config);
     const docUrlIsLikelyGraphQL = this.isLikelyGraphQL(config.documentationUrl, config);
 
     if (!urlIsLikelyGraphQL && !docUrlIsLikelyGraphQL) return null;
 
-    // Use the endpoint URL if it looks like GraphQL, otherwise use the documentation URL
     const url = urlIsLikelyGraphQL ? endpointUrl : config.documentationUrl;
     if (!url) {
       return null;
@@ -402,13 +415,14 @@ export class AxiosFetchingStrategy implements FetchingStrategy {
     }
   }
 }
-// Special strategy solely responsible for fetching page content if needed
 export class PlaywrightFetchingStrategy implements FetchingStrategy {
   private static readonly MAX_FETCHED_LINKS = server_defaults.DOCUMENTATION.MAX_FETCHED_LINKS;
   private static readonly PARALLEL_FETCH_LIMIT = server_defaults.DOCUMENTATION.PARALLEL_FETCH_LIMIT;
   private static browserInstance: playwright.Browser | null = null;
+  private static isCleaningUp = false;
+  private static activeContexts = 0;
+  private static readonly MAX_CONCURRENT_CONTEXTS = server_defaults.DOCUMENTATION.MAX_CONCURRENT_CONTEXTS;
 
-  // Keywords that indicate non-documentation links (support, legal, marketing, etc.)
   public static readonly EXCLUDED_LINK_KEYWORDS = [
     'signup', 'login', 'pricing', 'contact', 'support', 'cookie',
     'privacy', 'terms', 'legal', 'policy', 'status', 'help', 'blog',
@@ -421,6 +435,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
 
   private static async getBrowser(): Promise<playwright.Browser> {
     if (!PlaywrightFetchingStrategy.browserInstance) {
+      // Simple launch like the old implementation
       PlaywrightFetchingStrategy.browserInstance = await playwright.chromium.launch();
     }
     return PlaywrightFetchingStrategy.browserInstance;
@@ -430,7 +445,21 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     if (PlaywrightFetchingStrategy.browserInstance) {
       const closedInstance = PlaywrightFetchingStrategy.browserInstance;
       PlaywrightFetchingStrategy.browserInstance = null;
-      await closedInstance.close();
+      try {
+        // Try graceful close first
+        await closedInstance.close();
+      } catch (error) {
+        console.warn('Failed to close browser gracefully:', error?.message);
+        try {
+          // Force kill if graceful close fails
+          const browserProcess = (closedInstance as any)._process;
+          if (browserProcess && !browserProcess.killed) {
+            browserProcess.kill('SIGKILL');
+          }
+        } catch (killError) {
+          console.warn('Failed to force kill browser:', killError?.message);
+        }
+      }
     }
   }
   private async fetchPageContentWithPlaywright(urlString: string, config: DocumentationConfig, metadata: Metadata): Promise<{ content: string; links: Record<string, string>; } | null> {
@@ -439,8 +468,19 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       return null;
     }
 
+    const MAX_PAGE_SIZE_BYTES = server_defaults.DOCUMENTATION.MAX_PAGE_SIZE_BYTES;
+    const MAX_CODE_BLOCKS_PER_PAGE = server_defaults.DOCUMENTATION.MAX_CODE_BLOCKS_PER_PAGE;
+    const MAX_TABLE_ROWS_TOTAL = server_defaults.DOCUMENTATION.MAX_TABLE_ROWS_TOTAL;
+
+    // Wait if too many contexts are active
+    while (PlaywrightFetchingStrategy.activeContexts >= PlaywrightFetchingStrategy.MAX_CONCURRENT_CONTEXTS) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
     let page: playwright.Page | null = null;
     let browserContext: playwright.BrowserContext | null = null;
+    PlaywrightFetchingStrategy.activeContexts++;
+
     try {
       const browser = await PlaywrightFetchingStrategy.getBrowser();
       browserContext = await browser.newContext();
@@ -461,129 +501,62 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       await page.waitForLoadState('domcontentloaded', { timeout: server_defaults.DOCUMENTATION.TIMEOUTS.PLAYWRIGHT });
       await page.waitForTimeout(1000);
 
-      const links: Record<string, string> = await page.evaluate(() => {
-        const links = {};
-        const allLinks = document.querySelectorAll('a');
-        allLinks.forEach(link => {
+      const { links, prunedHtml } = await page.evaluate(({ MAX_CODE_BLOCKS, MAX_TABLE_ROWS }) => {
+        const links: Record<string, string> = {};
+
+        // Extract links
+        document.querySelectorAll('a').forEach(link => {
           try {
-            const url = new URL(link?.href);
-            const key = `${link.textContent} ${url.pathname}`?.toLowerCase()?.replace(/[^a-z0-9]/g, ' ').trim();
-            links[key] = link?.href?.split('#')[0]?.trim();
-          } catch (e) {
-            // ignore
-          }
+            const anchor = link as HTMLAnchorElement;
+            const url = new URL(anchor.href);
+            const key = `${anchor.textContent} ${url.pathname}`.toLowerCase().replace(/[^a-z0-9]/g, ' ').trim();
+            links[key] = anchor.href.split('#')[0].trim();
+          } catch (e) { }
         });
-        return links;
-      });
 
-      await page.evaluate((textPatternMaxLength) => {
+        // Remove non-content elements
         const selectorsToRemove = [
-          // Navigation & Layout
-          'nav', 'header', 'footer', '.nav', '.navbar', '.header', '.footer',
-          '.sidebar', '.menu', '[role="navigation"]', '[role="banner"]',
-          '[role="contentinfo"]', '.site-header', '.site-footer', '#navbar',
-          '.top-bar', '.bottom-bar', '.breadcrumb', '.breadcrumbs',
-
-          // Cookie & Privacy
-          '.cookie-banner', '.cookie-consent', '.cookies', '#cookie-banner',
-          '.cookie-notice', '.cookie-policy', '.privacy-notice', '.gdpr',
-          '.cc-banner', '.cookiebar', '.cookie-bar', '#cookieConsent',
-          '.cookie-popup', '.cookie-modal', '[class*="cookie"]', '[id*="cookie"]',
-          '.consent-banner', '.consent-notice', '[data-cookie]', '[data-consent]',
-
-          // Popups & Modals
-          '[role="dialog"]', '.modal', '.popup', '.overlay', '.lightbox',
-          '.newsletter', '.subscribe', '.subscription', '.email-signup',
-          '.exit-popup', '.exit-intent', '.promotion', '.promo-banner',
-          '.notification-bar', '.alert-banner', '.announcement-bar',
-
-          // Social & Sharing
-          '.social', '.share', '.sharing', '.social-media', '.social-links',
-          '.share-buttons', '.social-buttons', '[class*="share"]', '[class*="social"]',
-          '.follow-us', '.connect', '.facebook', '.twitter', '.linkedin',
-
-          // Support & Chat
-          '.chat', '.chat-widget', '.chatbot', '.live-chat', '.support-chat',
-          '.help-widget', '.feedback', '.feedback-widget', '[id*="chat"]',
-          '.intercom', '.drift', '.zendesk', '.freshchat', '.tawk',
-
-          // Ads & Marketing
-          '.ad', '.ads', '.advertisement', '.banner-ad', '.sponsored',
-          '.marketing', '.cta-banner', '.call-to-action', '[class*="ad-"]',
-          '.demo-request', '.free-trial', '.pricing-banner', '.upgrade-banner',
-
-          // Comments & Reviews
-          '.comments', '.comment-section', '.reviews', '.testimonials',
-          '.disqus', '#disqus_thread', '.discourse', '.rating',
-
-          // Media & Embeds
-          '.video-player', '.youtube', '.vimeo', 'iframe[src*="youtube"]',
-          'iframe[src*="vimeo"]', '.embed', '.media-embed',
-
-          // Misc UI Elements
-          '.search', '.search-box', '.search-bar', '#search', '[role="search"]',
-          '.language-selector', '.locale-selector', '.country-selector',
-          '.back-to-top', '.scroll-to-top', '.floating-button',
-          '.survey', '.survey-widget', '.nps', '.feedback-survey',
-          '.banner:not(.info-banner)', '.ribbon', '.badge:not(.version-badge)',
-
-          // Scripts & Styles
-          'script', 'style', 'link[rel="stylesheet"]', 'noscript',
-
-          // Data attributes commonly used for tracking/analytics
-          '[data-ga]', '[data-gtm]', '[data-analytics]', '[data-track]',
-          '[data-beacon]', '[data-segment]', '[data-heap]'
+          'img, video, svg, canvas, iframe, picture, source',
+          '[role="banner"], [role="dialog"], [role="contentinfo"]',
+          '.cookie-banner, .cookie-consent, .cookies',
+          'nav, header, footer, aside',
+          '.social, .share, .chat, .feedback'
         ];
+        selectorsToRemove.forEach(selector =>
+          document.querySelectorAll(selector).forEach(el => el.remove())
+        );
 
-        selectorsToRemove.forEach(selector => {
-          document.querySelectorAll(selector).forEach(element => {
-            try {
-              element.remove();
-            } catch (e) {
-              console.warn("Failed to remove element:", e?.message);
-            }
-          });
-        });
+        // Limit code blocks and tables
+        const codeBlocks = document.querySelectorAll('pre, code');
+        Array.from(codeBlocks).slice(MAX_CODE_BLOCKS).forEach(el => el.remove());
 
-        const textPatternsToRemove = [
-          /accept.*cookies?/i,
-          /cookie.*policy/i,
-          /privacy.*policy/i,
-          /subscribe.*newsletter/i,
-          /sign.*up.*updates/i,
-          /follow.*us/i,
-          /connect.*with.*us/i,
-          /share.*article/i,
-          /was.*this.*helpful/i,
-          /rate.*this/i,
-          /leave.*feedback/i
-        ];
-
-        const allElements = document.querySelectorAll('*');
-        allElements.forEach(element => {
-          const text = element.textContent || '';
-          if (text.length < textPatternMaxLength && textPatternsToRemove.some(pattern => pattern.test(text))) {
-            try {
-              element.remove();
-            } catch (e) {
-              console.warn("Failed to remove element by text pattern:", e?.message);
-            }
+        let remainingRows = MAX_TABLE_ROWS;
+        document.querySelectorAll('table').forEach(table => {
+          const rows = table.querySelectorAll('tr');
+          if (rows.length > remainingRows) {
+            Array.from(rows).slice(remainingRows).forEach(row => row.remove());
+            remainingRows = 0;
+          } else {
+            remainingRows -= rows.length;
           }
         });
 
-        // Remove empty containers that might have held removed content
-        document.querySelectorAll('div, section, aside').forEach(element => {
-          if (element.innerHTML.trim() === '' && !element.querySelector('*')) {
-            try {
-              element.remove();
-            } catch (e) {
-              console.warn("Failed to remove empty container:", e?.message);
-            }
-          }
-        });
-      }, server_defaults.DOCUMENTATION.TEXT_PATTERN_REMOVAL_MAX_LENGTH);
+        // Extract main content
+        const mainContent = document.querySelector('article, main, .docs-content, .markdown, .md-content, .api-content, .docContent');
+        const html = mainContent
+          ? `<html><body>${mainContent.outerHTML}</body></html>`
+          : `<html><body>${document.body?.innerHTML || ''}</body></html>`;
 
-      const content = await page.content();
+        return { links, prunedHtml: html };
+      }, { MAX_CODE_BLOCKS: MAX_CODE_BLOCKS_PER_PAGE, MAX_TABLE_ROWS: MAX_TABLE_ROWS_TOTAL });
+
+      const content = prunedHtml || await page.content();
+
+      if (content.length > MAX_PAGE_SIZE_BYTES) {
+        logMessage('warn', `Page ${urlString} is too large (${Math.round(content.length / 1024 / 1024)}MB), skipping`, metadata);
+        return null;
+      }
+
       logMessage('info', `Successfully fetched content for ${urlString}`, metadata);
       return {
         content,
@@ -593,8 +566,23 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       logMessage('warn', `Playwright fetch failed for ${urlString}: ${error?.message}`, metadata);
       return null;
     } finally {
-      if (page) await page.close();
-      if (browserContext) await browserContext.close();
+      // Always clean up, even if there was an error
+      PlaywrightFetchingStrategy.activeContexts--;
+
+      if (page) {
+        try {
+          await page.close();
+        } catch (e) {
+          // Page might already be closed
+        }
+      }
+      if (browserContext) {
+        try {
+          await browserContext.close();
+        } catch (e) {
+          // Context might already be closed
+        }
+      }
     }
   }
 
@@ -895,13 +883,16 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     return uniqueSitemapUrls;
   }
 
-  private async fetchPagesInParallel(
+  private async fetchPagesInBatches(
     urls: string[],
     config: DocumentationConfig,
     metadata: Metadata
   ): Promise<string> {
     let combinedContent = "";
     const BATCH_SIZE = PlaywrightFetchingStrategy.PARALLEL_FETCH_LIMIT;
+
+    // Collect all raw HTML first (like old implementation)
+    const allHtmlContent: string[] = [];
 
     for (let i = 0; i < urls.length && i < PlaywrightFetchingStrategy.MAX_FETCHED_LINKS; i += BATCH_SIZE) {
       const batch = urls.slice(i, Math.min(i + BATCH_SIZE, PlaywrightFetchingStrategy.MAX_FETCHED_LINKS));
@@ -965,7 +956,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
         const topUrls = rankedUrls.slice(0, PlaywrightFetchingStrategy.MAX_FETCHED_LINKS);
 
         // Content fetching happens without the sitemap timeout
-        const content = await this.fetchPagesInParallel(topUrls, config, metadata);
+        const content = await this.fetchPagesInBatches(topUrls, config, metadata);
 
         if (content) {
           return content;
@@ -1014,11 +1005,23 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     };
 
     // Normalize items to a common format
-    const normalizedItems = items.map(item => {
+    const normalizedItems = items.map((item, index) => {
       if (typeof item === 'string') {
-        return { url: extractPath(item), text: '', original: item };
+        return {
+          url: extractPath(item),
+          text: '',
+          original: item,
+          searchableContent: extractPath(item).toLowerCase(),
+          index
+        };
       } else {
-        return { url: extractPath(item.href), text: item.linkText, original: item };
+        return {
+          url: extractPath(item.href),
+          text: item.linkText,
+          original: item,
+          searchableContent: `${extractPath(item.href)} ${item.linkText}`.toLowerCase(),
+          index
+        };
       }
     });
 
@@ -1027,30 +1030,69 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       ? normalizedItems.filter(item => !fetchedLinks.has(item.original))
       : normalizedItems;
 
-    const scored = itemsToRank.map(item => {
-      const combined = `${item.url} ${item.text}`.toLowerCase();
-
-      // Filter out links containing excluded keywords
+    // Pre-filter excluded links
+    const filteredItems = itemsToRank.filter(item => {
       for (const excludedKeyword of PlaywrightFetchingStrategy.EXCLUDED_LINK_KEYWORDS) {
-        if (combined.includes(excludedKeyword)) {
-          return {
-            item: item.original,
-            score: 0  // Set score to 0 for excluded links
-          };
+        if (item.searchableContent.includes(excludedKeyword)) {
+          return false;
         }
       }
+      return true;
+    });
 
-      // Count keyword matches
-      let matchCount = 0;
-      for (const keyword of keywords) {
-        const keywordLower = keyword.toLowerCase();
-        if (combined.includes(keywordLower)) {
-          matchCount++;
-        }
+    // If no keywords provided, return filtered items in original order
+    if (!keywords || keywords.length === 0) {
+      return filteredItems.map(item => item.original);
+    }
+
+    // Configure Fuse.js for fuzzy search
+    const fuseOptions = {
+      keys: ['searchableContent'],
+      threshold: server_defaults.DOCUMENTATION.FUSE_THRESHOLD || 0.4, // 0.0 = exact match, 1.0 = match anything
+      includeScore: true,
+      shouldSort: true,
+      minMatchCharLength: server_defaults.DOCUMENTATION.FUSE_MIN_MATCH_LENGTH || 3,
+      ignoreLocation: true, // Ignore location for simple fuzzy search
+      useExtendedSearch: false,
+      findAllMatches: true
+    };
+
+    // Create Fuse instance
+    const fuse = new Fuse(filteredItems, fuseOptions);
+
+    // Create search query from keywords
+    // Use OR logic to find items matching any keyword
+    const searchResults: Map<number, number> = new Map(); // index -> best score
+
+    for (const keyword of keywords) {
+      const results = fuse.search(keyword.toLowerCase());
+
+      for (const result of results) {
+        const currentScore = searchResults.get(result.item.index) || 1;
+        // Use the best (lowest) score for each item
+        searchResults.set(result.item.index, Math.min(currentScore, result.score || 1));
+      }
+    }
+
+    // Combine fuzzy search with URL length normalization
+    const scored = filteredItems.map(item => {
+      const fuseScore = searchResults.get(item.index);
+
+      if (fuseScore === undefined) {
+        // No keyword match found
+        return {
+          item: item.original,
+          score: 0
+        };
       }
 
-      // Simple scoring: match count divided by URL length to avoid bias towards long URLs
-      const score = matchCount / Math.max(item.url.length, 1);
+      // Convert Fuse score (0 = perfect match, 1 = no match) to match count approximation
+      // Use the inverse of the fuse score as a proxy for match quality
+      const matchQuality = 1 - fuseScore;
+
+      // Simple scoring: match quality divided by URL length to avoid bias towards long URLs
+      // This mirrors the old logic: matchCount / Math.max(item.url.length, 1)
+      const score = matchQuality / Math.max(item.url.length, 1);
 
       return {
         item: item.original,
@@ -1058,8 +1100,9 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       };
     });
 
-    // Filter out items with score 0 (excluded links), sort by score, and return the original items
+    // Sort by score (highest first) and return the original items
     return scored
+      .filter(s => s.score > 0) // Only include items with matches
       .sort((a, b) => b.score - a.score)
       .map(s => s.item);
   }
@@ -1349,6 +1392,12 @@ class HtmlMarkdownStrategy implements ProcessingStrategy {
     }
     if (typeof content !== 'string') {
       content = JSON.stringify(content, null, 2);
+    }
+
+    const MAX_CONTENT_SIZE_FOR_CONVERSION = server_defaults.DOCUMENTATION.MAX_CONTENT_SIZE_FOR_CONVERSION;
+    if (content.length > MAX_CONTENT_SIZE_FOR_CONVERSION) {
+      logMessage('warn', `HtmlMarkdownStrategy: Content too large for conversion (${Math.round(content.length / 1024 / 1024)}MB), skipping`, metadata);
+      return null; // Let RawPageContentStrategy handle it
     }
 
     // Check if content is already Markdown (from individual page conversion)

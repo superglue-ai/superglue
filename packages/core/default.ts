@@ -20,13 +20,20 @@ export const server_defaults = {
         MAX_CONCURRENT_OPENAPI_FETCHES: 25,
         MAX_OPENAPI_SPECS_TO_FETCH: 100,
         TEXT_PATTERN_REMOVAL_MAX_LENGTH: 400,
+        FUSE_THRESHOLD: 0.2, // 0.0 = exact match, 1.0 = match anything
+        FUSE_MIN_MATCH_LENGTH: 3, // Minimum characters to match
+        MAX_CONCURRENT_CONTEXTS: 10, // Max concurrent Playwright browser contexts
+        MAX_PAGE_SIZE_BYTES: 5 * 1024 * 1024, // 5MB hard cap per page
+        MAX_CODE_BLOCKS_PER_PAGE: 50,
+        MAX_TABLE_ROWS_TOTAL: 5000,
+        MAX_CONTENT_SIZE_FOR_CONVERSION: 5 * 1024 * 1024, // 5MB max for HTML to Markdown conversion
         TIMEOUTS: {
             AXIOS: 120000,
             PLAYWRIGHT: 120000,
             EVAL_DOC_PROCESSING_TIMEOUT: 1200000,
             SITEMAP_FETCH: 60000,
             SITEMAP_PROCESSING_TOTAL: 120000
-        }    
+        }
     },
     POSTGRES: {
         POOL_IDLE_TIMEOUT: 5 * 60 * 1000, // 5 minutes

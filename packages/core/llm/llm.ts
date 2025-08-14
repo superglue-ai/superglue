@@ -47,7 +47,29 @@ export interface LLMObjectResponse {
     messages: OpenAI.Chat.ChatCompletionMessageParam[];
 }
 
-export const LanguageModel = selectLanguageModel();
+// Lazy initialization to ensure environment variables are loaded
+let _languageModel: LLM | null = null;
+
+export const LanguageModel = {
+    get contextLength(): number {
+        return this._getInstance().contextLength;
+    },
+
+    generateText(messages: OpenAI.Chat.ChatCompletionMessageParam[], temperature?: number): Promise<LLMResponse> {
+        return this._getInstance().generateText(messages, temperature);
+    },
+
+    generateObject(messages: OpenAI.Chat.ChatCompletionMessageParam[], schema: any, temperature?: number, customTools?: ToolDefinition[], context?: any): Promise<LLMObjectResponse> {
+        return this._getInstance().generateObject(messages, schema, temperature, customTools, context);
+    },
+
+    _getInstance(): LLM {
+        if (!_languageModel) {
+            _languageModel = selectLanguageModel();
+        }
+        return _languageModel;
+    }
+};
 
 function selectLanguageModel(): LLM {
     switch (String(process.env.LLM_PROVIDER).toUpperCase()) {

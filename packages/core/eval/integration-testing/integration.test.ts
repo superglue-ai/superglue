@@ -2,9 +2,40 @@ import path from 'path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { IntegrationTestingFramework } from './integration-testing-framework.js';
 
+// Register cleanup handlers for process termination
+let isCleaningUp = false;
+const cleanup = async (signal?: string) => {
+    if (!isCleaningUp) {
+        isCleaningUp = true;
+        if (signal) {
+            console.log(`\n🧹 Cleaning up test resources due to ${signal}...`);
+        }
+        try {
+            const { PlaywrightFetchingStrategy } = await import('../../utils/documentation.js');
+            await PlaywrightFetchingStrategy.closeBrowser();
+        } catch (e) {
+            console.error('Error during cleanup:', e);
+        }
+
+        // Kill any remaining vitest processes
+        if (signal === 'SIGINT' || signal === 'SIGTERM') {
+            process.exit(0);
+        }
+    }
+};
+
+process.once('SIGINT', () => cleanup('SIGINT'));
+process.once('SIGTERM', () => cleanup('SIGTERM'));
+process.once('exit', () => cleanup());
+process.once('uncaughtException', (err) => {
+    console.error('Uncaught exception:', err);
+    cleanup('uncaughtException');
+});
+
 describe('Integration Tests', () => {
     let originalDataStoreType: string | undefined;
     let originalDataStorePath: string | undefined;
+    let framework: IntegrationTestingFramework | null = null;
 
     beforeAll(async () => {
         // Load environment variables from .env file
@@ -23,7 +54,12 @@ describe('Integration Tests', () => {
     });
 
     afterAll(async () => {
-        // Restore original environment variables
+        try {
+            const { PlaywrightFetchingStrategy } = await import('../../utils/documentation.js');
+            await PlaywrightFetchingStrategy.closeBrowser();
+        } catch (e) {
+        }
+
         if (originalDataStoreType !== undefined) {
             process.env.DATA_STORE_TYPE = originalDataStoreType;
         } else {
