@@ -24,15 +24,12 @@ describe('Integration Tests', () => {
     });
 
     afterAll(async () => {
-        // Clean up Playwright browser if it exists
         try {
             const { PlaywrightFetchingStrategy } = await import('../../utils/documentation.js');
             await PlaywrightFetchingStrategy.closeBrowser();
         } catch (e) {
-            // Ignore errors
         }
 
-        // Restore original environment variables
         if (originalDataStoreType !== undefined) {
             process.env.DATA_STORE_TYPE = originalDataStoreType;
         } else {

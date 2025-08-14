@@ -14,13 +14,30 @@ export const server_defaults = {
     DOCUMENTATION: {
         MAX_LENGTH_OFFSET: 50000,
         MAX_LENGTH_ABSOLUTE: 200000,
-        MAX_FETCHED_LINKS: 20,
-        PARALLEL_FETCH_LIMIT: 20,
+        MAX_FETCHED_LINKS: 25,
+        PARALLEL_FETCH_LIMIT: 25,
         MAX_SITEMAP_DEPTH: 3,
         MAX_CONCURRENT_OPENAPI_FETCHES: 25,
         MAX_OPENAPI_SPECS_TO_FETCH: 100,
         TEXT_PATTERN_REMOVAL_MAX_LENGTH: 400,
-        MAX_PAGE_SIZE_BYTES: 150 * 1024 * 1024, 
-        PAGE_PROCESSING_TIMEOUT: 30000 
+        TIMEOUTS: {
+            AXIOS: 120000,
+            PLAYWRIGHT: 120000,
+            EVAL_DOC_PROCESSING_TIMEOUT: 1200000,
+            SITEMAP_FETCH: 60000,
+            SITEMAP_PROCESSING_TOTAL: 120000
+        }    
+    },
+    POSTGRES: {
+        POOL_IDLE_TIMEOUT: 5 * 60 * 1000, // 5 minutes
+        POOL_CLEANUP_INTERVAL: 60 * 1000, // 1 minute
+        DEFAULT_TIMEOUT: 30000, // 30 seconds
+        DEFAULT_RETRIES: 0,
+        DEFAULT_RETRY_DELAY: 1000, // 1 second
+    },
+    FTP: {
+        DEFAULT_TIMEOUT: 30000, // 30 seconds
+        DEFAULT_RETRIES: 0,
+        DEFAULT_RETRY_DELAY: 1000, // 1 second
     }
 }

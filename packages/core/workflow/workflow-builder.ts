@@ -76,23 +76,9 @@ export class WorkflowBuilder {
       );
       const generalSection = Documentation.extractRelevantSections(
         int.documentation,
-        this.instruction,
+        this.instruction + "reference object endpoints methods properties values fields enums search query filter list create update delete get put post patch",
         20,  // max 20 sections
-        2000 // should cover examples, endpoints etc.
-      );
-
-      const postgresSection = Documentation.extractRelevantSections(
-        int.documentation,
-        "postgres",
-        10,
-        4000
-      );
-
-      const graphqlSection = Documentation.extractRelevantSections(
-        int.documentation,
-        "graphql",
-        10,
-        4000
+        1000 // should cover examples, endpoints etc.
       );
 
       return `<${int.id}>
@@ -112,14 +98,6 @@ ${authSection}
     <context_relevant_to_user_instruction>
     ${generalSection && generalSection != authSection && generalSection != paginationSection ? generalSection : 'No general documentation found.'}
     </context_relevant_to_user_instruction>
-
-    <postgres>
-    ${postgresSection || 'No postgres information found.'}
-    </postgres>
-
-    <graphql>
-    ${graphqlSection || 'No graphql information found.'}
-    </graphql>
   </documentation>
 </${int.id}>`;
     }).join("\n");
