@@ -20,8 +20,8 @@ CRITICAL CONTEXT FOR WORKFLOW TRANSFORMATIONS:
 
 3. For LOOP execution contexts:
    - currentItem is available as the second parameter: (sourceData, currentItem) => { ... }
-   - currentItem properties are flattened with dot notation for use in templates
-   - Example: if currentItem = { id: 123, name: "test" }, use <<currentItem.id>> in templates
+   - currentItem properties are flattened for use in templates
+   - Example: if currentItem = { id: 123, name: "test" }, use <<currentItem_id>> for direct access
 
 Requirements:
 - Function signature: (sourceData) => { ... } or (sourceData, currentItem) => { ... } for loops
@@ -166,7 +166,7 @@ Further:
 - Never make assumptions or guesses about the data you need to fetch. Always fetch all prerequisites first - this is the most common failure mode.
 - Be acutely aware that the user might not be specific about the data they want to fetch. E.g. they might say "get all leads" but they might mean "get all people in my crm that have a certain status".
 - Make sure you really really understand the structure of the available data, and fetch prerequisites first.
-- Each step must correspond to a single API call (no compound operations)
+- Each step must correspond to a single API call (no compound operations).
 - Choose the appropriate integration for each step based on the provided documentation
 - Assign descriptive stepIds in camelCase that indicate the purpose of the step
 - Make absolutely sure that each step can be achieved with a single API call (or a loop of the same call)
@@ -288,7 +288,7 @@ For each step in the plan, you must:
 
 JAVASCRIPT EXPRESSIONS:
 Use JavaScript expressions within <<>> tags for any dynamic values:
-- Simple variable access: <<userId>>, <<currentItem.id>>
+- Simple variable access: <<userId>>, <<currentItem_id>>
 - JavaScript functions require arrow syntax: <<(sourceData) => sourceData.user.name>>
 - Array operations: <<(sourceData) => sourceData.users.map(u => u.id)>>
 - Complex transformations: <<(sourceData) => JSON.stringify({ ids: sourceData.fetchUsers.map(u => u.id) })>>
@@ -304,7 +304,7 @@ For data access in <<>> tags:
 - Initial payload fields: <<date>>, <<companies>>
 - Previous step results: <<fetchUsers>>, <<getProducts.data>>
 - Complex expressions: <<sourceData.users.filter(u => u.active).map(u => u.id)>>
-- Current item in loops: <<currentItem.id>>, <<currentItem.name>>
+- Current item in loops: <<currentItem_id>>, <<currentItem_name>>
 
 For special transformation functions:
 - loopSelector: (sourceData) => sourceData.fetchUsers.users
@@ -331,14 +331,14 @@ CRITICAL DATA ACCESS PATTERNS:
 When executionMode is "LOOP":
 1. The loopSelector extracts an array from available data: (sourceData) => sourceData.getContacts.results
 2. Each item in the array becomes available as 'currentItem' in the loop context.
-3. To access properties of the item, use dot notation. For example, to access the 'id' of the current item, use the variable '<<currentItem.id>>'.
+3. CURRENTITEM ACCESS: Use <<currentItem_propertyName>> for direct access (e.g., <<currentItem_id>>) OR <<(sourceData) => sourceData.currentItem.someMethod()>> for JavaScript expressions.
 4. Example flow:
    - loopSelector: (sourceData) => sourceData.getAllContacts.filter(c => c.status === 'active')
-   - URL: /contacts/<<currentItem.id>>/update
-   - Body: {"status": "processed", "contactId": "<<currentItem.id>>", "updatedBy": "<<userId>>", "previousData": <<JSON.stringify(currentItem)>>}
+   - URL: /contacts/<<currentItem_id>>/update
+   - Body: {"status": "processed", "contactId": "<<currentItem_id>>", "updatedBy": "<<userId>>", "previousData": <<(sourceData) => JSON.stringify(sourceData.currentItem)>>}
 5. You can use JavaScript expressions to transform loop data:
-   - Body with calculations: {"price": <<currentItem.price * 1.2>>, "currency": "<<currency>>"}
-   - Body with complex logic: <<JSON.stringify({ id: currentItem.id, tags: sourceData.globalTags.concat([currentItem.category]) })>>
+   - Body with calculations: {"price": <<(sourceData) => sourceData.currentItem_price * 1.2>>, "currency": "<<currency>>"}
+   - Body with complex logic: <<(sourceData) => JSON.stringify({ id: sourceData.currentItem_id, tags: sourceData.globalTags.concat([sourceData.currentItem_category]) })>>
 6. Response data from all iterations is collected into an array
 </LOOP_EXECUTION>
 
@@ -466,7 +466,7 @@ Understand what each error means:
 
 2. Loop context variables:
    - WRONG: <<contactId>>, <<itemId>>, <<recordId>>, <<userId>>
-   - RIGHT: <<currentItem.id>>, <<currentItem.name>>, <<currentItem.properties.fieldname>>
+   - RIGHT: <<currentItem_id>>, <<currentItem_name>>, <<currentItem_properties_fieldname>>
 
 3. Response evaluation failures:
    - This means the API call worked but returned data that doesn't match your instruction (e.g. empty array when you expected a list of items)
