@@ -25,7 +25,6 @@ const createPlaywrightMocks = () => {
     const mockPage = {
         goto: vi.fn().mockResolvedValue(undefined),
         waitForLoadState: vi.fn().mockResolvedValue(undefined),
-        waitForTimeout: vi.fn().mockResolvedValue(undefined), // Added mock
         content: vi.fn().mockResolvedValue(''),
         evaluate: vi.fn().mockResolvedValue(undefined),
         close: vi.fn().mockResolvedValue(undefined),
@@ -90,7 +89,6 @@ describe('Documentation Class', () => {
             expect(mockContext.newPage).toHaveBeenCalledTimes(1);
             expect(mockPage.goto).toHaveBeenCalledWith(docUrl, { timeout: server_defaults.DOCUMENTATION.TIMEOUTS.PLAYWRIGHT });
             expect(mockPage.waitForLoadState).toHaveBeenCalledWith('domcontentloaded', { timeout: server_defaults.DOCUMENTATION.TIMEOUTS.PLAYWRIGHT });
-            expect(mockPage.waitForTimeout).toHaveBeenCalledWith(1000);
             expect(mockPage.evaluate).toHaveBeenCalledTimes(1); // Single evaluate for DOM manipulation and link extraction
             expect(result).toContain('# API Docs');
             expect(result).toContain('Details here.');
