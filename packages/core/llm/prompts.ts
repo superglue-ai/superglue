@@ -100,7 +100,7 @@ ERROR HANDLING:
 
 Return your answer in the following JSON format:
 {
-  "mappingCode": "(sourceData) => { return { id: sourceData.id }; }"
+gi  "mappingCode": "(sourceData) => { return { id: sourceData.id }; }"
 }
 
 THE FUNCTION MUST BE VALID JAVASCRIPT that can be executed with eval().

@@ -94,7 +94,7 @@ export async function generateTransformCode(
   metadata: Metadata,
   retry = 0,
   messages?: ChatCompletionMessageParam[]
-): Promise<{ mappingCode: string } | null> {
+): Promise<{ mappingCode: string; data?: any } | null> {
   try {
     logMessage('info', "Generating mapping" + (retry > 0 ? ` (retry ${retry})` : ''), metadata);
 
