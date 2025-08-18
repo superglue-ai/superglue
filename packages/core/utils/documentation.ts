@@ -7,6 +7,7 @@ import * as yaml from 'js-yaml';
 import { NodeHtmlMarkdown } from "node-html-markdown";
 import { server_defaults } from '../default.js';
 import { LanguageModel } from '../llm/llm.js';
+import { parseJSON } from "./json-parser.js";
 import { logMessage } from "./logs.js";
 import { callPostgres } from './postgres.js';
 import { composeUrl } from "./tools.js";
@@ -117,7 +118,7 @@ export class Documentation {
 
         // First, try to parse as JSON
         try {
-          const parsed = JSON.parse(trimmedData);
+          const parsed = parseJSON(trimmedData);
           // Check for OpenAPI links in parsed JSON
           const openApiUrls = this.extractOpenApiUrls(parsed);
           if (openApiUrls.length > 0) {
@@ -207,7 +208,7 @@ export class Documentation {
           // Parse if string
           if (typeof specData === 'string') {
             try {
-              specData = JSON.parse(specData);
+              specData = parseJSON(specData);
             } catch {
               // Try YAML parsing
               try {
@@ -1208,7 +1209,7 @@ class OpenApiStrategy implements ProcessingStrategy {
       if (settingsMatch && settingsMatch[1]) {
         const settingsContent = settingsMatch[1].trim();
         try {
-          const settings = JSON.parse(settingsContent);
+          const settings = parseJSON(settingsContent);
           if (settings.url && typeof settings.url === 'string') {
             return settings.url;
           }
@@ -1265,7 +1266,7 @@ class OpenApiStrategy implements ProcessingStrategy {
         }
       } else if (typeof openApiData === 'string') {
         try {
-          const parsed = JSON.parse(openApiData);
+          const parsed = parseJSON(openApiData);
           if (parsed && (parsed.openapi || parsed.swagger)) {
             logMessage('info', `Successfully fetched valid OpenAPI/Swagger JSON string from ${absoluteOpenApiUrl}`, metadata);
             return openApiData; // Valid JSON spec
@@ -1302,7 +1303,7 @@ class OpenApiStrategy implements ProcessingStrategy {
     const isHtml = trimmedContent.slice(0, 500).toLowerCase().includes("<html");
     if (isJson) {
       try {
-        const parsed = JSON.parse(trimmedContent);
+        const parsed = parseJSON(trimmedContent);
         if (parsed && (parsed.openapi || parsed.swagger)) {
           logMessage('info', "Provided content is already a valid OpenAPI/Swagger JSON spec.", metadata);
           return trimmedContent; // Content is a valid JSON spec

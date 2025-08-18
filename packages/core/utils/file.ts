@@ -6,6 +6,7 @@ import * as unzipper from 'unzipper';
 import { promisify } from 'util';
 import * as XLSX from 'xlsx';
 import { gunzip, inflate } from 'zlib';
+import { parseJSON } from './json-parser.js';
 
 
 
@@ -164,16 +165,6 @@ async function parseCSV(buffer: Buffer): Promise<any> {
             },
         });
     });
-}
-
-async function parseJSON(buffer: Buffer): Promise<any> {
-    try {
-        let data = JSON.parse(buffer.toString('utf8'));
-        return data;
-    } catch (error) {
-        console.error('Failed parsing JSON');
-        throw error;
-    }
 }
 
 export async function parseXML(buffer: Buffer): Promise<any> {

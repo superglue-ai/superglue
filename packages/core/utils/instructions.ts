@@ -3,6 +3,7 @@ import type { ChatCompletionMessageParam } from "openai/resources/chat/completio
 import { LanguageModel } from "../llm/llm.js";
 import { BaseToolContext, ToolDefinition, ToolImplementation } from "../tools/tools.js";
 import { Documentation } from "./documentation.js";
+import { parseJSON } from "./json-parser.js";
 
 // Extend context to include integrations
 export interface InstructionGenerationContext extends BaseToolContext {
@@ -95,7 +96,7 @@ export function sanitizeInstructionSuggestions(raw: unknown): string[] {
   // Try to parse JSON if it's a string
   if (typeof raw === "string") {
     try {
-      const parsed = JSON.parse(raw);
+      const parsed = parseJSON(raw);
       if (Array.isArray(parsed)) arr = parsed;
       else arr = [parsed];
     } catch {
