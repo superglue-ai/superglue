@@ -201,6 +201,119 @@ class CommentStrategy extends RepairStrategy {
 }
 
 /**
+ * Strategy to handle trailing non-JSON characters after valid JSON
+ */
+class TrailingCharactersStrategy extends RepairStrategy {
+  name = 'TrailingCharactersRepair';
+  description = 'Removes trailing characters after valid JSON structure';
+  
+  canApply(input: string): boolean {
+    const trimmed = input.trim();
+    // Check if there's content after what looks like a complete JSON structure
+    // We need to properly match balanced braces/brackets with trailing content
+    
+    // Quick check: does it start with { or [ and have extra content after apparent end?
+    if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+      return false;
+    }
+    
+    // Try to find where the JSON structure ends
+    let braceCount = 0;
+    let bracketCount = 0;
+    let inString = false;
+    let escapeNext = false;
+    
+    for (let i = 0; i < trimmed.length; i++) {
+      const char = trimmed[i];
+      
+      if (!inString) {
+        if (char === '"') {
+          inString = true;
+        } else if (char === '{') {
+          braceCount++;
+        } else if (char === '}') {
+          braceCount--;
+          if (braceCount === 0 && bracketCount === 0 && i > 0 && i < trimmed.length - 1) {
+            // Found complete JSON with trailing content
+            return true;
+          }
+        } else if (char === '[') {
+          bracketCount++;
+        } else if (char === ']') {
+          bracketCount--;
+          if (bracketCount === 0 && braceCount === 0 && i > 0 && i < trimmed.length - 1) {
+            // Found complete JSON with trailing content
+            return true;
+          }
+        }
+      } else {
+        if (escapeNext) {
+          escapeNext = false;
+        } else if (char === '\\') {
+          escapeNext = true;
+        } else if (char === '"') {
+          inString = false;
+        }
+      }
+    }
+    
+    return false;
+  }
+  
+  apply(input: string): string {
+    const trimmed = input.trim();
+    
+    // Try to find the end of a valid JSON structure
+    let braceCount = 0;
+    let bracketCount = 0;
+    let inString = false;
+    let escapeNext = false;
+    let jsonEndIndex = -1;
+    
+    for (let i = 0; i < trimmed.length; i++) {
+      const char = trimmed[i];
+      
+      if (!inString) {
+        if (char === '"') {
+          inString = true;
+        } else if (char === '{') {
+          braceCount++;
+        } else if (char === '}') {
+          braceCount--;
+          if (braceCount === 0 && bracketCount === 0 && i > 0) {
+            jsonEndIndex = i;
+            break;
+          }
+        } else if (char === '[') {
+          bracketCount++;
+        } else if (char === ']') {
+          bracketCount--;
+          if (bracketCount === 0 && braceCount === 0 && i > 0) {
+            jsonEndIndex = i;
+            break;
+          }
+        }
+      } else {
+        if (escapeNext) {
+          escapeNext = false;
+        } else if (char === '\\') {
+          escapeNext = true;
+        } else if (char === '"') {
+          inString = false;
+        }
+      }
+    }
+    
+    if (jsonEndIndex > 0 && jsonEndIndex < trimmed.length - 1) {
+      // Found the end of JSON structure with trailing content
+      return trimmed.substring(0, jsonEndIndex + 1);
+    }
+    
+    return input;
+  }
+}
+
+/**
  * Main JSON parser class
  */
 export class ResilientJsonParser {
@@ -229,6 +342,7 @@ export class ResilientJsonParser {
   private initializeDefaultStrategies(): void {
     this.strategies = [
       new TripleQuoteStrategy(),
+      new TrailingCharactersStrategy(),  // Apply early to clean up trailing content
       new PythonLiteralStrategy(),
       new TrailingCommaStrategy(),
       new SingleQuoteStrategy(),
@@ -349,20 +463,30 @@ export class ResilientJsonParser {
    */
   private aggressiveFallback(input: string): ParseResult {
     try {
-      // Try to extract JSON-like content
-      const jsonMatch = input.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
-      if (!jsonMatch) {
+      // First, try to find JSON-like structures more precisely
+      // Look for JSON starting patterns
+      const objectStart = input.indexOf('{');
+      const arrayStart = input.indexOf('[');
+      
+      if (objectStart === -1 && arrayStart === -1) {
         return { success: false, error: 'No JSON-like structure found' };
       }
       
-      let extracted = jsonMatch[1];
+      // Start from the first JSON-like character
+      const startIdx = objectStart === -1 ? arrayStart : 
+                      arrayStart === -1 ? objectStart : 
+                      Math.min(objectStart, arrayStart);
       
-      // Apply all strategies aggressively
+      let extracted = input.substring(startIdx);
+      
+      // Apply all strategies to clean it up
       for (const strategy of this.strategies) {
-        extracted = strategy.apply(extracted);
+        if (strategy.canApply(extracted)) {
+          extracted = strategy.apply(extracted);
+        }
       }
       
-      // Final parse attempt
+      // Try to parse
       const data = JSON.parse(extracted);
       return { success: true, data };
     } catch (error) {

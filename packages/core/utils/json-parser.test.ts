@@ -322,5 +322,60 @@ describe('Resilient JSON Parser', () => {
       expect(result.success).toBe(false);
       expect(result.error).toContain('JSON parse error');
     });
+
+    it('should handle trailing non-JSON characters after valid JSON', () => {
+      const parser = new ResilientJsonParser();
+      
+      // Test with object and trailing tilde
+      const jsonWithTilde = '{"key": "value", "number": 42}~';
+      const result1 = parser.parse(jsonWithTilde);
+      expect(result1.success).toBe(true);
+      expect(result1.data).toEqual({ key: "value", number: 42 });
+      expect(result1.metadata?.strategiesApplied).toContain('TrailingCharactersRepair');
+      
+      // Test with array and trailing characters
+      const jsonArrayWithTrailing = '[1, 2, 3, "test"]random text here';
+      const result2 = parser.parse(jsonArrayWithTrailing);
+      expect(result2.success).toBe(true);
+      expect(result2.data).toEqual([1, 2, 3, "test"]);
+      expect(result2.metadata?.strategiesApplied).toContain('TrailingCharactersRepair');
+      
+      // Test with nested object and trailing newline and tilde
+      const complexJson = `{
+        "_index": "test",
+        "_id": "123",
+        "_source": {
+          "product": {
+            "title": "Test Product",
+            "price": 99.99
+          }
+        }
+      }
+~
+`;
+      const result3 = parser.parse(complexJson);
+      expect(result3.success).toBe(true);
+      expect(result3.data._index).toBe("test");
+      expect(result3.data._source.product.price).toBe(99.99);
+      expect(result3.metadata?.strategiesApplied).toContain('TrailingCharactersRepair');
+    });
+
+    it('should use aggressive fallback for JSON with leading garbage', () => {
+      const parser = new ResilientJsonParser();
+      
+      // Test with leading text before JSON
+      const jsonWithPrefix = 'Server response: {"status": "ok", "code": 200}';
+      const result = parser.parse(jsonWithPrefix);
+      expect(result.success).toBe(true);
+      expect(result.data).toEqual({ status: "ok", code: 200 });
+      expect(result.metadata?.strategiesApplied).toContain('AggressiveFallback');
+      
+      // Test with debug output around JSON
+      const debugJson = 'DEBUG: Processing data... [1, 2, 3] Done!';
+      const result2 = parser.parse(debugJson);
+      expect(result2.success).toBe(true);
+      expect(result2.data).toEqual([1, 2, 3]);
+      expect(result2.metadata?.strategiesApplied).toContain('AggressiveFallback');
+    });
   });
 });
