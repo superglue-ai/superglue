@@ -2,13 +2,12 @@ import playwright from '@playwright/test';
 import { ApiConfig } from "@superglue/client";
 import { Metadata } from "@superglue/shared";
 import axios from "axios";
-import Fuse from 'fuse.js';
 import { getIntrospectionQuery } from "graphql";
 
 import * as yaml from 'js-yaml';
-import { NodeHtmlMarkdown } from "node-html-markdown";
 import { server_defaults } from '../default.js';
 import { LanguageModel } from '../llm/llm.js';
+import { getSharedHtmlMarkdownPool } from './html-markdown-pool.js';
 import { logMessage } from "./logs.js";
 import { callPostgres } from './postgres.js';
 import { composeUrl } from "./tools.js";
@@ -99,9 +98,7 @@ export class Documentation {
       const response = await axios.get(this.config.openApiUrl, { timeout: server_defaults.DOCUMENTATION.TIMEOUTS.AXIOS });
       let data = response.data;
 
-      // If data is already an object (axios parsed it), check for OpenAPI links
       if (typeof data === 'object' && data !== null) {
-        // Check if this is a discovery/index response with links to other OpenAPI docs
         const openApiUrls = this.extractOpenApiUrls(data);
         if (openApiUrls.length > 0) {
           logMessage('debug', `Found ${openApiUrls.length} OpenAPI specification links in response`, this.metadata);
@@ -114,10 +111,8 @@ export class Documentation {
       if (typeof data === 'string') {
         const trimmedData = data.trim();
 
-        // First, try to parse as JSON
         try {
           const parsed = JSON.parse(trimmedData);
-          // Check for OpenAPI links in parsed JSON
           const openApiUrls = this.extractOpenApiUrls(parsed);
           if (openApiUrls.length > 0) {
             logMessage('debug', `Found ${openApiUrls.length} OpenAPI specification links in response`, this.metadata);
@@ -201,16 +196,13 @@ export class Documentation {
           const response = await axios.get(url, { timeout: server_defaults.DOCUMENTATION.TIMEOUTS.AXIOS });
           let specData = response.data;
 
-          // Parse if string
           if (typeof specData === 'string') {
             try {
               specData = JSON.parse(specData);
             } catch {
-              // Try YAML parsing
               try {
                 specData = yaml.load(specData) as any;
               } catch {
-                // Keep as string if parsing fails
               }
             }
           }
@@ -235,7 +227,6 @@ export class Documentation {
     } else if (specs.length === 1) {
       return JSON.stringify(specs[0].spec, null, 2);
     } else {
-      // Return all specs with their URLs for reference
       return JSON.stringify({
         _meta: {
           fetchedAt: new Date().toISOString(),
@@ -263,7 +254,7 @@ export class Documentation {
       return documentation;
     }
 
-    const MIN_SEARCH_TERM_LENGTH = server_defaults.DOCUMENTATION_MIN_SEARCH_TERM_LENGTH || 3;
+    const MIN_SEARCH_TERM_LENGTH = server_defaults.DOCUMENTATION.MIN_SEARCH_TERM_LENGTH || 3;
 
     const searchTerms = searchQuery?.toLowerCase()?.split(/[^a-z0-9/]/)
       .map(term => term.trim())
@@ -273,7 +264,6 @@ export class Documentation {
       return '';
     }
 
-    // Create sections with normalized content for searching
     const sections: Array<{ content: string; searchableContent: string; index: number; sectionIndex: number }> = [];
 
     for (let i = 0; i < documentation.length; i += sectionSize) {
@@ -286,40 +276,31 @@ export class Documentation {
       });
     }
 
-    // Configure Fuse.js for fuzzy search on sections
-    const fuseOptions = {
-      keys: ['searchableContent'],
-      threshold: server_defaults.DOCUMENTATION.FUSE_THRESHOLD || 0.2,
-      includeScore: true,
-      shouldSort: true,
-      minMatchCharLength: server_defaults.DOCUMENTATION.FUSE_MIN_MATCH_LENGTH || 3,
-      ignoreLocation: true,
-      useExtendedSearch: false,
-      findAllMatches: true
-    };
-
-    const fuse = new Fuse(sections, fuseOptions);
-
-    // Collect scores for each section across all search terms
     const sectionScores: Map<number, number> = new Map();
 
     for (const term of searchTerms) {
-      const results = fuse.search(term);
+      sections.forEach((section, idx) => {
+        let score = 0;
+        const content = section.searchableContent;
 
-      for (const result of results) {
-        const currentScore = sectionScores.get(result.item.sectionIndex) || 0;
-        // Convert Fuse score (0 = perfect, 1 = no match) to quality score (1 = perfect, 0 = no match)
-        const matchQuality = 1 - (result.score || 1);
-        // Weight by term length to prioritize longer, more specific terms
-        const weightedScore = matchQuality * term.length;
-        sectionScores.set(result.item.sectionIndex, currentScore + weightedScore);
-      }
+        const wordBoundaryRegex = new RegExp(`\\b${term}\\b`, 'g');
+        const exactMatches = (content.match(wordBoundaryRegex) || []).length;
+        score += exactMatches * 3 * term.length;
+
+        if (exactMatches === 0 && content.includes(term)) {
+          score += term.length;
+        }
+
+        if (score > 0) {
+          const currentScore = sectionScores.get(idx) || 0;
+          sectionScores.set(idx, currentScore + score);
+        }
+      });
     }
 
-    // Convert to array and sort by score
-    const scoredSections = sections.map(section => ({
+    const scoredSections = sections.map((section, idx) => ({
       ...section,
-      score: sectionScores.get(section.sectionIndex) || 0
+      score: sectionScores.get(idx) || 0
     }));
 
     const topSections = scoredSections
@@ -331,7 +312,6 @@ export class Documentation {
       return '';
     }
 
-    // Sort by original position to maintain document order
     topSections.sort((a, b) => a.index - b.index);
 
     const result = topSections.map(section => section.content).join('\n\n');
@@ -417,25 +397,22 @@ export class AxiosFetchingStrategy implements FetchingStrategy {
 }
 export class PlaywrightFetchingStrategy implements FetchingStrategy {
   private static readonly MAX_FETCHED_LINKS = server_defaults.DOCUMENTATION.MAX_FETCHED_LINKS;
-  private static readonly PARALLEL_FETCH_LIMIT = server_defaults.DOCUMENTATION.PARALLEL_FETCH_LIMIT;
+  private static readonly PARALLEL_FETCH_LIMIT = server_defaults.DOCUMENTATION.MAX_PAGES_TO_FETCH_IN_PARALLEL;
   private static browserInstance: playwright.Browser | null = null;
-  private static isCleaningUp = false;
-  private static activeContexts = 0;
-  private static readonly MAX_CONCURRENT_CONTEXTS = server_defaults.DOCUMENTATION.MAX_CONCURRENT_CONTEXTS;
+  private browserContext: playwright.BrowserContext | null = null;
 
   public static readonly EXCLUDED_LINK_KEYWORDS = [
     'signup', 'login', 'pricing', 'contact', 'support', 'cookie',
     'privacy', 'terms', 'legal', 'policy', 'status', 'help', 'blog',
     'careers', 'about', 'press', 'news', 'events', 'partners',
     'changelog', 'release-notes', 'updates', 'upgrade', 'register', 'cli',
-    'signin', 'sign-in', 'sign-up', 'trial', 'demo', 'sales'
+    'signin', 'sign-in', 'sign-up', 'trial', 'demo', 'sales', 'widget', 'webhooks'
   ];
 
 
 
   private static async getBrowser(): Promise<playwright.Browser> {
     if (!PlaywrightFetchingStrategy.browserInstance) {
-      // Simple launch like the old implementation
       PlaywrightFetchingStrategy.browserInstance = await playwright.chromium.launch();
     }
     return PlaywrightFetchingStrategy.browserInstance;
@@ -446,7 +423,6 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       const closedInstance = PlaywrightFetchingStrategy.browserInstance;
       PlaywrightFetchingStrategy.browserInstance = null;
       try {
-        // Try graceful close first
         await closedInstance.close();
       } catch (error) {
         console.warn('Failed to close browser gracefully:', error?.message);
@@ -462,32 +438,39 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       }
     }
   }
+  private async getOrCreateContext(config: DocumentationConfig): Promise<playwright.BrowserContext> {
+    if (!this.browserContext) {
+      const browser = await PlaywrightFetchingStrategy.getBrowser();
+      this.browserContext = await browser.newContext();
+
+      if (config.headers) {
+        await this.browserContext.setExtraHTTPHeaders(config.headers);
+      }
+    }
+    return this.browserContext;
+  }
+
+  private async cleanupContext(): Promise<void> {
+    if (this.browserContext) {
+      try {
+        await this.browserContext.close();
+      } catch (e) {
+        // Context might already be closed
+      }
+      this.browserContext = null;
+    }
+  }
+
   private async fetchPageContentWithPlaywright(urlString: string, config: DocumentationConfig, metadata: Metadata): Promise<{ content: string; links: Record<string, string>; } | null> {
 
     if (!urlString?.startsWith("http")) {
       return null;
     }
 
-    const MAX_PAGE_SIZE_BYTES = server_defaults.DOCUMENTATION.MAX_PAGE_SIZE_BYTES;
-    const MAX_CODE_BLOCKS_PER_PAGE = server_defaults.DOCUMENTATION.MAX_CODE_BLOCKS_PER_PAGE;
-    const MAX_TABLE_ROWS_TOTAL = server_defaults.DOCUMENTATION.MAX_TABLE_ROWS_TOTAL;
-
-    // Wait if too many contexts are active
-    while (PlaywrightFetchingStrategy.activeContexts >= PlaywrightFetchingStrategy.MAX_CONCURRENT_CONTEXTS) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-
     let page: playwright.Page | null = null;
-    let browserContext: playwright.BrowserContext | null = null;
-    PlaywrightFetchingStrategy.activeContexts++;
 
     try {
-      const browser = await PlaywrightFetchingStrategy.getBrowser();
-      browserContext = await browser.newContext();
-
-      if (config.headers) {
-        await browserContext.setExtraHTTPHeaders(config.headers);
-      }
+      const browserContext = await this.getOrCreateContext(config);
 
       const url = new URL(urlString);
       if (config.queryParams) {
@@ -499,12 +482,25 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       page = await browserContext.newPage();
       await page.goto(url.toString(), { timeout: server_defaults.DOCUMENTATION.TIMEOUTS.PLAYWRIGHT });
       await page.waitForLoadState('domcontentloaded', { timeout: server_defaults.DOCUMENTATION.TIMEOUTS.PLAYWRIGHT });
-      await page.waitForTimeout(1000);
 
-      const { links, prunedHtml } = await page.evaluate(({ MAX_CODE_BLOCKS, MAX_TABLE_ROWS }) => {
+      const result = await page.evaluate(() => {
+        const selectorsToRemove = [
+          'img, video, svg, canvas, iframe, picture, source, audio, embed, object',
+          '[role="banner"], [role="dialog"], [role="contentinfo"], [role="complementary"]',
+          '.cookie-banner, .cookie-consent, .cookies, .gdpr, .privacy-notice',
+          'nav, header, footer, aside, .sidebar, .menu, .navbar, .toolbar',
+          '.social, .share, .chat, .feedback, .comments, .disqus',
+          '.ads, .advertisement, .banner, .promo, .sponsored',
+          'script, style, noscript, link[rel="stylesheet"]',
+          '.breadcrumb, .pagination, .pager',
+          '.related, .recommended, .also-see',
+          'form, input, button, select, textarea'
+        ];
+        selectorsToRemove.forEach(selector =>
+          document.querySelectorAll(selector).forEach(el => el.remove())
+        );
+
         const links: Record<string, string> = {};
-
-        // Extract links
         document.querySelectorAll('a').forEach(link => {
           try {
             const anchor = link as HTMLAnchorElement;
@@ -514,73 +510,39 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
           } catch (e) { }
         });
 
-        // Remove non-content elements
-        const selectorsToRemove = [
-          'img, video, svg, canvas, iframe, picture, source',
-          '[role="banner"], [role="dialog"], [role="contentinfo"]',
-          '.cookie-banner, .cookie-consent, .cookies',
-          'nav, header, footer, aside',
-          '.social, .share, .chat, .feedback'
-        ];
-        selectorsToRemove.forEach(selector =>
-          document.querySelectorAll(selector).forEach(el => el.remove())
-        );
-
-        // Limit code blocks and tables
-        const codeBlocks = document.querySelectorAll('pre, code');
-        Array.from(codeBlocks).slice(MAX_CODE_BLOCKS).forEach(el => el.remove());
-
-        let remainingRows = MAX_TABLE_ROWS;
-        document.querySelectorAll('table').forEach(table => {
-          const rows = table.querySelectorAll('tr');
-          if (rows.length > remainingRows) {
-            Array.from(rows).slice(remainingRows).forEach(row => row.remove());
-            remainingRows = 0;
-          } else {
-            remainingRows -= rows.length;
-          }
-        });
-
-        // Extract main content
-        const mainContent = document.querySelector('article, main, .docs-content, .markdown, .md-content, .api-content, .docContent');
+        const mainContent = document.querySelector('article, main, .docs-content, .markdown, .md-content, .api-content, .docContent, .content, .doc-body');
         const html = mainContent
           ? `<html><body>${mainContent.outerHTML}</body></html>`
           : `<html><body>${document.body?.innerHTML || ''}</body></html>`;
 
-        return { links, prunedHtml: html };
-      }, { MAX_CODE_BLOCKS: MAX_CODE_BLOCKS_PER_PAGE, MAX_TABLE_ROWS: MAX_TABLE_ROWS_TOTAL });
+        return { html, links };
+      });
 
-      const content = prunedHtml || await page.content();
-
-      if (content.length > MAX_PAGE_SIZE_BYTES) {
-        logMessage('warn', `Page ${urlString} is too large (${Math.round(content.length / 1024 / 1024)}MB), skipping`, metadata);
+      if (!result || !result.html) {
+        logMessage('warn', `Failed to extract content from ${urlString}`, metadata);
         return null;
       }
 
-      logMessage('info', `Successfully fetched content for ${urlString}`, metadata);
+      const { html, links } = result;
+
+      if (html.length > server_defaults.DOCUMENTATION.MAX_PAGE_SIZE_BYTES) {
+        logMessage('warn', `Page ${urlString} exceeds size limit (${Math.round(html.length / 1024 / 1024)}MB > ${Math.round(server_defaults.DOCUMENTATION.MAX_PAGE_SIZE_BYTES / 1024 / 1024)}MB), skipping`, metadata);
+        return null;
+      }
+
+      logMessage('debug', `Successfully fetched content for ${urlString}`, metadata);
       return {
-        content,
+        content: html,
         links
       };
     } catch (error) {
       logMessage('warn', `Playwright fetch failed for ${urlString}: ${error?.message}`, metadata);
       return null;
     } finally {
-      // Always clean up, even if there was an error
-      PlaywrightFetchingStrategy.activeContexts--;
-
       if (page) {
         try {
           await page.close();
         } catch (e) {
-          // Page might already be closed
-        }
-      }
-      if (browserContext) {
-        try {
-          await browserContext.close();
-        } catch (e) {
-          // Context might already be closed
         }
       }
     }
@@ -593,7 +555,6 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       const origin = url.origin;
       const pathname = url.pathname;
 
-      // First, try sitemaps specific to the documentation path
       if (pathname && pathname !== '/') {
         // Try sitemap at the exact path
         candidates.push(`${baseUrl}/sitemap.xml`);
@@ -606,15 +567,12 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
         }
       }
 
-      // Then try common sitemap locations at the root
+      // Add common root sitemap locations
       candidates.push(
         `${origin}/sitemap.xml`,
-        `${origin}/sitemap_index.xml`,
-        `${origin}/sitemaps/sitemap.xml`,
-        `${origin}/sitemap/index.xml`,
-        `${origin}/docs/sitemap.xml`,
-        `${origin}/api/sitemap.xml`
+        `${origin}/sitemap_index.xml`
       );
+
     } catch {
       // Invalid URL
     }
@@ -705,11 +663,9 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     if (!config.documentationUrl) return [];
 
     const sitemapCandidates = await this.discoverSitemapUrls(config.documentationUrl);
-    const allUrls: string[] = [];
     const processedSitemaps = new Set<string>();
     const sitemapQueue: string[] = [];
 
-    // Parse the documentation URL to get the base path for filtering
     let docUrl: URL;
     try {
       docUrl = new URL(config.documentationUrl);
@@ -733,8 +689,6 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
 
     const MAX_SITEMAP_DEPTH = server_defaults.DOCUMENTATION.MAX_SITEMAP_DEPTH;
     let depth = 0;
-
-    // First, collect all URLs from sitemaps
     const allSitemapUrls: string[] = [];
     while (sitemapQueue.length > 0 && depth < MAX_SITEMAP_DEPTH) {
       const currentBatch = [...sitemapQueue];
@@ -750,7 +704,6 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
 
         const { urls, sitemaps } = this.parseSitemapContent(content, sitemapUrl);
 
-        // Filter out URLs with excluded keywords before adding
         const filteredUrls = urls.filter(url => {
           const urlLower = url.toLowerCase();
           for (const excludedKeyword of PlaywrightFetchingStrategy.EXCLUDED_LINK_KEYWORDS) {
@@ -761,7 +714,6 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
           return true;
         });
 
-        // Log sample URLs for debugging
         if (filteredUrls.length > 0) {
           logMessage('debug', `Found ${urls.length} total URLs in sitemap, ${filteredUrls.length} after filtering. First few: ${filteredUrls.slice(0, 3).join(', ')}`, metadata);
         }
@@ -804,7 +756,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
             }
 
             // 3. It contains documentation-related keywords in the path
-            const relevantKeywords = ['docs', 'api', 'reference', 'guide', 'documentation'];
+            const relevantKeywords = ['docs', 'api', 'documentation'];
             const sitemapLower = sitemapPath.toLowerCase();
             if (relevantKeywords.some(keyword => sitemapLower.includes(keyword))) {
               return true;
@@ -824,17 +776,12 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       }
     }
 
-    // Now apply progressive filtering
     const uniqueSitemapUrls = [...new Set(allSitemapUrls)];
-
-    // Build a list of filter paths from most specific to least specific
     const filterPaths: string[] = [];
     const pathParts = docUrl.pathname.split('/').filter(p => p);
 
-    // Start with the full path
     filterPaths.push(docUrl.pathname);
 
-    // Add progressively shorter paths
     for (let i = pathParts.length - 1; i >= 0; i--) {
       const parentPath = '/' + pathParts.slice(0, i).join('/');
       if (parentPath !== '/' && !filterPaths.includes(parentPath)) {
@@ -842,10 +789,8 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       }
     }
 
-    // Finally add root
     filterPaths.push('/');
 
-    // Try each filter path until we have enough URLs
     for (const filterPath of filterPaths) {
       const filteredUrls = uniqueSitemapUrls.filter(url => {
         try {
@@ -860,9 +805,8 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
           const normalizedFilterPath = filterPath.replace(/\/$/, '');
           const normalizedUrlPath = urlObj.pathname.replace(/\/$/, '');
 
-          // Special case for root path
           if (normalizedFilterPath === '') {
-            return true; // All URLs from the same domain
+            return true;
           }
 
           return normalizedUrlPath.startsWith(normalizedFilterPath);
@@ -872,9 +816,6 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       });
 
       if (filteredUrls.length > 0) {
-        logMessage('debug', `Collected ${filteredUrls.length} URLs under ${docUrl.origin}${filterPath} from sitemap(s)`, metadata);
-
-        // If we have enough URLs or this is the last filter, use these URLs
         if (filteredUrls.length >= PlaywrightFetchingStrategy.MAX_FETCHED_LINKS || filterPath === '/') {
           return filteredUrls;
         }
@@ -890,38 +831,47 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
   ): Promise<string> {
     let combinedContent = "";
     const BATCH_SIZE = PlaywrightFetchingStrategy.PARALLEL_FETCH_LIMIT;
+    const MAX_TOTAL_SIZE = server_defaults.DOCUMENTATION.MAX_TOTAL_CONTENT_SIZE;
+    let totalSize = 0;
+    let fetchedCount = 0;
 
-    // Collect all raw HTML first (like old implementation)
-    const allHtmlContent: string[] = [];
-
-    for (let i = 0; i < urls.length && i < PlaywrightFetchingStrategy.MAX_FETCHED_LINKS; i += BATCH_SIZE) {
-      const batch = urls.slice(i, Math.min(i + BATCH_SIZE, PlaywrightFetchingStrategy.MAX_FETCHED_LINKS));
+    for (let i = 0; i < urls.length && fetchedCount < PlaywrightFetchingStrategy.MAX_FETCHED_LINKS; i += BATCH_SIZE) {
+      const remainingSlots = PlaywrightFetchingStrategy.MAX_FETCHED_LINKS - fetchedCount;
+      const batch = urls.slice(i, Math.min(i + BATCH_SIZE, i + remainingSlots));
 
       const batchPromises = batch.map(async (url) => {
         const result = await this.fetchPageContentWithPlaywright(url, config, metadata);
         if (!result?.content) return null;
-
-        // Convert HTML to Markdown immediately for each page
-        try {
-          if (result.content.slice(0, 500).toLowerCase().includes("<html")) {
-            const markdown = NodeHtmlMarkdown.translate(result.content);
-            return markdown;
-          } else {
-            // Not HTML, return as-is
-            return result.content;
-          }
-        } catch (translateError) {
-          logMessage('warn', `Failed to convert HTML to Markdown for ${url}: ${translateError?.message}`, metadata);
-          return result.content; // Fallback to raw content
-        }
+        return { url, content: result.content };
       });
 
       const results = await Promise.all(batchPromises);
 
-      for (const content of results) {
-        if (content && !combinedContent.includes(content)) {
-          combinedContent += combinedContent ? `\n\n${content}` : content;
+      for (const result of results) {
+        if (!result || !result.content) continue;
+
+        const contentSize = Buffer.byteLength(result.content, 'utf8');
+
+        // Skip if adding this would exceed our total budget
+        if (totalSize + contentSize > MAX_TOTAL_SIZE) {
+          logMessage('debug', `Reached size budget (${Math.round(totalSize / 1024 / 1024)}MB), skipping remaining pages`, metadata);
+          return combinedContent;
         }
+
+        // Skip duplicate content
+        if (combinedContent.includes(result.content)) {
+          continue;
+        }
+
+        combinedContent += combinedContent ? `\n\n${result.content}` : result.content;
+        totalSize += contentSize;
+        fetchedCount++;
+
+      }
+
+      if (totalSize >= MAX_TOTAL_SIZE * 0.9) {
+        logMessage('debug', `Approaching size budget (${Math.round(totalSize / 1024 / 1024)}MB), stopping fetch`, metadata);
+        break;
       }
     }
 
@@ -932,41 +882,42 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     if (!config?.documentationUrl) return null;
 
     try {
-      // Apply timeout only to sitemap URL collection
-      const sitemapUrlsPromise = this.collectSitemapUrls(config, metadata);
-      let timeoutHandle: NodeJS.Timeout;
-      const timeoutPromise = new Promise<string[]>((resolve) => {
-        timeoutHandle = setTimeout(() => {
-          logMessage('warn', 'Sitemap URL collection timed out, falling back to iterative crawling', metadata);
-          resolve([]);
-        }, server_defaults.DOCUMENTATION.TIMEOUTS.SITEMAP_PROCESSING_TOTAL);
-      });
+      try {
+        // Apply timeout only to sitemap URL collection
+        const sitemapUrlsPromise = this.collectSitemapUrls(config, metadata);
+        let timeoutHandle: NodeJS.Timeout;
+        const timeoutPromise = new Promise<string[]>((resolve) => {
+          timeoutHandle = setTimeout(() => {
+            logMessage('warn', 'Sitemap URL collection timed out, falling back to iterative crawling', metadata);
+            resolve([]);
+          }, server_defaults.DOCUMENTATION.TIMEOUTS.SITEMAP_PROCESSING_TOTAL);
+        });
 
-      const sitemapUrls = await Promise.race([sitemapUrlsPromise, timeoutPromise]);
+        const sitemapUrls = await Promise.race([sitemapUrlsPromise, timeoutPromise]);
 
-      // Clear the timeout if sitemap collection succeeded
-      if (timeoutHandle!) {
-        clearTimeout(timeoutHandle);
-      }
-
-      if (sitemapUrls.length > 0) {
-        const keywords = this.getMergedKeywords(config.keywords);
-        const rankedUrls = this.rankItems(sitemapUrls, keywords) as string[];
-
-        const topUrls = rankedUrls.slice(0, PlaywrightFetchingStrategy.MAX_FETCHED_LINKS);
-
-        // Content fetching happens without the sitemap timeout
-        const content = await this.fetchPagesInBatches(topUrls, config, metadata);
-
-        if (content) {
-          return content;
+        if (timeoutHandle!) {
+          clearTimeout(timeoutHandle);
         }
-      }
-    } catch (error) {
-      logMessage('warn', `Sitemap processing failed: ${error?.message}, falling back to legacy crawling`, metadata);
-    }
 
-    return this.legacyTryFetch(config, metadata);
+        if (sitemapUrls.length > 0) {
+          const keywords = this.getMergedKeywords(config.keywords);
+          const rankedUrls = this.rankItems(sitemapUrls, keywords) as string[];
+
+          const topUrls = rankedUrls.slice(0, PlaywrightFetchingStrategy.MAX_FETCHED_LINKS);
+          const content = await this.fetchPagesInBatches(topUrls, config, metadata);
+
+          if (content) {
+            return content;
+          }
+        }
+      } catch (error) {
+        logMessage('warn', `Sitemap processing failed: ${error?.message}, falling back to legacy crawling`, metadata);
+      }
+
+      return await this.legacyTryFetch(config, metadata);
+    } finally {
+      await this.cleanupContext();
+    }
   }
 
   public getDefaultKeywords(): string[] {
@@ -992,46 +943,28 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
   }
 
   public rankItems(items: string[] | { linkText: string, href: string }[], keywords: string[], fetchedLinks?: Set<string>): any[] {
-    // Helper function to extract path from URL
-    const extractPath = (url: string): string => {
-      try {
-        const urlObj = new URL(url);
-        // Return pathname + search + hash (everything after the domain)
-        return urlObj.pathname + urlObj.search + urlObj.hash;
-      } catch {
-        // If it's not a valid URL, return as-is (might already be a path)
-        return url;
-      }
-    };
-
-    // Normalize items to a common format
     const normalizedItems = items.map((item, index) => {
-      if (typeof item === 'string') {
-        return {
-          url: extractPath(item),
-          text: '',
-          original: item,
-          searchableContent: extractPath(item).toLowerCase(),
-          index
-        };
-      } else {
-        return {
-          url: extractPath(item.href),
-          text: item.linkText,
-          original: item,
-          searchableContent: `${extractPath(item.href)} ${item.linkText}`.toLowerCase(),
-          index
-        };
-      }
+      const isString = typeof item === 'string';
+      const url = isString ? item : item.href;
+      const text = isString ? '' : item.linkText;
+      const searchableContent = `${url} ${text}`.toLowerCase();
+
+      return {
+        url,
+        original: item,
+        searchableContent,
+        index
+      };
     });
 
-    // Filter out already fetched links if provided
-    const itemsToRank = fetchedLinks
-      ? normalizedItems.filter(item => !fetchedLinks.has(item.original))
+    let itemsToRank = fetchedLinks
+      ? normalizedItems.filter(item => {
+        const href = typeof item.original === 'string' ? item.original : item.original.href;
+        return !fetchedLinks.has(href);
+      })
       : normalizedItems;
 
-    // Pre-filter excluded links
-    const filteredItems = itemsToRank.filter(item => {
+    itemsToRank = itemsToRank.filter(item => {
       for (const excludedKeyword of PlaywrightFetchingStrategy.EXCLUDED_LINK_KEYWORDS) {
         if (item.searchableContent.includes(excludedKeyword)) {
           return false;
@@ -1040,178 +973,115 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       return true;
     });
 
-    // If no keywords provided, return filtered items in original order
     if (!keywords || keywords.length === 0) {
-      return filteredItems.map(item => item.original);
+      return itemsToRank.map(item => item.original);
     }
 
-    // Configure Fuse.js for fuzzy search
-    const fuseOptions = {
-      keys: ['searchableContent'],
-      threshold: server_defaults.DOCUMENTATION.FUSE_THRESHOLD || 0.4, // 0.0 = exact match, 1.0 = match anything
-      includeScore: true,
-      shouldSort: true,
-      minMatchCharLength: server_defaults.DOCUMENTATION.FUSE_MIN_MATCH_LENGTH || 3,
-      ignoreLocation: true, // Ignore location for simple fuzzy search
-      useExtendedSearch: false,
-      findAllMatches: true
-    };
+    const scored = itemsToRank.map(item => {
+      let matchScore = 0;
+      const content = item.searchableContent;
 
-    // Create Fuse instance
-    const fuse = new Fuse(filteredItems, fuseOptions);
+      for (const keyword of keywords) {
+        const keywordLower = keyword.toLowerCase();
+        const wordBoundaryRegex = new RegExp(`\\b${keywordLower}\\b`, 'g');
+        const exactMatches = (content.match(wordBoundaryRegex) || []).length;
+        matchScore += exactMatches * 3;
 
-    // Create search query from keywords
-    // Use OR logic to find items matching any keyword
-    const searchResults: Map<number, number> = new Map(); // index -> best score
-
-    for (const keyword of keywords) {
-      const results = fuse.search(keyword.toLowerCase());
-
-      for (const result of results) {
-        const currentScore = searchResults.get(result.item.index) || 1;
-        // Use the best (lowest) score for each item
-        searchResults.set(result.item.index, Math.min(currentScore, result.score || 1));
-      }
-    }
-
-    // Combine fuzzy search with URL length normalization
-    const scored = filteredItems.map(item => {
-      const fuseScore = searchResults.get(item.index);
-
-      if (fuseScore === undefined) {
-        // No keyword match found
-        return {
-          item: item.original,
-          score: 0
-        };
+        if (exactMatches === 0 && content.includes(keywordLower)) {
+          matchScore += 1;
+        }
       }
 
-      // Convert Fuse score (0 = perfect match, 1 = no match) to match count approximation
-      // Use the inverse of the fuse score as a proxy for match quality
-      const matchQuality = 1 - fuseScore;
-
-      // Simple scoring: match quality divided by URL length to avoid bias towards long URLs
-      // This mirrors the old logic: matchCount / Math.max(item.url.length, 1)
-      const score = matchQuality / Math.max(item.url.length, 1);
+      const urlLength = Math.max(item.url.length, 1);
+      const score = matchScore / urlLength;
 
       return {
         item: item.original,
-        score: score
+        score,
+        hasMatch: matchScore > 0
       };
     });
 
-    // Sort by score (highest first) and return the original items
     return scored
-      .filter(s => s.score > 0) // Only include items with matches
-      .sort((a, b) => b.score - a.score)
+      .sort((a, b) => {
+        if (a.hasMatch !== b.hasMatch) {
+          return a.hasMatch ? -1 : 1;
+        }
+        return b.score - a.score;
+      })
       .map(s => s.item);
+  }
+
+  private async crawlWithLinks(startUrl: string, config: DocumentationConfig, metadata: Metadata): Promise<string> {
+    const visitedUrls = new Set<string>();
+    const linkQueue: { linkText: string, href: string }[] = [{ linkText: "documentation", href: startUrl }];
+    const searchKeywords = this.getMergedKeywords(config.keywords);
+    let aggregatedContent = "";
+
+    while (visitedUrls.size < PlaywrightFetchingStrategy.MAX_FETCHED_LINKS && linkQueue.length > 0) {
+      // Get next prioritized link
+      const prioritizedLinks = this.rankItems(linkQueue, searchKeywords, visitedUrls) as { linkText: string, href: string }[];
+      if (prioritizedLinks.length === 0) break;
+
+      const nextLink = prioritizedLinks[0];
+      linkQueue.splice(linkQueue.findIndex(l => l.href === nextLink.href), 1);
+
+      try {
+        const pageData = await this.fetchPageContentWithPlaywright(nextLink.href, config, metadata);
+        visitedUrls.add(nextLink.href);
+
+        if (pageData?.content) {
+          aggregatedContent += aggregatedContent ? `\n\n${pageData.content}` : pageData.content;
+
+          // Add discovered links to queue
+          if (pageData.links) {
+            for (const [linkText, href] of Object.entries(pageData.links)) {
+              if (this.isValidDocLink(href, linkText, startUrl) &&
+                !visitedUrls.has(href) &&
+                !linkQueue.some(l => l.href === href)) {
+                linkQueue.push({ linkText, href });
+              }
+            }
+          }
+        }
+      } catch (error) {
+        logMessage('warn', `Failed to fetch ${nextLink.href}: ${error?.message}`, metadata);
+      }
+    }
+
+    return aggregatedContent;
   }
 
   async legacyTryFetch(config: DocumentationConfig, metadata: Metadata): Promise<string | null> {
     if (!config?.documentationUrl) return null;
-
-    const visitedUrls = new Set<string>();
-    let aggregatedDocumentation = "";
-
-    const searchKeywords = this.getMergedKeywords(config.keywords);
-
-    // Queue of discovered links with their anchor text for ranking (text helps prioritize relevant pages)
-    const linkQueue: { linkText: string, href: string; }[] = [];
-
-    // Add documentation URL with high priority score
-    linkQueue.push({
-      linkText: "documentation",
-      href: config.documentationUrl,
-    });
-
-    while (visitedUrls.size < PlaywrightFetchingStrategy.MAX_FETCHED_LINKS && linkQueue.length > 0) {
-      const prioritizedLinks =
-        linkQueue.length > 1 ?
-          this.rankItems(linkQueue, searchKeywords, visitedUrls) as { linkText: string, href: string }[]
-          : linkQueue;
-
-      if (prioritizedLinks.length === 0) break;
-      const nextLinkToFetch = prioritizedLinks[0];
-
-      // Remove the selected link from the queue to free memory
-      const linkIndex = linkQueue.findIndex(l => l.href === nextLinkToFetch.href);
-      if (linkIndex > -1) {
-        linkQueue.splice(linkIndex, 1);
-      }
-
-      try {
-        const fetchedPageData = await this.fetchPageContentWithPlaywright(nextLinkToFetch.href, config, metadata);
-        visitedUrls.add(nextLinkToFetch.href);
-
-        if (!fetchedPageData?.content) continue;
-
-        aggregatedDocumentation += aggregatedDocumentation ? `\n\n${fetchedPageData.content}` : fetchedPageData.content;
-
-        // Add newly discovered links to the queue
-        if (!fetchedPageData.links) continue;
-
-        for (const [linkText, href] of Object.entries(fetchedPageData.links)) {
-          if (this.shouldSkipLink(linkText, href, config.documentationUrl)) continue;
-          if (visitedUrls.has(href) || linkQueue.some(l => l.href === href)) continue;
-
-          linkQueue.push({ linkText, href });
-        }
-      } catch (error) {
-        logMessage('warn', `Failed to fetch link ${nextLinkToFetch.href}: ${error?.message}`, metadata);
-      }
-    }
-    linkQueue.length = 0;
-    return aggregatedDocumentation;
+    return this.crawlWithLinks(config.documentationUrl, config, metadata);
   }
 
-  private shouldSkipLink(linkText: string, href: string, documentationUrl?: string): boolean {
-    // Basic content filtering
-    if (!linkText) {
-      return true;
-    }
+  private isValidDocLink(href: string, linkText: string, baseUrl: string): boolean {
+    if (!linkText || !href) return false;
 
-    // Check if link contains any excluded keywords
     const hrefLower = href.toLowerCase();
-    for (const excludedKeyword of PlaywrightFetchingStrategy.EXCLUDED_LINK_KEYWORDS) {
-      if (hrefLower.includes(excludedKeyword)) {
-        return true;
-      }
+    if (PlaywrightFetchingStrategy.EXCLUDED_LINK_KEYWORDS.some(kw => hrefLower.includes(kw))) {
+      return false;
     }
 
-    // Domain and path filtering to stay within relevant documentation scope
-    if (documentationUrl) {
-      try {
-        const docUrl = new URL(documentationUrl);
-        const linkUrl = new URL(href);
+    try {
+      const base = new URL(baseUrl);
+      const link = new URL(href);
 
-        // Skip if different hostname (domain)
-        if (linkUrl.hostname !== docUrl.hostname) {
-          return true;
-        }
+      if (link.hostname !== base.hostname) return false;
 
-        // Get the base path from documentation URL for path filtering
-        // e.g., https://discord.com/developers/docs/reference -> /developers
-        const docPathParts = docUrl.pathname.split('/').filter(p => p);
-        const linkPathParts = linkUrl.pathname.split('/').filter(p => p);
-
-        // If documentation URL has a meaningful path structure, enforce it
-        if (docPathParts.length >= 2) {
-          // For URLs like /developers/docs/*, we want to stay under /developers
-          const requiredBasePath = '/' + docPathParts.slice(0, -1).join('/');
-
-          // Allow same path or deeper under the base path
-          if (!linkUrl.pathname.startsWith(requiredBasePath)) {
-            return true;
-          }
-        }
-        // If documentation URL is at root or shallow (e.g., /docs), allow any path on same domain
-      } catch (error) {
-        // Invalid URL, skip it
-        return true;
+      // Stay within documentation path scope
+      const baseParts = base.pathname.split('/').filter(p => p);
+      if (baseParts.length >= 2) {
+        const requiredPath = '/' + baseParts.slice(0, -1).join('/');
+        if (!link.pathname.startsWith(requiredPath)) return false;
       }
-    }
 
-    return false;
+      return true;
+    } catch {
+      return false;
+    }
   }
 
 
@@ -1246,7 +1116,6 @@ ORDER BY table_name, ordinal_position;`
 class OpenApiStrategy implements ProcessingStrategy {
   private extractOpenApiUrl(html: string, metadata: Metadata): string | null {
     try {
-      // First try to match based on swagger settings
       const settingsMatch = html.match(/<script[^>]*id=["']swagger-settings["'][^>]*>([\s\S]*?)<\/script>/i);
       if (settingsMatch && settingsMatch[1]) {
         const settingsContent = settingsMatch[1].trim();
@@ -1332,7 +1201,6 @@ class OpenApiStrategy implements ProcessingStrategy {
   }
 
   async tryProcess(content: string, config: ApiConfig, metadata: Metadata): Promise<string | null> {
-    // Needs page content fetched by PlaywrightFetchingStrategy (or null if fetch failed)
     if (content === undefined || content === null) {
       return null;
     }
@@ -1375,7 +1243,6 @@ class OpenApiStrategy implements ProcessingStrategy {
         return `${openApiSpec}\n\n${markdownContent}`;
       } else {
         logMessage('warn', "Successfully extracted OpenAPI spec, but failed to convert HTML to Markdown. Returning spec only.", metadata);
-        // We still have the spec, return it. Don't include the original raw HTML.
         return openApiSpec;
       }
     }
@@ -1386,7 +1253,6 @@ class OpenApiStrategy implements ProcessingStrategy {
 
 class HtmlMarkdownStrategy implements ProcessingStrategy {
   async tryProcess(content: string, config: ApiConfig, metadata: Metadata): Promise<string | null> {
-    // Needs page content fetched by PlaywrightFetchingStrategy
     if (content === undefined || content === null) {
       return null;
     }
@@ -1394,34 +1260,30 @@ class HtmlMarkdownStrategy implements ProcessingStrategy {
       content = JSON.stringify(content, null, 2);
     }
 
-    const MAX_CONTENT_SIZE_FOR_CONVERSION = server_defaults.DOCUMENTATION.MAX_CONTENT_SIZE_FOR_CONVERSION;
-    if (content.length > MAX_CONTENT_SIZE_FOR_CONVERSION) {
-      logMessage('warn', `HtmlMarkdownStrategy: Content too large for conversion (${Math.round(content.length / 1024 / 1024)}MB), skipping`, metadata);
-      return null; // Let RawPageContentStrategy handle it
-    }
-
-    // Check if content is already Markdown (from individual page conversion)
     const contentStart = content.slice(0, 1000).toLowerCase();
     const hasMarkdownIndicators = contentStart.includes('##') || contentStart.includes('###') ||
       contentStart.includes('```') || contentStart.includes('- ') ||
       contentStart.includes('* ');
-    const hasHtmlIndicators = contentStart.includes("<html") || contentStart.includes("<!doctype");
+    const hasHtmlIndicators = contentStart.includes("<html") || contentStart.includes("<!doctype") ||
+      contentStart.includes("<body") || contentStart.includes("<div");
 
+    // Already Markdown
     if (hasMarkdownIndicators && !hasHtmlIndicators) {
       return content;
     }
 
-    // Only apply if content looks like HTML
+    // Not HTML
     if (!hasHtmlIndicators) {
       return null;
     }
 
     try {
-      const markdown = NodeHtmlMarkdown.translate(content);
-      logMessage('info', "Successfully converted HTML to Markdown.", metadata);
-      return markdown;
+      const pool = getSharedHtmlMarkdownPool();
+      const markdown = await pool.convert(content);
+      return markdown ?? '';
     } catch (translateError) {
-      return null; // Failed translation, let RawPageContentStrategy handle it
+      logMessage('error', `HTML to Markdown conversion failed: ${translateError}`, metadata);
+      return null;
     }
   }
 }
@@ -1436,6 +1298,6 @@ class RawPageContentStrategy implements ProcessingStrategy {
       }
       return content;
     }
-    return null; // No content was fetched or available
+    return null;
   }
 }

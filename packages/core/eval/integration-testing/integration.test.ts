@@ -2,34 +2,74 @@ import path from 'path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { IntegrationTestingFramework } from './integration-testing-framework.js';
 
-// Register cleanup handlers for process termination
+// Shared cleanup function
 let isCleaningUp = false;
-const cleanup = async (signal?: string) => {
-    if (!isCleaningUp) {
-        isCleaningUp = true;
-        if (signal) {
-            console.log(`\n🧹 Cleaning up test resources due to ${signal}...`);
-        }
-        try {
-            const { PlaywrightFetchingStrategy } = await import('../../utils/documentation.js');
-            await PlaywrightFetchingStrategy.closeBrowser();
-        } catch (e) {
-            console.error('Error during cleanup:', e);
-        }
+async function cleanupResources(): Promise<void> {
+    if (isCleaningUp) return;
+    isCleaningUp = true;
 
-        // Kill any remaining vitest processes
-        if (signal === 'SIGINT' || signal === 'SIGTERM') {
+    const cleanupTasks = [];
+
+    // Clean up Playwright browser
+    try {
+        const { PlaywrightFetchingStrategy } = await import('../../utils/documentation.js');
+        cleanupTasks.push(PlaywrightFetchingStrategy.closeBrowser());
+    } catch (e) {
+        console.error('Error during browser cleanup:', e);
+    }
+
+    // Clean up HTML-to-Markdown worker pool
+    try {
+        const { shutdownSharedHtmlMarkdownPool } = await import('../../utils/html-markdown-pool.js');
+        cleanupTasks.push(shutdownSharedHtmlMarkdownPool());
+    } catch (e) {
+        console.error('Error during worker pool cleanup:', e);
+    }
+
+    // Wait for all cleanup tasks to complete
+    await Promise.all(cleanupTasks);
+}
+
+// Register cleanup handlers for process termination
+let interruptCount = 0;
+const handleInterrupt = async (signal: string) => {
+    interruptCount++;
+
+    if (interruptCount === 1) {
+        console.log(`\n🧹 Cleaning up test resources due to ${signal}...`);
+        console.log('⏳ Please wait for cleanup to complete (or press Ctrl+C again to force quit)');
+
+        // Set a timeout to force exit if cleanup takes too long
+        const forceExitTimeout = setTimeout(() => {
+            console.log('⚠️ Cleanup taking too long, forcing exit...');
+            process.exit(1);
+        }, 10000); // 10 second timeout
+
+        try {
+            await cleanupResources();
+            clearTimeout(forceExitTimeout);
+            console.log('✅ Cleanup completed successfully');
             process.exit(0);
+        } catch (e) {
+            clearTimeout(forceExitTimeout);
+            console.error('❌ Cleanup failed:', e);
+            process.exit(1);
         }
+    } else if (interruptCount === 2) {
+        console.log('\n⚠️ Second interrupt received, forcing immediate exit...');
+        console.log('⚠️ Warning: Browser/worker processes may be left running!');
+        console.log('💡 Run this to clean up: pkill -f "chromium|headless" && pkill -f "vitest"');
+        process.exit(1);
     }
 };
 
-process.once('SIGINT', () => cleanup('SIGINT'));
-process.once('SIGTERM', () => cleanup('SIGTERM'));
-process.once('exit', () => cleanup());
-process.once('uncaughtException', (err) => {
+process.on('SIGINT', () => handleInterrupt('SIGINT'));
+process.on('SIGTERM', () => handleInterrupt('SIGTERM'));
+
+process.once('uncaughtException', async (err) => {
     console.error('Uncaught exception:', err);
-    cleanup('uncaughtException');
+    await cleanupResources();
+    process.exit(1);
 });
 
 describe('Integration Tests', () => {
@@ -54,12 +94,10 @@ describe('Integration Tests', () => {
     });
 
     afterAll(async () => {
-        try {
-            const { PlaywrightFetchingStrategy } = await import('../../utils/documentation.js');
-            await PlaywrightFetchingStrategy.closeBrowser();
-        } catch (e) {
-        }
+        // Clean up browser and worker pool
+        await cleanupResources();
 
+        // Restore original environment variables
         if (originalDataStoreType !== undefined) {
             process.env.DATA_STORE_TYPE = originalDataStoreType;
         } else {

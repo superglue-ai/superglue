@@ -76,8 +76,7 @@ describe('Documentation Class', () => {
             const htmlDoc = `
         <html><body><h1>API Docs</h1><p>Details here.</p></body></html>
       `;
-            mockPage.content.mockResolvedValueOnce(htmlDoc);
-            mockPage.evaluate.mockResolvedValue({}); // Empty links
+            mockPage.evaluate.mockResolvedValue({ html: htmlDoc, links: {} });
 
             // Mock sitemap requests to fail (404)
             mockedAxios.get.mockRejectedValue(new Error('404'));
@@ -92,8 +91,7 @@ describe('Documentation Class', () => {
             expect(mockPage.goto).toHaveBeenCalledWith(docUrl, { timeout: server_defaults.DOCUMENTATION.TIMEOUTS.PLAYWRIGHT });
             expect(mockPage.waitForLoadState).toHaveBeenCalledWith('domcontentloaded', { timeout: server_defaults.DOCUMENTATION.TIMEOUTS.PLAYWRIGHT });
             expect(mockPage.waitForTimeout).toHaveBeenCalledWith(1000);
-            expect(mockPage.evaluate).toHaveBeenCalledTimes(2); // For removing elements and getting links
-            expect(mockPage.content).toHaveBeenCalledTimes(1);
+            expect(mockPage.evaluate).toHaveBeenCalledTimes(1); // Single evaluate for DOM manipulation and link extraction
             expect(result).toContain('# API Docs');
             expect(result).toContain('Details here.');
             // Sitemap fetches are attempted
@@ -103,8 +101,7 @@ describe('Documentation Class', () => {
 
         it('should return raw page content if not HTML, GraphQL, or OpenAPI', async () => {
             const plainDoc = 'Plain text documentation content.';
-            mockPage.content.mockResolvedValueOnce(plainDoc);
-            mockPage.evaluate.mockResolvedValue({}); // Empty links
+            mockPage.evaluate.mockResolvedValue({ html: plainDoc, links: {} })
 
             // Mock sitemap requests to fail
             mockedAxios.get.mockRejectedValue(new Error('404'));
@@ -113,7 +110,7 @@ describe('Documentation Class', () => {
             const result = await doc.fetchAndProcess();
 
             expect(playwright.chromium.launch).toHaveBeenCalledTimes(1);
-            expect(mockPage.content).toHaveBeenCalledTimes(1);
+            expect(mockPage.evaluate).toHaveBeenCalledTimes(1);
             expect(result).toBe(plainDoc);
             expect(mockedAxios.get).toHaveBeenCalled(); // Sitemap attempts
             expect(mockedAxios.post).not.toHaveBeenCalled();
@@ -146,7 +143,7 @@ describe('Documentation Class', () => {
         it('should fall back to Playwright fetch if GraphQL introspection fails', async () => {
             const htmlDoc = `<html><body>GraphQL Maybe?</body></html>`;
             mockedAxios.post.mockRejectedValueOnce(new Error('GraphQL Network Error')); // Simulate network failure
-            mockPage.content.mockResolvedValueOnce(htmlDoc); // Playwright fetch should succeed
+            mockPage.evaluate.mockResolvedValue({ html: htmlDoc, links: {} })
 
             const docUrl = 'https://api.example.com/graphql'; // Looks like GraphQL
             const doc = new Documentation({ documentationUrl: docUrl, urlHost: 'https://api.example.com' }, {}, metadata);
@@ -156,7 +153,7 @@ describe('Documentation Class', () => {
             expect(mockedAxios.post).toHaveBeenCalledWith(docUrl, expect.anything(), expect.anything());
             // Check Playwright was used as fallback
             expect(playwright.chromium.launch).toHaveBeenCalledTimes(1);
-            expect(mockPage.content).toHaveBeenCalledTimes(1);
+            expect(mockPage.evaluate).toHaveBeenCalledTimes(1);
             // Check result is from Playwright fetch (processed HTML)
             expect(result).toContain('GraphQL Maybe?');
         });
@@ -164,7 +161,7 @@ describe('Documentation Class', () => {
         it('should fall back to Playwright fetch if GraphQL returns errors', async () => {
             const htmlDoc = `<html><body>GraphQL Maybe?</body></html>`;
             mockedAxios.post.mockResolvedValueOnce({ data: { errors: [{ message: 'Bad Query' }] } }); // Simulate GQL error response
-            mockPage.content.mockResolvedValueOnce(htmlDoc); // Playwright fetch should succeed
+            mockPage.evaluate.mockResolvedValue({ html: htmlDoc, links: {} })
 
             const docUrl = 'https://api.example.com/graphql'; // Looks like GraphQL
             const doc = new Documentation({ documentationUrl: docUrl, urlHost: 'https://api.example.com' }, {}, metadata);
@@ -174,7 +171,7 @@ describe('Documentation Class', () => {
             expect(mockedAxios.post).toHaveBeenCalledWith(docUrl, expect.anything(), expect.anything());
             // Check Playwright was used as fallback
             expect(playwright.chromium.launch).toHaveBeenCalledTimes(1);
-            expect(mockPage.content).toHaveBeenCalledTimes(1);
+            expect(mockPage.evaluate).toHaveBeenCalledTimes(1);
             // Check result is from Playwright fetch (processed HTML)
             expect(result).toContain('GraphQL Maybe?');
         });
@@ -200,8 +197,7 @@ describe('Documentation Class', () => {
             const openApiYaml = `openapi: 3.0.0\ninfo:\n  title: YAML API`;
             const docUrl = 'https://api.example.com/docs';
 
-            mockPage.content.mockResolvedValueOnce(swaggerHtml);
-            mockPage.evaluate.mockResolvedValue({}); // Empty links
+            mockPage.evaluate.mockResolvedValue({ html: swaggerHtml, links: {} })
 
             // Mock sitemap requests to fail, then OpenAPI request succeeds
             mockedAxios.get.mockImplementation((url: string) => {
@@ -218,14 +214,13 @@ describe('Documentation Class', () => {
             const result = await doc.fetchAndProcess();
 
             expect(playwright.chromium.launch).toHaveBeenCalledTimes(1);
-            expect(mockPage.content).toHaveBeenCalledTimes(1);
+            expect(mockPage.evaluate).toHaveBeenCalledTimes(1);
             expect(result).toContain(openApiYaml);
         });
 
         it('should handle page content being the OpenAPI spec directly (JSON)', async () => {
             const openApiJsonString = JSON.stringify({ swagger: "2.0", info: { title: "Direct JSON" } });
-            mockPage.content.mockResolvedValueOnce(openApiJsonString); // Playwright returns JSON string
-            mockPage.evaluate.mockResolvedValue({}); // Empty links
+            mockPage.evaluate.mockResolvedValue({ html: openApiJsonString, links: {} })
 
             // Mock sitemap requests to fail
             mockedAxios.get.mockRejectedValue(new Error('404'));
@@ -235,14 +230,13 @@ describe('Documentation Class', () => {
             const result = await doc.fetchAndProcess();
 
             expect(playwright.chromium.launch).toHaveBeenCalledTimes(1);
-            expect(mockPage.content).toHaveBeenCalledTimes(1);
+            expect(mockPage.evaluate).toHaveBeenCalledTimes(1);
             expect(result).toContain(openApiJsonString);
         });
 
         it('should handle page content being the OpenAPI spec directly (YAML)', async () => {
             const openApiYaml = `openapi: 3.1.0\ninfo:\n  title: Direct YAML`;
-            mockPage.content.mockResolvedValueOnce(openApiYaml); // Playwright returns YAML string
-            mockPage.evaluate.mockResolvedValue({}); // Empty links
+            mockPage.evaluate.mockResolvedValue({ html: openApiYaml, links: {} })
 
             // Mock sitemap requests to fail
             mockedAxios.get.mockRejectedValue(new Error('404'));
@@ -252,14 +246,13 @@ describe('Documentation Class', () => {
             const result = await doc.fetchAndProcess();
 
             expect(playwright.chromium.launch).toHaveBeenCalledTimes(1);
-            expect(mockPage.content).toHaveBeenCalledTimes(1);
+            expect(mockPage.evaluate).toHaveBeenCalledTimes(1);
             expect(result).toBe(openApiYaml);
         });
 
         it('should fall back to HTML->Markdown if OpenAPI extraction/fetch fails', async () => {
             const swaggerHtml = `<html><script id="swagger-settings">{ "url": "/missing.json" }</script><body>Content</body></html>`;
-            mockPage.content.mockResolvedValueOnce(swaggerHtml); // Playwright gets HTML
-            mockPage.evaluate.mockResolvedValue({}); // Empty links
+            mockPage.evaluate.mockResolvedValue({ html: swaggerHtml, links: {} })
 
             // All requests fail
             mockedAxios.get.mockRejectedValue(new Error('404 Not Found'));
@@ -446,13 +439,13 @@ describe('Documentation Class', () => {
                 const keywords = ['docs', 'authentication'];
                 const ranked = strategy.rankItems(urls, keywords);
 
-                // Should exclude pricing, signup, and blog
-                expect(ranked).toHaveLength(5);
-                expect(ranked[1]).toBe('https://api.com/docs/getting-started');
+                // Should exclude pricing, signup, and blog completely
+                expect(ranked).toHaveLength(2);
                 expect(ranked[0]).toBe('https://api.com/docs/authentication');
-                expect(ranked[2]).toBe('https://api.com/pricing');
-                expect(ranked[3]).toBe('https://api.com/signup');
-                expect(ranked[4]).toBe('https://api.com/blog/updates');
+                expect(ranked[1]).toBe('https://api.com/docs/getting-started');
+                expect(ranked).not.toContain('https://api.com/pricing');
+                expect(ranked).not.toContain('https://api.com/signup');
+                expect(ranked).not.toContain('https://api.com/blog/updates');
             });
 
             it('should rank URLs by keyword match count divided by URL length', () => {
@@ -483,10 +476,10 @@ describe('Documentation Class', () => {
                 const keywords = ['api', 'reference'];
                 const ranked = strategy.rankItems(links, keywords);
 
-                expect(ranked).toHaveLength(3); // Pricing excluded
+                expect(ranked).toHaveLength(2); // Pricing excluded completely
                 expect(ranked[0]).toEqual({ linkText: 'API Reference', href: 'https://api.com/reference' });
                 expect(ranked[1]).toEqual({ linkText: 'Getting Started', href: 'https://api.com/start' });
-                expect(ranked[2]).toEqual({ linkText: 'Pricing Plans', href: 'https://api.com/pricing' });
+                expect(ranked).not.toContainEqual({ linkText: 'Pricing Plans', href: 'https://api.com/pricing' });
             });
 
             it('should filter already fetched links when provided', () => {
@@ -524,12 +517,9 @@ describe('Documentation Class', () => {
                 });
 
                 // Mock page fetches
-                mockPage.content.mockResolvedValue('<html><body>Content</body></html>');
-                mockPage.evaluate.mockImplementation((fn) => {
-                    if (typeof fn === 'function' && fn.toString().includes('querySelectorAll')) {
-                        return Promise.resolve({}); // Empty links
-                    }
-                    return Promise.resolve(undefined);
+                mockPage.evaluate.mockResolvedValue({
+                    html: '<html><body>Content</body></html>',
+                    links: {}
                 });
 
                 const doc = new Documentation({
@@ -573,8 +563,10 @@ describe('Documentation Class', () => {
                     return Promise.reject(new Error('404'));
                 });
 
-                mockPage.content.mockResolvedValue('<html><body>Docs</body></html>');
-                mockPage.evaluate.mockResolvedValue({});
+                mockPage.evaluate.mockResolvedValue({
+                    html: '<html><body>Docs</body></html>',
+                    links: {}
+                });
 
                 const doc = new Documentation({
                     documentationUrl: 'https://api.com/docs',
@@ -596,16 +588,12 @@ describe('Documentation Class', () => {
                 mockedAxios.get.mockRejectedValue(new Error('404'));
 
                 // Mock initial page with links
-                mockPage.content.mockResolvedValueOnce('<html><body>Main Page</body></html>');
-                mockPage.evaluate.mockImplementation((fn) => {
-                    if (typeof fn === 'function' && fn.toString().includes('querySelectorAll')) {
-                        // Return links on first call
-                        return Promise.resolve({
-                            'api reference https docs api': 'https://api.com/docs/api',
-                            'getting started https docs start': 'https://api.com/docs/start'
-                        });
+                mockPage.evaluate.mockResolvedValueOnce({
+                    html: '<html><body>Main Page</body></html>',
+                    links: {
+                        'api reference https docs api': 'https://api.com/docs/api',
+                        'getting started https docs start': 'https://api.com/docs/start'
                     }
-                    return Promise.resolve(undefined);
                 });
 
                 const doc = new Documentation({
@@ -638,8 +626,10 @@ describe('Documentation Class', () => {
                     return Promise.reject(new Error('404'));
                 });
 
-                mockPage.content.mockResolvedValue('<html><body>Page</body></html>');
-                mockPage.evaluate.mockResolvedValue({});
+                mockPage.evaluate.mockResolvedValue({
+                    html: '<html><body>Page</body></html>',
+                    links: {}
+                });
 
                 const doc = new Documentation({
                     documentationUrl: 'https://api.com/docs',
@@ -669,8 +659,10 @@ describe('Documentation Class', () => {
                     return Promise.reject(new Error('404'));
                 });
 
-                mockPage.content.mockResolvedValue('<html><body>Content</body></html>');
-                mockPage.evaluate.mockResolvedValue({});
+                mockPage.evaluate.mockResolvedValue({
+                    html: '<html><body>Content</body></html>',
+                    links: {}
+                });
 
                 const doc = new Documentation({
                     documentationUrl: 'https://api.com/docs/api',
