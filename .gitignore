@@ -13,10 +13,11 @@ diff.sh
 packages/web/public/test/*
 packages/core/.superglue/superglue_logs.json
 packages/core/.superglue/superglue_logs.jsonl
-
+scripts/migrate-redis-to-postgres.ts
 # Testing/evaluation artifacts
 **/.test-integration-data/
 **/test-reports/
 **/.api-ranking-data/
 packages/core/eval/api-ranking/upload-api-ranking.ts
 packages/core/eval/api-ranking/ranking.csv
+packages/core/eval/integration-testing/gha-integration-test-config.json

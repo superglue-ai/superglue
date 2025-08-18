@@ -155,7 +155,14 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
       }
       const flattenedCreds = flattenAndNamespaceWorkflowCredentials(relevantIntegrations);
       setIntegrationCredentials(flattenedCreds);
-      constructFromInputSchemaWithCreds(inputSchemaStr, flattenedCreds);
+
+      // Create masked credentials for display
+      const maskedCreds = Object.entries(flattenedCreds).reduce((acc, [key, _]) => {
+        acc[key] = `<<${key}>>`;
+        return acc;
+      }, {} as Record<string, string>);
+
+      constructFromInputSchemaWithCreds(inputSchemaStr, maskedCreds);
 
       toast({
         title: "Workflow loaded",
@@ -213,7 +220,13 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
 
   // Update the original function to use current integration credentials
   const constructFromInputSchema = (schema: string | null) => {
-    constructFromInputSchemaWithCreds(schema, integrationCredentials);
+    // Create masked credentials
+    const maskedCreds = Object.entries(integrationCredentials).reduce((acc, [key, _]) => {
+      acc[key] = `<<${key}>>`;
+      return acc;
+    }, {} as Record<string, string>);
+
+    constructFromInputSchemaWithCreds(schema, maskedCreds);
   };
 
   useEffect(() => {
@@ -308,6 +321,17 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
 
   const saveWorkflow = async () => {
     try {
+      try {
+        JSON.parse(responseSchema || '{}');
+      } catch (e) {
+        throw new Error("Invalid response schema JSON");
+      }
+      try {
+        JSON.parse(inputSchema || '{}');
+      } catch (e) {
+        throw new Error("Invalid input schema JSON");
+      }
+
       if (!workflowId.trim()) {
         updateWorkflowId(`wf-${Date.now()}`);
       }
@@ -362,10 +386,18 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
       // Validate JSON before execution
       try {
         JSON.parse(credentials || '{}');
+      } catch (e) {
+        throw new Error("Invalid credentials JSON");
+      }
+      try {
         JSON.parse(responseSchema || '{}');
+      } catch (e) {
+        throw new Error("Invalid response schema JSON");
+      }
+      try {
         JSON.parse(inputSchema || '{}');
       } catch (e) {
-        throw new Error("Invalid credentials JSON format");
+        throw new Error("Invalid input schema JSON");
       }
       const workflowResult = await client.executeWorkflow({
         workflow: {
@@ -388,6 +420,8 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
       }
 
       setResult(workflowResult);
+      setSteps(workflowResult.config.steps);
+      setFinalTransform(workflowResult.config.finalTransform);
     } catch (error) {
       console.error("Error executing workflow:", error);
       toast({
@@ -444,8 +478,14 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
 
       setIntegrationCredentials(flattenedCreds);
 
-      // Reconstruct credentials from schema with new integration data
-      constructFromInputSchema(inputSchema);
+      // Create masked credentials for UI display
+      const maskedCreds = Object.entries(flattenedCreds).reduce((acc, [key, _]) => {
+        acc[key] = `<<${key}>>`;
+        return acc;
+      }, {} as Record<string, string>);
+
+      // Reconstruct credentials from schema with masked data
+      constructFromInputSchemaWithCreds(inputSchema, maskedCreds);
 
       toast({
         title: "Integration credentials loaded",

@@ -1,14 +1,15 @@
 import { useConfig } from '@/src/app/config-context';
 import { useIntegrations } from '@/src/app/integrations-context';
+import { getAuthBadge } from '@/src/app/integrations/page';
 import { IntegrationForm } from '@/src/components/integrations/IntegrationForm';
 import { useToast } from '@/src/hooks/use-toast';
 import { inputErrorStyles, needsUIToTriggerDocFetch, parseCredentialsHelper } from '@/src/lib/client-utils';
-import { findMatchingIntegration, integrations as integrationTemplates } from '@/src/lib/integrations';
-import { cn, composeUrl } from '@/src/lib/utils';
+import { cn, composeUrl, getIntegrationIcon as getIntegrationIconName } from '@/src/lib/utils';
 import { Integration, IntegrationInput, SuperglueClient, UpsertMode, Workflow, WorkflowResult } from '@superglue/client';
+import { integrations as integrationTemplates } from "@superglue/shared";
 import { flattenAndNamespaceWorkflowCredentials, waitForIntegrationProcessing } from '@superglue/shared/utils';
-import { ArrowRight, Check, ChevronRight, FileText, Globe, Loader2, Pencil, Play, Plus, Workflow as WorkflowIcon, X } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { ArrowRight, Check, ChevronRight, Clock, FileText, Globe, Key, Loader2, Pencil, Play, Plus, Workflow as WorkflowIcon, X } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
 import { useEffect, useMemo, useState } from 'react';
@@ -63,9 +64,13 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const [isSaving, setIsSaving] = useState(false); // For upsertWorkflow mutation
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const superglueConfig = useConfig();
 
   const { integrations, pendingDocIds, loading, setPendingDocIds, refreshIntegrations } = useIntegrations();
+
+  // Parse integration from query params
+  const preselectedIntegrationId = searchParams.get('integration');
 
   const [instruction, setInstruction] = useState('');
   const [payload, setPayload] = useState('{}');
@@ -83,13 +88,18 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const [suggestions, setSuggestions] = useState<string[]>([]); // Store multiple suggestions
 
   const [showSchemaEditor, setShowSchemaEditor] = useState(false);
-  const [showSteps, setShowSteps] = useState(false);
+  const [showSteps, setShowSteps] = useState(true);
 
   const [reviewCredentials, setReviewCredentials] = useState<string>(
     JSON.stringify((currentWorkflow && (currentWorkflow as any).credentials) || {}, null, 2)
   );
 
-  const [selectedIntegrationIds, setSelectedIntegrationIds] = useState<string[]>([]);
+  const [selectedIntegrationIds, setSelectedIntegrationIds] = useState<string[]>(() => {
+    // Initialize with preselected integration if available
+    return preselectedIntegrationId && integrations.some(i => i.id === preselectedIntegrationId)
+      ? [preselectedIntegrationId]
+      : [];
+  });
 
   const [integrationSearch, setIntegrationSearch] = useState('');
   const [showIntegrationForm, setShowIntegrationForm] = useState(false);
@@ -113,6 +123,15 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     }
   }), [client]);
 
+  // Update selectedIntegrationIds when integrations load and preselected integration is available
+  useEffect(() => {
+    if (preselectedIntegrationId && integrations.length > 0 && selectedIntegrationIds.length === 0) {
+      if (integrations.some(i => i.id === preselectedIntegrationId)) {
+        setSelectedIntegrationIds([preselectedIntegrationId]);
+      }
+    }
+  }, [preselectedIntegrationId, integrations, selectedIntegrationIds.length]);
+
   // Clear execution results when navigating away from review step
   useEffect(() => {
     // Don't clear on initial mount or when entering review
@@ -122,24 +141,22 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       setExecutionError(null);
       setActiveTab('results'); // Reset to default tab
     }
+
+    // Clear validation errors when leaving prompt step
+    if (step !== 'prompt') {
+      setValidationErrors({});
+    }
   }, [step]);
 
   // Create integration options array with custom option first
   const integrationOptions = [
-    { value: "custom", label: "Custom", icon: "default" },
+    { value: "manual", label: "No Template", icon: "default" },
     ...Object.entries(integrationTemplates).map(([key, integration]) => ({
       value: key,
       label: key.charAt(0).toUpperCase() + key.slice(1),
       icon: integration.icon || "default"
     }))
   ];
-
-  // Auto-open integration form when no integrations exist and we're on the integrations step
-  useEffect(() => {
-    if (integrations.length === 0) {
-      setShowIntegrationForm(true);
-    }
-  }, [integrations.length]);
 
   // Add this helper function near the top of the component
   const highlightJson = (code: string) => {
@@ -182,7 +199,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     return !!(integration.documentationUrl?.trim() && !pendingDocIds.has(integration.id));
   };
   // --- Integration Management (add/edit) ---
-  const handleIntegrationFormSave = async (integration: Integration) => {
+  const handleIntegrationFormSave = async (integration: Integration): Promise<Integration | null> => {
     // Close form immediately
     setShowIntegrationForm(false);
     setIntegrationFormEdit(null);
@@ -191,9 +208,9 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     try {
       const mode = integrationFormEdit ? UpsertMode.UPDATE : UpsertMode.CREATE;
       const savedIntegration = await client.upsertIntegration(integration.id, integration, mode);
-      const needsDocFetch = needsUIToTriggerDocFetch(savedIntegration, integrationFormEdit);
+      const willTriggerDocFetch = needsUIToTriggerDocFetch(savedIntegration, integrationFormEdit);
 
-      if (needsDocFetch) {
+      if (willTriggerDocFetch) {
         // Set pending state for new integrations with doc URLs
         setPendingDocIds(prev => new Set([...prev, savedIntegration.id]));
 
@@ -216,6 +233,8 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
 
       // Refresh integrations to ensure UI is updated
       await refreshIntegrations();
+
+      return savedIntegration;
     } catch (error) {
       console.error('Error saving integration:', error);
       toast({
@@ -223,6 +242,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         description: error instanceof Error ? error.message : 'Failed to save integration',
         variant: 'destructive',
       });
+      return null;
     }
   };
   const handleIntegrationFormCancel = () => {
@@ -263,10 +283,13 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       } catch {
         errors.payload = true;
       }
+
+      setValidationErrors(errors);
+
       if (Object.keys(errors).length > 0) {
         toast({
           title: 'Validation Error',
-          description: 'Please provide a valid instruction and JSON payload.',
+          description: 'Please fix the errors below before continuing.',
           variant: 'destructive',
         });
         return;
@@ -274,8 +297,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       setIsBuilding(true);
       try {
         const freshIntegrations = integrations; // Use the updated integrations from context
-        const schema = await client.generateSchema(instruction, "");
-        setSchema(JSON.stringify(schema, null, 2));
         const parsedPayload = JSON.parse(payload || '{}');
         const response = await client.buildWorkflow({
           instruction: instruction,
@@ -294,29 +315,15 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
           .map(id => freshIntegrations.find(i => i.id === id))
           .filter(Boolean);
         const credentialsFromIntegrations = flattenAndNamespaceWorkflowCredentials(selectedIntegrations);
-        setReviewCredentials(JSON.stringify(credentialsFromIntegrations, null, 2));
 
-        // Populate payload with required fields from inputSchema
-        if (response.inputSchema) {
-          try {
-            const defaultValues = generateDefaultFromSchema(response.inputSchema);
-            if (defaultValues.payload !== undefined && defaultValues.payload !== null) {
-              setPayload(JSON.stringify(defaultValues.payload, null, 2));
-            } else {
-              setPayload('{}');
-            }
-          } catch (error) {
-            console.warn('Failed to generate payload from schema:', error);
-            setPayload('{}');
-          }
-        } else {
-          setPayload('{}');
-        }
+        // Mask the credentials for display
+        const maskedCredentials = Object.entries(credentialsFromIntegrations).reduce((acc, [key, _]) => {
+          acc[key] = `<<${key}>>`;
+          return acc;
+        }, {} as Record<string, string>);
 
-        toast({
-          title: 'Workflow Built',
-          description: `Workflow "${response.id}" generated successfully.`,
-        });
+        setReviewCredentials(JSON.stringify(maskedCredentials, null, 2));
+
         setStep(steps[currentIndex + 1]);
       } catch (error: any) {
         console.error('Error building workflow:', error);
@@ -695,8 +702,8 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                           >
                             <div className="flex items-center gap-3 flex-1 min-w-0">
                               {(() => {
-                                const integration = findMatchingIntegration(sys.urlHost);
-                                const icon = integration?.integration.icon ? getSimpleIcon(integration.integration.icon) : null;
+                                const iconName = getIntegrationIconName(sys);
+                                const icon = iconName ? getSimpleIcon(iconName) : null;
                                 return icon ? (
                                   <svg
                                     width="20"
@@ -723,9 +730,21 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                                     pending={pendingDocIds.has(sys.id)}
                                     hasDocumentation={hasDocumentation(sys)}
                                   />
-                                  {(!sys.credentials || Object.keys(sys.credentials).length === 0) && (
-                                    <span className="text-xs text-amber-800 dark:text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded">No credentials</span>
-                                  )}
+                                  {(() => {
+                                    const badge = getAuthBadge(sys);
+                                    const colorClasses = {
+                                      blue: 'text-blue-800 dark:text-blue-300 bg-blue-500/10',
+                                      amber: 'text-amber-800 dark:text-amber-300 bg-amber-500/10',
+                                      green: 'text-green-800 dark:text-green-300 bg-green-500/10'
+                                    };
+
+                                    return (
+                                      <span className={`text-xs ${colorClasses[badge.color]} px-2 py-0.5 rounded flex items-center gap-1`}>
+                                        {badge.icon === 'clock' ? <Clock className="h-3 w-3" /> : <Key className="h-3 w-3" />}
+                                        {badge.label}
+                                      </span>
+                                    );
+                                  })()}
                                 </div>
                               </div>
                             </div>
@@ -797,9 +816,14 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                   <Textarea
                     id="instruction"
                     value={instruction}
-                    onChange={(e) => { setInstruction(e.target.value); }}
+                    onChange={(e) => {
+                      setInstruction(e.target.value);
+                      if (e.target.value.trim()) {
+                        setValidationErrors(prev => ({ ...prev, instruction: false }));
+                      }
+                    }}
                     placeholder="e.g., 'Fetch customer details from CRM using the input email, then get their recent orders from productApi.'"
-                    className={cn("min-h-80")}
+                    className={cn("min-h-64", validationErrors.instruction && inputErrorStyles)}
                   />
                   {suggestions.length > 0 && !instruction && (
                     <div className="absolute bottom-0 p-3 pointer-events-none w-full">
@@ -819,6 +843,9 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                     </div>
                   )}
                 </div>
+                {validationErrors.instruction && (
+                  <p className="text-sm text-destructive mt-1">Workflow instruction is required</p>
+                )}
               </div>
 
               {/* Show loading state */}
@@ -832,26 +859,59 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                 <Label htmlFor="payload">Workflow Variables (Optional, JSON)</Label>
                 <HelpTooltip text="Provide dynamic variables for the workflow as a JSON object. Workflow variables are equivalent to your workflow's initial payload and can be referenced in the entire config. You can change them when you use the workflow later." />
                 <div className={cn(
-                  "flex-1 min-h-0 code-editor rounded-md border bg-transparent",
+                  "h-64 rounded-md border bg-transparent code-editor",
+                  validationErrors.payload && inputErrorStyles
                 )}>
-                  <Editor
-                    value={payload}
-                    onValueChange={(code) => {
-                      setPayload(code);
-                      try {
-                        JSON.parse(code);
-                        setValidationErrors(prev => ({ ...prev, payload: false }));
-                      } catch (e) {
-                        setValidationErrors(prev => ({ ...prev, payload: true }));
-                      }
-                    }}
-                    highlight={highlightJson}
-                    padding={10}
-                    tabSize={2}
-                    insertSpaces={true}
-                    className="font-mono text-xs w-full min-h-[60px] bg-transparent"
-                  />
+                  {/* Use plain textarea for large JSON (>5000 chars) for performance */}
+                  {payload.length > 5000 ? (
+                    <Textarea
+                      value={payload}
+                      onChange={(e) => {
+                        setPayload(e.target.value);
+                        try {
+                          JSON.parse(e.target.value || '{}');
+                          setValidationErrors(prev => ({ ...prev, payload: false }));
+                        } catch (e) {
+                          setValidationErrors(prev => ({ ...prev, payload: true }));
+                        }
+                      }}
+                      className={cn("h-64")}
+                      placeholder="{}"
+                      spellCheck={false}
+                    />
+                  ) : (
+                    <Editor
+                      value={payload}
+                      onValueChange={(code) => {
+                        setPayload(code);
+                        try {
+                          JSON.parse(code || '{}');
+                          setValidationErrors(prev => ({ ...prev, payload: false }));
+                        } catch (e) {
+                          setValidationErrors(prev => ({ ...prev, payload: true }));
+                        }
+                      }}
+                      highlight={highlightJson}
+                      padding={10}
+                      tabSize={2}
+                      insertSpaces={true}
+                      className="font-mono text-xs w-full h-64"
+                    />
+                  )}
                 </div>
+                {payload.length > 5000 && (
+                  <p className="text-xs text-muted-foreground">Large JSON detected - syntax highlighting disabled for performance</p>
+                )}
+                {validationErrors.payload && (
+                  <div className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5 bg-red-500/10 dark:bg-red-500/20 py-2 px-3 rounded-md mt-2">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" y1="8" x2="12" y2="12" />
+                      <line x1="12" y1="16" x2="12.01" y2="16" />
+                    </svg>
+                    <span>Invalid JSON format: Parse error</span>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -868,7 +928,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                   <div className="mb-2">
                     <Label>Instruction</Label>
                     <div className="font-mono text-sm text-foreground rounded py-1 mt-1 break-words flex items-start gap-2">
-                      {instruction}
+                      {String(instruction).length > 500 ? String(instruction).slice(0, 500) + '... [truncated]' : instruction}
                       <Button
                         variant="ghost"
                         size="icon"
@@ -938,31 +998,48 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                     <div className={cn(
                       "w-full max-w-full code-editor rounded-md border bg-transparent",
                     )}>
-                      <Editor
-                        value={payload}
-                        onValueChange={(code) => {
-                          setPayload(code);
-                        }}
-                        highlight={highlightJson}
-                        padding={10}
-                        tabSize={2}
-                        insertSpaces={true}
-                        className="font-mono text-xs w-full min-h-[60px] bg-transparent"
-                      />
+                      {/* Use plain textarea for large JSON (>5000 chars) for performance */}
+                      {payload.length > 5000 ? (
+                        <Textarea
+                          value={payload}
+                          onChange={(e) => {
+                            setPayload(e.target.value);
+                          }}
+                          className="font-mono text-xs w-full p-2.5"
+                          style={{ minHeight: '300px' }}
+                          placeholder="{}"
+                          spellCheck={false}
+                        />
+                      ) : (
+                        <Editor
+                          value={payload}
+                          onValueChange={(code) => {
+                            setPayload(code);
+                          }}
+                          highlight={highlightJson}
+                          padding={10}
+                          tabSize={2}
+                          insertSpaces={true}
+                          className="font-mono text-xs w-full min-h-[60px] bg-transparent"
+                        />
+                      )}
                     </div>
+                    {payload.length > 5000 && (
+                      <p className="text-xs text-muted-foreground">Large JSON detected - syntax highlighting disabled for performance</p>
+                    )}
                     {(() => {
                       try {
                         JSON.parse(payload);
                         return null;
-                      } catch {
+                      } catch (e) {
                         return (
-                          <div className="text-xs text-red-600 flex items-center gap-1.5 bg-red-500/10 py-1 px-2 rounded mt-2">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <div className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5 bg-red-500/10 dark:bg-red-500/20 py-2 px-3 rounded-md mt-2">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
                               <circle cx="12" cy="12" r="10" />
                               <line x1="12" y1="8" x2="12" y2="12" />
                               <line x1="12" y1="16" x2="12.01" y2="16" />
                             </svg>
-                            Invalid JSON format
+                            <span>Invalid JSON format: {e instanceof Error ? e.message : 'Parse error'}</span>
                           </div>
                         );
                       }

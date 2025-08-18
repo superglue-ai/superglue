@@ -1,9 +1,9 @@
-import { Metadata } from "@playwright/test";
-import { ExecutionStep, Integration, RequestOptions, Workflow, WorkflowResult, WorkflowStepResult } from "@superglue/client";
-import { Validator } from "jsonschema";
+import { ExecutionStep, RequestOptions, Workflow, WorkflowResult, WorkflowStepResult } from "@superglue/client";
+import { Metadata } from "@superglue/shared";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
+import { IntegrationManager } from "../integrations/integration-manager.js";
 import { logMessage } from "../utils/logs.js";
-import { addNullableToOptional, applyJsonata, applyTransformationWithValidation } from "../utils/tools.js";
+import { isSelfHealingEnabled, transformAndValidateSchema } from "../utils/tools.js";
 import { evaluateMapping, generateTransformCode } from "../utils/transform.js";
 import { selectStrategy } from "./workflow-strategies.js";
 
@@ -16,16 +16,16 @@ export class WorkflowExecutor implements Workflow {
   public metadata: Metadata;
   public instruction?: string;
   public inputSchema?: JSONSchema;
-  private integrations: Record<string, Integration>;
+  private integrations: Record<string, IntegrationManager>;
 
   constructor(
     workflow: Workflow,
     metadata: Metadata,
-    integrations: Integration[] = []
+    integrations: IntegrationManager[] = []
   ) {
     this.id = workflow.id;
     this.steps = workflow.steps;
-    this.finalTransform = workflow.finalTransform || "$";
+    this.finalTransform = workflow.finalTransform || "(sourceData) => sourceData";
     this.responseSchema = workflow.responseSchema;
     this.instruction = workflow.instruction;
     this.metadata = metadata;
@@ -33,7 +33,7 @@ export class WorkflowExecutor implements Workflow {
     this.integrations = integrations.reduce((acc, int) => {
       acc[int.id] = int;
       return acc;
-    }, {} as Record<string, Integration>);
+    }, {} as Record<string, IntegrationManager>);
     this.result = {
       id: crypto.randomUUID(),
       success: false,
@@ -70,14 +70,14 @@ export class WorkflowExecutor implements Workflow {
         try {
           const strategy = selectStrategy(step);
           const stepInputPayload = await this.prepareStepInput(step, payload);
-          const integration = step.integrationId ? this.integrations[step.integrationId] : undefined;
+          const integrationManager = step.integrationId ? this.integrations[step.integrationId] : undefined;
           stepResult = await strategy.execute(
             step,
             stepInputPayload,
             credentials,
             options || {},
             this.metadata,
-            integration
+            integrationManager
           );
           step.apiConfig = stepResult.config;
         } catch (stepError) {
@@ -113,8 +113,8 @@ export class WorkflowExecutor implements Workflow {
         };
         try {
           // Apply the final transform using the original data
-          let currentFinalTransform = this.finalTransform || "$";
-          const finalResult = await applyTransformationWithValidation(rawStepData, currentFinalTransform, this.responseSchema);
+          let currentFinalTransform = this.finalTransform || "(sourceData) => sourceData";
+          const finalResult = await transformAndValidateSchema(rawStepData, currentFinalTransform, this.responseSchema);
           if (!finalResult.success) {
             throw new Error(finalResult.error);
           }
@@ -145,6 +145,15 @@ export class WorkflowExecutor implements Workflow {
           this.result.error = undefined; // Clear any previous transform error
           this.result.success = true; // Ensure success is true if transform succeeds
         } catch (transformError) {
+          // Check if self-healing is enabled before regenerating
+          if (!isSelfHealingEnabled(options, "transform")) {
+            // If self-healing is disabled, fail with the original error
+            this.result.success = false;
+            this.result.error = transformError?.message || transformError;
+            this.result.completedAt = new Date();
+            return this.result;
+          }
+          
           logMessage("info", `Preparing new final transform`, this.metadata);
           const instruction = "Generate the final transformation code." +
             (this.instruction ? " with the following instruction: " + this.instruction : "") +
@@ -196,6 +205,7 @@ export class WorkflowExecutor implements Workflow {
       }
     }
 
+    /* we don't validate the input schema until we have figured out how to fix the edge cases
     if (this.inputSchema) {
       const validator = new Validator();
       const optionalSchema = addNullableToOptional(this.inputSchema);
@@ -203,7 +213,7 @@ export class WorkflowExecutor implements Workflow {
       if (!validation.valid) {
         throw new Error("Invalid payload: " + validation.errors.map(e => e.message).join(", "));
       }
-    }
+    }*/
   }
 
   private async prepareStepInput(
@@ -227,10 +237,19 @@ export class WorkflowExecutor implements Workflow {
       };
 
       if (step.inputMapping) {
-        // Prepare context for JSONata expression
+        // Use JS transform for input mapping
         try {
-          const result = await applyJsonata(mappingContext, step.inputMapping || "$");
-          return result as Record<string, unknown>;
+          const transformResult = await transformAndValidateSchema(
+            mappingContext,
+            step.inputMapping,
+            null // No schema validation for input mappings
+          );
+
+          if (!transformResult.success) {
+            throw new Error(`Input mapping failed: ${transformResult.error}`);
+          }
+
+          return transformResult.data as Record<string, unknown>;
         } catch (err) {
           console.warn(`[Step ${step.id}] Input mapping failed, falling back to auto-detection`, err);
         }

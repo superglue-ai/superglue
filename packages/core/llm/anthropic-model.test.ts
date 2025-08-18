@@ -49,7 +49,7 @@ describe('AnthropicModel', () => {
         system: 'You are a helpful assistant\n\nThe current date and time is ' + MOCK_DATE,
         messages: [
           { role: 'user', content: 'Hello' },
-          { role: 'assistant', content: 'Hi there!' },
+          { role: 'assistant', content: [{ type: 'text', text: 'Hi there!' }] },
           { role: 'user', content: 'How are you?' }
         ],
         temperature: 0,
@@ -228,7 +228,7 @@ describe('AnthropicModel', () => {
         system: 'You are a JSON generator\n\nThe current date and time is ' + MOCK_DATE,
         messages: [
           { role: 'user', content: 'First request' },
-          { role: 'assistant', content: 'First response' },
+          { role: 'assistant', content: [{ type: 'text', text: 'First response' }] },
           { 
             role: 'user', 
             content: 'Generate JSON\n\nPlease respond with a JSON object that matches this schema, wrapped in <json> tags:\n<json>\n' + JSON.stringify(schema, null, 2) + '\n</json>\n\nYour response must contain ONLY the JSON object within the <json> tags, with no additional text or explanation.'
@@ -326,7 +326,7 @@ describe('AnthropicModel', () => {
         expect.objectContaining({
           messages: [
             { role: 'user', content: 'User' },
-            { role: 'assistant', content: 'Assistant' }
+            { role: 'assistant', content: [{ type: 'text', text: 'Assistant' }] }
           ]
         })
       );

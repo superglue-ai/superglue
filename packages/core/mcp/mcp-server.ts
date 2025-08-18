@@ -43,7 +43,6 @@ export const TransformInputSchemaInternal = z.object({
   instruction: z.string().describe("Natural language description of the transformation"),
   responseSchema: z.record(z.unknown()).describe("JSONSchema defining the expected output structure"),
   responseMapping: z.any().describe("JSONata expression for mapping input to output"),
-  version: z.string().optional().describe("Version identifier for the transform"),
 });
 
 export const TransformInputRequestSchema = z.object({
@@ -70,12 +69,8 @@ export const ApiInputSchemaInternal = {
   headers: z.record(z.unknown()).optional().describe("JSON object containing HTTP headers"),
   body: z.string().optional().describe("Request body as string"),
   documentationUrl: z.string().optional().describe("URL to API documentation"),
-  responseSchema: z.record(z.unknown()).optional().describe("JSONSchema defining expected response structure"),
-  responseMapping: z.any().optional().describe("JSONata expression for response transformation"),
   authentication: AuthTypeEnum.optional().describe("Authentication method required"),
   pagination: PaginationInputSchema.optional().describe("Pagination configuration if supported"),
-  dataPath: z.string().optional().describe("JSONPath to extract data from response"),
-  version: z.string().optional().describe("Version identifier for the API config"),
 };
 
 export const ExecutionStepInputSchemaInternal = {
@@ -83,10 +78,8 @@ export const ExecutionStepInputSchemaInternal = {
   apiConfig: z.object(ApiInputSchemaInternal).describe("API configuration for this step"),
   integrationId: z.string().optional().describe("ID of the integration used by this step - REQUIRED for workflow execution to access credentials"),
   executionMode: z.enum(["DIRECT", "LOOP"]).optional().describe("How to execute this step (DIRECT or LOOP)"),
-  loopSelector: z.any().optional().describe("JSONata expression to select items for looping"),
-  loopMaxIters: z.number().int().optional().describe("Maximum number of loop iterations"),
-  inputMapping: z.any().optional().describe("JSONata expression to map workflow data to step input"),
-  responseMapping: z.any().optional().describe("JSONata expression to transform step output"),
+  loopSelector: z.any().optional().describe("JavaScript arrow function to select an array from previous step outputs. The step will execute once for each array item. Example: (sourceData) => sourceData.items"),
+  loopMaxIters: z.number().int().optional().describe("Maximum number of loop iterations. Default is 1000."),
 };
 
 
@@ -98,6 +91,7 @@ export const CreateIntegrationInputSchema = {
   documentationUrl: z.string().optional().describe("URL to the API documentation."),
   documentation: z.string().optional().describe("API documentation content, if provided directly."),
   specificInstructions: z.string().optional().describe("Specific guidance on how to use this integration (e.g., rate limits, special endpoints, authentication details). Max 2000 characters."),
+  documentationKeywords: z.array(z.string()).optional().describe("Keywords to help with documentation search and ranking (e.g., endpoint names, data objects, key concepts)."),
   credentials: z.record(z.string()).describe("Credentials for accessing the integration. Provide an empty object if no credentials are needed / given. Can be referenced by brackets: <<{integration_id}_{credential_name}>>. "),
 };
 
@@ -109,9 +103,6 @@ export const WorkflowInputSchema = z.object({
   responseSchema: z.record(z.unknown()).optional().describe("JSONSchema defining the expected output structure"),
   finalTransform: z.any().optional().describe("JSONata expression to transform final workflow output"),
   instruction: z.string().optional().describe("Natural language description of what this workflow does"),
-  version: z.string().optional().describe("Version identifier for the workflow"),
-  createdAt: z.string().optional().describe("ISO timestamp when workflow was created"),
-  updatedAt: z.string().optional().describe("ISO timestamp when workflow was last updated"),
 });
 
 export const SaveWorkflowInputSchema = {
@@ -723,6 +714,7 @@ export const toolDefinitions: Record<string, any> = {
       - Always split information clearly: urlHost (without secrets), urlPath, credentials (with secrets), etc.
       - Providing a documentationUrl will trigger asynchronous API documentation processing.
       - When users mention API constraints (rate limits, special endpoints, auth requirements, etc.), capture them in 'specificInstructions' to guide workflow building.
+      - Include relevant keywords in 'documentationKeywords' to improve documentation search (e.g., endpoint names, data objects, key concepts mentioned in conversation).
     </important_notes>
     `,
     inputSchema: CreateIntegrationInputSchema,
@@ -764,14 +756,16 @@ superglue: Universal API Integration Platform
 
 AGENT WORKFLOW:
 1. DISCOVER: Use 'superglue_find_relevant_integrations' to find available integrations for your task.
-2. BUILD & TEST: Use 'superglue_build_and_run' with instruction and integrations. Iterate until successful.
+2. [Optional] CREATE: Use 'superglue_create_integration' to create a new integration. ALWAYS ask user permission before creating a new integration.
+2. BUILD & TEST: Use 'superglue_build_and_run' with instruction and integrations. Iterate until successful. If no credentials are saved with the integration, add them to the build_and_run request.
 3. SAVE (Optional): Ask user if they want to save the workflow, then use 'superglue_save_workflow' with the workflow data.
 4. EXECUTE: Use 'superglue_execute_workflow' for saved workflows.
 
 BEST PRACTICES:
 - Always start with 'superglue_find_relevant_integrations' for discovery.
-- Create integrations and store credentials in integrations using 'superglue_create_integration'. Ask users for credentials if needed.
+- Create integrations and store credentials in integrations using 'superglue_create_integration'. Ask users for credentials before creating a new integration.
 - When creating integrations, capture any user-provided guidance about rate limits, special endpoints, or usage requirements in the 'specificInstructions' field.
+- Generic integrations (e.g., "postgres", "webhook", "api") can be reused for multiple services. Never create a new integration without asking the user first, and use existing integrations if possible.
 - If you get authentication errors during build_and_run despite using integrations with saved credentials, the integrations may have placeholder values instead of actual credentials. Check with the user if they provided the correct credentials.
 - Ask user before saving workflows.
 - When saving workflows, NEVER set fields to null - omit optional fields if no value available.
@@ -819,12 +813,12 @@ BEST PRACTICES:
           properties: {
             toolName: toolName,
             orgId: orgId,
-            args: { 
-              instruction: args?.instruction, 
+            args: {
+              instruction: args?.instruction,
               integrationIds: args?.integrationIds
             }
           }
-        });      
+        });
         return {
           content: [
             {

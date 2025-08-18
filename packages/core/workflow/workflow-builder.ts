@@ -1,35 +1,15 @@
-import { ApiConfig, ExecutionStep, HttpMethod, Integration, Workflow } from "@superglue/client";
-import { ExecutionMode, Metadata } from "@superglue/shared";
+import { ExecutionStep, Integration, Workflow } from "@superglue/client";
+import { Metadata } from "@superglue/shared";
 import { type OpenAI } from "openai";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
-import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 import { toJsonSchema } from "../external/json-schema.js";
-import { LanguageModel } from "../llm/llm.js";
-import { PLANNING_PROMPT } from "../llm/prompts.js";
+import { BUILD_WORKFLOW_SYSTEM_PROMPT } from "../llm/prompts.js";
+import { executeTool } from "../tools/tools.js";
 import { Documentation } from "../utils/documentation.js";
-import { logMessage } from "../utils/logs.js"; // Added import
-import { composeUrl, safeHttpMethod } from "../utils/tools.js"; // Assuming path
+import { logMessage } from "../utils/logs.js";
+import { composeUrl, sample } from "../utils/tools.js";
 
 type ChatMessage = OpenAI.Chat.ChatCompletionMessageParam;
-
-// Define the structure for the output of the planning step
-interface WorkflowPlanStep {
-  stepId: string;
-  integrationId?: string;
-  urlHost?: string;
-  urlPath?: string;
-  instruction: string;
-  mode: ExecutionMode;
-  loopSelector?: string;
-  method?: HttpMethod;
-}
-
-interface WorkflowPlan {
-  id: string;
-  steps: WorkflowPlanStep[];
-  finalTransform?: string;
-}
 
 export class WorkflowBuilder {
   private integrations: Record<string, Integration>;
@@ -71,158 +51,156 @@ export class WorkflowBuilder {
     }
   }
 
-  private async planWorkflow(
-    currentMessages: ChatMessage[],
-    lastErrorFromPreviousAttempt: string | null
-  ): Promise<{ plan: WorkflowPlan; messages: ChatMessage[]; }> {
+  private generateIntegrationDescriptions(): string {
+    return Object.values(this.integrations).map(int => {
+      if (!int.documentation) {
+        return `<${int.id}>
+  Base URL: ${composeUrl(int.urlHost, int.urlPath)}
+  <specific_instructions>
+  ${int.specificInstructions?.length > 0 ? int.specificInstructions : "No specific instructions provided."}
+  </specific_instructions>
+</${int.id}>`;
+      }
+      const authSection = Documentation.extractRelevantSections(
+        int.documentation,
+        "authentication authorization api key token bearer basic oauth credentials access private app secret",
+        3,  // fewer sections needed for auth
+        2000 // should be detailed though
+      );
 
-    const planSchema = zodToJsonSchema(z.object({
-      id: z.string().describe("Come up with an ID for the workflow e.g. 'stripe-create-order'"),
-      steps: z.array(z.object({
-        stepId: z.string().describe("Unique camelCase identifier for the step (e.g., 'fetchCustomerDetails', 'updateOrderStatus')."),
-        integrationId: z.string().describe("The ID of the integration (from the provided list) to use for this step."),
-        instruction: z.string().describe("A specific, concise instruction for what this single API call should achieve (e.g., 'Get user profile by email', 'Create a new order')."),
-        mode: z.enum(["DIRECT", "LOOP"]).describe("The mode of execution for this step. Use 'DIRECT' for simple calls executed once or 'LOOP' when the call needs to be executed multiple times over a collection (e.g. payload is a list of customer ids and call is executed for each customer id). Important: Pagination is NOT a reason to use LOOP since pagination is handled by the execution engine itself."),
-        urlHost: z.string().optional().describe("Optional. Override the integration's default host. If not provided, the integration's urlHost will be used."),
-        urlPath: z.string().optional().describe("Optional. Specific API path for this step. If not provided, the integration's urlPath might be used or the LLM needs to determine it from documentation if the integration's base URL is just a host."),
-        method: z.enum(["GET", "POST", "PUT", "DELETE", "PATCH"]).optional().describe("Tentative HTTP method for this step, e.g. GET, POST, PUT, DELETE, PATCH. If unsure, default to GET.")
-      })).describe("The sequence of steps required to fulfill the overall instruction.")
-    }));
+      const paginationSection = Documentation.extractRelevantSections(
+        int.documentation,
+        "pagination page offset cursor limit per_page pageSize after next previous paging paginated results list",
+        3,  // max 3 sections
+        2000 // same logic applies here
+      );
+      const generalSection = Documentation.extractRelevantSections(
+        int.documentation,
+        this.instruction + "reference object endpoints methods properties values fields enums search query filter list create update delete get put post patch",
+        20,  // max 20 sections
+        1000 // should cover examples, endpoints etc.
+      );
 
-
-    const integrationDescriptions = Object.values(this.integrations).map(int => {
-      const processedDoc = Documentation.postProcess(int.documentation || "", this.instruction);
-      return `
-  <${int.id}>
-    Base URL: ${composeUrl(int.urlHost, int.urlPath)}
-    Credentials available: ${JSON.stringify(Object.entries(int.credentials || {}).reduce((obj, [name, value]) => ({ ...obj, [`${int.id}_${name}`]: value }), {}) || 'None')}
-    ${int.specificInstructions ? `\n    User Instructions for this integration:\n    ${int.specificInstructions}\n` : ''}
-    Documentation:
-    \`\`\`
-    ${processedDoc || 'No documentation content available.'}
-    \`\`\`
-  </${int.id}>`;
+      return `<${int.id}>
+  Base URL: ${composeUrl(int.urlHost, int.urlPath)}
+  <specific_instructions>
+  ${int.specificInstructions?.length > 0 ? int.specificInstructions : "No specific instructions provided."}
+  </specific_instructions>
+  <documentation>
+${authSection ? `<authentication>
+${authSection}
+</authentication>` : ''}
+    
+    ${paginationSection && paginationSection != authSection ? `<pagination>
+    ${paginationSection}
+    </pagination>` : ''}
+    
+    <context_relevant_to_user_instruction>
+    ${generalSection && generalSection != authSection && generalSection != paginationSection ? generalSection : 'No general documentation found.'}
+    </context_relevant_to_user_instruction>
+  </documentation>
+</${int.id}>`;
     }).join("\n");
-    const initialPayloadText = JSON.stringify(this.initialPayload);
-    const initialPayloadDescription = this.initialPayload ? `Initial Input Payload contains keys: ${Object.keys(this.initialPayload).join(", ") || 'None'}\nPayload example: ${initialPayloadText.length > 10000 ? initialPayloadText.slice(0, 10000) + '...[truncated]' : initialPayloadText}` : '';
+  }
 
-    let newMessages = [...currentMessages];
+  private generatePayloadDescription(maxLength: number = 4000): string {
+    if (!this.initialPayload || Object.keys(this.initialPayload).length === 0) {
+      return 'No initial payload provided';
+    }
 
-    if (newMessages.length === 0) {
-      newMessages.push({ role: "system", content: PLANNING_PROMPT });
-      const initialUserPrompt = `
-Create a plan to fulfill the user's request by orchestrating single API calls across the available integrations.
+    let payloadText = JSON.stringify(this.initialPayload);
+    if (payloadText.length > maxLength) {
+      payloadText = JSON.stringify(sample(this.initialPayload, 3), null, 2);
+    }
+    if (payloadText.length > maxLength) {
+      payloadText = payloadText.slice(0, maxLength) + '...[truncated]';
+    }
 
-<instruction>
+    return `Initial Input Payload contains keys: ${Object.keys(this.initialPayload).join(", ")}\nPayload example: ${payloadText}`;
+  }
+
+  private prepareBuildingContext(): ChatMessage[] {
+    const integrationDescriptions = this.generateIntegrationDescriptions();
+    const initialPayloadDescription = this.generatePayloadDescription();
+
+    const availableVariables = [
+      ...Object.values(this.integrations).flatMap(int => Object.keys(int.credentials || {}).map(k => `<<${int.id}_${k}>>`)),
+      ...Object.keys(this.initialPayload || {}).map(k => `<<${k}>>`)
+    ].join(", ");
+
+    const buildingPromptForAgent = `
+Build a complete workflow to fulfill the user's request.
+
+<user_instruction>
 ${this.instruction}
-</instruction>
+</user_instruction>
 
-<available_integrations>
+<available_integrations_and_documentation>
 ${integrationDescriptions}
-</available_integrations>
+</available_integrations_and_documentation>
+
+<available_variables>
+${availableVariables}
+</available_variables>
 
 <initial_payload>
 ${initialPayloadDescription}
 </initial_payload>
 
-<output_schema>
-Output a JSON object conforming to the WorkflowPlan schema. Define the necessary steps, assigning a unique lowercase \`stepId\`, selecting the appropriate \`integrationId\`, writing a clear \`instruction\` for that specific API call based on documentation, and setting the execution \`mode\`. 
-For each step, also include a tentative HTTP \`method\` (GET, POST, etc.)—if unsure, default to GET. Assume data from previous steps is available implicitly for subsequent steps. If a step involves iteration, ensure \`loopSelector\` is appropriately defined. 
-The plan should also include a \`finalTransform\` field, which is a JSONata expression for the final output transformation (default to '$' if no specific transformation is needed).
-</output_schema>
-`;
-      newMessages.push({ role: "user", content: initialUserPrompt });
-    }
+Ensure that the final output matches the instruction and you use ONLY the available integration ids.`;
 
-    if (lastErrorFromPreviousAttempt) {
-      newMessages.push({ role: "user", content: `The previous attempt resulted in an error: "${lastErrorFromPreviousAttempt}". Please analyze this error and provide a revised plan to address it. Ensure the new plan is valid and complete according to the schema.` });
-    }
-
-    const { response: rawPlanObject, messages: updatedMessagesFromLLM } = await LanguageModel.generateObject(
-      newMessages,
-      planSchema
-    );
-
-    if (!rawPlanObject || typeof rawPlanObject !== 'object' || !('steps' in rawPlanObject) || !Array.isArray(rawPlanObject.steps) || rawPlanObject.steps.length === 0) {
-      const errorMsg = "Workflow planning failed: LLM did not produce a valid plan with steps.";
-      logMessage('error', errorMsg + `\nPlan attempt: ${JSON.stringify(rawPlanObject)}`, this.metadata);
-      throw new Error(errorMsg);
-    }
-
-    const plan: WorkflowPlan = {
-      steps: rawPlanObject.steps as WorkflowPlanStep[],
-      id: rawPlanObject.id,
-      finalTransform: "(sourceData) => { return sourceData; }",
-    };
-
-    return { plan, messages: updatedMessagesFromLLM };
+    return [
+      { role: "system", content: BUILD_WORKFLOW_SYSTEM_PROMPT },
+      { role: "user", content: buildingPromptForAgent }
+    ];
   }
 
-  public async build(): Promise<Workflow> {
-    let success = false;
-    let attempts = 0;
-    const MAX_ATTEMPTS = 3;
-    let lastErrorForPlanning: string | null = null;
+  public async buildWorkflow(): Promise<Workflow> {
     let builtWorkflow: Workflow | null = null;
-    let conversationMessages: ChatMessage[] = [];
-    do {
-      attempts++;
-      logMessage('info', `Building workflow${attempts > 1 ? ` (attempt ${attempts} of ${MAX_ATTEMPTS})` : ''}`, this.metadata);
-      try {
-        const { plan: currentPlan, messages: updatedConvMessages } = await this.planWorkflow(
-          conversationMessages,
-          lastErrorForPlanning
-        );
-        conversationMessages = updatedConvMessages;
-        lastErrorForPlanning = null;
 
-        const executionSteps: ExecutionStep[] = [];
-        for (const plannedStep of currentPlan.steps) {
-          const integration = this.integrations[plannedStep.integrationId];
-          if (!integration) {
-            const errorMsg = `Configuration error during step setup: integration ID "${plannedStep.integrationId}" for step "${plannedStep.stepId}" not found.`;
-            logMessage('error', errorMsg, this.metadata);
-            throw new Error(errorMsg);
-          }
-          const partialApiConfig: ApiConfig = {
-            id: plannedStep.stepId,
-            instruction: plannedStep.instruction,
-            urlHost: plannedStep.urlHost || integration.urlHost,
-            urlPath: plannedStep.urlPath || integration.urlPath,
-            documentationUrl: integration.documentationUrl,
-            method: safeHttpMethod(plannedStep.method)
-          };
-          const executionStep: ExecutionStep = {
-            id: plannedStep.stepId,
-            apiConfig: partialApiConfig,
-            integrationId: plannedStep.integrationId,
-            executionMode: plannedStep.mode,
-            loopSelector: plannedStep.mode === "LOOP" ? "$" : undefined,
-            inputMapping: "$",
-            responseMapping: "$",
-          };
-          executionSteps.push(executionStep);
-        }
+    try {
+      logMessage('info', `Building workflow`, this.metadata);
 
-        builtWorkflow = {
-          id: currentPlan.id,
-          steps: executionSteps,
-          finalTransform: currentPlan.finalTransform || "(sourceData) => { return sourceData; }",
-          responseSchema: this.responseSchema,
-          instruction: this.instruction,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        };
-        success = true;
-      } catch (error: any) {
-        logMessage('error', `Error during workflow build attempt ${attempts}: ${error.message}`, this.metadata);
-        lastErrorForPlanning = error.message || "An unexpected error occurred during the planning or setup phase.";
-        success = false;
+      const messages = this.prepareBuildingContext();
+
+      const toolMetadata = {
+        ...this.metadata,
+        messages
+      };
+
+      // Call the build_workflow tool
+      const result = await executeTool(
+        {
+          id: `build-workflow`,
+          name: 'build_workflow',
+          arguments: {}
+        },
+        toolMetadata
+      );
+
+      if (result.error) {
+        throw new Error(result.error);
       }
-    } while (!success && attempts < MAX_ATTEMPTS);
+
+      if (!result.data || !(result.data?.id)) {
+        throw new Error('No workflow generated');
+      }
+
+      builtWorkflow = result.data;
+
+      builtWorkflow.instruction = this.instruction;
+      builtWorkflow.responseSchema = this.responseSchema;
+      try {
+        builtWorkflow.originalResponseSchema = await this.generateOriginalResponseSchema(builtWorkflow.steps);
+      } catch (error) {
+        logMessage('warn', `Error generating original response schema: ${error}`, this.metadata);
+      }
+    } catch (error: any) {
+      logMessage('error', `Error during workflow build attempt: ${error.message}`, this.metadata);
+    }
 
     if (!builtWorkflow) {
-      const finalErrorMsg = `Failed to build and execute workflow after ${attempts} attempts. Last error: ${lastErrorForPlanning || "Unknown final error."}`;
+      const finalErrorMsg = `The build_workflow tool call failed to build a valid workflow.`;
       logMessage('error', finalErrorMsg, this.metadata);
       throw new Error(finalErrorMsg);
     }
@@ -231,11 +209,330 @@ The plan should also include a \`finalTransform\` field, which is a JSONata expr
       id: builtWorkflow.id,
       steps: builtWorkflow.steps,
       integrationIds: Object.keys(this.integrations),
+      instruction: this.instruction,
       finalTransform: builtWorkflow.finalTransform,
-      responseSchema: builtWorkflow.responseSchema,
+      originalResponseSchema: builtWorkflow.originalResponseSchema,
+      responseSchema: this.responseSchema,
       inputSchema: this.inputSchema,
-      createdAt: builtWorkflow.createdAt,
-      updatedAt: builtWorkflow.updatedAt,
+      createdAt: builtWorkflow.createdAt || new Date(),
+      updatedAt: builtWorkflow.updatedAt || new Date(),
     };
+  }
+  async generateOriginalResponseSchema(steps: ExecutionStep[]): Promise<JSONSchema> {
+    const properties: Record<string, any> = {};
+    const required: string[] = [];
+
+    for (const step of steps) {
+      // Get the integration for this step
+      const integration = this.integrations[step.integrationId];
+
+      if (!integration) {
+        logMessage('warn', `Integration ${step.integrationId} not found for step ${step.id}`, this.metadata);
+        // Add a generic schema for this step
+        properties[step.id] = {
+          type: "object",
+          description: `Response data from step ${step.id}`
+        };
+        continue;
+      }
+
+      // Try to extract response schema from OpenAPI documentation
+      let stepResponseSchema: any = {
+        type: "object",
+        description: `Response data from ${integration.id} API for step ${step.id}`
+      };
+
+      if (integration.openApiSchema) {
+        try {
+          // Try to parse OpenAPI documentation if available
+          const openApiDoc = await this.parseOpenApiDocumentation(integration.openApiSchema, step.apiConfig);
+          if (openApiDoc) {
+            stepResponseSchema = openApiDoc;
+          }
+        } catch (error) {
+          logMessage('debug', `Failed to extract OpenAPI schema for step ${step.id}: ${error}`, this.metadata);
+        }
+      }
+
+      // If it's a LOOP execution mode, wrap the schema in an array
+      if (step.executionMode === "LOOP") {
+        properties[step.id] = {
+          type: "array",
+          items: stepResponseSchema,
+          description: `Array of responses from looped execution of step ${step.id}`
+        };
+      } else {
+        properties[step.id] = stepResponseSchema;
+      }
+
+      required.push(step.id);
+    }
+
+    return {
+      type: "object",
+      properties,
+      required,
+      additionalProperties: false
+    } as JSONSchema;
+  }
+
+  private async parseOpenApiDocumentation(openApiSchema: string, apiConfig: any): Promise<any | null> {
+    if (!openApiSchema) {
+      return null;
+    }
+
+    try {
+      // Parse the schema JSON
+      let spec = JSON.parse(openApiSchema);
+
+      if (!spec) {
+        return null;
+      }
+
+      // Check if it's a Google Discovery schema
+      if (spec.resources && !spec.openapi && !spec.swagger) {
+        return this.parseGoogleDiscoverySchema(spec, apiConfig);
+      }
+
+      // Otherwise, treat it as an OpenAPI schema
+      return this.parseOpenApiSchema(spec, apiConfig);
+    } catch (error) {
+      logMessage('debug', `Error parsing API schema documentation: ${error}`, this.metadata);
+      return null;
+    }
+  }
+
+  private parseOpenApiSchema(openApiSpec: any, apiConfig: any): any | null {
+    // Extract response schema based on the API endpoint
+    const { urlPath, method } = apiConfig;
+    if (!urlPath || !method) {
+      return null;
+    }
+
+    // Clean up the path (remove variable syntax)
+    const cleanPath = urlPath.replace(/<<[^>]+>>/g, '{param}')
+      .replace(/\{[^}]+\}/g, (match) => match.toLowerCase());
+
+    // Look for the path in the OpenAPI spec
+    const paths = openApiSpec.paths || openApiSpec.specifications?.reduce((acc, spec) => ({ ...acc, ...spec.spec.paths }), {}) || {};
+    let pathSchema = null;
+
+    // Try to find exact match first
+    for (const [path, pathConfig] of Object.entries(paths)) {
+      if (this.pathMatches(cleanPath, path)) {
+        const methodConfig = pathConfig[method.toLowerCase()];
+        if (methodConfig?.responses) {
+          // Get the successful response schema (200, 201, etc.)
+          const successResponse = methodConfig.responses['200'] ||
+            methodConfig.responses['201'] ||
+            methodConfig.responses['2XX'] ||
+            methodConfig.responses['default'];
+
+          if (successResponse?.content) {
+            // Extract schema from content type
+            const content = successResponse.content['application/json'] ||
+              successResponse.content['*/*'] ||
+              Object.values(successResponse.content)[0];
+
+            if (content?.schema) {
+              pathSchema = this.resolveOpenApiSchema(content.schema, openApiSpec);
+              break;
+            }
+          } else if (successResponse?.schema) {
+            // OpenAPI 2.0 format
+            pathSchema = this.resolveOpenApiSchema(successResponse.schema, openApiSpec);
+            break;
+          }
+        }
+      }
+    }
+
+    return pathSchema;
+  }
+
+  private parseGoogleDiscoverySchema(discoverySpec: any, apiConfig: any): any | null {
+    const { urlPath, method } = apiConfig;
+    if (!urlPath || !method) {
+      return null;
+    }
+
+    // Clean up the path
+    const cleanPath = urlPath.replace(/<<[^>]+>>/g, '{param}');
+
+    // Recursively search through resources and methods
+    const findMethod = (resources: any, currentPath: string = ''): any => {
+      if (!resources) return null;
+
+      for (const [resourceName, resource] of Object.entries(resources)) {
+        const res = resource as any;
+        // Check methods in this resource
+        if (res.methods) {
+          for (const [methodName, methodConfig] of Object.entries(res.methods)) {
+            const method = methodConfig as any;
+            const fullPath = method.path || method.flatPath;
+            if (fullPath && this.pathMatches(cleanPath, fullPath)) {
+              // Check if HTTP method matches
+              if (method.httpMethod?.toUpperCase() === apiConfig.method.toUpperCase()) {
+                // Found the matching method, extract response
+                if (method.response?.$ref) {
+                  // Resolve the reference in schemas
+                  return this.resolveGoogleDiscoveryRef(method.response.$ref, discoverySpec);
+                } else if (method.response) {
+                  return this.convertGoogleDiscoverySchema(method.response, discoverySpec);
+                }
+              }
+            }
+          }
+        }
+
+        // Recursively check nested resources
+        if (res.resources) {
+          const result = findMethod(res.resources, `${currentPath}/${resourceName}`);
+          if (result) return result;
+        }
+      }
+
+      return null;
+    };
+
+    return findMethod(discoverySpec.resources);
+  }
+
+  private resolveGoogleDiscoveryRef(ref: string, spec: any): any {
+    // Google Discovery refs are direct schema names
+    const schemas = spec.schemas || {};
+    const schema = schemas[ref];
+
+    if (!schema) {
+      logMessage('debug', `Google Discovery schema reference '${ref}' not found in schemas`, this.metadata);
+      // Return a generic object schema as fallback
+      return {
+        type: 'object',
+        description: `Response of type ${ref}`
+      };
+    }
+
+    return this.convertGoogleDiscoverySchema(schema, spec);
+  }
+
+  private convertGoogleDiscoverySchema(schema: any, spec: any): any {
+    if (!schema) return null;
+
+    // Handle $ref
+    if (schema.$ref) {
+      return this.resolveGoogleDiscoveryRef(schema.$ref, spec);
+    }
+
+    // Convert Google Discovery types to JSON Schema types
+    const typeMap: Record<string, string> = {
+      'string': 'string',
+      'integer': 'integer',
+      'number': 'number',
+      'boolean': 'boolean',
+      'array': 'array',
+      'object': 'object',
+      'any': 'object'
+    };
+
+    const result: any = {};
+
+    if (schema.type) {
+      result.type = typeMap[schema.type] || schema.type;
+    }
+
+    if (schema.description) {
+      result.description = schema.description;
+    }
+
+    // Handle array items
+    if (schema.type === 'array' && schema.items) {
+      result.items = this.convertGoogleDiscoverySchema(schema.items, spec);
+    }
+
+    // Handle object properties
+    if (schema.properties) {
+      result.type = 'object';
+      result.properties = {};
+      for (const [key, value] of Object.entries(schema.properties)) {
+        result.properties[key] = this.convertGoogleDiscoverySchema(value, spec);
+      }
+    }
+
+    // Handle additional properties
+    if (schema.additionalProperties !== undefined) {
+      result.additionalProperties = schema.additionalProperties;
+    }
+
+    // Handle required fields
+    if (schema.required) {
+      result.required = schema.required;
+    }
+
+    // Handle enums
+    if (schema.enum) {
+      result.enum = schema.enum;
+    }
+
+    // Handle format
+    if (schema.format) {
+      result.format = schema.format;
+    }
+
+    return result;
+  }
+
+  private pathMatches(cleanPath: string, openApiPath: string): boolean {
+    // Convert OpenAPI path parameters to regex
+    const regexPattern = openApiPath
+      .replace(/\{[^}]+\}/g, '[^/]+')
+      .replace(/\//g, '\\/');
+
+    const regex = new RegExp(`^${regexPattern}$`, 'i');
+    return regex.test(cleanPath);
+  }
+
+  private resolveOpenApiSchema(schema: any, spec: any): any {
+    if (!schema) return null;
+
+    // Handle $ref references
+    if (schema.$ref) {
+      const refPath = schema.$ref.replace('#/', '').split('/');
+      let resolved = spec;
+      for (const part of refPath) {
+        resolved = resolved?.[part];
+      }
+      return this.resolveOpenApiSchema(resolved, spec);
+    }
+
+    // Handle array types
+    if (schema.type === 'array' && schema.items) {
+      return {
+        type: 'array',
+        items: this.resolveOpenApiSchema(schema.items, spec)
+      };
+    }
+
+    // Handle object types
+    if (schema.type === 'object' || schema.properties) {
+      const result: any = {
+        type: 'object',
+        properties: {}
+      };
+
+      if (schema.properties) {
+        for (const [key, value] of Object.entries(schema.properties)) {
+          result.properties[key] = this.resolveOpenApiSchema(value as any, spec);
+        }
+      }
+
+      if (schema.required) {
+        result.required = schema.required;
+      }
+
+      return result;
+    }
+
+    // Return primitive types as-is
+    return schema;
   }
 }

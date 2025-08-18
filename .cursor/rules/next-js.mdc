@@ -1,7 +1,7 @@
 ---
-description: write app router code for nextjs
-globs: *.tsx, *.ts, *.js, *.jsx
-alwaysApply: false
+description: 
+globs: 
+alwaysApply: true
 ---
 # Rules
 always use functional react code. always write include typescript type annotations.
@@ -12,6 +12,8 @@ use tailwind classes instead of CSS to style HTML elements if possible.
 name handlers with the handle prefix, use descriptive variable names.
 
 use early returns to make code more readable.
+
+do not suggest in-line imports, move imports to the top of the page, unless instructed otherwise.
 
 to run unit tests, always just run `npm run test` in the top level project folder.
 

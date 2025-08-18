@@ -1,6 +1,6 @@
 {
   "$schema": "https://mintlify.com/schema.json",
-  "name": "Superglue",
+  "name": "superglue",
   "logo": {
     "dark": "/logo/dark.svg",
     "light": "/logo/light.svg"
@@ -41,13 +41,15 @@
     {
       "group": "Getting Started",
       "pages": [
-        "introduction",
-        "quickstart"
+        "index"
       ]
     },
     {
-      "group": "superglue for Agents",
+      "group": "For Agent & AI App Builders",
       "pages": [
+        "agent-builders/quickstart",
+        "agent-builders/sdk-integration",
+        "agent-builders/credential-management",
         "mcp/mcp",
         "mcp/mcp-guide",
         "mcp/mcp-db",
@@ -55,13 +57,27 @@
       ]
     },
     {
+      "group": "For Data & Integration Engineers", 
+      "pages": [
+        "data-engineers/quickstart",
+        "data-engineers/ui-vs-sdk",
+        "data-engineers/api-ranking",
+        "data-engineers/data-pipelines"
+      ]
+    },
+    {
       "group": "Guides & Examples",
       "pages": [
         "guides/self-hosting",
         "guides/architecture",
-        "guides/shopify",
-        "guides/jira",
-        "guides/hubspot"
+        "guides/postgres",
+        "guides/ftp-sftp",
+        "guides/oauth-integrations",
+        "guides/webhooks",
+        "guides/hubspot",
+        "guides/google-ads",
+        "guides/instagram-business",
+        "guides/api-testing"
       ]
     },
     {

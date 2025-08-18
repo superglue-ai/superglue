@@ -36,7 +36,7 @@ type ApiConfig implements BaseConfig {
   dataPath: String
 }
 
-type ExtractConfig implements BaseConfig {  
+type ExtractConfig implements BaseConfig {
   # BaseConfig
   id: ID!
   version: String
@@ -75,6 +75,8 @@ type RunResult {
   id: ID!
   success: Boolean!
   data: JSON
+  headers: JSON
+  statusCode: Int
   error: String
   startedAt: DateTime!
   completedAt: DateTime!
@@ -85,6 +87,7 @@ type Pagination {
   type: PaginationType!
   pageSize: String
   cursorPath: String
+  stopCondition: String
 }
 
 type RunList {
@@ -180,6 +183,7 @@ input PaginationInput {
   type: PaginationType!
   pageSize: String
   cursorPath: String
+  stopCondition: String
 }
 
 input ApiInput {
@@ -273,6 +277,7 @@ input IntegrationInput {
   documentation: String
   documentationPending: Boolean
   specificInstructions: String
+  documentationKeywords: [String!]
 }
 
 type Log {
@@ -308,7 +313,7 @@ type Query {
   generateSchema(instruction: String!, responseData: String): JSONSchema!
   generateInstructions(integrations: [IntegrationInput!]!): [String!]!
   getTenantInfo: TenantInfo
-  
+
   # Workflow queries
 }
 
@@ -321,7 +326,7 @@ type ExecutionStep {
   id: String!
   apiConfig: ApiConfig!
   integrationId: ID
-  executionMode: String  # DIRECT | LOOP
+  executionMode: String # DIRECT | LOOP
   loopSelector: JSONata
   loopMaxIters: Int
   inputMapping: JSONata
@@ -332,7 +337,7 @@ input ExecutionStepInput {
   id: String!
   apiConfig: ApiInput!
   integrationId: ID
-  executionMode: String  # DIRECT | LOOP
+  executionMode: String # DIRECT | LOOP
   loopSelector: JSONata
   loopMaxIters: Int
   inputMapping: JSONata
@@ -353,6 +358,7 @@ type Workflow implements BaseConfig {
   finalTransform: JSONata
   responseSchema: JSONSchema
   inputSchema: JSONSchema
+  originalResponseSchema: JSONSchema
 }
 
 type WorkflowStepResult {
@@ -387,34 +393,34 @@ input WorkflowInput {
 
 type Mutation {
   setTenantInfo(email: String, emailEntrySkipped: Boolean): TenantInfo!
-  
+
   call(
     input: ApiInputRequest!
     payload: JSON
     credentials: JSON
     options: RequestOptions
   ): RunResult!
-  
+
   extract(
     input: ExtractInputRequest!
     payload: JSON
     credentials: JSON
     options: RequestOptions
   ): RunResult!
-  
+
   transform(
     input: TransformInputRequest!
     data: JSON!
     options: RequestOptions
   ): RunResult!
-  
+
   executeWorkflow(
     input: WorkflowInputRequest!
     payload: JSON
     credentials: JSON
     options: RequestOptions
   ): WorkflowResult!
-  
+
   buildWorkflow(
     instruction: String!
     payload: JSON
@@ -424,7 +430,7 @@ type Mutation {
 
   upsertWorkflow(id: ID!, input: JSON!): Workflow!
   deleteWorkflow(id: ID!): Boolean!
-  
+
   upsertApi(id: ID!, input: JSON!): ApiConfig!
   deleteApi(id: ID!): Boolean!
 
@@ -432,7 +438,7 @@ type Mutation {
 
   upsertExtraction(id: ID!, input: JSON!): ExtractConfig!
   deleteExtraction(id: ID!): Boolean!
-  
+
   upsertTransformation(id: ID!, input: JSON!): TransformConfig!
   deleteTransformation(id: ID!): Boolean!
 
@@ -457,7 +463,10 @@ type Integration {
   documentationUrl: String
   documentation: String
   documentationPending: Boolean
+  openApiUrl: String
+  openApiSchema: String
   specificInstructions: String
+  documentationKeywords: [String!]
   icon: String
   version: String
   createdAt: DateTime

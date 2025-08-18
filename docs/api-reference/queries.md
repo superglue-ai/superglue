@@ -9,6 +9,11 @@ description: "Queries are used to retrieve configs, logs, and workflow info."
 
 Returns a paginated list of execution runs.
 
+**Parameters:**
+- `limit`: Int - Number of items to return (default: 10, max: 100)
+- `offset`: Int - Number of items to skip (default: 0)
+- `configId`: ID - Filter runs by specific configuration ID (optional)
+
 <Tabs>
   <Tab title="GraphQL">
     ```graphql
@@ -68,98 +73,6 @@ Returns a paginated list of execution runs.
   <Tab title="Client">
     ```typescript
     const { items, total } = await client.listRuns(100, 0);
-    ```
-  </Tab>
-</Tabs>
-
-### listApis
-
-Returns a paginated list of API configurations.
-
-<Tabs>
-  <Tab title="GraphQL">
-    ```graphql
-    query ListApis($limit: Int = 10, $offset: Int = 0) {
-      listApis(limit: $limit, offset: $offset) {
-        items {
-          id
-          urlHost
-          urlPath
-          method
-          instruction
-          authentication
-          createdAt
-          updatedAt
-        }
-        total
-      }
-    }
-    ```
-  </Tab>
-  <Tab title="Client">
-    ```typescript
-    const { items, total } = await client.listApis(10, 0);
-    ```
-  </Tab>
-</Tabs>
-
-### listTransforms
-
-Returns a paginated list of transform configurations.
-
-<Tabs>
-  <Tab title="GraphQL">
-    ```graphql
-    query ListTransforms($limit: Int = 10, $offset: Int = 0) {
-      listTransforms(limit: $limit, offset: $offset) {
-        items {
-          id
-          instruction
-          responseSchema
-          responseMapping
-          createdAt
-          updatedAt
-        }
-        total
-      }
-    }
-    ```
-  </Tab>
-  <Tab title="Client">
-    ```typescript
-    const { items, total } = await client.listTransforms(10, 0);
-    ```
-  </Tab>
-</Tabs>
-
-### listExtracts
-
-Returns a paginated list of extract configurations.
-
-<Tabs>
-  <Tab title="GraphQL">
-    ```graphql
-    query ListExtracts($limit: Int = 10, $offset: Int = 0) {
-      listExtracts(limit: $limit, offset: $offset) {
-        items {
-          id
-          urlHost
-          urlPath
-          fileType
-          decompressionMethod
-          instruction
-          authentication
-          createdAt
-          updatedAt
-        }
-        total
-      }
-    }
-    ```
-  </Tab>
-  <Tab title="Client">
-    ```typescript
-    const { items, total } = await client.listExtracts(10, 0);
     ```
   </Tab>
 </Tabs>
@@ -231,6 +144,7 @@ Returns a paginated list of integration configurations.
           documentationUrl
           documentation
           documentationPending
+          specificInstructions
           icon
           version
           createdAt
@@ -314,99 +228,6 @@ Retrieves a specific execution run by ID.
   </Tab>
 </Tabs>
 
-### getApi
-
-Retrieves a specific API configuration by ID.
-
-<Tabs>
-  <Tab title="GraphQL">
-    ```graphql
-    query GetApi($id: ID!) {
-      getApi(id: $id) {
-        id
-        urlHost
-        urlPath
-        method
-        instruction
-        headers
-        queryParams
-        authentication
-        responseSchema
-        responseMapping
-        pagination {
-          type
-          pageSize
-          cursorPath
-        }
-        dataPath
-        createdAt
-        updatedAt
-      }
-    }
-    ```
-  </Tab>
-  <Tab title="Client">
-    ```typescript
-    const config = await client.getApi("api-config-id");
-    ```
-  </Tab>
-</Tabs>
-
-### getTransform
-
-Retrieves a specific transform configuration by ID.
-
-<Tabs>
-  <Tab title="GraphQL">
-    ```graphql
-    query GetTransform($id: ID!) {
-      getTransform(id: $id) {
-        id
-        instruction
-        responseSchema
-        responseMapping
-        createdAt
-        updatedAt
-      }
-    }
-    ```
-  </Tab>
-  <Tab title="Client">
-    ```typescript
-    const config = await client.getTransform("transform-config-id");
-    ```
-  </Tab>
-</Tabs>
-
-### getExtract
-
-Retrieves a specific extract configuration by ID.
-
-<Tabs>
-  <Tab title="GraphQL">
-    ```graphql
-    query GetExtract($id: ID!) {
-      getExtract(id: $id) {
-        id
-        urlHost
-        urlPath
-        fileType
-        decompressionMethod
-        instruction
-        authentication
-        createdAt
-        updatedAt
-      }
-    }
-    ```
-  </Tab>
-  <Tab title="Client">
-    ```typescript
-    const config = await client.getExtract("extract-config-id");
-    ```
-  </Tab>
-</Tabs>
-
 ### getWorkflow
 
 Retrieves a specific workflow configuration by ID.
@@ -471,6 +292,7 @@ Retrieves a specific integration configuration by ID.
         documentationUrl
         documentation
         documentationPending
+        specificInstructions
         icon
         version
         createdAt
@@ -490,7 +312,11 @@ Retrieves a specific integration configuration by ID.
 
 ### generateSchema
 
-Generates a JSON schema based on instructions and optional response data.
+Generates a JSON schema based on instructions and optional response data. Useful for creating response schemas for workflows.
+
+**Parameters:**
+- `instruction`: String! - Natural language description of the desired schema (required)
+- `responseData`: String - Sample JSON data to infer schema from (optional)
 
 <Tabs>
   <Tab title="GraphQL">
@@ -512,7 +338,10 @@ Generates a JSON schema based on instructions and optional response data.
 
 ### generateInstructions
 
-Generates natural language instructions based on integration configurations.
+Generates natural language instructions based on integration configurations. Helps create workflow instructions from available integrations.
+
+**Parameters:**
+- `integrations`: [IntegrationInput!]! - List of integrations to generate instructions for (required)
 
 <Tabs>
   <Tab title="GraphQL">
@@ -560,7 +389,10 @@ Retrieves tenant account information.
 
 ### findRelevantIntegrations
 
-Finds integrations relevant to a given natural language instruction.
+Finds integrations relevant to a given natural language instruction. Returns suggested integrations with explanations.
+
+**Parameters:**
+- `instruction`: String - Natural language description of what you want to do (optional, returns all integrations if not provided)
 
 <Tabs>
   <Tab title="GraphQL">
@@ -588,3 +420,204 @@ Finds integrations relevant to a given natural language instruction.
 
 - `instruction`: String (optional) - Natural language description of what you want to do
 - Returns: Array of `SuggestedIntegration` objects
+
+## Deprecated Operations
+
+The following operations are deprecated. Use workflow-based operations instead.
+
+### listApis (Deprecated)
+
+**⚠️ Deprecated:** Use workflow-based operations instead.
+
+Returns a paginated list of API configurations.
+
+<Tabs>
+  <Tab title="GraphQL">
+    ```graphql
+    query ListApis($limit: Int = 10, $offset: Int = 0) {
+      listApis(limit: $limit, offset: $offset) {
+        items {
+          id
+          urlHost
+          urlPath
+          method
+          instruction
+          authentication
+          createdAt
+          updatedAt
+        }
+        total
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Client">
+    ```typescript
+    const { items, total } = await client.listApis(10, 0);
+    ```
+  </Tab>
+</Tabs>
+
+### listTransforms (Deprecated)
+
+**⚠️ Deprecated:** Use workflow-based operations instead.
+
+Returns a paginated list of transform configurations.
+
+<Tabs>
+  <Tab title="GraphQL">
+    ```graphql
+    query ListTransforms($limit: Int = 10, $offset: Int = 0) {
+      listTransforms(limit: $limit, offset: $offset) {
+        items {
+          id
+          instruction
+          responseSchema
+          responseMapping
+          createdAt
+          updatedAt
+        }
+        total
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Client">
+    ```typescript
+    const { items, total } = await client.listTransforms(10, 0);
+    ```
+  </Tab>
+</Tabs>
+
+### listExtracts (Deprecated)
+
+**⚠️ Deprecated:** Use workflow-based operations instead.
+
+Returns a paginated list of extract configurations.
+
+<Tabs>
+  <Tab title="GraphQL">
+    ```graphql
+    query ListExtracts($limit: Int = 10, $offset: Int = 0) {
+      listExtracts(limit: $limit, offset: $offset) {
+        items {
+          id
+          urlHost
+          urlPath
+          fileType
+          decompressionMethod
+          instruction
+          authentication
+          createdAt
+          updatedAt
+        }
+        total
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Client">
+    ```typescript
+    const { items, total } = await client.listExtracts(10, 0);
+    ```
+  </Tab>
+</Tabs>
+
+### getApi (Deprecated)
+
+**⚠️ Deprecated:** Use workflow-based operations instead.
+
+Retrieves a specific API configuration by ID.
+
+<Tabs>
+  <Tab title="GraphQL">
+    ```graphql
+    query GetApi($id: ID!) {
+      getApi(id: $id) {
+        id
+        urlHost
+        urlPath
+        method
+        instruction
+        headers
+        queryParams
+        authentication
+        responseSchema
+        responseMapping
+        pagination {
+          type
+          pageSize
+          cursorPath
+        }
+        dataPath
+        createdAt
+        updatedAt
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Client">
+    ```typescript
+    const config = await client.getApi("api-config-id");
+    ```
+  </Tab>
+</Tabs>
+
+### getTransform (Deprecated)
+
+**⚠️ Deprecated:** Use workflow-based operations instead.
+
+Retrieves a specific transform configuration by ID.
+
+<Tabs>
+  <Tab title="GraphQL">
+    ```graphql
+    query GetTransform($id: ID!) {
+      getTransform(id: $id) {
+        id
+        instruction
+        responseSchema
+        responseMapping
+        createdAt
+        updatedAt
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Client">
+    ```typescript
+    const config = await client.getTransform("transform-config-id");
+    ```
+  </Tab>
+</Tabs>
+
+### getExtract (Deprecated)
+
+**⚠️ Deprecated:** Use workflow-based operations instead.
+
+Retrieves a specific extract configuration by ID.
+
+<Tabs>
+  <Tab title="GraphQL">
+    ```graphql
+    query GetExtract($id: ID!) {
+      getExtract(id: $id) {
+        id
+        urlHost
+        urlPath
+        fileType
+        decompressionMethod
+        instruction
+        authentication
+        createdAt
+        updatedAt
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Client">
+    ```typescript
+    const config = await client.getExtract("extract-config-id");
+    ```
+  </Tab>
+</Tabs>

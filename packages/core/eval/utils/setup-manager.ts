@@ -3,6 +3,7 @@ import { waitForIntegrationProcessing } from '@superglue/shared/utils';
 import fs from 'fs';
 import { FileStore } from '../../datastore/filestore.js';
 import { DataStore } from '../../datastore/types.js';
+import { server_defaults } from '../../default.js';
 import { logMessage } from '../../utils/logs.js';
 import { IntegrationConfig } from './config-loader.js';
 
@@ -115,11 +116,11 @@ export class SetupManager {
                 }
 
                 // Save to datastore
-                const saved = await datastore.upsertIntegration(
-                    integration.id,
+                const saved = await datastore.upsertIntegration({
+                    id: integration.id,
                     integration,
-                    this.metadata.orgId
-                );
+                    orgId: this.metadata.orgId
+                });
 
                 integrations.push(saved);
 
@@ -166,7 +167,7 @@ export class SetupManager {
         // Refresh integrations to get the latest state after documentation processing
         const refreshedIntegrations: Integration[] = [];
         for (const integration of integrations) {
-            const updated = await datastore.getIntegration(integration.id, this.metadata.orgId);
+            const updated = await datastore.getIntegration({ id: integration.id, includeDocs: true, orgId: this.metadata.orgId });
             if (updated) {
                 refreshedIntegrations.push(updated);
             } else {
@@ -215,7 +216,7 @@ export class SetupManager {
                 const docString = await docFetcher.fetchAndProcess();
 
                 // Check if integration still exists
-                const stillExists = await datastore.getIntegration(integration.id, this.metadata.orgId);
+                const stillExists = await datastore.getIntegration({ id: integration.id, includeDocs: false, orgId: this.metadata.orgId });
                 if (!stillExists) {
                     logMessage('warn',
                         `Integration ${integration.id} was deleted during documentation fetch`,
@@ -225,12 +226,16 @@ export class SetupManager {
                 }
 
                 // Update with documentation
-                await datastore.upsertIntegration(integration.id, {
-                    ...integration,
-                    documentation: docString,
-                    documentationPending: false,
-                    updatedAt: new Date()
-                }, this.metadata.orgId);
+                await datastore.upsertIntegration({
+                    id: integration.id,
+                    integration: {
+                        ...integration,
+                        documentation: docString,
+                        documentationPending: false,
+                        updatedAt: new Date()
+                    },
+                    orgId: this.metadata.orgId
+                });
 
                 logMessage('info', `✅ Documentation fetched for ${integration.id}`, this.metadata);
 
@@ -242,14 +247,18 @@ export class SetupManager {
 
                 // Always update documentationPending to false even on failure
                 try {
-                    const stillExists = await datastore.getIntegration(integration.id, this.metadata.orgId);
+                    const stillExists = await datastore.getIntegration({ id: integration.id, includeDocs: false, orgId: this.metadata.orgId });
                     if (stillExists) {
-                        await datastore.upsertIntegration(integration.id, {
-                            ...integration,
-                            documentation: '',
-                            documentationPending: false,
-                            updatedAt: new Date()
-                        }, this.metadata.orgId);
+                        await datastore.upsertIntegration({
+                            id: integration.id,
+                            integration: {
+                                ...integration,
+                                documentation: '',
+                                documentationPending: false,
+                                updatedAt: new Date()
+                            },
+                            orgId: this.metadata.orgId
+                        });
                         logMessage('info', `📝 Marked documentation as processed (failed) for ${integration.id}`, this.metadata);
                     }
                 } catch (updateError) {
@@ -280,14 +289,14 @@ export class SetupManager {
         try {
             const datastoreAdapter = {
                 getIntegration: async (id: string): Promise<Integration | null> => {
-                    return await datastore.getIntegration(id, this.metadata.orgId);
+                    return await datastore.getIntegration({ id, includeDocs: false, orgId: this.metadata.orgId });
                 }
             };
 
             await waitForIntegrationProcessing(
                 datastoreAdapter,
                 pendingIntegrations,
-                240000
+                server_defaults.DOCUMENTATION.TIMEOUTS.EVAL_DOC_PROCESSING_TIMEOUT
             );
 
             const documentationProcessingTime = Date.now() - docStartTime;
@@ -310,7 +319,7 @@ export class SetupManager {
         } catch (error) {
             const documentationProcessingTime = Date.now() - docStartTime;
             logMessage('warn',
-                `⚠️  Documentation processing timeout after ${documentationProcessingTime}ms (4 minute limit): ${String(error)}`,
+                `⚠️  Documentation processing timeout after ${documentationProcessingTime}ms (10 minute limit): ${String(error)}`,
                 this.metadata
             );
 
@@ -318,13 +327,17 @@ export class SetupManager {
             // to prevent "still being fetched" warnings later
             for (const integrationId of pendingIntegrations) {
                 try {
-                    const integration = await datastore.getIntegration(integrationId, this.metadata.orgId);
+                    const integration = await datastore.getIntegration({ id: integrationId, includeDocs: false, orgId: this.metadata.orgId });
                     if (integration && integration.documentationPending) {
-                        await datastore.upsertIntegration(integrationId, {
-                            ...integration,
-                            documentationPending: false,
-                            updatedAt: new Date()
-                        }, this.metadata.orgId);
+                        await datastore.upsertIntegration({
+                            id: integrationId,
+                            integration: {
+                                ...integration,
+                                documentationPending: false,
+                                updatedAt: new Date()
+                            },
+                            orgId: this.metadata.orgId
+                        });
                         logMessage('info',
                             `📝 Marked documentation as processed (timeout) for ${integrationId}`,
                             this.metadata

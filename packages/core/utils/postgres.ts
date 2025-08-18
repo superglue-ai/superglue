@@ -1,10 +1,89 @@
 import { ApiConfig, RequestOptions } from "@superglue/client";
 import { Pool, PoolConfig } from 'pg';
+import { server_defaults } from "../default.js";
 import { composeUrl, replaceVariables } from "./tools.js";
 
-const DEFAULT_TIMEOUT = 30000; // 30 seconds
-const DEFAULT_RETRIES = 0;
-const DEFAULT_RETRY_DELAY = 1000; // 1 second
+
+// Pool cache management
+interface PoolCacheEntry {
+  pool: Pool;
+  lastUsed: number;
+  connectionString: string;
+}
+
+const poolCache = new Map<string, PoolCacheEntry>();
+
+// Start cleanup interval
+let cleanupInterval: NodeJS.Timeout | null = null;
+
+function startCleanupInterval() {
+  if (!cleanupInterval) {
+    cleanupInterval = setInterval(() => {
+      const now = Date.now();
+      for (const [key, entry] of poolCache.entries()) {
+        if (now - entry.lastUsed > server_defaults.POSTGRES.POOL_IDLE_TIMEOUT) {
+          entry.pool.end().catch(console.error);
+          poolCache.delete(key);
+        }
+      }
+    }, server_defaults.POSTGRES.POOL_CLEANUP_INTERVAL);
+    
+    // Prevent the interval from keeping the process alive
+    if (cleanupInterval.unref) {
+      cleanupInterval.unref();
+    }
+  }
+}
+
+function getOrCreatePool(connectionString: string, poolConfig: PoolConfig): Pool {
+  const cacheKey = connectionString;
+  const existingEntry = poolCache.get(cacheKey);
+  
+  if (existingEntry) {
+    existingEntry.lastUsed = Date.now();
+    return existingEntry.pool;
+  }
+  
+  const pool = new Pool({
+    ...poolConfig,
+    max: 10, // Maximum number of clients in the pool
+    idleTimeoutMillis: server_defaults.POSTGRES.DEFAULT_TIMEOUT, // How long a client can sit idle before being removed
+    connectionTimeoutMillis: 5000, // How long to wait for a connection
+  });
+  
+  // Add error handler to prevent unhandled errors
+  pool.on('error', (err) => {
+    console.error('Unexpected pool error:', err);
+    // Remove from cache if pool has an error
+    poolCache.delete(cacheKey);
+  });
+  
+  poolCache.set(cacheKey, {
+    pool,
+    lastUsed: Date.now(),
+    connectionString
+  });
+  
+  // Start cleanup interval if not already running
+  startCleanupInterval();
+  
+  return pool;
+}
+
+// Graceful shutdown function
+export async function closeAllPools(): Promise<void> {
+  if (cleanupInterval) {
+    clearInterval(cleanupInterval);
+    cleanupInterval = null;
+  }
+  
+  const closePromises = Array.from(poolCache.values()).map(entry => 
+    entry.pool.end().catch(console.error)
+  );
+  
+  await Promise.all(closePromises);
+  poolCache.clear();
+}
 
 function sanitizeDatabaseName(connectionString: string): string {
   // First remove any trailing slashes
@@ -29,11 +108,19 @@ export async function callPostgres(endpoint: ApiConfig, payload: Record<string, 
   const requestVars = { ...payload, ...credentials };
   let connectionString = await replaceVariables(composeUrl(endpoint.urlHost, endpoint.urlPath), requestVars);
   connectionString = sanitizeDatabaseName(connectionString);
-  const query = await replaceVariables(JSON.parse(endpoint.body).query, requestVars);
+  
+  let bodyParsed: any;
+  try {
+    bodyParsed = JSON.parse(await replaceVariables(endpoint.body, requestVars));
+  } catch (error) {
+    throw new Error(`Invalid JSON in body: ${error.message} for body: ${JSON.stringify(endpoint.body)}`);
+  }
+  const queryText = bodyParsed.query;
+  const queryParams = bodyParsed.params || bodyParsed.values; // Support both 'params' and 'values' keys
 
   const poolConfig: PoolConfig = {
     connectionString,
-    statement_timeout: options?.timeout || DEFAULT_TIMEOUT,
+    statement_timeout: options?.timeout || server_defaults.POSTGRES.DEFAULT_TIMEOUT,
     ssl: {
       rejectUnauthorized: false, // Set to true for production with valid certs
       // ca: fs.readFileSync('path/to/ca-cert.pem'), // Optional: CA certificate
@@ -42,27 +129,34 @@ export async function callPostgres(endpoint: ApiConfig, payload: Record<string, 
     }
   };
 
-  const pool = new Pool(poolConfig);
+  // Get or create pool from cache
+  const pool = getOrCreatePool(connectionString, poolConfig);
   let attempts = 0;
-  const maxRetries = options?.retries || DEFAULT_RETRIES;
+  const maxRetries = options?.retries || server_defaults.POSTGRES.DEFAULT_RETRIES;
 
   do {
     try {
-      const result = await pool.query(query);
-      await pool.end();
-      return result.rows;
+      
+      // Use parameterized query if params are provided, otherwise fall back to simple query
+      const result = queryParams 
+        ? await pool.query(queryText, queryParams)
+        : await pool.query(queryText);
+        return result.rows;
     } catch (error) {
+      
       attempts++;
 
       if (attempts > maxRetries) {
-        await pool.end();
         if (error instanceof Error) {
-          throw new Error(`PostgreSQL error after ${attempts} attempts: ${error.message}`);
+          const errorContext = queryParams 
+            ? ` for query: ${queryText} with params: ${JSON.stringify(queryParams)}`
+            : ` for query: ${queryText}`;
+          throw new Error(`PostgreSQL error: ${error.message}${errorContext}`);
         }
         throw new Error('Unknown PostgreSQL error occurred');
       }
 
-      const retryDelay = options?.retryDelay || DEFAULT_RETRY_DELAY;
+      const retryDelay = options?.retryDelay || server_defaults.POSTGRES.DEFAULT_RETRY_DELAY;
       await new Promise(resolve => setTimeout(resolve, retryDelay));
     }
   } while (attempts <= maxRetries);

@@ -1,5 +1,4 @@
-import { Integration } from "@superglue/client"
-import { cleanUrl } from "./utils"
+import { Integration } from "@superglue/client";
 
 export const inputErrorStyles = "!border-destructive !border-[1px] focus:!ring-0 focus:!ring-offset-0"
 
@@ -72,21 +71,30 @@ export const splitUrl = (url: string) => {
       urlPath: ''
     }
   }
-  const urlObj = cleanUrl(url);
+  
+  // Find the position after the protocol (://)
+  const protocolEnd = url.indexOf('://');  
+  // Find the first slash after the protocol
+  const firstSlashAfterProtocol = url.indexOf('/', protocolEnd + 3);
+  
+  if (firstSlashAfterProtocol === -1) {
+    // No path, entire URL is the host
+    return {
+      urlHost: url,
+      urlPath: ''
+    }
+  }
+  
+  // Split at the first slash after protocol
   return {
-    urlHost: urlObj.protocol + '//' + urlObj.host,
-    urlPath: urlObj.pathname === '/' ? '' : urlObj.pathname
+    urlHost: url.substring(0, firstSlashAfterProtocol),
+    urlPath: url.substring(firstSlashAfterProtocol)
   }
 }
 
 export function needsUIToTriggerDocFetch(newIntegration: Integration, oldIntegration: Integration | null): boolean {
   // If documentation was manually provided, no fetch needed.
   if (newIntegration.documentation && newIntegration.documentation.trim()) {
-    return false;
-  }
-
-  // If no doc URL, no fetch needed.
-  if (!newIntegration.documentationUrl || !newIntegration.documentationUrl.trim()) {
     return false;
   }
 

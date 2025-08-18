@@ -16,25 +16,160 @@ import { Button } from '@/src/components/ui/button';
 import { DocStatus } from '@/src/components/utils/DocStatusSpinner';
 import { useToast } from '@/src/hooks/use-toast';
 import { needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
-import { integrations as integrationTemplates } from '@/src/lib/integrations';
-import { composeUrl } from '@/src/lib/utils';
+import { composeUrl, getIntegrationIcon as getIntegrationIconName } from '@/src/lib/utils';
 import type { Integration } from '@superglue/client';
 import { SuperglueClient, UpsertMode } from '@superglue/client';
+import { integrations as integrationTemplates } from '@superglue/shared';
 import { waitForIntegrationProcessing } from '@superglue/shared/utils';
-import { FileDown, Globe, Pencil, Plus, RotateCw, Trash2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { Clock, FileDown, Globe, Key, Pencil, Plus, RotateCw, Sparkles, Trash2 } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
 import type { SimpleIcon } from 'simple-icons';
 import * as simpleIcons from 'simple-icons';
+
+// Single source of truth for auth type detection
+export const detectAuthType = (credentials: any): 'oauth' | 'apikey' | 'none' => {
+    if (!credentials || Object.keys(credentials).length === 0) return 'none';
+
+    // Define OAuth-specific fields
+    const oauthSpecificFields = ['client_id', 'client_secret', 'auth_url', 'token_url', 'access_token', 'refresh_token', 'scopes', 'expires_at', 'token_type'];
+
+    // Get all credential keys
+    const allKeys = Object.keys(credentials);
+
+    // Check if all keys are OAuth-specific
+    const containsOnlyOAuthKeys = allKeys.every(key => oauthSpecificFields.includes(key));
+
+    if (containsOnlyOAuthKeys) {
+        // It's OAuth-related, now check the status
+        if (credentials.access_token && credentials.refresh_token) {
+            return 'oauth'; // Will be shown as configured
+        } else if (credentials.client_id || credentials.client_secret) {
+            return 'oauth'; // Will be shown as pending
+        } else {
+            return 'none'; // Only has meta fields like auth_url, scopes, etc.
+        }
+    }
+
+    // Has non-OAuth fields, so it's API key
+    return 'apikey';
+};
+
+// Helper to determine auth badge status
+export const getAuthBadge = (integration: Integration): {
+    type: 'oauth-configured' | 'oauth-incomplete' | 'apikey' | 'none',
+    label: string,
+    color: 'blue' | 'amber' | 'green',
+    icon: 'key' | 'clock'
+} => {
+    const creds = integration.credentials || {};
+    const authType = detectAuthType(creds);
+
+    if (authType === 'none') {
+        return { type: 'none', label: 'No auth', color: 'amber', icon: 'key' };
+    }
+
+    if (authType === 'oauth') {
+        // OAuth is configured only when BOTH access_token AND refresh_token are present
+        const isConfigured = !!(creds.access_token && creds.refresh_token);
+        return isConfigured
+            ? { type: 'oauth-configured', label: 'OAuth configured', color: 'blue', icon: 'key' }
+            : { type: 'oauth-incomplete', label: 'OAuth incomplete', color: 'amber', icon: 'clock' };
+    }
+
+    // Must be API key
+    return { type: 'apikey', label: 'API Key', color: 'green', icon: 'key' };
+};
 
 export default function IntegrationsPage() {
     const config = useConfig();
     const { toast } = useToast();
+    const searchParams = useSearchParams();
+    const router = useRouter();
     const { integrations, pendingDocIds, loading: initialLoading, refreshIntegrations, setPendingDocIds } = useIntegrations();
 
     const client = useMemo(() => new SuperglueClient({
         endpoint: config.superglueEndpoint,
         apiKey: config.superglueApiKey,
     }), [config.superglueEndpoint, config.superglueApiKey]);
+
+    // Handle OAuth callback messages from URL params
+    useEffect(() => {
+        const success = searchParams.get('success');
+        const error = searchParams.get('error');
+        const integration = searchParams.get('integration');
+        const message = searchParams.get('message');
+        const description = searchParams.get('description');
+
+        if (success === 'oauth_completed' && integration) {
+            toast({
+                title: 'OAuth Connection Successful',
+                description: `Successfully connected to ${integration}`,
+            });
+            // Clear the URL params
+            window.history.replaceState({}, '', '/integrations');
+            // Refresh integrations to show updated OAuth status
+            refreshIntegrations();
+        } else if (error) {
+            toast({
+                title: 'OAuth Error',
+                description: description || message || 'Failed to complete OAuth connection',
+                variant: 'destructive',
+            });
+            // Clear the URL params
+            window.history.replaceState({}, '', '/integrations');
+        }
+    }, [searchParams, toast, refreshIntegrations]);
+
+    // Handle OAuth callback messages from popup windows
+    useEffect(() => {
+        const handleMessage = async (event: MessageEvent) => {
+            // Verify origin matches
+            if (event.origin !== window.location.origin) return;
+
+            if (event.data.type === 'oauth-success') {
+                const integrationId = event.data.integrationId;
+
+                // Wait a moment for the backend to finish updating
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                // Refresh integrations and get the updated list
+                await refreshIntegrations();
+
+                // We need to fetch the integration directly since the state might not be updated yet
+                try {
+                    const updatedIntegration = await client.getIntegration(integrationId);
+                    if (updatedIntegration?.credentials?.access_token && updatedIntegration?.credentials?.refresh_token) {
+                        toast({
+                            title: 'OAuth Connection Successful',
+                            description: `Successfully connected to ${integrationId}`,
+                        });
+                    } else {
+                        toast({
+                            title: 'OAuth Connection Failed',
+                            description: 'OAuth flow completed but tokens were not saved. Please try again.',
+                            variant: 'destructive',
+                        });
+                    }
+                } catch (error) {
+                    toast({
+                        title: 'OAuth Connection Failed',
+                        description: 'Failed to verify OAuth connection. Please refresh the page.',
+                        variant: 'destructive',
+                    });
+                }
+            } else if (event.data.type === 'oauth-error') {
+                toast({
+                    title: 'OAuth Error',
+                    description: event.data.message || 'Failed to complete OAuth connection',
+                    variant: 'destructive',
+                });
+            }
+        };
+
+        window.addEventListener('message', handleMessage);
+        return () => window.removeEventListener('message', handleMessage);
+    }, [client, refreshIntegrations, toast]);
 
     const { waitForIntegrationReady } = useMemo(() => ({
         waitForIntegrationReady: (integrationIds: string[]) => {
@@ -49,10 +184,13 @@ export default function IntegrationsPage() {
     const [editingIntegration, setEditingIntegration] = useState<Integration | null>(null);
 
     const integrationOptions = [
-        { value: "custom", label: "Custom", icon: "default" },
+        { value: "manual", label: "No Template", icon: "default" },
         ...Object.entries(integrationTemplates).map(([key, integration]) => ({
             value: key,
-            label: key.charAt(0).toUpperCase() + key.slice(1),
+            label: key
+                .replace(/([A-Z])/g, ' $1')  // Add space before capital letters
+                .replace(/^./, str => str.toUpperCase())  // Capitalize first letter
+                .trim(),  // Remove leading space
             icon: integration.icon || "default"
         }))
     ];
@@ -108,18 +246,15 @@ export default function IntegrationsPage() {
         setEditingIntegration(null);
         setAddFormOpen(true);
     };
-    const handleModalClose = () => {
-        setAddFormOpen(false);
-        setEditingIntegration(null);
-    };
-    const handleSave = async (integration: Integration) => {
+
+    const handleSave = async (integration: Integration): Promise<Integration | null> => {
         try {
             if (integration.id) {
                 const mode = editingIntegration ? UpsertMode.UPDATE : UpsertMode.CREATE;
                 const savedIntegration = await client.upsertIntegration(integration.id, integration, mode);
-                const needsDocFetch = needsUIToTriggerDocFetch(savedIntegration, editingIntegration);
+                const willTriggerDocFetch = needsUIToTriggerDocFetch(savedIntegration, editingIntegration);
 
-                if (needsDocFetch) {
+                if (willTriggerDocFetch) {
                     setPendingDocIds(prev => new Set([...prev, savedIntegration.id]));
 
                     // Fire-and-forget poller for background doc fetch
@@ -136,7 +271,10 @@ export default function IntegrationsPage() {
                 setEditingIntegration(null);
                 setAddFormOpen(false);
                 await refreshIntegrations();
+
+                return savedIntegration; // Return the saved integration with correct ID
             }
+            return null;
         } catch (error) {
             console.error('Error saving integration:', error);
             toast({
@@ -144,6 +282,7 @@ export default function IntegrationsPage() {
                 description: 'Failed to save integration',
                 variant: 'destructive',
             });
+            throw error; // Re-throw so the form can handle the error
         }
     };
 
@@ -188,12 +327,6 @@ export default function IntegrationsPage() {
                 }, UpsertMode.UPDATE);
 
                 setPendingDocIds(prev => new Set([...prev].filter(id => id !== integrationId)));
-
-                toast({
-                    title: 'Refresh Failed',
-                    description: `Failed to refresh documentation for "${integrationId}".`,
-                    variant: 'destructive',
-                });
             }
 
         } catch (error) {
@@ -217,12 +350,6 @@ export default function IntegrationsPage() {
             }
 
             setPendingDocIds(prev => new Set([...prev].filter(id => id !== integrationId)));
-
-            toast({
-                title: 'Refresh Failed',
-                description: `Failed to refresh documentation for "${integrationId}".`,
-                variant: 'destructive',
-            });
         }
     };
 
@@ -234,12 +361,11 @@ export default function IntegrationsPage() {
 
     // Helper to get icon for integration
     function getIntegrationIcon(integration: Integration) {
-        const match = integrationOptions.find(opt =>
-            opt.value !== 'custom' &&
-            (integration.id === opt.value || integration.urlHost.includes(opt.value))
-        );
-        return match ? getSimpleIcon(match.icon) : null;
+        const iconName = getIntegrationIconName(integration);
+        return iconName ? getSimpleIcon(iconName) : null;
     }
+
+
 
 
     const handleRefresh = async () => {
@@ -270,7 +396,10 @@ export default function IntegrationsPage() {
                                     modal={true}
                                     integration={editingIntegration}
                                     onSave={handleSave}
-                                    onCancel={() => setAddFormOpen(false)}
+                                    onCancel={() => {
+                                        setAddFormOpen(false);
+                                        setEditingIntegration(null);
+                                    }}
                                     integrationOptions={integrationOptions}
                                     getSimpleIcon={getSimpleIcon}
                                     inputErrorStyles={inputErrorStyles}
@@ -294,86 +423,110 @@ export default function IntegrationsPage() {
                                     <Plus className="mr-2 h-4 w-4" /> Add Integration
                                 </Button>
                             </div>
-                            {paginatedIntegrations.map((integration) => (
-                                <div key={integration.id} className="relative">
-                                    <div className="flex items-center gap-3 border rounded-lg p-4 bg-card">
-                                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                                            {getIntegrationIcon(integration) ? (
-                                                <svg
-                                                    width="20"
-                                                    height="20"
-                                                    viewBox="0 0 24 24"
-                                                    fill={`#${getIntegrationIcon(integration)?.hex}`}
-                                                    className="flex-shrink-0"
-                                                >
-                                                    <path d={getIntegrationIcon(integration)?.path || ''} />
-                                                </svg>
-                                            ) : (
-                                                <Globe className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
-                                            )}
-                                            <div className="flex flex-col min-w-0">
-                                                <span className="font-medium truncate max-w-[200px]">{integration.id}</span>
-                                                <span className="text-sm text-muted-foreground truncate max-w-[240px]">
-                                                    {composeUrl(integration.urlHost, integration.urlPath) || 'No API endpoint'}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <DocStatus
-                                                    pending={pendingDocIds.has(integration.id)}
-                                                    hasDocumentation={hasDocumentation(integration)}
-                                                />
-                                                {(!integration.credentials || Object.keys(integration.credentials).length === 0) && (
-                                                    <span className="text-xs text-amber-800 dark:text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded">No credentials</span>
+                            {paginatedIntegrations.map((integration) => {
+                                const badge = getAuthBadge(integration);
+                                return (
+                                    <div key={integration.id} className="relative">
+                                        <div className="flex items-center gap-3 border rounded-lg p-4 bg-card">
+                                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                {getIntegrationIcon(integration) ? (
+                                                    <svg
+                                                        width="20"
+                                                        height="20"
+                                                        viewBox="0 0 24 24"
+                                                        fill={`#${getIntegrationIcon(integration)?.hex}`}
+                                                        className="flex-shrink-0"
+                                                    >
+                                                        <path d={getIntegrationIcon(integration)?.path || ''} />
+                                                    </svg>
+                                                ) : (
+                                                    <Globe className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
                                                 )}
+                                                <div className="flex flex-col min-w-0">
+                                                    <span className="font-medium truncate max-w-[200px]">{integration.id}</span>
+                                                    <span className="text-sm text-muted-foreground truncate max-w-[240px]">
+                                                        {composeUrl(integration.urlHost, integration.urlPath) || 'No API endpoint'}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <DocStatus
+                                                        pending={pendingDocIds.has(integration.id)}
+                                                        hasDocumentation={hasDocumentation(integration)}
+                                                    />
+                                                    {(() => {
+                                                        const colorClasses = {
+                                                            blue: 'text-blue-800 dark:text-blue-300 bg-blue-500/10',
+                                                            amber: 'text-amber-800 dark:text-amber-300 bg-amber-500/10',
+                                                            green: 'text-green-800 dark:text-green-300 bg-green-500/10'
+                                                        };
+
+                                                        return (
+                                                            <span className={`text-xs ${colorClasses[badge.color]} px-2 py-0.5 rounded flex items-center gap-1`}>
+                                                                {badge.icon === 'clock' ? <Clock className="h-3 w-3" /> : <Key className="h-3 w-3" />}
+                                                                {badge.label}
+                                                            </span>
+                                                        );
+                                                    })()}
+                                                </div>
                                             </div>
-                                        </div>
-                                        <div className="ml-auto flex gap-2">
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-8 w-8 text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
-                                                onClick={() => handleEdit(integration)}
-                                                disabled={pendingDocIds.has(integration.id)}
-                                                title={pendingDocIds.has(integration.id) ? "Documentation is being processed" : "Edit integration"}
-                                            >
-                                                <Pencil className="h-4 w-4" />
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-8 w-8 text-muted-foreground hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                                                onClick={() => handleRefreshDocs(integration.id)}
-                                                disabled={
-                                                    !integration.documentationUrl ||
-                                                    !integration.documentationUrl.trim() ||
-                                                    integration.documentationUrl.startsWith('file://') ||
-                                                    pendingDocIds.has(integration.id)
-                                                }
-                                                title={
-                                                    integration.documentationUrl?.startsWith('file://')
-                                                        ? "Cannot refresh file uploads"
-                                                        : !integration.documentationUrl || !integration.documentationUrl.trim()
-                                                            ? "No documentation URL to refresh"
-                                                            : "Refresh documentation from URL"
-                                                }
-                                            >
-                                                <FileDown className="h-4 w-4" />
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-8 w-8 text-destructive hover:text-destructive"
-                                                onClick={() => {
-                                                    setIntegrationToDelete(integration);
-                                                    setDeleteDialogOpen(true);
-                                                }}
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
+                                            <div className="ml-auto flex gap-2">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="text-muted-foreground hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    onClick={() => router.push(`/workflows?integration=${integration.id}`)}
+                                                    title={badge.type === 'oauth-incomplete' ? "OAuth configuration required" : "Build workflow with this integration"}
+                                                    disabled={badge.type === 'oauth-incomplete'}
+                                                >
+                                                    <Sparkles className="h-4 w-4 mr-2" />
+                                                    Build Workflow
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    onClick={() => handleEdit(integration)}
+                                                    title="Edit integration"
+                                                >
+                                                    <Pencil className="h-4 w-4" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-muted-foreground hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    onClick={() => handleRefreshDocs(integration.id)}
+                                                    disabled={
+                                                        (pendingDocIds.has(integration.id) && Date.now() - new Date(integration.updatedAt).getTime() < 60000) ||
+                                                        integration.documentationUrl.startsWith('file://')
+                                                    }
+                                                    title={
+                                                        pendingDocIds.has(integration.id)
+                                                            ? "Documentation is already being processed"
+                                                            : integration.documentationUrl?.startsWith('file://')
+                                                                ? "Cannot refresh file uploads"
+                                                                : !integration.documentationUrl || !integration.documentationUrl.trim()
+                                                                    ? "No documentation URL to refresh"
+                                                                    : "Refresh documentation from URL"
+                                                    }
+                                                >
+                                                    <FileDown className="h-4 w-4" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-destructive hover:text-destructive"
+                                                    onClick={() => {
+                                                        setIntegrationToDelete(integration);
+                                                        setDeleteDialogOpen(true);
+                                                    }}
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                             <div className="flex justify-between items-center mt-4">
                                 <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}>Previous</Button>
                                 <span className="text-sm text-muted-foreground">Page {page + 1} of {totalPages}</span>

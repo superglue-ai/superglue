@@ -1,5 +1,6 @@
+import { SelfHealingMode } from '@superglue/client'
 import { describe, expect, it } from 'vitest'
-import { applyAuthFormat, applyJsonata, applyJsonataWithValidation, composeUrl, maskCredentials, replaceVariables, sample, safeHttpMethod } from './tools.js'
+import { applyAuthFormat, applyJsonata, applyJsonataWithValidation, composeUrl, isSelfHealingEnabled, maskCredentials, replaceVariables, safeHttpMethod, sample } from './tools.js'
 
 describe('tools utility functions', () => {
   describe('composeUrl', () => {
@@ -332,6 +333,70 @@ describe('tools utility functions', () => {
       expect(() => safeHttpMethod(null)).not.toThrow();
       expect(safeHttpMethod(undefined)).toBe('GET');
       expect(safeHttpMethod(null)).toBe('GET');
+    });
+  });
+
+  describe('isSelfHealingEnabled', () => {
+    describe('transform type', () => {
+      it('should return true for ENABLED mode', () => {
+        const options = { selfHealing: SelfHealingMode.ENABLED };
+        expect(isSelfHealingEnabled(options, 'transform')).toBe(true);
+      });
+
+      it('should return true for TRANSFORM_ONLY mode', () => {
+        const options = { selfHealing: SelfHealingMode.TRANSFORM_ONLY };
+        expect(isSelfHealingEnabled(options, 'transform')).toBe(true);
+      });
+
+      it('should return false for REQUEST_ONLY mode', () => {
+        const options = { selfHealing: SelfHealingMode.REQUEST_ONLY };
+        expect(isSelfHealingEnabled(options, 'transform')).toBe(false);
+      });
+
+      it('should return false for DISABLED mode', () => {
+        const options = { selfHealing: SelfHealingMode.DISABLED };
+        expect(isSelfHealingEnabled(options, 'transform')).toBe(false);
+      });
+
+      it('should default to true when selfHealing is undefined', () => {
+        const options = {};
+        expect(isSelfHealingEnabled(options, 'transform')).toBe(true);
+      });
+
+      it('should default to true when options is undefined', () => {
+        expect(isSelfHealingEnabled(undefined, 'transform')).toBe(true);
+      });
+    });
+
+    describe('api type', () => {
+      it('should return true for ENABLED mode', () => {
+        const options = { selfHealing: SelfHealingMode.ENABLED };
+        expect(isSelfHealingEnabled(options, 'api')).toBe(true);
+      });
+
+      it('should return true for REQUEST_ONLY mode', () => {
+        const options = { selfHealing: SelfHealingMode.REQUEST_ONLY };
+        expect(isSelfHealingEnabled(options, 'api')).toBe(true);
+      });
+
+      it('should return false for TRANSFORM_ONLY mode', () => {
+        const options = { selfHealing: SelfHealingMode.TRANSFORM_ONLY };
+        expect(isSelfHealingEnabled(options, 'api')).toBe(false);
+      });
+
+      it('should return false for DISABLED mode', () => {
+        const options = { selfHealing: SelfHealingMode.DISABLED };
+        expect(isSelfHealingEnabled(options, 'api')).toBe(false);
+      });
+
+      it('should default to true when selfHealing is undefined', () => {
+        const options = {};
+        expect(isSelfHealingEnabled(options, 'api')).toBe(true);
+      });
+
+      it('should default to true when options is undefined', () => {
+        expect(isSelfHealingEnabled(undefined, 'api')).toBe(true);
+      });
     });
   });
 }) 

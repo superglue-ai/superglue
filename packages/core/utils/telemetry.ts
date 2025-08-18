@@ -1,5 +1,5 @@
 import { PostHog } from 'posthog-node';
-import { config } from '../default.js';
+import { server_defaults } from '../default.js';
 import { logMessage } from "./logs.js";
 
 // we use a privacy-preserving session id to track queries
@@ -11,9 +11,9 @@ export const isTelemetryDisabled = process.env.DISABLE_TELEMETRY === "true";
 
 export const telemetryClient = !isTelemetryDisabled && !isDebug ?
   new PostHog(
-    config.posthog.apiKey,
+    server_defaults.posthog.apiKey,
     {
-      host: config.posthog.host,
+      host: server_defaults.posthog.host,
       enableExceptionAutocapture: true
     }
   ) : null;

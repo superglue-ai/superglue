@@ -1,5 +1,4 @@
 import { CacheMode, DecompressionMethod, ExtractConfig, ExtractInputRequest, FileType, RequestOptions } from "@superglue/client";
-import type { Context, Metadata } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { Documentation } from "../../utils/documentation.js";
 import { callExtract, generateExtractConfig, processFile } from "../../utils/extract.js";
@@ -7,6 +6,7 @@ import { logMessage } from "../../utils/logs.js";
 import { telemetryClient } from "../../utils/telemetry.js";
 import { maskCredentials } from "../../utils/tools.js";
 import { notifyWebhook } from "../../utils/webhook.js";
+import { Context, Metadata } from '../types.js';
 
 export const extractResolver = async (
   _: any,
@@ -53,7 +53,7 @@ export const extractResolver = async (
       }
       else {
         preparedExtract = readCache ?
-          await context.datastore.getExtractConfig(input.id, context.orgId)
+          await context.datastore.getExtractConfig({ id: input.id, orgId: context.orgId })
           : null;
         if (!preparedExtract) {
           if (!input.endpoint.instruction) {
@@ -61,7 +61,7 @@ export const extractResolver = async (
           }
           const documentation = new Documentation(input.endpoint, credentials, metadata);
           const rawDoc = await documentation.fetchAndProcess();
-          const documentationString = Documentation.postProcess(rawDoc, input.endpoint.instruction || "");
+          const documentationString = Documentation.extractRelevantSections(rawDoc, input.endpoint.instruction || "");
           preparedExtract = await generateExtractConfig(input.endpoint, documentationString, payload, credentials, lastError);
         }
 
@@ -87,7 +87,7 @@ export const extractResolver = async (
 
     // Save configuration if requested
     if (writeCache) {
-      context.datastore.upsertExtractConfig(input.id || preparedExtract.id, preparedExtract, context.orgId);
+      context.datastore.upsertExtractConfig({ id: input.id || preparedExtract.id, config: preparedExtract, orgId: context.orgId });
     }
     const completedAt = new Date();
 
@@ -115,7 +115,7 @@ export const extractResolver = async (
     const completedAt = new Date();
 
     if (options?.webhookUrl) {
-      await notifyWebhook(options.webhookUrl, callId, false, undefined, maskedError);
+      notifyWebhook(options.webhookUrl, callId, false, undefined, maskedError);
     }
 
     return {

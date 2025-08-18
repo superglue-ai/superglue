@@ -1,14 +1,14 @@
 "use client"
-import { ApolloClient, gql, InMemoryCache, useSubscription } from "@apollo/client"
-import { GraphQLWsLink } from '@apollo/client/link/subscriptions'
-import { motion } from "framer-motion"
-import { createClient } from 'graphql-ws'
-import { ChevronRight, X } from "lucide-react"
-import { useEffect, useMemo, useRef, useState } from "react"
-import { useConfig } from "../../app/config-context"
-import { Button } from "../ui/button"
-import { ScrollArea } from "../ui/scroll-area"
-import { Switch } from "../ui/switch"
+import { ApolloClient, gql, InMemoryCache, useSubscription } from "@apollo/client";
+import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
+import { motion } from "framer-motion";
+import { createClient } from 'graphql-ws';
+import { ChevronRight, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useConfig } from "../../app/config-context";
+import { Button } from "../ui/button";
+import { ScrollArea } from "../ui/scroll-area";
+import { Switch } from "../ui/switch";
 
 export interface LogEntry {
   id: string;
@@ -43,7 +43,7 @@ export function LogSidebar() {
   const [logViewWidth, setLogViewWidth] = useState(LOG_MIN_WIDTH)
   const resizingWidthRef = useRef(logViewWidth)
   const logViewRef = useRef<HTMLDivElement | null>(null)
-  const [showDebug, setShowDebug] = useState(true)
+  const [showDebug, setShowDebug] = useState(false)
   const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set())
   const config = useConfig();
 
@@ -152,7 +152,7 @@ export function LogSidebar() {
       ref={logViewRef}
       animate={{ width: isExpanded ? Math.max(logViewWidth, LOG_MIN_WIDTH) : LOG_COLLAPSED_WIDTH }}
       transition={{ duration: transitionDuration }}
-      className="border-l border-border bg-background flex flex-col relative overflow-hidden"
+      className="border-l border-border bg-background flex flex-col relative overflow-hidden h-full"
     >
       <div className={`m-2 max-w-full ${isExpanded ? 'h-12' : 'h-24'}`}>
         <Button
@@ -182,7 +182,7 @@ export function LogSidebar() {
       {isExpanded && (
         <>
 
-          <ScrollArea className="max-w-full block flex-1">
+          <ScrollArea className="max-w-full block flex-1 h-full">
             <div className="p-4 max-w-[100%-5rem]">
               {filteredLogs.map((log) => {
                 const isLogExpanded = expandedLogs.has(log.id)

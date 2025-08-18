@@ -1,9 +1,11 @@
-import type { ExecutionStep, RequestOptions, WorkflowStepResult } from "@superglue/client";
+import type { ApiConfig, ExecutionStep, RequestOptions, WorkflowStepResult } from "@superglue/client";
 import { Integration, Metadata } from "@superglue/shared";
-import { executeApiCall } from "../graphql/resolvers/call.js";
+import { server_defaults } from "../default.js";
+import { IntegrationManager } from "../integrations/integration-manager.js";
+import { executeApiCall } from "../utils/api.js";
 import { logMessage } from "../utils/logs.js";
-import { applyJsonata } from "../utils/tools.js";
-import { generateTransformJsonata } from "../utils/transform.js";
+import { applyJsonata, flattenObject, transformAndValidateSchema } from "../utils/tools.js";
+import { generateTransformCode } from "../utils/transform.js";
 
 export interface ExecutionStrategy {
   execute(
@@ -30,7 +32,7 @@ const directStrategy: ExecutionStrategy = {
     credentials: Record<string, string>,
     options: RequestOptions = {},
     metadata: Metadata,
-    integration?: Integration
+    integrationManager?: IntegrationManager
   ): Promise<WorkflowStepResult> {
     const result: WorkflowStepResult = {
       stepId: step.id,
@@ -38,15 +40,15 @@ const directStrategy: ExecutionStrategy = {
       config: step.apiConfig
     }
     try {
-      const apiResponse = await executeApiCall(
-        step.apiConfig,
+      const apiResponse = await executeApiCall({
+        endpoint: step.apiConfig,
         payload,
         credentials,
         options,
         metadata,
-        integration
-      );
-      const transformedData = await applyJsonata(apiResponse.data, step.responseMapping);
+        integrationManager
+      });
+      const transformedData = await applyJsonata(apiResponse.data, step.responseMapping); //LEGACY: New workflow strategy will not use respone mappings
 
       result.rawData = apiResponse.data;
       result.transformedData = transformedData;
@@ -72,7 +74,7 @@ const loopStrategy: ExecutionStrategy = {
     credentials: Record<string, string>,
     options: RequestOptions = {},
     metadata: Metadata,
-    integration?: Integration
+    integrationManager?: IntegrationManager
   ): Promise<WorkflowStepResult> {
     const result: WorkflowStepResult = {
       stepId: step.id,
@@ -81,48 +83,83 @@ const loopStrategy: ExecutionStrategy = {
     }
 
     try {
-      if (!step.loopSelector) {
-        if (Array.isArray(payload)) {
-          step.loopSelector = "$";
+      let loopItems: any[] = [];
+
+      const loopSelectorResult = await transformAndValidateSchema(payload, step.loopSelector || "$", null);
+      loopItems = loopSelectorResult.data;
+
+      // Regenerate selector if no items found - always generate JS going forward
+      if (!loopSelectorResult.success || !Array.isArray(loopItems)) {
+        logMessage("error", `No input data found for '${step.id}' - regenerating data selector`, metadata);
+
+        const instruction = `Create a JavaScript function that extracts the array of items to loop over for step: ${step.id}. 
+          
+Step instruction: ${step.apiConfig.instruction}
+
+The function should:
+1. Extract an array of ACTUAL DATA ITEMS (not metadata or property definitions)
+2. Apply any filtering based on the step's instruction
+
+Available data in sourceData:
+${Object.keys(payload).map(key => {
+          const value = payload[key];
+          const type = Array.isArray(value) ? `array[${value.length}]` : typeof value;
+          return `- ${key}: ${type}`;
+        }).join('\n')}
+
+The function should return an array of items that this step will iterate over.`;
+
+        const arraySchema = { type: "array", description: "Array of items to iterate over" };
+        const transformResult = await generateTransformCode(arraySchema, payload, instruction, metadata);
+
+        step.loopSelector = transformResult.mappingCode;
+        const retryResult = await transformAndValidateSchema(payload, step.loopSelector, null);
+        loopItems = retryResult.data;
+
+        if (!retryResult.success || !Array.isArray(loopItems)) {
+          throw new Error("Failed to generate loop selector");
         }
-        else {
-          throw new Error("loopSelector is required for LOOP execution mode");
-        }
       }
 
-      let loopItems: any[] = await applyJsonata(payload, step.loopSelector);
+      loopItems = loopItems.slice(0, step.loopMaxIters || server_defaults.DEFAULT_LOOP_MAX_ITERS);
 
-      if (!Array.isArray(loopItems) || loopItems.length === 0) {
-        if (step.loopSelector !== "$") logMessage("error", `No input data found for '${step.id}' - regenerating data selector`, metadata);
-        const newLoopSelector = await generateTransformJsonata({ type: "array" }, payload, "Find the array of selector values for the following loop: " + step.id, metadata);
-        step.loopSelector = newLoopSelector.jsonata;
-        loopItems = await applyJsonata(payload, step.loopSelector);
-      }
-
-      if (step.loopMaxIters > 0) {
-        loopItems = loopItems.slice(0, step.loopMaxIters);
-      }
       const stepResults: WorkflowStepResult[] = [];
+      let successfulConfig: ApiConfig | null = null;
+
       for (let i = 0; i < loopItems.length; i++) {
         const currentItem = loopItems[i] || "";
-        logMessage("debug", `Executing for ${JSON.stringify(currentItem).slice(0, 100)} (${i + 1}/${loopItems.length})`, metadata);
+        logMessage("debug", `Executing loop iteration ${i + 1}/${loopItems.length}`, metadata);
 
-        const loopPayload = {
+        const loopPayload: Record<string, any> = {
           ...payload,
           currentItem: currentItem,
+          ...flattenObject(currentItem, 'currentItem')
         };
 
         try {
-          const apiResponse = await executeApiCall(
-            step.apiConfig,
-            loopPayload,
+          const apiResponse = await executeApiCall({
+            endpoint: successfulConfig || step.apiConfig,
+            payload: loopPayload,
             credentials,
-            { ...options, testMode: options?.testMode && i === 0 },
-            metadata,
-            integration
-          );
+            options: {
+              ...options,
+              testMode: false
+            },
+            integrationManager, 
+            metadata
+          });
+
+          // Store/update the successful configuration
+          if (apiResponse.endpoint) {
+            successfulConfig = apiResponse.endpoint;
+            if (successfulConfig !== step.apiConfig) {
+              logMessage("debug", `Loop iteration ${i + 1} updated configuration`, metadata);
+            }
+          }
+
           const rawData = { currentItem: currentItem, ...(typeof apiResponse.data === 'object' ? apiResponse.data : { data: apiResponse.data }) };
-          const transformedData = await applyJsonata(rawData, step.responseMapping);
+          const transformedData = await applyJsonata(rawData, step.responseMapping); //LEGACY: New workflow strategy will not use response mappings, default to $
+
           stepResults.push({
             stepId: step.id,
             success: true,
@@ -135,11 +172,12 @@ const loopStrategy: ExecutionStrategy = {
           step.apiConfig = apiResponse.endpoint;
 
         } catch (callError) {
-          const errorMessage = `Error processing '${currentItem}': ${String(callError)}`;
+          const errorMessage = `Error processing item ${i + 1}/${loopItems.length} '${JSON.stringify(currentItem).slice(0, 50)}...': ${String(callError)}`;
           logMessage("error", errorMessage, metadata);
-          throw errorMessage;
+          throw new Error(errorMessage);
         }
       }
+
       result.config = step.apiConfig;
       result.rawData = stepResults.map(r => r.rawData);
       result.transformedData = stepResults.map(r => r.transformedData);

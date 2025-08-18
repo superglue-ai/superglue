@@ -1,11 +1,13 @@
-import { HttpMethod, RequestOptions } from "@superglue/client";
-import axios, { AxiosRequestConfig } from "axios";
+import { HttpMethod, RequestOptions, SelfHealingMode } from "@superglue/client";
+import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
 import { GraphQLResolveInfo } from "graphql";
 import ivm from 'isolated-vm';
 import jsonata from "jsonata";
 import { Validator } from "jsonschema";
 import { toJsonSchema } from "../external/json-schema.js";
 import { HttpMethodEnum } from "../mcp/mcp-server.js";
+import { ApiCallError } from "./api.js";
+import { injectVMHelpersIndividually } from "./vm-helpers.js";
 
 export function isRequested(field: string, info: GraphQLResolveInfo) {
   return info.fieldNodes.some(
@@ -29,7 +31,7 @@ export async function applyJsonata(data: any, expr: string): Promise<any> {
     return result;
   } catch (error) {
     const errorPositions = (error as any).position ? expr.substring(error.position - 10, error.position + 10) : "";
-    throw new Error(`JSONata transformation failed: ${error.message} at ${errorPositions}.`);
+    throw new Error(`Transformation failed: ${error.message} at ${errorPositions}.`);
   }
 }
 
@@ -121,15 +123,15 @@ export function superglueJsonata(expr: string) {
   return expression;
 }
 
-export async function applyTransformationWithValidation(data: any, expr: string, schema: any): Promise<TransformResult> {
+export async function transformAndValidateSchema(data: any, expr: string, schema: any): Promise<TransformResult> {
   try {
     let result: TransformResult;
     if (!expr) {
       result = { success: true, data: data };
     }
-
-    if (expr.startsWith("(sourceData) =>") ||
-      expr.startsWith("(sourceData)=>")) {
+    const ARROW_FUNCTION_PATTERN = /^\s*\([^)]+\)\s*=>/;
+    
+    if (ARROW_FUNCTION_PATTERN.test(expr)) {
       result = await executeAndValidateMappingCode(data, expr, schema);
     } else {
       result = await applyJsonataWithValidation(data, expr, schema);
@@ -143,9 +145,7 @@ export async function applyTransformationWithValidation(data: any, expr: string,
 export async function applyJsonataWithValidation(data: any, expr: string, schema: any): Promise<TransformResult> {
   try {
     const result = await applyJsonata(data, expr);
-    if (result === null || result === undefined) {
-      return { success: false, error: "Result is empty" };
-    }
+
     // if no schema is given, skip validation
     if (!schema) {
       return { success: true, data: result };
@@ -169,15 +169,16 @@ export async function applyJsonataWithValidation(data: any, expr: string, schema
 export async function executeAndValidateMappingCode(input: any, mappingCode: string, schema: any): Promise<TransformResult> {
   const isolate = new ivm.Isolate({ memoryLimit: 1024 }); // 32 MB
   const context = await isolate.createContext();
+
+  // Inject helper functions into the context
+  await injectVMHelpersIndividually(context);
+
   await context.global.set('input', JSON.stringify(input));
 
   let result: any;
   try {
-    const scriptSource = `const fn = ${mappingCode}; return JSON.stringify(fn(JSON.parse(input)));`;
+    const scriptSource = `const fn = ${mappingCode}; const result = fn(JSON.parse(input)); return result === undefined ? null : JSON.stringify(result);`;
     result = JSON.parse(await context.evalClosure(scriptSource, null, { timeout: 10000 }));
-    if (result === null || result === undefined) {
-      return { success: false, error: "Result is empty" };
-    }
     // if no schema is given, skip validation
     if (!schema) {
       return { success: true, data: result };
@@ -220,15 +221,18 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
     config.data = undefined;
   }
   else if (config.data && config.data.trim().startsWith("{")) {
-    config.data = JSON.parse(config.data);
+    try {
+      config.data = JSON.parse(config.data);
+    } catch (error) { }
   }
   else if (!config.data) {
     config.data = undefined;
   }
 
   do {
+    let response: AxiosResponse | null = null;
     try {
-      const response = await axios({
+      response = await axios({
         ...config,
         validateStatus: null, // Don't throw on any status
       });
@@ -264,7 +268,7 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
 
       return response;
     } catch (error) {
-      if (retryCount >= maxRetries) throw error;
+      if (retryCount >= maxRetries) throw new ApiCallError(error.message, response?.status);
       retryCount++;
       await new Promise(resolve => setTimeout(resolve, delay * retryCount));
     }
@@ -280,8 +284,9 @@ export function applyAuthFormat(format: string, credentials: Record<string, stri
   });
 }
 
+// i do not think we are actually using this anywhere since we always get an id for each request
 export function generateId(host: string, path: string) {
-  const domain = host?.replace(/^https?:\/\//, '') || 'api';
+  const domain = host?.replace(/^(https?|postgres(ql)?|ftp(s)?|sftp|file):\/\//, '') || 'api';
   const lastPath = path?.split('/').filter(Boolean).pop() || '';
   const rand = Math.floor(1000 + Math.random() * 9000);
   return `${domain}-${lastPath}-${rand}`;
@@ -294,7 +299,7 @@ export function composeUrl(host: string, path: string) {
   if (!path) path = '';
 
   // Add https:// if protocol is missing
-  if (!/^(https?|postgres(ql)?):\/\//i.test(host)) {
+  if (!/^(https?|postgres(ql)?|ftp(s)?|sftp|file):\/\//i.test(host)) {
     host = `https://${host}`;
   }
 
@@ -314,13 +319,19 @@ export async function replaceVariables(template: string, payload: Record<string,
   const matches = [...template.matchAll(pattern)];
 
   for (const match of matches) {
-    const path = match[1];
+    const path = match[1].trim();
     let value: any;
     if (payload[path]) {
       value = payload[path];
     }
     else {
-      value = await applyJsonata(payload, path);
+      // Use transformAndValidateSchema to handle both JS and JSONata
+      const result = await transformAndValidateSchema(payload, path, null);
+      if (result.success) {
+        value = result.data;
+      } else {
+        throw new Error(`Failed to run JS expression: ${path} - ${result.error}`);
+      }
     }
 
     if (Array.isArray(value) || typeof value === 'object') {
@@ -365,6 +376,19 @@ function oldReplaceVariables(template: string, variables: Record<string, any>): 
   });
 }
 
+export function flattenObject(obj: any, parentKey = '', res: Record<string, any> = {}): Record<string, any> {
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      const propName = parentKey ? `${parentKey}_${key}` : key;
+      if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
+        flattenObject(obj[key], propName, res);
+      } else {
+        res[propName] = obj[key];
+      }
+    }
+  }
+  return res;
+}
 
 export function sample(value: any, sampleSize = 10): any {
   if (Array.isArray(value)) {
@@ -394,9 +418,9 @@ export function maskCredentials(message: string, credentials?: Record<string, st
 
   let maskedMessage = message;
   Object.entries(credentials).forEach(([key, value]) => {
-    if (value && value.length > 0) {
-      // Use global flag to replace all occurrences
-      const regex = new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+    const valueString = String(value);
+    if (value && valueString) {
+      const regex = new RegExp(valueString.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
       maskedMessage = maskedMessage.replace(regex, `{masked_${key}}`);
     }
   });
@@ -458,4 +482,64 @@ export function safeHttpMethod(method: any): HttpMethod {
   const upper = method?.toUpperCase?.();
   if (upper && validMethods.includes(upper)) return upper as HttpMethod;
   return "GET" as HttpMethod;
+}
+
+export async function evaluateStopCondition(
+  stopConditionCode: string,
+  response: AxiosResponse,
+  pageInfo: { page: number; offset: number; cursor: any; totalFetched: number }
+): Promise<{ shouldStop: boolean; error?: string }> {
+
+
+  const isolate = new ivm.Isolate({ memoryLimit: 128 });
+
+  try {
+    const context = await isolate.createContext();
+
+    // Inject the response and pageInfo as JSON strings
+    // legacy support for direct response data access
+    await context.global.set('responseJSON', JSON.stringify({ data: response.data, headers: response.headers, ...response.data }));
+    await context.global.set('pageInfoJSON', JSON.stringify(pageInfo));
+
+    // if the stop condition code starts with return or is not a function, we need to wrap it in a function
+    if (stopConditionCode.startsWith("return")) {
+      stopConditionCode = `(response, pageInfo) => { ${stopConditionCode} }`;
+    }
+    else if (!stopConditionCode.startsWith("(response")) {
+      stopConditionCode = `(response, pageInfo) => ${stopConditionCode}`;
+    }
+
+    // Create the evaluation script
+    const script = `
+          const response = JSON.parse(responseJSON);
+          const pageInfo = JSON.parse(pageInfoJSON);
+          const fn = ${stopConditionCode};
+          const result = fn(response, pageInfo);
+          // Return the boolean result
+          return Boolean(result);
+      `;
+
+    const shouldStop = await context.evalClosure(script, null, { timeout: 3000 });
+
+    return { shouldStop: Boolean(shouldStop) };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    let helpfulError = `Stop condition evaluation failed: ${errorMessage}`;
+
+    return {
+      shouldStop: false, // Default to continue on error
+      error: helpfulError
+    };
+  } finally {
+    isolate.dispose();
+  }
+}
+
+export function isSelfHealingEnabled(options: RequestOptions, type: "transform" | "api"): boolean {
+  if (type === "transform") {
+    return options?.selfHealing ? options.selfHealing === SelfHealingMode.ENABLED || options.selfHealing === SelfHealingMode.TRANSFORM_ONLY : true;
+  }
+  if (type === "api") {
+    return options?.selfHealing ? options.selfHealing === SelfHealingMode.ENABLED || options.selfHealing === SelfHealingMode.REQUEST_ONLY : true;
+  }
 }

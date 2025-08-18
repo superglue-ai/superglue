@@ -1,12 +1,14 @@
 import { Integration, RequestOptions, Workflow, WorkflowResult } from "@superglue/client";
-import { Context, Metadata } from "@superglue/shared";
-import { flattenAndNamespaceWorkflowCredentials, waitForIntegrationProcessing } from "@superglue/shared/utils";
+import { flattenAndNamespaceWorkflowCredentials, generateUniqueId, waitForIntegrationProcessing } from "@superglue/shared/utils";
 import type { GraphQLResolveInfo } from "graphql";
 import { WorkflowExecutor } from "../../workflow/workflow-executor.js";
+import { Context, Metadata } from '../types.js';
 
-import { generateUniqueId } from "@superglue/shared/utils";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
+import { IntegrationManager } from "../../integrations/integration-manager.js";
 import { logMessage } from "../../utils/logs.js";
+import { replaceVariables } from "../../utils/tools.js";
+import { notifyWebhook } from "../../utils/webhook.js";
 import { WorkflowBuilder } from "../../workflow/workflow-builder.js";
 
 function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined, defaultValue?: T): T | undefined {
@@ -43,7 +45,7 @@ export const executeWorkflowResolver = async (
 
   try {
     if (args.input.id) {
-      workflow = await context.datastore.getWorkflow(args.input.id, context.orgId);
+      workflow = await context.datastore.getWorkflow({ id: args.input.id, orgId: context.orgId });
       if (!workflow) {
         throw new Error("Workflow not found");
       }
@@ -52,7 +54,6 @@ export const executeWorkflowResolver = async (
       // Validate required workflow fields
       if (!workflow.id) throw new Error("Workflow must have an ID");
       if (!workflow.steps || !Array.isArray(workflow.steps)) throw new Error("Workflow must have steps array");
-      logMessage('info', `Executing workflow ${workflow.id}`, metadata);
     } else {
       throw new Error("Must provide either workflow ID or workflow object");
     }
@@ -66,7 +67,7 @@ export const executeWorkflowResolver = async (
     }
 
     let mergedCredentials = args.credentials || {};
-    let integrations: Integration[] = [];
+    let integrationManagers: IntegrationManager[] = [];
 
     // Collect integration IDs from workflow level and steps
     const allIntegrationIds = new Set<string>();
@@ -87,30 +88,58 @@ export const executeWorkflowResolver = async (
 
     if (allIntegrationIds.size > 0) {
       const requestedIds = Array.from(allIntegrationIds);
-      integrations = await context.datastore.getManyIntegrations(requestedIds, context.orgId);
-      const foundIds = new Set(integrations.map(i => i.id));
+      integrationManagers = await IntegrationManager.fromIds(requestedIds, context.datastore, context.orgId);
+      
+      const foundIds = new Set(integrationManagers.map(i => i.id));
       requestedIds.forEach(id => {
         if (!foundIds.has(id)) {
           logMessage('warn', `Integration with id "${id}" not found, skipping.`, metadata);
         }
       });
+
+      // refresh oauth tokens if needed
+      await Promise.all(integrationManagers.map(i => i.refreshTokenIfNeeded()));
+      const integrations = await Promise.all(integrationManagers.map(i => i.getIntegration()));
       const integrationCreds = flattenAndNamespaceWorkflowCredentials(integrations);
-      mergedCredentials = { ...integrationCreds, ...(args.credentials || {}) };
+
+      // Process args.credentials with variable replacement
+      const processedCredentials = await Promise.all(
+        Object.entries(args.credentials || {}).map(async ([key, value]) => {
+          return {
+            [key]: await replaceVariables(String(value), integrationCreds)
+          };
+        })
+      );
+
+      // Merge all credential objects
+      mergedCredentials = Object.assign(
+        {},
+        integrationCreds,
+        ...processedCredentials
+      );
     }
 
-    const executor = new WorkflowExecutor(workflow, metadata, integrations);
+    const executor = new WorkflowExecutor(workflow, metadata, integrationManagers);
     const result = await executor.execute(args.payload, mergedCredentials, args.options);
 
     // Save run to datastore
     context.datastore.createRun({
-      id: runId,
-      success: result.success,
-      error: result.error || undefined,
-      config: result.config || workflow,
-      stepResults: result.stepResults || [],
-      startedAt,
-      completedAt: new Date()
-    }, context.orgId);
+      result: {
+        id: runId,
+        success: result.success,
+        error: result.error || undefined,
+        config: result.config || workflow,
+        stepResults: [],
+        startedAt,
+        completedAt: new Date()
+      },
+      orgId: context.orgId
+    });
+
+    // Notify webhook if configured (fire-and-forget)
+    if (args.options?.webhookUrl) {
+      notifyWebhook(args.options.webhookUrl, runId, true, result.data);
+    }
 
     return result;
 
@@ -126,7 +155,12 @@ export const executeWorkflowResolver = async (
       completedAt: new Date(),
     };
     // Save run to datastore
-    context.datastore.createRun(result, context.orgId);
+    context.datastore.createRun({ result, orgId: context.orgId });
+
+    // Notify webhook if configured (for failure, fire-and-forget)
+    if (args.options?.webhookUrl) {
+      notifyWebhook(args.options.webhookUrl, runId, false, undefined, String(error));
+    }
 
     return { ...result, data: {}, stepResults: [] } as WorkflowResult;
   }
@@ -139,7 +173,7 @@ export const upsertWorkflowResolver = async (_: unknown, { id, input }: { id: st
 
   try {
     const now = new Date();
-    const oldWorkflow = await context.datastore.getWorkflow(id, context.orgId);
+    const oldWorkflow = await context.datastore.getWorkflow({ id, orgId: context.orgId });
 
     const workflow = {
       id,
@@ -160,7 +194,7 @@ export const upsertWorkflowResolver = async (_: unknown, { id, input }: { id: st
       }
     });
 
-    return await context.datastore.upsertWorkflow(id, workflow, context.orgId);
+    return await context.datastore.upsertWorkflow({ id, workflow, orgId: context.orgId });
   } catch (error) {
     logMessage('error', "Error upserting workflow: " + String(error), { orgId: context.orgId });
     throw error;
@@ -173,7 +207,7 @@ export const deleteWorkflowResolver = async (_: unknown, { id }: { id: string },
   }
 
   try {
-    return await context.datastore.deleteWorkflow(id, context.orgId);
+    return await context.datastore.deleteWorkflow({ id, orgId: context.orgId });
   } catch (error) {
     logMessage('error', "Error deleting workflow: " + String(error), { orgId: context.orgId });
     throw error;
@@ -186,7 +220,7 @@ export const getWorkflowResolver = async (_: unknown, { id }: { id: string }, co
   }
 
   try {
-    const workflow = await context.datastore.getWorkflow(id, context.orgId);
+    const workflow = await context.datastore.getWorkflow({ id, orgId: context.orgId });
     if (!workflow) {
       throw new Error("Workflow not found");
     }
@@ -209,7 +243,7 @@ export const listWorkflowsResolver = async (
   context: any,
 ) => {
   try {
-    const result = await context.datastore.listWorkflows(limit, offset, context.orgId);
+    const result = await context.datastore.listWorkflows({ limit, offset, orgId: context.orgId });
     return {
       items: result.items,
       total: result.total,
@@ -226,6 +260,7 @@ export const buildWorkflowResolver = async (
   context: Context,
   info: GraphQLResolveInfo,
 ): Promise<Workflow> => {
+
   try {
     const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
     const { instruction, payload = {}, integrationIds, responseSchema } = args;
@@ -240,24 +275,29 @@ export const buildWorkflowResolver = async (
     // Validate that all integration IDs exist
     const datastoreAdapter = {
       getManyIntegrations: async (ids: string[]): Promise<Integration[]> => {
-        return await context.datastore.getManyIntegrations(ids, context.orgId);
+        return await context.datastore.getManyIntegrations({ ids, includeDocs: true, orgId: context.orgId });
       }
     };
 
     const resolvedIntegrations = await waitForIntegrationProcessing(datastoreAdapter, integrationIds);
 
-    const builder = new WorkflowBuilder(instruction, resolvedIntegrations, payload, responseSchema, metadata);
-    const workflow = await builder.build();
+    const builder = new WorkflowBuilder(
+      instruction,
+      resolvedIntegrations,
+      payload,
+      responseSchema,
+      metadata
+    );
+    const workflow = await builder.buildWorkflow();
 
-    // prevent collisions with existing workflows
     workflow.id = await generateUniqueId({
       baseId: workflow.id,
-      exists: async (id) => !!(await context.datastore.getWorkflow(id, context.orgId))
+      exists: async (id) => !!(await context.datastore.getWorkflow({ id, orgId: context.orgId }))
     });
 
     return workflow;
   } catch (error) {
-    logMessage('error', "Workflow building error: " + String(error), { orgId: context.orgId });
-    throw new Error(`Failed to build workflow: ${error}`);
+    logMessage('error', `Failed to build workflow: ${error}`, { orgId: context.orgId });
+    throw error;
   }
 };

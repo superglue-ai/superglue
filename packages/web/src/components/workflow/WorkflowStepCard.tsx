@@ -1,9 +1,9 @@
 import { useConfig } from '@/src/app/config-context';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/src/components/ui/select";
 import { useToast } from '@/src/hooks/use-toast';
-import { integrations as integrationTemplates } from '@/src/lib/integrations';
-import { cn } from '@/src/lib/utils';
+import { cn, getIntegrationIcon as getIntegrationIconName } from '@/src/lib/utils';
 import { Integration, SuperglueClient } from "@superglue/client";
+import { integrations as integrationTemplates } from '@superglue/shared';
 import { ArrowDown, Check, Globe, Pencil, RotateCw, Trash2, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type { SimpleIcon } from 'simple-icons';
@@ -30,6 +30,10 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
   const [editedStep, setEditedStep] = useState(step);
   const [localIntegrations, setLocalIntegrations] = useState<Integration[]>([]);
   const [loadingIntegrations, setLoadingIntegrations] = useState(false);
+  const [headersText, setHeadersText] = useState('');
+  const [queryParamsText, setQueryParamsText] = useState('');
+  const [headersError, setHeadersError] = useState(false);
+  const [queryParamsError, setQueryParamsError] = useState(false);
 
   const config = useConfig();
   const { toast } = useToast();
@@ -92,11 +96,8 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
   ];
 
   const getIntegrationIcon = (integration: Integration) => {
-    const match = integrationOptions.find(opt =>
-      opt.value !== 'custom' &&
-      (integration.id === opt.value || integration.urlHost?.includes(opt.value))
-    );
-    return match ? getSimpleIcon(match.icon) : null;
+    const iconName = getIntegrationIconName(integration);
+    return iconName ? getSimpleIcon(iconName) : null;
   };
 
   // Sync editedStep with step prop changes
@@ -104,13 +105,99 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
     setEditedStep(step);
   }, [step]);
 
+  // Initialize text fields when editing starts
+  useEffect(() => {
+    if (isEditing) {
+      try {
+        // Safely stringify headers - use empty object if undefined or invalid
+        const headers = editedStep.apiConfig?.headers;
+        const headersJson = headers !== undefined && headers !== null 
+          ? JSON.stringify(headers, null, 2)
+          : '{}';
+        
+        setHeadersText(headersJson);
+        
+        // Validate headers JSON
+        try {
+          JSON.parse(headersJson);
+          setHeadersError(false);
+        } catch {
+          setHeadersError(true);
+        }
+      } catch (error) {
+        // If stringify fails, use empty object
+        console.warn('Failed to stringify headers:', error);
+        setHeadersText('{}');
+        setHeadersError(false);
+      }
+      
+      try {
+        // Safely stringify queryParams - use empty object if undefined or invalid
+        const queryParams = editedStep.apiConfig?.queryParams;
+        const queryParamsJson = queryParams !== undefined && queryParams !== null
+          ? JSON.stringify(queryParams, null, 2)
+          : '{}';
+        
+        setQueryParamsText(queryParamsJson);
+        
+        // Validate queryParams JSON
+        try {
+          JSON.parse(queryParamsJson);
+          setQueryParamsError(false);
+        } catch {
+          setQueryParamsError(true);
+        }
+      } catch (error) {
+        // If stringify fails, use empty object
+        console.warn('Failed to stringify queryParams:', error);
+        setQueryParamsText('{}');
+        setQueryParamsError(false);
+      }
+    }
+  }, [isEditing, editedStep.apiConfig?.headers, editedStep.apiConfig?.queryParams]);
+
   const handleSave = () => {
+    // Validate JSON fields before saving
+    if (headersError || queryParamsError) {
+      toast({
+        title: 'Invalid JSON',
+        description: 'Please fix the JSON errors in Headers or Query Parameters before saving.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     onEdit(step.id, editedStep);
     setIsEditing(false);
   };
 
   const handleCancel = () => {
     setEditedStep(step);
+    
+    // Safely reset headers text
+    try {
+      const headers = step.apiConfig?.headers;
+      setHeadersText(headers !== undefined && headers !== null 
+        ? JSON.stringify(headers, null, 2)
+        : '{}');
+    } catch (error) {
+      console.warn('Failed to stringify headers on cancel:', error);
+      setHeadersText('{}');
+    }
+    
+    // Safely reset queryParams text
+    try {
+      const queryParams = step.apiConfig?.queryParams;
+      setQueryParamsText(queryParams !== undefined && queryParams !== null
+        ? JSON.stringify(queryParams, null, 2)
+        : '{}');
+    } catch (error) {
+      console.warn('Failed to stringify queryParams on cancel:', error);
+      setQueryParamsText('{}');
+    }
+    
+    setHeadersError(false);
+    setQueryParamsError(false);
     setIsEditing(false);
   };
 
@@ -127,7 +214,7 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
     }
     // Fallback to URL host matching
     return step.apiConfig?.urlHost && integration.urlHost &&
-      step.apiConfig.urlHost.includes(integration.urlHost.replace(/^https?:\/\//, ''));
+      step.apiConfig.urlHost.includes(integration.urlHost.replace(/^(https?|postgres(ql)?|ftp(s)?|sftp|file):\/\//, ''));
   });
 
   // Sync integrationId with linked integration
@@ -346,20 +433,48 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
                     <HelpTooltip text="HTTP headers to include with the request. Use JSON format. Common headers include Content-Type, Authorization, etc." />
                   </Label>
                   <Textarea
-                    value={JSON.stringify(editedStep.apiConfig.headers || {}, null, 2)}
+                    value={headersText}
                     onChange={(e) => {
+                      const newValue = e.target.value;
+                      setHeadersText(newValue);
+                      
+                      // Handle empty or whitespace-only input
+                      if (!newValue.trim()) {
+                        setEditedStep(prev => ({
+                          ...prev,
+                          apiConfig: { ...prev.apiConfig, headers: {} }
+                        }));
+                        setHeadersError(false);
+                        return;
+                      }
+                      
+                      // Only update the actual data if it's valid JSON
                       try {
-                        const headers = JSON.parse(e.target.value);
+                        const headers = JSON.parse(newValue);
                         setEditedStep(prev => ({
                           ...prev,
                           apiConfig: { ...prev.apiConfig, headers }
                         }));
+                        setHeadersError(false);
                       } catch (error) {
-                        // Handle invalid JSON
+                        // Keep the text but don't update the step data
+                        // This allows typing invalid JSON temporarily
+                        setHeadersError(true);
                       }
                     }}
                     className="font-mono text-xs h-20 mt-1"
+                    placeholder="{}"
                   />
+                  {headersError && (
+                    <div className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5 bg-red-500/10 dark:bg-red-500/20 py-1.5 px-2.5 rounded-md mt-1">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="12" />
+                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                      </svg>
+                      <span>Invalid JSON format</span>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -368,26 +483,54 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
                     <HelpTooltip text='URL query parameters to append to the request. Use JSON format like {"param1": "value1", "param2": "value2"}' />
                   </Label>
                   <Textarea
-                    value={JSON.stringify(editedStep.apiConfig.queryParams || {}, null, 2)}
+                    value={queryParamsText}
                     onChange={(e) => {
+                      const newValue = e.target.value;
+                      setQueryParamsText(newValue);
+                      
+                      // Handle empty or whitespace-only input
+                      if (!newValue.trim()) {
+                        setEditedStep(prev => ({
+                          ...prev,
+                          apiConfig: { ...prev.apiConfig, queryParams: {} }
+                        }));
+                        setQueryParamsError(false);
+                        return;
+                      }
+                      
+                      // Only update the actual data if it's valid JSON
                       try {
-                        const queryParams = JSON.parse(e.target.value);
+                        const queryParams = JSON.parse(newValue);
                         setEditedStep(prev => ({
                           ...prev,
                           apiConfig: { ...prev.apiConfig, queryParams }
                         }));
+                        setQueryParamsError(false);
                       } catch (error) {
-                        // Handle invalid JSON
+                        // Keep the text but don't update the step data
+                        // This allows typing invalid JSON temporarily
+                        setQueryParamsError(true);
                       }
                     }}
                     className="font-mono text-xs h-20 mt-1"
+                    placeholder="{}"
                   />
+                  {queryParamsError && (
+                    <div className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5 bg-red-500/10 dark:bg-red-500/20 py-1.5 px-2.5 rounded-md mt-1">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="12" />
+                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                      </svg>
+                      <span>Invalid JSON format</span>
+                    </div>
+                  )}
                 </div>
 
                 <div>
                   <Label className="text-xs flex items-center gap-1">
                     Body
-                    <HelpTooltip text="Request body content. Can be JSON, form data, or plain text. Use JSONata expressions to transform data from previous steps." />
+                    <HelpTooltip text="Request body content. Can be JSON, form data, or plain text. Use JavaScript expressions to transform data from previous steps." />
                   </Label>
                   <Textarea
                     value={editedStep.apiConfig.body || ''}
@@ -399,12 +542,122 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
                   />
                 </div>
 
+                <div>
+                  <Label className="text-xs flex items-center gap-1">
+                    Pagination
+                    <HelpTooltip text="Configure pagination if the API returns data in pages. Only set this if you're using pagination variables like {'<<offset>>'}, {'<<page>>'}, or {'<<cursor>>'} in your request." />
+                  </Label>
+                  <div className="space-y-2 mt-1">
+                    <Select
+                      value={editedStep.apiConfig.pagination?.type || 'none'}
+                      onValueChange={(value) => {
+                        if (value === 'none') {
+                          setEditedStep(prev => ({
+                            ...prev,
+                            apiConfig: { ...prev.apiConfig, pagination: undefined }
+                          }));
+                        } else {
+                          setEditedStep(prev => ({
+                            ...prev,
+                            apiConfig: {
+                              ...prev.apiConfig,
+                              pagination: {
+                                ...prev.apiConfig.pagination,
+                                type: value,
+                                pageSize: prev.apiConfig.pagination?.pageSize || '50',
+                                cursorPath: prev.apiConfig.pagination?.cursorPath || '',
+                                stopCondition: prev.apiConfig.pagination?.stopCondition || '(response, pageInfo) => !response.data || response.data.length === 0'
+                              }
+                            }
+                          }));
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="No pagination" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No pagination</SelectItem>
+                        <SelectItem value="OFFSET_BASED">Offset-based (uses {'<<offset>>'})</SelectItem>
+                        <SelectItem value="PAGE_BASED">Page-based (uses {'<<page>>'})</SelectItem>
+                        <SelectItem value="CURSOR_BASED">Cursor-based (uses {'<<cursor>>'})</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    {editedStep.apiConfig.pagination && (
+                      <>
+                        <div>
+                          <Label className="text-xs">Page Size</Label>
+                          <Input
+                            value={editedStep.apiConfig.pagination.pageSize || '50'}
+                            onChange={(e) => setEditedStep(prev => ({
+                              ...prev,
+                              apiConfig: {
+                                ...prev.apiConfig,
+                                pagination: {
+                                  ...prev.apiConfig.pagination!,
+                                  pageSize: e.target.value
+                                }
+                              }
+                            }))}
+                            className="text-xs mt-1"
+                            placeholder="50"
+                          />
+                        </div>
+
+                        {editedStep.apiConfig.pagination.type === 'CURSOR_BASED' && (
+                          <div>
+                            <Label className="text-xs">Cursor Path</Label>
+                            <Input
+                              value={editedStep.apiConfig.pagination.cursorPath || ''}
+                              onChange={(e) => setEditedStep(prev => ({
+                                ...prev,
+                                apiConfig: {
+                                  ...prev.apiConfig,
+                                  pagination: {
+                                    ...prev.apiConfig.pagination!,
+                                    cursorPath: e.target.value
+                                  }
+                                }
+                              }))}
+                              className="text-xs mt-1"
+                              placeholder="e.g., response.nextCursor"
+                            />
+                          </div>
+                        )}
+
+                        <div>
+                          <Label className="text-xs flex items-center gap-1">
+                            Stop Condition (JavaScript)
+                            <HelpTooltip text="JavaScript function that returns true when pagination should stop. Receives (response, pageInfo) where pageInfo has: page, offset, cursor, totalFetched." />
+                          </Label>
+                          <Textarea
+                            value={editedStep.apiConfig.pagination.stopCondition || '(response, pageInfo) => !response.data || response.data.length === 0'}
+                            onChange={(e) => setEditedStep(prev => ({
+                              ...prev,
+                              apiConfig: {
+                                ...prev.apiConfig,
+                                pagination: {
+                                  ...prev.apiConfig.pagination!,
+                                  stopCondition: e.target.value
+                                }
+                              }
+                            }))}
+                            className="font-mono text-xs h-16 mt-1"
+                            placeholder="(response, pageInfo) => !response.data || response.data.length === 0"
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
                 {editedStep.executionMode === 'LOOP' && (
                   <>
                     <div>
                       <Label className="text-xs flex items-center gap-1">
-                        Loop Selector (JSONata)
-                        <HelpTooltip text="JSONata expression to select an array from previous step outputs. The step will execute once for each item. Example: $.items or $.data[*]" />
+                        Loop Selector (JavaScript)
+                        <HelpTooltip text="JavaScript arrow function to select an array from previous step outputs. The step will execute once for each item. Example: (sourceData) => sourceData.items" />
                       </Label>
                       <Input
                         value={editedStep.loopSelector || ''}
@@ -413,17 +666,18 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
                           loopSelector: e.target.value
                         }))}
                         className="text-xs mt-1"
-                        placeholder="e.g., $.items"
+                        placeholder="e.g., (sourceData) => sourceData.items"
                       />
                     </div>
                     <div>
                       <Label className="text-xs flex items-center gap-1">
                         Max Iterations
-                        <HelpTooltip text="Maximum number of loop iterations to prevent infinite loops. Leave empty for no limit." />
+                        <HelpTooltip text="Maximum number of loop iterations to prevent infinite loops. Default is 1000." />
                       </Label>
                       <Input
                         type="number"
                         value={editedStep.loopMaxIters || ''}
+                        defaultValue={1000}
                         onChange={(e) => setEditedStep(prev => ({
                           ...prev,
                           loopMaxIters: parseInt(e.target.value) || undefined
@@ -433,38 +687,6 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
                     </div>
                   </>
                 )}
-
-                <div>
-                  <Label className="text-xs flex items-center gap-1">
-                    Input Mapping (JSONata)
-                    <HelpTooltip text='Transform and map data from previous steps before sending to this API. Use JSONata expressions to reshape data. Example: {"name": $.user.fullName, "email": $.user.email}' />
-                  </Label>
-                  <Textarea
-                    value={editedStep.inputMapping || ''}
-                    onChange={(e) => setEditedStep(prev => ({
-                      ...prev,
-                      inputMapping: e.target.value
-                    }))}
-                    className="font-mono text-xs h-20 mt-1"
-                    placeholder="Transform input before sending to API"
-                  />
-                </div>
-
-                <div>
-                  <Label className="text-xs flex items-center gap-1">
-                    Response Mapping (JSONata)
-                    <HelpTooltip text="Transform the API response before passing to the next step. Use JSONata expressions to extract and reshape data. Example: $.data.results[*].{id: id, name: title}" />
-                  </Label>
-                  <Textarea
-                    value={editedStep.responseMapping || ''}
-                    onChange={(e) => setEditedStep(prev => ({
-                      ...prev,
-                      responseMapping: e.target.value
-                    }))}
-                    className="font-mono text-xs h-20 mt-1"
-                    placeholder="Transform API response"
-                  />
-                </div>
               </div>
             </>
           ) : (

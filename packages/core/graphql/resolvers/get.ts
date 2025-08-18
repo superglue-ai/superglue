@@ -1,6 +1,6 @@
-import { Context } from "@superglue/shared";
-import { GraphQLResolveInfo } from "graphql";
-import { telemetryClient } from "../../utils/telemetry.js";
+import { GraphQLResolveInfo } from 'graphql';
+import { telemetryClient } from '../../utils/telemetry.js';
+import { Context } from '../types.js';
 
 export const getApiResolver = async (
   _: any,
@@ -12,7 +12,7 @@ export const getApiResolver = async (
     throw new Error("id is required");
   }
 
-  const config = await context.datastore.getApiConfig(id, context.orgId);
+  const config = await context.datastore.getApiConfig({ id, orgId: context.orgId });
   if (!config) {
     telemetryClient?.captureException(new Error(`api config with id ${id} not found`), context.orgId, {
       id: id,
@@ -32,7 +32,7 @@ export const getTransformResolver = async (
     throw new Error("id is required");
   }
 
-  const config = await context.datastore.getTransformConfig(id, context.orgId);
+  const config = await context.datastore.getTransformConfig({ id, orgId: context.orgId });
   if (!config) {
     telemetryClient?.captureException(new Error(`transform config with id ${id} not found`), context.orgId, {
       id: id,
@@ -52,7 +52,7 @@ export const getExtractResolver = async (
     throw new Error("id is required");
   }
 
-  const config = await context.datastore.getExtractConfig(id, context.orgId);
+  const config = await context.datastore.getExtractConfig({ id, orgId: context.orgId });
   if (!config) {
     telemetryClient?.captureException(new Error(`extract config with id ${id} not found`), context.orgId, {
       id: id,
@@ -72,7 +72,7 @@ export const getRunResolver = async (
     throw new Error("id is required");
   }
 
-  const run = await context.datastore.getRun(id, context.orgId);
+  const run = await context.datastore.getRun({ id, orgId: context.orgId });
   if (!run) {
     telemetryClient?.captureException(new Error(`run with id ${id} not found`), context.orgId, {
       id: id,

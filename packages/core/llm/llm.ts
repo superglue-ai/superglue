@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { ToolCall, ToolCallResult, ToolDefinition } from "../tools/tools.js";
 import { logMessage } from "../utils/logs.js";
 import { AnthropicModel } from "./anthropic-model.js";
 import { GeminiModel } from "./gemini-model.js";
@@ -7,7 +8,33 @@ import { OpenAIModel } from "./openai-model.js";
 export interface LLM {
     contextLength: number;
     generateText(messages: OpenAI.Chat.ChatCompletionMessageParam[], temperature?: number): Promise<LLMResponse>;
-    generateObject(messages: OpenAI.Chat.ChatCompletionMessageParam[], schema: any, temperature?: number): Promise<LLMObjectResponse>;
+    generateObject(messages: OpenAI.Chat.ChatCompletionMessageParam[], schema: any, temperature?: number, customTools?: ToolDefinition[], context?: any): Promise<LLMObjectResponse>;
+}
+
+export interface LLMToolResponse {
+    toolCall: ToolCall | null;
+    textResponse?: string;
+    messages: OpenAI.Chat.ChatCompletionMessageParam[];
+    responseId?: string;  // For OpenAI conversation continuity
+}
+
+export interface LLMAgentResponse {
+    finalResult: any;
+    toolCalls: ToolCall[];
+    executionTrace: Array<{
+        toolCall: ToolCall;
+        result: ToolCallResult;
+    }>;
+    messages: OpenAI.Chat.ChatCompletionMessageParam[];
+    responseId?: string;  // For OpenAI conversation continuity
+    success: boolean;
+    lastSuccessfulToolCall?: {
+        toolCall: ToolCall;
+        result: any;
+        additionalData?: any;
+    };
+    lastError?: string;
+    terminationReason: 'success' | 'max_iterations' | 'abort' | 'error';
 }
 
 export interface LLMResponse {
@@ -35,7 +62,8 @@ function selectLanguageModel(): LLM {
             logMessage("warn", "⚠️  Anthropic models use a workaround for structured output generation. While enhanced for reliability, they may have higher failure rates than OpenAI/Gemini for complex schemas. Consider using OpenAI or Gemini for production workloads requiring high reliability.");
             return new AnthropicModel();
         default:
-            logMessage("info", "Using default model: " + process.env.OPENAI_MODEL);
-            return new OpenAIModel();
+            const defaultModel = new OpenAIModel();
+            logMessage("info", "Using default model: " + defaultModel.model);
+            return defaultModel;
     }
 }

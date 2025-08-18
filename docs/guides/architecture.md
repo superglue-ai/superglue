@@ -1,6 +1,6 @@
 ---
 title: "Architecture"
-description: "Technical architecture of the Superglue integration agent and its data flow"
+description: "Technical architecture of the superglue integration agent and its data flow"
 ---
 
 superglue operates as a self-healing integration agent, designed to connect disparate systems and data sources through automated, multi-step workflows. It intelligently orchestrates data extraction, transformation, and validation, ensuring data arrives in your target systems in the correct format, even when source APIs change.
@@ -20,7 +20,7 @@ The following diagram illustrates the core components and a typical workflow dat
           ExternalSource[Generic API / File Source]
       end
   
-      subgraph SuperglueAgent[Superglue Integration Agent]
+      subgraph SuperglueAgent[superglue Integration Agent]
           direction TB
           Orchestrator[Workflow Orchestrator]
           
@@ -70,15 +70,15 @@ The following diagram illustrates the core components and a typical workflow dat
 
 ### External Systems / Data Sources
 
-Superglue can connect to a wide array of external systems as steps within a workflow:
+superglue can connect to a wide array of external systems as steps within a workflow:
 
 - **REST & GraphQL APIs**: Connects to any modern API, handling authentication, rate limiting, and pagination per step. Supports common authentication methods (OAuth, API keys, JWT tokens).
 - **XML/JSON/CSV Files**: Processes structured data files from sources like local filesystems, S3 buckets, or remote URLs as part of a workflow step.
 - **Legacy System Interfaces**: Interfaces with older systems (SOAP APIs, FTP) as defined in a workflow step.
 
-### Superglue Integration Agent
+### superglue Integration Agent
 
-This is the core of Superglue, responsible for executing integration workflows.
+This is the core of superglue, responsible for executing integration workflows.
 
 - **Workflow Engine / Orchestrator**:
   - Manages the execution of multi-step workflows defined by the user.
@@ -102,7 +102,7 @@ This is the core of Superglue, responsible for executing integration workflows.
 
 ### Configuration & Cache (Persistent Store - e.g., Redis, File)
 
-Superglue relies on persistent storage for its operational data:
+superglue relies on persistent storage for its operational data:
 
 - **Workflow Definitions**: Stores the structure of user-defined workflows, including the sequence of steps and their configurations.
 - **API/Step Configurations**: Contains the specific configurations for each step within a workflow (e.g., `ApiConfig`, `ExtractConfig`, `TransformConfig` for individual API calls or file processing operations).
@@ -114,13 +114,13 @@ Superglue relies on persistent storage for its operational data:
 
 ### User / Your Client System
 
-- **Your Application**: The system that ultimately consumes the data processed by Superglue workflows or triggers these workflows.
-- **Workflow Trigger**: Workflows can be initiated via an API call to Superglue or potentially through a scheduled mechanism.
+- **Your Application**: The system that ultimately consumes the data processed by superglue workflows or triggers these workflows.
+- **Workflow Trigger**: Workflows can be initiated via an API call to superglue or potentially through a scheduled mechanism.
 
 ## Data Flow (Workflow Example)
 
-1. A workflow is triggered (e.g., by an API call from 'Your Application' to Superglue).
-2. The **Workflow Engine** in Superglue loads the workflow definition.
+1. A workflow is triggered (e.g., by an API call from 'Your Application' to superglue).
+2. The **Workflow Engine** in superglue loads the workflow definition.
 3. **For each step in the workflow** (e.g., calling API A, then API B using data from A):
    a.  The Orchestrator initiates the step, using the specific configuration for that step (e.g., an `ApiConfig` for calling API A).
    b.  The **Extract Pipeline** retrieves raw data from the external system (e.g., API A).
@@ -139,8 +139,34 @@ Superglue relies on persistent storage for its operational data:
 
 ## Security Implementation
 
-- All external connections made by Superglue during workflow steps can be encrypted (e.g., TLS 1.3 for API calls).
-- Credentials for accessing external systems within workflow steps are securely managed (e.g., stored encrypted if using Redis).
+### Transport Security
+- All external connections made by superglue during workflow steps can be encrypted (e.g., TLS 1.3 for API calls).
+
+### Credential Encryption
+superglue supports at-rest encryption for all stored credentials using industry-standard AES-256-CBC encryption:
+
+- **Encryption Key**: Set the `MASTER_ENCRYPTION_KEY` environment variable to enable encryption
+- **Algorithm**: AES-256-CBC with unique initialization vectors (IVs) for each encrypted value
+- **Automatic Handling**: Credentials are automatically encrypted when stored and decrypted when retrieved
+- **Storage Format**: Encrypted values are stored as `enc:iv:encryptedData`
+- **Backward Compatibility**: If no master key is set, credentials are stored in plaintext
+
+**Key Features:**
+- Each credential field is encrypted separately with its own IV
+- The master key is hashed using SHA-256 to derive the encryption key
+- Supported in both FileStore and PostgreSQL datastores
+- Transparent to the application - no code changes required
+
+**Setup:**
+```bash
+# Generate a secure master key
+openssl rand -hex 32
+
+# Set in your environment
+export MASTER_ENCRYPTION_KEY=your-generated-key
+```
+
+**Important:** Once encryption is enabled and credentials are stored, changing or removing the master key will make existing credentials unreadable. Always backup your master key securely.
 - Transformation logic for each step runs in isolated contexts.
 - Rate limiting can be configured per API step.
 

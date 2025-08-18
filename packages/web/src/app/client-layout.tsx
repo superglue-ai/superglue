@@ -1,14 +1,14 @@
 "use client"
-import { AnimatePresence, motion } from 'framer-motion'
-import { usePathname } from 'next/navigation'
-import { Sidebar } from '../components/Sidebar'
-import { Toaster } from '../components/ui/toaster'
-import { LogSidebar } from '../components/utils/LogSidebar'
-import { ServerMonitor } from '../components/utils/ServerMonitor'
-import { ConfigProvider } from './config-context'
-import { jetbrainsMono, jetbrainsSans } from './fonts'
-import { IntegrationsProvider } from './integrations-context'
-import { CSPostHogProvider } from './providers'
+import { AnimatePresence, motion } from 'framer-motion';
+import { usePathname } from 'next/navigation';
+import { Sidebar } from '../components/Sidebar';
+import { Toaster } from '../components/ui/toaster';
+import { LogSidebar } from '../components/utils/LogSidebar';
+import { ServerMonitor } from '../components/utils/ServerMonitor';
+import { ConfigProvider } from './config-context';
+import { jetbrainsMono, jetbrainsSans } from './fonts';
+import { IntegrationsProvider } from './integrations-context';
+import { CSPostHogProvider } from './providers';
 
 interface Props {
   children: React.ReactNode
@@ -40,7 +40,11 @@ export function ClientWrapper({ children, config }: Props) {
                     {children}
                   </motion.div>
                 </AnimatePresence>
-                {config.superglueApiKey && <LogSidebar />}
+                {config.superglueApiKey && (
+                  <div className="hidden lg:block">
+                    <LogSidebar />
+                  </div>
+                )}
               </div>
             )}
             <Toaster />

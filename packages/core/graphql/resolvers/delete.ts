@@ -1,5 +1,5 @@
-import { Context } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
+import { Context } from '../types.js';
 
 export const deleteApiResolver = async (
   _: any,
@@ -7,11 +7,11 @@ export const deleteApiResolver = async (
   context: Context,
   info: GraphQLResolveInfo
 ) => {
-  const existing = await context.datastore.getApiConfig(id, context.orgId);
+  const existing = await context.datastore.getApiConfig({ id, orgId: context.orgId });
   if (!existing) {
     throw new Error(`API config with id ${id} not found`);
   }
-  return context.datastore.deleteApiConfig(id, context.orgId);
+  return context.datastore.deleteApiConfig({ id, orgId: context.orgId });
 };
 
 export const deleteTransformResolver = async (
@@ -20,7 +20,7 @@ export const deleteTransformResolver = async (
   context: Context,
   info: GraphQLResolveInfo
 ) => {
-  return context.datastore.deleteTransformConfig(id, context.orgId);
+  return context.datastore.deleteTransformConfig({ id, orgId: context.orgId });
 };
 
 export const deleteExtractResolver = async (
@@ -29,5 +29,5 @@ export const deleteExtractResolver = async (
   context: Context,
   info: GraphQLResolveInfo
 ) => {
-  return context.datastore.deleteExtractConfig(id, context.orgId);
+  return context.datastore.deleteExtractConfig({ id, orgId: context.orgId });
 };

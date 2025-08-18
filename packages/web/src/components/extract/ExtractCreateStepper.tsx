@@ -1,22 +1,22 @@
 'use client'
 
-import { useConfig } from '@/src/app/config-context'
-import { useToast } from '@/src/hooks/use-toast'
-import { findArraysOfObjects, inputErrorStyles, parseCredentialsHelper } from '@/src/lib/client-utils'
-import { cn } from '@/src/lib/utils'
-import { ApiConfig, AuthType, CacheMode, ExtractConfig, SuperglueClient, TransformConfig } from '@superglue/client'
-import { Copy, Download, Loader2, Terminal, Upload } from 'lucide-react'
-import { useRouter } from 'next/navigation'
-import { useState } from 'react'
-import { Button } from '../ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
-import { Input } from '../ui/input'
-import { Label } from '../ui/label'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs"
-import { Textarea } from '../ui/textarea'
-import { HelpTooltip } from '../utils/HelpTooltip'
-import { API_CREATE_STEPS, StepIndicator, type StepperStep } from '../utils/StepIndicator'
-import { InteractiveExtractPlayground } from './InteractiveExtractPlayground'
+import { useConfig } from '@/src/app/config-context';
+import { useToast } from '@/src/hooks/use-toast';
+import { findArraysOfObjects, inputErrorStyles, parseCredentialsHelper } from '@/src/lib/client-utils';
+import { cn } from '@/src/lib/utils';
+import { ApiConfig, AuthType, CacheMode, ExtractConfig, SuperglueClient, TransformConfig } from '@superglue/client';
+import { Copy, Download, Loader2, Terminal, Upload } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { Button } from '../ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
+import { Textarea } from '../ui/textarea';
+import { HelpTooltip } from '../utils/HelpTooltip';
+import { API_CREATE_STEPS, StepIndicator, type StepperStep } from '../utils/StepIndicator';
+import { InteractiveExtractPlayground } from './InteractiveExtractPlayground';
 
 interface ExtractCreateStepperProps {
   open: boolean
@@ -300,7 +300,7 @@ if (transformResult?.success) {
     // Call autofill endpoint
     const response = await superglueClient.extract({
       endpoint: {
-        id: formData.urlHost?.replace(/^https?:\/\//, '').replace(/\//g, '') + '-' + Math.floor(1000 + Math.random() * 9000),
+        id: formData.urlHost?.replace(/^(https?|postgres(ql)?|ftp(s)?|sftp|file):\/\//, '').replace(/\//g, '') + '-' + Math.floor(1000 + Math.random() * 9000),
         urlHost: formData.urlHost,
         ...(formData.urlPath ? { urlPath: formData.urlPath } : {}),
         ...(formData.documentationUrl ? { documentationUrl: formData.documentationUrl } : {}),
@@ -333,7 +333,7 @@ if (transformResult?.success) {
     // Apply the returned config
     const config = response.config as ApiConfig
     if (config) {
-      const id = formData.urlHost.replace(/^https?:\/\//, '').replace(/\//g, '') + '-' + Math.floor(1000 + Math.random() * 9000)
+      const id = formData.urlHost.replace(/^(https?|postgres(ql)?|ftp(s)?|sftp|file):\/\//, '').replace(/\//g, '') + '-' + Math.floor(1000 + Math.random() * 9000)
       setExtractId(id)
 
       // Save the configuration with the generated schema

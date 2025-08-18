@@ -168,7 +168,7 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
 
     if (!formData.id) {
       formData.id = formData.urlHost
-        .replace(/^https?:\/\//, '')  // Remove http:// or https://
+        .replace(/^(https?|postgres(ql)?|ftp(s)?|sftp|file):\/\//, '')  // Remove http:// or https://
         .replace(/\//g, '')           // Remove all slashes
         + (formData.urlPath ? formData.urlPath.split('/').pop() : '')
         + '-' + Math.floor(1000 + Math.random() * 9000);

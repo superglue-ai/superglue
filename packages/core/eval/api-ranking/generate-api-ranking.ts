@@ -23,6 +23,11 @@ interface ApiRankingResult {
     successfulAttempts: number;
     apiFailureCount: number;
     superglueScore: number;
+    softValidation?: {
+        success: boolean;
+        confidence: number;
+        reason: string;
+    };
     llmResults: {
         'claude-sonnet-4-20250514': number;
         'claude-opus-4-20250514': number;
@@ -88,7 +93,7 @@ async function generateApiRanking(configPath?: string): Promise<void> {
                 workflow.integrationIds.includes(i.id)
             );
 
-            // Run Superglue evaluation
+            // Run superglue evaluation
             const runResult = await workflowRunner.runWorkflow(
                 workflow,
                 workflowIntegrations,
@@ -96,7 +101,9 @@ async function generateApiRanking(configPath?: string): Promise<void> {
                     maxAttemptsPerWorkflow: config.settings.attemptsPerWorkflow,
                     collectLogs: true,
                     saveRuns: false,
-                    delayBetweenAttempts: config.settings.delayBetweenAttempts || 0 
+                    delayBetweenAttempts: config.settings.delayBetweenAttempts || 0,
+                    enableSoftValidation: config.settings.enableSoftValidation || false, 
+                    expectedResult: workflow.expectedResult 
                 }
             );
 
@@ -140,7 +147,7 @@ async function generateApiRanking(configPath?: string): Promise<void> {
                     const modelResults = Object.entries(llmResults)
                         .map(([model, rate]) => `${model}: ${(rate * 100).toFixed(0)}%`)
                         .join(', ');
-                    
+
                     logMessage('info',
                         `📊 Direct LLM results - ${modelResults}`,
                         metadata
@@ -201,9 +208,6 @@ async function generateApiRanking(configPath?: string): Promise<void> {
     }
 }
 
-/**
- * Calculate Average Score based on all success rates (Superglue + LLM models)
- */
 function calculateAverageScore(
     superglueSuccessRate: number,
     llmResults: {
@@ -219,7 +223,6 @@ function calculateAverageScore(
         superglueSuccessRate,
         ...Object.values(llmResults)
     ];
-    
     // Calculate average
     const sum = allRates.reduce((acc, rate) => acc + rate, 0);
     return sum / allRates.length;
@@ -230,11 +233,11 @@ function calculateAverageScore(
  */
 async function generateRankingCsv(results: ApiRankingResult[], outputPath: string): Promise<void> {
     const headers = [
-        'Rank', 
-        'API', 
-        'Average Score', 
-        'Superglue Success %',
-        'Claude Sonnet 4', 
+        'Rank',
+        'API',
+        'Average Score',
+        'superglue Success %',
+        'Claude Sonnet 4',
         'Claude Opus 4',
         'GPT-4.1',
         'O4 Mini',
@@ -247,7 +250,7 @@ async function generateRankingCsv(results: ApiRankingResult[], outputPath: strin
             index + 1, // Rank
             result.api, // API name
             result.superglueScore.toFixed(2), // Score
-            `${(result.successRate * 100).toFixed(0)}%`, // Superglue Success %
+            `${(result.successRate * 100).toFixed(0)}%`, // superglue Success %
             `${(result.llmResults['claude-sonnet-4-20250514'] * 100).toFixed(0)}%`, // Claude Sonnet
             `${(result.llmResults['claude-opus-4-20250514'] * 100).toFixed(0)}%`, // Claude Opus
             `${(result.llmResults['gpt-4.1'] * 100).toFixed(0)}%`, // GPT-4.1

@@ -1,4 +1,4 @@
-import type { DataStore } from "@superglue/shared";
+import { DataStore } from "../../datastore/types.js";
 
 export const getTenantInfoResolver = async (
   _: any,
@@ -35,7 +35,7 @@ export const setTenantInfoResolver = async (
     };
   }
   try {
-    await datastore.setTenantInfo(email, emailEntrySkipped);
+    await datastore.setTenantInfo({ email, emailEntrySkipped });
     const currentInfo = await datastore.getTenantInfo();
     return currentInfo;
   } catch (error) {

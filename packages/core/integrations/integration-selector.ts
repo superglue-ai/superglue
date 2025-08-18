@@ -53,7 +53,7 @@ export class IntegrationSelector {
         const integrationDescriptions = integrations.map(int => {
             return `
 ---
-Integration ID: ${int.id}
+Integration ID: ${int.id} ${int.name ? int.name : ""}
 Documentation Summary: ${int.documentation?.slice(0, 1000)}
 ${int.specificInstructions ? `User Instructions for this integration: ${int.specificInstructions}\n` : ''}
 `;

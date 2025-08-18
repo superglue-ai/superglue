@@ -1,8 +1,10 @@
 import { Integration, Workflow, WorkflowResult } from '@superglue/client';
 import { generateUniqueId } from '@superglue/shared/utils';
 import { DataStore } from '../../datastore/types.js';
+import { IntegrationManager } from '../../integrations/integration-manager.js';
 import { logEmitter, logMessage } from '../../utils/logs.js';
 import { BaseWorkflowConfig } from './config-loader.js';
+import { validateWorkflowResult, type SoftValidationResult } from './soft-validator.js';
 
 export interface WorkflowRunAttempt {
     attemptNumber: number;
@@ -25,6 +27,7 @@ export interface WorkflowRunResult {
     attempts: WorkflowRunAttempt[];
     finalResult?: WorkflowResult;
     collectedLogs?: any[];
+    softValidation?: SoftValidationResult;  // Result of soft validation if enabled
 }
 
 export interface WorkflowRunnerOptions {
@@ -33,6 +36,8 @@ export interface WorkflowRunnerOptions {
     saveRuns?: boolean;
     delayBetweenAttempts?: number;  // Set to 0 for testing, use 1000-2000ms for production APIs to avoid rate limiting
     onAttemptComplete?: (attempt: WorkflowRunAttempt) => void;
+    enableSoftValidation?: boolean;  // Enable LLM-based validation of results
+    expectedResult?: string;  // Expected result for soft validation (description or JSON)
 }
 
 /**
@@ -132,12 +137,50 @@ export class WorkflowRunner {
             }
         }
 
-        const successRate = successfulAttempts / options.maxAttemptsPerWorkflow;
+        let successRate = successfulAttempts / options.maxAttemptsPerWorkflow;
 
         logMessage('info',
             `📊 Workflow ${workflowConfig.name} completed: ${successfulAttempts}/${options.maxAttemptsPerWorkflow} successful (${(successRate * 100).toFixed(1)}% success rate)`,
             this.metadata
         );
+
+        // Perform soft validation if enabled and we have a result
+        let softValidation: SoftValidationResult | undefined;
+        if (options.enableSoftValidation && options.expectedResult && finalResult?.data) {
+            try {
+                logMessage('info', `🎯 Running soft validation for ${workflowConfig.name}...`, this.metadata);
+
+                softValidation = await validateWorkflowResult(
+                    finalResult.data,
+                    options.expectedResult,
+                    workflowConfig.instruction,
+                    this.metadata
+                );
+
+                logMessage('info',
+                    `🎯 Soft validation result: ${softValidation.success ? '✅ PASS' : '❌ FAIL'}`,
+                    this.metadata
+                );
+
+                // If soft validation is enabled and fails, adjust the success metrics
+                if (!softValidation.success) {
+                    // Override the success rate if soft validation fails
+                    successfulAttempts = 0;
+                    successRate = 0;
+                    finalResult = undefined;
+
+                    logMessage('warn',
+                        `⚠️  Soft validation failed - marking workflow as failed despite execution success`,
+                        this.metadata
+                    );
+                }
+            } catch (error) {
+                logMessage('error',
+                    `❌ Soft validation error for ${workflowConfig.name}: ${error}`,
+                    this.metadata
+                );
+            }
+        }
 
         return {
             workflowId: workflowConfig.id,
@@ -147,7 +190,8 @@ export class WorkflowRunner {
             successRate,
             attempts,
             finalResult,
-            collectedLogs: options.collectLogs ? collectedLogs : undefined
+            collectedLogs: options.collectLogs ? collectedLogs : undefined,
+            softValidation
         };
     }
 
@@ -184,10 +228,10 @@ export class WorkflowRunner {
                 this.metadata
             );
 
-            workflow = await builder.build();
+            workflow = await builder.buildWorkflow();
             workflow.id = await generateUniqueId({
                 baseId: workflow.id,
-                exists: async (id) => !!(await this.datastore.getWorkflow(id, this.metadata.orgId))
+                exists: async (id) => !!(await this.datastore.getWorkflow({ id, orgId: this.metadata.orgId }))
             });
 
             attempt.buildSuccess = true;
@@ -228,7 +272,7 @@ export class WorkflowRunner {
                 const executor = new WorkflowExecutor(
                     workflow,
                     metadataWithWorkflowId,
-                    integrations
+                    IntegrationManager.fromIntegrations(integrations, this.datastore, this.metadata.orgId)
                 );
 
                 // Combine all credentials from integrations
@@ -254,14 +298,18 @@ export class WorkflowRunner {
                 // Save run if requested
                 if (saveRun) {
                     await this.datastore.createRun({
-                        id: workflowResult.id,
-                        success: workflowResult.success,
-                        error: workflowResult.error || undefined,
-                        config: workflowResult.config || workflow,
-                        stepResults: workflowResult.stepResults || [],
-                        startedAt: workflowResult.startedAt,
-                        completedAt: workflowResult.completedAt || new Date()
-                    }, this.metadata.orgId);
+                        result: {
+                            id: workflowResult.id,
+                            success: workflowResult.success,
+                            error: workflowResult.error || undefined,
+                            config: workflowResult.config || workflow,
+                            stepResults: workflowResult.stepResults || [],
+                            startedAt: workflowResult.startedAt,
+                            completedAt: workflowResult.completedAt || new Date(),
+                            data: null
+                        },
+                        orgId: this.metadata.orgId
+                    });
                 }
 
                 if (attempt.executionSuccess) {

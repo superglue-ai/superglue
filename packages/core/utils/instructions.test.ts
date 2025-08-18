@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LanguageModel } from '../llm/llm.js';
-import { generateInstructions, sanitizeInstructionSuggestions } from './instructions.js';
+import { generateInstructionsImplementation, sanitizeInstructionSuggestions } from './instructions.js';
 
 vi.mock('../llm/llm.js', () => {
   return {
@@ -19,7 +19,7 @@ vi.mock('../llm/llm.js', () => {
   };
 });
 
-describe('generateInstructions', () => {
+describe('generateInstructionsImplementation', () => {
   const originalEnv = { ...process.env }
 
   // Test data
@@ -58,55 +58,41 @@ describe('generateInstructions', () => {
     const generateObject = vi.mocked(LanguageModel.generateObject)
     generateObject.mockResolvedValueOnce({ response: expectedInstructions, messages: [] })
 
-    const instructions = await generateInstructions(integrations, { orgId: 'test-org' })
-    expect(instructions).toEqual(expectedInstructions)
+    const result = await generateInstructionsImplementation({ integrations }, { orgId: 'test-org', runId: 'test-run', integrations })
+    expect(result.success).toBe(true)
+    expect(result.data).toEqual(expectedInstructions)
     expect(LanguageModel.generateObject).toHaveBeenCalledTimes(1)
   })
 
-  it('should retry on failure and succeed on second attempt', async () => {
-    const errorMessage = 'Test error message'
+  it('should handle empty response gracefully', async () => {
     const generateObject = vi.mocked(LanguageModel.generateObject)
+    generateObject.mockResolvedValueOnce({ response: [], messages: [] })
 
-    // First call fails
-    generateObject.mockRejectedValueOnce(new Error(errorMessage))
-    // Second call succeeds
-    generateObject.mockResolvedValueOnce({ response: expectedInstructions, messages: [] })
-
-    const instructions = await generateInstructions(integrations, { orgId: 'test-org' })
-    expect(instructions).toEqual(expectedInstructions)
-    expect(generateObject).toHaveBeenCalledTimes(2)
-
-    const secondCallArgs = generateObject.mock.calls[1][0]
-    const lastMessage = secondCallArgs[secondCallArgs.length - 1]
-    expect(lastMessage.content).toContain(errorMessage)
+    const result = await generateInstructionsImplementation({ integrations }, { orgId: 'test-org', runId: 'test-run', integrations })
+    expect(result.success).toBe(true)
+    expect(result.data).toEqual([])
   })
 
-
-  it('should increase temperature on retries', async () => {
+  it('should handle malformed response', async () => {
     const generateObject = vi.mocked(LanguageModel.generateObject)
+    generateObject.mockResolvedValueOnce({ response: "not an array", messages: [] })
 
-    // Make it fail twice
-    generateObject.mockRejectedValueOnce(new Error('First failure'))
-    generateObject.mockRejectedValueOnce(new Error('Second failure'))
-    generateObject.mockResolvedValueOnce({ response: expectedInstructions, messages: [] })
-
-    await generateInstructions(integrations, { orgId: 'test-org' })
-
-    // Check that temperature increased with each retry
-    expect(generateObject).toHaveBeenNthCalledWith(1, expect.any(Array), expect.any(Object), 0)
-    expect(generateObject).toHaveBeenNthCalledWith(2, expect.any(Array), expect.any(Object), 0.3)
-    expect(generateObject).toHaveBeenNthCalledWith(3, expect.any(Array), expect.any(Object), 0.6)
+    const result = await generateInstructionsImplementation({ integrations }, { orgId: 'test-org', runId: 'test-run', integrations })
+    expect(result.success).toBe(true)
+    expect(result.data).toEqual(["not an array"])
   })
 
-  it('should fail after max retries', async () => {
+  it('should use correct temperature', async () => {
     const generateObject = vi.mocked(LanguageModel.generateObject)
-    const error = new Error('Persistent error')
+    generateObject.mockResolvedValueOnce({ response: expectedInstructions, messages: [] })
 
-    // Make it fail consistently
-    generateObject.mockRejectedValue(error)
+    await generateInstructionsImplementation({ integrations }, { orgId: 'test-org', runId: 'test-run', integrations })
 
-    await expect(generateInstructions(integrations, { orgId: 'test-org' })).rejects.toThrow('Persistent error')
-    expect(generateObject).toHaveBeenCalledTimes(4) // Initial try + 3 retries
+    expect(generateObject).toHaveBeenCalledWith(
+      expect.any(Array),
+      expect.any(Object),
+      0.2
+    )
   })
 })
 
