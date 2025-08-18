@@ -208,9 +208,6 @@ async function generateApiRanking(configPath?: string): Promise<void> {
     }
 }
 
-/**
- * Calculate Average Score based on all success rates (superglue + LLM models)
- */
 function calculateAverageScore(
     superglueSuccessRate: number,
     llmResults: {
@@ -226,7 +223,6 @@ function calculateAverageScore(
         superglueSuccessRate,
         ...Object.values(llmResults)
     ];
-
     // Calculate average
     const sum = allRates.reduce((acc, rate) => acc + rate, 0);
     return sum / allRates.length;
