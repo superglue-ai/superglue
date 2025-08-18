@@ -104,6 +104,14 @@ export class DirectLLMEvaluator {
                     this.metadata
                 );
             }
+
+            // Force garbage collection between attempts (if running with --expose-gc)
+            if (global.gc) {
+                global.gc();
+            }
+
+            // Add small delay to prevent overwhelming the system
+            await new Promise(resolve => setTimeout(resolve, 100));
         }
 
         const successRate = successfulAttempts / maxAttempts;
@@ -194,6 +202,15 @@ export class DirectLLMEvaluator {
         }
 
         attempt.executionTime = Date.now() - startTime;
+
+        // Truncate large results/code to save memory
+        if (attempt.generatedCode && attempt.generatedCode.length > 10000) {
+            attempt.generatedCode = attempt.generatedCode.substring(0, 10000) + '... [truncated]';
+        }
+        if (attempt.executionResult && JSON.stringify(attempt.executionResult).length > 10000) {
+            attempt.executionResult = { truncated: true, preview: JSON.stringify(attempt.executionResult).substring(0, 1000) };
+        }
+
         return attempt;
     }
 
@@ -340,7 +357,18 @@ Always wrap your code in <<CODE>> and <</CODE>> tags (note the closing tag has a
         `;
 
         try {
-            const result = await eval(wrappedCode);
+            // Create a timeout promise that rejects after 20 seconds
+            const TIMEOUT_MS = 20000;
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Code execution timed out after 20 seconds')), TIMEOUT_MS);
+            });
+
+            // Race the code execution against the timeout
+            const result = await Promise.race([
+                eval(wrappedCode),
+                timeoutPromise
+            ]);
+            
             return result;
         } catch (error) {
             throw new Error(`Code execution failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -387,7 +415,7 @@ Always wrap your code in <<CODE>> and <</CODE>> tags (note the closing tag has a
             missing.push('ANTHROPIC_API_KEY');
         }
 
-        if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+        if (!process.env.GEMINI_API_KEY) {
             missing.push('GEMINI_API_KEY');
         }
 

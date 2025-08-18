@@ -14,6 +14,7 @@ export class OpenAIModel implements LLM {
     this.client = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY || "",
       baseURL: process.env.OPENAI_BASE_URL,
+      timeout: 60000,
     });
   }
   async generateText(messages: ChatCompletionMessageParam[], temperature: number = 0): Promise<LLMResponse> {
