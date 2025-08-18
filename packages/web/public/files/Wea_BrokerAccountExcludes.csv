@@ -1,0 +1,54 @@
+﻿BrokerID;AccountNumber;Description
+"ABB       ";509001201262;Nathalie van Heesewijk
+"ABB       ";509001203484;NULL
+"ABB       ";509001305437;ABN BE - R.H.A.J. Govers - Not managed
+"ABB       ";509001308164;ABN BE - R.H.A.J. Govers - Not managed
+"ABB       ";509063532654;ABN BE - R.H.A.J. Govers - Not managed
+"ABB       ";509063532755;ABN BE - R.H.A.J. Govers - Not managed
+"ABM       ";426003470;20240708 - Wealtheon account, not managed in eXimius
+"ABM       ";577093053;20240410 - Wealtheon account, not managed in eXimius
+"ABN       ";426003470;
+"ABN       ";462380386;
+"ABN       ";577093053;
+"BDL       ";4165581.1001;20241023 -  this is portfolio 10066 which has an end date on 01-10-2024. It can be filtered out of the interface.
+"BDL       ";4360014.1001;20241023 - it is still empty and not yet opened in eXimius.
+"BIN       ";255500;NULL
+"BIN       ";255517;Meijboom
+"BIN       ";255518;Meijboom
+"BIN       ";255532;NULL
+"BIN       ";255612;Not managed
+"BIN       ";584000;
+"KBC       ";6360007401000978;account from closed portfolio
+"KBC       ";6360060401000978;email HJ DD 6/2/2025: This is a second account of an existing client but it's not in eXimius
+"PIB       ";166742.001;Used for block orders. Account not managed
+"PIB       ";255612;Grandson of a client - not managed
+"PIB       ";301541.001;account from ended portfolio 2057-2
+"PIB       ";305837.002;loan account of ptf 4002
+"SAX       ";15323129;Wealtheon account 69900/TRADWEA
+"SAX       ";15323142;Account to Exclude
+"SAX       ";16698849;Account to Exclude
+"SAX       ";16793358;Account to Exclude
+"SAX       ";16793409;Not in eXimius - not managed 255612
+"SAX       ";16793435;Not in eXimius - not managed 255640
+"SAX       ";69900/255505EUR;account from closed portfolio
+"SAX       ";69900/255517EUR;Account to Exclude
+"SAX       ";69900/255518EUR;Account to Exclude
+"SAX       ";69900/255559EUR;account from closed portfolio
+"SAX       ";69900/255560EUR;account from closed portfolio
+"SAX       ";69900/255575EUR;account from closed portfolio
+"SAX       ";69900/255612EUR;Not in eXimius - not managed
+"SAX       ";69900/255640EUR;Not in eXimius - not managed
+"SAX       ";69900/255640USD;Not in eXimius - not managed
+"SAX       ";69900/ERRORWEA;Wealtheon account
+"SAX       ";69900/FEEEURWEA;Wealtheon Account to Exclude
+"SAX       ";69900/TRADWEA;Wealtheon account
+"SAX       ";69900/TRADWEA1;Wealtheon account
+"SAX       ";98900/584001EUR;Account to Exclude
+"SAX       ";98900/584115EUR;Account to Exclude
+"SAX       ";98900/584116EUR;Account to Exclude
+"SAX       ";98900/FEEEURWLE;Wealtheon Account to Exclude
+"SAX       ";98900/TRADWLE;Wealtheon Account to Exclude
+"SAX       ";98900/TRADWLE1;Wealtheon account
+"VLK       ";7800010899;20240311 - Not managed in eXimius
+"VLK       ";7800078787;20240311 - Not managed in eXimius
+"VLK       ";7800085902;20240311 - Not managed in eXimius

@@ -4,7 +4,7 @@ import { server_defaults } from "../default.js";
 import { IntegrationManager } from "../integrations/integration-manager.js";
 import { executeApiCall } from "../utils/api.js";
 import { logMessage } from "../utils/logs.js";
-import { applyJsonata, flattenObject, transformAndValidateSchema } from "../utils/tools.js";
+import { applyJsonata, transformAndValidateSchema } from "../utils/tools.js";
 import { generateTransformCode } from "../utils/transform.js";
 
 export interface ExecutionStrategy {
@@ -132,8 +132,7 @@ The function should return an array of items that this step will iterate over.`;
 
         const loopPayload: Record<string, any> = {
           ...payload,
-          currentItem: currentItem,
-          ...flattenObject(currentItem, 'currentItem')
+          currentItem: currentItem
         };
 
         try {
@@ -145,7 +144,7 @@ The function should return an array of items that this step will iterate over.`;
               ...options,
               testMode: false
             },
-            integrationManager, 
+            integrationManager,
             metadata
           });
 
