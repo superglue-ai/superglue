@@ -288,7 +288,7 @@ Get detailed file metadata:
   "urlHost": "sftp://<<integrationId_ftpUser>>:<<integrationId_ftpPassword>>@<<integrationId_ftpHost>>:<<integrationId_ftpPort>>",
   "body": {
     "operation": "get",
-    "path": "/incoming/<<currentItem_name>>"
+    "path": "/incoming/<<(sourceData) => sourceData.currentItem.name>>"
   },
   "instruction": "Download each CSV file for processing"
 }
@@ -338,7 +338,7 @@ Get detailed file metadata:
   "urlHost": "ftp://<<integrationId_ftpUser>>:<<integrationId_ftpPassword>>@<<integrationId_ftpHost>>:<<integrationId_ftpPort>>",
   "body": {
     "operation": "delete",
-    "path": "/temp/<<currentItem_name>>"
+    "path": "/temp/<<(sourceData) => sourceData.currentItem.name>>"
   },
   "instruction": "Delete files older than 30 days"
 }
