@@ -81,7 +81,7 @@ export async function executeTransform(args: {
     };
 
     return {
-      data: result.data,
+      data: data,
       config: currentConfig
     };
   }
@@ -94,7 +94,7 @@ export async function generateTransformCode(
   metadata: Metadata,
   retry = 0,
   messages?: ChatCompletionMessageParam[]
-): Promise<{ mappingCode: string, confidence: number, data?: any } | null> {
+): Promise<{ mappingCode: string } | null> {
   try {
     logMessage('info', "Generating mapping" + (retry > 0 ? ` (retry ${retry})` : ''), metadata);
 
@@ -118,9 +118,8 @@ ${schema ? `<target_schema>${JSON.stringify(schema, null, 2)}</target_schema>` :
       type: "object",
       properties: {
         mappingCode: { type: "string", description: "JS function as string" },
-        confidence: { type: "number", description: "Confidence score 0-100" }
       },
-      required: ["mappingCode", "confidence"],
+      required: ["mappingCode"],
       additionalProperties: false
     };
 
@@ -143,7 +142,7 @@ ${schema ? `<target_schema>${JSON.stringify(schema, null, 2)}</target_schema>` :
     if (!evaluation.success) {
       throw new Error(`Mapping evaluation failed: ${evaluation.reason}`);
     }
-    logMessage('info', `Mapping generated successfully with ${response.confidence}% confidence`, metadata);
+    logMessage('info', `Mapping generated successfully`, metadata);
     return response;
   } catch (error) {
     if (retry < server_defaults.MAX_TRANSFORMATION_RETRIES) {
@@ -224,26 +223,4 @@ Critical:Please evaluate the transformation based on the criteria mentioned in t
     logMessage('error', `Error evaluating mapping: ${errorMessage.slice(0, 250)}`, metadata);
     return { success: false, reason: `Error during evaluation: ${errorMessage}` };
   }
-}
-
-const jsonataSchema = {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "JSONata Expression Schema",
-  "description": "Schema for validating JSONata expressions",
-  "type": "object",
-  "properties": {
-    "jsonata": {
-      "type": "string",
-      "description": "JSONata expression"
-    },
-    "confidence": {
-      "type": "number",
-      "description": `Confidence score for the JSONata expression between 0 and 100. 
-      Give a low confidence score if there are missing fields in the source data. 
-      Give a low confidence score if there are multiple options for a field and it is unclear which one to choose.
-      `,
-    }
-  },
-  "required": ["jsonata", "confidence"],
-  "additionalProperties": false
 }

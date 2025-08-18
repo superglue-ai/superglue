@@ -100,8 +100,7 @@ ERROR HANDLING:
 
 Return your answer in the following JSON format:
 {
-  "mappingCode": "(sourceData) => { return { id: sourceData.id }; }",
-  "confidence": <number between 0 and 100>
+  "mappingCode": "(sourceData) => { return { id: sourceData.id }; }"
 }
 
 THE FUNCTION MUST BE VALID JAVASCRIPT that can be executed with eval().
