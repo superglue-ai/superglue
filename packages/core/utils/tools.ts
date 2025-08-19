@@ -200,7 +200,11 @@ export async function executeAndValidateMappingCode(input: any, mappingCode: str
   } catch (error) {
     return { success: false, error: error.message };
   } finally {
-    isolate.dispose();
+    try {
+      isolate.dispose();
+    } catch (error) {
+      console.error("Error disposing isolate", error);
+    }
   }
 }
 
@@ -518,7 +522,11 @@ export async function evaluateStopCondition(
       error: helpfulError
     };
   } finally {
-    isolate.dispose();
+    try {
+      isolate.dispose();
+    } catch (error) {
+      console.error("Error disposing isolate", error);
+    }
   }
 }
 
