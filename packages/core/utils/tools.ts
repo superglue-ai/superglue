@@ -208,7 +208,7 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
   let retryCount = 0;
   const maxRetries = options?.retries || 0;
   const delay = options?.retryDelay || 1000;
-  const maxRateLimitWaitMs = 60 * 60 * 1000 * 2; // 24 hours is the max wait time for rate limit retries, hardcoded
+  const maxRateLimitWaitMs = 60 * 60 * 1000 * 24; // 24 hours is the max wait time for rate limit retries, hardcoded
   let rateLimitRetryCount = 0;
   let totalRateLimitWaitTime = 0;
 
