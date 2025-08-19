@@ -160,6 +160,7 @@ Note: Both `params` and `values` keys are supported for compatibility.
       "<<(sourceData) => sourceData.currentItem.eventType>>",
       "<<(sourceData) => JSON.stringify(sourceData.currentItem.metadata)>>"
     ]
+    // Note: If currentItem was just an ID string, you could use <<currentItem>> directly
   },
   "instruction": "Insert each event record into the database"
 }

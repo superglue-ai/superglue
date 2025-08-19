@@ -281,6 +281,8 @@ Get detailed file metadata:
 }
 
 // Step 2: Process each file
+// Note: Use <<currentItem>> for direct access to the whole item,
+// or <<(sourceData) => sourceData.currentItem.property>> when accessing specific properties
 {
   "id": "processFiles",
   "executionMode": "LOOP",
