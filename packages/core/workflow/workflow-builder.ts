@@ -156,52 +156,105 @@ Ensure that the final output matches the instruction and you use ONLY the availa
     ];
   }
 
+  private validateWorkflow(workflow: Workflow): { valid: boolean; errors: string[] } {
+    const errors: string[] = [];
+    const availableIntegrationIds = Object.keys(this.integrations);
+
+    workflow.steps?.forEach((step, index) => {
+      if (!step.integrationId) {
+        errors.push(`Step ${index + 1} (${step.id}): Missing integrationId`);
+      } else if (!availableIntegrationIds.includes(step.integrationId)) {
+        errors.push(`Step ${index + 1} (${step.id}): Invalid integrationId '${step.integrationId}'. Available integrations: ${availableIntegrationIds.join(', ')}`);
+      }
+      if (!step.apiConfig?.urlHost) {
+        errors.push(`Step ${index + 1} (${step.id}): Missing URL configuration (urlHost: '${step.apiConfig?.urlHost || 'undefined'}'). Please ensure that all steps correspond to a single API call, or merge this step with the previous one.`);
+      }
+    });
+
+    return {
+      valid: errors.length === 0,
+      errors
+    };
+  }
+
   public async buildWorkflow(): Promise<Workflow> {
     let builtWorkflow: Workflow | null = null;
+    let messages = this.prepareBuildingContext();
+    let retryCount = 0;
+    const maxRetries = 3;
+    let lastError: string | null = null;
 
-    try {
-      logMessage('info', `Building workflow`, this.metadata);
-
-      const messages = this.prepareBuildingContext();
-
-      const toolMetadata = {
-        ...this.metadata,
-        messages
-      };
-
-      // Call the build_workflow tool
-      const result = await executeTool(
-        {
-          id: `build-workflow`,
-          name: 'build_workflow',
-          arguments: {}
-        },
-        toolMetadata
-      );
-
-      if (result.error) {
-        throw new Error(result.error);
-      }
-
-      if (!result.data || !(result.data?.id)) {
-        throw new Error('No workflow generated');
-      }
-
-      builtWorkflow = result.data;
-
-      builtWorkflow.instruction = this.instruction;
-      builtWorkflow.responseSchema = this.responseSchema;
+    while (retryCount < maxRetries) {
       try {
-        builtWorkflow.originalResponseSchema = await this.generateOriginalResponseSchema(builtWorkflow.steps);
-      } catch (error) {
-        logMessage('warn', `Error generating original response schema: ${error}`, this.metadata);
+        logMessage('info', `Building workflow${retryCount > 0 ? ` (attempt ${retryCount + 1}/${maxRetries})` : ''}`, this.metadata);
+
+        const toolMetadata = {
+          ...this.metadata,
+          messages
+        };
+
+        const result = await executeTool(
+          {
+            id: `build-workflow`,
+            name: 'build_workflow',
+            arguments: retryCount > 0 ? { previousError: lastError } : {}
+          },
+          toolMetadata
+        );
+
+        if (result.error) {
+          throw new Error(result.error);
+        }
+
+        if (!result.data || !(result.data?.id)) {
+          throw new Error('No workflow generated');
+        }
+
+        builtWorkflow = result.data;
+
+        const validation = this.validateWorkflow(builtWorkflow);
+        if (!validation.valid) {
+          const errorDetails = validation.errors.join('\n');
+          const workflowSummary = JSON.stringify({
+            id: builtWorkflow.id,
+            steps: builtWorkflow.steps?.map(s => ({
+              id: s.id,
+              integrationId: s.integrationId,
+              urlHost: s.apiConfig?.urlHost,
+              urlPath: s.apiConfig?.urlPath
+            }))
+          }, null, 2);
+
+          throw new Error(`Workflow validation failed:\n${errorDetails}\n\nGenerated workflow:\n${workflowSummary}`);
+        }
+
+        builtWorkflow.instruction = this.instruction;
+        builtWorkflow.responseSchema = this.responseSchema;
+        try {
+          builtWorkflow.originalResponseSchema = await this.generateOriginalResponseSchema(builtWorkflow.steps);
+        } catch (error) {
+          logMessage('warn', `Error generating original response schema: ${error}`, this.metadata);
+        }
+
+        break;
+
+      } catch (error: any) {
+        lastError = error.message;
+        logMessage('error', `Error during workflow build attempt ${retryCount + 1}: ${error.message}`, this.metadata);
+
+        if (retryCount < maxRetries - 1) {
+          messages.push({
+            role: "user",
+            content: `The previous workflow build attempt failed with the following error:\n\n${error.message}\n\nPlease fix these issues and generate a valid workflow.`
+          } as ChatMessage);
+        }
+
+        retryCount++;
       }
-    } catch (error: any) {
-      logMessage('error', `Error during workflow build attempt: ${error.message}`, this.metadata);
     }
 
     if (!builtWorkflow) {
-      const finalErrorMsg = `The build_workflow tool call failed to build a valid workflow.`;
+      const finalErrorMsg = `Workflow build failed after ${maxRetries} attempts. Last error: ${lastError}`;
       logMessage('error', finalErrorMsg, this.metadata);
       throw new Error(finalErrorMsg);
     }

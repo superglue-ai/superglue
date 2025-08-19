@@ -103,18 +103,8 @@ export const integrations: Record<string, IntegrationConfig> = {
         "tickets",
         "line_items",
         "products",
-        "custom_objects",
-        "properties",
-        "schemas",
         "associations",
-        "filterGroups",
-        "filters",
-        "search",
-        "batch_read",
-        "memberships",
-        "lists",
-        "sorts",
-        "objectTypeId"
+        "memberships"
       ]
 
   },
@@ -128,7 +118,6 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: [
       "people",
       "objects",
-      "attributes",
       "records",
       "lists",
       "entries",

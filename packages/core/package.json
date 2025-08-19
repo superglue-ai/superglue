@@ -19,6 +19,7 @@
     "@vitest/coverage-v8": "^3.2.4",
     "copyfiles": "^2.4.1",
     "ts-node": "^10.9.2",
+    "tsx": "^4.20.4",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4"
   },

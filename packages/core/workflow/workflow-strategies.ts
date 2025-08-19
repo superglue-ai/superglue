@@ -145,7 +145,7 @@ The function should return an array of items that this step will iterate over.`;
               ...options,
               testMode: false
             },
-            integrationManager, 
+            integrationManager,
             metadata
           });
 

@@ -377,20 +377,6 @@ function oldReplaceVariables(template: string, variables: Record<string, any>): 
   });
 }
 
-export function flattenObject(obj: any, parentKey = '', res: Record<string, any> = {}): Record<string, any> {
-  for (const key in obj) {
-    if (Object.prototype.hasOwnProperty.call(obj, key)) {
-      const propName = parentKey ? `${parentKey}_${key}` : key;
-      if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
-        flattenObject(obj[key], propName, res);
-      } else {
-        res[propName] = obj[key];
-      }
-    }
-  }
-  return res;
-}
-
 export function sample(value: any, sampleSize = 10): any {
   if (Array.isArray(value)) {
     const arrLength = value.length;
@@ -543,4 +529,19 @@ export function isSelfHealingEnabled(options: RequestOptions, type: "transform" 
   if (type === "api") {
     return options?.selfHealing ? options.selfHealing === SelfHealingMode.ENABLED || options.selfHealing === SelfHealingMode.REQUEST_ONLY : true;
   }
+}
+
+// Legacy function needs to stay for existing workflow backwards compatibility
+export function flattenObject(obj: any, parentKey = '', res: Record<string, any> = {}): Record<string, any> {
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      const propName = parentKey ? `${parentKey}_${key}` : key;
+      if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
+        flattenObject(obj[key], propName, res);
+      } else {
+        res[propName] = obj[key];
+      }
+    }
+  }
+  return res;
 }
