@@ -1,4 +1,5 @@
 import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
+import { parseJSON } from "../../utils/json-parser.js";
 import { logMessage } from '../../utils/logs.js';
 import { sample } from '../../utils/tools.js';
 
@@ -27,7 +28,7 @@ export async function validateWorkflowResult(
         let isExpectedJson = false;
 
         try {
-            const parsed = JSON.parse(expectedResult);
+            const parsed = parseJSON(expectedResult);
             expectedContent = JSON.stringify(parsed, null, 2);
             isExpectedJson = true;
         } catch (e) {

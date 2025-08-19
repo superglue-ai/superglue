@@ -4,6 +4,7 @@ import * as path from "path";
 import SFTPClient from "ssh2-sftp-client";
 import { URL } from "url";
 import { server_defaults } from "../default.js";
+import { parseJSON } from "./json-parser.js";
 import { composeUrl } from "./tools.js";
 
 const SUPPORTED_OPERATIONS = ['list', 'get', 'put', 'delete', 'rename', 'mkdir', 'rmdir', 'exists', 'stat'];
@@ -74,7 +75,7 @@ async function executeFTPOperation(client: FTPClient, operation: FTPOperation): 
       
       // Try to parse as JSON if possible
       try {
-        return JSON.parse(content);
+        return parseJSON(content);
       } catch {
         // If not JSON, return as string
         return content;
@@ -192,7 +193,7 @@ async function executeSFTPOperation(client: SFTPClient, operation: FTPOperation)
       
       // Try to parse as JSON if possible
       try {
-        return JSON.parse(content);
+        return parseJSON(content);
       } catch {
         // If not JSON, return as string
         return content;
@@ -280,7 +281,7 @@ export async function callFTP({endpoint, credentials, options}: {endpoint: ApiCo
   // Parse operation from body
   let operation: FTPOperation;
   try {
-    operation = JSON.parse(endpoint.body);
+    operation = parseJSON(endpoint.body);
   } catch (error) {
     throw new Error(`Invalid JSON in body: ${error.message}. Body must be a JSON object with an 'operation' field. Supported operations: ${SUPPORTED_OPERATIONS.join(', ')}`);
   }

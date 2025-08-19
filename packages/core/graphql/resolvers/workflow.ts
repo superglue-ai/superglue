@@ -6,6 +6,7 @@ import { Context, Metadata } from '../types.js';
 
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { IntegrationManager } from "../../integrations/integration-manager.js";
+import { parseJSON } from "../../utils/json-parser.js";
 import { logMessage } from "../../utils/logs.js";
 import { replaceVariables } from "../../utils/tools.js";
 import { notifyWebhook } from "../../utils/webhook.js";
@@ -60,10 +61,10 @@ export const executeWorkflowResolver = async (
 
     // Parse schemas if they're strings
     if (workflow.inputSchema && typeof workflow.inputSchema === 'string') {
-      workflow.inputSchema = JSON.parse(workflow.inputSchema);
+      workflow.inputSchema = parseJSON(workflow.inputSchema);
     }
     if (workflow.responseSchema && typeof workflow.responseSchema === 'string') {
-      workflow.responseSchema = JSON.parse(workflow.responseSchema);
+      workflow.responseSchema = parseJSON(workflow.responseSchema);
     }
 
     let mergedCredentials = args.credentials || {};

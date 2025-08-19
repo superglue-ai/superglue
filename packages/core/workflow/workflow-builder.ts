@@ -6,6 +6,7 @@ import { toJsonSchema } from "../external/json-schema.js";
 import { BUILD_WORKFLOW_SYSTEM_PROMPT } from "../llm/prompts.js";
 import { executeTool } from "../tools/tools.js";
 import { Documentation } from "../utils/documentation.js";
+import { parseJSON } from "../utils/json-parser.js";
 import { logMessage } from "../utils/logs.js";
 import { composeUrl, sample } from "../utils/tools.js";
 
@@ -336,7 +337,7 @@ Ensure that the final output matches the instruction and you use ONLY the availa
 
     try {
       // Parse the schema JSON
-      let spec = JSON.parse(openApiSchema);
+      let spec = parseJSON(openApiSchema);
 
       if (!spec) {
         return null;

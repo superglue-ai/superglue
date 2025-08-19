@@ -7,6 +7,7 @@ import { Validator } from "jsonschema";
 import { toJsonSchema } from "../external/json-schema.js";
 import { HttpMethodEnum } from "../mcp/mcp-server.js";
 import { ApiCallError } from "./api.js";
+import { parseJSON } from "./json-parser.js";
 import { injectVMHelpersIndividually } from "./vm-helpers.js";
 
 export function isRequested(field: string, info: GraphQLResolveInfo) {
@@ -178,7 +179,7 @@ export async function executeAndValidateMappingCode(input: any, mappingCode: str
   let result: any;
   try {
     const scriptSource = `const fn = ${mappingCode}; const result = fn(JSON.parse(input)); return result === undefined ? null : JSON.stringify(result);`;
-    result = JSON.parse(await context.evalClosure(scriptSource, null, { timeout: 10000 }));
+    result = parseJSON(await context.evalClosure(scriptSource, null, { timeout: 10000 }));
     // if no schema is given, skip validation
     if (!schema) {
       return { success: true, data: result };
@@ -222,7 +223,7 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
   }
   else if (config.data && config.data.trim().startsWith("{")) {
     try {
-      config.data = JSON.parse(config.data);
+      config.data = parseJSON(config.data);
     } catch (error) { }
   }
   else if (!config.data) {

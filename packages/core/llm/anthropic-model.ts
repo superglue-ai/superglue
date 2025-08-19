@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
 import { ToolCall, ToolCallResult, ToolDefinition } from "../tools/tools.js";
+import { parseJSON } from "../utils/json-parser.js";
 import { LLM, LLMAgentResponse, LLMObjectResponse, LLMResponse } from "./llm.js";
 
 export class AnthropicModel implements LLM {
@@ -103,7 +104,7 @@ Your response must contain ONLY the JSON object within the <json> tags, with no 
         const xmlMatch = responseText.match(/<json>\s*([\s\S]*?)\s*<\/json>/);
         if (xmlMatch) {
             try {
-                generatedObject = JSON.parse(xmlMatch[1]);
+                generatedObject = parseJSON(xmlMatch[1]);
             } catch (e) {
                 extractionError = `Failed to parse JSON from XML tags: ${e}`;
             }
@@ -114,7 +115,7 @@ Your response must contain ONLY the JSON object within the <json> tags, with no 
             const codeBlockMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
             if (codeBlockMatch) {
                 try {
-                    generatedObject = JSON.parse(codeBlockMatch[1]);
+                    generatedObject = parseJSON(codeBlockMatch[1]);
                 } catch (e) {
                     extractionError = `Failed to parse JSON from code block: ${e}`;
                 }
@@ -130,7 +131,7 @@ Your response must contain ONLY the JSON object within the <json> tags, with no 
 
             for (const match of jsonMatches) {
                 try {
-                    const parsed = JSON.parse(match[0]);
+                    const parsed = parseJSON(match[0]);
                     const size = JSON.stringify(parsed).length;
                     if (size > largestSize) {
                         largestJson = parsed;
@@ -335,7 +336,7 @@ Your response must contain ONLY the JSON object within the <json> tags, with no 
                                 type: 'tool_use',
                                 id: toolCall.id,
                                 name: toolCall.function.name,
-                                input: JSON.parse(toolCall.function.arguments)
+                                input: parseJSON(toolCall.function.arguments)
                             });
                         }
                     }

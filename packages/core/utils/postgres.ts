@@ -1,6 +1,7 @@
 import { ApiConfig, RequestOptions } from "@superglue/client";
 import { Pool, PoolConfig } from 'pg';
 import { server_defaults } from "../default.js";
+import { parseJSON } from "./json-parser.js";
 import { composeUrl, replaceVariables } from "./tools.js";
 
 
@@ -111,7 +112,7 @@ export async function callPostgres(endpoint: ApiConfig, payload: Record<string, 
   
   let bodyParsed: any;
   try {
-    bodyParsed = JSON.parse(await replaceVariables(endpoint.body, requestVars));
+    bodyParsed = parseJSON(await replaceVariables(endpoint.body, requestVars));
   } catch (error) {
     throw new Error(`Invalid JSON in body: ${error.message} for body: ${JSON.stringify(endpoint.body)}`);
   }

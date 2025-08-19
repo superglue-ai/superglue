@@ -2,6 +2,7 @@ import { Integration } from "@superglue/client";
 import { GraphQLResolveInfo } from "graphql";
 import { executeTool, ToolCall } from "../../tools/tools.js";
 import { InstructionGenerationContext } from "../../utils/instructions.js";
+import { parseJSON } from "../../utils/json-parser.js";
 import { generateSchema } from "../../utils/schema.js";
 import { telemetryClient } from "../../utils/telemetry.js";
 import { getSchemaFromData } from "../../utils/tools.js";
@@ -22,7 +23,7 @@ export const generateSchemaResolver = async (
   }
   if (responseData) {
     try {
-      responseData = getSchemaFromData(JSON.parse(responseData));
+      responseData = getSchemaFromData(parseJSON(responseData));
     } catch (error) {
       telemetryClient?.captureException(error, context.orgId, {
         instruction: instruction,

@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
 import { ToolDefinition } from "../tools/tools.js";
+import { parseJSON } from "../utils/json-parser.js";
 import { addNullableToOptional } from "../utils/tools.js";
 import { LLM, LLMObjectResponse, LLMResponse } from "./llm.js";
 
@@ -135,7 +136,7 @@ export class OpenAIModel implements LLM {
     const args = toolCallData.arguments || toolCallData.function?.arguments;
     
     if (name === "submit") {
-      let finalResult = typeof args === "string" ? JSON.parse(args) : args;
+      let finalResult = typeof args === "string" ? parseJSON(args) : args;
       if (finalResult.___results) {
         finalResult = finalResult.___results;
       }
@@ -146,12 +147,12 @@ export class OpenAIModel implements LLM {
       });
       return { finalResult, shouldBreak: true };
     } else if (name === "abort") {
-      let error = typeof args === "string" ? JSON.parse(args) : args;
+      let error = typeof args === "string" ? parseJSON(args) : args;
       return { finalResult: { "error": error?.reason || "Unknown error" }, shouldBreak: true };
     } else {
       const tool = tools.find(t => t.name === name);
       if (tool && tool.execute) {
-        const toolResult = await tool.execute(typeof args === "string" ? JSON.parse(args) : args, context);
+        const toolResult = await tool.execute(typeof args === "string" ? parseJSON(args) : args, context);
         conversationMessages.push({
           type: "function_call_output",
           call_id: callId,

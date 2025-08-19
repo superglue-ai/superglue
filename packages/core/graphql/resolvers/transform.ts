@@ -1,6 +1,7 @@
 import { CacheMode, FileType, RequestOptions, TransformConfig, TransformInputRequest } from "@superglue/client";
 import { GraphQLResolveInfo } from "graphql";
 import { parseFile } from "../../utils/file.js";
+import { parseJSON } from "../../utils/json-parser.js";
 import { executeTransform } from "../../utils/transform.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 import { Context, Metadata } from '../types.js';
@@ -34,7 +35,7 @@ export const transformResolver = async (
   try {
     if (typeof data === 'string') {
       try {
-        data = JSON.parse(data);
+        data = parseJSON(data);
       } catch (error) {
         data = await parseFile(Buffer.from(data), FileType.AUTO);
       }

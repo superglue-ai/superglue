@@ -7,6 +7,7 @@ import { getIntrospectionQuery } from "graphql";
 import * as yaml from 'js-yaml';
 import { server_defaults } from '../default.js';
 import { LanguageModel } from '../llm/llm.js';
+import { parseJSON } from "./json-parser.js";
 import { getSharedHtmlMarkdownPool } from './html-markdown-pool.js';
 import { logMessage } from "./logs.js";
 import { callPostgres } from './postgres.js';
@@ -112,7 +113,7 @@ export class Documentation {
         const trimmedData = data.trim();
 
         try {
-          const parsed = JSON.parse(trimmedData);
+          const parsed = parseJSON(trimmedData);
           const openApiUrls = this.extractOpenApiUrls(parsed);
           if (openApiUrls.length > 0) {
             logMessage('debug', `Found ${openApiUrls.length} OpenAPI specification links in response`, this.metadata);
@@ -198,7 +199,7 @@ export class Documentation {
 
           if (typeof specData === 'string') {
             try {
-              specData = JSON.parse(specData);
+              specData = parseJSON(specData);
             } catch {
               try {
                 specData = yaml.load(specData) as any;
@@ -1133,7 +1134,7 @@ class OpenApiStrategy implements ProcessingStrategy {
       if (settingsMatch && settingsMatch[1]) {
         const settingsContent = settingsMatch[1].trim();
         try {
-          const settings = JSON.parse(settingsContent);
+          const settings = parseJSON(settingsContent);
           if (settings.url && typeof settings.url === 'string') {
             return settings.url;
           }
@@ -1190,7 +1191,7 @@ class OpenApiStrategy implements ProcessingStrategy {
         }
       } else if (typeof openApiData === 'string') {
         try {
-          const parsed = JSON.parse(openApiData);
+          const parsed = parseJSON(openApiData);
           if (parsed && (parsed.openapi || parsed.swagger)) {
             logMessage('info', `Successfully fetched valid OpenAPI/Swagger JSON string from ${absoluteOpenApiUrl}`, metadata);
             return openApiData; // Valid JSON spec
@@ -1226,7 +1227,7 @@ class OpenApiStrategy implements ProcessingStrategy {
     const isHtml = trimmedContent.slice(0, 500).toLowerCase().includes("<html");
     if (isJson) {
       try {
-        const parsed = JSON.parse(trimmedContent);
+        const parsed = parseJSON(trimmedContent);
         if (parsed && (parsed.openapi || parsed.swagger)) {
           logMessage('info', "Provided content is already a valid OpenAPI/Swagger JSON spec.", metadata);
           return trimmedContent; // Content is a valid JSON spec
