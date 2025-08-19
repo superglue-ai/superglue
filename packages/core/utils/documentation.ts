@@ -482,18 +482,32 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       page = await browserContext.newPage();
       await page.goto(url.toString(), { timeout: server_defaults.DOCUMENTATION.TIMEOUTS.PLAYWRIGHT });
       await page.waitForLoadState('domcontentloaded', { timeout: server_defaults.DOCUMENTATION.TIMEOUTS.PLAYWRIGHT });
+      await page.waitForTimeout(1000);
 
       const result = await page.evaluate(() => {
         const selectorsToRemove = [
+          // Media elements
           'img, video, svg, canvas, iframe, picture, source, audio, embed, object',
+          // ARIA landmarks that typically contain non-content
           '[role="banner"], [role="dialog"], [role="contentinfo"], [role="complementary"]',
+          // Cookie & privacy notices
           '.cookie-banner, .cookie-consent, .cookies, .gdpr, .privacy-notice',
+          // Navigation elements
           'nav, header, footer, aside, .sidebar, .menu, .navbar, .toolbar',
+          // Social & engagement widgets
           '.social, .share, .chat, .feedback, .comments, .disqus',
+          // Chat widgets (specific vendors)
+          '.intercom, .drift, .zendesk, .freshchat, .tawk',
+          // Advertising & promotions
           '.ads, .advertisement, .banner, .promo, .sponsored',
+          // Scripts, styles, and tracking
           'script, style, noscript, link[rel="stylesheet"]',
+          '[data-ga], [data-gtm], [data-analytics], [data-track]',
+          // Navigation helpers
           '.breadcrumb, .pagination, .pager',
+          // Related content suggestions
           '.related, .recommended, .also-see',
+          // Interactive elements
           'form, input, button, select, textarea'
         ];
         selectorsToRemove.forEach(selector =>
@@ -523,11 +537,11 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
         return null;
       }
 
-      const { html, links } = result;
+      let { html, links } = result;
 
       if (html.length > server_defaults.DOCUMENTATION.MAX_PAGE_SIZE_BYTES) {
-        logMessage('warn', `Page ${urlString} exceeds size limit (${Math.round(html.length / 1024 / 1024)}MB > ${Math.round(server_defaults.DOCUMENTATION.MAX_PAGE_SIZE_BYTES / 1024 / 1024)}MB), skipping`, metadata);
-        return null;
+        logMessage('warn', `Page ${urlString} exceeds size limit after cleanup (${Math.round(html.length / 1024 / 1024)}MB > ${Math.round(server_defaults.DOCUMENTATION.MAX_PAGE_SIZE_BYTES / 1024 / 1024)}MB), truncating`, metadata);
+        html = html.substring(0, server_defaults.DOCUMENTATION.MAX_PAGE_SIZE_BYTES) + '\n<!-- Content truncated due to size limit -->';
       }
 
       logMessage('debug', `Successfully fetched content for ${urlString}`, metadata);
@@ -866,7 +880,6 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
         combinedContent += combinedContent ? `\n\n${result.content}` : result.content;
         totalSize += contentSize;
         fetchedCount++;
-
       }
 
       if (totalSize >= MAX_TOTAL_SIZE * 0.9) {

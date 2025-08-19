@@ -31,7 +31,7 @@ export const server_defaults = {
     },
     HTML_MARKDOWN_POOL: {
         MAX_WORKERS: 16,
-        TASK_TIMEOUT: 240000, // 120 seconds for HTML to Markdown conversion (handles up to 10MB)
+        TASK_TIMEOUT: 240000, // 240 seconds for HTML to Markdown conversion (handles up to 10MB)
         MAX_QUEUE_SIZE: 200
     },
     POSTGRES: {
