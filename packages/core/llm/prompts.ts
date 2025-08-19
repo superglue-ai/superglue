@@ -199,6 +199,7 @@ Important: Avoid using LOOP mode for potentially very large data objects. If you
   * Parameters prevent SQL injection and improve performance
   * Use $1, $2, $3, etc. as placeholders in the query
   * Provide values in the params or values array in the same order
+  * Always wrap js string results in quotes like so: {"name": "<<(sourceData) => sourceData.name>>"}
 </POSTGRES>
 
 <FTP_SFTP>
@@ -247,6 +248,7 @@ Important: Avoid using LOOP mode for potentially very large data objects. If you
 - Access previous step results via sourceData.stepId (e.g., sourceData.fetchUsers)
 - Access initial payload via sourceData (e.g., sourceData.userId)
 - Complex transformations can be done inline: <<(sourceData) => sourceData.contacts.filter(c => c.active).map(c => c.email).join(',')>>
+- For json content, always wrap js string results in quotes like so: {"name": "<<(sourceData) => sourceData.name>>"}
 </VARIABLES>
 
 <AUTHENTICATION_PATTERNS>
@@ -487,6 +489,7 @@ Use variables in the API configuration with <<variable>> syntax and wrap JavaScr
 For Basic Auth: "Basic <<username>>:<<password>>" (auto-converts to Base64)
 Headers starting with 'x-' are likely custom headers
 ALWAYS verify variables exist in the available list before using them
+For json bodies, always wrap js string results in quotes like so: {"name": "<<(sourceData) => sourceData.name>>"}
 </VARIABLES>
 
 <AUTHENTICATION>
@@ -505,11 +508,9 @@ Most modern APIs use HEADER authentication type with different header formats.
 Correct PostgreSQL configuration:
 - urlHost: "postgres://<<user>>:<<password>>@<<hostname>>:<<port>>"
 - urlPath: "<<database_name>>"
-- body: {query: "postgres statement", params: [param1, param2]} // Recommended: parameterized query
-- body: {query: "SELECT * FROM users WHERE age > $1", params: [<<(sourceData) => sourceData.age>>]}
+- body: {query: "postgres statement", params: ["some string", true]} // Recommended: parameterized query, do not forget to wrap params in quotes uf they are strings.
+- body: {query: "SELECT * FROM users WHERE age > $1", params: [<<(sourceData) => sourceData.age>>, "<<(sourceData) => sourceData.name>>"]}
 - body: {query: "INSERT INTO logs (message, level) VALUES ($1, $2)", params: ["Error occurred", "<<error_level>>"]}
-
-The query is a postgres statement and can contain variables. Use $$...$$ notation to paste complex fields.
 
 ALWAYS USE PARAMETERIZED QUERIES:
 - Use $1, $2, $3, etc. as placeholders in the query string
