@@ -208,7 +208,7 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
   let retryCount = 0;
   const maxRetries = options?.retries || 0;
   const delay = options?.retryDelay || 1000;
-  const maxRateLimitWaitMs = 60 * 1000; // 60s is the max wait time for rate limit retries, hardcoded
+  const maxRateLimitWaitMs = 60 * 60 * 1000 * 2; // 24 hours is the max wait time for rate limit retries, hardcoded
   let rateLimitRetryCount = 0;
   let totalRateLimitWaitTime = 0;
 
@@ -251,8 +251,8 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
             waitTime = retryDate.getTime() - Date.now();
           }
         } else {
-          // Exponential backoff with jitter
-          waitTime = Math.min(Math.pow(2, rateLimitRetryCount) * 1000 + Math.random() * 1000, 10000);
+          // Exponential backoff with jitter - max wait time is 1 hour
+          waitTime = Math.min(Math.pow(10, rateLimitRetryCount) * 1000 + Math.random() * 100, 3600000);
         }
 
         // Check if we've exceeded the maximum wait time
