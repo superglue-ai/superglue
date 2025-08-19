@@ -80,8 +80,8 @@ export const buildWorkflowImplementation: ToolImplementation<WorkflowBuildContex
                 apiConfig: z.object({
                     id: z.string().describe("Same as the step ID"),
                     instruction: z.string().describe("A concise instruction describing WHAT data this API call should retrieve or what action it should perform."),
-                    urlHost: z.string().describe("The base URL host (e.g., https://api.example.com)"),
-                    urlPath: z.string().describe("The API endpoint path (e.g., /v1/users). Use <<variable>> syntax for dynamic values or JavaScript expressions, e.g., /users/<<currentItem.id>>/posts or /api/<<sourceData.version || 'v1'>>/data"),
+                    urlHost: z.string().describe("The base URL host (e.g., https://api.example.com). Must not be empty."),
+                    urlPath: z.string().describe("The API endpoint path (e.g., /v1/users)."),
                     method: z.enum(Object.values(HttpMethod) as [string, ...string[]]).describe("HTTP method: GET, POST, PUT, DELETE, or PATCH"),
                     queryParams: z.array(z.object({
                         key: z.string(),
@@ -97,7 +97,7 @@ export const buildWorkflowImplementation: ToolImplementation<WorkflowBuildContex
                         pageSize: z.string().describe("Number of items per page (e.g., '50', '100'). Once set, this becomes available as <<limit>> (same as pageSize)."),
                         cursorPath: z.string().describe("If cursor_based: The path to the cursor in the response. If not, set this to \"\""),
                         stopCondition: z.string().describe("REQUIRED: JavaScript function that determines when to stop pagination. This is the primary control for pagination. Format: (response, pageInfo) => boolean. The pageInfo object contains: page (number), offset (number), cursor (any), totalFetched (number). response is the axios response object, access response data via response.data. Return true to STOP. E.g. (response, pageInfo) => !response.data.pagination.has_more")
-                    }).optional().describe("OPTIONAL: Only configure if you have verified the exact pagination mechanism from the API documentation. For OFFSET_BASED, ALWAYS use <<offset>>. If PAGE_BASED, ALWAYS use <<page>>. If CURSOR_BASED, ALWAYS use <<cursor>> in the URL, headers, or body.")
+                    }).optional().describe("OPTIONAL: Only configure if you are using pagination variables in the URL, headers, or body. For OFFSET_BASED, ALWAYS use <<offset>>. If PAGE_BASED, ALWAYS use <<page>>. If CURSOR_BASED, ALWAYS use <<cursor>>.")
                 }).describe("Complete API configuration for this step")
             })).describe("Array of workflow steps with full configuration"),
             finalTransform: z.string().describe("JavaScript function to transform the final workflow output to match responseSchema. Format: (sourceData) => ({ result: sourceData }). Access step results via sourceData.stepId"),
