@@ -121,13 +121,7 @@ export async function callPostgres(endpoint: ApiConfig, payload: Record<string, 
 
   const poolConfig: PoolConfig = {
     connectionString,
-    statement_timeout: options?.timeout || server_defaults.POSTGRES.DEFAULT_TIMEOUT,
-    ssl: {
-      rejectUnauthorized: false, // Set to true for production with valid certs
-      // ca: fs.readFileSync('path/to/ca-cert.pem'), // Optional: CA certificate
-      // cert: fs.readFileSync('path/to/client-cert.pem'), // Optional: client certificate
-      // key: fs.readFileSync('path/to/client-key.pem'), // Optional: client key
-    }
+    statement_timeout: options?.timeout || server_defaults.POSTGRES.DEFAULT_TIMEOUT
   };
 
   // Get or create pool from cache
