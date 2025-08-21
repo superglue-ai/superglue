@@ -286,6 +286,7 @@ export class OpenAIModel implements LLM {
       } as LLMObjectResponse;
 
     } catch (error) {
+      console.error('Error in generateObject with Responses API:', error);
       const updatedMessages = [...messages, {
         role: "assistant",
         content: "Error: " + error.message
