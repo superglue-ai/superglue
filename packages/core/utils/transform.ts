@@ -1,6 +1,5 @@
 import { Integration, RequestOptions, TransformConfig, TransformInputRequest } from "@superglue/client";
 import type { DataStore, Metadata } from "@superglue/shared";
-import pkg from 'lodash';
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import prettier from "prettier";
 import { server_defaults } from "../default.js";
@@ -8,8 +7,7 @@ import { toJsonSchema } from "../external/json-schema.js";
 import { LanguageModel } from "../llm/llm.js";
 import { PROMPT_JS_TRANSFORM } from "../llm/prompts.js";
 import { logMessage } from "./logs.js";
-import { getSchemaFromData, isSelfHealingEnabled, transformAndValidateSchema } from "./tools.js";
-const { get } = pkg;
+import { getSchemaFromData, isSelfHealingEnabled, sample, transformAndValidateSchema } from "./tools.js";
 
 export async function executeTransform(args: {
   datastore: DataStore,
@@ -119,7 +117,7 @@ export async function generateTransformCode({
 ${instruction ? `<user_instruction>${instruction}</user_instruction>` : ''}
 ${schema && Object.keys(schema).length > 0 ? `<target_schema>${JSON.stringify(schema, null, 2)}</target_schema>` : ''}
 <source_data_structure>${getSchemaFromData(payload)}</source_data_structure>
-Use get_source_field tool to get the source data.
+<source_data_sample>${JSON.stringify(sample(payload, 5), null, 2).slice(0, 50000)}</source_data_sample>
 ${integrations && integrations.length > 0 ? `<source_integrations>
 ${integrations.map(i => `${i.id}: ${i.specificInstructions || ''}`).join('\n\n  \n')}
 </source_integrations>` : ''}
@@ -141,25 +139,7 @@ ${integrations.map(i => `${i.id}: ${i.specificInstructions || ''}`).join('\n\n  
       additionalProperties: false
     };
 
-    const { response, messages: updatedMessages } = await LanguageModel.generateObject(messages, mappingSchema, temperature, [
-      {
-        name: "get_source_field",
-        description: "Query 10000 characters of a specific field from the source data with lodash.get().",
-        arguments: {
-          type: "object",
-          properties: {
-            path: { type: "string", description: "The path to the field to get. leave empty to get the entire source data." },
-            offset: { type: "number", description: "The offset in the string response" }
-          }
-        },
-        execute: async (args: { path?: string, offset?: number }) => {
-          console.log("get_source_field", args);
-          const offset = args.offset || 0;
-          const value = JSON.stringify(args.path ? get(payload, args.path) : payload, null, 2)?.slice(offset, offset + 10000);
-          return { success: value !== undefined, value: value };
-        }
-      }
-    ]);
+    const { response, messages: updatedMessages } = await LanguageModel.generateObject(messages, mappingSchema, temperature);
     messages = updatedMessages;
     try {
       if(!response.mappingCode) {
