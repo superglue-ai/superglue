@@ -1094,7 +1094,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                     {showSchemaEditor && (
                       <div className="mt-2 mb-4">
                         <JsonSchemaEditor
-                          isOptional={true}
                           value={schema}
                           onChange={setSchema}
                         />
