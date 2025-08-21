@@ -1,10 +1,29 @@
 import OpenAI from "openai";
 import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
+import { server_defaults } from "../default.js";
 import { ToolDefinition } from "../tools/tools.js";
 import { parseJSON } from "../utils/json-parser.js";
 import { addNullableToOptional } from "../utils/tools.js";
 import { LLM, LLMObjectResponse, LLMResponse } from "./llm.js";
 
+type ReasoningEffort = "minimal" | "low" | "medium" | "high";
+type VerbosityLevel = "low" | "medium" | "high";
+
+interface ResponsesParamsOptions {
+  model: string;
+  desiredTemperature?: number;
+  desiredReasoningEffort?: ReasoningEffort;
+  desiredVerbosity?: VerbosityLevel;
+  hasWebSearchTool?: boolean;
+  forceToolUse?: boolean;
+}
+
+interface ResponsesParamsConfig {
+  temperature?: number;
+  reasoning?: { effort: ReasoningEffort };
+  text?: { verbosity: VerbosityLevel };
+  tool_choice?: "auto" | "required";
+}
 
 export class OpenAIModel implements LLM {
   public contextLength: number = 128000;
@@ -16,7 +35,8 @@ export class OpenAIModel implements LLM {
     this.client = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY || "",
       baseURL: process.env.OPENAI_BASE_URL,
-      timeout: 60000,
+      timeout: server_defaults.LLM.REQUEST_TIMEOUT_MS,
+      maxRetries: server_defaults.LLM.MAX_INTERNAL_RETRIES,
     });
   }
   async generateText(messages: ChatCompletionMessageParam[], temperature: number = 0): Promise<LLMResponse> {
@@ -38,8 +58,8 @@ export class OpenAIModel implements LLM {
       const response = await (this.client.responses.create as any)({
         model: this.model,
         input: input as any,
-        temperature: process.env.OPENAI_MODEL?.startsWith('o') ? undefined : temperature,
-        store: false  // Don't store for simple text generation
+        store: false,  // Don't store for simple text generation
+        ...this.getResponsesParamsForModel({ model: this.model, desiredTemperature: temperature })
       }) as any;
 
       // Extract text response
@@ -73,9 +93,9 @@ export class OpenAIModel implements LLM {
       // Fall back to chat completions API
       const result = await this.client.chat.completions.create({
         messages: [dateMessage as ChatCompletionMessageParam, ...messages],
-        model: process.env.OPENAI_MODEL || "gpt-4.1",
-        temperature: process.env.OPENAI_MODEL?.startsWith('o') ? undefined : temperature
-      });
+        model: this.model || process.env.OPENAI_MODEL || "gpt-4.1",
+        ...this.getChatCompletionsParamsForModel({ model: this.model, desiredTemperature: temperature })
+      } as any);
 
       let responseText = result.choices[0].message.content;
 
@@ -134,7 +154,7 @@ export class OpenAIModel implements LLM {
     const name = toolCallData.name || toolCallData.function?.name;
     const callId = toolCallData.call_id || toolCallData.id;
     const args = toolCallData.arguments || toolCallData.function?.arguments;
-    
+
     if (name === "submit") {
       let finalResult = typeof args === "string" ? parseJSON(args) : args;
       if (finalResult.___results) {
@@ -211,31 +231,30 @@ export class OpenAIModel implements LLM {
     ];
 
     try {
-      // Use the Responses API with multi-turn support
       let finalResult = null;
-      // if the first message is the date message, don't add it again
-      let conversationMessages: any = String(messages[0]?.content)?.startsWith("The current date and time is") ? 
+      let conversationMessages: any = String(messages[0]?.content)?.startsWith("The current date and time is") ?
         messages : [dateMessage, ...messages];
 
-      // Continue until the model calls submit
       while (finalResult === null) {
         const requestParams: any = {
-          model: process.env.OPENAI_MODEL || "gpt-4.1",
+          model: this.model || process.env.OPENAI_MODEL || "gpt-4.1",
           tools: tools,
-          temperature: temperature,
-          tool_choice: "required"
+          input: conversationMessages,
+          ...this.getResponsesParamsForModel({
+            model: this.model,
+            desiredTemperature: temperature,
+            hasWebSearchTool: true,
+            forceToolUse: true
+          })
         };
 
-        requestParams.input = conversationMessages;
         const response = await (this.client.responses.create as any)(requestParams);
 
-        // Extract the result from the response
         const output = response.output || [];
 
         for (const item of output) {
           conversationMessages.push(item);
-          
-          // Check for direct function calls
+
           if (item?.type === "function_call") {
             const { finalResult: result, shouldBreak } = await this.processToolCall(
               item,
@@ -248,8 +267,7 @@ export class OpenAIModel implements LLM {
               break;
             }
           }
-          
-          // Check for tool calls within messages
+
           if (item?.type === "message") {
             for (const toolCall of item?.tool_calls || []) {
               const { finalResult: result, shouldBreak } = await this.processToolCall(
@@ -267,14 +285,11 @@ export class OpenAIModel implements LLM {
           }
         }
 
-        // Add a safety check to prevent infinite loops
-        // If we've made too many attempts, throw an error
         if (!finalResult && output.length === 0) {
           throw new Error("No output received from the model");
         }
       }
 
-      // Convert back to messages format for compatibility
       const updatedMessages = [...conversationMessages, {
         role: "assistant",
         content: JSON.stringify(finalResult)
@@ -296,5 +311,55 @@ export class OpenAIModel implements LLM {
         messages: updatedMessages
       } as LLMObjectResponse;
     }
+  }
+
+  private getResponsesParamsForModel(options: ResponsesParamsOptions): ResponsesParamsConfig {
+    const model = String(options.model || "").toLowerCase();
+    const isGpt5 = model.startsWith("gpt-5");
+    const isOModel = model.startsWith("o");
+
+    const params: ResponsesParamsConfig = {};
+
+    if (!isGpt5 && !isOModel) {
+      params.temperature = options.desiredTemperature;
+    }
+
+    if (isGpt5) {
+      // Reasoning effort: default to low, upgrade minimal to low if web_search is present
+      let effort: ReasoningEffort = options.desiredReasoningEffort || "low";
+      if (options.hasWebSearchTool && effort === "minimal") {
+        effort = "low"; // web_search doesn't work with minimal
+      }
+      params.reasoning = { effort };
+      params.text = { verbosity: options.desiredVerbosity || "low" };
+      params.tool_choice = "auto"; // GPT-5 requires auto when web_search is present
+    } else if (options.forceToolUse && !isOModel) {
+      params.tool_choice = "required";
+    }
+
+    return params;
+  }
+
+  private getChatCompletionsParamsForModel(options: ResponsesParamsOptions): Record<string, any> {
+    const model = String(options.model || "").toLowerCase();
+    const isGpt5 = model.startsWith("gpt-5");
+    const isOModel = model.startsWith("o");
+
+    const params: Record<string, any> = {};
+
+    if (!isGpt5 && !isOModel) {
+      params.temperature = options.desiredTemperature;
+    }
+
+    if (isGpt5) {
+      let effort: ReasoningEffort = options.desiredReasoningEffort || "low";
+      if (options.hasWebSearchTool && effort === "minimal") {
+        effort = "low";
+      }
+      params.reasoning_effort = effort;
+      params.verbosity = options.desiredVerbosity || "low";
+    }
+
+    return params;
   }
 }

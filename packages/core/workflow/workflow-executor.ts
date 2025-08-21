@@ -114,8 +114,10 @@ export class WorkflowExecutor implements Workflow {
         try {
           // Apply the final transform using the original data
           let currentFinalTransform = this.finalTransform || "(sourceData) => sourceData";
+          logMessage("debug", `Applying final transform: ${currentFinalTransform.slice(0, 200)}...`, this.metadata);
           const finalResult = await transformAndValidateSchema(rawStepData, currentFinalTransform, this.responseSchema);
           if (!finalResult.success) {
+            logMessage("warn", `Final transform validation failed: ${finalResult.error}`, this.metadata);
             throw new Error(finalResult.error);
           }
 
@@ -146,14 +148,16 @@ export class WorkflowExecutor implements Workflow {
           this.result.success = true; // Ensure success is true if transform succeeds
         } catch (transformError) {
           // Check if self-healing is enabled before regenerating
+          logMessage("debug", `Transform error occurred. Self-healing mode: ${options?.selfHealing}, Is enabled: ${isSelfHealingEnabled(options, "transform")}`, this.metadata);
           if (!isSelfHealingEnabled(options, "transform")) {
             // If self-healing is disabled, fail with the original error
+            logMessage("info", `Self-healing disabled, failing with error: ${transformError?.message || transformError}`, this.metadata);
             this.result.success = false;
             this.result.error = transformError?.message || transformError;
             this.result.completedAt = new Date();
             return this.result;
           }
-          
+
           logMessage("info", `Preparing new final transform`, this.metadata);
           const instruction = "Generate the final transformation code." +
             (this.instruction ? " with the following instruction: " + this.instruction : "") +

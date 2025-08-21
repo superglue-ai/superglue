@@ -332,24 +332,69 @@ export class GeminiModel implements LLM {
         return schema;
     }
 
-    private convertToGeminiHistory(messages: ChatCompletionMessageParam[]): { geminiHistory: any; systemInstruction: any; userPrompt: any; } {
+    private convertToGeminiHistory(messages: ChatCompletionMessageParam[]): { geminiHistory: any[]; systemInstruction: string | undefined; userPrompt: any; } {
         const geminiHistory: any[] = [];
-        let userPrompt: any;
-        let systemInstruction: any;
-        for (var i = 0; i < messages.length; i++) {
-            if (messages[i].role == "system") {
-                systemInstruction = messages[i].content;
-                continue;
-            }
-            if (i == messages.length - 1) {
-                userPrompt = messages[i].content;
-                continue;
+        let systemInstruction: string | undefined;
+
+        const systemMessage = messages.find(m => m.role === 'system');
+        if (systemMessage) {
+            systemInstruction = systemMessage.content as string;
+        }
+
+        const historyMessages = messages.filter(m => m.role !== 'system');
+        const lastMessage = historyMessages.pop();
+        const userPrompt = lastMessage?.content ?? "";
+
+        for (const message of historyMessages) {
+            let parts: any[] = [];
+            if (message.content) {
+                parts.push({ text: message.content });
             }
 
-            geminiHistory.push({
-                role: messages[i].role == "assistant" ? "model" : messages[i].role,
-                parts: [{ text: messages[i].content }]
-            });
+            if (message.role === 'assistant' && message.tool_calls) {
+                const functionCalls = message.tool_calls.map(tc => {
+                    try {
+                        return {
+                            name: tc.function.name,
+                            args: JSON.parse(tc.function.arguments)
+                        };
+                    } catch (e) {
+                        return {
+                            name: tc.function.name,
+                            args: {}
+                        };
+                    }
+                });
+
+                if (functionCalls.length > 0) {
+                    parts = [{ functionCall: functionCalls[0] }];
+                }
+            } else if (message.role === 'tool') {
+                let toolContent: any;
+                try {
+                    toolContent = JSON.parse(message.content as string);
+                } catch (e) {
+                    toolContent = { content: message.content };
+                }
+
+                const assistantToolCall = messages
+                    .flatMap(m => (m.role === 'assistant' && m.tool_calls) ? m.tool_calls : [])
+                    .find(tc => tc.id === message.tool_call_id);
+
+                parts = [{
+                    functionResponse: {
+                        name: assistantToolCall?.function.name || '',
+                        response: toolContent
+                    }
+                }];
+            }
+
+            if (parts.length > 0) {
+                geminiHistory.push({
+                    role: message.role === 'assistant' ? 'model' : 'user',
+                    parts
+                });
+            }
         }
         return { geminiHistory, systemInstruction, userPrompt };
     }

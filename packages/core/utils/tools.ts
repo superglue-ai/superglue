@@ -131,7 +131,7 @@ export async function transformAndValidateSchema(data: any, expr: string, schema
       result = { success: true, data: data };
     }
     const ARROW_FUNCTION_PATTERN = /^\s*\([^)]+\)\s*=>/;
-    
+
     if (ARROW_FUNCTION_PATTERN.test(expr)) {
       result = await executeAndValidateMappingCode(data, expr, schema);
     } else {
@@ -531,6 +531,10 @@ export async function evaluateStopCondition(
 }
 
 export function isSelfHealingEnabled(options: RequestOptions, type: "transform" | "api"): boolean {
+  if (options?.selfHealing === SelfHealingMode.DISABLED) {
+    return false;
+  }
+
   if (type === "transform") {
     return options?.selfHealing ? options.selfHealing === SelfHealingMode.ENABLED || options.selfHealing === SelfHealingMode.TRANSFORM_ONLY : true;
   }

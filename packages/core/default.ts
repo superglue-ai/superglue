@@ -23,10 +23,10 @@ export const server_defaults = {
         MAX_TOTAL_CONTENT_SIZE: 10 * 1024 * 1024, // 10MB total budget for all pages combined
         TIMEOUTS: {
             AXIOS: 120000,
-            PLAYWRIGHT: 120000, 
+            PLAYWRIGHT: 120000,
             EVAL_DOC_PROCESSING_TIMEOUT: 1200000,
             SITEMAP_FETCH: 60000,
-            SITEMAP_PROCESSING_TOTAL: 120000 
+            SITEMAP_PROCESSING_TOTAL: 120000
         }
     },
     HTML_MARKDOWN_POOL: {
@@ -45,5 +45,9 @@ export const server_defaults = {
         DEFAULT_TIMEOUT: 30000, // 30 seconds
         DEFAULT_RETRIES: 0,
         DEFAULT_RETRY_DELAY: 1000, // 1 second
+    },
+    LLM: {
+        REQUEST_TIMEOUT_MS: 60000, // 60 seconds per LLM API request
+        MAX_INTERNAL_RETRIES: 0, // Disable OpenAI SDK's internal retry mechanism
     }
 }

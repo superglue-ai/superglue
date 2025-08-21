@@ -208,14 +208,28 @@ export const submitToolDefinition: ToolDefinition = {
                         description: "HTTP method"
                     },
                     queryParams: {
-                        type: "object",
+                        type: "array",
                         description: "Query parameters as key-value pairs. Use <<variable>> syntax for dynamic values or JavaScript expressions.",
-                        additionalProperties: { type: "string" }
+                        items: {
+                            type: "object",
+                            properties: {
+                                key: { type: "string" },
+                                value: { type: "string" }
+                            },
+                            required: ["key", "value"]
+                        }
                     },
                     headers: {
-                        type: "object",
+                        type: "array",
                         description: "HTTP headers as key-value pairs. Use <<variable>> syntax for dynamic values or JavaScript expressions",
-                        additionalProperties: { type: "string" }
+                        items: {
+                            type: "object",
+                            properties: {
+                                key: { type: "string" },
+                                value: { type: "string" }
+                            },
+                            required: ["key", "value"]
+                        }
                     },
                     body: {
                         type: "string",

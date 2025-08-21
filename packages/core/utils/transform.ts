@@ -166,37 +166,50 @@ export async function evaluateMapping(
   try {
     logMessage('info', "Evaluating mapping", metadata);
 
-    const systemPrompt = `You are a data transformation evaluator. Your task is to assess if the 'transformedData' is a correct and high-quality transformation of the 'sourcePayload' according to the 'targetSchema'.
-${instruction ? `The user's original instruction for the transformation was: "${instruction}"` : 'No specific transformation instruction was provided by the user; focus on accurately mapping source data to the target schema.'}
-Return { success: true, reason: "Transformation is correct, complete, and aligns with the objectives." } if the transformed data accurately reflects the source data, matches the target schema, and (if provided) adheres to the user's instruction.
-If the transformation is incorrect, incomplete, introduces errors, misses crucial data from the source payload that could map to the target schema, or (if an instruction was provided) fails to follow it, return { success: false, reason: "Describe the issue with the transformation, specifically referencing how it deviates from the schema or instruction." }.
-Consider if all relevant parts of the sourcePayload have been used to populate the targetSchema where applicable.
-If transformedData is missing required or key fields (such as empty strings) while the sourcePayload clearly contains matching, decodable, or otherwise directly applicable data, this should be marked as a failure even if the mapping code appears structurally correct.
-In these cases, the what should be in the output according to visible sample source data takes priority over the mere presence or "correctness" of the mapping code.
-If the transformedData is empty or missing key fields, but the sourcePayload is not, this is likely an issue unless the targetSchema itself implies an empty object/missing fields are valid under certain source conditions.
-Focus on data accuracy and completeness of the mapping, and adherence to the instruction if provided.
-Keep in mind that you only get a sample of the source data and the transformed data. Samples mean that each array is randomized and reduced to the first 5 entries. If in doubt, check the mapping code. If that is correct, all is good.
-So, do NOT fail the evaluation if the arrays in the transformed data are different from the source data but the code is correct, look at the STRUCTURE of the data and the adherence of the transformedData to the targetSchema.
-Also, if data is not required in the target schema and is missing from the transformed data it is not an issue. Be particularly lenient with arrays since the data might be sampled out.
+    const systemPrompt = `You are a data transformation evaluator assessing if the mapping code correctly implements the transformation logic.
+
+${instruction ? `The user's instruction: "${instruction}"` : 'No specific instruction provided; focus on mapping source to target schema.'}
+
+CRITICAL: You are viewing ONLY 5 random samples from potentially thousands of records. The mapping code operates on the FULL dataset.
+
+ONLY fail the evaluation if you find:
+1. Syntax errors or code that would crash
+2. Clear logic errors (e.g., using wrong operators, accessing non-existent properties that would cause runtime errors)
+3. Output that violates the target schema structure
+4. Direct contradiction of explicit instructions (not assumptions based on samples)
+
+DO NOT fail for:
+- Field choices that differ from what you see in samples - the full data may contain values you don't see
+- Missing values in output samples - they may come from records not in your sample
+- Filter conditions that seem incorrect based on samples - trust the instruction over sample inference
+- Empty arrays or filtered results - the sample may not contain matching records
+- Field mappings you cannot verify from the limited sample
+- Using a field mentioned in the instruction even if it's not visible in your 5-record sample
+
+When the instruction specifies exact field names or conditions, trust the instruction even if you don't see those values in the sample. The instruction was written with knowledge of the full dataset.
+
+Focus on data accuracy and completeness of the mapping logic, and adherence to the instruction if provided.
+Be particularly lenient with arrays and filtered data since the samples may not contain all relevant records.
+Return { success: true, reason: "Mapping follows instruction and appears logically sound" } unless you find definitive errors in the code logic itself.
 `;
     const userPrompt = `
 <Target Schema>
 ${JSON.stringify(targetSchema, null, 2)}
 </Target Schema>
 
-<Source Payload Sample> // arrays are randomized and reduced to the first 5 entries, max 10KB
+<Source Payload Sample> // Random sample of 5 items per array, actual datasets may be much larger
 ${JSON.stringify(sample(sourcePayload, 5), null, 2).slice(0, 50000)}
 </Source Payload Sample>
 
-<Transformed Data Sample> // arrays are randomized and reduced to the first 5 entries, max 10KB
+<Transformed Data Sample> // Random sample of 5 items per array, actual datasets may be much larger
 ${JSON.stringify(sample(transformedData, 5), null, 2).slice(0, 50000)}
 </Transformed Data Sample>
 
-<Mapping Code> // this is the code that was used to transform the data
+<Mapping Code> // The actual transformation logic applied to the full dataset
 ${mappingCode}
 </Mapping Code>
 
-Critical:Please evaluate the transformation based on the criteria mentioned in the system prompt. `;
+Please evaluate the transformation based on the criteria in the system prompt, considering that samples may not show all data values present in the full dataset.`;
 
     const messages: ChatCompletionMessageParam[] = [
       { role: "system", content: systemPrompt },
@@ -212,10 +225,7 @@ Critical:Please evaluate the transformation based on the criteria mentioned in t
       required: ["success", "reason"],
       additionalProperties: false
     };
-
-    // Using temperature 0 for more deterministic evaluation
     const { response } = await LanguageModel.generateObject(messages, llmResponseSchema, 0);
-
     return response;
 
   } catch (error) {

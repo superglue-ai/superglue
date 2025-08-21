@@ -411,7 +411,7 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
         payload: JSON.parse(payload || '{}'),
         credentials: JSON.parse(credentials || '{}'),
         options: {
-          testMode: true
+          testMode: false // IMO this is not needed here. Should be set to true if the workflow is edited in some form in the playground
         }
       });
 
