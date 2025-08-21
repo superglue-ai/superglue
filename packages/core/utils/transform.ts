@@ -1,12 +1,15 @@
-import { RequestOptions, TransformConfig, TransformInputRequest } from "@superglue/client";
+import { Integration, RequestOptions, TransformConfig, TransformInputRequest } from "@superglue/client";
 import type { DataStore, Metadata } from "@superglue/shared";
+import pkg from 'lodash';
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import prettier from "prettier";
 import { server_defaults } from "../default.js";
+import { toJsonSchema } from "../external/json-schema.js";
 import { LanguageModel } from "../llm/llm.js";
 import { PROMPT_JS_TRANSFORM } from "../llm/prompts.js";
 import { logMessage } from "./logs.js";
-import { getSchemaFromData, isSelfHealingEnabled, sample, transformAndValidateSchema } from "./tools.js";
+import { getSchemaFromData, isSelfHealingEnabled, transformAndValidateSchema } from "./tools.js";
+const { get } = pkg;
 
 export async function executeTransform(args: {
   datastore: DataStore,
@@ -14,7 +17,8 @@ export async function executeTransform(args: {
   input: TransformInputRequest,
   data: any,
   options?: RequestOptions,
-  metadata: Metadata
+  metadata: Metadata,
+  integrations?: Integration[]
 }): Promise<{ data?: any; config?: TransformConfig }> {
   const { datastore, fromCache, input, data, metadata, options } = args;
   let currentConfig = input.endpoint;
@@ -61,12 +65,13 @@ export async function executeTransform(args: {
       throw new Error(transformError);
     }
 
-    const result = await generateTransformCode(
-      currentConfig.responseSchema,
-      data,
-      instruction,
-      metadata
-    );
+    const result = await generateTransformCode({
+      schema: currentConfig.responseSchema,
+      payload: data,
+      instruction: instruction,
+      metadata: metadata,
+      integrations: args.integrations
+    });
 
     if (!result || !result?.mappingCode) {
       throw new Error("Failed to generate transformation mapping");
@@ -87,13 +92,23 @@ export async function executeTransform(args: {
   }
 }
 
-export async function generateTransformCode(
+export async function generateTransformCode({
+  schema,
+  payload,
+  instruction,
+  metadata,
+  retry = 0,
+  messages = [],
+  integrations = []
+}: {
   schema: any,
   payload: any,
   instruction: string,
   metadata: Metadata,
-  retry = 0,
+  retry?: number,
   messages?: ChatCompletionMessageParam[]
+  integrations?: Integration[]
+}
 ): Promise<{ mappingCode: string; data?: any } | null> {
   try {
     logMessage('info', "Generating mapping" + (retry > 0 ? ` (retry ${retry})` : ''), metadata);
@@ -102,9 +117,12 @@ export async function generateTransformCode(
       const userPrompt =
         `Given a source data and structure, create a JavaScript function (as a string) that transforms the input data according to the instruction.
 ${instruction ? `<user_instruction>${instruction}</user_instruction>` : ''}
-${schema ? `<target_schema>${JSON.stringify(schema, null, 2)}</target_schema>` : ''}
+${schema && Object.keys(schema).length > 0 ? `<target_schema>${JSON.stringify(schema, null, 2)}</target_schema>` : ''}
 <source_data_structure>${getSchemaFromData(payload)}</source_data_structure>
-<source_data_sample>${JSON.stringify(sample(payload, 2), null, 2).slice(0, 50000)}</source_data_sample>
+Use get_source_field tool to get the source data.
+${integrations && integrations.length > 0 ? `<source_integrations>
+${integrations.map(i => `${i.id}: ${i.specificInstructions || ''}`).join('\n\n  \n')}
+</source_integrations>` : ''}
 `;
       messages = [
         { role: "system", content: PROMPT_JS_TRANSFORM },
@@ -123,9 +141,30 @@ ${schema ? `<target_schema>${JSON.stringify(schema, null, 2)}</target_schema>` :
       additionalProperties: false
     };
 
-    const { response, messages: updatedMessages } = await LanguageModel.generateObject(messages, mappingSchema, temperature);
+    const { response, messages: updatedMessages } = await LanguageModel.generateObject(messages, mappingSchema, temperature, [
+      {
+        name: "get_source_field",
+        description: "Query 10000 characters of a specific field from the source data with lodash.get().",
+        arguments: {
+          type: "object",
+          properties: {
+            path: { type: "string", description: "The path to the field to get. leave empty to get the entire source data." },
+            offset: { type: "number", description: "The offset in the string response" }
+          }
+        },
+        execute: async (args: { path?: string, offset?: number }) => {
+          console.log("get_source_field", args);
+          const offset = args.offset || 0;
+          const value = JSON.stringify(args.path ? get(payload, args.path) : payload, null, 2)?.slice(offset, offset + 10000);
+          return { success: value !== undefined, value: value };
+        }
+      }
+    ]);
     messages = updatedMessages;
     try {
+      if(!response.mappingCode) {
+        throw new Error("No mapping code generated: " + JSON.stringify(response));
+      }
       // Autoformat the generated code
       response.mappingCode = await prettier.format(response.mappingCode, { parser: "babel" });
       const validation = await transformAndValidateSchema(payload, response.mappingCode, schema);
@@ -138,7 +177,14 @@ ${schema ? `<target_schema>${JSON.stringify(schema, null, 2)}</target_schema>` :
     }
 
     // Optionally, evaluate mapping quality as before
-    const evaluation = await evaluateMapping(response.data, response.mappingCode, payload, schema, instruction, metadata);
+    const evaluation = await evaluateMapping({
+      transformedData: response.data,
+      mappingCode: response.mappingCode,
+      sourcePayload: payload,
+      targetSchema: schema,
+      instruction: instruction,
+      metadata: metadata
+    });
     if (!evaluation.success) {
       throw new Error(`Mapping evaluation failed: ${evaluation.reason}`);
     }
@@ -149,52 +195,72 @@ ${schema ? `<target_schema>${JSON.stringify(schema, null, 2)}</target_schema>` :
       const errorMessage = String(error.message);
       logMessage('warn', "Error generating JS mapping: " + errorMessage.slice(0, 1000), metadata);
       messages?.push({ role: "user", content: errorMessage });
-      return generateTransformCode(schema, payload, instruction, metadata, retry + 1, messages);
+      return generateTransformCode({
+        schema: schema,
+        payload: payload,
+        instruction: instruction,
+        metadata: metadata,
+        retry: retry + 1,
+        messages: messages,
+        integrations: integrations
+      });
     }
   }
   return null;
 }
 
-export async function evaluateMapping(
+export async function evaluateMapping({
+  transformedData,
+  mappingCode,
+  sourcePayload,
+  targetSchema,
+  instruction,
+  metadata
+}:{
   transformedData: any,
   mappingCode: string,
   sourcePayload: any,
   targetSchema: any,
   instruction: string,
   metadata: Metadata
+}
 ): Promise<{ success: boolean; reason: string }> {
   try {
     logMessage('info', "Evaluating mapping", metadata);
+    const systemPrompt = `You are a data transformation evaluator. Your task is to assess if the 'transformed_data' is a correct and high-quality transformation of the 'source_payload' that strictly follows the 'instruction' and the 'targetSchema'.
+Return { success: true, reason: "" } if the transformed data accurately reflects the source data, matches the target schema, and (if provided) adheres to the user's instruction.
+Return { success: false, reason: "Describe the issue with the transformation, specifically referencing how it deviates from the schema or instruction." } if the transformation code is incorrect or incomplete.
 
-    const systemPrompt = `You are a data transformation evaluator. Your task is to assess if the 'transformedData' is a correct and high-quality transformation of the 'sourcePayload' according to the 'targetSchema'.
-${instruction ? `The user's original instruction for the transformation was: "${instruction}"` : 'No specific transformation instruction was provided by the user; focus on accurately mapping source data to the target schema.'}
-Return { success: true, reason: "Transformation is correct, complete, and aligns with the objectives." } if the transformed data accurately reflects the source data, matches the target schema, and (if provided) adheres to the user's instruction.
-If the transformation is incorrect, incomplete, introduces errors, misses crucial data from the source payload that could map to the target schema, or (if an instruction was provided) fails to follow it, return { success: false, reason: "Describe the issue with the transformation, specifically referencing how it deviates from the schema or instruction." }.
-Consider if all relevant parts of the sourcePayload have been used to populate the targetSchema where applicable.
-If transformedData is missing required or key fields (such as empty strings) while the sourcePayload clearly contains matching, decodable, or otherwise directly applicable data, this should be marked as a failure even if the mapping code appears structurally correct.
-In these cases, the what should be in the output according to visible sample source data takes priority over the mere presence or "correctness" of the mapping code.
-If the transformedData is empty or missing key fields, but the sourcePayload is not, this is likely an issue unless the targetSchema itself implies an empty object/missing fields are valid under certain source conditions.
-Focus on data accuracy and completeness of the mapping, and adherence to the instruction if provided.
-Keep in mind that you only get a sample of the source data and the transformed data. Samples mean that each array is randomized and reduced to the first 5 entries. If in doubt, check the mapping code. If that is correct, all is good.
-So, do NOT fail the evaluation if the arrays in the transformed data are different from the source data but the code is correct, look at the STRUCTURE of the data and the adherence of the transformedData to the targetSchema.
-Also, if data is not required in the target schema and is missing from the transformed data it is not an issue. Be particularly lenient with arrays since the data might be sampled out.
+Apply the following strategy to evaluate the transformation:
+- Is the transformed data correct and complete given the available source data? If the output of a given field is not available or always the default, this could be a failure.
+- Is the transformation code correct and complete?
+- Do all field references in the transformation code match the field names in the source data, if available?
+- Does the transformation and the output data adhere to the user's instruction and the target schema?
+- If data is not required in the target schema and is missing from the transformed data it is not an issue. Be particularly lenient with arrays since the data might be sampled out.
+- Keep in mind that you only get a sample of the source data and the transformed data. Samples mean that each array is randomized and reduced to the first 5 entries. If in doubt, check the mapping code. If that is correct, all is good.
+- Pay particular attention to output fields that have default values but should not - this is almost always a wrong field path.
+
 `;
     const userPrompt = `
+<User Instruction>
+${instruction ? `${instruction}` : 'No specific transformation instruction was provided by the user; focus on accurately mapping source data to the target schema.'}
+</User Instruction>
+
 <Target Schema>
 ${JSON.stringify(targetSchema, null, 2)}
 </Target Schema>
 
-<Source Payload Sample> // arrays are randomized and reduced to the first 5 entries, max 10KB
-${JSON.stringify(sample(sourcePayload, 5), null, 2).slice(0, 50000)}
-</Source Payload Sample>
+<Source Payload Schema> // first 50000 characters of the source payload schema
+${JSON.stringify(toJsonSchema(sourcePayload)).slice(0, 50000)}
+</Source Payload Schema>
 
-<Transformed Data Sample> // arrays are randomized and reduced to the first 5 entries, max 10KB
-${JSON.stringify(sample(transformedData, 5), null, 2).slice(0, 50000)}
-</Transformed Data Sample>
+<Transformed Data Schema> // first 50000 characters of the transformed data schema
+${JSON.stringify(toJsonSchema(transformedData)).slice(0, 50000)}
+</Transformed Data Schema>
 
-<Mapping Code> // this is the code that was used to transform the data
+<Transformation Code> // this is the code that was used to transform the data
 ${mappingCode}
-</Mapping Code>
+</Transformation Code>
 
 Critical:Please evaluate the transformation based on the criteria mentioned in the system prompt. `;
 
@@ -216,7 +282,7 @@ Critical:Please evaluate the transformation based on the criteria mentioned in t
     // Using temperature 0 for more deterministic evaluation
     const { response } = await LanguageModel.generateObject(messages, llmResponseSchema, 0);
 
-    return response;
+      return response;
 
   } catch (error) {
     const errorMessage = String(error instanceof Error ? error.message : error);

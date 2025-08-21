@@ -110,7 +110,13 @@ ${Object.keys(payload).map(key => {
 The function should return an array of items that this step will iterate over.`;
 
         const arraySchema = { type: "array", description: "Array of items to iterate over" };
-        const transformResult = await generateTransformCode(arraySchema, payload, instruction, metadata);
+        const transformResult = await generateTransformCode({
+          schema: arraySchema,
+          payload: payload,
+          instruction: instruction,
+          metadata: metadata,
+          integrations: [integrationManager?.toIntegrationSync()]
+        });
 
         step.loopSelector = transformResult.mappingCode;
         const retryResult = await transformAndValidateSchema(payload, step.loopSelector, null);

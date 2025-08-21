@@ -120,14 +120,14 @@ export class WorkflowExecutor implements Workflow {
           }
 
           if (options?.testMode) {
-            const testResult = await evaluateMapping(
-              finalResult.data,
-              currentFinalTransform,
-              rawStepData,
-              this.responseSchema,
-              this.instruction,
-              this.metadata
-            );
+            const testResult = await evaluateMapping({
+              transformedData: finalResult.data,
+              mappingCode: currentFinalTransform,
+              sourcePayload: rawStepData,
+              targetSchema: this.responseSchema,
+              instruction: this.instruction,
+              metadata: this.metadata
+            });
             if (!testResult.success) {
               throw new Error(testResult.reason);
             }
@@ -155,11 +155,17 @@ export class WorkflowExecutor implements Workflow {
           }
           
           logMessage("info", `Preparing new final transform`, this.metadata);
-          const instruction = "Generate the final transformation code." +
+          const instruction = "Generate the final transformation code" +
             (this.instruction ? " with the following instruction: " + this.instruction : "") +
-            (this.finalTransform ? "\nOriginally, we used the following transformation, fix it without messing up future transformations with the original data: " + this.finalTransform : "");
+            (this.finalTransform ? "\nThe following transformation failed, make sure to account for all edge cases and errors in there when creating the new transformation: " + this.finalTransform : "");
 
-          const newTransformConfig = await generateTransformCode(this.responseSchema, rawStepData, instruction, this.metadata);
+          const newTransformConfig = await generateTransformCode({
+            schema: this.responseSchema,
+            payload: rawStepData,
+            instruction: instruction,
+            metadata: this.metadata,
+            integrations: Object.values(this.integrations).map(i => i.toIntegrationSync())
+          });
           if (!newTransformConfig) {
             throw new Error("Failed to generate new final transform");
           }
