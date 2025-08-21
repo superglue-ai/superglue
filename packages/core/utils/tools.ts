@@ -484,31 +484,24 @@ export async function evaluateStopCondition(
 
   try {
     const context = await isolate.createContext();
-
-    // Inject the response and pageInfo as JSON strings
-    // legacy support for direct response data access
-    await context.global.set('responseJSON', JSON.stringify({ data: response.data, headers: response.headers, ...response.data }));
-    await context.global.set('pageInfoJSON', JSON.stringify(pageInfo));
-
+    stopConditionCode = stopConditionCode.trim();
     // if the stop condition code starts with return or is not a function, we need to wrap it in a function
     if (stopConditionCode.startsWith("return")) {
       stopConditionCode = `(response, pageInfo) => { ${stopConditionCode} }`;
     }
-    else if (!stopConditionCode.startsWith("(response")) {
+    else if (!stopConditionCode.startsWith("(")) {
       stopConditionCode = `(response, pageInfo) => ${stopConditionCode}`;
     }
 
     // Create the evaluation script
     const script = `
-          const response = JSON.parse(responseJSON);
-          const pageInfo = JSON.parse(pageInfoJSON);
           const fn = ${stopConditionCode};
-          const result = fn(response, pageInfo);
+          const result = fn($0, $1);
           // Return the boolean result
           return Boolean(result);
-      `;
+    `;
 
-    const shouldStop = await context.evalClosure(script, null, { timeout: 3000 });
+    const shouldStop = await context.evalClosure(script, [{ data: response.data, headers: response.headers, ...response.data }, pageInfo], { timeout: 3000, result: { copy: true }, arguments: { copy: true } });
 
     return { shouldStop: Boolean(shouldStop) };
   } catch (error) {
