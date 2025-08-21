@@ -163,6 +163,7 @@ enum FileType {
   CSV
   JSON
   XML
+  EXCEL
   AUTO
 }
 
