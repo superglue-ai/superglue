@@ -30,29 +30,9 @@ Requirements:
 - Function signature: (sourceData) => { ... } or (sourceData, currentItem) => { ... } for loops
 - Return statement is REQUIRED - the function must return the transformed data
 - Pure function - no side effects or external dependencies
-- Handle missing/null data gracefully with optional chaining (?.) and defaults
+- Handle missing/null data gracefully when not required - otherwise throw an error when required inputs are missing.
 - Validate arrays with Array.isArray() before using array methods
-- Return appropriate defaults when data is missing
-
-DEFENSIVE PROGRAMMING PATTERNS:
-\`\`\`javascript
-const items = Array.isArray(sourceData.items) ? sourceData.items : [];
-
-const config = sourceData.config || {};
-const name = config.name || 'default';
-
-const userId = sourceData.user?.profile?.id;
-
-const activeItems = (sourceData.items || []).filter(item => 
-  item && item.status === 'active'
-);
-
-if (sourceData.type === 'batch') {
-  return sourceData.items.map(transformItem);
-} else {
-  return [transformItem(sourceData)];
-}
-\`\`\`
+- Return appropriate defaults when data is missing but throw an error if the data is not available and the user's instruction requires it.
 
 COMMON WORKFLOW TRANSFORMATIONS:
 
@@ -175,6 +155,7 @@ Further:
 - Aggregation, grouping, sorting, filtering is covered by a separate final transformation and does not need to be added as a dedicated step. However, if the API supports e.g. filtering when retrieving, this should be part of the retrieval step, just do not add an extra one.
 - Step instructions should DESCRIBE what data to retrieve, and how the response should be structured, without prescribing a rigid response structure.
 - The API's actual response structure will be discovered during execution - don't prescribe it
+- NEVER add transformation / parsing / calculation only steps - we have a final transformation step for that that will be added later.
 </STEP_CREATION>
 
 <EXECUTION_MODES>
@@ -320,6 +301,7 @@ For special transformation functions:
 - loopSelector: (sourceData) => sourceData.fetchUsers.users
   * MUST throw error if expected array is missing rather than returning []. Exceptions can be cases if the instruction is "Get all users" and the API returns an empty array, in which case you should return [].
 - finalTransform: (sourceData) => ({ results: sourceData.processItems })
+  * MUST (1) test if all required data was retrieved from all sources (throw error if not), and (2) calculate / transform the data to the correct format / return exactly what the user asked for.
 
 CRITICAL DATA ACCESS PATTERNS:
 1. Initial payload data: Access directly in <<>> tags
