@@ -441,8 +441,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         payload: JSON.parse(payload || '{}'),
         credentials: parseCredentialsHelper(reviewCredentials),
         options: {
-          testMode: false,
-          selfHealing: SelfHealingMode.DISABLED
+          testMode: true,
         }
       });
       setExecutionResult(result);

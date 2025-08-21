@@ -541,6 +541,8 @@ export function isSelfHealingEnabled(options: RequestOptions, type: "transform" 
   if (type === "api") {
     return options?.selfHealing ? options.selfHealing === SelfHealingMode.ENABLED || options.selfHealing === SelfHealingMode.REQUEST_ONLY : true;
   }
+
+  return true; // Default to enabled if type doesn't match
 }
 
 // Legacy function needs to stay for existing workflow backwards compatibility

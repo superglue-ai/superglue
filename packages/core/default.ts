@@ -48,6 +48,6 @@ export const server_defaults = {
     },
     LLM: {
         REQUEST_TIMEOUT_MS: 60000, // 60 seconds per LLM API request
-        MAX_INTERNAL_RETRIES: 0, // Disable OpenAI SDK's internal retry mechanism
+        MAX_INTERNAL_RETRIES: 0,
     }
 }
