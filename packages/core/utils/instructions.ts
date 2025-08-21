@@ -62,6 +62,8 @@ For each integration, provide 1-2 specific retrieval-focused examples. Then, sug
 
 **Important:** Return ONLY a JSON array of strings. Do NOT include any section headers, markdown, bullet points, numbers, or explanations. Each string in the array should be a single, specific, implementable instruction.
 
+Avoid instructions like "when X do Y" since we don't have a way to trigger workflows on events.
+
 **Example output:**
 [
   "Retrieve all Stripe customers who have spent over $1000 in the last 30 days.",
