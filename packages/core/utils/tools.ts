@@ -173,13 +173,10 @@ export async function executeAndValidateMappingCode(input: any, mappingCode: str
 
   // Inject helper functions into the context
   await injectVMHelpersIndividually(context);
-
-  await context.global.set('input', JSON.stringify(input));
-
   let result: any;
   try {
-    const scriptSource = `const fn = ${mappingCode}; const result = fn(JSON.parse(input)); return result === undefined ? null : JSON.stringify(result);`;
-    result = parseJSON(await context.evalClosure(scriptSource, null, { timeout: 10000 }));
+    const scriptSource = `const fn = ${mappingCode}; const result = fn($0); return result;`;
+    result = await context.evalClosure(scriptSource, [input], { timeout: 10000 , result: { copy: true }, arguments: { copy: true } });  
     // if no schema is given, skip validation
     if (!schema) {
       return { success: true, data: result };
@@ -201,6 +198,7 @@ export async function executeAndValidateMappingCode(input: any, mappingCode: str
     return { success: false, error: error.message };
   } finally {
     try {
+      context.release();
       isolate.dispose();
     } catch (error) {
       console.error("Error disposing isolate", error);
@@ -482,7 +480,7 @@ export async function evaluateStopCondition(
 ): Promise<{ shouldStop: boolean; error?: string }> {
 
 
-  const isolate = new ivm.Isolate({ memoryLimit: 128 });
+  const isolate = new ivm.Isolate({ memoryLimit: 1024 });
 
   try {
     const context = await isolate.createContext();
