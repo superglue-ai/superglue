@@ -90,7 +90,7 @@ const loopStrategy: ExecutionStrategy = {
 
       // Regenerate selector if no items found - always generate JS going forward
       if (!loopSelectorResult.success || !Array.isArray(loopItems)) {
-        logMessage("error", `No input data found for '${step.id}' - regenerating data selector`, metadata);
+        logMessage("warn", `No input data found for '${step.id}' - regenerating data selector`, metadata);
 
         const instruction = `Create a JavaScript function that extracts the array of items to loop over for step: ${step.id}. 
           
