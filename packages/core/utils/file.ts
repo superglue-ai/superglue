@@ -123,10 +123,7 @@ async function parseCSV(buffer: Buffer): Promise<any> {
                     currentLine++;
                     // Store metadata rows
                     if (currentLine == headerRowIndex) {
-                        rawHeader = result.data.filter(Boolean).reduce((acc, value, index) => {
-                            acc[`${index}`] = value;
-                            return acc;
-                        }, {});
+                        rawHeader = result.data.filter(Boolean);
                         return;
                     }
                     else if (currentLine < headerRowIndex) {
@@ -354,7 +351,7 @@ function detectDelimiter(buffer: Buffer): string {
     });
 
     if (detectedDelimiter.count === 0) {
-        return ' ';
+        return ',';
     }
 
     return detectedDelimiter.delimiter;
