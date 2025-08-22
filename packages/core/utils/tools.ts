@@ -530,19 +530,16 @@ export async function evaluateStopCondition(
   }
 }
 
-export function isSelfHealingEnabled(options: RequestOptions, type: "transform" | "api"): boolean {
-  if (options?.selfHealing === SelfHealingMode.DISABLED) {
+export function isSelfHealingEnabled(options: RequestOptions | undefined, type: "transform" | "api"): boolean {
+  const selfHealingMode = options?.selfHealing;
+
+  if (selfHealingMode === undefined || selfHealingMode === null) {
+    return true; // we default to enabled if options.selfHealing is not set
+  }
+  if (selfHealingMode === SelfHealingMode.DISABLED) {
     return false;
-  }
-
-  if (type === "transform") {
-    return options?.selfHealing ? options.selfHealing === SelfHealingMode.ENABLED || options.selfHealing === SelfHealingMode.TRANSFORM_ONLY : true;
-  }
-  if (type === "api") {
-    return options?.selfHealing ? options.selfHealing === SelfHealingMode.ENABLED || options.selfHealing === SelfHealingMode.REQUEST_ONLY : true;
-  }
-
-  return true; // Default to enabled if type doesn't match
+  } 
+  return type === "transform" ? (selfHealingMode === SelfHealingMode.ENABLED || selfHealingMode === SelfHealingMode.TRANSFORM_ONLY) : (selfHealingMode === SelfHealingMode.ENABLED || selfHealingMode === SelfHealingMode.REQUEST_ONLY);
 }
 
 // Legacy function needs to stay for existing workflow backwards compatibility

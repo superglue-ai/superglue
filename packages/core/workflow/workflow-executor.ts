@@ -116,7 +116,6 @@ export class WorkflowExecutor implements Workflow {
           let currentFinalTransform = this.finalTransform || "(sourceData) => sourceData";
           const finalResult = await transformAndValidateSchema(rawStepData, currentFinalTransform, this.responseSchema);
           if (!finalResult.success) {
-            logMessage("warn", `Final transform validation failed: ${finalResult.error}`, this.metadata);
             throw new Error(finalResult.error);
           }
 
