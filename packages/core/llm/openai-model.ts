@@ -322,6 +322,9 @@ export class OpenAIModel implements LLM {
 
     if (!isGpt5 && !isOModel) {
       params.temperature = options.desiredTemperature;
+    } else if (isOModel) {
+      // Explicitly set temperature to undefined for o-models
+      params.temperature = undefined;
     }
 
     if (isGpt5) {
