@@ -15,7 +15,7 @@ export interface LLMToolResponse {
     toolCall: ToolCall | null;
     textResponse?: string;
     messages: OpenAI.Chat.ChatCompletionMessageParam[];
-    responseId?: string;  // For OpenAI conversation continuity
+    responseId?: string;
 }
 
 export interface LLMAgentResponse {
@@ -26,7 +26,7 @@ export interface LLMAgentResponse {
         result: ToolCallResult;
     }>;
     messages: OpenAI.Chat.ChatCompletionMessageParam[];
-    responseId?: string;  // For OpenAI conversation continuity
+    responseId?: string;  
     success: boolean;
     lastSuccessfulToolCall?: {
         toolCall: ToolCall;
