@@ -2,11 +2,9 @@
 import { useConfig } from "@/src/app/config-context";
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import JsonSchemaEditor from "@/src/components/utils/JsonSchemaEditor";
-import { parseCredentialsHelper } from "@/src/lib/client-utils";
 import { cn } from "@/src/lib/utils";
 import { ExecutionStep, Integration, SelfHealingMode, SuperglueClient, WorkflowResult } from "@superglue/client";
-import { flattenAndNamespaceWorkflowCredentials } from "@superglue/shared/utils";
-import { ChevronRight, Database, FileText, Workflow, X } from "lucide-react";
+import { ChevronRight, Database, X } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from "react";
 import { useToast } from "../../hooks/use-toast";
@@ -15,8 +13,7 @@ import { Card, CardContent, CardFooter } from "../ui/card";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
-import { WorkflowResultsView } from "./WorkflowResultsView";
-import { WorkflowStepsView } from "./WorkflowStepsView";
+import { WorkflowStepGallery } from "./WorkflowStepGallery";
 
 export default function WorkflowPlayground({ id }: { id?: string; }) {
   const router = useRouter();
@@ -30,16 +27,15 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
   }
 }`);
   const [responseSchema, setResponseSchema] = useState<string | null>(`{"type": "object", "properties": {"result": {"type": "object"}}}`);
-  const [inputSchema, setInputSchema] = useState<string | null>(`{"type": "object", "properties": {"payload": {"type": "object"}, "credentials": {"type": "object"}}}`);
-  const [credentials, setCredentials] = useState<string>('');
+  const [inputSchema, setInputSchema] = useState<string | null>(`{"type": "object", "properties": {"payload": {"type": "object"}}}`);
   const [payload, setPayload] = useState<string>('{}');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<WorkflowResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [activeResultTab, setActiveResultTab] = useState<'results' | 'transform' | 'final' | 'instructions'>("final");
-  const [integrationCredentials, setIntegrationCredentials] = useState<Record<string, string>>({});
-  const [showSteps, setShowSteps] = useState(false);
+
+
+
   const [showResponseSchemaEditor, setShowResponseSchemaEditor] = useState(false);
   const [showInputSchemaEditor, setShowInputSchemaEditor] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
@@ -129,42 +125,10 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
 
       const inputSchemaStr = workflow.inputSchema
         ? JSON.stringify(workflow.inputSchema, null, 2)
-        : `{"type": "object", "properties": {"payload": {"type": "object"}, "credentials": {"type": "object"}}}`;
+        : `{"type": "object", "properties": {"payload": {"type": "object"}}}`;
       setInputSchema(inputSchemaStr);
 
-      const stepIntegrationIds = Array.isArray(workflow.steps)
-        ? Array.from(new Set(workflow.steps.map((step: any) => step.integrationId).filter(Boolean)))
-        : [];
-      let missingIntegrations: string[] = [];
-      const relevantIntegrations = (await Promise.all(
-        stepIntegrationIds.map(async id => {
-          try {
-            const integ = await client.getIntegration(id);
-            if (!integ) missingIntegrations.push(id);
-            return integ;
-          } catch (err: any) {
-            missingIntegrations.push(id);
-            return null;
-          }
-        })
-      )).filter(Boolean);
-      if (missingIntegrations.length > 0) {
-        toast({
-          title: `Some integrations missing`,
-          description: `Could not load integrations: ${missingIntegrations.join(", ")}`,
-          variant: "destructive",
-        });
-      }
-      const flattenedCreds = flattenAndNamespaceWorkflowCredentials(relevantIntegrations);
-      setIntegrationCredentials(flattenedCreds);
-
-      // Create masked credentials for display
-      const maskedCreds = Object.entries(flattenedCreds).reduce((acc, [key, _]) => {
-        acc[key] = `<<${key}>>`;
-        return acc;
-      }, {} as Record<string, string>);
-
-      constructFromInputSchemaWithCreds(inputSchemaStr, maskedCreds);
+      constructFromInputSchemaWithCreds(inputSchemaStr, {});
 
       toast({
         title: "Workflow loaded",
@@ -183,31 +147,14 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
   };
 
   // Updated function that takes integration credentials as parameter
-  const constructFromInputSchemaWithCreds = (schema: string | null, integCreds: Record<string, string>) => {
+  const constructFromInputSchemaWithCreds = (schema: string | null, _integCreds: Record<string, string>) => {
     if (!schema) return;
 
     try {
       const parsedSchema = JSON.parse(schema);
       const defaultValues = generateDefaultFromSchema(parsedSchema);
 
-      // Handle credentials - prioritize integration credentials
-      if (defaultValues.credentials !== undefined) {
-        if (Object.keys(integCreds).length > 0) {
-          const mergedCredentials = {
-            ...defaultValues.credentials,
-            ...integCreds
-          };
-          setCredentials(JSON.stringify(mergedCredentials, null, 1));
-        } else {
-          setCredentials(JSON.stringify(defaultValues.credentials, null, 1));
-        }
-        setValidationErrors(prev => ({ ...prev, credentials: false }));
-      } else if (Object.keys(integCreds).length > 0) {
-        setCredentials(JSON.stringify(integCreds, null, 1));
-        setValidationErrors(prev => ({ ...prev, credentials: false }));
-      } else {
-        setCredentials('{}');
-      }
+      // Credentials handling removed
 
       // Handle payload from schema
       if (defaultValues.payload !== undefined && defaultValues.payload !== null) {
@@ -220,15 +167,9 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
     }
   };
 
-  // Update the original function to use current integration credentials
+  // Update the original function
   const constructFromInputSchema = (schema: string | null) => {
-    // Create masked credentials
-    const maskedCreds = Object.entries(integrationCredentials).reduce((acc, [key, _]) => {
-      acc[key] = `<<${key}>>`;
-      return acc;
-    }, {} as Record<string, string>);
-
-    constructFromInputSchemaWithCreds(schema, maskedCreds);
+    constructFromInputSchemaWithCreds(schema, {});
   };
 
   useEffect(() => {
@@ -250,7 +191,7 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
   }
 }`);
       setResponseSchema('{"type": "object", "properties": {"result": {"type": "object"}}}');
-      const defaultInputSchema = '{"type": "object", "properties": {"payload": {"type": "object"}, "credentials": {"type": "object"}}}';
+      const defaultInputSchema = '{"type": "object", "properties": {"payload": {"type": "object"}}}';
       setInputSchema(defaultInputSchema);
       // Construct default credentials and payload from default schema
       constructFromInputSchema(defaultInputSchema);
@@ -258,7 +199,7 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
     }
   }, [id]);
 
-  // Effect to update credentials and payload when input schema changes (but not during workflow loading)
+  // Effect to update payload when input schema changes (but not during workflow loading)
   useEffect(() => {
     // Only run this if we're not in the middle of loading a workflow
     if (!loading) {
@@ -266,12 +207,7 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
     }
   }, [inputSchema]);
 
-  // Separate effect for when integration credentials change
-  useEffect(() => {
-    if (!loading && Object.keys(integrationCredentials).length > 0) {
-      constructFromInputSchema(inputSchema);
-    }
-  }, [integrationCredentials]);
+  // Removed integration credentials effect
 
   const fillDogExample = () => {
     updateWorkflowId("Dog Breed Workflow");
@@ -387,11 +323,6 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
     try {
       // Validate JSON before execution
       try {
-        JSON.parse(credentials || '{}');
-      } catch (e) {
-        throw new Error("Invalid credentials JSON");
-      }
-      try {
         JSON.parse(responseSchema || '{}');
       } catch (e) {
         throw new Error("Invalid response schema JSON");
@@ -411,7 +342,6 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
           finalTransform: finalTransform,
         },
         payload: JSON.parse(payload || '{}'),
-        credentials: JSON.parse(credentials || '{}'),
         options: {
           testMode: selfHealingEnabled,
           selfHealing: selfHealingEnabled ? SelfHealingMode.ENABLED : SelfHealingMode.DISABLED
@@ -447,62 +377,9 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
     );
   };
 
-  const isCredentialsEmpty = () => {
-    if (!credentials || credentials.trim() === '') return true;
+  // credentials helpers removed
 
-    try {
-      const parsed = JSON.parse(credentials);
-      if (typeof parsed === 'object' && parsed !== null) {
-        return Object.keys(parsed).length === 0 ||
-          Object.values(parsed).every(value =>
-            value === '' || value === null || value === undefined
-          );
-      }
-    } catch {
-      // If it's not valid JSON, treat as string
-      return credentials.trim() === '';
-    }
-
-    return false;
-  };
-
-  const fetchAndFlattenIntegrationCredentials = async (integrationIds: string[]) => {
-    if (!integrationIds || integrationIds.length === 0) return;
-
-    try {
-      const integrations = await Promise.all(
-        integrationIds.map(id => client.getIntegration(id))
-      );
-
-      // Flatten and namespace integration credentials
-      const flattenedCreds = flattenAndNamespaceWorkflowCredentials(
-        integrations.filter(Boolean)
-      );
-
-      setIntegrationCredentials(flattenedCreds);
-
-      // Create masked credentials for UI display
-      const maskedCreds = Object.entries(flattenedCreds).reduce((acc, [key, _]) => {
-        acc[key] = `<<${key}>>`;
-        return acc;
-      }, {} as Record<string, string>);
-
-      // Reconstruct credentials from schema with masked data
-      constructFromInputSchemaWithCreds(inputSchema, maskedCreds);
-
-      toast({
-        title: "Integration credentials loaded",
-        description: `Loaded credentials for ${integrations.length} integrations`,
-      });
-    } catch (error) {
-      console.error('Failed to load integration credentials:', error);
-      toast({
-        title: "Error loading integration credentials",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
+  // credentials integration fetch removed
 
   return (
     <div className="p-6 max-w-none w-full">
@@ -518,9 +395,9 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
         </Button>
       </div>
       <h1 className="text-2xl font-bold mb-3 flex-shrink-0">Workflows</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Left Column - Workflow Configuration */}
-        <Card className="flex flex-col">
+      <div className="w-full">
+        {/* Workflow Configuration */}
+        <Card className="flex flex-col min-h-[80vh]">
           <CardContent className="p-4 overflow-auto flex-grow">
             {/* Workflow name and example/load buttons */}
             <div className="mb-3">
@@ -565,136 +442,35 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
               </div>
             </div>
 
-            {/* Credentials Input */}
-            <div className="mb-4">
-              <Label htmlFor="credentials">Credentials</Label>
-              <HelpTooltip text='API keys or tokens needed for this workflow. Enter without any prefix like Bearer. If you need to add new credentials keys to the JSON, go back and add them to your integrations or add them to the workflow variables.' />
-              <div className="w-full max-w-full">
-                <Input
-                  value={credentials}
-                  onChange={(e) => {
-                    setCredentials(e.target.value);
-                    try {
-                      JSON.parse(e.target.value);
-                      setValidationErrors(prev => ({ ...prev, credentials: false }));
-                    } catch (e) {
-                      setValidationErrors(prev => ({ ...prev, credentials: true }));
-                    }
-                  }}
-                  placeholder="Enter credentials"
-                  className="min-h-10 font-mono text-xs"
-                />
-              </div>
-              {(() => {
-                try {
-                  const parsed = JSON.parse(credentials || '{}');
-                  if (!parsed) {
-                    return null;
-                  }
-                  if (Object.values(parsed).every(value => value === '' || value === null || value === undefined)) {
-                    return (
-                      <div className="text-xs text-amber-800 dark:text-amber-300 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded mt-2">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                          <line x1="12" y1="9" x2="12" y2="13" />
-                          <line x1="12" y1="17" x2="12.01" y2="17" />
-                        </svg>
-                        No credentials added
-                      </div>
-                    );
-                  }
-                  return null;
-                } catch {
-                  return (
-                    <div className="text-xs text-red-600 flex items-center gap-1.5 bg-red-500/10 py-1 px-2 rounded mt-2">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="12" cy="12" r="10" />
-                        <line x1="12" y1="8" x2="12" y2="12" />
-                        <line x1="12" y1="16" x2="12.01" y2="16" />
-                      </svg>
-                      Invalid JSON format
-                    </div>
-                  );
-                }
-              })()}
-            </div>
-
-            {/* Payload Input */}
-            <div className="mb-4">
-              <Label htmlFor="payload">Workflow Variables</Label>
-              <HelpTooltip text="Dynamic variables for the workflow as a JSON object. These are equivalent to your workflow's initial payload and can be referenced in the entire config." />
-              <div className="w-full max-w-full">
-                <Input
-                  value={payload}
-                  onChange={(e) => setPayload(e.target.value)}
-                  placeholder="Enter payload"
-                  className="min-h-10 font-mono text-xs"
-                />
-              </div>
-              {(() => {
-                try {
-                  const parsed = JSON.parse(payload || '{}');
-                  if (!parsed) {
-                    return null;
-                  }
-                  if (Object.values(parsed).some(value => value === '' || value === null || value === undefined)) {
-                    return (
-                      <div className="text-xs text-amber-800 dark:text-amber-300 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded mt-2">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                          <line x1="12" y1="9" x2="12" y2="13" />
-                          <line x1="12" y1="17" x2="12.01" y2="17" />
-                        </svg>
-                        No variables added
-                      </div>
-                    );
-                  }
-                  return null;
-                } catch {
-                  return (
-                    <div className="text-xs text-red-600 flex items-center gap-1.5 bg-red-500/10 py-1 px-2 rounded mt-2">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="12" cy="12" r="10" />
-                        <line x1="12" y1="8" x2="12" y2="12" />
-                        <line x1="12" y1="16" x2="12.01" y2="16" />
-                      </svg>
-                      Invalid JSON format
-                    </div>
-                  );
-                }
-              })()}
-            </div>
+            {/* Payload removed - now handled in workflow steps */}
 
             {/* Steps and Schema Editors */}
             <div className="space-y-3 flex flex-col flex-grow">
-              {/* Steps Toggle */}
-              <div
-                className="flex items-center gap-2 cursor-pointer select-none"
-                onClick={() => setShowSteps((v) => !v)}
-                role="button"
-                tabIndex={0}
-              >
-                <ChevronRight
-                  className={cn(
-                    "h-4 w-4 transition-transform",
-                    showSteps && "rotate-90"
-                  )}
-                  aria-hidden="true"
+              {/* Workflow Steps - response schema now integrated in final transform */}
+              <div className="mb-4">
+                <WorkflowStepGallery
+                  steps={steps}
+                  stepResults={result?.stepResults || {}}
+                  finalTransform={finalTransform}
+                  finalResult={result?.data}
+                  responseSchema={responseSchema}
+                  onStepsChange={handleStepsChange}
+                  onStepEdit={handleStepEdit}
+                  onFinalTransformChange={setFinalTransform}
+                  onResponseSchemaChange={setResponseSchema}
+                  onPayloadChange={setPayload}
+                  integrations={integrations}
+                  isExecuting={loading}
+                  readOnly={false}
+                  payload={(() => {
+                    try {
+                      return JSON.parse(payload || '{}');
+                    } catch {
+                      return {};
+                    }
+                  })()}
                 />
-                <Workflow className="h-4 w-4" />
-                <span className="font-medium text-sm">Workflow Steps</span>
-                <HelpTooltip text="Define the sequence of API calls that make up your workflow. You can add multiple steps to your workflow and each step can call an external API." />
               </div>
-              {showSteps && (
-                <div className="flex-1 min-h-0 mb-2">
-                  <WorkflowStepsView
-                    steps={steps}
-                    onStepsChange={handleStepsChange}
-                    onStepEdit={handleStepEdit}
-                    integrations={integrations}
-                  />
-                </div>
-              )}
 
               {/* Input Schema Toggle */}
               <div
@@ -720,33 +496,6 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
                     isOptional={true}
                     value={inputSchema}
                     onChange={setInputSchema}
-                  />
-                </div>
-              )}
-              {/* Response Schema Toggle */}
-              <div
-                className="flex items-center gap-2 cursor-pointer select-none"
-                onClick={() => setShowResponseSchemaEditor((v) => !v)}
-                role="button"
-                tabIndex={0}
-              >
-                <ChevronRight
-                  className={cn(
-                    "h-4 w-4 transition-transform",
-                    showResponseSchemaEditor && "rotate-90"
-                  )}
-                  aria-hidden="true"
-                />
-                <FileText className="h-4 w-4" />
-                <span className="font-medium text-sm">Response Schema Editor</span>
-                <HelpTooltip text="Define the expected structure of your workflow's final output. This schema validates and documents what data format the workflow will return." />
-              </div>
-              {showResponseSchemaEditor && (
-                <div className="mt-2 mb-4">
-                  <JsonSchemaEditor
-                    isOptional={true}
-                    value={responseSchema}
-                    onChange={setResponseSchema}
                   />
                 </div>
               )}
@@ -780,55 +529,6 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
               </div>
             </div>
           </CardFooter>
-        </Card>
-
-        {/* Right Column - Results */}
-        <Card className="flex flex-col min-h-[80vh]">
-          <WorkflowResultsView
-            activeTab={activeResultTab}
-            setActiveTab={setActiveResultTab}
-            showInstructionsTab={true}
-            currentWorkflow={{
-              id: workflowId,
-              steps: steps.map((step: ExecutionStep) => ({
-                ...step,
-                apiConfig: {
-                  id: step.apiConfig.id || step.id,
-                  ...step.apiConfig,
-                  pagination: step.apiConfig.pagination || null
-                }
-              })),
-              responseSchema: (() => {
-                try {
-                  return responseSchema ? JSON.parse(responseSchema) : null;
-                } catch {
-                  return null;
-                }
-              })(),
-              inputSchema: (() => {
-                try {
-                  return inputSchema ? JSON.parse(inputSchema) : { type: "object" };
-                } catch {
-                  return { type: "object" };
-                }
-              })(),
-              finalTransform
-            }}
-            credentials={parseCredentialsHelper(credentials)}
-            payload={(() => {
-              try {
-                return JSON.parse(payload || '{}');
-              } catch {
-                return {};
-              }
-            })()}
-            executionResult={result}
-            finalTransform={finalTransform}
-            setFinalTransform={setFinalTransform}
-            finalResult={result?.data}
-            isExecuting={loading}
-            executionError={result?.error || null}
-          />
         </Card>
       </div>
     </div>

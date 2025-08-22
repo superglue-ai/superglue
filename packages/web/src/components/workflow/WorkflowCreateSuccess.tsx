@@ -8,14 +8,14 @@ type Workflow = any // Replace with your actual Workflow type
 
 interface WorkflowCreateSuccessProps {
   currentWorkflow: Workflow
-  credentials: Record<string, string>
   payload: Record<string, any>
+  credentials?: Record<string, string>
 }
 
 export function WorkflowCreateSuccess({
   currentWorkflow,
-  credentials,
-  payload
+  payload,
+  credentials
 }: WorkflowCreateSuccessProps) {
   const superglueConfig = useConfig();
   const [sdkCopied, setSdkCopied] = useState(false)
@@ -26,7 +26,7 @@ export function WorkflowCreateSuccess({
     endpoint: superglueConfig.superglueEndpoint,
     workflowId: currentWorkflow.id,
     payload,
-    credentials,
+    credentials: credentials || {},
   })
 
   const curlCommand = `curl -X POST "${superglueConfig.superglueEndpoint}/graphql" \\

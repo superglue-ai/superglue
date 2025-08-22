@@ -3,12 +3,13 @@ import { useIntegrations } from '@/src/app/integrations-context';
 import { getAuthBadge } from '@/src/app/integrations/page';
 import { IntegrationForm } from '@/src/components/integrations/IntegrationForm';
 import { useToast } from '@/src/hooks/use-toast';
-import { inputErrorStyles, needsUIToTriggerDocFetch, parseCredentialsHelper } from '@/src/lib/client-utils';
+import { inputErrorStyles, needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
 import { cn, composeUrl, getIntegrationIcon as getIntegrationIconName } from '@/src/lib/utils';
-import { Integration, IntegrationInput, SelfHealingMode, SuperglueClient, UpsertMode, Workflow, WorkflowResult } from '@superglue/client';
+import { executeSingleStep, executeWorkflowStepByStep } from '@/src/lib/workflow-execution-utils';
+import { Integration, IntegrationInput, SuperglueClient, UpsertMode, Workflow, WorkflowResult } from '@superglue/client';
 import { integrations as integrationTemplates } from "@superglue/shared";
-import { flattenAndNamespaceWorkflowCredentials, waitForIntegrationProcessing } from '@superglue/shared/utils';
-import { ArrowRight, Check, ChevronRight, Clock, FileText, Globe, Key, Loader2, Pencil, Play, Plus, Workflow as WorkflowIcon, X } from 'lucide-react';
+import { waitForIntegrationProcessing } from '@superglue/shared/utils';
+import { ArrowRight, Check, Clock, Globe, Key, Loader2, Pencil, Play, Plus, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
@@ -22,11 +23,9 @@ import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { DocStatus } from '../utils/DocStatusSpinner';
 import { HelpTooltip } from '../utils/HelpTooltip';
-import JsonSchemaEditor from '../utils/JsonSchemaEditor';
 import { StepIndicator, WORKFLOW_CREATE_STEPS } from '../utils/StepIndicator';
 import { WorkflowCreateSuccess } from './WorkflowCreateSuccess';
-import { WorkflowResultsView } from './WorkflowResultsView';
-import { WorkflowStepsView } from './WorkflowStepsView';
+import { WorkflowStepGallery } from './WorkflowStepGallery';
 
 // Define step types specific to workflow creation
 type WorkflowCreateStep = 'integrations' | 'prompt' | 'review' | 'success'; // Added success step
@@ -77,22 +76,25 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const [currentWorkflow, setCurrentWorkflow] = useState<Workflow | null>(null); // To store result from buildWorkflow
 
   const [schema, setSchema] = useState<string>('{}');
-  const [activeTab, setActiveTab] = useState<'results' | 'transform' | 'final' | 'instructions'>('results');
+
 
   const [isExecuting, setIsExecuting] = useState(false);
   const [executionResult, setExecutionResult] = useState<WorkflowResult | null>(null);
   const [finalResult, setFinalResult] = useState<any>(null);
   const [executionError, setExecutionError] = useState<string | null>(null);
 
+  // Step-by-step execution state
+  const [isExecutingStep, setIsExecutingStep] = useState<number | undefined>(undefined);
+  const [completedSteps, setCompletedSteps] = useState<string[]>([]);
+  const [stepExecutionResults, setStepExecutionResults] = useState<Record<string, any>>({});
+
   const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]); // Store multiple suggestions
 
-  const [showSchemaEditor, setShowSchemaEditor] = useState(false);
-  const [showSteps, setShowSteps] = useState(true);
 
-  const [reviewCredentials, setReviewCredentials] = useState<string>(
-    JSON.stringify((currentWorkflow && (currentWorkflow as any).credentials) || {}, null, 2)
-  );
+
+
+  // credentials removed from review step
 
   const [selectedIntegrationIds, setSelectedIntegrationIds] = useState<string[]>(() => {
     // Initialize with preselected integration if available
@@ -139,7 +141,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       setExecutionResult(null);
       setFinalResult(null);
       setExecutionError(null);
-      setActiveTab('results'); // Reset to default tab
     }
 
     // Clear validation errors when leaving prompt step
@@ -310,20 +311,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         }
         setCurrentWorkflow(response);
 
-        // Populate review credentials from integrations
-        const selectedIntegrations = selectedIntegrationIds
-          .map(id => freshIntegrations.find(i => i.id === id))
-          .filter(Boolean);
-        const credentialsFromIntegrations = flattenAndNamespaceWorkflowCredentials(selectedIntegrations);
-
-        // Mask the credentials for display
-        const maskedCredentials = Object.entries(credentialsFromIntegrations).reduce((acc, [key, _]) => {
-          acc[key] = `<<${key}>>`;
-          return acc;
-        }, {} as Record<string, string>);
-
-        setReviewCredentials(JSON.stringify(maskedCredentials, null, 2));
-
         setStep(steps[currentIndex + 1]);
       } catch (error: any) {
         console.error('Error building workflow:', error);
@@ -427,9 +414,13 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const handleExecuteWorkflow = async () => {
     setIsExecuting(true);
     setExecutionError(null);
+    setCompletedSteps([]);
+    setStepExecutionResults({});
+
     try {
-      const result = await client.executeWorkflow({
-        workflow: {
+      const state = await executeWorkflowStepByStep(
+        client,
+        {
           id: currentWorkflow.id,
           steps: currentWorkflow.steps,
           integrationIds: selectedIntegrationIds,
@@ -438,16 +429,52 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
           inputSchema: currentWorkflow.inputSchema,
           instruction: currentWorkflow.instruction
         },
-        payload: JSON.parse(payload || '{}'),
-        credentials: parseCredentialsHelper(reviewCredentials),
-        options: {
-          testMode: true,
-        }
-      });
+        JSON.parse(payload || '{}'),
+        (stepIndex, result) => {
+          // Update state for each completed step
+          if (result.success) {
+            setCompletedSteps(prev => [...prev, currentWorkflow.steps[stepIndex].id]);
+            setStepExecutionResults(prev => ({
+              ...prev,
+              [currentWorkflow.steps[stepIndex].id]: result.data
+            }));
+
+            // Update the step if self-healing modified it
+            if (result.updatedStep) {
+              setCurrentWorkflow(prev => ({
+                ...prev!,
+                steps: prev!.steps.map((s, idx) =>
+                  idx === stepIndex ? result.updatedStep : s
+                )
+              }));
+            }
+          }
+        },
+        true // Enable self-healing
+      );
+
+      // Convert to WorkflowResult format
+      const result: WorkflowResult = {
+        id: crypto.randomUUID(),
+        success: state.failedSteps.length === 0,
+        data: state.stepResults['__final_transform__']?.data || {},
+        error: state.failedSteps.length > 0 ? `Step ${state.failedSteps[0]} failed` : undefined,
+        startedAt: new Date(),
+        completedAt: new Date(),
+        config: state.currentWorkflow,
+        stepResults: Object.entries(state.stepResults)
+          .filter(([key]) => key !== '__final_transform__')
+          .map(([stepId, result]) => ({
+            stepId,
+            success: result.success,
+            data: result.data,
+            error: result.error
+          }))
+      };
+
       setExecutionResult(result);
-      setCurrentWorkflow(result.config);
+      setCurrentWorkflow(state.currentWorkflow);
       setFinalResult(result.data);
-      setActiveTab('final');
 
     } catch (error: any) {
       setExecutionError(error.message);
@@ -458,6 +485,74 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       });
     } finally {
       setIsExecuting(false);
+    }
+  };
+
+  const handleExecuteSingleStep = async (stepIndex: number) => {
+    if (!currentWorkflow) return;
+
+    setIsExecutingStep(stepIndex);
+    setExecutionError(null);
+
+    try {
+      const result = await executeSingleStep(
+        client,
+        currentWorkflow,
+        stepIndex,
+        JSON.parse(payload || '{}'),
+        stepExecutionResults,
+        true // Enable self-healing
+      );
+
+      if (result.success) {
+        setCompletedSteps(prev => [...prev, currentWorkflow.steps[stepIndex].id]);
+        setStepExecutionResults(prev => ({
+          ...prev,
+          [currentWorkflow.steps[stepIndex].id]: result.data
+        }));
+
+        // Update the step if self-healing modified it
+        if (result.updatedStep) {
+          setCurrentWorkflow(prev => ({
+            ...prev!,
+            steps: prev!.steps.map((s, idx) =>
+              idx === stepIndex ? result.updatedStep : s
+            )
+          }));
+        }
+
+        // Update execution result to reflect the new step results
+        setExecutionResult(prev => ({
+          ...prev!,
+          stepResults: [
+            ...(prev?.stepResults || []),
+            {
+              stepId: currentWorkflow.steps[stepIndex].id,
+              success: true,
+              data: result.data
+            }
+          ]
+        }));
+
+        toast({
+          title: 'Step Executed Successfully',
+          description: `Step ${stepIndex + 1} completed`,
+        });
+      } else {
+        toast({
+          title: 'Step Execution Failed',
+          description: result.error || 'Unknown error',
+          variant: 'destructive',
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Step Execution Failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsExecutingStep(undefined);
     }
   };
 
@@ -544,11 +639,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       </div>
 
       {/* Content Area */}
-      <div className={cn(
-        "flex-1 overflow-hidden",
-        // Only use grid layout on review step
-        step === 'review' ? "grid grid-cols-1 md:grid-cols-2 gap-6" : "flex flex-col"
-      )}>
+      <div className="flex-1 overflow-hidden flex flex-col">
         {/* Main Content */}
         <div className="overflow-y-auto px-1 min-h-0">
           {/* Step 1: Integrations */}
@@ -857,60 +948,31 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
 
               <div className="space-y-1">
                 <Label htmlFor="payload">Workflow Variables (Optional, JSON)</Label>
-                <HelpTooltip text="Provide dynamic variables for the workflow as a JSON object. Workflow variables are equivalent to your workflow's initial payload and can be referenced in the entire config. You can change them when you use the workflow later." />
+                <HelpTooltip text="Provide the payload for the workflow as a JSON object. You can reference these variables throughout the config. You can change them when you use the workflow later." />
                 <div className={cn(
-                  "h-64 rounded-md border bg-transparent code-editor",
+                  "h-64 rounded-md border bg-transparent",
                   validationErrors.payload && inputErrorStyles
                 )}>
-                  {/* Use plain textarea for large JSON (>5000 chars) for performance */}
-                  {payload.length > 5000 ? (
-                    <Textarea
-                      value={payload}
-                      onChange={(e) => {
-                        setPayload(e.target.value);
-                        try {
-                          JSON.parse(e.target.value || '{}');
-                          setValidationErrors(prev => ({ ...prev, payload: false }));
-                        } catch (e) {
-                          setValidationErrors(prev => ({ ...prev, payload: true }));
-                        }
-                      }}
-                      className={cn("h-64")}
-                      placeholder="{}"
-                      spellCheck={false}
-                    />
-                  ) : (
-                    <Editor
-                      value={payload}
-                      onValueChange={(code) => {
-                        setPayload(code);
-                        try {
-                          JSON.parse(code || '{}');
-                          setValidationErrors(prev => ({ ...prev, payload: false }));
-                        } catch (e) {
-                          setValidationErrors(prev => ({ ...prev, payload: true }));
-                        }
-                      }}
-                      highlight={highlightJson}
-                      padding={10}
-                      tabSize={2}
-                      insertSpaces={true}
-                      className="font-mono text-xs w-full h-64"
-                    />
-                  )}
+                  <Editor
+                    value={payload}
+                    onValueChange={(code) => {
+                      setPayload(code);
+                      try {
+                        JSON.parse(code || '{}');
+                        setValidationErrors(prev => ({ ...prev, payload: false }));
+                      } catch (e) {
+                        setValidationErrors(prev => ({ ...prev, payload: true }));
+                      }
+                    }}
+                    highlight={highlightJson}
+                    padding={10}
+                    tabSize={2}
+                    insertSpaces={true}
+                    className="font-mono text-xs w-full h-64"
+                  />
                 </div>
-                {payload.length > 5000 && (
-                  <p className="text-xs text-muted-foreground">Large JSON detected - syntax highlighting disabled for performance</p>
-                )}
                 {validationErrors.payload && (
-                  <div className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5 bg-red-500/10 dark:bg-red-500/20 py-2 px-3 rounded-md mt-2">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
-                      <circle cx="12" cy="12" r="10" />
-                      <line x1="12" y1="8" x2="12" y2="12" />
-                      <line x1="12" y1="16" x2="12.01" y2="16" />
-                    </svg>
-                    <span>Invalid JSON format: Parse error</span>
-                  </div>
+                  <p className="text-xs text-destructive">Invalid JSON format</p>
                 )}
               </div>
             </div>
@@ -921,185 +983,42 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
             <div className="space-y-4">
               {currentWorkflow ? (
                 <>
-                  <div className="flex items-center justify-between">
-                    <p className="text-lg font-medium"><span className="font-mono text-base bg-muted px-2 py-0.5 rounded">{currentWorkflow.id}</span></p>
-                  </div>
-                  {/* Recap of instruction */}
-                  <div className="mb-2">
-                    <Label>Instruction</Label>
-                    <div className="font-mono text-sm text-foreground rounded py-1 mt-1 break-words flex items-start gap-2">
-                      {String(instruction).length > 500 ? String(instruction).slice(0, 500) + '... [truncated]' : instruction}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-4 w-4 p-0 text-foreground hover:text-foreground flex-shrink-0"
-                        onClick={() => setStep('prompt')}
-                      >
-                        <Pencil className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Editable credentials input */}
-                  <div className="mb-4">
-                    <Label htmlFor="review-credentials">Credentials</Label>
-                    <HelpTooltip text='API keys or tokens needed for this workflow. Enter without any prefix like Bearer. If you need to add new credentials keys to the JSON, go back and add them to your integrations or add them to the workflow variables.' />
-                    <div className="w-full max-w-full">
-                      <Input
-                        value={reviewCredentials}
-                        onChange={(e) => {
-                          setReviewCredentials(e.target.value);
-                          try {
-                            JSON.parse(e.target.value);
-                            setValidationErrors(prev => ({ ...prev, credentials: false }));
-                          } catch (e) {
-                            setValidationErrors(prev => ({ ...prev, credentials: true }));
-                          }
-                        }}
-                        placeholder="Enter credentials"
-                        className={cn("min-h-10 font-mono text-xs")}
-                      />
-                    </div>
-                    {(() => {
-                      try {
-                        const creds = JSON.parse(reviewCredentials);
-                        if (!creds || Object.keys(creds).length === 0) {
-                          return (
-                            <div className="text-xs text-amber-800 dark:text-amber-300 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded mt-2">
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                                <line x1="12" y1="9" x2="12" y2="13" />
-                                <line x1="12" y1="17" x2="12.01" y2="17" />
-                              </svg>
-                              No credentials added
-                            </div>
-                          );
-                        }
-                        return null;
-                      } catch {
-                        return (
-                          <div className="text-xs text-red-600 flex items-center gap-1.5 bg-red-500/10 py-1 px-2 rounded mt-2">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <circle cx="12" cy="12" r="10" />
-                              <line x1="12" y1="8" x2="12" y2="12" />
-                              <line x1="12" y1="16" x2="12.01" y2="16" />
-                            </svg>
-                            Invalid JSON format
-                          </div>
-                        );
-                      }
-                    })()}
-                  </div>
-
-                  {/* Editable workflow variables (payload) input */}
-                  <div className="mb-4">
-                    <Label htmlFor="review-payload">Workflow Variables</Label>
-                    <HelpTooltip text="Dynamic variables for the workflow as a JSON object. These are equivalent to your workflow's initial payload and can be referenced in the entire config." />
-                    <div className={cn(
-                      "w-full max-w-full code-editor rounded-md border bg-transparent",
-                    )}>
-                      {/* Use plain textarea for large JSON (>5000 chars) for performance */}
-                      {payload.length > 5000 ? (
-                        <Textarea
-                          value={payload}
-                          onChange={(e) => {
-                            setPayload(e.target.value);
-                          }}
-                          className="font-mono text-xs w-full p-2.5"
-                          style={{ minHeight: '300px' }}
-                          placeholder="{}"
-                          spellCheck={false}
-                        />
-                      ) : (
-                        <Editor
-                          value={payload}
-                          onValueChange={(code) => {
-                            setPayload(code);
-                          }}
-                          highlight={highlightJson}
-                          padding={10}
-                          tabSize={2}
-                          insertSpaces={true}
-                          className="font-mono text-xs w-full min-h-[60px] bg-transparent"
-                        />
-                      )}
-                    </div>
-                    {payload.length > 5000 && (
-                      <p className="text-xs text-muted-foreground">Large JSON detected - syntax highlighting disabled for performance</p>
-                    )}
-                    {(() => {
-                      try {
-                        JSON.parse(payload);
-                        return null;
-                      } catch (e) {
-                        return (
-                          <div className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5 bg-red-500/10 dark:bg-red-500/20 py-2 px-3 rounded-md mt-2">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
-                              <circle cx="12" cy="12" r="10" />
-                              <line x1="12" y1="8" x2="12" y2="12" />
-                              <line x1="12" y1="16" x2="12.01" y2="16" />
-                            </svg>
-                            <span>Invalid JSON format: {e instanceof Error ? e.message : 'Parse error'}</span>
-                          </div>
-                        );
-                      }
-                    })()}
-                  </div>
-
-                  <div className="flex flex-col gap-2 mt-2">
+                  <div className="flex flex-col gap-2">
                     {/* Workflow Steps Toggle */}
-                    <div
-                      className="flex items-center gap-2 cursor-pointer select-none"
-                      onClick={() => setShowSteps(!showSteps)}
-                      role="button"
-                      tabIndex={0}
-                    >
-                      <ChevronRight
-                        className={cn(
-                          "h-4 w-4 transition-transform",
-                          showSteps && "rotate-90"
-                        )}
-                        aria-hidden="true"
+                    {/* Workflow Steps */}
+                    <div className="mb-4">
+                      <WorkflowStepGallery
+                        steps={currentWorkflow.steps}
+                        stepResults={executionResult?.stepResults || stepExecutionResults}
+                        finalTransform={currentWorkflow.finalTransform}
+                        finalResult={executionResult?.data}
+                        responseSchema={schema}
+                        workflowId={currentWorkflow.id}
+                        instruction={instruction}
+                        onStepsChange={handleStepsChange}
+                        onStepEdit={handleStepEdit}
+                        onFinalTransformChange={(transform) => setCurrentWorkflow({ ...currentWorkflow, finalTransform: transform } as Workflow)}
+                        onResponseSchemaChange={setSchema}
+                        onPayloadChange={setPayload}
+                        onWorkflowIdChange={(id) => setCurrentWorkflow({ ...currentWorkflow, id } as Workflow)}
+                        onInstructionEdit={() => setStep('prompt')}
+                        onExecuteStep={handleExecuteSingleStep}
+                        onExecuteAllSteps={handleExecuteWorkflow}
+                        completedSteps={completedSteps}
+                        integrations={integrations}
+                        isExecuting={isExecuting}
+                        isExecutingStep={isExecutingStep}
+                        readOnly={false}
+                        payload={(() => {
+                          try {
+                            return JSON.parse(payload || '{}');
+                          } catch {
+                            return {};
+                          }
+                        })()}
                       />
-                      <WorkflowIcon className="h-4 w-4" />
-                      <span className="font-medium text-sm">Workflow Steps</span>
                     </div>
-                    {showSteps && (
-                      <div className="flex-1 min-h-0 bg-background h-[200px] mb-2">
-                        <WorkflowStepsView
-                          steps={currentWorkflow.steps}
-                          onStepsChange={handleStepsChange}
-                          onStepEdit={handleStepEdit}
-                          integrations={integrations}
-                        />
-                      </div>
-                    )}
-                    {/* Response Schema Editor Toggle */}
-                    <div
-                      className="flex items-center gap-2 cursor-pointer select-none"
-                      onClick={() => setShowSchemaEditor(!showSchemaEditor)}
-                      role="button"
-                      tabIndex={0}
-                    >
-                      <ChevronRight
-                        className={cn(
-                          "h-4 w-4 transition-transform",
-                          showSchemaEditor && "rotate-90"
-                        )}
-                        aria-hidden="true"
-                      />
-                      <FileText className="h-4 w-4" />
-                      <span className="font-medium text-sm">Response Schema Editor</span>
-                    </div>
-                    {showSchemaEditor && (
-                      <div className="mt-2 mb-4">
-                        <JsonSchemaEditor
-                          isOptional={true}
-                          value={schema}
-                          onChange={setSchema}
-                        />
-                      </div>
-                    )}
+                    {/* Response Schema now integrated in final transform */}
                   </div>
                 </>
               ) : (
@@ -1154,20 +1073,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
           )}
         </div>
 
-        {/* Right Column - Test Results (only shown during review) */}
-        {step === 'review' && (
-          <WorkflowResultsView
-            activeTab={activeTab}
-            showInstructionsTab={false}
-            setActiveTab={setActiveTab}
-            executionResult={executionResult}
-            finalTransform={currentWorkflow?.finalTransform || '$'}
-            setFinalTransform={(transform) => setCurrentWorkflow({ ...currentWorkflow, finalTransform: transform || '$' } as Workflow)}
-            finalResult={finalResult}
-            isExecuting={isExecuting}
-            executionError={executionError}
-          />
-        )}
+
       </div>
 
       {/* Footer Buttons */}
