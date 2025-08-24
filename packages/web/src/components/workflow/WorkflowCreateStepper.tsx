@@ -3,9 +3,8 @@ import { useIntegrations } from '@/src/app/integrations-context';
 import { getAuthBadge } from '@/src/app/integrations/page';
 import { IntegrationForm } from '@/src/components/integrations/IntegrationForm';
 import { useToast } from '@/src/hooks/use-toast';
-import { inputErrorStyles, needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
+import { executeSingleStep, executeWorkflowStepByStep, inputErrorStyles, needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
 import { cn, composeUrl, getIntegrationIcon as getIntegrationIconName } from '@/src/lib/utils';
-import { executeSingleStep, executeWorkflowStepByStep } from '@/src/lib/workflow-execution-utils';
 import { Integration, IntegrationInput, SuperglueClient, UpsertMode, Workflow, WorkflowResult } from '@superglue/client';
 import { integrations as integrationTemplates } from "@superglue/shared";
 import { waitForIntegrationProcessing } from '@superglue/shared/utils';
@@ -401,10 +400,40 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       ...currentWorkflow,
       steps: newSteps
     });
+
+    // Reset completion status for edited step and all subsequent steps
+    const stepIndex = currentWorkflow.steps.findIndex((s: any) => s.id === stepId);
+    if (stepIndex !== -1) {
+      const stepsToReset = currentWorkflow.steps.slice(stepIndex).map((s: any) => s.id);
+      setCompletedSteps(prev => prev.filter(id => !stepsToReset.includes(id)));
+
+      // Also clear execution results for reset steps
+      setStepExecutionResults(prev => {
+        const newResults = { ...prev };
+        stepsToReset.forEach(id => delete newResults[id]);
+        return newResults;
+      });
+    }
   };
 
   const handleStepsChange = (newSteps: any[]) => {
     if (!currentWorkflow) return;
+
+    // Check if any steps were removed
+    const removedStepIds = currentWorkflow.steps
+      .filter((oldStep: any) => !newSteps.find((newStep: any) => newStep.id === oldStep.id))
+      .map((step: any) => step.id);
+
+    // Clear completion status and results for removed steps
+    if (removedStepIds.length > 0) {
+      setCompletedSteps(prev => prev.filter(id => !removedStepIds.includes(id)));
+      setStepExecutionResults(prev => {
+        const newResults = { ...prev };
+        removedStepIds.forEach(id => delete newResults[id]);
+        return newResults;
+      });
+    }
+
     setCurrentWorkflow({
       ...currentWorkflow,
       steps: newSteps

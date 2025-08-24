@@ -4,7 +4,7 @@ import { useToast } from '@/src/hooks/use-toast';
 import { cn, getIntegrationIcon as getIntegrationIconName } from '@/src/lib/utils';
 import { Integration, SuperglueClient } from "@superglue/client";
 import { integrations as integrationTemplates } from '@superglue/shared';
-import { ArrowDown, Check, Globe, Pencil, RotateCw, Trash2, X } from 'lucide-react';
+import { ArrowDown, Globe, Pencil, RotateCw, Save, Trash2, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type { SimpleIcon } from 'simple-icons';
 import * as simpleIcons from 'simple-icons';
@@ -111,12 +111,12 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
       try {
         // Safely stringify headers - use empty object if undefined or invalid
         const headers = editedStep.apiConfig?.headers;
-        const headersJson = headers !== undefined && headers !== null 
+        const headersJson = headers !== undefined && headers !== null
           ? JSON.stringify(headers, null, 2)
           : '{}';
-        
+
         setHeadersText(headersJson);
-        
+
         // Validate headers JSON
         try {
           JSON.parse(headersJson);
@@ -130,16 +130,16 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
         setHeadersText('{}');
         setHeadersError(false);
       }
-      
+
       try {
         // Safely stringify queryParams - use empty object if undefined or invalid
         const queryParams = editedStep.apiConfig?.queryParams;
         const queryParamsJson = queryParams !== undefined && queryParams !== null
           ? JSON.stringify(queryParams, null, 2)
           : '{}';
-        
+
         setQueryParamsText(queryParamsJson);
-        
+
         // Validate queryParams JSON
         try {
           JSON.parse(queryParamsJson);
@@ -166,25 +166,35 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
       });
       return;
     }
-    
-    onEdit(step.id, editedStep);
+
+    // Ensure the complete step structure is maintained
+    const updatedStep = {
+      ...step,
+      ...editedStep,
+      apiConfig: {
+        ...step.apiConfig,
+        ...editedStep.apiConfig,
+      }
+    };
+
+    onEdit(step.id, updatedStep);
     setIsEditing(false);
   };
 
   const handleCancel = () => {
     setEditedStep(step);
-    
+
     // Safely reset headers text
     try {
       const headers = step.apiConfig?.headers;
-      setHeadersText(headers !== undefined && headers !== null 
+      setHeadersText(headers !== undefined && headers !== null
         ? JSON.stringify(headers, null, 2)
         : '{}');
     } catch (error) {
       console.warn('Failed to stringify headers on cancel:', error);
       setHeadersText('{}');
     }
-    
+
     // Safely reset queryParams text
     try {
       const queryParams = step.apiConfig?.queryParams;
@@ -195,7 +205,7 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
       console.warn('Failed to stringify queryParams on cancel:', error);
       setQueryParamsText('{}');
     }
-    
+
     setHeadersError(false);
     setQueryParamsError(false);
     setIsEditing(false);
@@ -280,23 +290,48 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
               )}
               <div className="flex gap-1 flex-shrink-0">
                 {isEditing ? (
-                  <>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive flex-shrink-0" onClick={handleRemove}>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-3 text-xs"
+                      onClick={handleCancel}
+                    >
+                      <X className="h-3 w-3 mr-1" />
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="h-7 px-3 text-xs"
+                      onClick={handleSave}
+                      disabled={headersError || queryParamsError}
+                    >
+                      <Save className="h-3 w-3 mr-1" />
+                      Save
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={handleRemove}
+                      title="Remove step"
+                    >
                       <Trash2 className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={handleCancel}>
-                      <X className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={handleSave}>
-                      <Check className="h-4 w-4" />
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={() => setIsEditing(true)}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => setIsEditing(true)}
+                      title="Edit step"
+                    >
                       <Pencil className="h-4 w-4" />
                     </Button>
-                  </>
+                  </div>
                 )}
               </div>
             </div>
@@ -437,7 +472,7 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
                     onChange={(e) => {
                       const newValue = e.target.value;
                       setHeadersText(newValue);
-                      
+
                       // Handle empty or whitespace-only input
                       if (!newValue.trim()) {
                         setEditedStep(prev => ({
@@ -447,7 +482,7 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
                         setHeadersError(false);
                         return;
                       }
-                      
+
                       // Only update the actual data if it's valid JSON
                       try {
                         const headers = JSON.parse(newValue);
@@ -487,7 +522,7 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
                     onChange={(e) => {
                       const newValue = e.target.value;
                       setQueryParamsText(newValue);
-                      
+
                       // Handle empty or whitespace-only input
                       if (!newValue.trim()) {
                         setEditedStep(prev => ({
@@ -497,7 +532,7 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
                         setQueryParamsError(false);
                         return;
                       }
-                      
+
                       // Only update the actual data if it's valid JSON
                       try {
                         const queryParams = JSON.parse(newValue);

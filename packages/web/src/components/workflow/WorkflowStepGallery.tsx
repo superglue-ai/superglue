@@ -3,9 +3,10 @@ import { Card } from '@/src/components/ui/card';
 import { Input } from '@/src/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import JsonSchemaEditor from '@/src/components/utils/JsonSchemaEditor';
+import { canExecuteStep } from '@/src/lib/client-utils';
 import { cn } from '@/src/lib/utils';
 import { Integration } from "@superglue/client";
-import { ArrowRight, Check, ChevronDown, ChevronLeft, ChevronRight, Code2, Copy, Database, FileJson, Layers, Package, Pencil, Play, Plus, Settings, Trash2 } from 'lucide-react';
+import { ArrowRight, Check, ChevronDown, ChevronLeft, ChevronRight, Code2, Copy, Database, Eye, FileJson, Layers, Package, Pencil, Play, Plus, Settings, Trash2, X } from 'lucide-react';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-javascript';
 import 'prismjs/components/prism-json';
@@ -41,10 +42,20 @@ interface WorkflowStepGalleryProps {
 const highlightCode = (code: string, language: string) => {
     try {
         if (language === 'javascript' || language === 'js') {
-            return Prism.highlight(code, Prism.languages.javascript, 'javascript');
+            // Ensure we're using the JavaScript language definition
+            const jsLang = Prism.languages.javascript || Prism.languages.js;
+            if (jsLang) {
+                return Prism.highlight(code, jsLang, 'javascript');
+            }
+        } else if (language === 'json') {
+            const jsonLang = Prism.languages.json;
+            if (jsonLang) {
+                return Prism.highlight(code, jsonLang, 'json');
+            }
         }
-        return Prism.highlight(code, Prism.languages.json || Prism.languages.javascript, 'json');
-    } catch {
+        return code;
+    } catch (error) {
+        console.error('Syntax highlighting error:', error);
         return code;
     }
 };
@@ -168,12 +179,124 @@ const CopyButton = ({ text }: { text: string }) => {
     );
 };
 
+// Instruction Display Component with truncation and modal
+const InstructionDisplay = ({
+    instruction,
+    onEdit
+}: {
+    instruction: string;
+    onEdit?: () => void;
+}) => {
+    const [showFull, setShowFull] = useState(false);
+    const MAX_LENGTH = 100;
+    const truncated = instruction.length > MAX_LENGTH
+        ? instruction.substring(0, MAX_LENGTH) + '...'
+        : instruction;
+
+    return (
+        <>
+            <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-md border">
+                <div className="flex-1 flex items-center gap-2">
+                    <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                    <p className="text-xs text-muted-foreground font-medium">INSTRUCTION:</p>
+                    <p className="text-xs font-mono text-foreground/80 truncate flex-1">
+                        {truncated}
+                    </p>
+                </div>
+                <div className="flex items-center gap-1">
+                    {instruction.length > MAX_LENGTH && (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => setShowFull(true)}
+                            title="View full instruction"
+                        >
+                            <Eye className="h-3 w-3" />
+                        </Button>
+                    )}
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => navigator.clipboard.writeText(instruction)}
+                        title="Copy"
+                    >
+                        <Copy className="h-3 w-3" />
+                    </Button>
+                    {onEdit && (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={onEdit}
+                            title="Edit"
+                        >
+                            <Pencil className="h-3 w-3" />
+                        </Button>
+                    )}
+                </div>
+            </div>
+
+            {/* Full Instruction Modal */}
+            {showFull && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setShowFull(false)}>
+                    <Card className="max-w-3xl w-full max-h-[80vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                        <div className="p-6">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-lg font-semibold">Workflow Instruction</h3>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => setShowFull(false)}
+                                >
+                                    <X className="h-4 w-4" />
+                                </Button>
+                            </div>
+                            <div className="bg-muted/30 rounded-lg p-4 max-h-[60vh] overflow-y-auto">
+                                <p className="text-sm font-mono whitespace-pre-wrap">
+                                    {instruction}
+                                </p>
+                            </div>
+                            <div className="mt-4 flex justify-end gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(instruction);
+                                    }}
+                                >
+                                    <Copy className="h-3 w-3 mr-1" />
+                                    Copy
+                                </Button>
+                                {onEdit && (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            setShowFull(false);
+                                            onEdit();
+                                        }}
+                                    >
+                                        <Pencil className="h-3 w-3 mr-1" />
+                                        Edit
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
+                    </Card>
+                </div>
+            )}
+        </>
+    );
+};
+
 // Split JSON Editor Component with copy buttons
 const SplitJsonEditor = ({
     data,
     readOnly = true,
-    minHeight = '150px',
-    maxHeight = '300px'
+    minHeight = '100px',
+    maxHeight = '200px'
 }: {
     data: any;
     readOnly?: boolean;
@@ -187,20 +310,21 @@ const SplitJsonEditor = ({
         <div className="grid grid-cols-2 gap-2">
             {/* Schema */}
             <div>
-                <div className="text-xs text-muted-foreground mb-1">Schema</div>
+                <div className="text-[10px] text-muted-foreground mb-1 font-medium">SCHEMA</div>
                 <div className="relative bg-background dark:bg-muted/10 rounded-md border">
                     <CopyButton text={schemaStr} />
-                    <div className="p-2 pr-8 overflow-auto" style={{ maxHeight }}>
+                    <div className="p-1.5 pr-8 overflow-auto" style={{ maxHeight }}>
                         <Editor
                             value={schemaStr}
                             onValueChange={() => { }}
                             highlight={(code) => highlightCode(code, 'json')}
                             padding={0}
                             disabled={readOnly}
-                            className="font-mono text-xs"
+                            className="font-mono text-[10px] leading-[14px]"
                             style={{
                                 minHeight,
                                 background: 'transparent',
+                                lineHeight: '14px'
                             }}
                         />
                     </div>
@@ -209,20 +333,21 @@ const SplitJsonEditor = ({
 
             {/* Data Preview */}
             <div>
-                <div className="text-xs text-muted-foreground mb-1">Data Preview</div>
+                <div className="text-[10px] text-muted-foreground mb-1 font-medium">DATA PREVIEW</div>
                 <div className="relative bg-background dark:bg-muted/10 rounded-md border">
                     <CopyButton text={dataStr} />
-                    <div className="p-2 pr-8 overflow-auto" style={{ maxHeight }}>
+                    <div className="p-1.5 pr-8 overflow-auto" style={{ maxHeight }}>
                         <Editor
                             value={dataStr}
                             onValueChange={() => { }}
                             highlight={(code) => highlightCode(code, 'json')}
                             padding={0}
                             disabled={readOnly}
-                            className="font-mono text-xs"
+                            className="font-mono text-[10px] leading-[14px]"
                             style={{
                                 minHeight,
                                 background: 'transparent',
+                                lineHeight: '14px'
                             }}
                         />
                     </div>
@@ -237,8 +362,8 @@ const JavaScriptCodeEditor = ({
     value,
     onChange,
     readOnly = false,
-    minHeight = '250px',
-    maxHeight = '400px',
+    minHeight = '200px',
+    maxHeight = '350px',
     showCopy = true
 }: {
     value: string;
@@ -251,29 +376,37 @@ const JavaScriptCodeEditor = ({
     const lines = (value || '').split('\n');
 
     return (
-        <div className="relative bg-gradient-to-br from-slate-900/95 to-slate-800/95 dark:from-slate-950 dark:to-slate-900 rounded-lg border border-slate-700/50 font-mono shadow-xl">
+        <div className="relative bg-muted/50 dark:bg-muted/20 rounded-lg border font-mono shadow-sm">
             {showCopy && <CopyButton text={value || ''} />}
-            <div className="absolute left-0 top-0 bottom-0 w-12 bg-black/20 border-r border-slate-700/30 rounded-l-lg">
-                <div className="flex flex-col py-3" style={{ maxHeight, overflow: 'auto' }}>
+            <div className="absolute left-0 top-0 bottom-0 w-10 bg-muted/30 border-r rounded-l-lg">
+                <div className="flex flex-col py-2" style={{ maxHeight, overflow: 'auto' }}>
                     {lines.map((_, i) => (
-                        <div key={i} className="text-xs text-slate-500 text-right pr-3 leading-5 select-none">
+                        <div key={i} className="text-[10px] text-muted-foreground text-right pr-2 leading-[18px] select-none">
                             {i + 1}
                         </div>
                     ))}
                 </div>
             </div>
-            <div className="pl-14 pr-3 py-3 overflow-auto" style={{ maxHeight }}>
+            <div className="pl-12 pr-3 py-2 overflow-auto" style={{ maxHeight }}>
                 <Editor
                     value={value || '// No transformation defined'}
                     onValueChange={onChange || (() => { })}
-                    highlight={(code) => highlightCode(code, 'javascript')}
+                    highlight={(code) => {
+                        try {
+                            // Use JavaScript highlighting specifically
+                            return Prism.highlight(code, Prism.languages.javascript, 'javascript');
+                        } catch {
+                            return code;
+                        }
+                    }}
                     padding={0}
                     disabled={readOnly}
-                    className="font-mono text-xs text-slate-100"
+                    className="font-mono text-[11px] leading-[18px]"
                     textareaClassName="outline-none"
                     style={{
                         minHeight,
                         background: 'transparent',
+                        lineHeight: '18px'
                     }}
                 />
             </div>
@@ -298,7 +431,7 @@ const JsonCodeEditor = ({
     placeholder?: string;
 }) => {
     return (
-        <div className="relative bg-gradient-to-br from-emerald-950/20 to-teal-950/20 dark:from-emerald-950/30 dark:to-teal-950/30 rounded-lg border border-emerald-900/30 shadow-lg">
+        <div className="relative bg-muted/30 rounded-lg border shadow-sm">
             <CopyButton text={value || placeholder} />
             <div className="p-3 pr-10 overflow-auto" style={{ maxHeight }}>
                 <Editor
@@ -352,15 +485,15 @@ const PayloadCard = ({
     };
 
     return (
-        <Card className="w-full max-w-6xl mx-auto shadow-xl bg-gradient-to-br from-emerald-50/50 to-teal-50/50 dark:from-emerald-950/20 dark:to-teal-950/20 border-emerald-200 dark:border-emerald-900/50">
-            <div className="p-8">
-                <div className="flex items-center gap-3 mb-6">
-                    <div className="p-2 bg-emerald-100 dark:bg-emerald-900/50 rounded-lg">
-                        <Package className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+        <Card className="w-full max-w-5xl mx-auto shadow-md border-2 dark:border-border/50">
+            <div className="p-6">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="p-1.5 bg-muted rounded-lg">
+                        <Package className="h-5 w-5 text-muted-foreground" />
                     </div>
                     <div>
-                        <h3 className="text-xl font-semibold">Initial Payload</h3>
-                        <span className="text-sm text-muted-foreground">JSON Data Input</span>
+                        <h3 className="text-lg font-semibold">Initial Payload</h3>
+                        <span className="text-xs text-muted-foreground">JSON Data Input</span>
                     </div>
                 </div>
 
@@ -368,8 +501,8 @@ const PayloadCard = ({
                     value={localPayload}
                     onChange={handleChange}
                     readOnly={readOnly}
-                    minHeight="200px"
-                    maxHeight="500px"
+                    minHeight="150px"
+                    maxHeight="350px"
                 />
 
                 {error && (
@@ -431,15 +564,15 @@ const FinalTransformCard = ({
     };
 
     return (
-        <Card className="w-full max-w-6xl mx-auto shadow-xl bg-gradient-to-br from-purple-50/50 to-indigo-50/50 dark:from-purple-950/20 dark:to-indigo-950/20 border-purple-200 dark:border-purple-900/50">
-            <div className="p-8">
-                <div className="flex items-center gap-3 mb-6">
-                    <div className="p-2 bg-purple-100 dark:bg-purple-900/50 rounded-lg">
-                        <Code2 className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+        <Card className="w-full max-w-5xl mx-auto shadow-md border-2 dark:border-border/50">
+            <div className="p-6">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="p-1.5 bg-muted rounded-lg">
+                        <Code2 className="h-5 w-5 text-muted-foreground" />
                     </div>
                     <div>
-                        <h3 className="text-xl font-semibold">Final Transformation</h3>
-                        <span className="text-sm text-muted-foreground">JavaScript Transform & Response Schema</span>
+                        <h3 className="text-lg font-semibold">Final Transformation</h3>
+                        <span className="text-xs text-muted-foreground">JavaScript Transform & Response Schema</span>
                     </div>
                 </div>
 
@@ -454,8 +587,8 @@ const FinalTransformCard = ({
                             value={localTransform}
                             onChange={handleTransformChange}
                             readOnly={readOnly}
-                            minHeight="350px"
-                            maxHeight="600px"
+                            minHeight="250px"
+                            maxHeight="400px"
                         />
                     </TabsContent>
 
@@ -505,12 +638,12 @@ const SpotlightStepCard = ({
     const [showOutput, setShowOutput] = useState(false);
 
     return (
-        <Card className="w-full max-w-6xl mx-auto shadow-lg">
-            <div className="p-8">
-                <div className="flex items-center justify-between mb-6">
+        <Card className="w-full max-w-5xl mx-auto shadow-md bg-accent/10 dark:bg-accent/5 border-2 border-accent/30 dark:border-accent/20">
+            <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
-                        <Database className="h-5 w-5 text-muted-foreground" />
-                        <h3 className="text-xl font-semibold">
+                        <Database className="h-4 w-4 text-muted-foreground" />
+                        <h3 className="text-lg font-semibold">
                             {step.id || `Step ${stepIndex + 1}`}
                         </h3>
                         {step.name && step.name !== step.id && (
@@ -520,12 +653,11 @@ const SpotlightStepCard = ({
                     <div className="flex items-center gap-2">
                         {!readOnly && onExecuteStep && (
                             <Button
-                                variant="default"
+                                variant="success"
                                 size="sm"
                                 onClick={onExecuteStep}
                                 disabled={!canExecute || isExecuting}
                                 title={!canExecute ? "Execute previous steps first" : "Test this step"}
-                                className="bg-emerald-600 hover:bg-emerald-700 text-white"
                             >
                                 {isExecuting ? (
                                     <>
@@ -571,8 +703,8 @@ const SpotlightStepCard = ({
                             <SplitJsonEditor
                                 data={evolvingPayload}
                                 readOnly={true}
-                                minHeight="120px"
-                                maxHeight="200px"
+                                minHeight="80px"
+                                maxHeight="150px"
                             />
                         )}
                     </div>
@@ -620,8 +752,8 @@ const SpotlightStepCard = ({
                             <SplitJsonEditor
                                 data={stepResult}
                                 readOnly={true}
-                                minHeight="120px"
-                                maxHeight="200px"
+                                minHeight="80px"
+                                maxHeight="150px"
                             />
                         )}
                     </div>
@@ -640,7 +772,8 @@ const MiniStepCard = ({
     onClick,
     hasResult,
     isPayload = false,
-    isTransform = false
+    isTransform = false,
+    isExecuting = false
 }: {
     step: any;
     index: number;
@@ -649,22 +782,23 @@ const MiniStepCard = ({
     hasResult: boolean;
     isPayload?: boolean;
     isTransform?: boolean;
+    isExecuting?: boolean;
 }) => {
     if (isPayload) {
         return (
             <div
                 className={cn(
                     "cursor-pointer transition-all duration-200",
-                    isActive ? "scale-105" : "scale-100 opacity-70 hover:opacity-90"
+                    isActive ? "scale-105" : "scale-100 opacity-80 hover:opacity-100"
                 )}
                 onClick={onClick}
             >
                 <Card className={cn(
-                    "p-4 min-w-[200px] max-w-[250px]",
+                    "p-5 min-w-[240px] max-w-[280px]",
                     isActive && "ring-2 ring-primary shadow-lg"
                 )}>
                     <div className="flex flex-col items-center gap-2">
-                        <Package className="h-5 w-5 text-muted-foreground" />
+                        <Package className="h-6 w-6 text-muted-foreground" />
                         <p className="text-sm font-medium">Initial Payload</p>
                         <p className="text-xs text-muted-foreground">JSON</p>
                     </div>
@@ -678,16 +812,16 @@ const MiniStepCard = ({
             <div
                 className={cn(
                     "cursor-pointer transition-all duration-200",
-                    isActive ? "scale-105" : "scale-100 opacity-70 hover:opacity-90"
+                    isActive ? "scale-105" : "scale-100 opacity-80 hover:opacity-100"
                 )}
                 onClick={onClick}
             >
                 <Card className={cn(
-                    "p-4 min-w-[200px] max-w-[250px]",
+                    "p-5 min-w-[240px] max-w-[280px]",
                     isActive && "ring-2 ring-primary shadow-lg"
                 )}>
                     <div className="flex flex-col items-center gap-2">
-                        <Code2 className="h-5 w-5 text-muted-foreground" />
+                        <Code2 className="h-6 w-6 text-muted-foreground" />
                         <p className="text-sm font-medium">Final Transform</p>
                         <p className="text-xs text-muted-foreground">JavaScript</p>
                     </div>
@@ -699,28 +833,32 @@ const MiniStepCard = ({
     const method = step.apiConfig?.method || 'GET';
     const url = `${step.apiConfig?.urlHost || ''}${step.apiConfig?.urlPath || ''}`.trim() || 'No URL';
 
+    // Determine status dot color
+    const getStatusDotColor = () => {
+        if (isExecuting) return "bg-yellow-500 animate-pulse";
+        if (hasResult) return "bg-green-500";
+        return "bg-gray-400";
+    };
+
     return (
         <div
             className={cn(
                 "cursor-pointer transition-all duration-200",
-                isActive ? "scale-105" : "scale-100 opacity-70 hover:opacity-90"
+                isActive ? "scale-105" : "scale-100 opacity-80 hover:opacity-100"
             )}
             onClick={onClick}
         >
             <Card className={cn(
-                "p-4 min-w-[200px] max-w-[250px]",
+                "p-5 min-w-[240px] max-w-[280px]",
                 isActive && "ring-2 ring-primary shadow-lg"
             )}>
-                <div className="space-y-2">
+                <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                        <div className={cn(
-                            "w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold",
-                            hasResult ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-muted"
-                        )}>
+                        <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-sm font-semibold">
                             {index}
                         </div>
                         <span className={cn(
-                            "text-xs px-2 py-0.5 rounded font-medium",
+                            "text-xs px-2 py-1 rounded font-medium",
                             method === 'GET' && "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
                             method === 'POST' && "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
                             method === 'PUT' && "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
@@ -731,15 +869,21 @@ const MiniStepCard = ({
                         </span>
                     </div>
                     <div>
-                        <p className="text-sm font-medium truncate">
+                        <p className="text-sm font-semibold truncate">
                             {step.id || `Step ${index}`}
                         </p>
                         <p className="text-xs text-muted-foreground truncate mt-1">
                             {url}
                         </p>
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                        {hasResult ? "✓ Completed" : "○ Pending"}
+                    <div className="flex items-center gap-2">
+                        <div className={cn(
+                            "w-2 h-2 rounded-full transition-all",
+                            getStatusDotColor()
+                        )} />
+                        <span className="text-xs text-muted-foreground">
+                            {isExecuting ? "Testing..." : hasResult ? "Completed" : "Pending"}
+                        </span>
                     </div>
                 </div>
             </Card>
@@ -756,7 +900,7 @@ export function WorkflowStepGallery({
     workflowId,
     instruction,
     onStepsChange,
-    onStepEdit,
+    onStepEdit: originalOnStepEdit,
     onFinalTransformChange,
     onResponseSchemaChange,
     onPayloadChange,
@@ -868,6 +1012,15 @@ export function WorkflowStepGallery({
         }
     };
 
+    // Wrap onStepEdit to reset completion status when a step is edited
+    const onStepEdit = (stepId: string, updatedStep: any) => {
+        if (originalOnStepEdit) {
+            originalOnStepEdit(stepId, updatedStep);
+            // The parent component should handle resetting the completion status
+            // by clearing the stepId from completedSteps array
+        }
+    };
+
     // Auto-select first item on mount
     useEffect(() => {
         setActiveIndex(0);
@@ -882,12 +1035,15 @@ export function WorkflowStepGallery({
                         <Layers className="h-5 w-5 text-muted-foreground" />
                         <h2 className="text-lg font-semibold">Workflow</h2>
                         {workflowId && (
-                            <Input
-                                value={workflowId}
-                                onChange={(e) => onWorkflowIdChange?.(e.target.value)}
-                                className="h-8 font-mono text-sm w-[260px]"
-                                readOnly={readOnly || !onWorkflowIdChange}
-                            />
+                            <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 rounded-md border">
+                                <span className="text-xs text-muted-foreground">ID:</span>
+                                <Input
+                                    value={workflowId}
+                                    onChange={(e) => onWorkflowIdChange?.(e.target.value)}
+                                    className="h-6 font-mono text-sm w-[320px] border-0 bg-transparent p-0 focus:ring-0"
+                                    readOnly={readOnly || !onWorkflowIdChange}
+                                />
+                            </div>
                         )}
                     </div>
 
@@ -901,33 +1057,10 @@ export function WorkflowStepGallery({
 
                 {/* Instruction Display */}
                 {instruction && (
-                    <div className="relative bg-muted/50 rounded-lg p-3 border border-border">
-                        <div className="font-mono text-sm text-muted-foreground max-h-20 overflow-y-auto pr-16">
-                            "{instruction}"
-                        </div>
-                        <div className="absolute top-2 right-2 flex items-center gap-1">
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6"
-                                onClick={() => navigator.clipboard.writeText(instruction)}
-                                title="Copy"
-                            >
-                                <Copy className="h-3 w-3" />
-                            </Button>
-                            {onInstructionEdit && (
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6"
-                                    onClick={onInstructionEdit}
-                                    title="Edit"
-                                >
-                                    <Pencil className="h-3 w-3" />
-                                </Button>
-                            )}
-                        </div>
-                    </div>
+                    <InstructionDisplay
+                        instruction={instruction}
+                        onEdit={onInstructionEdit}
+                    />
                 )}
             </div>
 
@@ -966,9 +1099,10 @@ export function WorkflowStepGallery({
                                         index={globalIndex}
                                         isActive={globalIndex === activeIndex}
                                         onClick={() => handleCardClick(globalIndex)}
-                                        hasResult={!!item.stepResult}
+                                        hasResult={item.type === 'step' ? completedSteps.includes(item.data.id) : !!item.stepResult}
                                         isPayload={item.type === 'payload'}
                                         isTransform={item.type === 'transform'}
+                                        isExecuting={item.type === 'step' && isExecutingStep === globalIndex - 1}
                                     />
                                     {localIndex < visibleItems.length - 1 && (
                                         <ArrowRight className="h-4 w-4 text-muted-foreground mx-2" />
@@ -1018,7 +1152,7 @@ export function WorkflowStepGallery({
             )}
 
             {/* Spotlight Card */}
-            <div className="min-h-[500px]">
+            <div className="min-h-[400px]">
                 {currentItem && (
                     currentItem.type === 'payload' ? (
                         <PayloadCard
@@ -1043,7 +1177,7 @@ export function WorkflowStepGallery({
                             onEdit={!readOnly ? onStepEdit : undefined}
                             onRemove={!readOnly && currentItem.type === 'step' ? handleRemoveStep : undefined}
                             onExecuteStep={onExecuteStep ? () => onExecuteStep(activeIndex - 1) : undefined}
-                            canExecute={activeIndex === 1 || completedSteps.includes(steps[activeIndex - 2]?.id)}
+                            canExecute={canExecuteStep(activeIndex - 1, completedSteps, { steps } as any)}
                             isExecuting={isExecutingStep === activeIndex - 1}
                             integrations={integrations}
                             readOnly={readOnly}
