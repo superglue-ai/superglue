@@ -64,9 +64,6 @@ describe('PostgreSQL Utilities', () => {
       expect(vi.mocked(Pool)).toHaveBeenCalledWith({
         connectionString: 'postgres://testuser:testpass@localhost:5432/testdb',
         statement_timeout: 30000,
-        ssl: {
-          rejectUnauthorized: false,
-        },
         max: 10,
         idleTimeoutMillis: server_defaults.POSTGRES.DEFAULT_TIMEOUT,
         connectionTimeoutMillis: 5000
@@ -120,15 +117,12 @@ describe('PostgreSQL Utilities', () => {
         
       await callPostgres(mockEndpoint, mockPayload, mockCredentials, options);
 
-      expect(vi.mocked(Pool)).toHaveBeenCalledWith({
+            expect(vi.mocked(Pool)).toHaveBeenCalledWith({
         connectionString: expect.any(String),
         statement_timeout: 5000,
-        ssl: {
-          rejectUnauthorized: false,
-        },
         max: 10,
         idleTimeoutMillis: server_defaults.POSTGRES.DEFAULT_TIMEOUT,
-        connectionTimeoutMillis: 5000 
+        connectionTimeoutMillis: 5000
       });
     });
 

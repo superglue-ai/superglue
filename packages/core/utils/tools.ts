@@ -131,7 +131,7 @@ export async function transformAndValidateSchema(data: any, expr: string, schema
       result = { success: true, data: data };
     }
     const ARROW_FUNCTION_PATTERN = /^\s*\([^)]+\)\s*=>/;
-    
+
     if (ARROW_FUNCTION_PATTERN.test(expr)) {
       result = await executeAndValidateMappingCode(data, expr, schema);
     } else {
@@ -530,13 +530,16 @@ export async function evaluateStopCondition(
   }
 }
 
-export function isSelfHealingEnabled(options: RequestOptions, type: "transform" | "api"): boolean {
-  if (type === "transform") {
-    return options?.selfHealing ? options.selfHealing === SelfHealingMode.ENABLED || options.selfHealing === SelfHealingMode.TRANSFORM_ONLY : true;
+export function isSelfHealingEnabled(options: RequestOptions | undefined, type: "transform" | "api"): boolean {
+  const selfHealingMode = options?.selfHealing;
+
+  if (selfHealingMode === undefined || selfHealingMode === null) {
+    return true; // we default to enabled if options.selfHealing is not set
   }
-  if (type === "api") {
-    return options?.selfHealing ? options.selfHealing === SelfHealingMode.ENABLED || options.selfHealing === SelfHealingMode.REQUEST_ONLY : true;
-  }
+  if (selfHealingMode === SelfHealingMode.DISABLED) {
+    return false;
+  } 
+  return type === "transform" ? (selfHealingMode === SelfHealingMode.ENABLED || selfHealingMode === SelfHealingMode.TRANSFORM_ONLY) : (selfHealingMode === SelfHealingMode.ENABLED || selfHealingMode === SelfHealingMode.REQUEST_ONLY);
 }
 
 // Legacy function needs to stay for existing workflow backwards compatibility

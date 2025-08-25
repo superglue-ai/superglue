@@ -5,7 +5,7 @@ import { IntegrationForm } from '@/src/components/integrations/IntegrationForm';
 import { useToast } from '@/src/hooks/use-toast';
 import { inputErrorStyles, needsUIToTriggerDocFetch, parseCredentialsHelper } from '@/src/lib/client-utils';
 import { cn, composeUrl, getIntegrationIcon as getIntegrationIconName } from '@/src/lib/utils';
-import { Integration, IntegrationInput, SuperglueClient, UpsertMode, Workflow, WorkflowResult } from '@superglue/client';
+import { Integration, IntegrationInput, SelfHealingMode, SuperglueClient, UpsertMode, Workflow, WorkflowResult } from '@superglue/client';
 import { integrations as integrationTemplates } from "@superglue/shared";
 import { flattenAndNamespaceWorkflowCredentials, waitForIntegrationProcessing } from '@superglue/shared/utils';
 import { ArrowRight, Check, ChevronRight, Clock, FileText, Globe, Key, Loader2, Pencil, Play, Plus, Workflow as WorkflowIcon, X } from 'lucide-react';
@@ -441,7 +441,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         payload: JSON.parse(payload || '{}'),
         credentials: parseCredentialsHelper(reviewCredentials),
         options: {
-          testMode: true
+          testMode: true,
         }
       });
       setExecutionResult(result);

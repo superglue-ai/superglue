@@ -4,7 +4,7 @@ import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import JsonSchemaEditor from "@/src/components/utils/JsonSchemaEditor";
 import { parseCredentialsHelper } from "@/src/lib/client-utils";
 import { cn } from "@/src/lib/utils";
-import { ExecutionStep, Integration, SuperglueClient, WorkflowResult } from "@superglue/client";
+import { ExecutionStep, Integration, SelfHealingMode, SuperglueClient, WorkflowResult } from "@superglue/client";
 import { flattenAndNamespaceWorkflowCredentials } from "@superglue/shared/utils";
 import { ChevronRight, Database, FileText, Workflow, X } from "lucide-react";
 import { useRouter } from 'next/navigation';
@@ -14,6 +14,7 @@ import { Button } from "../ui/button";
 import { Card, CardContent, CardFooter } from "../ui/card";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
+import { Switch } from "../ui/switch";
 import { WorkflowResultsView } from "./WorkflowResultsView";
 import { WorkflowStepsView } from "./WorkflowStepsView";
 
@@ -44,6 +45,7 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [instructions, setInstructions] = useState<string>('');
+  const [selfHealingEnabled, setSelfHealingEnabled] = useState(false);
 
   const client = useMemo(() => new SuperglueClient({
     endpoint: config.superglueEndpoint,
@@ -411,7 +413,8 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
         payload: JSON.parse(payload || '{}'),
         credentials: JSON.parse(credentials || '{}'),
         options: {
-          testMode: true
+          testMode: selfHealingEnabled,
+          selfHealing: selfHealingEnabled ? SelfHealingMode.ENABLED : SelfHealingMode.DISABLED
         }
       });
 
@@ -557,7 +560,7 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
             <div className="mb-4">
               <Label htmlFor="instructions">Workflow Instructions</Label>
               <HelpTooltip text="Describe what this workflow does and how it should behave. This helps with documentation and AI assistance." />
-              <div className="font-mono text-sm text-foreground rounded py-1 mt-1 break-words">
+              <div className="font-mono text-sm text-foreground rounded py-1 mt-1 break-words whitespace-pre-wrap max-h-32 overflow-y-auto">
                 {instructions || <span className="italic text-muted-foreground">No instructions provided</span>}
               </div>
             </div>
@@ -750,23 +753,32 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
             </div>
           </CardContent>
 
-          <CardFooter className="flex gap-2 p-3 flex-shrink-0 border-t">
-            <Button
-              variant="outline"
-              onClick={saveWorkflow}
-              disabled={saving || loading}
-              className="w-full"
-            >
-              {saving ? "Saving..." : "Save Workflow"}
-            </Button>
-            <Button
-              variant="success"
-              onClick={executeWorkflow}
-              disabled={loading || saving}
-              className="w-full"
-            >
-              {loading ? "Running..." : "Run Workflow"}
-            </Button>
+          <CardFooter className="flex p-3 flex-shrink-0 border-t">
+            <div className="flex items-center gap-2 w-full flex-wrap">
+              <Button
+                variant="outline"
+                onClick={saveWorkflow}
+                disabled={saving || loading}
+                className="flex-1"
+              >
+                {saving ? "Saving..." : "Save Workflow"}
+              </Button>
+              <Button
+                variant="success"
+                onClick={executeWorkflow}
+                disabled={loading || saving}
+                className="flex-1"
+              >
+                {loading ? "Running..." : "Run Workflow"}
+              </Button>
+              <div className="flex items-center gap-2 shrink-0">
+                <Label htmlFor="selfHealing" className="text-xs flex items-center gap-1">
+                  <span>Self-healing</span>
+                </Label>
+                <Switch className="custom-switch" id="selfHealing" checked={selfHealingEnabled} onCheckedChange={setSelfHealingEnabled} />
+                <sup className="leading-none"><HelpTooltip text="Enable LLM-based self-healing during execution. Slower, but can auto-fix failures." /></sup>
+              </div>
+            </div>
           </CardFooter>
         </Card>
 

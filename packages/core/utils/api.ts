@@ -17,7 +17,7 @@ import { callAxios, composeUrl, evaluateStopCondition, generateId, isSelfHealing
 export class ApiCallError extends Error {
   statusCode?: number;
 
-  constructor(message: string, statusCode?: number, ) {
+  constructor(message: string, statusCode?: number,) {
     super(message);
     this.name = 'ApiCallError';
     this.statusCode = statusCode;
@@ -45,7 +45,7 @@ export function convertBasicAuthToBase64(headerValue: string) {
   return headerValue;
 }
 
-export async function callEndpoint({endpoint, payload, credentials, options}: {endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions}): Promise<{ data: any; statusCode: number; headers: Record<string, any>; }> {
+export async function callEndpoint({ endpoint, payload, credentials, options }: { endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions }): Promise<{ data: any; statusCode: number; headers: Record<string, any>; }> {
   const allVariables = { ...payload, ...credentials };
 
   let allResults = [];
@@ -76,17 +76,17 @@ export async function callEndpoint({endpoint, payload, credentials, options}: {e
     // check if the pagination type is configured correctly
     if (endpoint.pagination?.type === PaginationType.PAGE_BASED) {
       const request = JSON.stringify(endpoint);
-      if(!request.includes('page')) {
+      if (!request.includes('page')) {
         throw new Error(`Pagination type is ${PaginationType.PAGE_BASED} but no page parameter is provided in the request. Please provide a page parameter in the request.`);
       }
     } else if (endpoint.pagination?.type === PaginationType.OFFSET_BASED) {
       const request = JSON.stringify(endpoint);
-      if(!request.includes('offset')) {
+      if (!request.includes('offset')) {
         throw new Error(`Pagination type is ${PaginationType.OFFSET_BASED} but no offset parameter is provided in the request. Please provide an offset parameter in the request.`);
       }
     } else if (endpoint.pagination?.type === PaginationType.CURSOR_BASED) {
       const request = JSON.stringify(endpoint);
-      if(!request.includes('cursor')) {
+      if (!request.includes('cursor')) {
         throw new Error(`Pagination type is ${PaginationType.CURSOR_BASED} but no cursor parameter is provided in the request. Please provide a cursor parameter in the request.`);
       }
     }
@@ -143,7 +143,7 @@ export async function callEndpoint({endpoint, payload, credentials, options}: {e
         urlPath: processedUrlPath,
         body: processedBody
       };
-      return { data: await callFTP({endpoint: ftpEndpoint, credentials, options}), statusCode: 200, headers: {} };
+      return { data: await callFTP({ endpoint: ftpEndpoint, credentials, options }), statusCode: 200, headers: {} };
     }
 
     const processedUrl = composeUrl(processedUrlHost, processedUrlPath);
@@ -180,7 +180,7 @@ config: ${maskedConfig}`;
 
       throw new ApiCallError(`API call failed with status ${lastResponse.status}. Response: ${message}`, lastResponse.status);
     }
-    
+
     if (typeof lastResponse.data === 'string' &&
       (lastResponse.data.slice(0, 100).trim().toLowerCase().startsWith('<!doctype html') ||
         lastResponse.data.slice(0, 100).trim().toLowerCase().startsWith('<html'))) {
@@ -349,13 +349,13 @@ export async function generateApiConfig({
   messages?: OpenAI.Chat.ChatCompletionMessageParam[],
   integrationManager: IntegrationManager,
 }): Promise<{ config: ApiConfig; messages: OpenAI.Chat.ChatCompletionMessageParam[]; }> {
-  if(!retryCount) retryCount = 0;
-  if(!messages) messages = [];
-  
+  if (!retryCount) retryCount = 0;
+  if (!messages) messages = [];
+
   if (messages.length === 0) {
     const fullDocs = await integrationManager?.getDocumentation();
-    const documentation = fullDocs?.content?.length < LanguageModel.contextLength / 4 ? 
-      fullDocs?.content : 
+    const documentation = fullDocs?.content?.length < LanguageModel.contextLength / 4 ?
+      fullDocs?.content :
       await integrationManager?.searchDocumentation(apiConfig.urlPath || apiConfig.instruction);
     const userPrompt = `Generate API configuration for the following:
 
@@ -410,7 +410,7 @@ ${JSON.stringify(sample(payload || {}, 5)).slice(0, LanguageModel.contextLength 
     { integration: await integrationManager?.getIntegration() }
   );
 
-  if(generatedConfig?.error) {
+  if (generatedConfig?.error) {
     throw new AbortError(generatedConfig.error);
   }
 
@@ -450,7 +450,7 @@ export async function evaluateResponse({
   if (content.length > LanguageModel.contextLength / 2) {
     content = JSON.stringify(sample(data, 10));
   }
-  if(content.length > LanguageModel.contextLength / 2) {
+  if (content.length > LanguageModel.contextLength / 2) {
     content = content.slice(0, LanguageModel.contextLength / 2) + "\n\n...truncated...";
   }
 
@@ -492,8 +492,10 @@ Refactoring is NOT needed if the response contains extra fields or needs to be g
 ${documentationContext}
 </documentation>`
     },
-    { role: "user", content: `<request>${JSON.stringify(endpoint)}</request>
-<api_response>${content}</api_response>` }
+    {
+      role: "user", content: `<request>${JSON.stringify(endpoint)}</request>
+<api_response>${content}</api_response>`
+    }
   ] as OpenAI.Chat.ChatCompletionMessageParam[];
 
   const response = await LanguageModel.generateObject(
@@ -511,7 +513,7 @@ export async function executeApiCall({
   integrationManager,
   options,
   metadata,
-  }: {
+}: {
   endpoint: ApiConfig,
   payload: any,
   credentials: Record<string, string>,
@@ -551,7 +553,7 @@ export async function executeApiCall({
         messages = computedApiCallConfig.messages;
       }
 
-      response = await callEndpoint({endpoint, payload, credentials, options});
+      response = await callEndpoint({ endpoint, payload, credentials, options });
 
       if (!response.data) {
         throw new Error("No data returned from API. This could be due to a configuration error.");
@@ -575,7 +577,7 @@ export async function executeApiCall({
     catch (error) {
       const rawErrorString = error?.message || JSON.stringify(error || {});
       lastError = maskCredentials(rawErrorString, credentials).slice(0, 2000);
-      if(retryCount > 0) {
+      if (retryCount > 0) {
         messages.push({ role: "user", content: `There was an error with the configuration, please fix: ${rawErrorString.slice(0, 4000)}` });
         logMessage('warn', `API call failed. ${lastError}`, metadata);
       }
@@ -585,7 +587,7 @@ export async function executeApiCall({
         response = response || {};
         response.statusCode = error instanceof ApiCallError ? error.statusCode : 500;
       }
-      if(error instanceof AbortError) {
+      if (error instanceof AbortError) {
         break;
       }
     }

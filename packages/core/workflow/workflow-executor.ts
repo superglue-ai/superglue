@@ -153,7 +153,7 @@ export class WorkflowExecutor implements Workflow {
             this.result.completedAt = new Date();
             return this.result;
           }
-          
+
           logMessage("info", `Preparing new final transform`, this.metadata);
           const instruction = "Generate the final transformation code." +
             (this.instruction ? " with the following instruction: " + this.instruction : "") +
