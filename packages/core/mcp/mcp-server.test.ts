@@ -8,6 +8,7 @@ const listWorkflows = toolDefinitions.superglue_list_available_workflows.execute
 const findIntegrations = toolDefinitions.superglue_find_relevant_integrations.execute;
 const saveWorkflow = toolDefinitions.superglue_save_workflow.execute;
 const createIntegration = toolDefinitions.superglue_create_integration.execute;
+const modifyIntegration = toolDefinitions.superglue_modify_integration.execute
 
 // Mock the waitForIntegrationProcessing function
 vi.mock('@superglue/shared/utils', () => ({
@@ -631,3 +632,71 @@ describe('superglue_create_integration', () => {
   });
 })
 
+describe('superglue_modify_integration', () => {
+  it('modify integration successfully', async () => {
+    const client = {
+      upsertIntegration: vi.fn().mockResolvedValue({
+        id: 'test-integration',
+        name: 'Test Integration',
+        documentationPending: false
+      })
+    };
+    const args = {
+      client,
+      id: 'test-integration',
+      name: 'Test Integration',
+      urlHost: 'https://api.test.com',
+      credentials: { apiKey: 'test' }
+    };
+    const result = await modifyIntegration(args, {});
+
+    expect(result.success).toBe(true);
+    expect(result.integration).toBeDefined();
+    expect(result.note).toContain('created successfully');
+    expect(client.upsertIntegration).toHaveBeenCalledWith('test-integration', {
+      id: 'test-integration',
+      name: 'Test Integration',
+      urlHost: 'https://api.test.com',
+      credentials: { apiKey: 'test' }
+    }, 'UPDATE');
+  });
+
+  it('handles documentation processing', async () => {
+    const client = {
+      upsertIntegration: vi.fn().mockResolvedValue({
+        id: 'test-integration',
+        documentationPending: true
+      })
+    };
+    const args = {
+      client,
+      id: 'test-integration',
+      documentationUrl: 'https://api.test.com/docs'
+    };
+    const result = await modifyIntegration(args, {});
+
+    expect(result.success).toBe(true);
+    expect(result.note).toContain('Documentation is being processed');
+  });
+
+  it('validates required id field', async () => {
+    const client = { upsertIntegration: vi.fn() };
+    const args = { client }; // Missing id
+    const result = await createIntegration(args, {});
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Integration ID is required');
+  });
+
+  it('returns failure when upsertIntegration throws', async () => {
+    const client = {
+      upsertIntegration: vi.fn().mockRejectedValue(new Error('Integration creation failed'))
+    };
+    const args = { client, id: 'test-integration' };
+    const result = await createIntegration(args, {});
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Integration creation failed');
+    expect(result.suggestion).toContain('Validate all integration inputs');
+  });
+})

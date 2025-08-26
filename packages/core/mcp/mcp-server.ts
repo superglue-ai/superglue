@@ -95,6 +95,18 @@ export const CreateIntegrationInputSchema = {
   credentials: z.record(z.string()).describe("Credentials for accessing the integration. Provide an empty object if no credentials are needed / given. Can be referenced by brackets: <<{integration_id}_{credential_name}>>. "),
 };
 
+export const ModifyIntegrationInputSchema = {
+  id: z.string().describe("The unique identifier for of the integration."),
+  name: z.string().optional().describe("Human-readable name for the integration."),
+  urlHost: z.string().optional().describe("Base URL/hostname for the API including protocol."),
+  urlPath: z.string().optional().describe("Path component of the URL. For postgres, use db name as the path."),
+  documentationUrl: z.string().optional().describe("URL to the API documentation."),
+  documentation: z.string().optional().describe("API documentation content, if provided directly."),
+  specificInstructions: z.string().optional().describe("Specific guidance on how to use this integration (e.g., rate limits, special endpoints, authentication details). Max 2000 characters."),
+  documentationKeywords: z.array(z.string()).optional().describe("Keywords to help with documentation search and ranking (e.g., endpoint names, data objects, key concepts)."),
+  credentials: z.record(z.string()).optional().describe("Credentials for accessing the integration. Provide an empty object if no credentials are needed / given. Can be referenced by brackets: <<{integration_id}_{credential_name}>>. "),
+};
+
 // Workflow structure schemas (for validation)
 export const WorkflowInputSchema = z.object({
   steps: z.array(z.object(ExecutionStepInputSchemaInternal)).describe("Array of execution steps that make up the workflow"),
@@ -744,6 +756,48 @@ export const toolDefinitions: Record<string, any> = {
       }
     },
   },
+  superglue_modify_integration: {
+    description: `
+    <use_case>
+      Modifies an already existing integration identified by id. Integrations are building blocks for workflows and contain the credentials for accessing the API.
+      Only provide the id and the fields you want to change. Fields not included or set to undefined will remain unchanged. If you set a field to null, it will be reset to null.
+    </use_case>
+
+    <important_notes>
+      - Most APIs require authentication (API keys, tokens, etc.). Always ask the user for credentials if needed.
+      - Always split information clearly: urlHost (without secrets), urlPath, credentials (with secrets), etc.
+      - When users mention API constraints (rate limits, special endpoints, auth requirements, etc.), capture them in 'specificInstructions' to guide workflow building.
+      - Providing a documentationUrl will trigger asynchronous API documentation processing.
+      - If you provide documentationUrl, include relevant keywords in 'documentationKeywords' to improve documentation search (e.g., endpoint names, data objects, key concepts mentioned in conversation).
+    </important_notes>
+    `,
+    inputSchema: ModifyIntegrationInputSchema,
+    execute: async (args: any & { client: SuperglueClient; orgId: string; }, request) => {
+      const { client, orgId, ...integrationInput } = args;
+
+      try {
+        const validationErrors = validateIntegrationCreation(integrationInput);
+        if (validationErrors.length > 0) {
+          throw new Error(`Validation failed:\n${validationErrors.join('\n')}`);
+        }
+
+        const result = await client.upsertIntegration(integrationInput.id, integrationInput, 'UPDATE');
+        const note = result.documentationPending ? "Integration created. Documentation is being processed in the background." : "Integration created successfully."
+        
+        return {
+          note: note,
+          success: true,
+          integration: result
+        };
+      } catch (error: any) {
+        return {
+          success: false,
+          error: error.message,
+          suggestion: "Failed to create integration. Validate all integration inputs and try again."
+        };
+      }
+    },
+  }
 };
 
 // Modified server creation function
