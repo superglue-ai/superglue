@@ -33,34 +33,6 @@ export class HtmlMarkdownPool {
     }
 
     private createWorker(): Worker {
-        const tsUrl = new URL('./html-markdown-worker.ts', import.meta.url);
-        // 1) Node 22.6+ native strip types
-        const major = Number.parseInt(process.versions.node.split('.')[0] || '0', 10);
-        if (major >= 22) {
-            try {
-                const worker = new Worker(tsUrl, { execArgv: ['--experimental-strip-types'] });
-                this.attachWorkerEvents(worker);
-                return worker;
-            } catch { /* fall through */ }
-        }
-
-        // 2) tsx if available
-        try {
-            require.resolve('tsx');
-            const worker = new Worker(tsUrl, { execArgv: ['--import', 'tsx'] });
-            this.attachWorkerEvents(worker);
-            return worker;
-        } catch { /* fall through */ }
-
-        // 3) ts-node transpile-only (CJS)
-        try {
-            require.resolve('ts-node/register/transpile-only');
-            const worker = new Worker(tsUrl, { execArgv: ['-r', 'ts-node/register/transpile-only'] });
-            this.attachWorkerEvents(worker);
-            return worker;
-        } catch { /* fall through */ }
-
-        // 4) compiled JS in dist
         const jsUrl = new URL('./html-markdown-worker.js', import.meta.url);
         const worker = new Worker(jsUrl);
         this.attachWorkerEvents(worker);
