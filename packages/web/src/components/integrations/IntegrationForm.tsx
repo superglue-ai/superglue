@@ -230,7 +230,7 @@ export function IntegrationForm({
         const errors: Record<string, boolean> = {};
         if (!id.trim()) errors.id = true;
         if (!urlHost.trim()) errors.urlHost = true;
-        if (specificInstructions.length > 2000) errors.specificInstructions = true;
+        if (specificInstructions.length > 10000) errors.specificInstructions = true;
 
         let creds = {};
 
@@ -788,15 +788,15 @@ export function IntegrationForm({
                                         'min-h-[100px] pr-16',
                                         validationErrors.specificInstructions && inputErrorStyles
                                     )}
-                                    maxLength={2000}
+                                    maxLength={10000}
                                 />
                                 <div className="absolute bottom-2 right-2 text-xs text-muted-foreground">
-                                    {specificInstructions.length}/2000
+                                    {specificInstructions.length}/10000
                                 </div>
                             </div>
                             {validationErrors.specificInstructions && (
                                 <p className="text-sm text-destructive mt-1">
-                                    Specific instructions must be 2000 characters or less.
+                                    Specific instructions must be 10000 characters or less.
                                 </p>
                             )}
                         </div>
