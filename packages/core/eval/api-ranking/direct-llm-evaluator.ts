@@ -387,10 +387,16 @@ Always wrap your code in <<CODE>> and <</CODE>> tags (note the closing tag has a
             // Load evaluateResponse dynamically
             const { evaluateResponse } = await import('../../utils/api.js');
             const documentation = integrations[0]?.documentation || '';
+            
+            const MAX_DOCS_LENGTH = 300_000; // around 75K Tokens
+            const truncatedDocs = documentation.length > MAX_DOCS_LENGTH
+                ? documentation.slice(0, MAX_DOCS_LENGTH) + "\n\n...truncated..."
+                : documentation;
+                        
             const evaluation = await evaluateResponse({
                 data: result,
                 endpoint: {instruction} as any,
-                documentation
+                documentation: truncatedDocs
             });
 
             return {
