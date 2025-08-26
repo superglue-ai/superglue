@@ -197,6 +197,39 @@ Creates and immediately saves a new integration. Integrations are building block
 }
 ```
 
+### superglue_modify_integration
+
+Modifies fields of an existing integration by id. Provide only the id and the fields you want to change. Fields not included will remain unchanged.
+
+**Input Schema:**
+- `id`: **Required** - The unique identifier of the existing integration
+- `name`: (Optional) Human-readable name for the integration
+- `urlHost`: (Optional) Base URL/hostname for the API including protocol
+- `urlPath`: (Optional) Path component of the URL
+- `documentationUrl`: (Optional) URL to the API documentation
+- `documentation`: (Optional) API documentation content, if provided directly
+- `credentials`: (Optional) Credentials object (can be empty {} if no credentials needed)
+
+<Note>
+**Important Notes:**
+- Most APIs require authentication (API keys, tokens, etc.)
+- Always store credentials in the credentials field
+- Use placeholder references: `<<{integration_id}_{credential_name}>>`
+- Split information clearly: urlHost (without secrets), credentials (with secrets)
+- Providing a documentationUrl triggers async documentation processing
+</Note>
+
+**Example Usage:**
+```json
+{
+  "toolName": "superglue_modify_integration",
+  "inputs": {
+    "id": "my-api",
+    "documentationUrl": "https://api.example.com/docs"
+  }
+}
+```
+
 ## Code Generation
 
 ### superglue_get_workflow_integration_code
