@@ -169,7 +169,6 @@ Creates and immediately saves a new integration. Integrations are building block
 - `urlHost`: (Optional) Base URL/hostname for the API including protocol
 - `urlPath`: (Optional) Path component of the URL
 - `documentationUrl`: (Optional) URL to the API documentation
-- `documentation`: (Optional) API documentation content, if provided directly
 - `credentials`: **Required** - Credentials object (can be empty {} if no credentials needed)
 
 <Note>
@@ -207,7 +206,6 @@ Modifies fields of an existing integration by id. Provide only the id and the fi
 - `urlHost`: (Optional) Base URL/hostname for the API including protocol
 - `urlPath`: (Optional) Path component of the URL
 - `documentationUrl`: (Optional) URL to the API documentation
-- `documentation`: (Optional) API documentation content, if provided directly
 - `credentials`: (Optional) Credentials object (can be empty {} if no credentials needed)
 
 <Note>
@@ -225,7 +223,7 @@ Modifies fields of an existing integration by id. Provide only the id and the fi
   "toolName": "superglue_modify_integration",
   "inputs": {
     "id": "my-api",
-    "documentationUrl": "https://api.example.com/docs"
+    "documentationUrl": "https://example.com/docs"
   }
 }
 ```

@@ -89,7 +89,6 @@ export const CreateIntegrationInputSchema = {
   urlHost: z.string().optional().describe("Base URL/hostname for the API including protocol."),
   urlPath: z.string().optional().describe("Path component of the URL. For postgres, use db name as the path."),
   documentationUrl: z.string().optional().describe("URL to the API documentation."),
-  documentation: z.string().optional().describe("API documentation content, if provided directly."),
   specificInstructions: z.string().optional().describe("Specific guidance on how to use this integration (e.g., rate limits, special endpoints, authentication details). Max 2000 characters."),
   documentationKeywords: z.array(z.string()).optional().describe("Keywords to help with documentation search and ranking (e.g., endpoint names, data objects, key concepts)."),
   credentials: z.record(z.string()).describe("Credentials for accessing the integration. Provide an empty object if no credentials are needed / given. Can be referenced by brackets: <<{integration_id}_{credential_name}>>. "),
@@ -101,7 +100,6 @@ export const ModifyIntegrationInputSchema = {
   urlHost: z.string().optional().describe("Base URL/hostname for the API including protocol."),
   urlPath: z.string().optional().describe("Path component of the URL. For postgres, use db name as the path."),
   documentationUrl: z.string().optional().describe("URL to the API documentation."),
-  documentation: z.string().optional().describe("API documentation content, if provided directly."),
   specificInstructions: z.string().optional().describe("Specific guidance on how to use this integration (e.g., rate limits, special endpoints, authentication details). Max 2000 characters."),
   documentationKeywords: z.array(z.string()).optional().describe("Keywords to help with documentation search and ranking (e.g., endpoint names, data objects, key concepts)."),
   credentials: z.record(z.string()).optional().describe("Credentials for accessing the integration. Provide an empty object if no credentials are needed / given. Can be referenced by brackets: <<{integration_id}_{credential_name}>>. "),
@@ -381,7 +379,7 @@ const validateIntegrationCreation = (args: any) => {
 
 // Update execute functions with validation
 export const toolDefinitions: Record<string, any> = {
-  superglue_list_available_workflows: {
+  h: {
     description: `
     <use_case>
       List all available superglue workflows for the current organization. Use this to discover what workflows are available for execution.
