@@ -759,8 +759,8 @@ export const toolDefinitions: Record<string, any> = {
   superglue_modify_integration: {
     description: `
     <use_case>
-      Modifies an already existing integration identified by id. Integrations are building blocks for workflows and contain the credentials for accessing the API.
-      Only provide the id and the fields you want to change. Fields not included or set to undefined will remain unchanged. If you set a field to null, it will be reset to null.
+      Modifies an existing integration identified by its id. Integrations are building blocks for workflows and contain the credentials for accessing the API.
+      Provide only the id and the fields you want to change. Fields not included will remain unchanged.
     </use_case>
 
     <important_notes>
