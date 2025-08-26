@@ -96,7 +96,7 @@ export const CreateIntegrationInputSchema = {
 };
 
 export const ModifyIntegrationInputSchema = {
-  id: z.string().describe("The unique identifier for of the integration."),
+  id: z.string().describe("The unique identifier of the integration."),
   name: z.string().optional().describe("Human-readable name for the integration."),
   urlHost: z.string().optional().describe("Base URL/hostname for the API including protocol."),
   urlPath: z.string().optional().describe("Path component of the URL. For postgres, use db name as the path."),
