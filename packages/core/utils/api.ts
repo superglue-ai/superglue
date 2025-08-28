@@ -560,7 +560,7 @@ export async function executeApiCall({
       }
 
       // Check if response is valid
-      if (retryCount > 0 && isSelfHealing) {
+      if (retryCount > 0 && isSelfHealing || options.testMode) {
         const result = await evaluateResponse({
           data: response.data,
           endpoint: endpoint,
