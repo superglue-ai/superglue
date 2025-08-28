@@ -5,7 +5,7 @@ if (!parentPort) {
     throw new Error('This file must be run as a worker thread');
 }
 
-parentPort.on('message', ({ html, taskId }: { html: string; taskId: string }) => {
+parentPort.on('message', ({ html, taskId }) => {
     try {
         const markdown = NodeHtmlMarkdown.translate(html);
         parentPort.postMessage({ taskId, success: true, markdown });
