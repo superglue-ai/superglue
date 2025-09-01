@@ -379,7 +379,7 @@ const validateIntegrationCreation = (args: any) => {
 
 // Update execute functions with validation
 export const toolDefinitions: Record<string, any> = {
-  h: {
+  superglue_list_available_workflows: {
     description: `
     <use_case>
       List all available superglue workflows for the current organization. Use this to discover what workflows are available for execution.

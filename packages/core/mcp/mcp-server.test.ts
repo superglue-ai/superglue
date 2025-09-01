@@ -8,7 +8,7 @@ const listWorkflows = toolDefinitions.superglue_list_available_workflows.execute
 const findIntegrations = toolDefinitions.superglue_find_relevant_integrations.execute;
 const saveWorkflow = toolDefinitions.superglue_save_workflow.execute;
 const createIntegration = toolDefinitions.superglue_create_integration.execute;
-const modifyIntegration = toolDefinitions.superglue_modify_integration.execute
+const modifyIntegration = toolDefinitions.superglue_modify_integration.execute;
 
 // Mock the waitForIntegrationProcessing function
 vi.mock('@superglue/shared/utils', () => ({
