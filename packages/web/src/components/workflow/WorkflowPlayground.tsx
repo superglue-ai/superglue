@@ -2,7 +2,7 @@
 import { useConfig } from "@/src/app/config-context";
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import { executeSingleStep, executeWorkflowStepByStep, type StepExecutionResult } from "@/src/lib/client-utils";
-import { ExecutionStep, Integration, SuperglueClient, WorkflowResult } from "@superglue/client";
+import { ExecutionStep, Integration, SelfHealingMode, SuperglueClient, WorkflowResult } from "@superglue/client";
 import { X } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from "react";
@@ -33,15 +33,11 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
   const [failedSteps, setFailedSteps] = useState<string[]>([]);
   const [navigateToFinalSignal, setNavigateToFinalSignal] = useState<number>(0);
+  const [showStepOutputSignal, setShowStepOutputSignal] = useState<number>(0);
   const [stepResultsMap, setStepResultsMap] = useState<Record<string, any>>({});
   const [isExecutingTransform, setIsExecutingTransform] = useState<boolean>(false);
   const [finalPreviewResult, setFinalPreviewResult] = useState<any>(null);
 
-
-
-  const [showResponseSchemaEditor, setShowResponseSchemaEditor] = useState(false);
-  const [showInputSchemaEditor, setShowInputSchemaEditor] = useState(false);
-  const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [instructions, setInstructions] = useState<string>('');
   const [selfHealingEnabled, setSelfHealingEnabled] = useState(true);
@@ -425,6 +421,8 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
                       setCompletedSteps(prev => Array.from(new Set([...prev.filter(id => id !== sid), sid])));
                       setFailedSteps(prev => prev.filter(id => id !== sid));
                       setStepResultsMap(prev => ({ ...prev, [sid]: single.data }));
+                      // Trigger output panel display
+                      setShowStepOutputSignal(Date.now());
                     } else {
                       setFailedSteps(prev => Array.from(new Set([...prev.filter(id => id !== sid), sid])));
                       setCompletedSteps(prev => prev.filter(id => id !== sid));
@@ -441,29 +439,65 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
                 onExecuteTransform={async () => {
                   try {
                     setIsExecutingTransform(true);
-                    const state = await executeWorkflowStepByStep(
-                      client,
-                      { id: workflowId, steps, finalTransform, responseSchema: responseSchema ? JSON.parse(responseSchema) : null, inputSchema: inputSchema ? JSON.parse(inputSchema) : { type: 'object' } } as any,
-                      JSON.parse(payload || '{}'),
-                      undefined,
-                      false
-                    );
-                    const ft = state.stepResults['__final_transform__'];
-                    if (ft?.success) {
+
+                    // Build the payload with all step results
+                    const finalPayload = {
+                      ...JSON.parse(payload || '{}'),
+                      ...stepResultsMap
+                    };
+
+                    // Execute just the final transform (empty steps, only transform)
+                    const result = await client.executeWorkflow({
+                      workflow: {
+                        id: workflowId,
+                        steps: [],
+                        finalTransform,
+                        responseSchema: responseSchema ? JSON.parse(responseSchema) : null,
+                        inputSchema: inputSchema ? JSON.parse(inputSchema) : { type: 'object' }
+                      },
+                      payload: finalPayload,
+                      options: {
+                        testMode: false,
+                        selfHealing: SelfHealingMode.DISABLED // No self-healing for test
+                      }
+                    });
+
+                    if (result.success) {
                       setCompletedSteps(prev => Array.from(new Set([...prev.filter(id => id !== '__final_transform__'), '__final_transform__'])));
                       setFailedSteps(prev => prev.filter(id => id !== '__final_transform__'));
-                      setStepResultsMap(prev => ({ ...prev, ...state.stepResults }));
-                      setFinalPreviewResult(ft.data);
+                      setStepResultsMap(prev => ({ ...prev, ['__final_transform__']: result.data }));
+                      setFinalPreviewResult(result.data);
                       setNavigateToFinalSignal(Date.now());
+                      toast({
+                        title: "Transform executed successfully",
+                        description: "Final transform completed",
+                      });
                     } else {
                       setFailedSteps(prev => Array.from(new Set([...prev.filter(id => id !== '__final_transform__'), '__final_transform__'])));
                       setCompletedSteps(prev => prev.filter(id => id !== '__final_transform__'));
-                      setStepResultsMap(prev => {
-                        const next = { ...prev } as Record<string, any>;
-                        delete next['__final_transform__'];
-                        return next;
+                      // Store error message for display
+                      setStepResultsMap(prev => ({
+                        ...prev,
+                        ['__final_transform__']: result.error || 'Transform execution failed'
+                      }));
+                      toast({
+                        title: "Transform execution failed",
+                        description: result.error || "Failed to execute final transform",
+                        variant: "destructive",
                       });
                     }
+                  } catch (error: any) {
+                    setFailedSteps(prev => Array.from(new Set([...prev.filter(id => id !== '__final_transform__'), '__final_transform__'])));
+                    setCompletedSteps(prev => prev.filter(id => id !== '__final_transform__'));
+                    setStepResultsMap(prev => ({
+                      ...prev,
+                      ['__final_transform__']: error.message || 'Transform execution failed'
+                    }));
+                    toast({
+                      title: "Transform execution error",
+                      description: error.message || "An unexpected error occurred",
+                      variant: "destructive",
+                    });
                   } finally {
                     setIsExecutingTransform(false);
                   }
@@ -497,7 +531,7 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
                       <div className="flex items-center">
                         <Switch className="custom-switch" id="selfHealing-top" checked={selfHealingEnabled} onCheckedChange={setSelfHealingEnabled} />
                         <div className="ml-1 flex items-center">
-                          <HelpTooltip text="Enable LLM-based self-healing during execution. Slower, but can auto-fix failures." />
+                          <HelpTooltip text="Enable self-healing during execution. Slower, but can auto-fix failures in workflow steps and transformation code." />
                         </div>
                       </div>
                     </div>
@@ -520,6 +554,7 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
                   </div>
                 )}
                 navigateToFinalSignal={navigateToFinalSignal}
+                showStepOutputSignal={showStepOutputSignal}
               />
             </div>
 

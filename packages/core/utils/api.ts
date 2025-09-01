@@ -533,7 +533,7 @@ export async function executeApiCall({
   let success = false;
   let isSelfHealing = isSelfHealingEnabled(options, "api");
 
-
+  // If self healing is enabled, use the retries from the options or the default max of 10 if not specified, otherwise use 1 (no self-healing case)
   const effectiveMaxRetries = isSelfHealing ? (options?.retries !== undefined ? options.retries : server_defaults.MAX_CALL_RETRIES) : 1;
 
   do {
