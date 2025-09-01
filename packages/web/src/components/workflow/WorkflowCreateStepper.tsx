@@ -132,10 +132,16 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   useEffect(() => {
     // Don't clear on initial mount or when entering review
     if (step !== 'review') {
+      // Reset all execution states when leaving review (e.g., going back to edit prompt)
       setExecutionResult(null);
       setFinalResult(null);
       setTransformResult(null);
       setExecutionError(null);
+      setCompletedSteps([]);
+      setFailedSteps([]);
+      setStepExecutionResults({});
+      setIsExecutingStep(undefined);
+      setIsExecutingTransform(false);
     }
 
     // Clear validation errors when leaving prompt step
@@ -416,14 +422,22 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     const stepIndex = currentWorkflow.steps.findIndex((s: any) => s.id === stepId);
     if (stepIndex !== -1) {
       const stepsToReset = currentWorkflow.steps.slice(stepIndex).map((s: any) => s.id);
+      // Clear both completed and failed states
       setCompletedSteps(prev => prev.filter(id => !stepsToReset.includes(id)));
+      setFailedSteps(prev => prev.filter(id => !stepsToReset.includes(id)));
 
       // Also clear execution results for reset steps
       setStepExecutionResults(prev => {
         const newResults = { ...prev };
         stepsToReset.forEach(id => delete newResults[id]);
+        // Also clear final transform if it exists
+        delete newResults['__final_transform__'];
         return newResults;
       });
+
+      // Reset final transform states if any step was edited
+      setTransformResult(null);
+      setFinalResult(null);
     }
   };
 
@@ -1169,7 +1183,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                         <Button
                           variant="success"
                           onClick={handleExecuteWorkflow}
-                          disabled={isExecuting}
+                          disabled={isExecuting || isSaving || isExecutingStep !== undefined || isExecutingTransform}
                           className="h-9 px-4"
                         >
                           {isExecuting ? "Testing Workflow..." : "Test Workflow"}
@@ -1177,7 +1191,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                         <Button
                           variant="default"
                           onClick={handleSave}
-                          disabled={isSaving}
+                          disabled={isSaving || isExecuting || isExecutingStep !== undefined || isExecutingTransform}
                           className="h-9 px-5 shadow-md border border-primary/40"
                         >
                           {isSaving ? "Saving..." : "Save & Complete"}

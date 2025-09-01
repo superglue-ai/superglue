@@ -347,13 +347,29 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
     setSteps(prevSteps =>
       prevSteps.map(step => (step.id === stepId ? { ...updatedStep, apiConfig: { ...updatedStep.apiConfig, id: updatedStep.apiConfig.id || updatedStep.id } } : step))
     );
-    setCompletedSteps(prev => prev.filter(id => id !== stepId));
-    setFailedSteps(prev => prev.filter(id => id !== stepId));
-    setStepResultsMap(prev => {
-      const next = { ...prev } as Record<string, any>;
-      delete next[stepId];
-      return next;
-    });
+
+    // Find the index of the edited step
+    const stepIndex = steps.findIndex(s => s.id === stepId);
+    if (stepIndex !== -1) {
+      // Reset completion status for edited step and all subsequent steps
+      const stepsToReset = steps.slice(stepIndex).map(s => s.id);
+
+      // Clear both completed and failed states
+      setCompletedSteps(prev => prev.filter(id => !stepsToReset.includes(id)));
+      setFailedSteps(prev => prev.filter(id => !stepsToReset.includes(id)));
+
+      // Clear execution results for reset steps
+      setStepResultsMap(prev => {
+        const next = { ...prev } as Record<string, any>;
+        stepsToReset.forEach(id => delete next[id]);
+        // Also clear final transform if it exists
+        delete next['__final_transform__'];
+        return next;
+      });
+
+      // Reset final transform states
+      setFinalPreviewResult(null);
+    }
   };
 
   // credentials helpers removed
@@ -395,13 +411,13 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
                 onExecuteStep={async (idx) => {
                   try {
                     // mark testing state for indicator without freezing entire UI
-                    setIsExecutingStep(idx as any);
+                    setIsExecutingStep(idx);
                     const single = await executeSingleStep(
                       client,
                       { id: workflowId, steps } as any,
                       idx,
                       JSON.parse(payload || '{}'),
-                      {},
+                      stepResultsMap,  // Pass accumulated results
                       false
                     );
                     const sid = steps[idx].id;
@@ -412,14 +428,14 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
                     } else {
                       setFailedSteps(prev => Array.from(new Set([...prev.filter(id => id !== sid), sid])));
                       setCompletedSteps(prev => prev.filter(id => id !== sid));
-                      setStepResultsMap(prev => {
-                        const next = { ...prev } as Record<string, any>;
-                        delete next[sid];
-                        return next;
-                      });
+                      // Store error message in step results for display
+                      setStepResultsMap(prev => ({
+                        ...prev,
+                        [sid]: single.error || 'Step execution failed'
+                      }));
                     }
                   } finally {
-                    setIsExecutingStep(undefined as any);
+                    setIsExecutingStep(undefined);
                   }
                 }}
                 onExecuteTransform={async () => {

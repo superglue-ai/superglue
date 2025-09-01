@@ -102,73 +102,54 @@ const inferSchema = (data: any): any => {
     return { type: typeof data };
 };
 
-// Helper to truncate data for display - aggressively limit arrays and object keys
-const MAX_OBJECT_KEYS = 50;
-const MAX_ARRAY_ITEMS = 1;
-const truncateData = (data: any, maxDepth = 4, currentDepth = 0): any => {
-    if (data === null || data === undefined) return data;
+// Size-based truncation for display (1MB limit)
+const MAX_DISPLAY_SIZE = 1024 * 1024; // 1MB
+const MAX_DISPLAY_LINES = 10000; // Max lines to display
 
-    if (Array.isArray(data)) {
-        if (data.length === 0) return [];
-
-        // For arrays, show only first N items fully and indicate remainder
-        const itemsToShow = Math.min(MAX_ARRAY_ITEMS, data.length);
-        const shown = [] as any[];
-        for (let i = 0; i < itemsToShow; i++) {
-            shown.push(truncateData(data[i], maxDepth, currentDepth + 1));
-        }
-        if (data.length > itemsToShow) {
-            shown.push({
-                "__truncated__": true,
-                "__message__": `... and ${data.length - itemsToShow} more item${data.length - itemsToShow > 1 ? 's' : ''}`
-            });
-        }
-        return shown;
+const truncateForDisplay = (data: any): { value: string, truncated: boolean } => {
+    if (data === null || data === undefined) {
+        return { value: '{}', truncated: false };
     }
 
-    if (typeof data === 'object') {
-        if (currentDepth >= maxDepth) {
-            return '{...}';
+    try {
+        const fullJson = JSON.stringify(data, null, 2);
+
+        // Check if data is too large
+        if (fullJson.length > MAX_DISPLAY_SIZE) {
+            // Try to show a reasonable portion
+            const truncatedString = fullJson.substring(0, MAX_DISPLAY_SIZE);
+            // Find the last complete line
+            const lastNewline = truncatedString.lastIndexOf('\n');
+            const cleanTruncated = truncatedString.substring(0, lastNewline > 0 ? lastNewline : MAX_DISPLAY_SIZE);
+            return {
+                value: cleanTruncated + '\n\n... [Data truncated for display - too large]',
+                truncated: true
+            };
         }
 
-        const truncated: Record<string, any> = {};
-        const keys = Object.keys(data);
-        const keysToShow = keys.slice(0, MAX_OBJECT_KEYS);
-        for (const key of keysToShow) {
-            truncated[key] = truncateData((data as any)[key], maxDepth, currentDepth + 1);
+        // Check line count
+        const lines = fullJson.split('\n');
+        if (lines.length > MAX_DISPLAY_LINES) {
+            return {
+                value: lines.slice(0, MAX_DISPLAY_LINES).join('\n') + '\n\n... [Data truncated - too many lines]',
+                truncated: true
+            };
         }
-        if (keys.length > MAX_OBJECT_KEYS) {
-            truncated['__truncated__'] = true;
-            truncated['__message__'] = `... and ${keys.length - MAX_OBJECT_KEYS} more propert${keys.length - MAX_OBJECT_KEYS > 1 ? 'ies' : 'y'}`;
-        }
-        return truncated;
+
+        return { value: fullJson, truncated: false };
+    } catch (e) {
+        // Fallback for circular references or other issues
+        return { value: String(data), truncated: false };
     }
-
-    // For strings, truncate if too long
-    if (typeof data === 'string' && data.length > 200) {
-        return data.substring(0, 200) + '...';
-    }
-
-    return data;
 };
 
-const containsTruncationMarker = (data: any, depth = 0): boolean => {
-    if (data === null || data === undefined) return false;
-    if (typeof data === 'string') return data === '{...}';
-    if (Array.isArray(data)) {
-        for (const item of data) {
-            if (containsTruncationMarker(item, depth + 1)) return true;
-        }
-        return false;
-    }
-    if (typeof data === 'object') {
-        if ((data as any)['__truncated__']) return true;
-        for (const key of Object.keys(data)) {
-            if (containsTruncationMarker((data as any)[key], depth + 1)) return true;
-        }
-        return false;
-    }
-    return false;
+
+
+const truncateLines = (text: string, maxLines: number): string => {
+    if (!text) return text;
+    const lines = text.split('\n');
+    if (lines.length <= maxLines) return text;
+    return lines.slice(0, maxLines).join('\n') + `\n... truncated ${lines.length - maxLines} more lines ...`;
 };
 
 // Helper to merge payload with step results progressively
@@ -328,19 +309,21 @@ const InstructionDisplay = ({
     );
 };
 
-// Final Results Card
+// Final Results Card with size-based truncation
 const FinalResultsCard = ({ result }: { result: any }) => {
-    const preview = (() => {
-        try {
-            return truncateData(result ?? {});
-        } catch {
-            return {};
-        }
-    })();
-    const json = typeof preview === 'string' ? preview : JSON.stringify(preview, null, 2);
-    const bytes = new Blob([json]).size;
-    const truncated = containsTruncationMarker(preview) || json.includes('...truncated...');
-    const MAX_COPY_WARNING_BYTES = 500_000;
+    const [copied, setCopied] = useState(false);
+
+    // Get truncated display and full data separately
+    const displayData = truncateForDisplay(result);
+    const fullJson = result ? JSON.stringify(result, null, 2) : '{}';
+    const bytes = new Blob([fullJson]).size;
+
+    const handleCopy = () => {
+        // Always copy the full result, never truncated
+        navigator.clipboard.writeText(fullJson);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+    };
 
     return (
         <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50">
@@ -350,17 +333,30 @@ const FinalResultsCard = ({ result }: { result: any }) => {
                         <Package className="h-4 w-4 text-muted-foreground" />
                         <h3 className="text-lg font-semibold">Final Result</h3>
                     </div>
-                    <span className="text-xs text-muted-foreground">{bytes.toLocaleString()} bytes</span>
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">{bytes.toLocaleString()} bytes</span>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={handleCopy}
+                            title="Copy full result"
+                        >
+                            {copied ? <Check className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3" />}
+                        </Button>
+                    </div>
                 </div>
-                <JsonCodeEditor
-                    value={json}
-                    readOnly
-                    minHeight="220px"
-                    maxHeight="420px"
-                />
-                {(bytes > MAX_COPY_WARNING_BYTES || truncated) && (
+                <div className="relative">
+                    <JsonCodeEditor
+                        value={displayData.value}
+                        readOnly
+                        minHeight="220px"
+                        maxHeight="420px"
+                    />
+                </div>
+                {displayData.truncated && (
                     <div className="mt-2 text-xs text-amber-600 dark:text-amber-300">
-                        Large result preview truncated for performance. Copying may be slow; consider exporting via API.
+                        Preview truncated for performance. Use copy button to get full data.
                     </div>
                 )}
             </div>
@@ -368,78 +364,7 @@ const FinalResultsCard = ({ result }: { result: any }) => {
     );
 };
 
-// Split JSON Editor Component with copy buttons
-const SplitJsonEditor = ({
-    data,
-    readOnly = true,
-    minHeight = '100px',
-    maxHeight = '200px'
-}: {
-    data: any;
-    readOnly?: boolean;
-    minHeight?: string;
-    maxHeight?: string;
-}) => {
-    const schemaStr = data ? JSON.stringify(inferSchema(data), null, 2) : '{}';
-    const preview = data ? truncateData(data) : {};
-    const dataStr = typeof preview === 'string' ? preview : JSON.stringify(preview, null, 2);
-    const showTruncationNotice = containsTruncationMarker(preview);
 
-    return (
-        <div className="grid grid-cols-2 gap-2">
-            {/* Schema */}
-            <div>
-                <div className="text-[10px] text-muted-foreground mb-1 font-medium">SCHEMA</div>
-                <div className="relative bg-background dark:bg-muted/10 rounded-md border">
-                    <CopyButton text={schemaStr} />
-                    <div className="p-1.5 pr-8 overflow-auto" style={{ maxHeight }}>
-                        <Editor
-                            value={schemaStr}
-                            onValueChange={() => { }}
-                            highlight={(code) => highlightCode(code, 'json')}
-                            padding={0}
-                            disabled={readOnly}
-                            className="font-mono text-[10px] leading-[14px]"
-                            style={{
-                                minHeight,
-                                background: 'transparent',
-                                lineHeight: '14px'
-                            }}
-                        />
-                    </div>
-                </div>
-            </div>
-
-            {/* Data Preview */}
-            <div>
-                <div className="text-[10px] text-muted-foreground mb-1 font-medium">DATA PREVIEW</div>
-                <div className="relative bg-background dark:bg-muted/10 rounded-md border">
-                    <CopyButton text={dataStr} />
-                    <div className="p-1.5 pr-8 overflow-auto" style={{ maxHeight }}>
-                        <Editor
-                            value={dataStr}
-                            onValueChange={() => { }}
-                            highlight={(code) => highlightCode(code, 'json')}
-                            padding={0}
-                            disabled={readOnly}
-                            className="font-mono text-[10px] leading-[14px]"
-                            style={{
-                                minHeight,
-                                background: 'transparent',
-                                lineHeight: '14px'
-                            }}
-                        />
-                        {showTruncationNotice && (
-                            <div className="mt-1 text-[10px] text-amber-700 dark:text-amber-300">
-                                Preview truncated for performance. View full data via API or reduce payload size.
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
 
 // JavaScript Code Editor Component with proper syntax highlighting
 const JavaScriptCodeEditor = ({
@@ -542,9 +467,16 @@ const JsonCodeEditor = ({
             "relative rounded-lg border shadow-sm",
             readOnly ? "bg-muted/30 border-dashed" : "bg-background border"
         )}>
-            <div className="absolute top-1 right-1 z-10 flex items-center gap-1">
-                <CopyButton text={value || placeholder} />
-            </div>
+            {overlay && (
+                <div className="absolute top-1 right-1 z-10 flex items-center gap-1">
+                    {overlay}
+                </div>
+            )}
+            {!overlay && (
+                <div className="absolute top-1 right-1 z-10">
+                    <CopyButton text={value || placeholder} />
+                </div>
+            )}
             <div className={cn(
                 "p-3 pr-10 overflow-auto",
                 readOnly ? "cursor-not-allowed" : "cursor-text"
@@ -803,7 +735,8 @@ const SpotlightStepCard = ({
     canExecute,
     isExecuting,
     integrations,
-    readOnly
+    readOnly,
+    failedSteps = []
 }: {
     step: any;
     stepIndex: number;
@@ -816,6 +749,8 @@ const SpotlightStepCard = ({
     isExecuting?: boolean;
     integrations?: Integration[];
     readOnly?: boolean;
+    failedSteps?: string[];
+    stepResultsMap?: Record<string, any>;
 }) => {
     const [activePanel, setActivePanel] = useState<'input' | 'config' | 'output'>('config');
     const [inputViewMode, setInputViewMode] = useState<'preview' | 'schema'>('preview');
@@ -890,24 +825,38 @@ const SpotlightStepCard = ({
                     {activePanel === 'input' && (
                         <div>
                             {(() => {
-                                const raw = inputViewMode === 'schema' ? inferSchema(evolvingPayload || {}) : (evolvingPayload || {});
-                                const truncated = truncateData(raw);
-                                const inputString = typeof truncated === 'string' ? truncated : JSON.stringify(truncated, null, 2);
+                                let inputString = '';
+                                let isTruncated = false;
+                                if (inputViewMode === 'schema') {
+                                    const schemaObj = inferSchema(evolvingPayload || {});
+                                    inputString = truncateLines(JSON.stringify(schemaObj, null, 2), 1000);
+                                } else {
+                                    const displayData = truncateForDisplay(evolvingPayload);
+                                    inputString = displayData.value;
+                                    isTruncated = displayData.truncated;
+                                }
                                 return (
-                                    <JsonCodeEditor
-                                        value={inputString}
-                                        readOnly={true}
-                                        minHeight="60px"
-                                        maxHeight="120px"
-                                        overlay={
-                                            <Tabs value={inputViewMode} onValueChange={(v) => setInputViewMode(v as 'preview' | 'schema')} className="w-auto">
-                                                <TabsList className="h-6 rounded-md">
-                                                    <TabsTrigger value="preview" className="h-5 px-2 text-[11px] rounded-md data-[state=active]:rounded-md">Preview</TabsTrigger>
-                                                    <TabsTrigger value="schema" className="h-5 px-2 text-[11px] rounded-md data-[state=active]:rounded-md">Schema</TabsTrigger>
-                                                </TabsList>
-                                            </Tabs>
-                                        }
-                                    />
+                                    <>
+                                        <JsonCodeEditor
+                                            value={inputString}
+                                            readOnly={true}
+                                            minHeight="60px"
+                                            maxHeight="120px"
+                                            overlay={
+                                                <Tabs value={inputViewMode} onValueChange={(v) => setInputViewMode(v as 'preview' | 'schema')} className="w-auto">
+                                                    <TabsList className="h-6 rounded-md">
+                                                        <TabsTrigger value="preview" className="h-5 px-2 text-[11px] rounded-md data-[state=active]:rounded-md">Preview</TabsTrigger>
+                                                        <TabsTrigger value="schema" className="h-5 px-2 text-[11px] rounded-md data-[state=active]:rounded-md">Schema</TabsTrigger>
+                                                    </TabsList>
+                                                </Tabs>
+                                            }
+                                        />
+                                        {isTruncated && inputViewMode === 'preview' && (
+                                            <div className="mt-1 text-[10px] text-amber-600 dark:text-amber-300 px-2">
+                                                Preview truncated for performance
+                                            </div>
+                                        )}
+                                    </>
                                 );
                             })()}
                         </div>
@@ -928,24 +877,54 @@ const SpotlightStepCard = ({
                     {activePanel === 'output' && (
                         <div>
                             {(() => {
-                                const raw = outputViewMode === 'schema' ? inferSchema(stepResult || {}) : (stepResult || {});
-                                const truncated = truncateData(raw);
-                                const outputString = typeof truncated === 'string' ? truncated : JSON.stringify(truncated, null, 2);
+                                // Check if step has failed and we should show error
+                                const stepFailed = failedSteps?.includes(step.id);
+                                const errorResult = stepFailed && (!stepResult || typeof stepResult === 'string');
+
+                                let outputString = '';
+                                let isTruncated = false;
+                                if (errorResult) {
+                                    // Show error message if step failed
+                                    outputString = stepResult ?
+                                        (typeof stepResult === 'string' ? stepResult : JSON.stringify(stepResult, null, 2)) :
+                                        '{\n  "error": "Step execution failed"\n}';
+                                } else if (outputViewMode === 'schema') {
+                                    const schemaObj = inferSchema(stepResult || {});
+                                    outputString = truncateLines(JSON.stringify(schemaObj, null, 2), 1000);
+                                } else {
+                                    const displayData = truncateForDisplay(stepResult);
+                                    outputString = displayData.value;
+                                    isTruncated = displayData.truncated;
+                                }
                                 return (
-                                    <JsonCodeEditor
-                                        value={outputString}
-                                        readOnly={true}
-                                        minHeight="60px"
-                                        maxHeight="120px"
-                                        overlay={
-                                            <Tabs value={outputViewMode} onValueChange={(v) => setOutputViewMode(v as 'preview' | 'schema')} className="w-auto">
-                                                <TabsList className="h-6 rounded-md">
-                                                    <TabsTrigger value="preview" className="h-6 px-2 text-[11px] rounded-md data-[state=active]:rounded-md">Preview</TabsTrigger>
-                                                    <TabsTrigger value="schema" className="h-6 px-2 text-[11px] rounded-md data-[state=active]:rounded-md">Schema</TabsTrigger>
-                                                </TabsList>
-                                            </Tabs>
-                                        }
-                                    />
+                                    <>
+                                        {stepFailed && (
+                                            <div className="mb-2 p-2 bg-destructive/10 border border-destructive/20 rounded-md">
+                                                <p className="text-xs text-destructive">Step execution failed</p>
+                                            </div>
+                                        )}
+                                        <JsonCodeEditor
+                                            value={outputString}
+                                            readOnly={true}
+                                            minHeight="60px"
+                                            maxHeight="120px"
+                                            overlay={
+                                                !errorResult && (
+                                                    <Tabs value={outputViewMode} onValueChange={(v) => setOutputViewMode(v as 'preview' | 'schema')} className="w-auto">
+                                                        <TabsList className="h-6 rounded-md">
+                                                            <TabsTrigger value="preview" className="h-6 px-2 text-[11px] rounded-md data-[state=active]:rounded-md">Preview</TabsTrigger>
+                                                            <TabsTrigger value="schema" className="h-6 px-2 text-[11px] rounded-md data-[state=active]:rounded-md">Schema</TabsTrigger>
+                                                        </TabsList>
+                                                    </Tabs>
+                                                )
+                                            }
+                                        />
+                                        {isTruncated && outputViewMode === 'preview' && (
+                                            <div className="mt-1 text-[10px] text-amber-600 dark:text-amber-300 px-2">
+                                                Preview truncated for performance
+                                            </div>
+                                        )}
+                                    </>
                                 );
                             })()}
                         </div>
@@ -1021,6 +1000,7 @@ const MiniStepCard = ({
         const getStatusLabel = () => {
             if (isFailed) return "Failed";
             if (isCompleted) return "Completed";
+            if (isTesting) return "Testing...";
             if (isRunningAll) return "Testing...";
             return "Pending";
         };
@@ -1098,7 +1078,7 @@ const MiniStepCard = ({
     const getStatusLabel = () => {
         if (isFailed) return "Failed";
         if (isCompleted) return "Completed";
-        if (isRunningAll && stepId) return "Testing...";
+        if (isTesting || (isRunningAll && stepId)) return "Testing...";
         return "Pending";
     };
 
@@ -1186,6 +1166,7 @@ export function WorkflowStepGallery({
 }: WorkflowStepGalleryProps) {
     const [activeIndex, setActiveIndex] = useState(1); // Default to first workflow step, not payload
     const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+    const [containerWidth, setContainerWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1200);
     const trackRef = useState<HTMLElement | null>(null)[0] as unknown as React.MutableRefObject<HTMLDivElement | null> || { current: null } as any;
     const listRef = useRef<HTMLDivElement | null>(null);
 
@@ -1197,6 +1178,20 @@ export function WorkflowStepGallery({
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
+
+    // Observe container width (e.g., when logs panel opens/closes) to responsively adjust cards
+    useEffect(() => {
+        const container = listRef.current?.parentElement?.parentElement as HTMLElement | null;
+        if (!container || typeof ResizeObserver === 'undefined') return;
+        const ro = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                const w = (entry.contentRect?.width || container.getBoundingClientRect().width);
+                if (w && Math.abs(w - containerWidth) > 1) setContainerWidth(w);
+            }
+        });
+        ro.observe(container);
+        return () => ro.disconnect();
+    }, [listRef.current, containerWidth]);
 
     // Convert stepResults array to object if needed
     const stepResultsMap = Array.isArray(stepResults)
@@ -1378,10 +1373,7 @@ export function WorkflowStepGallery({
                                     // Compute how many cards fit based on a minimum card width and gutter
                                     const MIN_CARD_WIDTH = 220; // px
                                     const GUTTER = 8; // px
-                                    const container = listRef.current?.parentElement?.parentElement as HTMLElement | null;
-                                    // Recompute on resize and when sidebar/log changes shrink width
-                                    const containerWidth = container ? container.getBoundingClientRect().width : windowWidth;
-                                    const cardsToShow = Math.max(1, Math.min(workflowItems.length, Math.floor((containerWidth + GUTTER) / (MIN_CARD_WIDTH + GUTTER))));
+                                    const cardsToShow = Math.max(1, Math.min(workflowItems.length, Math.floor(((containerWidth || windowWidth) + GUTTER) / (MIN_CARD_WIDTH + GUTTER))));
 
                                     // Calculate the range of cards to display
                                     if (totalCards <= cardsToShow) {
@@ -1500,7 +1492,7 @@ export function WorkflowStepGallery({
                                 readOnly={readOnly}
                                 onExecuteTransform={onExecuteTransform}
                                 isExecuting={isExecutingTransform}
-                                canExecute={completedSteps.length === steps.length}
+                                canExecute={steps.every((s: any) => completedSteps.includes(s.id))}
                                 transformResult={transformResult || finalResult}
                             />
                         ) : currentItem.type === 'final' ? (
@@ -1514,10 +1506,11 @@ export function WorkflowStepGallery({
                                 onEdit={!readOnly ? onStepEdit : undefined}
                                 onRemove={!readOnly && currentItem.type === 'step' ? handleRemoveStep : undefined}
                                 onExecuteStep={onExecuteStep ? () => onExecuteStep(activeIndex - 1) : undefined}
-                                canExecute={canExecuteStep(activeIndex - 1, completedSteps, { steps } as any)}
+                                canExecute={canExecuteStep(activeIndex - 1, completedSteps, { steps } as any, stepResultsMap)}
                                 isExecuting={isExecutingStep === activeIndex - 1}
                                 integrations={integrations}
                                 readOnly={readOnly}
+                                failedSteps={failedSteps}
                             />
                         )
                     )}

@@ -210,14 +210,21 @@ export async function executeWorkflowStepByStep(
 export function canExecuteStep(
   stepIndex: number,
   completedSteps: string[],
-  workflow: Workflow
+  workflow: Workflow,
+  stepResults?: Record<string, any>
 ): boolean {
   if (stepIndex === 0) {
     return true;
   }
 
+  // Check that all previous steps are completed and have results
   for (let i = 0; i < stepIndex; i++) {
-    if (!completedSteps.includes(workflow.steps[i].id)) {
+    const stepId = workflow.steps[i].id;
+    if (!completedSteps.includes(stepId)) {
+      return false;
+    }
+    // If stepResults is provided, also check that the step has a result
+    if (stepResults && !stepResults[stepId]) {
       return false;
     }
   }

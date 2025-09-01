@@ -222,8 +222,6 @@ class UnescapedControlCharactersStrategy extends RepairStrategy {
   }
 
   apply(input: string): string {
-    // This is complex because we need to only escape control chars inside JSON strings
-    // We'll use a state machine approach to track whether we're inside a string
     let result = '';
     let inString = false;
     let escapeNext = false;
