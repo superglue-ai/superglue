@@ -1,16 +1,13 @@
 "use client";
 import { useConfig } from "@/src/app/config-context";
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
-import JsonSchemaEditor from "@/src/components/utils/JsonSchemaEditor";
-import { cn } from "@/src/lib/utils";
-import { ExecutionStep, Integration, SelfHealingMode, SuperglueClient, WorkflowResult } from "@superglue/client";
-import { ChevronRight, Database, X } from "lucide-react";
+import { executeSingleStep, executeWorkflowStepByStep, type StepExecutionResult } from "@/src/lib/client-utils";
+import { ExecutionStep, Integration, SuperglueClient, WorkflowResult } from "@superglue/client";
+import { X } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from "react";
 import { useToast } from "../../hooks/use-toast";
 import { Button } from "../ui/button";
-import { Card, CardContent, CardFooter } from "../ui/card";
-import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
 import { WorkflowStepGallery } from "./WorkflowStepGallery";
@@ -33,6 +30,12 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<WorkflowResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [completedSteps, setCompletedSteps] = useState<string[]>([]);
+  const [failedSteps, setFailedSteps] = useState<string[]>([]);
+  const [navigateToFinalSignal, setNavigateToFinalSignal] = useState<number>(0);
+  const [stepResultsMap, setStepResultsMap] = useState<Record<string, any>>({});
+  const [isExecutingTransform, setIsExecutingTransform] = useState<boolean>(false);
+  const [finalPreviewResult, setFinalPreviewResult] = useState<any>(null);
 
 
 
@@ -41,19 +44,15 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [instructions, setInstructions] = useState<string>('');
-  const [selfHealingEnabled, setSelfHealingEnabled] = useState(false);
+  const [selfHealingEnabled, setSelfHealingEnabled] = useState(true);
+  const [isExecutingStep, setIsExecutingStep] = useState<number | undefined>(undefined);
 
   const client = useMemo(() => new SuperglueClient({
     endpoint: config.superglueEndpoint,
     apiKey: config.superglueApiKey,
   }), [config.superglueEndpoint, config.superglueApiKey]);
 
-  const updateWorkflowId = (id: string) => {
-    const sanitizedId = id
-      .replace(/ /g, "-") // Replace spaces with hyphens
-      .replace(/[^a-zA-Z0-9-]/g, ""); // Remove special characters
-    setWorkflowId(sanitizedId);
-  };
+
 
   const generateDefaultFromSchema = (schema: any): any => {
     if (!schema || typeof schema !== 'object') return {};
@@ -112,7 +111,7 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
       if (!workflow) {
         throw new Error(`Workflow with ID "${idToLoad}" not found.`);
       }
-      updateWorkflowId(workflow.id || '');
+      setWorkflowId(workflow.id || '');
       setSteps(workflow?.steps?.map(step => ({ ...step, apiConfig: { ...step.apiConfig, id: step.apiConfig.id || step.id } })) || []);
       setFinalTransform(workflow.finalTransform || `(sourceData) => {
         return {
@@ -182,7 +181,7 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
       loadWorkflow(id);
     } else {
       // Reset to a clean slate if id is removed or not provided
-      updateWorkflowId("");
+      setWorkflowId("");
       setSteps([]);
       setInstructions("");
       setFinalTransform(`(sourceData) => {
@@ -196,6 +195,7 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
       // Construct default credentials and payload from default schema
       constructFromInputSchema(defaultInputSchema);
       setResult(null);
+      setFinalPreviewResult(null);
     }
   }, [id]);
 
@@ -206,56 +206,6 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
       constructFromInputSchema(inputSchema);
     }
   }, [inputSchema]);
-
-  // Removed integration credentials effect
-
-  const fillDogExample = () => {
-    updateWorkflowId("Dog Breed Workflow");
-    setInstructions("This workflow fetches all dog breeds and gets random images for the first 5 breeds");
-    setSteps(
-      [
-        {
-          id: "getAllBreeds",
-          apiConfig: {
-            id: "getAllBreeds",
-            urlPath: "/breeds/list/all",
-            instruction: "Get all dog breeds",
-            urlHost: "https://dog.ceo/api",
-            method: "GET",
-          },
-          executionMode: "DIRECT",
-          inputMapping: "$",
-          responseMapping: "$keys($.message)",
-        },
-        {
-          id: "getBreedImage",
-          apiConfig: {
-            id: "getBreedImage",
-            urlPath: "/breed/{currentItem}/images/random",
-            instruction: "Get a random image for a specific dog breed",
-            urlHost: "https://dog.ceo/api",
-            method: "GET",
-          },
-          executionMode: "LOOP",
-          loopSelector: "getAllBreeds",
-          loopMaxIters: 5,
-          inputMapping: "$",
-          responseMapping: "$",
-        },
-      ]
-    );
-    setFinalTransform(`(sourceData) => {
-  return {
-    result: sourceData
-  }
-}`);
-    setResponseSchema(`{"type": "object", "properties": {"result": {"type": "array", "items": {"type": "object", "properties": {"breed": {"type": "string"}, "image": {"type": "string"}}}}}}`);
-    setInputSchema(`{"type": "object", "properties": {"payload": {"type": "object"}, "credentials": {"type": "object"}}}`);
-    toast({
-      title: "Example loaded",
-      description: "Dog breed example has been loaded",
-    });
-  };
 
   const saveWorkflow = async () => {
     try {
@@ -271,7 +221,7 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
       }
 
       if (!workflowId.trim()) {
-        updateWorkflowId(`wf-${Date.now()}`);
+        setWorkflowId(`wf-${Date.now()}`);
       }
       setSaving(true);
       const input = {
@@ -295,7 +245,7 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
       if (!savedWorkflow) {
         throw new Error("Failed to save workflow");
       }
-      updateWorkflowId(savedWorkflow.id);
+      setWorkflowId(savedWorkflow.id);
 
       toast({
         title: "Workflow saved",
@@ -317,45 +267,67 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
 
   const executeWorkflow = async () => {
     setLoading(true);
+    setCompletedSteps([]);
+    setFailedSteps([]);
     setResult(null);
+    setFinalPreviewResult(null);
+    setStepResultsMap({});
     setError(null);
 
     try {
-      // Validate JSON before execution
-      try {
-        JSON.parse(responseSchema || '{}');
-      } catch (e) {
-        throw new Error("Invalid response schema JSON");
-      }
-      try {
-        JSON.parse(inputSchema || '{}');
-      } catch (e) {
-        throw new Error("Invalid input schema JSON");
-      }
-      const workflowResult = await client.executeWorkflow({
-        workflow: {
-          id: workflowId,
-          steps: steps,
-          integrationIds: [],
-          responseSchema: responseSchema ? JSON.parse(responseSchema) : null,
-          inputSchema: inputSchema ? JSON.parse(inputSchema) : { type: "object" },
-          finalTransform: finalTransform,
+      JSON.parse(responseSchema || '{}');
+      JSON.parse(inputSchema || '{}');
+
+      const workflow = {
+        id: workflowId,
+        steps: steps,
+        finalTransform,
+        responseSchema: responseSchema ? JSON.parse(responseSchema) : null,
+        inputSchema: inputSchema ? JSON.parse(inputSchema) : { type: "object" },
+      } as any;
+
+      const payloadObj = JSON.parse(payload || '{}');
+
+      const state = await executeWorkflowStepByStep(
+        client,
+        workflow,
+        payloadObj,
+        (i: number, res: StepExecutionResult) => {
+          if (res.success) {
+            setCompletedSteps(prev => Array.from(new Set([...prev, res.stepId])));
+          } else {
+            setFailedSteps(prev => Array.from(new Set([...prev, res.stepId])));
+          }
         },
-        payload: JSON.parse(payload || '{}'),
-        options: {
-          testMode: selfHealingEnabled,
-          selfHealing: selfHealingEnabled ? SelfHealingMode.ENABLED : SelfHealingMode.DISABLED
-        }
-      });
+        selfHealingEnabled
+      );
 
-      if (workflowResult.error) {
-        throw new Error(workflowResult.error || "Workflow execution failed without a specific error message.");
+      setSteps(state.currentWorkflow.steps);
+
+      const stepResults: Record<string, any> = state.stepResults;
+      setStepResultsMap(stepResults);
+      const finalData = stepResults['__final_transform__']?.data;
+      setFinalPreviewResult(finalData);
+      const wr: any = {
+        success: state.failedSteps.length === 0,
+        data: finalData,
+        error: stepResults['__final_transform__']?.error,
+        stepResults,
+        config: {
+          id: workflowId,
+          steps: state.currentWorkflow.steps,
+          finalTransform,
+        } as any
+      };
+      setResult(wr);
+      setFinalTransform(state.currentWorkflow.finalTransform || finalTransform);
+      setCompletedSteps(state.completedSteps);
+      setFailedSteps(state.failedSteps);
+
+      if (state.failedSteps.length === 0) {
+        setNavigateToFinalSignal(Date.now());
       }
-
-      setResult(workflowResult);
-      setSteps(workflowResult.config.steps);
-      setFinalTransform(workflowResult.config.finalTransform);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error executing workflow:", error);
       toast({
         title: "Error executing workflow",
@@ -375,6 +347,13 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
     setSteps(prevSteps =>
       prevSteps.map(step => (step.id === stepId ? { ...updatedStep, apiConfig: { ...updatedStep.apiConfig, id: updatedStep.apiConfig.id || updatedStep.id } } : step))
     );
+    setCompletedSteps(prev => prev.filter(id => id !== stepId));
+    setFailedSteps(prev => prev.filter(id => id !== stepId));
+    setStepResultsMap(prev => {
+      const next = { ...prev } as Record<string, any>;
+      delete next[stepId];
+      return next;
+    });
   };
 
   // credentials helpers removed
@@ -395,141 +374,141 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
         </Button>
       </div>
       <h1 className="text-2xl font-bold mb-3 flex-shrink-0">Workflows</h1>
+
       <div className="w-full">
         {/* Workflow Configuration */}
-        <Card className="flex flex-col min-h-[80vh]">
-          <CardContent className="p-4 overflow-auto flex-grow">
-            {/* Workflow name and example/load buttons */}
-            <div className="mb-3">
-              <div className="flex items-center justify-between mb-1">
-                <Label htmlFor="workflowId">Workflow ID</Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="workflowId"
-                  value={workflowId}
-                  onChange={(e) => updateWorkflowId(e.target.value)}
-                  placeholder="Enter workflow ID to load or save"
-                  className="flex-grow"
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => loadWorkflow(workflowId)}
-                  disabled={loading || saving || !workflowId}
-                  className="flex-shrink-0"
-                >
-                  {loading && !saving ? "Loading..." : "Load"}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={fillDogExample}
-                  disabled={loading || saving}
-                  className="flex-shrink-0"
-                >
-                  Example
-                </Button>
-              </div>
-            </div>
-
-            {/* Workflow Instructions */}
+        <div className="w-full">
+          {/* Steps and Schema Editors */}
+          <div className="space-y-4">
+            {/* Workflow Steps - response schema now integrated in final transform */}
             <div className="mb-4">
-              <Label htmlFor="instructions">Workflow Instructions</Label>
-              <HelpTooltip text="Describe what this workflow does and how it should behave. This helps with documentation and AI assistance." />
-              <div className="font-mono text-sm text-foreground rounded py-1 mt-1 break-words whitespace-pre-wrap max-h-32 overflow-y-auto">
-                {instructions || <span className="italic text-muted-foreground">No instructions provided</span>}
-              </div>
-            </div>
-
-            {/* Payload removed - now handled in workflow steps */}
-
-            {/* Steps and Schema Editors */}
-            <div className="space-y-3 flex flex-col flex-grow">
-              {/* Workflow Steps - response schema now integrated in final transform */}
-              <div className="mb-4">
-                <WorkflowStepGallery
-                  steps={steps}
-                  stepResults={result?.stepResults || {}}
-                  finalTransform={finalTransform}
-                  finalResult={result?.data}
-                  responseSchema={responseSchema}
-                  onStepsChange={handleStepsChange}
-                  onStepEdit={handleStepEdit}
-                  onFinalTransformChange={setFinalTransform}
-                  onResponseSchemaChange={setResponseSchema}
-                  onPayloadChange={setPayload}
-                  integrations={integrations}
-                  isExecuting={loading}
-                  readOnly={false}
-                  payload={(() => {
-                    try {
-                      return JSON.parse(payload || '{}');
-                    } catch {
-                      return {};
+              <WorkflowStepGallery
+                steps={steps}
+                stepResults={stepResultsMap}
+                finalTransform={finalTransform}
+                finalResult={finalPreviewResult}
+                responseSchema={responseSchema}
+                workflowId={workflowId}
+                instruction={instructions}
+                onStepsChange={handleStepsChange}
+                onStepEdit={handleStepEdit}
+                onExecuteStep={async (idx) => {
+                  try {
+                    // mark testing state for indicator without freezing entire UI
+                    setIsExecutingStep(idx as any);
+                    const single = await executeSingleStep(
+                      client,
+                      { id: workflowId, steps } as any,
+                      idx,
+                      JSON.parse(payload || '{}'),
+                      {},
+                      false
+                    );
+                    const sid = steps[idx].id;
+                    if (single.success) {
+                      setCompletedSteps(prev => Array.from(new Set([...prev.filter(id => id !== sid), sid])));
+                      setFailedSteps(prev => prev.filter(id => id !== sid));
+                      setStepResultsMap(prev => ({ ...prev, [sid]: single.data }));
+                    } else {
+                      setFailedSteps(prev => Array.from(new Set([...prev.filter(id => id !== sid), sid])));
+                      setCompletedSteps(prev => prev.filter(id => id !== sid));
+                      setStepResultsMap(prev => {
+                        const next = { ...prev } as Record<string, any>;
+                        delete next[sid];
+                        return next;
+                      });
                     }
-                  })()}
-                />
-              </div>
-
-              {/* Input Schema Toggle */}
-              <div
-                className="flex items-center gap-2 cursor-pointer select-none"
-                onClick={() => setShowInputSchemaEditor((v) => !v)}
-                role="button"
-                tabIndex={0}
-              >
-                <ChevronRight
-                  className={cn(
-                    "h-4 w-4 transition-transform",
-                    showInputSchemaEditor && "rotate-90"
-                  )}
-                  aria-hidden="true"
-                />
-                <Database className="h-4 w-4" />
-                <span className="font-medium text-sm">Input Schema Editor</span>
-                <HelpTooltip text="Define the expected structure of input data (payload and credentials) that your workflow accepts. This validates and documents the required input format." />
-              </div>
-              {showInputSchemaEditor && (
-                <div className="mt-2 mb-4">
-                  <JsonSchemaEditor
-                    isOptional={true}
-                    value={inputSchema}
-                    onChange={setInputSchema}
-                  />
-                </div>
-              )}
+                  } finally {
+                    setIsExecutingStep(undefined as any);
+                  }
+                }}
+                onExecuteTransform={async () => {
+                  try {
+                    setIsExecutingTransform(true);
+                    const state = await executeWorkflowStepByStep(
+                      client,
+                      { id: workflowId, steps, finalTransform, responseSchema: responseSchema ? JSON.parse(responseSchema) : null, inputSchema: inputSchema ? JSON.parse(inputSchema) : { type: 'object' } } as any,
+                      JSON.parse(payload || '{}'),
+                      undefined,
+                      false
+                    );
+                    const ft = state.stepResults['__final_transform__'];
+                    if (ft?.success) {
+                      setCompletedSteps(prev => Array.from(new Set([...prev.filter(id => id !== '__final_transform__'), '__final_transform__'])));
+                      setFailedSteps(prev => prev.filter(id => id !== '__final_transform__'));
+                      setStepResultsMap(prev => ({ ...prev, ...state.stepResults }));
+                      setFinalPreviewResult(ft.data);
+                      setNavigateToFinalSignal(Date.now());
+                    } else {
+                      setFailedSteps(prev => Array.from(new Set([...prev.filter(id => id !== '__final_transform__'), '__final_transform__'])));
+                      setCompletedSteps(prev => prev.filter(id => id !== '__final_transform__'));
+                      setStepResultsMap(prev => {
+                        const next = { ...prev } as Record<string, any>;
+                        delete next['__final_transform__'];
+                        return next;
+                      });
+                    }
+                  } finally {
+                    setIsExecutingTransform(false);
+                  }
+                }}
+                onFinalTransformChange={setFinalTransform}
+                onResponseSchemaChange={setResponseSchema}
+                onPayloadChange={setPayload}
+                onWorkflowIdChange={setWorkflowId}
+                integrations={integrations}
+                isExecuting={loading || isExecutingTransform || (isExecutingStep !== undefined)}
+                isExecutingStep={isExecutingStep}
+                isExecutingTransform={isExecutingTransform as any}
+                completedSteps={completedSteps}
+                failedSteps={failedSteps}
+                readOnly={false}
+                inputSchema={inputSchema}
+                onInputSchemaChange={setInputSchema}
+                payload={(() => {
+                  try {
+                    return JSON.parse(payload || '{}');
+                  } catch {
+                    return {};
+                  }
+                })()}
+                headerActions={(
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 mr-2">
+                      <Label htmlFor="selfHealing-top" className="text-xs flex items-center gap-1">
+                        <span>Self-healing</span>
+                      </Label>
+                      <div className="flex items-center">
+                        <Switch className="custom-switch" id="selfHealing-top" checked={selfHealingEnabled} onCheckedChange={setSelfHealingEnabled} />
+                        <div className="ml-1 flex items-center">
+                          <HelpTooltip text="Enable LLM-based self-healing during execution. Slower, but can auto-fix failures." />
+                        </div>
+                      </div>
+                    </div>
+                    <Button
+                      variant="success"
+                      onClick={executeWorkflow}
+                      disabled={loading || saving || (isExecutingStep !== undefined) || isExecutingTransform}
+                      className="h-9 px-4"
+                    >
+                      {loading ? "Running Workflow..." : "Run Workflow"}
+                    </Button>
+                    <Button
+                      variant="default"
+                      onClick={saveWorkflow}
+                      disabled={saving || loading}
+                      className="h-9 px-5 shadow-md border border-primary/40"
+                    >
+                      {saving ? "Saving Workflow..." : "Save Workflow"}
+                    </Button>
+                  </div>
+                )}
+                navigateToFinalSignal={navigateToFinalSignal}
+              />
             </div>
-          </CardContent>
 
-          <CardFooter className="flex p-3 flex-shrink-0 border-t">
-            <div className="flex items-center gap-2 w-full flex-wrap">
-              <Button
-                variant="outline"
-                onClick={saveWorkflow}
-                disabled={saving || loading}
-                className="flex-1"
-              >
-                {saving ? "Saving..." : "Save Workflow"}
-              </Button>
-              <Button
-                variant="success"
-                onClick={executeWorkflow}
-                disabled={loading || saving}
-                className="flex-1"
-              >
-                {loading ? "Running..." : "Run Workflow"}
-              </Button>
-              <div className="flex items-center gap-2 shrink-0">
-                <Label htmlFor="selfHealing" className="text-xs flex items-center gap-1">
-                  <span>Self-healing</span>
-                </Label>
-                <Switch className="custom-switch" id="selfHealing" checked={selfHealingEnabled} onCheckedChange={setSelfHealingEnabled} />
-                <sup className="leading-none"><HelpTooltip text="Enable LLM-based self-healing during execution. Slower, but can auto-fix failures." /></sup>
-              </div>
-            </div>
-          </CardFooter>
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
   );

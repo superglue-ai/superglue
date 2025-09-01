@@ -47,3 +47,4 @@ export function getIntegrationIcon(integration: { id: string; urlHost?: string }
   return null;
 }
 
+export const inputErrorStyles = "border-red-500 focus:border-red-500 focus:ring-red-500";

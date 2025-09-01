@@ -55,8 +55,6 @@ const ARRAY_ITEM_TYPE_DISPLAY = {
   'any': 'any[]',
 };
 
-const DEFAULT_EMPTY_SCHEMA = `{"type":"any"}`;
-
 const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
   value,
   onChange,
@@ -392,7 +390,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
                     // Hide tooltip when typing
                     setHoveredDescField(null);
                   }}
-                  className="w-full min-w-[200px] flex-1 border-muted hover:border-primary/50 focus:border-primary/50 text-xs sm:text-sm focus:ring-inset"
+                  className="w-full min-w-[200px] flex-1 border-muted hover:border-primary/50 focus:border-primary/50 text-xs sm:text-sm"
                   placeholder="Add AI instructions or filters"
                   onFocus={() => {
                     // Clear timeout and hide tooltip on focus
@@ -630,6 +628,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
                     "font-mono text-xs w-full min-h-full",
                     jsonError && "border-red-500"
                   )}
+                  textareaClassName="outline-none focus:outline-none"
                   style={{
                     fontFamily: 'var(--font-mono)',
                     minHeight: '100%',

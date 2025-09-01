@@ -3,12 +3,12 @@ import { useIntegrations } from '@/src/app/integrations-context';
 import { getAuthBadge } from '@/src/app/integrations/page';
 import { IntegrationForm } from '@/src/components/integrations/IntegrationForm';
 import { useToast } from '@/src/hooks/use-toast';
-import { executeSingleStep, executeWorkflowStepByStep, inputErrorStyles, needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
-import { cn, composeUrl, getIntegrationIcon as getIntegrationIconName } from '@/src/lib/utils';
+import { executeSingleStep, executeWorkflowStepByStep, needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
+import { cn, composeUrl, getIntegrationIcon as getIntegrationIconName, inputErrorStyles } from '@/src/lib/utils';
 import { Integration, IntegrationInput, SuperglueClient, UpsertMode, Workflow, WorkflowResult } from '@superglue/client';
 import { integrations as integrationTemplates } from "@superglue/shared";
 import { waitForIntegrationProcessing } from '@superglue/shared/utils';
-import { ArrowRight, Check, Clock, Globe, Key, Loader2, Pencil, Play, Plus, X } from 'lucide-react';
+import { ArrowRight, Check, Clock, Globe, Key, Loader2, Pencil, Plus, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
@@ -19,6 +19,7 @@ import * as simpleIcons from 'simple-icons';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
+import { Switch } from '../ui/switch';
 import { Textarea } from '../ui/textarea';
 import { DocStatus } from '../utils/DocStatusSpinner';
 import { HelpTooltip } from '../utils/HelpTooltip';
@@ -66,14 +67,10 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const superglueConfig = useConfig();
 
   const { integrations, pendingDocIds, loading, setPendingDocIds, refreshIntegrations } = useIntegrations();
-
-  // Parse integration from query params
   const preselectedIntegrationId = searchParams.get('integration');
-
   const [instruction, setInstruction] = useState('');
   const [payload, setPayload] = useState('{}');
   const [currentWorkflow, setCurrentWorkflow] = useState<Workflow | null>(null); // To store result from buildWorkflow
-
   const [schema, setSchema] = useState<string>('{}');
 
 
@@ -81,19 +78,17 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const [executionResult, setExecutionResult] = useState<WorkflowResult | null>(null);
   const [finalResult, setFinalResult] = useState<any>(null);
   const [executionError, setExecutionError] = useState<string | null>(null);
-
-  // Step-by-step execution state
   const [isExecutingStep, setIsExecutingStep] = useState<number | undefined>(undefined);
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
+  const [failedSteps, setFailedSteps] = useState<string[]>([]);
   const [stepExecutionResults, setStepExecutionResults] = useState<Record<string, any>>({});
+  const [transformResult, setTransformResult] = useState<any>(null);
 
   const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]); // Store multiple suggestions
+  const [selfHealingEnabled, setSelfHealingEnabled] = useState(true);
+  const [isExecutingTransform, setIsExecutingTransform] = useState<boolean>(false);
 
-
-
-
-  // credentials removed from review step
 
   const [selectedIntegrationIds, setSelectedIntegrationIds] = useState<string[]>(() => {
     // Initialize with preselected integration if available
@@ -139,6 +134,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     if (step !== 'review') {
       setExecutionResult(null);
       setFinalResult(null);
+      setTransformResult(null);
       setExecutionError(null);
     }
 
@@ -248,6 +244,21 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const handleIntegrationFormCancel = () => {
     setShowIntegrationForm(false);
     setIntegrationFormEdit(null);
+  };
+
+  const handleSave = async () => {
+    if (!currentWorkflow) return;
+    try {
+      setIsSaving(true);
+      const saved = await client.upsertWorkflow(currentWorkflow.id, currentWorkflow as any);
+      if (!saved) throw new Error('Failed to save workflow');
+      toast({ title: 'Workflow saved', description: `"${saved.id}" saved successfully` });
+      setStep('success');
+    } catch (e: any) {
+      toast({ title: 'Error saving workflow', description: e.message || 'Unknown error', variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
 
@@ -444,6 +455,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     setIsExecuting(true);
     setExecutionError(null);
     setCompletedSteps([]);
+    setFailedSteps([] as any);
     setStepExecutionResults({});
 
     try {
@@ -462,7 +474,11 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         (stepIndex, result) => {
           // Update state for each completed step
           if (result.success) {
-            setCompletedSteps(prev => [...prev, currentWorkflow.steps[stepIndex].id]);
+            setCompletedSteps(prev => Array.from(new Set([...
+              prev.filter(id => id !== currentWorkflow.steps[stepIndex].id),
+            currentWorkflow.steps[stepIndex].id
+            ])));
+            setFailedSteps(prev => prev.filter(id => id !== currentWorkflow.steps[stepIndex].id));
             setStepExecutionResults(prev => ({
               ...prev,
               [currentWorkflow.steps[stepIndex].id]: result.data
@@ -477,9 +493,20 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                 )
               }));
             }
+          } else {
+            setFailedSteps(prev => Array.from(new Set([...
+              (prev as any).filter((id: string) => id !== currentWorkflow.steps[stepIndex].id),
+            currentWorkflow.steps[stepIndex].id
+            ])) as any);
+            setCompletedSteps(prev => prev.filter(id => id !== currentWorkflow.steps[stepIndex].id));
+            setStepExecutionResults(prev => {
+              const next = { ...prev } as Record<string, any>;
+              delete next[currentWorkflow.steps[stepIndex].id];
+              return next;
+            });
           }
         },
-        true // Enable self-healing
+        selfHealingEnabled
       );
 
       // Convert to WorkflowResult format
@@ -504,6 +531,26 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       setExecutionResult(result);
       setCurrentWorkflow(state.currentWorkflow);
       setFinalResult(result.data);
+      const ft = state.stepResults['__final_transform__'];
+      if (ft) {
+        if (ft.success) {
+          setCompletedSteps(prev => Array.from(new Set([...
+            prev.filter(id => id !== '__final_transform__'),
+            '__final_transform__'
+          ])));
+          setFailedSteps(prev => prev.filter(id => id !== '__final_transform__'));
+          setTransformResult(ft.data);
+          // Navigate to final results mini-card
+          // We drive this by selecting the last item in gallery via step state update below
+        } else {
+          setFailedSteps(prev => Array.from(new Set([...
+            (prev as any).filter((id: string) => id !== '__final_transform__'),
+            '__final_transform__'
+          ])) as any);
+          setCompletedSteps(prev => prev.filter(id => id !== '__final_transform__'));
+          setTransformResult(null);
+        }
+      }
 
     } catch (error: any) {
       setExecutionError(error.message);
@@ -524,17 +571,26 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     setExecutionError(null);
 
     try {
+      const workflowToExecute = {
+        ...currentWorkflow,
+        steps: [...currentWorkflow.steps]
+      };
+
       const result = await executeSingleStep(
         client,
-        currentWorkflow,
+        workflowToExecute,
         stepIndex,
         JSON.parse(payload || '{}'),
         stepExecutionResults,
-        true // Enable self-healing
+        false
       );
 
       if (result.success) {
-        setCompletedSteps(prev => [...prev, currentWorkflow.steps[stepIndex].id]);
+        setCompletedSteps(prev => Array.from(new Set([...
+          prev.filter(id => id !== currentWorkflow.steps[stepIndex].id),
+        currentWorkflow.steps[stepIndex].id
+        ])));
+        setFailedSteps(prev => prev.filter(id => id !== currentWorkflow.steps[stepIndex].id));
         setStepExecutionResults(prev => ({
           ...prev,
           [currentWorkflow.steps[stepIndex].id]: result.data
@@ -572,6 +628,16 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
           title: 'Step Execution Failed',
           description: result.error || 'Unknown error',
           variant: 'destructive',
+        });
+        setFailedSteps(prev => Array.from(new Set([...
+          (prev as any).filter((id: string) => id !== currentWorkflow.steps[stepIndex].id),
+        currentWorkflow.steps[stepIndex].id
+        ])) as any);
+        setCompletedSteps(prev => prev.filter(id => id !== currentWorkflow.steps[stepIndex].id));
+        setStepExecutionResults(prev => {
+          const next = { ...prev } as Record<string, any>;
+          delete next[currentWorkflow.steps[stepIndex].id];
+          return next;
         });
       }
     } catch (error: any) {
@@ -918,7 +984,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                       onCancel={handleIntegrationFormCancel}
                       integrationOptions={integrationOptions}
                       getSimpleIcon={getSimpleIcon}
-                      inputErrorStyles={inputErrorStyles}
                     />
                   </div>
                 </div>
@@ -979,7 +1044,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                 <Label htmlFor="payload">Workflow Variables (Optional, JSON)</Label>
                 <HelpTooltip text="Provide the payload for the workflow as a JSON object. You can reference these variables throughout the config. You can change them when you use the workflow later." />
                 <div className={cn(
-                  "h-64 rounded-md border bg-transparent",
+                  "h-64 rounded-md border border-input bg-transparent code-editor",
                   validationErrors.payload && inputErrorStyles
                 )}>
                   <Editor
@@ -997,7 +1062,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                     padding={10}
                     tabSize={2}
                     insertSpaces={true}
-                    className="font-mono text-xs w-full h-64"
+                    className="font-mono text-xs w-full h-64 [&_textarea]:outline-none [&_textarea]:w-full [&_textarea]:resize-none [&_textarea]:p-0 [&_textarea]:border-0 [&_textarea]:bg-transparent"
                   />
                 </div>
                 {validationErrors.payload && (
@@ -1011,45 +1076,116 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
           {step === 'review' && (
             <div className="space-y-4">
               {currentWorkflow ? (
-                <>
-                  <div className="flex flex-col gap-2">
-                    {/* Workflow Steps Toggle */}
-                    {/* Workflow Steps */}
-                    <div className="mb-4">
-                      <WorkflowStepGallery
-                        steps={currentWorkflow.steps}
-                        stepResults={executionResult?.stepResults || stepExecutionResults}
-                        finalTransform={currentWorkflow.finalTransform}
-                        finalResult={executionResult?.data}
-                        responseSchema={schema}
-                        workflowId={currentWorkflow.id}
-                        instruction={instruction}
-                        onStepsChange={handleStepsChange}
-                        onStepEdit={handleStepEdit}
-                        onFinalTransformChange={(transform) => setCurrentWorkflow({ ...currentWorkflow, finalTransform: transform } as Workflow)}
-                        onResponseSchemaChange={setSchema}
-                        onPayloadChange={setPayload}
-                        onWorkflowIdChange={(id) => setCurrentWorkflow({ ...currentWorkflow, id } as Workflow)}
-                        onInstructionEdit={() => setStep('prompt')}
-                        onExecuteStep={handleExecuteSingleStep}
-                        onExecuteAllSteps={handleExecuteWorkflow}
-                        completedSteps={completedSteps}
-                        integrations={integrations}
-                        isExecuting={isExecuting}
-                        isExecutingStep={isExecutingStep}
-                        readOnly={false}
-                        payload={(() => {
-                          try {
-                            return JSON.parse(payload || '{}');
-                          } catch {
-                            return {};
-                          }
-                        })()}
-                      />
-                    </div>
-                    {/* Response Schema now integrated in final transform */}
-                  </div>
-                </>
+                <div className="w-full">
+                  {/* Workflow Steps */}
+                  <WorkflowStepGallery
+                    steps={currentWorkflow.steps}
+                    stepResults={stepExecutionResults}
+                    finalTransform={currentWorkflow.finalTransform}
+                    finalResult={executionResult?.data}
+                    responseSchema={schema}
+                    workflowId={currentWorkflow.id}
+                    instruction={instruction}
+                    onStepsChange={handleStepsChange}
+                    onStepEdit={handleStepEdit}
+                    onExecuteStep={(idx) => handleExecuteSingleStep(idx)}
+                    onExecuteTransform={async () => {
+                      // execute only final transform against current accumulated results
+                      try {
+                        setIsExecutingTransform(true as any);
+                        const state = await executeWorkflowStepByStep(
+                          client,
+                          {
+                            id: currentWorkflow.id,
+                            steps: currentWorkflow.steps,
+                            integrationIds: selectedIntegrationIds,
+                            responseSchema: JSON.parse(schema),
+                            finalTransform: currentWorkflow.finalTransform,
+                            inputSchema: currentWorkflow.inputSchema,
+                            instruction: currentWorkflow.instruction
+                          },
+                          JSON.parse(payload || '{}'),
+                          undefined,
+                          false
+                        );
+                        const ft = state.stepResults['__final_transform__'];
+                        if (ft?.success) {
+                          setCompletedSteps(prev => Array.from(new Set([...
+                            prev.filter(id => id !== '__final_transform__'),
+                            '__final_transform__'
+                          ])));
+                          setFailedSteps(prev => prev.filter(id => id !== '__final_transform__'));
+                          setFinalResult(ft.data);
+                          setStepExecutionResults(prev => ({ ...prev, '__final_transform__': ft.data }));
+                        } else {
+                          setFailedSteps(prev => Array.from(new Set([...
+                            prev.filter(id => id !== '__final_transform__'),
+                            '__final_transform__'
+                          ])));
+                          setCompletedSteps(prev => prev.filter(id => id !== '__final_transform__'));
+                          setStepExecutionResults(prev => {
+                            const next = { ...prev } as Record<string, any>;
+                            delete next['__final_transform__'];
+                            return next;
+                          });
+                        }
+                      } finally {
+                        setIsExecutingTransform(undefined as any);
+                      }
+                    }}
+                    onFinalTransformChange={(transform) => setCurrentWorkflow({ ...currentWorkflow, finalTransform: transform } as Workflow)}
+                    onResponseSchemaChange={setSchema}
+                    onPayloadChange={setPayload}
+                    onWorkflowIdChange={(id) => setCurrentWorkflow({ ...currentWorkflow, id } as Workflow)}
+                    onInstructionEdit={() => setStep('prompt')}
+                    completedSteps={completedSteps}
+                    failedSteps={failedSteps}
+                    integrations={integrations}
+                    isExecuting={isExecuting}
+                    isExecutingStep={isExecutingStep}
+                    readOnly={false}
+                    inputSchema={currentWorkflow.inputSchema ? JSON.stringify(currentWorkflow.inputSchema, null, 2) : undefined}
+                    onInputSchemaChange={(schema) => setCurrentWorkflow({ ...currentWorkflow, inputSchema: JSON.parse(schema) } as Workflow)}
+                    payload={(() => {
+                      try {
+                        return JSON.parse(payload || '{}');
+                      } catch {
+                        return {};
+                      }
+                    })()}
+                    headerActions={(
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 mr-2">
+                          <Label htmlFor="wcs-selfHealing" className="text-xs flex items-center gap-1">
+                            <span>Self-healing</span>
+                          </Label>
+                          <div className="flex items-center">
+                            <Switch id="wcs-selfHealing" className="custom-switch" checked={selfHealingEnabled} onCheckedChange={setSelfHealingEnabled} />
+                            <div className="ml-1 flex items-center">
+                              <HelpTooltip text="Enable LLM-based self-healing during execution. Slower, but can auto-fix failures." />
+                            </div>
+                          </div>
+                        </div>
+                        <Button
+                          variant="success"
+                          onClick={handleExecuteWorkflow}
+                          disabled={isExecuting}
+                          className="h-9 px-4"
+                        >
+                          {isExecuting ? "Testing Workflow..." : "Test Workflow"}
+                        </Button>
+                        <Button
+                          variant="default"
+                          onClick={handleSave}
+                          disabled={isSaving}
+                          className="h-9 px-5 shadow-md border border-primary/40"
+                        >
+                          {isSaving ? "Saving..." : "Save & Complete"}
+                        </Button>
+                      </div>
+                    )}
+                  />
+                </div>
               ) : (
                 <p className="text-muted-foreground">Workflow details will appear here after generation.</p>
               )}
@@ -1118,35 +1254,23 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
           Back
         </Button>
         <div className="flex gap-2">
-          {step === 'review' && (
+          {step !== 'review' && (
             <Button
-              onClick={handleExecuteWorkflow}
-              disabled={isExecuting}
-              variant="success"
+              onClick={handleNext}
+              disabled={
+                isBuilding ||
+                isSaving ||
+                isGeneratingSuggestions ||
+                (step === 'integrations' && selectedIntegrationIds.length === 0)
+              }
             >
-              {isExecuting ? (
-                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Executing...</>
-              ) : (
-                <><Play className="mr-2 h-4 w-4" /> Test Workflow</>
-              )}
-            </Button>
-          )}
-          <Button
-            onClick={handleNext}
-            disabled={
-              isBuilding ||
-              isSaving ||
-              isGeneratingSuggestions ||
-              (step === 'integrations' && selectedIntegrationIds.length === 0)
-            }
-          >
-            {isBuilding ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Building...</> :
-              isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</> :
-                isGeneratingSuggestions ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating...</> :
-                  step === 'review' ? 'Save & Complete' :
+              {isBuilding ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Building...</> :
+                isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</> :
+                  isGeneratingSuggestions ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating...</> :
                     step === 'success' ? 'Done' :
                       'Next'}
-          </Button>
+            </Button>
+          )}
         </div>
       </div>
     </div>

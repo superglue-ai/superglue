@@ -538,7 +538,7 @@ export function isSelfHealingEnabled(options: RequestOptions | undefined, type: 
   }
   if (selfHealingMode === SelfHealingMode.DISABLED) {
     return false;
-  } 
+  }
   return type === "transform" ? (selfHealingMode === SelfHealingMode.ENABLED || selfHealingMode === SelfHealingMode.TRANSFORM_ONLY) : (selfHealingMode === SelfHealingMode.ENABLED || selfHealingMode === SelfHealingMode.REQUEST_ONLY);
 }
 

@@ -10,7 +10,6 @@ async function cleanupResources(): Promise<void> {
 
     const cleanupTasks = [];
 
-    // Clean up Playwright browser
     try {
         const { PlaywrightFetchingStrategy } = await import('../../utils/documentation.js');
         cleanupTasks.push(PlaywrightFetchingStrategy.closeBrowser());
@@ -30,7 +29,6 @@ async function cleanupResources(): Promise<void> {
     await Promise.all(cleanupTasks);
 }
 
-// Register cleanup handlers for process termination
 let interruptCount = 0;
 const handleInterrupt = async (signal: string) => {
     interruptCount++;
