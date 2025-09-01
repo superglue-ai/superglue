@@ -630,6 +630,21 @@ describe('superglue_create_integration', () => {
     expect(result.error).toBe('Integration creation failed');
     expect(result.suggestion).toContain('Validate all integration inputs');
   });
+
+  it('filters sensitive fields', async () => {
+    const client = { upsertIntegration: vi.fn().mockResolvedValue({
+      id: 'test-integration',
+      openApiSchema: 'test',
+      documentation: 'test',
+      credentials: {}
+    }) };
+    const args = { client, id: 'test-integration' };
+    const result = await createIntegration(args, {});
+
+    expect(result.success).toBe(true);
+    expect(result.integration).not.toHaveProperty('openApiSchema');
+    expect(result.integration).not.toHaveProperty('documentation');
+  });
 })
 
 describe('superglue_modify_integration', () => {
@@ -652,7 +667,7 @@ describe('superglue_modify_integration', () => {
 
     expect(result.success).toBe(true);
     expect(result.integration).toBeDefined();
-    expect(result.note).toContain('created successfully');
+    expect(result.note).toContain('modified successfully');
     expect(client.upsertIntegration).toHaveBeenCalledWith('test-integration', {
       id: 'test-integration',
       name: 'Test Integration',
@@ -690,13 +705,27 @@ describe('superglue_modify_integration', () => {
 
   it('returns failure when upsertIntegration throws', async () => {
     const client = {
-      upsertIntegration: vi.fn().mockRejectedValue(new Error('Integration creation failed'))
+      upsertIntegration: vi.fn().mockRejectedValue(new Error('Integration modification failed'))
     };
     const args = { client, id: 'test-integration' };
     const result = await createIntegration(args, {});
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe('Integration creation failed');
+    expect(result.error).toBe('Integration modification failed');
     expect(result.suggestion).toContain('Validate all integration inputs');
+  });
+
+  it('filters sensitive fields', async () => {
+    const client = { upsertIntegration: vi.fn().mockResolvedValue({
+      id: 'test-integration',
+      openApiSchema: 'test',
+      documentation: 'test'
+    }) };
+    const args = { client, id: 'test-integration' };
+    const result = await modifyIntegration(args, {});
+
+    expect(result.success).toBe(true);
+    expect(result.integration).not.toHaveProperty('openApiSchema');
+    expect(result.integration).not.toHaveProperty('documentation');
   });
 })

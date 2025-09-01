@@ -5,7 +5,7 @@ import {
   CallToolResult,
   isInitializeRequest
 } from "@modelcontextprotocol/sdk/types.js";
-import { SuperglueClient, WorkflowResult } from '@superglue/client';
+import { SuperglueClient, WorkflowResult, Integration} from '@superglue/client';
 import { LogEntry } from "@superglue/shared";
 import { getSDKCode } from '@superglue/shared/templates';
 import { flattenAndNamespaceWorkflowCredentials } from "@superglue/shared/utils";
@@ -377,6 +377,11 @@ const validateIntegrationCreation = (args: any) => {
   return errors;
 };
 
+const filterIntegrationFields = (integration: Integration) => {
+  const { openApiSchema, documentation, ...filtered } = integration;
+  return filtered;
+};
+
 // Update execute functions with validation
 export const toolDefinitions: Record<string, any> = {
   superglue_list_available_workflows: {
@@ -743,7 +748,7 @@ export const toolDefinitions: Record<string, any> = {
             ? "Integration created. Documentation is being processed in the background."
             : "Integration created successfully.",
           success: true,
-          integration: result
+          integration: filterIntegrationFields(result)
         };
       } catch (error: any) {
         return {
@@ -780,18 +785,18 @@ export const toolDefinitions: Record<string, any> = {
         }
 
         const result = await client.upsertIntegration(integrationInput.id, integrationInput, 'UPDATE');
-        const note = result.documentationPending ? "Integration created. Documentation is being processed in the background." : "Integration created successfully."
+        const note = result.documentationPending ? "Integration modified. Documentation is being processed in the background." : "Integration modified successfully."
         
         return {
           note: note,
           success: true,
-          integration: result
+          integration: filterIntegrationFields(result)
         };
       } catch (error: any) {
         return {
           success: false,
           error: error.message,
-          suggestion: "Failed to create integration. Validate all integration inputs and try again."
+          suggestion: "Failed to modify integration. Validate all integration inputs and try again."
         };
       }
     },
