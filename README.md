@@ -16,7 +16,7 @@
 <h3 align="center"> Now live: let agents build deterministic workflows across apps, databases and APIs using the superglue MCP<br>
 Let's glue.<br>
 
-[Read the docs](https://docs.superglue.cloud/mcp) 🍯🍯🍯</h3>
+[Read the docs](https://docs.superglue.cloud) 🍯🍯🍯</h3>
 
 
 ## what is superglue?
