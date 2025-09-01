@@ -1,4 +1,6 @@
+import { existsSync } from 'fs';
 import { cpus } from 'os';
+import { fileURLToPath } from 'url';
 import { Worker } from 'worker_threads';
 import { server_defaults } from '../default.js';
 
@@ -33,10 +35,27 @@ export class HtmlMarkdownPool {
     }
 
     private createWorker(): Worker {
+        // Try TypeScript file first (for tests/development)
+        const tsUrl = new URL('./html-markdown-worker.ts', import.meta.url);
+        const tsPath = fileURLToPath(tsUrl);
+        
+        if (existsSync(tsPath)) {
+            const worker = new Worker(tsUrl);
+            this.attachWorkerEvents(worker);
+            return worker;
+        }
+        
+        // Try JavaScript file (for production or when TS can't be run directly)
         const jsUrl = new URL('./html-markdown-worker.js', import.meta.url);
-        const worker = new Worker(jsUrl);
-        this.attachWorkerEvents(worker);
-        return worker;
+        const jsPath = fileURLToPath(jsUrl);
+        
+        if (existsSync(jsPath)) {
+            const worker = new Worker(jsUrl);
+            this.attachWorkerEvents(worker);
+            return worker;
+        }
+        
+        throw new Error('Worker file not found: neither .ts nor .js file exists');
     }
 
     private attachWorkerEvents(worker: Worker): void {
@@ -61,6 +80,7 @@ export class HtmlMarkdownPool {
     }
 
     private handleWorkerFailure(failedWorker: Worker): void {
+        console.error('Worker failed', failedWorker);
         const availableIndex = this.availableWorkers.indexOf(failedWorker);
         if (availableIndex > -1) this.availableWorkers.splice(availableIndex, 1);
         const workerIndex = this.workers.indexOf(failedWorker);
