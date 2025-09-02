@@ -14,6 +14,7 @@ import {
 } from "@/src/components/ui/alert-dialog";
 import { Button } from '@/src/components/ui/button';
 import { DocStatus } from '@/src/components/utils/DocStatusSpinner';
+import { createOAuthErrorHandler, triggerOAuthFlow } from '@/src/components/utils/oauth-utils';
 import { useToast } from '@/src/hooks/use-toast';
 import { needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
 import { composeUrl, getIntegrationIcon as getIntegrationIconName } from '@/src/lib/utils';
@@ -111,11 +112,10 @@ export default function IntegrationsPage() {
             // Refresh integrations to show updated OAuth status
             refreshIntegrations();
         } else if (error) {
-            toast({
-                title: 'OAuth Error',
-                description: description || message || 'Failed to complete OAuth connection',
-                variant: 'destructive',
-            });
+            const errorMessage = description || message || 'Failed to complete OAuth connection';
+            const handleOAuthError = createOAuthErrorHandler(integration || 'unknown', toast);
+            handleOAuthError(errorMessage);
+            
             // Clear the URL params
             window.history.replaceState({}, '', '/integrations');
         }
@@ -159,11 +159,9 @@ export default function IntegrationsPage() {
                     });
                 }
             } else if (event.data.type === 'oauth-error') {
-                toast({
-                    title: 'OAuth Error',
-                    description: event.data.message || 'Failed to complete OAuth connection',
-                    variant: 'destructive',
-                });
+                const errorMessage = event.data.message || 'Failed to complete OAuth connection';
+                const handleOAuthError = createOAuthErrorHandler(event.data.integrationId || 'unknown', toast);
+                handleOAuthError(errorMessage);
             }
         };
 
@@ -245,6 +243,39 @@ export default function IntegrationsPage() {
     const handleAdd = () => {
         setEditingIntegration(null);
         setAddFormOpen(true);
+    };
+
+    const handleCompleteOAuth = (integration: Integration) => {
+        // Extract OAuth fields from integration credentials
+        const oauthFields = {
+            access_token: integration.credentials?.access_token,
+            refresh_token: integration.credentials?.refresh_token,
+            client_id: integration.credentials?.client_id,
+            scopes: integration.credentials?.scopes,
+            auth_url: integration.credentials?.auth_url,
+        };
+
+        // Determine auth type dynamically (defensive programming)
+        const authType = detectAuthType(integration.credentials || {});
+
+        // Enhanced error handling using centralized utility
+        const handleOAuthError = createOAuthErrorHandler(integration.id, toast);
+
+        // Trigger OAuth flow with error handling
+        const cleanup = triggerOAuthFlow(
+            integration.id,
+            oauthFields,
+            integration.id, // Use integration ID as selectedIntegration
+            config.superglueApiKey,
+            authType,
+            handleOAuthError,
+            true // Force OAuth
+        );
+
+        // Store cleanup function for potential use
+        if (cleanup) {
+            // Cleanup will be called automatically when OAuth completes or fails
+        }
     };
 
     const handleSave = async (integration: Integration): Promise<Integration | null> => {
@@ -474,12 +505,21 @@ export default function IntegrationsPage() {
                                                     variant="outline"
                                                     size="sm"
                                                     className="text-muted-foreground hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                                                    onClick={() => router.push(`/workflows?integration=${integration.id}`)}
-                                                    title={badge.type === 'oauth-incomplete' ? "OAuth configuration required" : "Build workflow with this integration"}
-                                                    disabled={badge.type === 'oauth-incomplete'}
+                                                    onClick={() => badge.type === 'oauth-incomplete' ? handleCompleteOAuth(integration) : router.push(`/workflows?integration=${integration.id}`)}
+                                                    title={badge.type === 'oauth-incomplete' ? "Start OAuth flow to complete configuration" : "Build workflow with this integration"}
+                                                    disabled={false}
                                                 >
-                                                    <Sparkles className="h-4 w-4 mr-2" />
-                                                    Build Workflow
+                                                    {badge.type === 'oauth-incomplete' ? (
+                                                        <>
+                                                            <Key className="h-4 w-4 mr-2" />
+                                                            Complete OAuth
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Sparkles className="h-4 w-4 mr-2" />
+                                                            Build Workflow
+                                                        </>
+                                                    )}
                                                 </Button>
                                                 <Button
                                                     variant="ghost"

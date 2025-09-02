@@ -17,7 +17,8 @@ import { useToast } from '@/src/hooks/use-toast';
 import { cn, composeUrl } from '@/src/lib/utils';
 import type { Integration } from '@superglue/client';
 
-import { getOAuthConfig, integrations } from '@superglue/shared';
+import { buildOAuthUrlForIntegration, createOAuthErrorHandler, getOAuthCallbackUrl, triggerOAuthFlow } from '@/src/components/utils/oauth-utils';
+import { integrations } from '@superglue/shared';
 import { Check, ChevronRight, ChevronsUpDown, Copy, Globe, Link } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
@@ -94,6 +95,28 @@ export function IntegrationForm({
             expires_at: creds.expires_at || '',
             token_type: creds.token_type || 'Bearer'
         };
+    });
+
+    // Track initial OAuth field values to detect changes
+    const [initialOAuthFields, setInitialOAuthFields] = useState(() => {
+        const creds = integration?.credentials || {};
+        return {
+            client_id: creds.client_id || '',
+            client_secret: creds.client_secret || '',
+            auth_url: creds.auth_url || '',
+            token_url: creds.token_url || '',
+            scopes: creds.scopes || ''
+        };
+    });
+
+    // Track initial API credentials to detect changes
+    const [initialApiCredentials, setInitialApiCredentials] = useState(() => {
+        const creds = integration?.credentials || {};
+        if (initialAuthType === 'oauth' && integration) {
+            const { client_id, client_secret, auth_url, token_url, access_token, refresh_token, scopes, expires_at, ...additionalCreds } = creds;
+            return Object.keys(additionalCreds).length > 0 ? JSON.stringify(additionalCreds, null, 2) : '{}';
+        }
+        return Object.keys(creds).length > 0 ? JSON.stringify(creds, null, 2) : '{}';
     });
 
     // Initialize API key credentials as JSON string for CredentialsManager
@@ -226,6 +249,24 @@ export function IntegrationForm({
         }
     };
 
+    // Check if OAuth fields have changed
+    const hasOAuthFieldsChanged = () => {
+        if (authType !== 'oauth') return false;
+        
+        // Check if any OAuth field changed
+        const oauthFieldsChanged = 
+            oauthFields.client_id !== initialOAuthFields.client_id ||
+            oauthFields.client_secret !== initialOAuthFields.client_secret ||
+            oauthFields.auth_url !== initialOAuthFields.auth_url ||
+            oauthFields.token_url !== initialOAuthFields.token_url ||
+            oauthFields.scopes !== initialOAuthFields.scopes;
+        
+        // Check if additional API credentials changed
+        const apiCredentialsChanged = apiKeyCredentials !== initialApiCredentials;
+        
+        return oauthFieldsChanged || apiCredentialsChanged;
+    };
+
     const handleSubmit = async () => {
         const errors: Record<string, boolean> = {};
         if (!id.trim()) errors.id = true;
@@ -294,21 +335,26 @@ export function IntegrationForm({
                 return;
             }
 
-            // If OAuth and not already configured, trigger OAuth flow using the resolved integration ID
-            if (authType === 'oauth' && (!oauthFields.access_token || !oauthFields.refresh_token)) {
-                const authUrl = buildOAuthUrlForIntegration(savedIntegration.id);
-                if (authUrl) {
-                    const width = 600;
-                    const height = 700;
-                    const left = (window.screen.width - width) / 2;
-                    const top = (window.screen.height - height) / 2;
+            // Check if OAuth should be triggered
+            const shouldTriggerOAuth = authType === 'oauth' && (
+                // Trigger if OAuth is not configured yet
+                (!oauthFields.access_token || !oauthFields.refresh_token) ||
+                // OR if OAuth fields have changed
+                hasOAuthFieldsChanged()
+            );
 
-                    const popup = window.open(
-                        authUrl,
-                        'oauth_popup',
-                        `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
-                    );
-                }
+            if (shouldTriggerOAuth) {
+                const handleOAuthError = createOAuthErrorHandler(savedIntegration.id, toast);
+
+                triggerOAuthFlow(
+                    savedIntegration.id,
+                    oauthFields,
+                    selectedIntegration,
+                    config.superglueApiKey,
+                    authType,
+                    handleOAuthError,
+                    hasOAuthFieldsChanged() // Force OAuth if fields changed
+                );
             }
         } catch (error) {
             // Error handling is done in the parent component
@@ -316,11 +362,7 @@ export function IntegrationForm({
         }
     };
 
-    // Generate OAuth callback URL
-    const getOAuthCallbackUrl = () => {
-        const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-        return `${baseUrl}/api/auth/callback`; // No more integration ID needed
-    };
+
 
 
 
@@ -341,61 +383,10 @@ export function IntegrationForm({
         }
     };
 
-    // Helper to build OAuth authorization URL
-    const buildOAuthUrlForIntegration = (integrationId: string) => {
-        try {
-            const { client_id, scopes } = oauthFields;
-
-            if (!client_id) return null;
-
-            const redirectUri = getOAuthCallbackUrl();
-
-            // Get auth URL from OAuth fields or known providers
-            let authUrl = oauthFields.auth_url;
-            let defaultScopes = '';
-
-            if (!authUrl) {
-                const oauthConfig = getOAuthConfig(integrationId) || getOAuthConfig(selectedIntegration);
-                authUrl = oauthConfig?.authUrl;
-                defaultScopes = oauthConfig?.scopes || '';
-            }
-
-            if (!authUrl) return null;
-
-            const params = new URLSearchParams({
-                client_id,
-                redirect_uri: redirectUri,
-                response_type: 'code',
-                state: btoa(JSON.stringify({
-                    integrationId,
-                    timestamp: Date.now(),
-                    apiKey: config.superglueApiKey,
-                    redirectUri,
-                })),
-            });
-
-            // Use explicitly set scopes or fall back to defaults
-            const finalScopes = scopes || defaultScopes;
-            if (finalScopes) {
-                params.append('scope', finalScopes);
-            }
-
-            // Add Google-specific parameters if it's a Google service
-            if (authUrl.includes('google.com')) {
-                params.append('access_type', 'offline');
-                params.append('prompt', 'consent');
-            }
-
-            return `${authUrl}?${params.toString()}`;
-        } catch {
-            return null;
-        }
-    };
-
     // Legacy function that uses the form's current ID (for backward compatibility)
     const buildOAuthUrl = () => {
         const integrationId = isEditing ? integration!.id : id.trim();
-        return buildOAuthUrlForIntegration(integrationId);
+        return buildOAuthUrlForIntegration(integrationId, oauthFields, selectedIntegration, config.superglueApiKey);
     };
 
     return (
