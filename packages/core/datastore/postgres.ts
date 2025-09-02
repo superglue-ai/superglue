@@ -681,6 +681,13 @@ export class PostgresService implements DataStore {
         if (!id) return false;
         const client = await this.pool.connect();
         try {
+            // Delete integration_details first due to foreign key constraint
+            await client.query(
+                'DELETE FROM integration_details WHERE integration_id = $1 AND org_id = $2',
+                [id, orgId || '']
+            );
+            
+            // Then delete the integration
             const result = await client.query(
                 'DELETE FROM integrations WHERE id = $1 AND org_id = $2',
                 [id, orgId || '']
