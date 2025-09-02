@@ -39,6 +39,7 @@ interface WorkflowStepGalleryProps {
     isExecuting?: boolean;
     isExecutingStep?: number;
     isExecutingTransform?: boolean;
+    currentExecutingStepIndex?: number;
     transformResult?: any;
     readOnly?: boolean;
     payload?: any;
@@ -1553,6 +1554,7 @@ export function WorkflowStepGallery({
     isExecuting,
     isExecutingStep,
     isExecutingTransform,
+    currentExecutingStepIndex,
     transformResult,
     readOnly = false,
     payload,
@@ -1818,7 +1820,7 @@ export function WorkflowStepGallery({
                                                                 isPayload={item.type === 'payload'}
                                                                 isTransform={item.type === 'transform'}
                                                                 isFinal={item.type === 'final'}
-                                                                isRunningAll={!!isExecuting}
+                                                                isRunningAll={isExecuting && currentExecutingStepIndex === (globalIdx - 1)}
                                                                 isTesting={
                                                                     item.type === 'step' ? isExecutingStep === (globalIdx - 1) :
                                                                         item.type === 'transform' ? isExecutingTransform :

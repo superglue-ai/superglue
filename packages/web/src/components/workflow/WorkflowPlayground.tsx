@@ -89,6 +89,7 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
   const [instructions, setInstructions] = useState<string>(initialInstruction || '');
   const [selfHealingEnabled, setSelfHealingEnabled] = useState(externalSelfHealingEnabled ?? true);
   const [isExecutingStep, setIsExecutingStep] = useState<number | undefined>(undefined);
+  const [currentExecutingStepIndex, setCurrentExecutingStepIndex] = useState<number | undefined>(undefined);
 
   // Handle external self-healing state changes
   useEffect(() => {
@@ -401,12 +402,19 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
       } as any;
 
       const payloadObj = JSON.parse(payload || '{}');
+      setCurrentExecutingStepIndex(0);
 
       const state = await executeWorkflowStepByStep(
         client,
         workflow,
         payloadObj,
         (i: number, res: StepExecutionResult) => {
+          if (i < workflow.steps.length - 1) {
+            setCurrentExecutingStepIndex(i + 1);
+          } else {
+            setCurrentExecutingStepIndex(workflow.steps.length);
+          }
+
           if (res.success) {
             setCompletedSteps(prev => Array.from(new Set([...prev, res.stepId])));
           } else {
@@ -472,6 +480,7 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
       });
     } finally {
       setLoading(false);
+      setCurrentExecutingStepIndex(undefined);
     }
   };
 
@@ -678,6 +687,7 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
                 isExecuting={loading}
                 isExecutingStep={isExecutingStep}
                 isExecutingTransform={isExecutingTransform as any}
+                currentExecutingStepIndex={currentExecutingStepIndex}
                 completedSteps={completedSteps}
                 failedSteps={failedSteps}
                 readOnly={readOnly}

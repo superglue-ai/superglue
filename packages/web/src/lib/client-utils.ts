@@ -37,23 +37,10 @@ export function createSingleStepWorkflow(
 
   const step = workflow.steps[stepIndex];
 
-  const accumulatedPayload = Object.keys(previousResults).reduce((acc, stepId) => {
-    return {
-      ...acc,
-      [`${stepId}`]: previousResults[stepId]
-    };
-  }, {});
-
   const singleStepWorkflow: any = {
     id: `${workflow.id}_step_${stepIndex}`,
     steps: [step],
-    finalTransform: '(sourceData) => sourceData',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        ...accumulatedPayload
-      }
-    }
+    finalTransform: '(sourceData) => sourceData'
   };
 
   return singleStepWorkflow;
