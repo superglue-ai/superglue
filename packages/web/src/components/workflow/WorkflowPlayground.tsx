@@ -2,32 +2,75 @@
 import { useConfig } from "@/src/app/config-context";
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import { executeSingleStep, executeWorkflowStepByStep, type StepExecutionResult } from "@/src/lib/client-utils";
-import { ExecutionStep, Integration, SelfHealingMode, SuperglueClient, WorkflowResult } from "@superglue/client";
+import { ExecutionStep, Integration, SelfHealingMode, SuperglueClient, Workflow, WorkflowResult } from "@superglue/client";
 import { X } from "lucide-react";
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
 import { useToast } from "../../hooks/use-toast";
 import { Button } from "../ui/button";
 import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
 import { WorkflowStepGallery } from "./WorkflowStepGallery";
 
-export default function WorkflowPlayground({ id }: { id?: string; }) {
+// Export the props interface for use in embedded mode
+export interface WorkflowPlaygroundProps {
+  id?: string;
+  embedded?: boolean;
+  initialWorkflow?: Workflow;
+  initialPayload?: string;
+  initialInstruction?: string;
+  integrations?: Integration[];
+  onSave?: (workflow: Workflow) => Promise<void>;
+  onExecute?: (workflow: Workflow, result: WorkflowResult) => void;
+  headerActions?: React.ReactNode;
+  hideHeader?: boolean;
+  readOnly?: boolean;
+  selfHealingEnabled?: boolean;
+  onSelfHealingChange?: (enabled: boolean) => void;
+}
+
+// Export handle interface for imperative control
+export interface WorkflowPlaygroundHandle {
+  executeWorkflow: () => Promise<void>;
+  saveWorkflow: () => Promise<void>;
+}
+
+const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygroundProps>(({
+  id,
+  embedded = false,
+  initialWorkflow,
+  initialPayload,
+  initialInstruction,
+  integrations: providedIntegrations,
+  onSave,
+  onExecute,
+  headerActions,
+  hideHeader = false,
+  readOnly = false,
+  selfHealingEnabled: externalSelfHealingEnabled,
+  onSelfHealingChange
+}, ref) => {
   const router = useRouter();
   const { toast } = useToast();
   const config = useConfig();
-  const [workflowId, setWorkflowId] = useState("");
-  const [steps, setSteps] = useState<any[]>([]);
+  const [workflowId, setWorkflowId] = useState(initialWorkflow?.id || "");
+  const [steps, setSteps] = useState<any[]>(initialWorkflow?.steps || []);
   // Track self-healed step configurations separately from the original steps
   const [selfHealedSteps, setSelfHealedSteps] = useState<any[]>([]);
-  const [finalTransform, setFinalTransform] = useState(`(sourceData) => {
+  const [finalTransform, setFinalTransform] = useState(initialWorkflow?.finalTransform || `(sourceData) => {
   return {
     result: sourceData
   }
 }`);
-  const [responseSchema, setResponseSchema] = useState<string>('');
-  const [inputSchema, setInputSchema] = useState<string | null>(`{"type": "object", "properties": {"payload": {"type": "object"}}}`);
-  const [payload, setPayload] = useState<string>('{}');
+  const [responseSchema, setResponseSchema] = useState<string>(
+    initialWorkflow?.responseSchema ? JSON.stringify(initialWorkflow.responseSchema, null, 2) : ''
+  );
+  const [inputSchema, setInputSchema] = useState<string | null>(
+    initialWorkflow?.inputSchema
+      ? JSON.stringify(initialWorkflow.inputSchema, null, 2)
+      : `{"type": "object", "properties": {"payload": {"type": "object"}}}`
+  );
+  const [payload, setPayload] = useState<string>(initialPayload || '{}');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<WorkflowResult | null>(null);
@@ -40,17 +83,35 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
   const [isExecutingTransform, setIsExecutingTransform] = useState<boolean>(false);
   const [finalPreviewResult, setFinalPreviewResult] = useState<any>(null);
 
-  const [integrations, setIntegrations] = useState<Integration[]>([]);
-  const [instructions, setInstructions] = useState<string>('');
-  const [selfHealingEnabled, setSelfHealingEnabled] = useState(true);
+  const [integrations, setIntegrations] = useState<Integration[]>(providedIntegrations || []);
+  const [instructions, setInstructions] = useState<string>(initialInstruction || '');
+  const [selfHealingEnabled, setSelfHealingEnabled] = useState(externalSelfHealingEnabled ?? true);
   const [isExecutingStep, setIsExecutingStep] = useState<number | undefined>(undefined);
+
+  // Handle external self-healing state changes
+  useEffect(() => {
+    if (externalSelfHealingEnabled !== undefined) {
+      setSelfHealingEnabled(externalSelfHealingEnabled);
+    }
+  }, [externalSelfHealingEnabled]);
+
+  const handleSelfHealingChange = (enabled: boolean) => {
+    setSelfHealingEnabled(enabled);
+    if (onSelfHealingChange) {
+      onSelfHealingChange(enabled);
+    }
+  };
+
+  // Expose imperative methods
+  useImperativeHandle(ref, () => ({
+    executeWorkflow,
+    saveWorkflow
+  }), []);
 
   const client = useMemo(() => new SuperglueClient({
     endpoint: config.superglueEndpoint,
     apiKey: config.superglueApiKey,
   }), [config.superglueEndpoint, config.superglueApiKey]);
-
-
 
   const generateDefaultFromSchema = (schema: any): any => {
     if (!schema || typeof schema !== 'object') return {};
@@ -83,6 +144,9 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
   };
 
   const loadIntegrations = async () => {
+    // Skip if integrations are provided externally (embedded mode)
+    if (providedIntegrations) return;
+
     try {
       setLoading(true);
       const result = await client.listIntegrations(100, 0);
@@ -130,7 +194,7 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
 
       toast({
         title: "Workflow loaded",
-        description: `Loaded \"${workflow.id}\" successfully`,
+        description: `Loaded "${workflow.id}" successfully`,
       });
     } catch (error: any) {
       console.error("Error loading workflow:", error);
@@ -170,15 +234,44 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
   };
 
   useEffect(() => {
-    // Load integrations on component mount
-    loadIntegrations();
-  }, []);
+    // Load integrations on component mount (only in non-embedded mode)
+    if (!embedded && !providedIntegrations) {
+      loadIntegrations();
+    }
+  }, [embedded, providedIntegrations]);
 
   useEffect(() => {
-    if (id) {
+    // Update integrations when provided externally (embedded mode)
+    if (providedIntegrations) {
+      setIntegrations(providedIntegrations);
+    }
+  }, [providedIntegrations]);
+
+  useEffect(() => {
+    // Update workflow when provided externally (embedded mode)
+    if (initialWorkflow) {
+      setWorkflowId(initialWorkflow.id || '');
+      setSteps(initialWorkflow.steps?.map(step => ({
+        ...step,
+        apiConfig: { ...step.apiConfig, id: step.apiConfig.id || step.id }
+      })) || []);
+      setFinalTransform(initialWorkflow.finalTransform || `(sourceData) => {
+  return {
+    result: sourceData
+  }
+}`);
+      setResponseSchema(initialWorkflow.responseSchema ? JSON.stringify(initialWorkflow.responseSchema, null, 2) : '');
+      setInputSchema(initialWorkflow.inputSchema ? JSON.stringify(initialWorkflow.inputSchema, null, 2) : `{"type": "object", "properties": {"payload": {"type": "object"}}}`);
+      setInstructions(initialWorkflow.instruction || '');
+    }
+  }, [initialWorkflow]);
+
+  useEffect(() => {
+    // In non-embedded mode, handle workflow loading by ID
+    if (!embedded && id) {
       loadWorkflow(id);
-    } else {
-      // Reset to a clean slate if id is removed or not provided
+    } else if (!embedded && !id && !initialWorkflow) {
+      // Reset to a clean slate if id is removed or not provided (non-embedded mode)
       setWorkflowId("");
       setSteps([]);
       setSelfHealedSteps([]);
@@ -196,15 +289,15 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
       setResult(null);
       setFinalPreviewResult(null);
     }
-  }, [id]);
+  }, [id, embedded, initialWorkflow]);
 
   // Effect to update payload when input schema changes (but not during workflow loading)
   useEffect(() => {
-    // Only run this if we're not in the middle of loading a workflow
-    if (!loading) {
+    // Only run this if we're not in the middle of loading a workflow and not in embedded mode with initial payload
+    if (!loading && !initialPayload) {
       constructFromInputSchema(inputSchema);
     }
-  }, [inputSchema]);
+  }, [inputSchema, loading, initialPayload]);
 
   const saveWorkflow = async () => {
     try {
@@ -223,10 +316,11 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
         setWorkflowId(`wf-${Date.now()}`);
       }
       setSaving(true);
+
       // Use self-healed steps if available and self-healing was enabled, otherwise use original steps
       const stepsToSave = (selfHealedSteps && selfHealedSteps.length > 0) ? selfHealedSteps : steps;
 
-      const input = {
+      const workflowToSave: Workflow = {
         id: workflowId,
         // Save the self-healed steps if they exist (from a successful run with self-healing enabled)
         steps: stepsToSave.map((step: ExecutionStep) => ({
@@ -242,22 +336,28 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
         inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
         finalTransform,
         instruction: instructions
-      };
+      } as any;
 
-      const savedWorkflow = await client.upsertWorkflow(workflowId, input);
+      // In embedded mode, use the provided onSave callback
+      if (embedded && onSave) {
+        await onSave(workflowToSave);
+      } else {
+        // In standalone mode, save to backend
+        const savedWorkflow = await client.upsertWorkflow(workflowId, workflowToSave as any);
 
-      if (!savedWorkflow) {
-        throw new Error("Failed to save workflow");
+        if (!savedWorkflow) {
+          throw new Error("Failed to save workflow");
+        }
+        setWorkflowId(savedWorkflow.id);
+
+        toast({
+          title: "Workflow saved",
+          description: `"${savedWorkflow.id}" saved successfully`,
+        });
+
+        router.push(`/workflows/${savedWorkflow.id}`);
       }
-      setWorkflowId(savedWorkflow.id);
-
-      toast({
-        title: "Workflow saved",
-        description: `"${savedWorkflow.id}" saved successfully`,
-      });
-
-      router.push(`/workflows/${savedWorkflow.id}`);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving workflow:", error);
       toast({
         title: "Error saving workflow",
@@ -319,11 +419,21 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
 
       const finalData = stepResults['__final_transform__']?.data;
       setFinalPreviewResult(finalData);
-      const wr: any = {
+      const wr: WorkflowResult = {
+        id: crypto.randomUUID(),
         success: state.failedSteps.length === 0,
         data: finalData,
         error: stepResults['__final_transform__']?.error,
-        stepResults,
+        startedAt: new Date(),
+        completedAt: new Date(),
+        stepResults: Object.entries(stepResults)
+          .filter(([key]) => key !== '__final_transform__')
+          .map(([stepId, result]) => ({
+            stepId,
+            success: result.success || !result.error,
+            data: result.data || result,
+            error: result.error
+          })),
         config: {
           id: workflowId,
           steps: state.currentWorkflow.steps,
@@ -331,6 +441,7 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
         } as any
       };
       setResult(wr);
+
       // Update finalTransform with the self-healed version if it was modified
       if (state.currentWorkflow.finalTransform) {
         setFinalTransform(state.currentWorkflow.finalTransform);
@@ -345,6 +456,11 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
 
       if (state.failedSteps.length === 0) {
         setNavigateToFinalSignal(Date.now());
+      }
+
+      // Call onExecute callback if provided (embedded mode)
+      if (embedded && onExecute) {
+        onExecute(state.currentWorkflow, wr);
       }
     } catch (error: any) {
       console.error("Error executing workflow:", error);
@@ -391,24 +507,178 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
     }
   };
 
-  // credentials helpers removed
+  const handleExecuteStep = async (idx: number) => {
+    try {
+      // mark testing state for indicator without freezing entire UI
+      setIsExecutingStep(idx);
+      const single = await executeSingleStep(
+        client,
+        {
+          id: workflowId,
+          steps
+        } as any,
+        idx,
+        JSON.parse(payload || '{}'),
+        stepResultsMap,  // Pass accumulated results
+        false
+      );
+      const sid = steps[idx].id;
+      if (single.success) {
+        setCompletedSteps(prev => Array.from(new Set([...prev.filter(id => id !== sid), sid])));
+        setFailedSteps(prev => prev.filter(id => id !== sid));
+        setStepResultsMap(prev => ({ ...prev, [sid]: single.data }));
+        // Trigger output panel display
+        setShowStepOutputSignal(Date.now());
+      } else {
+        setFailedSteps(prev => Array.from(new Set([...prev.filter(id => id !== sid), sid])));
+        setCompletedSteps(prev => prev.filter(id => id !== sid));
+        // Store error message in step results for display
+        setStepResultsMap(prev => ({
+          ...prev,
+          [sid]: single.error || 'Step execution failed'
+        }));
+      }
+    } finally {
+      setIsExecutingStep(undefined);
+    }
+  };
 
-  // credentials integration fetch removed
+  const handleExecuteTransform = async (schemaStr: string, transformStr: string) => {
+    try {
+      setIsExecutingTransform(true);
+
+      // Build the payload with all step results
+      // Extract just the data from each step result (not the full StepExecutionResult object)
+      const stepData: Record<string, any> = {};
+      Object.entries(stepResultsMap).forEach(([stepId, result]) => {
+        // Skip the __final_transform__ result and extract data from StepExecutionResult
+        if (stepId !== '__final_transform__') {
+          // If result has a 'data' property, use it; otherwise use the result directly
+          stepData[stepId] = result?.data !== undefined ? result.data : result;
+        }
+      });
+
+      const finalPayload = {
+        ...JSON.parse(payload || '{}'),
+        ...stepData
+      };
+
+      // Parse response schema if provided
+      // Use schemaStr if it's explicitly provided (even if empty string means disabled)
+      // Only fall back to parent schema if schemaStr is undefined
+      const parsedResponseSchema = schemaStr !== undefined
+        ? (schemaStr && schemaStr.trim() ? JSON.parse(schemaStr) : null)
+        : (responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null);
+
+      // Execute just the final transform (empty steps, only transform)
+      const result = await client.executeWorkflow({
+        workflow: {
+          id: workflowId,
+          steps: [],
+          finalTransform: transformStr || finalTransform,
+          // Only include responseSchema if it's actually defined
+          ...(parsedResponseSchema ? { responseSchema: parsedResponseSchema } : {}),
+          inputSchema: inputSchema ? JSON.parse(inputSchema) : { type: 'object' }
+        },
+        payload: finalPayload,
+        options: {
+          testMode: !!parsedResponseSchema, // Use test mode when response schema is defined
+          selfHealing: SelfHealingMode.DISABLED // No self-healing for test
+        }
+      });
+
+      if (result.success) {
+        setCompletedSteps(prev => Array.from(new Set([...prev.filter(id => id !== '__final_transform__'), '__final_transform__'])));
+        setFailedSteps(prev => prev.filter(id => id !== '__final_transform__'));
+        setStepResultsMap(prev => ({ ...prev, ['__final_transform__']: result.data }));
+        setFinalPreviewResult(result.data);
+        setNavigateToFinalSignal(Date.now());
+        toast({
+          title: "Transform executed successfully",
+          description: "Final transform completed",
+        });
+      } else {
+        setFailedSteps(prev => Array.from(new Set([...prev.filter(id => id !== '__final_transform__'), '__final_transform__'])));
+        setCompletedSteps(prev => prev.filter(id => id !== '__final_transform__'));
+        // Store error message for display
+        setStepResultsMap(prev => ({
+          ...prev,
+          ['__final_transform__']: result.error || 'Transform execution failed'
+        }));
+        toast({
+          title: "Transform execution failed",
+          description: result.error || "Failed to execute final transform",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      setFailedSteps(prev => Array.from(new Set([...prev.filter(id => id !== '__final_transform__'), '__final_transform__'])));
+      setCompletedSteps(prev => prev.filter(id => id !== '__final_transform__'));
+      setStepResultsMap(prev => ({
+        ...prev,
+        ['__final_transform__']: error.message || 'Transform execution failed'
+      }));
+      toast({
+        title: "Transform execution error",
+        description: error.message || "An unexpected error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExecutingTransform(false);
+    }
+  };
+
+  // Default header actions for standalone mode
+  const defaultHeaderActions = (
+    <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 mr-2">
+        <Label htmlFor="selfHealing-top" className="text-xs flex items-center gap-1">
+          <span>Self-healing</span>
+        </Label>
+        <div className="flex items-center">
+          <Switch className="custom-switch" id="selfHealing-top" checked={selfHealingEnabled} onCheckedChange={handleSelfHealingChange} />
+          <div className="ml-1 flex items-center">
+            <HelpTooltip text="Enable self-healing during execution. Slower, but can auto-fix failures in workflow steps and transformation code." />
+          </div>
+        </div>
+      </div>
+      <Button
+        variant="success"
+        onClick={executeWorkflow}
+        disabled={loading || saving || (isExecutingStep !== undefined) || isExecutingTransform}
+        className="h-9 px-4"
+      >
+        {loading ? "Running Workflow..." : "Run Workflow"}
+      </Button>
+      <Button
+        variant="default"
+        onClick={saveWorkflow}
+        disabled={saving || loading}
+        className="h-9 px-5 shadow-md border border-primary/40"
+      >
+        {saving ? "Saving Workflow..." : "Save Workflow"}
+      </Button>
+    </div>
+  );
 
   return (
-    <div className="p-6 max-w-none w-full">
-      <div className="flex justify-end items-center mb-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="shrink-0"
-          onClick={() => router.push('/configs')}
-          aria-label="Close"
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
-      <h1 className="text-2xl font-bold mb-3 flex-shrink-0">Workflows</h1>
+    <div className={embedded ? "w-full" : "p-6 max-w-none w-full"}>
+      {!embedded && !hideHeader && (
+        <>
+          <div className="flex justify-end items-center mb-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="shrink-0"
+              onClick={() => router.push('/configs')}
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          <h1 className="text-2xl font-bold mb-3 flex-shrink-0">Workflows</h1>
+        </>
+      )}
 
       <div className="w-full">
         {/* Workflow Configuration */}
@@ -416,7 +686,7 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
           {/* Steps and Schema Editors */}
           <div className="space-y-4">
             {/* Workflow Steps - response schema now integrated in final transform */}
-            <div className="mb-4">
+            <div className={embedded ? "" : "mb-4"}>
               <WorkflowStepGallery
                 steps={steps}
                 stepResults={stepResultsMap}
@@ -428,136 +698,20 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
                 instruction={instructions}
                 onStepsChange={handleStepsChange}
                 onStepEdit={handleStepEdit}
-                onExecuteStep={async (idx) => {
-                  try {
-                    // mark testing state for indicator without freezing entire UI
-                    setIsExecutingStep(idx);
-                    const single = await executeSingleStep(
-                      client,
-                      {
-                        id: workflowId,
-                        steps
-                      } as any,
-                      idx,
-                      JSON.parse(payload || '{}'),
-                      stepResultsMap,  // Pass accumulated results
-                      false
-                    );
-                    const sid = steps[idx].id;
-                    if (single.success) {
-                      setCompletedSteps(prev => Array.from(new Set([...prev.filter(id => id !== sid), sid])));
-                      setFailedSteps(prev => prev.filter(id => id !== sid));
-                      setStepResultsMap(prev => ({ ...prev, [sid]: single.data }));
-                      // Trigger output panel display
-                      setShowStepOutputSignal(Date.now());
-                    } else {
-                      setFailedSteps(prev => Array.from(new Set([...prev.filter(id => id !== sid), sid])));
-                      setCompletedSteps(prev => prev.filter(id => id !== sid));
-                      // Store error message in step results for display
-                      setStepResultsMap(prev => ({
-                        ...prev,
-                        [sid]: single.error || 'Step execution failed'
-                      }));
-                    }
-                  } finally {
-                    setIsExecutingStep(undefined);
-                  }
-                }}
-                onExecuteTransform={async (schemaStr, transformStr) => {
-                  try {
-                    setIsExecutingTransform(true);
-
-                    // Build the payload with all step results
-                    // Extract just the data from each step result (not the full StepExecutionResult object)
-                    const stepData: Record<string, any> = {};
-                    Object.entries(stepResultsMap).forEach(([stepId, result]) => {
-                      // Skip the __final_transform__ result and extract data from StepExecutionResult
-                      if (stepId !== '__final_transform__') {
-                        // If result has a 'data' property, use it; otherwise use the result directly
-                        stepData[stepId] = result?.data !== undefined ? result.data : result;
-                      }
-                    });
-
-                    const finalPayload = {
-                      ...JSON.parse(payload || '{}'),
-                      ...stepData
-                    };
-
-                    // Parse response schema if provided
-                    // Use schemaStr if it's explicitly provided (even if empty string means disabled)
-                    // Only fall back to parent schema if schemaStr is undefined
-                    const parsedResponseSchema = schemaStr !== undefined
-                      ? (schemaStr && schemaStr.trim() ? JSON.parse(schemaStr) : null)
-                      : (responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null);
-
-                    // Execute just the final transform (empty steps, only transform)
-                    const result = await client.executeWorkflow({
-                      workflow: {
-                        id: workflowId,
-                        steps: [],
-                        finalTransform: transformStr || finalTransform,
-                        // Only include responseSchema if it's actually defined
-                        ...(parsedResponseSchema ? { responseSchema: parsedResponseSchema } : {}),
-                        inputSchema: inputSchema ? JSON.parse(inputSchema) : { type: 'object' }
-                      },
-                      payload: finalPayload,
-                      options: {
-                        testMode: !!parsedResponseSchema, // Use test mode when response schema is defined
-                        selfHealing: SelfHealingMode.DISABLED // No self-healing for test
-                      }
-                    });
-
-                    if (result.success) {
-                      setCompletedSteps(prev => Array.from(new Set([...prev.filter(id => id !== '__final_transform__'), '__final_transform__'])));
-                      setFailedSteps(prev => prev.filter(id => id !== '__final_transform__'));
-                      setStepResultsMap(prev => ({ ...prev, ['__final_transform__']: result.data }));
-                      setFinalPreviewResult(result.data);
-                      setNavigateToFinalSignal(Date.now());
-                      toast({
-                        title: "Transform executed successfully",
-                        description: "Final transform completed",
-                      });
-                    } else {
-                      setFailedSteps(prev => Array.from(new Set([...prev.filter(id => id !== '__final_transform__'), '__final_transform__'])));
-                      setCompletedSteps(prev => prev.filter(id => id !== '__final_transform__'));
-                      // Store error message for display
-                      setStepResultsMap(prev => ({
-                        ...prev,
-                        ['__final_transform__']: result.error || 'Transform execution failed'
-                      }));
-                      toast({
-                        title: "Transform execution failed",
-                        description: result.error || "Failed to execute final transform",
-                        variant: "destructive",
-                      });
-                    }
-                  } catch (error: any) {
-                    setFailedSteps(prev => Array.from(new Set([...prev.filter(id => id !== '__final_transform__'), '__final_transform__'])));
-                    setCompletedSteps(prev => prev.filter(id => id !== '__final_transform__'));
-                    setStepResultsMap(prev => ({
-                      ...prev,
-                      ['__final_transform__']: error.message || 'Transform execution failed'
-                    }));
-                    toast({
-                      title: "Transform execution error",
-                      description: error.message || "An unexpected error occurred",
-                      variant: "destructive",
-                    });
-                  } finally {
-                    setIsExecutingTransform(false);
-                  }
-                }}
+                onExecuteStep={handleExecuteStep}
+                onExecuteTransform={handleExecuteTransform}
                 onFinalTransformChange={setFinalTransform}
                 onResponseSchemaChange={setResponseSchema}
                 onPayloadChange={setPayload}
                 onWorkflowIdChange={setWorkflowId}
+                onInstructionEdit={embedded ? undefined : () => { }} // Disable instruction editing in embedded mode
                 integrations={integrations}
                 isExecuting={loading}
                 isExecutingStep={isExecutingStep}
                 isExecutingTransform={isExecutingTransform as any}
                 completedSteps={completedSteps}
                 failedSteps={failedSteps}
-                readOnly={false}
+                readOnly={readOnly}
                 inputSchema={inputSchema}
                 onInputSchemaChange={setInputSchema}
                 payload={(() => {
@@ -567,45 +721,18 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
                     return {};
                   }
                 })()}
-                headerActions={(
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-2 mr-2">
-                      <Label htmlFor="selfHealing-top" className="text-xs flex items-center gap-1">
-                        <span>Self-healing</span>
-                      </Label>
-                      <div className="flex items-center">
-                        <Switch className="custom-switch" id="selfHealing-top" checked={selfHealingEnabled} onCheckedChange={setSelfHealingEnabled} />
-                        <div className="ml-1 flex items-center">
-                          <HelpTooltip text="Enable self-healing during execution. Slower, but can auto-fix failures in workflow steps and transformation code." />
-                        </div>
-                      </div>
-                    </div>
-                    <Button
-                      variant="success"
-                      onClick={executeWorkflow}
-                      disabled={loading || saving || (isExecutingStep !== undefined) || isExecutingTransform}
-                      className="h-9 px-4"
-                    >
-                      {loading ? "Running Workflow..." : "Run Workflow"}
-                    </Button>
-                    <Button
-                      variant="default"
-                      onClick={saveWorkflow}
-                      disabled={saving || loading}
-                      className="h-9 px-5 shadow-md border border-primary/40"
-                    >
-                      {saving ? "Saving Workflow..." : "Save Workflow"}
-                    </Button>
-                  </div>
-                )}
+                headerActions={headerActions || (!embedded ? defaultHeaderActions : undefined)}
                 navigateToFinalSignal={navigateToFinalSignal}
                 showStepOutputSignal={showStepOutputSignal}
               />
             </div>
-
           </div>
         </div>
       </div>
     </div>
   );
-}
+});
+
+WorkflowPlayground.displayName = 'WorkflowPlayground';
+
+export default WorkflowPlayground;
