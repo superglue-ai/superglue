@@ -133,7 +133,7 @@ export class WorkflowExecutor implements Workflow {
             }
           }
 
-          this.result.data = finalResult.data as Record<string, unknown> || {};
+          this.result.data = finalResult.data || {};
           this.result.config = {
             id: this.id,
             steps: this.steps,
@@ -163,7 +163,7 @@ export class WorkflowExecutor implements Workflow {
           if (!newTransformConfig) {
             throw new Error("Failed to generate new final transform");
           }
-          this.result.data = newTransformConfig.data as Record<string, unknown> || {};
+          this.result.data = newTransformConfig.data || {};
           this.result.config = {
             id: this.id,
             steps: this.steps,

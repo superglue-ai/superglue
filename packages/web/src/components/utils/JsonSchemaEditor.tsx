@@ -63,7 +63,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
 }) => {
   const [isCodeMode, setIsCodeMode] = React.useState(false);
   const [jsonError, setJsonError] = React.useState<string | null>(null);
-  const [localIsEnabled, setLocalIsEnabled] = React.useState<boolean>(!isOptional || value !== null);
+  const [localIsEnabled, setLocalIsEnabled] = React.useState<boolean>(!isOptional || (value !== null && value !== undefined));
 
   // Initialize from localStorage on mount
   React.useEffect(() => {
@@ -83,7 +83,9 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
   React.useEffect(() => {
     // Sync localIsEnabled with value prop if isOptional is true
     if (isOptional) {
-      setLocalIsEnabled(value !== null);
+      // Only consider it disabled if value is explicitly null
+      // Empty string '' means enabled but with empty content
+      setLocalIsEnabled(value !== null && value !== undefined);
     } else {
       setLocalIsEnabled(true); // Always enabled if not optional
     }
@@ -612,9 +614,12 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
                 <Editor
                   value={value || ""} // Editor expects string, use "" if value is null but enabled (e.g. just re-enabled)
                   onValueChange={(code) => {
-                    onChange(code); // Pass code directly
+                    // Always pass the code as-is when in code mode
+                    // The user is actively editing, don't interpret empty as disabled
+                    onChange(code);
                     try {
-                      JSON.parse(code);
+                      // For validation, treat empty as {}
+                      JSON.parse(code || '{}');
                       setJsonError(null);
                     } catch (e) {
                       setJsonError((e as Error).message);

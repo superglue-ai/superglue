@@ -71,7 +71,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const [instruction, setInstruction] = useState('');
   const [payload, setPayload] = useState('{}');
   const [currentWorkflow, setCurrentWorkflow] = useState<Workflow | null>(null); // To store result from buildWorkflow
-  const [schema, setSchema] = useState<string>('{}');
+  const [schema, setSchema] = useState<string>('');
 
 
   const [isExecuting, setIsExecuting] = useState(false);
@@ -147,6 +147,13 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       setStepExecutionResults({});
       setIsExecutingStep(undefined);
       setIsExecutingTransform(false);
+    }
+
+    // If we're on the prompt step, reset all review-driven UI state
+    if (step === 'prompt') {
+      setCurrentWorkflow(null);
+      setLocalWorkflowId('');
+      setSchema('');
     }
 
     // Clear validation errors when leaving prompt step
@@ -261,8 +268,12 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     if (!currentWorkflow) return;
     try {
       setIsSaving(true);
-      // Use the local workflow ID for saving
-      const workflowToSave = { ...currentWorkflow, id: localWorkflowId || currentWorkflow.id };
+      const workflowToSave = {
+        ...currentWorkflow,
+        id: localWorkflowId || currentWorkflow.id,
+        // Only save responseSchema if it's explicitly enabled (non-empty string)
+        responseSchema: schema && schema.trim() ? JSON.parse(schema) : null
+      };
       const saved = await client.upsertWorkflow(workflowToSave.id, workflowToSave as any);
       if (!saved) throw new Error('Failed to save workflow');
       toast({ title: 'Workflow saved', description: `"${saved.id}" saved successfully` });
@@ -326,7 +337,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
           instruction: instruction,
           payload: parsedPayload,
           integrationIds: selectedIntegrationIds,
-          responseSchema: schema,
+          responseSchema: schema || undefined,
           save: false
         });
         if (!response) {
@@ -363,7 +374,8 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
           integrationIds: selectedIntegrationIds,
           inputSchema: currentWorkflow.inputSchema,
           finalTransform: currentWorkflow.finalTransform,
-          responseSchema: JSON.parse(schema),
+          // Only save responseSchema if it's explicitly enabled (non-empty string)
+          responseSchema: schema && schema.trim() ? JSON.parse(schema) : null,
           instruction: instruction
         };
         const response = await client.upsertWorkflow(currentWorkflow.id, workflowInput);
@@ -487,7 +499,9 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
           id: currentWorkflow.id,
           steps: currentWorkflow.steps,
           integrationIds: selectedIntegrationIds,
-          responseSchema: JSON.parse(schema),
+          // Only pass responseSchema if it's explicitly enabled (non-empty string)
+          // Empty string means disabled, so pass null
+          responseSchema: schema && schema.trim() ? JSON.parse(schema) : null,
           finalTransform: currentWorkflow.finalTransform,
           inputSchema: currentWorkflow.inputSchema,
           instruction: currentWorkflow.instruction
@@ -552,24 +566,23 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
 
       setExecutionResult(result);
       setCurrentWorkflow(state.currentWorkflow);
+      // Also update responseSchema if it was part of the workflow
+      if (state.currentWorkflow.responseSchema !== undefined) {
+        setSchema(state.currentWorkflow.responseSchema ? JSON.stringify(state.currentWorkflow.responseSchema, null, 2) : '');
+      }
       setFinalResult(result.data);
+
+      // Set the completed and failed steps from the state (now includes __final_transform__)
+      setCompletedSteps(state.completedSteps);
+      setFailedSteps(state.failedSteps);
+
       const ft = state.stepResults['__final_transform__'];
       if (ft) {
         if (ft.success) {
-          setCompletedSteps(prev => Array.from(new Set([...
-            prev.filter(id => id !== '__final_transform__'),
-            '__final_transform__'
-          ])));
-          setFailedSteps(prev => prev.filter(id => id !== '__final_transform__'));
           setTransformResult(ft.data);
           // Navigate to final results mini-card
           setNavigateToFinalSignal(Date.now());
         } else {
-          setFailedSteps(prev => Array.from(new Set([...
-            (prev as any).filter((id: string) => id !== '__final_transform__'),
-            '__final_transform__'
-          ])) as any);
-          setCompletedSteps(prev => prev.filter(id => id !== '__final_transform__'));
           setTransformResult(null);
         }
       } else if (state.failedSteps.length === 0) {
@@ -597,13 +610,13 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
 
     try {
       const workflowToExecute = {
-        ...currentWorkflow,
-        steps: [...currentWorkflow.steps]
+        id: currentWorkflow.id,
+        steps: [...currentWorkflow.steps],
       };
 
       const result = await executeSingleStep(
         client,
-        workflowToExecute,
+        workflowToExecute as any,
         stepIndex,
         JSON.parse(payload || '{}'),
         stepExecutionResults,
@@ -633,7 +646,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
           }));
         }
 
-        // Update execution result to reflect the new step results
         setExecutionResult(prev => ({
           ...prev!,
           stepResults: [
@@ -1111,12 +1123,13 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                     stepResults={stepExecutionResults}
                     finalTransform={currentWorkflow.finalTransform}
                     finalResult={executionResult?.data}
+                    transformResult={transformResult}
                     responseSchema={schema}
                     instruction={instruction}
                     onStepsChange={handleStepsChange}
                     onStepEdit={handleStepEdit}
                     onExecuteStep={(idx) => handleExecuteSingleStep(idx)}
-                    onExecuteTransform={async () => {
+                    onExecuteTransform={async (schemaStr, transformStr) => {
                       // execute only final transform against current accumulated results
                       try {
                         setIsExecutingTransform(true as any);
@@ -1125,19 +1138,23 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                           ...JSON.parse(payload || '{}'),
                           ...stepExecutionResults
                         };
+                        const parsedResponseSchema = schemaStr !== undefined
+                          ? (schemaStr && schemaStr.trim() ? JSON.parse(schemaStr) : null)
+                          : (schema && schema.trim() ? JSON.parse(schema) : null);
 
                         // Execute just the final transform (empty steps, only transform)
                         const result = await client.executeWorkflow({
                           workflow: {
                             id: currentWorkflow.id,
                             steps: [],
-                            finalTransform: currentWorkflow.finalTransform,
-                            responseSchema: JSON.parse(schema),
+                            finalTransform: transformStr || currentWorkflow.finalTransform,
+                            // Only include responseSchema if it's actually defined
+                            ...(parsedResponseSchema ? { responseSchema: parsedResponseSchema } : {}),
                             inputSchema: currentWorkflow.inputSchema
                           },
                           payload: finalPayload,
                           options: {
-                            testMode: false,
+                            testMode: !!parsedResponseSchema, // Use test mode when response schema is defined
                             selfHealing: SelfHealingMode.DISABLED // No self-healing for test
                           }
                         });
@@ -1148,7 +1165,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                             '__final_transform__'
                           ])));
                           setFailedSteps(prev => prev.filter(id => id !== '__final_transform__'));
-                          setFinalResult(result.data);
+                          setTransformResult(result.data);  // Set transform result for display
                           setStepExecutionResults(prev => ({ ...prev, '__final_transform__': result.data }));
                           // Navigate to final results
                           setNavigateToFinalSignal(Date.now());

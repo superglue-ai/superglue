@@ -31,7 +31,7 @@ interface WorkflowStepGalleryProps {
     onInstructionEdit?: () => void;
     onExecuteStep?: (stepIndex: number) => Promise<void>;
     onExecuteAllSteps?: () => Promise<void>;
-    onExecuteTransform?: () => Promise<void>;
+    onExecuteTransform?: (schema: string, transform: string) => Promise<void>;
     completedSteps?: string[];
     failedSteps?: string[];
     integrations?: Integration[];
@@ -104,26 +104,90 @@ const inferSchema = (data: any): any => {
 };
 
 // Size-based truncation for display 
-const MAX_DISPLAY_SIZE = 500 * 1024;
+const MAX_DISPLAY_SIZE = 1000 * 1024;
 const MAX_DISPLAY_LINES = 5000;
+const MAX_STRING_PREVIEW_LENGTH = 500;
+
+// Special truncation that preserves object structure
+const truncateValue = (value: any, depth: number = 0): any => {
+    if (depth > 3) return '...';
+
+    if (typeof value === 'string') {
+        if (value.length > MAX_STRING_PREVIEW_LENGTH) {
+            return value.substring(0, MAX_STRING_PREVIEW_LENGTH) + `... [${value.length.toLocaleString()} chars total]`;
+        }
+        return value;
+    }
+
+    if (Array.isArray(value)) {
+        if (value.length > 10) {
+            return [...value.slice(0, 10).map(v => truncateValue(v, depth + 1)), `... ${value.length - 10} more items`];
+        }
+        return value.map(v => truncateValue(v, depth + 1));
+    }
+
+    if (typeof value === 'object' && value !== null) {
+        const result: any = {};
+        const keys = Object.keys(value);
+        const keysToShow = keys.slice(0, 20);
+
+        for (const key of keysToShow) {
+            result[key] = truncateValue(value[key], depth + 1);
+        }
+
+        if (keys.length > 20) {
+            result['...'] = `${keys.length - 20} more keys`;
+        }
+
+        return result;
+    }
+
+    return value;
+};
 
 const truncateForDisplay = (data: any): { value: string, truncated: boolean } => {
     if (data === null || data === undefined) {
         return { value: '{}', truncated: false };
     }
 
-    try {
-        const fullJson = JSON.stringify(data, null, 2);
-
-        // Check if data is too large
-        if (fullJson.length > MAX_DISPLAY_SIZE) {
-            // Try to show a reasonable portion
-            const truncatedString = fullJson.substring(0, MAX_DISPLAY_SIZE);
-            // Find the last complete line
+    if (typeof data === 'string') {
+        if (data.length > MAX_STRING_PREVIEW_LENGTH) {
+            const truncatedString = data.substring(0, MAX_STRING_PREVIEW_LENGTH);
             const lastNewline = truncatedString.lastIndexOf('\n');
-            const cleanTruncated = truncatedString.substring(0, lastNewline > 0 ? lastNewline : MAX_DISPLAY_SIZE);
+            const cleanTruncated = truncatedString.substring(0, lastNewline > 0 ? lastNewline : MAX_STRING_PREVIEW_LENGTH);
             return {
-                value: cleanTruncated + '\n\n... [Data truncated for display - too large]',
+                value: `"${cleanTruncated}"\n\n... [String truncated - showing ${MAX_STRING_PREVIEW_LENGTH.toLocaleString()} of ${data.length.toLocaleString()} characters]`,
+                truncated: true
+            };
+        }
+        return { value: `"${data}"`, truncated: false };
+    }
+
+    try {
+        // For objects, first try to show the structure with truncated values
+        const truncatedData = truncateValue(data);
+        const fullJson = JSON.stringify(truncatedData, null, 2);
+
+        // Check if even the truncated version is too large
+        if (fullJson.length > MAX_DISPLAY_SIZE) {
+            // Fall back to showing just the top-level keys
+            const keys = Object.keys(data);
+            const preview: any = {};
+            for (const key of keys.slice(0, 3)) {
+                const val = data[key];
+                if (typeof val === 'string') {
+                    preview[key] = val.length > 100 ? val.substring(0, 100) + '...' : val;
+                } else if (typeof val === 'object') {
+                    preview[key] = Array.isArray(val) ? `[Array with ${val.length} items]` : '{...}';
+                } else {
+                    preview[key] = val;
+                }
+            }
+            if (keys.length > 10) {
+                preview['...'] = `${keys.length - 10} more keys`;
+            }
+            return {
+                value: JSON.stringify(preview, null, 2) + '\n\n... [Data structure truncated for display]',
                 truncated: true
             };
         }
@@ -132,15 +196,26 @@ const truncateForDisplay = (data: any): { value: string, truncated: boolean } =>
         const lines = fullJson.split('\n');
         if (lines.length > MAX_DISPLAY_LINES) {
             return {
-                value: lines.slice(0, MAX_DISPLAY_LINES).join('\n') + '\n\n... [Data truncated - too many lines]',
+                value: lines.slice(0, MAX_DISPLAY_LINES).join('\n') + '\n\n... [Truncated - too many lines]',
                 truncated: true
             };
         }
 
-        return { value: fullJson, truncated: false };
+        // Check if we truncated anything
+        const originalJson = JSON.stringify(data, null, 2);
+        const wasTruncated = originalJson !== fullJson;
+
+        return { value: fullJson, truncated: wasTruncated };
     } catch (e) {
         // Fallback for circular references or other issues
-        return { value: String(data), truncated: false };
+        const stringValue = String(data);
+        if (stringValue.length > MAX_STRING_PREVIEW_LENGTH) {
+            return {
+                value: stringValue.substring(0, MAX_STRING_PREVIEW_LENGTH) + '... [Truncated]',
+                truncated: true
+            };
+        }
+        return { value: stringValue, truncated: false };
     }
 };
 
@@ -345,7 +420,21 @@ const FinalResultsCard = ({ result }: { result: any }) => {
                     </div>
                     <div className="flex items-center gap-2">
                         <span className="text-xs text-muted-foreground">{bytes.toLocaleString()} bytes</span>
-
+                        {!isPending && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2 text-xs"
+                                onClick={handleCopy}
+                                title="Copy full result data"
+                            >
+                                {copied ? (
+                                    <><Check className="h-3 w-3 mr-1" /> Copied!</>
+                                ) : (
+                                    <><Copy className="h-3 w-3 mr-1" /> Copy Full Data</>
+                                )}
+                            </Button>
+                        )}
                     </div>
                 </div>
                 <div className="relative">
@@ -691,7 +780,7 @@ const FinalTransformCard = ({
     onTransformChange?: (value: string) => void;
     onResponseSchemaChange?: (value: string) => void;
     readOnly?: boolean;
-    onExecuteTransform?: () => void;
+    onExecuteTransform?: (schema: string, transform: string) => void;
     isExecutingTransform?: boolean;
     canExecute?: boolean;
     transformResult?: any;
@@ -699,7 +788,7 @@ const FinalTransformCard = ({
 }) => {
     const [activeTab, setActiveTab] = useState('transform');
     const [localTransform, setLocalTransform] = useState(transform || '');
-    const [localSchema, setLocalSchema] = useState(responseSchema || '{"type": "object"}');
+    const [localSchema, setLocalSchema] = useState(responseSchema || '');
     const [inputViewMode, setInputViewMode] = useState<'preview' | 'schema'>('preview');
 
     useEffect(() => {
@@ -707,28 +796,44 @@ const FinalTransformCard = ({
     }, [transform]);
 
     useEffect(() => {
-        setLocalSchema(responseSchema || '{"type": "object"}');
+        setLocalSchema(responseSchema || '');
     }, [responseSchema]);
+
+    // Update parent state when switching tabs (acts like blur)
+    useEffect(() => {
+        const handleTabChange = () => {
+            if (onTransformChange && localTransform !== transform) {
+                onTransformChange(localTransform);
+            }
+            if (onResponseSchemaChange && localSchema !== responseSchema) {
+                onResponseSchemaChange(localSchema);
+            }
+        };
+
+        handleTabChange();
+    }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleTransformChange = (value: string) => {
         setLocalTransform(value);
-        if (onTransformChange) {
-            onTransformChange(value);
-        }
     };
 
     const handleSchemaChange = (value: string | null) => {
         if (value === null) {
-            // Schema editor is disabled
-            setLocalSchema('{"type": "object"}');
-            if (onResponseSchemaChange) {
-                onResponseSchemaChange('{"type": "object"}');
-            }
+            setLocalSchema('');
         } else {
             setLocalSchema(value);
-            if (onResponseSchemaChange) {
-                onResponseSchemaChange(value);
-            }
+        }
+    };
+
+    const handleExecuteTransform = () => {
+        if (onTransformChange) {
+            onTransformChange(localTransform);
+        }
+        if (onResponseSchemaChange) {
+            onResponseSchemaChange(localSchema);
+        }
+        if (onExecuteTransform) {
+            onExecuteTransform(localSchema, localTransform);
         }
     };
 
@@ -749,7 +854,7 @@ const FinalTransformCard = ({
                         <Button
                             variant="success"
                             size="sm"
-                            onClick={onExecuteTransform}
+                            onClick={handleExecuteTransform}
                             disabled={!canExecute || isExecutingTransform}
                             title={!canExecute ? "Execute all steps first" : isExecutingTransform ? "Transform is executing..." : "Test final transform"}
                         >
@@ -835,7 +940,7 @@ const FinalTransformCard = ({
                     <TabsContent value="schema" className="mt-2">
                         <div className="space-y-3">
                             <JsonSchemaEditor
-                                value={localSchema === '{"type": "object"}' ? null : localSchema}
+                                value={localSchema}
                                 onChange={handleSchemaChange}
                                 isOptional={true}
                             />
@@ -984,11 +1089,7 @@ const SpotlightStepCard = ({
                                                             <TabsTrigger value="schema" className="h-5 px-2 text-[11px] rounded-md data-[state=active]:rounded-md">Schema</TabsTrigger>
                                                         </TabsList>
                                                     </Tabs>
-                                                    <CopyButton getData={() =>
-                                                        inputViewMode === 'schema'
-                                                            ? inferSchema(evolvingPayload || {})
-                                                            : evolvingPayload
-                                                    } />
+                                                    <CopyButton text={inputString} />
                                                 </div>
                                             }
                                         />
@@ -1083,11 +1184,7 @@ const SpotlightStepCard = ({
                                                                     </TabsList>
                                                                 </Tabs>
                                                             )}
-                                                            <CopyButton getData={() =>
-                                                                outputViewMode === 'schema'
-                                                                    ? inferSchema(stepResult || {})
-                                                                    : stepResult
-                                                            } />
+                                                            <CopyButton text={outputString} />
                                                         </div>
                                                     }
                                                 />

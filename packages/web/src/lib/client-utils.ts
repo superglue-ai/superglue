@@ -36,8 +36,7 @@ export function createSingleStepWorkflow(
     };
   }, {});
 
-  return {
-    ...workflow,
+  const singleStepWorkflow: any = {
     id: `${workflow.id}_step_${stepIndex}`,
     steps: [step],
     finalTransform: '(sourceData) => sourceData',
@@ -48,6 +47,8 @@ export function createSingleStepWorkflow(
       }
     }
   };
+
+  return singleStepWorkflow;
 }
 
 export async function executeSingleStep(
@@ -179,11 +180,12 @@ export async function executeWorkflowStepByStep(
         workflow: {
           ...state.currentWorkflow,
           steps: [],
-          finalTransform: workflow.finalTransform
+          finalTransform: workflow.finalTransform,
+          responseSchema: workflow.responseSchema
         },
         payload: finalPayload,
         options: {
-          testMode: false,
+          testMode: !!workflow.responseSchema,
           selfHealing: selfHealing ? SelfHealingMode.ENABLED : SelfHealingMode.DISABLED
         }
       });
@@ -194,12 +196,20 @@ export async function executeWorkflowStepByStep(
         data: finalResult.data,
         error: finalResult.error
       };
+
+      // Update the completed/failed steps to include final transform
+      if (finalResult.success) {
+        state.completedSteps.push('__final_transform__');
+      } else {
+        state.failedSteps.push('__final_transform__');
+      }
     } catch (error: any) {
       state.stepResults['__final_transform__'] = {
         stepId: '__final_transform__',
         success: false,
         error: error.message
       };
+      state.failedSteps.push('__final_transform__');
     }
   }
 

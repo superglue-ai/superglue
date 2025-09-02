@@ -18,12 +18,14 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
   const config = useConfig();
   const [workflowId, setWorkflowId] = useState("");
   const [steps, setSteps] = useState<any[]>([]);
+  // Track self-healed step configurations separately from the original steps
+  const [selfHealedSteps, setSelfHealedSteps] = useState<any[]>([]);
   const [finalTransform, setFinalTransform] = useState(`(sourceData) => {
   return {
     result: sourceData
   }
 }`);
-  const [responseSchema, setResponseSchema] = useState<string | null>(`{"type": "object", "properties": {"result": {"type": "object"}}}`);
+  const [responseSchema, setResponseSchema] = useState<string>('');
   const [inputSchema, setInputSchema] = useState<string | null>(`{"type": "object", "properties": {"payload": {"type": "object"}}}`);
   const [payload, setPayload] = useState<string>('{}');
   const [loading, setLoading] = useState(false);
@@ -109,6 +111,7 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
       }
       setWorkflowId(workflow.id || '');
       setSteps(workflow?.steps?.map(step => ({ ...step, apiConfig: { ...step.apiConfig, id: step.apiConfig.id || step.id } })) || []);
+      setSelfHealedSteps([]); // Reset self-healed steps when loading a workflow
       setFinalTransform(workflow.finalTransform || `(sourceData) => {
         return {
           result: sourceData
@@ -116,7 +119,7 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
       }`);
 
       setInstructions(workflow.instruction || '');
-      setResponseSchema(workflow.responseSchema ? JSON.stringify(workflow.responseSchema, null, 2) : null);
+      setResponseSchema(workflow.responseSchema ? JSON.stringify(workflow.responseSchema, null, 2) : '');
 
       const inputSchemaStr = workflow.inputSchema
         ? JSON.stringify(workflow.inputSchema, null, 2)
@@ -141,7 +144,6 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
     }
   };
 
-  // Updated function that takes integration credentials as parameter
   const constructFromInputSchemaWithCreds = (schema: string | null, _integCreds: Record<string, string>) => {
     if (!schema) return;
 
@@ -179,13 +181,14 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
       // Reset to a clean slate if id is removed or not provided
       setWorkflowId("");
       setSteps([]);
+      setSelfHealedSteps([]);
       setInstructions("");
       setFinalTransform(`(sourceData) => {
   return {
     result: sourceData
   }
 }`);
-      setResponseSchema('{"type": "object", "properties": {"result": {"type": "object"}}}');
+      setResponseSchema('');
       const defaultInputSchema = '{"type": "object", "properties": {"payload": {"type": "object"}}}';
       setInputSchema(defaultInputSchema);
       // Construct default credentials and payload from default schema
@@ -222,6 +225,7 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
       setSaving(true);
       const input = {
         id: workflowId,
+        // Always save the original user-defined steps, not the self-healed versions
         steps: steps.map((step: ExecutionStep) => ({
           ...step,
           apiConfig: {
@@ -230,7 +234,8 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
             pagination: step.apiConfig.pagination || null
           }
         })),
-        responseSchema: responseSchema ? JSON.parse(responseSchema) : null,
+        // Only save responseSchema if it's explicitly enabled (non-empty string)
+        responseSchema: responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null,
         inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
         finalTransform,
         instruction: instructions
@@ -274,11 +279,15 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
       JSON.parse(responseSchema || '{}');
       JSON.parse(inputSchema || '{}');
 
+      // Use the self-healed steps for execution if available, otherwise use original steps
+      const executionSteps = selfHealedSteps.length > 0 ? selfHealedSteps : steps;
       const workflow = {
         id: workflowId,
-        steps: steps,
+        steps: executionSteps,
         finalTransform,
-        responseSchema: responseSchema ? JSON.parse(responseSchema) : null,
+        // Only pass responseSchema if it's explicitly enabled (non-empty string)
+        // Empty string means disabled, so pass null
+        responseSchema: responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null,
         inputSchema: inputSchema ? JSON.parse(inputSchema) : { type: "object" },
       } as any;
 
@@ -298,10 +307,13 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
         selfHealingEnabled
       );
 
-      setSteps(state.currentWorkflow.steps);
+      // Store self-healed steps separately - don't overwrite the original workflow structure
+      // The original steps should only be modified by explicit user edits
+      setSelfHealedSteps(state.currentWorkflow.steps);
 
       const stepResults: Record<string, any> = state.stepResults;
       setStepResultsMap(stepResults);
+
       const finalData = stepResults['__final_transform__']?.data;
       setFinalPreviewResult(finalData);
       const wr: any = {
@@ -317,6 +329,11 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
       };
       setResult(wr);
       setFinalTransform(state.currentWorkflow.finalTransform || finalTransform);
+      // Also update responseSchema if it was part of the workflow
+      if (state.currentWorkflow.responseSchema !== undefined) {
+        setResponseSchema(state.currentWorkflow.responseSchema ? JSON.stringify(state.currentWorkflow.responseSchema, null, 2) : '');
+      }
+      // Set the completed and failed steps from the state (now includes __final_transform__)
       setCompletedSteps(state.completedSteps);
       setFailedSteps(state.failedSteps);
 
@@ -398,7 +415,8 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
                 steps={steps}
                 stepResults={stepResultsMap}
                 finalTransform={finalTransform}
-                finalResult={finalPreviewResult}
+                finalResult={result?.data}
+                transformResult={finalPreviewResult}
                 responseSchema={responseSchema}
                 workflowId={workflowId}
                 instruction={instructions}
@@ -410,7 +428,10 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
                     setIsExecutingStep(idx);
                     const single = await executeSingleStep(
                       client,
-                      { id: workflowId, steps } as any,
+                      {
+                        id: workflowId,
+                        steps
+                      } as any,
                       idx,
                       JSON.parse(payload || '{}'),
                       stepResultsMap,  // Pass accumulated results
@@ -436,28 +457,46 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
                     setIsExecutingStep(undefined);
                   }
                 }}
-                onExecuteTransform={async () => {
+                onExecuteTransform={async (schemaStr, transformStr) => {
                   try {
                     setIsExecutingTransform(true);
 
                     // Build the payload with all step results
+                    // Extract just the data from each step result (not the full StepExecutionResult object)
+                    const stepData: Record<string, any> = {};
+                    Object.entries(stepResultsMap).forEach(([stepId, result]) => {
+                      // Skip the __final_transform__ result and extract data from StepExecutionResult
+                      if (stepId !== '__final_transform__') {
+                        // If result has a 'data' property, use it; otherwise use the result directly
+                        stepData[stepId] = result?.data !== undefined ? result.data : result;
+                      }
+                    });
+
                     const finalPayload = {
                       ...JSON.parse(payload || '{}'),
-                      ...stepResultsMap
+                      ...stepData
                     };
+
+                    // Parse response schema if provided
+                    // Use schemaStr if it's explicitly provided (even if empty string means disabled)
+                    // Only fall back to parent schema if schemaStr is undefined
+                    const parsedResponseSchema = schemaStr !== undefined
+                      ? (schemaStr && schemaStr.trim() ? JSON.parse(schemaStr) : null)
+                      : (responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null);
 
                     // Execute just the final transform (empty steps, only transform)
                     const result = await client.executeWorkflow({
                       workflow: {
                         id: workflowId,
                         steps: [],
-                        finalTransform,
-                        responseSchema: responseSchema ? JSON.parse(responseSchema) : null,
+                        finalTransform: transformStr || finalTransform,
+                        // Only include responseSchema if it's actually defined
+                        ...(parsedResponseSchema ? { responseSchema: parsedResponseSchema } : {}),
                         inputSchema: inputSchema ? JSON.parse(inputSchema) : { type: 'object' }
                       },
                       payload: finalPayload,
                       options: {
-                        testMode: false,
+                        testMode: !!parsedResponseSchema, // Use test mode when response schema is defined
                         selfHealing: SelfHealingMode.DISABLED // No self-healing for test
                       }
                     });
@@ -507,7 +546,7 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
                 onPayloadChange={setPayload}
                 onWorkflowIdChange={setWorkflowId}
                 integrations={integrations}
-                isExecuting={loading || isExecutingTransform || (isExecutingStep !== undefined)}
+                isExecuting={loading}
                 isExecutingStep={isExecutingStep}
                 isExecutingTransform={isExecutingTransform as any}
                 completedSteps={completedSteps}
