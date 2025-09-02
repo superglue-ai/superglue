@@ -662,7 +662,7 @@ const JsonCodeEditor = ({
 };
 
 // Initial Payload Card with Input Schema - compact version with tabs
-const PayloadCard = ({
+const PayloadMiniStepCard = ({
     payload,
     inputSchema,
     onChange,
@@ -763,7 +763,7 @@ const PayloadCard = ({
     );
 };
 
-const FinalTransformCard = ({
+const FinalTransformMiniStepCard = ({
     transform,
     responseSchema,
     onTransformChange,
@@ -865,7 +865,6 @@ const FinalTransformCard = ({
                     </div>
                     {!readOnly && onExecuteTransform && (
                         <Button
-                            variant="success"
                             size="sm"
                             onClick={handleExecuteTransform}
                             disabled={!canExecute || isExecutingTransform}
@@ -874,12 +873,12 @@ const FinalTransformCard = ({
                             {isExecutingTransform ? (
                                 <>
                                     <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
-                                    Testing...
+                                    Running...
                                 </>
                             ) : (
                                 <>
                                     <Play className="h-3 w-3 mr-1" />
-                                    Test Transform
+                                    Run Transform
                                 </>
                             )}
                         </Button>
@@ -953,7 +952,7 @@ const FinalTransformCard = ({
                     <TabsContent value="schema" className="mt-2">
                         <div className="space-y-3">
                             <JsonSchemaEditor
-                                value={localSchema || null}
+                                value={localSchema}
                                 onChange={handleSchemaChange}
                                 isOptional={true}
                             />
@@ -1023,7 +1022,6 @@ const SpotlightStepCard = ({
                     <div className="flex items-center gap-2">
                         {!readOnly && onExecuteStep && (
                             <Button
-                                variant="success"
                                 size="sm"
                                 onClick={onExecuteStep}
                                 disabled={!canExecute || isExecuting}
@@ -1032,12 +1030,12 @@ const SpotlightStepCard = ({
                                 {isExecuting ? (
                                     <>
                                         <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
-                                        Testing...
+                                        Running...
                                     </>
                                 ) : (
                                     <>
                                         <Play className="h-3 w-3 mr-1" />
-                                        Test Step
+                                        Run Step
                                     </>
                                 )}
                             </Button>
@@ -1285,8 +1283,8 @@ const MiniStepCard = ({
         const getStatusLabel = () => {
             if (isFailed) return "Failed";
             if (isCompleted) return "Completed";
-            if (isTesting) return "Testing...";
-            if (isRunningAll) return "Testing...";
+            if (isTesting) return "Running...";
+            if (isRunningAll) return "Running...";
             return "Pending";
         };
         return (
@@ -1363,7 +1361,7 @@ const MiniStepCard = ({
     const getStatusLabel = () => {
         if (isFailed) return "Failed";
         if (isCompleted) return "Completed";
-        if (isTesting || (isRunningAll && stepId)) return "Testing...";
+        if (isTesting || (isRunningAll && stepId)) return "Running...";
         return "Pending";
     };
 
@@ -1766,7 +1764,7 @@ export function WorkflowStepGallery({
                 <div className="min-h-[220px] max-w-6xl mx-auto">
                     {currentItem && (
                         currentItem.type === 'payload' ? (
-                            <PayloadCard
+                            <PayloadMiniStepCard
                                 payload={currentItem.data.payload}
                                 inputSchema={currentItem.data.inputSchema}
                                 onChange={onPayloadChange}
@@ -1774,7 +1772,7 @@ export function WorkflowStepGallery({
                                 readOnly={readOnly}
                             />
                         ) : currentItem.type === 'transform' ? (
-                            <FinalTransformCard
+                            <FinalTransformMiniStepCard
                                 transform={currentItem.data.transform}
                                 responseSchema={currentItem.data.responseSchema}
                                 onTransformChange={onFinalTransformChange}

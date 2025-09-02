@@ -111,6 +111,12 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
       setJsonError(null);
       return;
     }
+    // Handle empty string as valid empty content (not disabled)
+    if (value === '') {
+      setVisualSchema({});
+      setJsonError(null);
+      return;
+    }
     try {
       const parsed = JSON.parse(value);
       setVisualSchema(parsed);
@@ -122,11 +128,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
         onChange(formattedValue);
       }
     } catch (e) {
-      if (value !== '') {
-        setJsonError((e as Error).message);
-      } else {
-        setJsonError(null);
-      }
+      setJsonError((e as Error).message);
     }
   }, [value, onChange]);
 
@@ -569,9 +571,12 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
       if (!enabled) {
         onChange(null);
       } else {
-        // If enabling and current parent value is null, provide a default
+        // If enabling and current parent value is null or empty, provide a default
         // This ensures a fresh start if re-enabled
-        onChange(JSON.stringify(ensureObjectStructure({ type: 'any' }), null, 2));
+        if (value === null || value === '') {
+          onChange(JSON.stringify(ensureObjectStructure({ type: 'any' }), null, 2));
+        }
+        // Otherwise keep the existing value
       }
     }
   };
