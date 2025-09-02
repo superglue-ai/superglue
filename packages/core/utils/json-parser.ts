@@ -428,11 +428,11 @@ export class ResilientJsonParser {
   private initializeDefaultStrategies(): void {
     this.strategies = [
       new TripleQuoteStrategy(),
-      new UnescapedControlCharactersStrategy(),  // Fix control characters early
+      new SingleQuoteStrategy(),  // Convert quotes first so control char fix works
+      new UnescapedControlCharactersStrategy(),  // Now can fix control chars in all strings
       new TrailingCharactersStrategy(),  // Apply early to clean up trailing content
       new PythonLiteralStrategy(),
       new TrailingCommaStrategy(),
-      new SingleQuoteStrategy(),
       new UnquotedKeyStrategy(),
       new CommentStrategy(),
     ];
