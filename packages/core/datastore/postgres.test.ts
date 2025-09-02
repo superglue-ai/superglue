@@ -250,10 +250,24 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
                 expect(items[0]).toMatchObject({ ...testIntegration, id: testIntegration.id });
             });
 
-            it('should delete integrations', async () => {
+            it('should delete integrations without details', async () => {
                 await store.upsertIntegration({ id: testIntegration.id, integration: testIntegration, orgId: testOrgId });
                 await store.deleteIntegration({ id: testIntegration.id, orgId: testOrgId });
                 const retrieved = await store.getIntegration({ id: testIntegration.id, includeDocs: true, orgId: testOrgId });
+                expect(retrieved).toBeNull();
+            });
+
+            it('should delete integrations with details', async () => {
+                const integrationWithDetails: Integration = {
+                    ...testIntegration,
+                    id: 'test-int-with-details',
+                    documentation: 'Test documentation content',
+                    openApiSchema: '{"openapi": "3.0.0", "info": {"title": "Test API"}}'
+                };
+                
+                await store.upsertIntegration({ id: integrationWithDetails.id, integration: integrationWithDetails, orgId: testOrgId });
+                await store.deleteIntegration({ id: integrationWithDetails.id, orgId: testOrgId });
+                const retrieved = await store.getIntegration({ id: integrationWithDetails.id, includeDocs: true, orgId: testOrgId });
                 expect(retrieved).toBeNull();
             });
 
