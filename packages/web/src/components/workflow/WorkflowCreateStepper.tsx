@@ -565,6 +565,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       };
 
       setExecutionResult(result);
+      // Update the current workflow with self-healed configs (including finalTransform)
       setCurrentWorkflow(state.currentWorkflow);
       // Also update responseSchema if it was part of the workflow
       if (state.currentWorkflow.responseSchema !== undefined) {

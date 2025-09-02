@@ -200,6 +200,20 @@ export async function executeWorkflowStepByStep(
       // Update the completed/failed steps to include final transform
       if (finalResult.success) {
         state.completedSteps.push('__final_transform__');
+        // If self-healing modified the final transform, capture it
+        if (finalResult.config?.finalTransform) {
+          state.currentWorkflow = {
+            ...state.currentWorkflow,
+            finalTransform: finalResult.config.finalTransform
+          };
+        }
+        // Also capture any updated response schema
+        if (finalResult.config?.responseSchema !== undefined) {
+          state.currentWorkflow = {
+            ...state.currentWorkflow,
+            responseSchema: finalResult.config.responseSchema
+          };
+        }
       } else {
         state.failedSteps.push('__final_transform__');
       }

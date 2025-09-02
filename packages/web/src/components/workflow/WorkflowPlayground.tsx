@@ -223,10 +223,13 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
         setWorkflowId(`wf-${Date.now()}`);
       }
       setSaving(true);
+      // Use self-healed steps if available and self-healing was enabled, otherwise use original steps
+      const stepsToSave = (selfHealedSteps && selfHealedSteps.length > 0) ? selfHealedSteps : steps;
+
       const input = {
         id: workflowId,
-        // Always save the original user-defined steps, not the self-healed versions
-        steps: steps.map((step: ExecutionStep) => ({
+        // Save the self-healed steps if they exist (from a successful run with self-healing enabled)
+        steps: stepsToSave.map((step: ExecutionStep) => ({
           ...step,
           apiConfig: {
             id: step.apiConfig.id || step.id,
@@ -324,11 +327,14 @@ export default function WorkflowPlayground({ id }: { id?: string; }) {
         config: {
           id: workflowId,
           steps: state.currentWorkflow.steps,
-          finalTransform,
+          finalTransform: state.currentWorkflow.finalTransform || finalTransform,
         } as any
       };
       setResult(wr);
-      setFinalTransform(state.currentWorkflow.finalTransform || finalTransform);
+      // Update finalTransform with the self-healed version if it was modified
+      if (state.currentWorkflow.finalTransform) {
+        setFinalTransform(state.currentWorkflow.finalTransform);
+      }
       // Also update responseSchema if it was part of the workflow
       if (state.currentWorkflow.responseSchema !== undefined) {
         setResponseSchema(state.currentWorkflow.responseSchema ? JSON.stringify(state.currentWorkflow.responseSchema, null, 2) : '');
