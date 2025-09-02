@@ -72,7 +72,7 @@ export async function parseFile(buffer: Buffer, fileType: FileType): Promise<any
             return parseCSV(buffer);
         case FileType.EXCEL:
             return parseExcel(buffer);
-        case FileType.AUTO:
+        case FileType.RAW:
             return buffer.toString('utf8');
         default:
             throw new Error('Unsupported file type');
@@ -312,26 +312,19 @@ async function parseExcel(buffer: Buffer): Promise<{ [sheetName: string]: any[] 
 }
 
 async function detectFileType(buffer: Buffer): Promise<FileType> {
-    // Excel file signatures
     const xlsxSignature = buffer.slice(0, 4).toString('hex');
     if (xlsxSignature === '504b0304') { // XLSX files are ZIP files
         try {
-            // Try to parse as XLSX
             XLSX.read(buffer, { type: 'buffer' });
             return FileType.EXCEL;
-        } catch {
-            // If XLSX parsing fails, continue with other detection
-        }
+        } catch { }
     }
-
-    // Take a larger sample for better detection
     const sampleSize = Math.min(buffer.length, 4096);
     const sample = buffer.slice(0, sampleSize).toString('utf8');
 
     try {
         const trimmedLine = sample.trim();
 
-        // Determine file type
         if (trimmedLine.startsWith('{') || trimmedLine.startsWith('[')) {
             return FileType.JSON;
         } else if (trimmedLine.startsWith('<?xml') || trimmedLine.startsWith('<')) {
@@ -339,7 +332,7 @@ async function detectFileType(buffer: Buffer): Promise<FileType> {
         } else if (isLikelyCSV(buffer)) {
             return FileType.CSV;
         } else {
-            return FileType.AUTO;
+            return FileType.RAW;
         }
     } catch (error) {
         throw new Error(`Error reading file: ${error.message}`);
