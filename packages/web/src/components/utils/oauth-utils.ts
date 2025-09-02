@@ -180,6 +180,7 @@ export const triggerOAuthFlow = (
         client_id?: string;
         scopes?: string;
         auth_url?: string;
+        grant_type?: string;
     },
     selectedIntegration?: string,
     apiKey?: string,
@@ -187,6 +188,15 @@ export const triggerOAuthFlow = (
     onError?: (error: string) => void,
     forceOAuth?: boolean
 ): (() => void) | null => {
+    const grantType = oauthFields.grant_type || 'authorization_code';
+    
+    // For client credentials, the backend handles the OAuth flow automatically
+    // when the integration is saved, so we don't need to do anything here
+    if (grantType === 'client_credentials') {
+        return null;
+    }
+    
+    // For authorization code flow, check if we should trigger OAuth
     const shouldTriggerOAuth = authType === 'oauth' && (
         // Trigger if OAuth is not configured yet
         (!oauthFields.access_token || !oauthFields.refresh_token) ||
@@ -195,6 +205,7 @@ export const triggerOAuthFlow = (
     );
 
     if (shouldTriggerOAuth) {
+        // Authorization code flow - open popup
         const authUrl = buildOAuthUrlForIntegration(
             integrationId,
             oauthFields,

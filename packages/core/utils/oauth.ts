@@ -121,6 +121,113 @@ export function buildOAuthHeaders(integration: Integration): Record<string, stri
 }
 
 /**
+ * Handle client credentials OAuth flow
+ */
+export async function handleClientCredentialsFlow(
+    integrationId: string,
+    getIntegration: (id: string) => Promise<Integration | null>,
+    updateIntegration: (id: string, integration: Integration) => Promise<void>
+): Promise<OAuthCallbackResult> {
+    try {
+        const integration = await getIntegration(integrationId);
+
+        if (!integration) {
+            return {
+                success: false,
+                error: 'Integration not found'
+            };
+        }
+
+        const { client_id, client_secret, token_url, scopes } = integration.credentials || {};
+
+        if (!client_id || !client_secret) {
+            return {
+                success: false,
+                error: 'OAuth client credentials not configured'
+            };
+        }
+
+        // Get token URL
+        let finalTokenUrl = token_url as string;
+        if (!finalTokenUrl) {
+            finalTokenUrl = getOAuthTokenUrl(integration);
+            if (!finalTokenUrl) {
+                return {
+                    success: false,
+                    error: 'Could not determine token URL for integration'
+                };
+            }
+        }
+
+        // Prepare request body
+        const body = new URLSearchParams({
+            grant_type: 'client_credentials',
+        });
+
+        if (scopes) {
+            body.append('scope', scopes as string);
+        }
+
+        // Make the token request with basic auth
+        const authHeader = Buffer.from(`${client_id}:${client_secret}`).toString('base64');
+        const tokenResponse = await fetch(finalTokenUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Accept': 'application/json',
+                'Authorization': `Basic ${authHeader}`,
+            },
+            body,
+        });
+
+        if (!tokenResponse.ok) {
+            const errorData = await tokenResponse.text();
+            return {
+                success: false,
+                error: `Client credentials flow failed: ${errorData}`
+            };
+        }
+
+        const tokenData = await tokenResponse.json();
+
+        // Update integration with new tokens
+        const updatedIntegration = {
+            ...integration,
+            credentials: {
+                ...integration.credentials,
+                access_token: tokenData.access_token,
+                token_type: tokenData.token_type || 'Bearer',
+                expires_at: tokenData.expires_at || (tokenData.expires_in
+                    ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
+                    : undefined),
+            },
+        };
+
+        // Save the updated integration
+        await updateIntegration(integrationId, updatedIntegration);
+
+        logMessage('info', 'Successfully completed client credentials OAuth flow', {
+            integrationId
+        });
+
+        return {
+            success: true,
+            integration: updatedIntegration
+        };
+    } catch (error) {
+        logMessage('error', 'Client credentials OAuth flow error', {
+            integrationId,
+            error: error instanceof Error ? error.message : String(error)
+        });
+
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error'
+        };
+    }
+}
+
+/**
  * Handle OAuth callback - exchange code for tokens
  */
 export async function handleOAuthCallback(

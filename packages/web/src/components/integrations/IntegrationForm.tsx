@@ -93,7 +93,8 @@ export function IntegrationForm({
             refresh_token: creds.refresh_token || '',
             scopes: creds.scopes || '',
             expires_at: creds.expires_at || '',
-            token_type: creds.token_type || 'Bearer'
+            token_type: creds.token_type || 'Bearer',
+            grant_type: creds.grant_type || 'authorization_code'
         };
     });
 
@@ -105,7 +106,8 @@ export function IntegrationForm({
             client_secret: creds.client_secret || '',
             auth_url: creds.auth_url || '',
             token_url: creds.token_url || '',
-            scopes: creds.scopes || ''
+            scopes: creds.scopes || '',
+            grant_type: creds.grant_type || 'authorization_code'
         };
     });
 
@@ -259,7 +261,8 @@ export function IntegrationForm({
             oauthFields.client_secret !== initialOAuthFields.client_secret ||
             oauthFields.auth_url !== initialOAuthFields.auth_url ||
             oauthFields.token_url !== initialOAuthFields.token_url ||
-            oauthFields.scopes !== initialOAuthFields.scopes;
+            oauthFields.scopes !== initialOAuthFields.scopes ||
+            oauthFields.grant_type !== initialOAuthFields.grant_type;
         
         // Check if additional API credentials changed
         const apiCredentialsChanged = apiKeyCredentials !== initialApiCredentials;
@@ -336,25 +339,37 @@ export function IntegrationForm({
             }
 
             // Check if OAuth should be triggered
+            const grantType = oauthFields.grant_type || 'authorization_code';
             const shouldTriggerOAuth = authType === 'oauth' && (
-                // Trigger if OAuth is not configured yet
-                (!oauthFields.access_token || !oauthFields.refresh_token) ||
-                // OR if OAuth fields have changed
+                // For authorization code: trigger if OAuth is not configured yet
+                (grantType === 'authorization_code' && (!oauthFields.access_token || !oauthFields.refresh_token)) ||
+                // For client credentials: trigger if OAuth fields have changed (backend will handle it)
+                (grantType === 'client_credentials' && hasOAuthFieldsChanged()) ||
+                // OR if OAuth is forced (e.g., when fields changed)
                 hasOAuthFieldsChanged()
             );
 
             if (shouldTriggerOAuth) {
-                const handleOAuthError = createOAuthErrorHandler(savedIntegration.id, toast);
+                if (grantType === 'client_credentials') {
+                    // For client credentials, show a message that OAuth is being processed
+                    toast({
+                        title: 'OAuth Processing',
+                        description: 'Client credentials OAuth flow is being processed in the background. The integration will be updated automatically.',
+                    });
+                } else {
+                    // For authorization code, trigger the popup flow
+                    const handleOAuthError = createOAuthErrorHandler(savedIntegration.id, toast);
 
-                triggerOAuthFlow(
-                    savedIntegration.id,
-                    oauthFields,
-                    selectedIntegration,
-                    config.superglueApiKey,
-                    authType,
-                    handleOAuthError,
-                    hasOAuthFieldsChanged() // Force OAuth if fields changed
-                );
+                    triggerOAuthFlow(
+                        savedIntegration.id,
+                        oauthFields,
+                        selectedIntegration,
+                        config.superglueApiKey,
+                        authType,
+                        handleOAuthError,
+                        hasOAuthFieldsChanged() // Force OAuth if fields changed
+                    );
+                }
             }
         } catch (error) {
             // Error handling is done in the parent component
@@ -680,6 +695,27 @@ export function IntegrationForm({
                         {/* OAuth Advanced Settings */}
                         {authType === 'oauth' && (
                             <>
+                                <div>
+                                    <Label htmlFor="grant_type" className="text-xs flex items-center gap-1">
+                                        OAuth Grant Type
+                                        <HelpTooltip text="Authorization Code: User-based flow requiring browser popup for user consent. Client Credentials: Server-to-server flow using only client credentials, no user interaction needed." />
+                                    </Label>
+                                    <Select
+                                        value={oauthFields.grant_type}
+                                        onValueChange={(value: 'authorization_code' | 'client_credentials') => 
+                                            setOauthFields(prev => ({ ...prev, grant_type: value }))
+                                        }
+                                    >
+                                        <SelectTrigger className="h-9">
+                                            <SelectValue placeholder="Select grant type" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="authorization_code">Authorization Code (User-based)</SelectItem>
+                                            <SelectItem value="client_credentials">Client Credentials (Server-to-server)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
                                 <div>
                                     <Label htmlFor="scopes" className="text-xs">OAuth Scopes</Label>
                                     <HelpTooltip text="Permissions requested from the OAuth provider. Format varies by provider: Google uses URLs (https://www.googleapis.com/auth/...), others use simple strings (read write). Leave empty to use defaults." />

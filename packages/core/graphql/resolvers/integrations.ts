@@ -5,6 +5,7 @@ import { GraphQLResolveInfo } from "graphql";
 import { IntegrationSelector } from '../../integrations/integration-selector.js';
 import { Documentation } from '../../utils/documentation.js';
 import { logMessage } from '../../utils/logs.js';
+import { handleClientCredentialsFlow } from '../../utils/oauth.js';
 import { composeUrl } from '../../utils/tools.js';
 
 export const listIntegrationsResolver = async (
@@ -79,6 +80,12 @@ export const upsertIntegrationResolver = async (
 
     if (shouldFetchDoc) {
       triggerAsyncDocumentationFetch(input, context); // Fire-and-forget, will fetch docs in background and update integration documentation, documentationPending and metadata fields once its done
+    }
+
+    const shouldTriggerOAuth: boolean = shouldTriggerClientCredentialsOAuthFlow(input, existingIntegrationOrNull);
+
+    if (shouldTriggerOAuth) {
+      triggerAsyncClientCredentialsOAuth(input, context); // Fire-and-forget, will fetch OAuth tokens in background
     }
 
     const integrationToSave = {
@@ -270,4 +277,75 @@ async function triggerAsyncDocumentationFetch(
 function uniqueKeywords(keywords: string[] | undefined): string[] {
   if (!keywords || keywords.length === 0) return [];
   return [...new Set(keywords)];
+}
+
+function shouldTriggerClientCredentialsOAuthFlow(input: Integration, existingIntegration?: Integration | null): boolean {
+  const credentials = input.credentials || {};
+  const grantType = credentials.grant_type;
+  
+  // Only trigger for client_credentials grant type
+  if (grantType !== 'client_credentials') return false;
+  
+  // Check if we have the required OAuth fields
+  const hasRequiredFields = credentials.client_id && credentials.client_secret;
+  if (!hasRequiredFields) return false;
+  
+  // For new integrations, trigger if we have the required fields
+  if (!existingIntegration) return true;
+  
+  // For existing integrations, trigger if OAuth fields have changed
+  const existingCredentials = existingIntegration.credentials || {};
+  const oauthFieldsChanged = 
+    credentials.client_id !== existingCredentials.client_id ||
+    credentials.client_secret !== existingCredentials.client_secret ||
+    credentials.auth_url !== existingCredentials.auth_url ||
+    credentials.token_url !== existingCredentials.token_url ||
+    credentials.scopes !== existingCredentials.scopes ||
+    credentials.grant_type !== existingCredentials.grant_type;
+  // Also trigger if we don't have an access token yet
+  const needsToken = !credentials.access_token;
+  
+  return oauthFieldsChanged || needsToken;
+}
+
+async function triggerAsyncClientCredentialsOAuth(
+  input: Integration,
+  context: Context
+): Promise<void> {
+  try {
+    logMessage('debug', `Starting async client credentials OAuth flow for integration ${input.id}`, { orgId: context.orgId });
+
+    const result = await handleClientCredentialsFlow(
+      input.id,
+      (id: string) => Promise.resolve(input), // Use the input integration directly
+      async (id: string, integration: Integration) => {
+        // CRITICAL: Fetch the latest integration state before updating
+        // This ensures we don't overwrite any changes made since the initial upsert
+        const latestIntegration = await context.datastore.getIntegration({ id, includeDocs: false, orgId: context.orgId });
+        if (!latestIntegration) {
+          logMessage('warn', `Integration ${id} was deleted while processing OAuth. Skipping upsert.`, { orgId: context.orgId });
+          return;
+        }
+
+        // Update ONLY the credentials-related fields
+        await context.datastore.upsertIntegration({
+          id,
+          integration: {
+            ...latestIntegration,
+            credentials: integration.credentials,
+            updatedAt: new Date(),
+          },
+          orgId: context.orgId
+        });
+      }
+    );
+
+    if (result.success) {
+      logMessage('info', `Successfully completed client credentials OAuth flow for integration ${input.id}`, { orgId: context.orgId });
+    } else {
+      logMessage('error', `Client credentials OAuth flow failed for integration ${input.id}: ${result.error}`, { orgId: context.orgId });
+    }
+  } catch (error) {
+    logMessage('error', `Error in client credentials OAuth flow for integration ${input.id}: ${String(error)}`, { orgId: context.orgId });
+  }
 }
