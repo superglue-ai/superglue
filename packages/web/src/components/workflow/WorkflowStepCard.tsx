@@ -4,7 +4,6 @@ import { Switch } from "@/src/components/ui/switch";
 import { useToast } from '@/src/hooks/use-toast';
 import { cn, getIntegrationIcon as getIntegrationIconName } from '@/src/lib/utils';
 import { Integration, SuperglueClient } from "@superglue/client";
-import { integrations as integrationTemplates } from '@superglue/shared';
 import { ArrowDown, Check, Copy, Globe, Pencil, RotateCw, Save, X } from 'lucide-react';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
@@ -92,32 +91,20 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
     }
   };
 
-  const integrationOptions = [
-    { value: "custom", label: "Custom", icon: "default" },
-    ...Object.entries(integrationTemplates).map(([key, integration]) => ({
-      value: key,
-      label: key.charAt(0).toUpperCase() + key.slice(1),
-      icon: (integration as any).icon || "default"
-    }))
-  ];
-
   const getIntegrationIcon = (integration: Integration) => {
     const iconName = getIntegrationIconName(integration);
     return iconName ? getSimpleIcon(iconName) : null;
   };
 
-  // Sync editedStep with step prop changes only when not editing
   useEffect(() => {
     if (!isEditing) {
       setEditedStep({ ...step });
     }
   }, [step, isEditing]);
 
-  // Initialize text fields when editing starts
   useEffect(() => {
     if (isEditing) {
       try {
-        // Safely stringify headers - use empty object if undefined or invalid
         const headers = editedStep.apiConfig?.headers;
         const headersJson = headers !== undefined && headers !== null
           ? JSON.stringify(headers, null, 2)
@@ -125,7 +112,6 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
 
         setHeadersText(headersJson);
 
-        // Validate headers JSON
         try {
           JSON.parse(headersJson);
           setHeadersError(false);
@@ -133,14 +119,12 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
           setHeadersError(true);
         }
       } catch (error) {
-        // If stringify fails, use empty object
         console.warn('Failed to stringify headers:', error);
         setHeadersText('{}');
         setHeadersError(false);
       }
 
       try {
-        // Safely stringify queryParams - use empty object if undefined or invalid
         const queryParams = editedStep.apiConfig?.queryParams;
         const queryParamsJson = queryParams !== undefined && queryParams !== null
           ? JSON.stringify(queryParams, null, 2)
@@ -148,7 +132,6 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
 
         setQueryParamsText(queryParamsJson);
 
-        // Validate queryParams JSON
         try {
           JSON.parse(queryParamsJson);
           setQueryParamsError(false);
@@ -156,7 +139,6 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
           setQueryParamsError(true);
         }
       } catch (error) {
-        // If stringify fails, use empty object
         console.warn('Failed to stringify queryParams:', error);
         setQueryParamsText('{}');
         setQueryParamsError(false);
@@ -165,7 +147,6 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
   }, [isEditing, editedStep.apiConfig?.headers, editedStep.apiConfig?.queryParams]);
 
   const handleSave = () => {
-    // Validate JSON fields before saving
     if (headersError || queryParamsError) {
       toast({
         title: 'Invalid JSON',
@@ -175,11 +156,9 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
       return;
     }
 
-    // Ensure the complete step structure is maintained
     const updatedStep = {
       ...step,
       ...editedStep,
-      // Explicitly preserve these top-level properties from editedStep
       executionMode: editedStep.executionMode,
       loopSelector: editedStep.loopSelector,
       loopMaxIters: editedStep.loopMaxIters,
@@ -207,7 +186,6 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
       setHeadersText('{}');
     }
 
-    // Safely reset queryParams text
     try {
       const queryParams = step.apiConfig?.queryParams;
       setQueryParamsText(queryParams !== undefined && queryParams !== null
@@ -235,17 +213,14 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
 
   // Find matching integration based on integrationId or urlHost
   const linkedIntegration = integrations?.find(integration => {
-    // First try direct ID match from both editedStep and original step
     if ((editedStep.integrationId && integration.id === editedStep.integrationId) ||
       (step.integrationId && integration.id === step.integrationId)) {
       return true;
     }
-    // Fallback to URL host matching
     return step.apiConfig?.urlHost && integration.urlHost &&
       step.apiConfig.urlHost.includes(integration.urlHost.replace(/^(https?|postgres(ql)?|ftp(s)?|sftp|file):\/\//, ''));
   });
 
-  // Sync integrationId with linked integration
   useEffect(() => {
     if (linkedIntegration && !editedStep.integrationId) {
       setEditedStep(prev => ({

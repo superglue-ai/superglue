@@ -2,6 +2,7 @@ import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
 import { Input } from '@/src/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
+import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import JsonSchemaEditor from '@/src/components/utils/JsonSchemaEditor';
 import { canExecuteStep } from '@/src/lib/client-utils';
 import { cn } from '@/src/lib/utils';
@@ -465,9 +466,6 @@ const FinalResultsCard = ({ result }: { result: any }) => {
     );
 };
 
-
-
-// JavaScript Code Editor Component with proper syntax highlighting
 const JavaScriptCodeEditor = ({
     value,
     onChange,
@@ -475,7 +473,8 @@ const JavaScriptCodeEditor = ({
     minHeight = '200px',
     maxHeight = '350px',
     showCopy = true,
-    resizable = false
+    resizable = false,
+    isTransformEditor = false
 }: {
     value: string;
     onChange?: (value: string) => void;
@@ -484,16 +483,60 @@ const JavaScriptCodeEditor = ({
     maxHeight?: string;
     showCopy?: boolean;
     resizable?: boolean;
+    isTransformEditor?: boolean;
 }) => {
     const [currentHeight, setCurrentHeight] = useState(maxHeight);
-    const lines = (value || '').split('\n');
     const effectiveHeight = resizable ? currentHeight : maxHeight;
+
+    // Check if code already has the proper arrow function format
+    const hasValidPattern = (code: string): boolean => {
+        const arrowFunctionPattern = /^\s*\(\s*sourceData\s*\)\s*=>\s*\{[\s\S]*\}\s*$/;
+        return arrowFunctionPattern.test(code);
+    };
+
+    // Ensure the code has the proper format for execution
+    const ensureValidTransform = (code: string): string => {
+        if (!code || !code.trim()) {
+            return `(sourceData) => {\n  // Transform sourceData into final output\n  return sourceData;\n}`;
+        }
+
+        // If it already has the correct pattern, return as-is
+        if (hasValidPattern(code)) {
+            return code;
+        }
+
+        // Otherwise, wrap it
+        return `(sourceData) => {\n${code}\n}`;
+    };
+
+    // Handle value for transform editor
+    const displayValue = value || '';
+
+    const handleChange = (newValue: string) => {
+        if (!onChange) return;
+
+        if (isTransformEditor) {
+            // Store exactly what the user types
+            // We'll ensure valid format only when executing
+            onChange(newValue);
+        } else {
+            onChange(newValue);
+        }
+    };
+
+    // Calculate line numbers
+    const lineNumbers = (displayValue || '').split('\n').map((_, i) => String(i + 1));
 
     return (
         <div className="relative bg-muted/50 dark:bg-muted/20 rounded-lg border font-mono shadow-sm js-code-editor">
-            {showCopy && (
-                <div className="absolute top-1 right-1 z-10">
-                    <CopyButton text={value || ''} />
+            {(showCopy || isTransformEditor) && (
+                <div className="absolute top-1 right-1 z-10 flex items-center gap-1">
+                    {isTransformEditor && (
+                        <HelpTooltip
+                            text="The transform must be an arrow function (sourceData) => { ... } that receives step results and returns the final output. Access each step's data via sourceData.stepId."
+                        />
+                    )}
+                    {showCopy && <CopyButton text={value || ''} />}
                 </div>
             )}
             {resizable && (
@@ -523,46 +566,83 @@ const JavaScriptCodeEditor = ({
                     }}
                 />
             )}
-            <div className="absolute left-0 top-0 bottom-0 w-10 bg-muted/30 border-r rounded-l-lg overflow-hidden">
-                <div className="flex flex-col py-2" style={{ maxHeight: effectiveHeight, overflow: 'auto' }}>
-                    {lines.map((_, i) => (
-                        <div key={i} className="text-[10px] text-muted-foreground text-right pr-2 leading-[18px] select-none">
-                            {i + 1}
+            <div className="flex overflow-auto" style={{ maxHeight: effectiveHeight }}>
+                {/* Line numbers column - scrolls with content */}
+                <div className="flex-shrink-0 bg-muted/30 border-r px-2 py-2">
+                    {lineNumbers.map((lineNum) => (
+                        <div key={lineNum} className="text-[10px] text-muted-foreground text-right leading-[18px] select-none">
+                            {lineNum}
                         </div>
                     ))}
                 </div>
+
+                {/* Code content */}
+                <div className="flex-1 px-3 py-2">
+                    {isTransformEditor ? (
+                        <>
+                            {/* Pattern indicator - shows if the format is valid */}
+                            {displayValue && !hasValidPattern(displayValue) && (
+                                <div className="text-[10px] text-amber-600 dark:text-amber-400 mb-1 flex items-center gap-1">
+                                    <span>⚠</span>
+                                    <span>Code will be auto-wrapped with (sourceData) =&gt; {'{'} ... {'}'} when executed</span>
+                                </div>
+                            )}
+                            <Editor
+                                value={displayValue}
+                                onValueChange={handleChange}
+                                highlight={(code) => {
+                                    try {
+                                        return Prism.highlight(code, Prism.languages.javascript, 'javascript');
+                                    } catch {
+                                        return code;
+                                    }
+                                }}
+                                padding={0}
+                                disabled={readOnly}
+                                className="font-mono text-[11px] leading-[18px]"
+                                textareaClassName="outline-none focus:outline-none"
+                                textareaId="transform-editor"
+                                placeholder="(sourceData) => { return sourceData; }"
+                                style={{
+                                    background: 'transparent',
+                                    lineHeight: '18px',
+                                    minHeight: '100px'
+                                }}
+                            />
+                        </>
+                    ) : (
+                        <Editor
+                            value={value || ''}
+                            onValueChange={onChange || (() => { })}
+                            highlight={(code) => {
+                                try {
+                                    return Prism.highlight(code, Prism.languages.javascript, 'javascript');
+                                } catch {
+                                    return code;
+                                }
+                            }}
+                            padding={0}
+                            disabled={readOnly}
+                            className="font-mono text-[11px] leading-[18px]"
+                            textareaClassName="outline-none focus:outline-none"
+                            style={{
+                                minHeight,
+                                background: 'transparent',
+                                lineHeight: '18px'
+                            }}
+                        />
+                    )}
+                </div>
             </div>
-            <div className="pl-12 pr-3 py-2 overflow-auto" style={{ maxHeight: effectiveHeight }}>
-                <Editor
-                    value={value || ''}
-                    onValueChange={onChange || (() => { })}
-                    highlight={(code) => {
-                        try {
-                            return Prism.highlight(code, Prism.languages.javascript, 'javascript');
-                        } catch {
-                            return code;
-                        }
-                    }}
-                    padding={0}
-                    disabled={readOnly}
-                    className="font-mono text-[11px] leading-[18px]"
-                    textareaClassName="outline-none focus:outline-none"
-                    style={{
-                        minHeight,
-                        background: 'transparent',
-                        lineHeight: '18px'
-                    }}
-                />
-                <style jsx global>{`
-                    .js-code-editor .token.property { color: rgb(156, 163, 175); }
-                    .js-code-editor .token.string { color: rgb(134, 239, 172); }
-                    .js-code-editor .token.function { color: rgb(147, 197, 253); }
-                    .js-code-editor .token.boolean, .js-code-editor .token.number { color: rgb(251, 191, 36); }
-                    .js-code-editor .token.punctuation, .js-code-editor .token.operator { color: rgb(148, 163, 184); }
-                    .js-code-editor .token.keyword { color: rgb(244, 114, 182); }
-                    .js-code-editor .token.comment { color: rgb(100, 116, 139); font-style: italic; }
-                `}</style>
-            </div>
+            <style jsx global>{`
+                .js-code-editor .token.property { color: rgb(156, 163, 175); }
+                .js-code-editor .token.string { color: rgb(134, 239, 172); }
+                .js-code-editor .token.function { color: rgb(147, 197, 253); }
+                .js-code-editor .token.boolean, .js-code-editor .token.number { color: rgb(251, 191, 36); }
+                .js-code-editor .token.punctuation, .js-code-editor .token.operator { color: rgb(148, 163, 184); }
+                .js-code-editor .token.keyword { color: rgb(244, 114, 182); }
+                .js-code-editor .token.comment { color: rgb(100, 116, 139); font-style: italic; }
+            `}</style>
         </div>
     );
 };
@@ -790,14 +870,21 @@ const FinalTransformMiniStepCard = ({
     const [localTransform, setLocalTransform] = useState(transform || '');
     const [localSchema, setLocalSchema] = useState(responseSchema || '');
     const [inputViewMode, setInputViewMode] = useState<'preview' | 'schema'>('preview');
+    // Track if we've initialized to prevent external updates
+    const [schemaInitialized, setSchemaInitialized] = useState(false);
 
     useEffect(() => {
         setLocalTransform(transform || '');
     }, [transform]);
 
     useEffect(() => {
-        setLocalSchema(responseSchema || '');
-    }, [responseSchema]);
+        // Only update localSchema from prop on initial mount, not on prop changes
+        // This prevents the schema from being reset when navigating between tabs
+        if (!schemaInitialized) {
+            setLocalSchema(responseSchema || '');
+            setSchemaInitialized(true);
+        }
+    }, [responseSchema, schemaInitialized]);
 
     // Update parent state when switching tabs (acts like blur)
     useEffect(() => {
@@ -839,15 +926,35 @@ const FinalTransformMiniStepCard = ({
     };
 
     const handleExecuteTransform = () => {
+        // Ensure the transform has valid format before executing
+        const validTransform = ensureValidTransform(localTransform);
+
         if (onTransformChange) {
+            // Save the original user input
             onTransformChange(localTransform);
         }
         if (onResponseSchemaChange) {
             onResponseSchemaChange(localSchema);
         }
         if (onExecuteTransform) {
-            onExecuteTransform(localSchema, localTransform);
+            // Execute with the valid format
+            onExecuteTransform(localSchema, validTransform);
         }
+    };
+
+    // Helper function to ensure valid transform format
+    const ensureValidTransform = (code: string): string => {
+        if (!code || !code.trim()) {
+            return `(sourceData) => {\n  return sourceData;\n}`;
+        }
+
+        const arrowFunctionPattern = /^\s*\(\s*sourceData\s*\)\s*=>\s*\{[\s\S]*\}\s*$/;
+        if (arrowFunctionPattern.test(code)) {
+            return code;
+        }
+
+        // Wrap the code if it doesn't have the pattern
+        return `(sourceData) => {\n${code}\n}`;
     };
 
     return (
@@ -864,24 +971,27 @@ const FinalTransformMiniStepCard = ({
                         </div>
                     </div>
                     {!readOnly && onExecuteTransform && (
-                        <Button
-                            size="sm"
-                            onClick={handleExecuteTransform}
-                            disabled={!canExecute || isExecutingTransform}
-                            title={!canExecute ? "Execute all steps first" : isExecutingTransform ? "Transform is executing..." : "Test final transform"}
-                        >
-                            {isExecutingTransform ? (
-                                <>
-                                    <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
-                                    Running...
-                                </>
-                            ) : (
-                                <>
-                                    <Play className="h-3 w-3 mr-1" />
-                                    Run Transform
-                                </>
-                            )}
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                size="sm"
+                                onClick={handleExecuteTransform}
+                                disabled={!canExecute || isExecutingTransform}
+                                title={!canExecute ? "Execute all steps first" : isExecutingTransform ? "Transform is executing..." : "Test final transform"}
+                            >
+                                {isExecutingTransform ? (
+                                    <>
+                                        <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
+                                        Running...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Play className="h-3 w-3 mr-1" />
+                                        Run Transform
+                                    </>
+                                )}
+                            </Button>
+                            <HelpTooltip text="Executes the final transform script with step results as input. If a response schema is enabled, the output will be validated against it." />
+                        </div>
                     )}
                 </div>
 
@@ -946,6 +1056,7 @@ const FinalTransformMiniStepCard = ({
                             minHeight="150px"
                             maxHeight="250px"
                             resizable={true}
+                            isTransformEditor={true}
                         />
                     </TabsContent>
 
@@ -1021,24 +1132,27 @@ const SpotlightStepCard = ({
                     </div>
                     <div className="flex items-center gap-2">
                         {!readOnly && onExecuteStep && (
-                            <Button
-                                size="sm"
-                                onClick={onExecuteStep}
-                                disabled={!canExecute || isExecuting}
-                                title={!canExecute ? "Execute previous steps first" : "Test this step (no self-healing)"}
-                            >
-                                {isExecuting ? (
-                                    <>
-                                        <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
-                                        Running...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Play className="h-3 w-3 mr-1" />
-                                        Run Step
-                                    </>
-                                )}
-                            </Button>
+                            <>
+                                <Button
+                                    size="sm"
+                                    onClick={onExecuteStep}
+                                    disabled={!canExecute || isExecuting}
+                                    title={!canExecute ? "Execute previous steps first" : "Test this step (no self-healing)"}
+                                >
+                                    {isExecuting ? (
+                                        <>
+                                            <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
+                                            Running...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Play className="h-3 w-3 mr-1" />
+                                            Run Step
+                                        </>
+                                    )}
+                                </Button>
+                                <HelpTooltip text="Executes this step configuration directly without instruction validation or self-healing. Useful for quick testing." />
+                            </>
                         )}
                         {!readOnly && onRemove && (
                             <Button

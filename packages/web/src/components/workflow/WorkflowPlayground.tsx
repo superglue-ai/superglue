@@ -22,6 +22,7 @@ export interface WorkflowPlaygroundProps {
   integrations?: Integration[];
   onSave?: (workflow: Workflow) => Promise<void>;
   onExecute?: (workflow: Workflow, result: WorkflowResult) => void;
+  onInstructionEdit?: () => void;
   headerActions?: React.ReactNode;
   hideHeader?: boolean;
   readOnly?: boolean;
@@ -44,6 +45,7 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
   integrations: providedIntegrations,
   onSave,
   onExecute,
+  onInstructionEdit,
   headerActions,
   hideHeader = false,
   readOnly = false,
@@ -260,11 +262,15 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
     result: sourceData
   }
 }`);
-      setResponseSchema(initialWorkflow.responseSchema ? JSON.stringify(initialWorkflow.responseSchema, null, 2) : '');
+      if (embedded) {
+        setResponseSchema('');  // Always disabled in create stepper
+      } else {
+        setResponseSchema(initialWorkflow.responseSchema ? JSON.stringify(initialWorkflow.responseSchema, null, 2) : '');
+      }
       setInputSchema(initialWorkflow.inputSchema ? JSON.stringify(initialWorkflow.inputSchema, null, 2) : `{"type": "object", "properties": {"payload": {"type": "object"}}}`);
       setInstructions(initialWorkflow.instruction || '');
     }
-  }, [initialWorkflow]);
+  }, [initialWorkflow, embedded]);
 
   useEffect(() => {
     // In non-embedded mode, handle workflow loading by ID
@@ -611,7 +617,7 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
         disabled={loading || saving || (isExecutingStep !== undefined) || isExecutingTransform}
         className="h-9 px-4"
       >
-        {loading ? "Running Workflow..." : "Run Workflow"}
+        {loading ? "Testing Workflow..." : "Test Workflow"}
       </Button>
       <Button
         variant="default"
@@ -667,7 +673,7 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
                 onResponseSchemaChange={setResponseSchema}
                 onPayloadChange={setPayload}
                 onWorkflowIdChange={setWorkflowId}
-                onInstructionEdit={embedded ? undefined : () => { }} // Disable instruction editing in embedded mode
+                onInstructionEdit={embedded ? onInstructionEdit : undefined} // Only show edit button in embedded mode
                 integrations={integrations}
                 isExecuting={loading}
                 isExecutingStep={isExecutingStep}

@@ -57,8 +57,8 @@ class ExtendedSuperglueClient extends SuperglueClient {
 
 export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps) {
   const [step, setStep] = useState<WorkflowCreateStep>('integrations');
-  const [isBuilding, setIsBuilding] = useState(false); 
-  const [isSaving, setIsSaving] = useState(false); 
+  const [isBuilding, setIsBuilding] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -101,7 +101,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     }
   }), [client]);
 
- 
+
   useEffect(() => {
     if (preselectedIntegrationId && integrations.length > 0 && selectedIntegrationIds.length === 0) {
       if (integrations.some(i => i.id === preselectedIntegrationId)) {
@@ -110,18 +110,18 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     }
   }, [preselectedIntegrationId, integrations, selectedIntegrationIds.length]);
 
-  
+
   useEffect(() => {
     if (step === 'prompt') {
       setCurrentWorkflow(null);
     }
-    
+
     if (step !== 'prompt') {
       setValidationErrors({});
     }
   }, [step]);
 
-  
+
   const integrationOptions = [
     { value: "manual", label: "No Template", icon: "default" },
     ...Object.entries(integrationTemplates).map(([key, integration]) => ({
@@ -205,7 +205,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         description: e.message || 'Unknown error',
         variant: 'destructive'
       });
-      throw e; 
+      throw e;
     } finally {
       setIsSaving(false);
     }
@@ -731,6 +731,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                 initialInstruction={instruction}
                 integrations={integrations}
                 onSave={handleSaveWorkflow}
+                onInstructionEdit={() => setStep('prompt')}
                 selfHealingEnabled={selfHealingEnabled}
                 onSelfHealingChange={setSelfHealingEnabled}
                 headerActions={(
