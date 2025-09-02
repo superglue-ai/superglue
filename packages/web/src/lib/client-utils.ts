@@ -8,6 +8,14 @@ export interface StepExecutionResult {
   updatedStep?: any;
 }
 
+export interface FinalTransformExecutionResult {
+  success: boolean;
+  data?: any;
+  error?: string;
+  updatedTransform?: string;
+  updatedResponseSchema?: any;
+}
+
 export interface WorkflowExecutionState {
   originalWorkflow: Workflow;
   currentWorkflow: Workflow;
@@ -62,10 +70,8 @@ export async function executeSingleStep(
   const step = workflow.steps[stepIndex];
 
   try {
-    // Create a single-step workflow
     const singleStepWorkflow = createSingleStepWorkflow(workflow, stepIndex, previousResults);
 
-    // Build the execution payload with accumulated results
     const executionPayload = {
       ...payload,
       ...Object.keys(previousResults).reduce((acc, stepId) => ({
@@ -74,7 +80,6 @@ export async function executeSingleStep(
       }), {})
     };
 
-    // Execute the single-step workflow
     const result = await client.executeWorkflow({
       workflow: singleStepWorkflow,
       payload: executionPayload,
@@ -170,65 +175,87 @@ export async function executeWorkflowStepByStep(
 
   // Execute final transformation if all steps succeeded
   if (workflow.finalTransform && state.failedSteps.length === 0) {
-    try {
-      const finalPayload = {
-        ...payload,
-        ...previousResults
-      };
+    const finalResult = await executeFinalTransform(
+      client,
+      workflow.id || 'workflow',
+      state.currentWorkflow.finalTransform || workflow.finalTransform,
+      workflow.responseSchema,
+      workflow.inputSchema,
+      payload,
+      previousResults,
+      selfHealing
+    );
 
-      const finalResult = await client.executeWorkflow({
-        workflow: {
+    state.stepResults['__final_transform__'] = {
+      stepId: '__final_transform__',
+      success: finalResult.success,
+      data: finalResult.data,
+      error: finalResult.error
+    };
+
+    if (finalResult.success) {
+      state.completedSteps.push('__final_transform__');
+
+      if (finalResult.updatedTransform && selfHealing) {
+        state.currentWorkflow = {
           ...state.currentWorkflow,
-          steps: [],
-          finalTransform: workflow.finalTransform,
-          responseSchema: workflow.responseSchema
-        },
-        payload: finalPayload,
-        options: {
-          testMode: !!workflow.responseSchema,
-          selfHealing: selfHealing ? SelfHealingMode.ENABLED : SelfHealingMode.DISABLED
-        }
-      });
-
-      state.stepResults['__final_transform__'] = {
-        stepId: '__final_transform__',
-        success: finalResult.success,
-        data: finalResult.data,
-        error: finalResult.error
-      };
-
-      // Update the completed/failed steps to include final transform
-      if (finalResult.success) {
-        state.completedSteps.push('__final_transform__');
-        // If self-healing modified the final transform, capture it
-        if (finalResult.config?.finalTransform) {
-          state.currentWorkflow = {
-            ...state.currentWorkflow,
-            finalTransform: finalResult.config.finalTransform
-          };
-        }
-        // Also capture any updated response schema
-        if (finalResult.config?.responseSchema !== undefined) {
-          state.currentWorkflow = {
-            ...state.currentWorkflow,
-            responseSchema: finalResult.config.responseSchema
-          };
-        }
-      } else {
-        state.failedSteps.push('__final_transform__');
+          finalTransform: finalResult.updatedTransform
+        };
       }
-    } catch (error: any) {
-      state.stepResults['__final_transform__'] = {
-        stepId: '__final_transform__',
-        success: false,
-        error: error.message
-      };
+    } else {
       state.failedSteps.push('__final_transform__');
     }
   }
 
   state.isExecuting = false;
   return state;
+}
+
+export async function executeFinalTransform(
+  client: SuperglueClient,
+  workflowId: string,
+  finalTransform: string,
+  responseSchema: any,
+  inputSchema: any,
+  payload: any,
+  previousResults: Record<string, any>,
+  selfHealing: boolean = false
+): Promise<FinalTransformExecutionResult> {
+  try {
+    const finalPayload = {
+      ...payload,
+      ...previousResults
+    };
+
+    const result = await client.executeWorkflow({
+      workflow: {
+        id: `${workflowId}_final_transform`,
+        steps: [],
+        finalTransform,
+        // Only include responseSchema if it's actually defined (not null/undefined)
+        ...(responseSchema ? { responseSchema } : {}),
+        inputSchema: inputSchema || { type: 'object' }
+      },
+      payload: finalPayload,
+      options: {
+        testMode: !!responseSchema,  // Always use test mode if responseSchema is provided
+        selfHealing: selfHealing ? SelfHealingMode.ENABLED : SelfHealingMode.DISABLED
+      }
+    });
+
+    return {
+      success: result.success,
+      data: result.data,
+      error: result.error,
+      updatedTransform: result.config?.finalTransform,
+      updatedResponseSchema: result.config?.responseSchema
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.message || 'Final transform execution failed'
+    };
+  }
 }
 
 export function canExecuteStep(

@@ -27,14 +27,12 @@ import { StepIndicator, WORKFLOW_CREATE_STEPS } from '../utils/StepIndicator';
 import { WorkflowCreateSuccess } from './WorkflowCreateSuccess';
 import WorkflowPlayground, { WorkflowPlaygroundHandle } from './WorkflowPlayground';
 
-// Define step types specific to workflow creation
 type WorkflowCreateStep = 'integrations' | 'prompt' | 'review' | 'success';
 
 interface WorkflowCreateStepperProps {
   onComplete?: () => void;
 }
 
-// Create an extended client class
 class ExtendedSuperglueClient extends SuperglueClient {
   async generateInstructions(integrations: IntegrationInput[]): Promise<string[]> {
     const response = await fetch(`${this['endpoint']}/graphql`, {
@@ -59,8 +57,8 @@ class ExtendedSuperglueClient extends SuperglueClient {
 
 export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps) {
   const [step, setStep] = useState<WorkflowCreateStep>('integrations');
-  const [isBuilding, setIsBuilding] = useState(false); // For buildWorkflow mutation
-  const [isSaving, setIsSaving] = useState(false); // For upsertWorkflow mutation
+  const [isBuilding, setIsBuilding] = useState(false); 
+  const [isSaving, setIsSaving] = useState(false); 
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -78,7 +76,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const [selfHealingEnabled, setSelfHealingEnabled] = useState(true);
 
   const [selectedIntegrationIds, setSelectedIntegrationIds] = useState<string[]>(() => {
-    // Initialize with preselected integration if available
     return preselectedIntegrationId && integrations.some(i => i.id === preselectedIntegrationId)
       ? [preselectedIntegrationId]
       : [];
@@ -97,7 +94,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
 
   const { waitForIntegrationReady } = useMemo(() => ({
     waitForIntegrationReady: (integrationIds: string[]) => {
-      // Create adapter for SuperglueClient to work with shared utility
       const clientAdapter = {
         getIntegration: (id: string) => client.getIntegration(id)
       };
@@ -105,7 +101,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     }
   }), [client]);
 
-  // Update selectedIntegrationIds when integrations load and preselected integration is available
+ 
   useEffect(() => {
     if (preselectedIntegrationId && integrations.length > 0 && selectedIntegrationIds.length === 0) {
       if (integrations.some(i => i.id === preselectedIntegrationId)) {
@@ -114,18 +110,18 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     }
   }, [preselectedIntegrationId, integrations, selectedIntegrationIds.length]);
 
-  // Clear workflow when navigating away from review step
+  
   useEffect(() => {
     if (step === 'prompt') {
       setCurrentWorkflow(null);
     }
-    // Clear validation errors when leaving prompt step
+    
     if (step !== 'prompt') {
       setValidationErrors({});
     }
   }, [step]);
 
-  // Create integration options array with custom option first
+  
   const integrationOptions = [
     { value: "manual", label: "No Template", icon: "default" },
     ...Object.entries(integrationTemplates).map(([key, integration]) => ({
@@ -135,40 +131,32 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     }))
   ];
 
-  // Add this helper function near the top of the component
   const highlightJson = (code: string) => {
     return Prism.highlight(code, Prism.languages.json, 'json');
   };
 
-  // Helper function to determine if integration has documentation
   const hasDocumentation = (integration: Integration) => {
     // Check if integration has documentation URL and is not pending
     return !!(integration.documentationUrl?.trim() && !pendingDocIds.has(integration.id));
   };
 
-  // --- Integration Management (add/edit) ---
   const handleIntegrationFormSave = async (integration: Integration): Promise<Integration | null> => {
     // Close form immediately
     setShowIntegrationForm(false);
     setIntegrationFormEdit(null);
 
-    // Handle background operations
     try {
       const mode = integrationFormEdit ? UpsertMode.UPDATE : UpsertMode.CREATE;
       const savedIntegration = await client.upsertIntegration(integration.id, integration, mode);
       const willTriggerDocFetch = needsUIToTriggerDocFetch(savedIntegration, integrationFormEdit);
 
       if (willTriggerDocFetch) {
-        // Set pending state for new integrations with doc URLs
         setPendingDocIds(prev => new Set([...prev, savedIntegration.id]));
 
-        // Wait for docs to be ready in background - no toast needed since UI shows spinner
         waitForIntegrationReady([savedIntegration.id]).then(() => {
-          // Remove from pending when done
           setPendingDocIds(prev => new Set([...prev].filter(id => id !== savedIntegration.id)));
         }).catch((error) => {
           console.error('Error waiting for docs:', error);
-          // Remove from pending on error
           setPendingDocIds(prev => new Set([...prev].filter(id => id !== savedIntegration.id)));
         });
       }
@@ -179,7 +167,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         return newIds;
       });
 
-      // Refresh integrations to ensure UI is updated
       await refreshIntegrations();
 
       return savedIntegration;
@@ -218,13 +205,12 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         description: e.message || 'Unknown error',
         variant: 'destructive'
       });
-      throw e; // Re-throw to let WorkflowPlayground handle it
+      throw e; 
     } finally {
       setIsSaving(false);
     }
   };
 
-  // --- Step Navigation ---
   const handleNext = async () => {
     const steps: WorkflowCreateStep[] = ['integrations', 'prompt', 'review', 'success'];
     const currentIndex = steps.indexOf(step);
@@ -319,7 +305,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     }
   };
 
-  // Helper to convert Integration to IntegrationInput (strip extra fields)
   const toIntegrationInput = (i: Integration): IntegrationInput => ({
     id: i.id,
     urlHost: i.urlHost,
@@ -358,15 +343,12 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     }
   };
 
-  // Helper function to get SimpleIcon
   const getSimpleIcon = (name: string): SimpleIcon | null => {
     if (!name || name === "default") return null;
 
-    // Convert service name to proper format for simple-icons
     const formatted = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
     const iconKey = `si${formatted}`;
     try {
-      // Try the direct lookup
       // @ts-ignore - The type definitions don't properly handle string indexing
       let icon = simpleIcons[iconKey];
       return icon || null;

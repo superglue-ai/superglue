@@ -59,13 +59,11 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
   value,
   onChange,
   isOptional = false,
-  title = "Set Response Schema"
 }) => {
   const [isCodeMode, setIsCodeMode] = React.useState(false);
   const [jsonError, setJsonError] = React.useState<string | null>(null);
   const [localIsEnabled, setLocalIsEnabled] = React.useState<boolean>(!isOptional || (value !== null && value !== undefined));
 
-  // Initialize from localStorage on mount
   React.useEffect(() => {
     const savedMode = localStorage?.getItem('jsonSchemaEditorCodeMode');
     if (savedMode !== null) {
@@ -73,7 +71,6 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
     }
   }, []);
 
-  // Update localStorage when isCodeMode changes
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('jsonSchemaEditorCodeMode', isCodeMode.toString());
@@ -81,11 +78,10 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
   }, [isCodeMode]);
 
   React.useEffect(() => {
-    // Sync localIsEnabled with value prop if isOptional is true
     if (isOptional) {
       setLocalIsEnabled(value !== null && value !== undefined);
     } else {
-      setLocalIsEnabled(true); // Always enabled if not optional
+      setLocalIsEnabled(true);
     }
   }, [value, isOptional]);
 

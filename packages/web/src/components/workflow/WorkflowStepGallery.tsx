@@ -815,13 +815,26 @@ const FinalTransformCard = ({
 
     const handleTransformChange = (value: string) => {
         setLocalTransform(value);
+        // Optionally sync with parent on every change for real-time updates
+        // This is commented out to avoid too frequent updates
+        // if (onTransformChange) {
+        //     onTransformChange(value);
+        // }
     };
 
     const handleSchemaChange = (value: string | null) => {
         if (value === null) {
             setLocalSchema('');
+            // Immediately sync with parent when schema is disabled
+            if (onResponseSchemaChange) {
+                onResponseSchemaChange('');
+            }
         } else {
             setLocalSchema(value);
+            // Immediately sync with parent when schema changes
+            if (onResponseSchemaChange) {
+                onResponseSchemaChange(value);
+            }
         }
     };
 
@@ -940,7 +953,7 @@ const FinalTransformCard = ({
                     <TabsContent value="schema" className="mt-2">
                         <div className="space-y-3">
                             <JsonSchemaEditor
-                                value={localSchema}
+                                value={localSchema || null}
                                 onChange={handleSchemaChange}
                                 isOptional={true}
                             />

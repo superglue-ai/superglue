@@ -1,8 +1,8 @@
 "use client";
 import { useConfig } from "@/src/app/config-context";
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
-import { executeSingleStep, executeWorkflowStepByStep, type StepExecutionResult } from "@/src/lib/client-utils";
-import { ExecutionStep, Integration, SelfHealingMode, SuperglueClient, Workflow, WorkflowResult } from "@superglue/client";
+import { executeFinalTransform, executeSingleStep, executeWorkflowStepByStep, type StepExecutionResult } from "@/src/lib/client-utils";
+import { ExecutionStep, Integration, SuperglueClient, Workflow, WorkflowResult } from "@superglue/client";
 import { X } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
@@ -384,13 +384,13 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
 
       // Use the self-healed steps for execution if available, otherwise use original steps
       const executionSteps = selfHealedSteps.length > 0 ? selfHealedSteps : steps;
+      const currentResponseSchema = responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null;
+
       const workflow = {
         id: workflowId,
         steps: executionSteps,
         finalTransform,
-        // Only pass responseSchema if it's explicitly enabled (non-empty string)
-        // Empty string means disabled, so pass null
-        responseSchema: responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null,
+        responseSchema: currentResponseSchema,
         inputSchema: inputSchema ? JSON.parse(inputSchema) : { type: "object" },
       } as any;
 
@@ -443,14 +443,9 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
       setResult(wr);
 
       // Update finalTransform with the self-healed version if it was modified
-      if (state.currentWorkflow.finalTransform) {
+      if (state.currentWorkflow.finalTransform && selfHealingEnabled) {
         setFinalTransform(state.currentWorkflow.finalTransform);
       }
-      // Also update responseSchema if it was part of the workflow
-      if (state.currentWorkflow.responseSchema !== undefined) {
-        setResponseSchema(state.currentWorkflow.responseSchema ? JSON.stringify(state.currentWorkflow.responseSchema, null, 2) : '');
-      }
-      // Set the completed and failed steps from the state (now includes __final_transform__)
       setCompletedSteps(state.completedSteps);
       setFailedSteps(state.failedSteps);
 
@@ -548,44 +543,24 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
       setIsExecutingTransform(true);
 
       // Build the payload with all step results
-      // Extract just the data from each step result (not the full StepExecutionResult object)
       const stepData: Record<string, any> = {};
       Object.entries(stepResultsMap).forEach(([stepId, result]) => {
-        // Skip the __final_transform__ result and extract data from StepExecutionResult
         if (stepId !== '__final_transform__') {
-          // If result has a 'data' property, use it; otherwise use the result directly
           stepData[stepId] = result?.data !== undefined ? result.data : result;
         }
       });
+      const parsedResponseSchema = schemaStr && schemaStr.trim() ? JSON.parse(schemaStr) : null;
 
-      const finalPayload = {
-        ...JSON.parse(payload || '{}'),
-        ...stepData
-      };
-
-      // Parse response schema if provided
-      // Use schemaStr if it's explicitly provided (even if empty string means disabled)
-      // Only fall back to parent schema if schemaStr is undefined
-      const parsedResponseSchema = schemaStr !== undefined
-        ? (schemaStr && schemaStr.trim() ? JSON.parse(schemaStr) : null)
-        : (responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null);
-
-      // Execute just the final transform (empty steps, only transform)
-      const result = await client.executeWorkflow({
-        workflow: {
-          id: workflowId,
-          steps: [],
-          finalTransform: transformStr || finalTransform,
-          // Only include responseSchema if it's actually defined
-          ...(parsedResponseSchema ? { responseSchema: parsedResponseSchema } : {}),
-          inputSchema: inputSchema ? JSON.parse(inputSchema) : { type: 'object' }
-        },
-        payload: finalPayload,
-        options: {
-          testMode: !!parsedResponseSchema, // Use test mode when response schema is defined
-          selfHealing: SelfHealingMode.DISABLED // No self-healing for test
-        }
-      });
+      const result = await executeFinalTransform(
+        client,
+        workflowId || 'test',
+        transformStr || finalTransform,
+        parsedResponseSchema,
+        inputSchema ? JSON.parse(inputSchema) : null,
+        JSON.parse(payload || '{}'),
+        stepData,
+        false
+      );
 
       if (result.success) {
         setCompletedSteps(prev => Array.from(new Set([...prev.filter(id => id !== '__final_transform__'), '__final_transform__'])));
@@ -611,18 +586,6 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
           variant: "destructive",
         });
       }
-    } catch (error: any) {
-      setFailedSteps(prev => Array.from(new Set([...prev.filter(id => id !== '__final_transform__'), '__final_transform__'])));
-      setCompletedSteps(prev => prev.filter(id => id !== '__final_transform__'));
-      setStepResultsMap(prev => ({
-        ...prev,
-        ['__final_transform__']: error.message || 'Transform execution failed'
-      }));
-      toast({
-        title: "Transform execution error",
-        description: error.message || "An unexpected error occurred",
-        variant: "destructive",
-      });
     } finally {
       setIsExecutingTransform(false);
     }
