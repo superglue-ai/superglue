@@ -59,6 +59,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const [step, setStep] = useState<WorkflowCreateStep>('integrations');
   const [isBuilding, setIsBuilding] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isExecuting, setIsExecuting] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -208,6 +209,15 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       throw e;
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleExecuteWorkflow = async () => {
+    try {
+      setIsExecuting(true);
+      await playgroundRef.current?.executeWorkflow();
+    } finally {
+      setIsExecuting(false);
     }
   };
 
@@ -754,11 +764,11 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                     </div>
                     <Button
                       variant="success"
-                      onClick={() => playgroundRef.current?.executeWorkflow()}
-                      disabled={isSaving}
+                      onClick={handleExecuteWorkflow}
+                      disabled={isSaving || isExecuting}
                       className="h-9 px-4"
                     >
-                      Test Workflow
+                      {isExecuting ? "Testing Workflow..." : "Test Workflow"}
                     </Button>
                     <Button
                       variant="default"
