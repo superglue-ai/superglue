@@ -168,7 +168,15 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
       }
     };
 
-    onEdit(step.id, updatedStep);
+    // Check if there are actual changes by comparing the serialized JSON
+    const originalJson = JSON.stringify(step);
+    const updatedJson = JSON.stringify(updatedStep);
+
+    if (originalJson !== updatedJson) {
+      // Only call onEdit if there are actual changes
+      onEdit(step.id, updatedStep);
+    }
+
     setIsEditing(false);
   };
 

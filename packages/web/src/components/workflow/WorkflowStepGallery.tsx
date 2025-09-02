@@ -456,7 +456,7 @@ const FinalResultsCard = ({ result }: { result: any }) => {
                             />
                             {displayData.truncated && (
                                 <div className="mt-2 text-xs text-amber-600 dark:text-amber-300">
-                                    Preview truncated for performance. Use copy button to get full data.
+                                    Preview truncated for display performance. Use copy button to get full data.
                                 </div>
                             )}
                         </>
@@ -1041,7 +1041,7 @@ const FinalTransformMiniStepCard = ({
                                     />
                                     {isTruncated && inputViewMode === 'preview' && (
                                         <div className="mt-1 text-[10px] text-amber-600 dark:text-amber-300 px-2">
-                                            Preview truncated for performance
+                                            Preview truncated for display performance
                                         </div>
                                     )}
                                 </>
@@ -1171,14 +1171,14 @@ const SpotlightStepCard = ({
                 <div className="space-y-3">
                     <div className="flex items-center justify-between">
                         <Tabs value={activePanel} onValueChange={(v) => setActivePanel(v as 'input' | 'config' | 'output')}>
-                            <TabsList className="h-8 rounded-md">
-                                <TabsTrigger value="input" className="h-8 px-3 text-xs flex items-center gap-1 rounded-md data-[state=active]:rounded-md">
+                            <TabsList className="h-9 p-1 rounded-md">
+                                <TabsTrigger value="input" className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm">
                                     <FileJson className="h-4 w-4" /> Step Input
                                 </TabsTrigger>
-                                <TabsTrigger value="config" className="h-8 px-3 text-xs flex items-center gap-1 rounded-md data-[state=active]:rounded-md">
+                                <TabsTrigger value="config" className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm">
                                     <Settings className="h-4 w-4" /> Step Config
                                 </TabsTrigger>
-                                <TabsTrigger value="output" className="h-8 px-3 text-xs flex items-center gap-1 rounded-md data-[state=active]:rounded-md">
+                                <TabsTrigger value="output" className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm">
                                     <Package className="h-4 w-4" /> Step Output
                                 </TabsTrigger>
                             </TabsList>
@@ -1210,9 +1210,9 @@ const SpotlightStepCard = ({
                                             overlay={
                                                 <div className="flex items-center gap-1">
                                                     <Tabs value={inputViewMode} onValueChange={(v) => setInputViewMode(v as 'preview' | 'schema')} className="w-auto">
-                                                        <TabsList className="h-6 rounded-md">
-                                                            <TabsTrigger value="preview" className="h-5 px-2 text-[11px] rounded-md data-[state=active]:rounded-md">Preview</TabsTrigger>
-                                                            <TabsTrigger value="schema" className="h-5 px-2 text-[11px] rounded-md data-[state=active]:rounded-md">Schema</TabsTrigger>
+                                                        <TabsList className="h-6 p-0.5 rounded-md">
+                                                            <TabsTrigger value="preview" className="h-full px-2 text-[11px] rounded-sm data-[state=active]:rounded-sm">Preview</TabsTrigger>
+                                                            <TabsTrigger value="schema" className="h-full px-2 text-[11px] rounded-sm data-[state=active]:rounded-sm">Schema</TabsTrigger>
                                                         </TabsList>
                                                     </Tabs>
                                                     <CopyButton text={inputString} />
@@ -1221,7 +1221,7 @@ const SpotlightStepCard = ({
                                         />
                                         {isTruncated && inputViewMode === 'preview' && (
                                             <div className="mt-1 text-[10px] text-amber-600 dark:text-amber-300 px-2">
-                                                Preview truncated for performance
+                                                Preview truncated for display performance
                                             </div>
                                         )}
                                     </>
@@ -1304,9 +1304,9 @@ const SpotlightStepCard = ({
                                                         <div className="flex items-center gap-1">
                                                             {!errorResult && (
                                                                 <Tabs value={outputViewMode} onValueChange={(v) => setOutputViewMode(v as 'preview' | 'schema')} className="w-auto">
-                                                                    <TabsList className="h-6 rounded-md">
-                                                                        <TabsTrigger value="preview" className="h-6 px-2 text-[11px] rounded-md data-[state=active]:rounded-md">Preview</TabsTrigger>
-                                                                        <TabsTrigger value="schema" className="h-6 px-2 text-[11px] rounded-md data-[state=active]:rounded-md">Schema</TabsTrigger>
+                                                                    <TabsList className="h-6 p-0.5 rounded-md">
+                                                                        <TabsTrigger value="preview" className="h-full px-2 text-[11px] rounded-sm data-[state=active]:rounded-sm">Preview</TabsTrigger>
+                                                                        <TabsTrigger value="schema" className="h-full px-2 text-[11px] rounded-sm data-[state=active]:rounded-sm">Schema</TabsTrigger>
                                                                     </TabsList>
                                                                 </Tabs>
                                                             )}
@@ -1316,7 +1316,7 @@ const SpotlightStepCard = ({
                                                 />
                                                 {isTruncated && outputViewMode === 'preview' && (
                                                     <div className="mt-1 text-[10px] text-amber-600 dark:text-amber-300 px-2">
-                                                        Preview truncated for performance
+                                                        Preview truncated for display performance
                                                     </div>
                                                 )}
                                             </>
