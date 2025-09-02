@@ -3,7 +3,7 @@ export interface SdkCodegenOptions {
     endpoint: string;
     workflowId: string;
     payload: any;
-    credentials?: any;
+    credentials: any;
     includeComments?: boolean;
     wrapInMain?: boolean;
 }
