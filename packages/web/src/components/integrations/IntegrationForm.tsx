@@ -607,26 +607,28 @@ export function IntegrationForm({
                                 </div>
                             </div>
 
-                            <div className="border-t pt-3">
-                                <Label className="text-xs flex items-center gap-1">
-                                    Redirect URI
-                                    <HelpTooltip text="Copy this URL and add it to your OAuth app's allowed redirect URIs. This is where users will be sent after authorizing your app." />
-                                </Label>
-                                <div className="flex items-center gap-2 mt-1 mb-2">
-                                    <code className="text-xs bg-background px-2 py-1 rounded flex-1 overflow-x-auto">
-                                        {getOAuthCallbackUrl()}
-                                    </code>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8"
-                                        onClick={() => copyToClipboard(getOAuthCallbackUrl())}
-                                    >
-                                        <Copy className="h-4 w-4" />
-                                    </Button>
+                            {oauthFields.grant_type === 'authorization_code' && (
+                                <div className="border-t pt-3">
+                                    <Label className="text-xs flex items-center gap-1">
+                                        Redirect URI
+                                        <HelpTooltip text="Copy this URL and add it to your OAuth app's allowed redirect URIs. This is where users will be sent after authorizing your app." />
+                                    </Label>
+                                    <div className="flex items-center gap-2 mt-1 mb-2">
+                                        <code className="text-xs bg-background px-2 py-1 rounded flex-1 overflow-x-auto">
+                                            {getOAuthCallbackUrl()}
+                                        </code>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8"
+                                            onClick={() => copyToClipboard(getOAuthCallbackUrl())}
+                                        >
+                                            <Copy className="h-4 w-4" />
+                                        </Button>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
 
 
                         </div>
