@@ -106,12 +106,12 @@ const inferSchema = (data: any): any => {
 };
 
 // Size-based truncation for display 
-const MAX_DISPLAY_SIZE = 1000 * 1024; // 1MB limit for JSON display
-const MAX_DISPLAY_LINES = 5000; // Max lines to show in any JSON view
-const MAX_STRING_PREVIEW_LENGTH = 5000; // Max chars for individual string values
+const MAX_DISPLAY_SIZE = 1024 * 1024; // 1MB limit for JSON display
+const MAX_DISPLAY_LINES = 3000; // Max lines to show in any JSON view
+const MAX_STRING_PREVIEW_LENGTH = 3000; // Max chars for individual string values
 const MAX_ARRAY_PREVIEW_ITEMS = 10; // Max array items to show before truncating
-const MAX_TRUNCATION_DEPTH = 5; // Max depth for nested object traversal
-const MAX_OBJECT_PREVIEW_KEYS = 300; // Max object keys to show before truncating
+const MAX_TRUNCATION_DEPTH = 10; // Max depth for nested object traversal
+const MAX_OBJECT_PREVIEW_KEYS = 100; // Max object keys to show before truncating
 
 const truncateValue = (value: any, depth: number = 0): any => {
     if (depth > MAX_TRUNCATION_DEPTH) return '...';
