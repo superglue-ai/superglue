@@ -389,7 +389,9 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
       JSON.parse(responseSchema || '{}');
       JSON.parse(inputSchema || '{}');
 
-      // Use the self-healed steps for execution if available, otherwise use original steps
+      // Use self-healed steps from a previous run only if:
+      // 1. They exist (from a previous successful self-healing run)  
+      // 2. The user hasn't edited steps/transform since then (editing clears selfHealedSteps)
       const executionSteps = selfHealedSteps.length > 0 ? selfHealedSteps : steps;
       const currentResponseSchema = responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null;
 
@@ -487,12 +489,14 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
 
   const handleStepsChange = (newSteps: any[]) => {
     setSteps(newSteps);
+    setSelfHealedSteps([]);
   };
 
   const handleStepEdit = (stepId: string, updatedStep: any) => {
     setSteps(prevSteps =>
       prevSteps.map(step => (step.id === stepId ? { ...updatedStep, apiConfig: { ...updatedStep.apiConfig, id: updatedStep.apiConfig.id || updatedStep.id } } : step))
     );
+    setSelfHealedSteps([]);
 
     // Find the index of the edited step
     const stepIndex = steps.findIndex(s => s.id === stepId);
@@ -679,7 +683,11 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
                 onStepEdit={handleStepEdit}
                 onExecuteStep={handleExecuteStep}
                 onExecuteTransform={handleExecuteTransform}
-                onFinalTransformChange={setFinalTransform}
+                onFinalTransformChange={(transform: string) => {
+                  setFinalTransform(transform);
+                  // Clear self-healed steps when transform is edited - ensures edited transform is used
+                  setSelfHealedSteps([]);
+                }}
                 onResponseSchemaChange={setResponseSchema}
                 onPayloadChange={setPayload}
                 onWorkflowIdChange={setWorkflowId}
