@@ -539,6 +539,8 @@ export async function executeApiCall({
   let success = false;
   let isSelfHealing = isSelfHealingEnabled(options, "api");
 
+  // If self healing is enabled, use the retries from the options or the default max of 10 if not specified, otherwise use 1 (no self-healing case)
+  const effectiveMaxRetries = isSelfHealing ? (options?.retries !== undefined ? options.retries : server_defaults.MAX_CALL_RETRIES) : 1;
 
   do {
     try {
@@ -598,13 +600,13 @@ export async function executeApiCall({
       }
     }
     retryCount++;
-  } while (retryCount < (options?.retries !== undefined ? options.retries : server_defaults.MAX_CALL_RETRIES));
+  } while (retryCount < effectiveMaxRetries);
   if (!success) {
-    telemetryClient?.captureException(new Error(`API call failed after ${retryCount} retries. Last error: ${lastError}`), metadata.orgId, {
+    telemetryClient?.captureException(new Error(`API call failed. Last error: ${lastError}`), metadata.orgId, {
       endpoint: endpoint,
       retryCount: retryCount,
     });
-    throw new ApiCallError(`API call failed after ${retryCount} retries. Last error: ${lastError}`, response?.statusCode);
+    throw new ApiCallError(`API call failed. Last error: ${lastError}`, response?.statusCode);
   }
 
   return { data: response?.data, endpoint, statusCode: response?.statusCode, headers: response?.headers };

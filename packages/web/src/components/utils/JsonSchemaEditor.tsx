@@ -55,19 +55,15 @@ const ARRAY_ITEM_TYPE_DISPLAY = {
   'any': 'any[]',
 };
 
-const DEFAULT_EMPTY_SCHEMA = `{"type":"any"}`;
-
 const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
   value,
   onChange,
   isOptional = false,
-  title = "Set Response Schema"
 }) => {
   const [isCodeMode, setIsCodeMode] = React.useState(false);
   const [jsonError, setJsonError] = React.useState<string | null>(null);
-  const [localIsEnabled, setLocalIsEnabled] = React.useState<boolean>(!isOptional || value !== null);
+  const [localIsEnabled, setLocalIsEnabled] = React.useState<boolean>(!isOptional || (value !== null && value !== undefined));
 
-  // Initialize from localStorage on mount
   React.useEffect(() => {
     const savedMode = localStorage?.getItem('jsonSchemaEditorCodeMode');
     if (savedMode !== null) {
@@ -75,7 +71,6 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
     }
   }, []);
 
-  // Update localStorage when isCodeMode changes
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('jsonSchemaEditorCodeMode', isCodeMode.toString());
@@ -83,11 +78,10 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
   }, [isCodeMode]);
 
   React.useEffect(() => {
-    // Sync localIsEnabled with value prop if isOptional is true
     if (isOptional) {
-      setLocalIsEnabled(value !== null);
+      setLocalIsEnabled(value !== null && value !== undefined);
     } else {
-      setLocalIsEnabled(true); // Always enabled if not optional
+      setLocalIsEnabled(true);
     }
   }, [value, isOptional]);
 
@@ -117,6 +111,12 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
       setJsonError(null);
       return;
     }
+    // Handle empty string as valid empty content (not disabled)
+    if (value === '') {
+      setVisualSchema({});
+      setJsonError(null);
+      return;
+    }
     try {
       const parsed = JSON.parse(value);
       setVisualSchema(parsed);
@@ -128,11 +128,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
         onChange(formattedValue);
       }
     } catch (e) {
-      if (value !== '') {
-        setJsonError((e as Error).message);
-      } else {
-        setJsonError(null);
-      }
+      setJsonError((e as Error).message);
     }
   }, [value, onChange]);
 
@@ -392,7 +388,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
                     // Hide tooltip when typing
                     setHoveredDescField(null);
                   }}
-                  className="w-full min-w-[200px] flex-1 border-muted hover:border-primary/50 focus:border-primary/50 text-xs sm:text-sm focus:ring-inset"
+                  className="w-full min-w-[200px] flex-1 border-muted hover:border-primary/50 focus:border-primary/50 text-xs sm:text-sm"
                   placeholder="Add AI instructions or filters"
                   onFocus={() => {
                     // Clear timeout and hide tooltip on focus
@@ -575,9 +571,12 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
       if (!enabled) {
         onChange(null);
       } else {
-        // If enabling and current parent value is null, provide a default
+        // If enabling and current parent value is null or empty, provide a default
         // This ensures a fresh start if re-enabled
-        onChange(JSON.stringify(ensureObjectStructure({ type: 'any' }), null, 2));
+        if (value === null || value === '') {
+          onChange(JSON.stringify(ensureObjectStructure({ type: 'any' }), null, 2));
+        }
+        // Otherwise keep the existing value
       }
     }
   };
@@ -614,9 +613,9 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
                 <Editor
                   value={value || ""} // Editor expects string, use "" if value is null but enabled (e.g. just re-enabled)
                   onValueChange={(code) => {
-                    onChange(code); // Pass code directly
+                    onChange(code);
                     try {
-                      JSON.parse(code);
+                      JSON.parse(code || '{}');
                       setJsonError(null);
                     } catch (e) {
                       setJsonError((e as Error).message);
@@ -630,6 +629,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
                     "font-mono text-xs w-full min-h-full",
                     jsonError && "border-red-500"
                   )}
+                  textareaClassName="outline-none focus:outline-none"
                   style={{
                     fontFamily: 'var(--font-mono)',
                     minHeight: '100%',

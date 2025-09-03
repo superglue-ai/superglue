@@ -14,7 +14,7 @@ import { DocumentationField } from '@/src/components/utils/DocumentationField';
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import { URLField } from '@/src/components/utils/URLField';
 import { useToast } from '@/src/hooks/use-toast';
-import { cn, composeUrl } from '@/src/lib/utils';
+import { cn, composeUrl, inputErrorStyles } from '@/src/lib/utils';
 import type { Integration } from '@superglue/client';
 
 import { buildOAuthUrlForIntegration, createOAuthErrorHandler, getOAuthCallbackUrl, triggerOAuthFlow } from '@/src/components/utils/oauth-utils';
@@ -28,7 +28,6 @@ export interface IntegrationFormProps {
     onCancel: () => void;
     integrationOptions: { value: string; label: string; icon: string }[];
     getSimpleIcon: (name: string) => any;
-    inputErrorStyles: string;
     modal?: boolean;
 }
 
@@ -56,7 +55,6 @@ export function IntegrationForm({
     onCancel,
     integrationOptions,
     getSimpleIcon,
-    inputErrorStyles,
     modal = false,
 }: IntegrationFormProps) {
     const initialSelected = integration

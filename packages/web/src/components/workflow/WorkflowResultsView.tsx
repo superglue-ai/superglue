@@ -245,8 +245,8 @@ export function WorkflowResultsView({
             <div className="p-4">
               <WorkflowCreateSuccess
                 currentWorkflow={currentWorkflow}
+                payload={payload || {}}
                 credentials={credentials}
-                payload={payload}
               />
             </div>
           )

@@ -1,6 +1,275 @@
-import { Integration } from "@superglue/client";
+import { Integration, SelfHealingMode, SuperglueClient, Workflow } from "@superglue/client";
 
-export const inputErrorStyles = "!border-destructive !border-[1px] focus:!ring-0 focus:!ring-offset-0"
+export interface StepExecutionResult {
+  stepId: string;
+  success: boolean;
+  data?: any;
+  error?: string;
+  updatedStep?: any;
+}
+
+export interface FinalTransformExecutionResult {
+  success: boolean;
+  data?: any;
+  error?: string;
+  updatedTransform?: string;
+  updatedResponseSchema?: any;
+}
+
+export interface WorkflowExecutionState {
+  originalWorkflow: Workflow;
+  currentWorkflow: Workflow;
+  stepResults: Record<string, StepExecutionResult>;
+  completedSteps: string[];
+  failedSteps: string[];
+  isExecuting: boolean;
+  currentStepIndex: number;
+}
+
+export function createSingleStepWorkflow(
+  workflow: Workflow,
+  stepIndex: number,
+  previousResults: Record<string, any> = {}
+): Workflow {
+  if (stepIndex < 0 || stepIndex >= workflow.steps.length) {
+    throw new Error(`Invalid step index: ${stepIndex}`);
+  }
+
+  const step = workflow.steps[stepIndex];
+
+  const singleStepWorkflow: any = {
+    id: `${workflow.id}_step_${stepIndex}`,
+    steps: [step],
+    finalTransform: '(sourceData) => sourceData'
+  };
+
+  return singleStepWorkflow;
+}
+
+export async function executeSingleStep(
+  client: SuperglueClient,
+  workflow: Workflow,
+  stepIndex: number,
+  payload: any,
+  previousResults: Record<string, any> = {},
+  selfHealing: boolean = true
+): Promise<StepExecutionResult> {
+  const step = workflow.steps[stepIndex];
+
+  try {
+    const singleStepWorkflow = createSingleStepWorkflow(workflow, stepIndex, previousResults);
+
+    const executionPayload = {
+      ...payload,
+      ...Object.keys(previousResults).reduce((acc, stepId) => ({
+        ...acc,
+        [`${stepId}`]: previousResults[stepId]
+      }), {})
+    };
+
+    const result = await client.executeWorkflow({
+      workflow: singleStepWorkflow,
+      payload: executionPayload,
+      options: {
+        testMode: false,
+        selfHealing: selfHealing ? SelfHealingMode.ENABLED : SelfHealingMode.DISABLED
+      }
+    });
+
+    const stepResult: any = Array.isArray(result.stepResults)
+      ? result.stepResults[0]
+      : result.stepResults?.[step.id];
+
+    return {
+      stepId: step.id,
+      success: result.success,
+      data: stepResult?.data || stepResult?.transformedData || stepResult || result.data,
+      error: result.error,
+      // If self-healing modified the step, capture the updated configuration
+      updatedStep: result.config?.steps?.[0]
+    };
+  } catch (error: any) {
+    return {
+      stepId: step.id,
+      success: false,
+      error: error.message || 'Step execution failed'
+    };
+  }
+}
+
+export async function executeWorkflowStepByStep(
+  client: SuperglueClient,
+  workflow: Workflow,
+  payload: any,
+  onStepComplete?: (stepIndex: number, result: StepExecutionResult) => void,
+  selfHealing: boolean = true
+): Promise<WorkflowExecutionState> {
+  const state: WorkflowExecutionState = {
+    originalWorkflow: workflow,
+    currentWorkflow: { ...workflow },
+    stepResults: {},
+    completedSteps: [],
+    failedSteps: [],
+    isExecuting: true,
+    currentStepIndex: 0
+  };
+
+  const previousResults: Record<string, any> = {};
+
+  for (let i = 0; i < workflow.steps.length; i++) {
+    state.currentStepIndex = i;
+    const step = workflow.steps[i];
+
+    const result = await executeSingleStep(
+      client,
+      state.currentWorkflow,
+      i,
+      payload,
+      previousResults,
+      selfHealing
+    );
+
+    state.stepResults[step.id] = result;
+
+    if (result.success) {
+      state.completedSteps.push(step.id);
+      previousResults[step.id] = result.data;
+
+      // Update the workflow if self-healing modified the step
+      if (result.updatedStep) {
+        state.currentWorkflow = {
+          ...state.currentWorkflow,
+          steps: state.currentWorkflow.steps.map((s, idx) =>
+            idx === i ? result.updatedStep : s
+          )
+        };
+      }
+    } else {
+      state.failedSteps.push(step.id);
+      state.isExecuting = false;
+
+      // Stop execution on failure
+      if (onStepComplete) {
+        onStepComplete(i, result);
+      }
+      return state;
+    }
+
+    if (onStepComplete) {
+      onStepComplete(i, result);
+    }
+  }
+
+  // Execute final transformation if all steps succeeded
+  if (workflow.finalTransform && state.failedSteps.length === 0) {
+    const finalResult = await executeFinalTransform(
+      client,
+      workflow.id || 'workflow',
+      state.currentWorkflow.finalTransform || workflow.finalTransform,
+      workflow.responseSchema,
+      workflow.inputSchema,
+      payload,
+      previousResults,
+      selfHealing
+    );
+
+    state.stepResults['__final_transform__'] = {
+      stepId: '__final_transform__',
+      success: finalResult.success,
+      data: finalResult.data,
+      error: finalResult.error
+    };
+
+    if (finalResult.success) {
+      state.completedSteps.push('__final_transform__');
+
+      if (finalResult.updatedTransform && selfHealing) {
+        state.currentWorkflow = {
+          ...state.currentWorkflow,
+          finalTransform: finalResult.updatedTransform
+        };
+      }
+    } else {
+      state.failedSteps.push('__final_transform__');
+    }
+  }
+
+  state.isExecuting = false;
+  return state;
+}
+
+export async function executeFinalTransform(
+  client: SuperglueClient,
+  workflowId: string,
+  finalTransform: string,
+  responseSchema: any,
+  inputSchema: any,
+  payload: any,
+  previousResults: Record<string, any>,
+  selfHealing: boolean = false
+): Promise<FinalTransformExecutionResult> {
+  try {
+    const finalPayload = {
+      ...payload,
+      ...previousResults
+    };
+
+    const result = await client.executeWorkflow({
+      workflow: {
+        id: `${workflowId}_final_transform`,
+        steps: [],
+        finalTransform,
+        // Only include responseSchema if it's actually defined (not null/undefined)
+        ...(responseSchema ? { responseSchema } : {}),
+        inputSchema: inputSchema || { type: 'object' }
+      },
+      payload: finalPayload,
+      options: {
+        testMode: !!responseSchema,  // Always use test mode if responseSchema is provided
+        selfHealing: selfHealing ? SelfHealingMode.ENABLED : SelfHealingMode.DISABLED
+      }
+    });
+
+    return {
+      success: result.success,
+      data: result.data,
+      error: result.error,
+      updatedTransform: result.config?.finalTransform,
+      updatedResponseSchema: result.config?.responseSchema
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.message || 'Final transform execution failed'
+    };
+  }
+}
+
+export function canExecuteStep(
+  stepIndex: number,
+  completedSteps: string[],
+  workflow: Workflow,
+  stepResults?: Record<string, any>
+): boolean {
+  if (stepIndex === 0) {
+    return true;
+  }
+
+  // Check that all previous steps are completed and have results
+  for (let i = 0; i < stepIndex; i++) {
+    const stepId = workflow.steps[i].id;
+    if (!completedSteps.includes(stepId)) {
+      return false;
+    }
+    // If stepResults is provided, also check that the step has a result
+    if (stepResults && !stepResults[stepId]) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 
 export const isJsonEmpty = (inputJson: string): boolean => {
   try {
@@ -71,12 +340,12 @@ export const splitUrl = (url: string) => {
       urlPath: ''
     }
   }
-  
+
   // Find the position after the protocol (://)
-  const protocolEnd = url.indexOf('://');  
+  const protocolEnd = url.indexOf('://');
   // Find the first slash after the protocol
   const firstSlashAfterProtocol = url.indexOf('/', protocolEnd + 3);
-  
+
   if (firstSlashAfterProtocol === -1) {
     // No path, entire URL is the host
     return {
@@ -84,7 +353,7 @@ export const splitUrl = (url: string) => {
       urlPath: ''
     }
   }
-  
+
   // Split at the first slash after protocol
   return {
     urlHost: url.substring(0, firstSlashAfterProtocol),

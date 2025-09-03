@@ -251,8 +251,6 @@ export default function IntegrationsPage() {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [integrationToDelete, setIntegrationToDelete] = useState<Integration | null>(null);
 
-    const inputErrorStyles = "border-destructive focus-visible:ring-destructive";
-
     const [isRefreshing, setIsRefreshing] = useState(false);
 
     const handleDelete = async (id: string) => {
@@ -496,7 +494,6 @@ export default function IntegrationsPage() {
                                     }}
                                     integrationOptions={integrationOptions}
                                     getSimpleIcon={getSimpleIcon}
-                                    inputErrorStyles={inputErrorStyles}
                                 />
                             </div>
                         </div>

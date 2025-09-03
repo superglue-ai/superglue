@@ -1474,6 +1474,13 @@ export const integrations: Record<string, IntegrationConfig> = {
     docsUrl: "https://crawlbase.com/docs/crawling-api/",
     preferredAuthType: "apikey",
     keywords: ["crawl", "scrape", "extract", "search", "pdf", "web", "html", "markdown", "api key"]
+  },
+  gemini: {
+    apiUrl: "https://generativelanguage.googleapis.com/v1beta/models/{model_string}:generateContent?key={your-api-key}",
+    regex: "^.*(gemini|generativelanguage)\\.googleapis\\.com.*$",
+    icon: "gemini",
+    docsUrl: "https://ai.google.dev/api",
+    preferredAuthType: "apikey",
   }
 }
 

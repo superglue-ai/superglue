@@ -58,7 +58,10 @@ export async function decompressZip(buffer: Buffer): Promise<Buffer> {
 
 export async function parseFile(buffer: Buffer, fileType: FileType): Promise<any> {
     if (!buffer || buffer.length == 0) return null;
-    fileType = fileType == FileType.AUTO ? await detectFileType(buffer) : fileType;
+
+    if (fileType === FileType.AUTO) {
+        fileType = await detectFileType(buffer);
+    }
 
     switch (fileType) {
         case FileType.JSON:
@@ -69,6 +72,8 @@ export async function parseFile(buffer: Buffer, fileType: FileType): Promise<any
             return parseCSV(buffer);
         case FileType.EXCEL:
             return parseExcel(buffer);
+        case FileType.RAW:
+            return buffer.toString('utf8');
         default:
             throw new Error('Unsupported file type');
     }
@@ -307,37 +312,70 @@ async function parseExcel(buffer: Buffer): Promise<{ [sheetName: string]: any[] 
 }
 
 async function detectFileType(buffer: Buffer): Promise<FileType> {
-    // Excel file signatures
     const xlsxSignature = buffer.slice(0, 4).toString('hex');
     if (xlsxSignature === '504b0304') { // XLSX files are ZIP files
         try {
-            // Try to parse as XLSX
             XLSX.read(buffer, { type: 'buffer' });
             return FileType.EXCEL;
-        } catch {
-            // If XLSX parsing fails, continue with other detection
-        }
+        } catch { }
     }
-
-    // Create stream and readline interface
-    const sampleSize = Math.min(buffer.length, 1024);
+    const sampleSize = Math.min(buffer.length, 4096);
     const sample = buffer.slice(0, sampleSize).toString('utf8');
 
     try {
-        // Wait for the first line
         const trimmedLine = sample.trim();
 
-        // Determine file type
         if (trimmedLine.startsWith('{') || trimmedLine.startsWith('[')) {
             return FileType.JSON;
         } else if (trimmedLine.startsWith('<?xml') || trimmedLine.startsWith('<')) {
             return FileType.XML;
-        } else {
+        } else if (isLikelyCSV(buffer)) {
             return FileType.CSV;
+        } else {
+            return FileType.RAW;
         }
     } catch (error) {
         throw new Error(`Error reading file: ${error.message}`);
     }
+}
+
+function isLikelyCSV(buffer: Buffer): boolean {
+    // Take a sample of the file
+    const sampleSize = Math.min(buffer.length, 8192);
+    const sample = buffer.slice(0, sampleSize).toString('utf8');
+    const lines = sample.split(/\r?\n/).filter(line => line.length > 0).slice(0, 10);
+
+    if (lines.length < 2) return false;
+
+    // Check common delimiters
+    const delimiters = [',', '\t', ';', '|'];
+
+    for (const delimiter of delimiters) {
+        // Count delimiter occurrences in each line
+        const delimiterCounts = lines.map(line => {
+            return (line.match(new RegExp(`\\${delimiter}`, 'g')) || []).length;
+        });
+
+        // Skip if no delimiters found
+        if (Math.max(...delimiterCounts) === 0) continue;
+
+        // Check if delimiter count is consistent across lines
+        // Allow some variance for headers and empty fields
+        const nonZeroCounts = delimiterCounts.filter(count => count > 0);
+        if (nonZeroCounts.length >= lines.length * 0.7) { // At least 70% of lines have delimiters
+            const avgCount = nonZeroCounts.reduce((a, b) => a + b, 0) / nonZeroCounts.length;
+            const consistentLines = delimiterCounts.filter(count =>
+                count === 0 || Math.abs(count - avgCount) <= Math.max(2, avgCount * 0.3)
+            ).length;
+
+            // If most lines have consistent delimiter counts, it's likely CSV
+            if (consistentLines >= lines.length * 0.8) {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }
 
 function detectDelimiter(buffer: Buffer): string {
