@@ -413,15 +413,21 @@ ${JSON.stringify(sample(payload || {}, 5)).slice(0, LanguageModel.contextLength 
   if (generatedConfig?.error) {
     throw new AbortError(generatedConfig.error);
   }
-
+  // convert the queryParams and headers to an object
+  const queryParams = generatedConfig.apiConfig.queryParams ?
+    Object.fromEntries(generatedConfig.apiConfig.queryParams.map((p: any) => [p.key, p.value])) :
+    undefined;
+  const headers = generatedConfig.apiConfig.headers ?
+    Object.fromEntries(generatedConfig.apiConfig.headers.map((p: any) => [p.key, p.value])) :
+    undefined;
   return {
     config: {
       instruction: apiConfig.instruction,
       urlHost: generatedConfig.apiConfig.urlHost,
       urlPath: generatedConfig.apiConfig.urlPath,
       method: generatedConfig.apiConfig.method,
-      queryParams: generatedConfig.apiConfig.queryParams,
-      headers: generatedConfig.apiConfig.headers,
+      queryParams: queryParams,
+      headers: headers,
       body: generatedConfig.apiConfig.body,
       authentication: generatedConfig.apiConfig.authentication,
       pagination: generatedConfig.apiConfig.pagination,
@@ -562,7 +568,7 @@ export async function executeApiCall({
       }
 
       // Check if response is valid
-      if (retryCount > 0 && isSelfHealing) {
+      if (retryCount > 0 && isSelfHealing || options.testMode) {
         const result = await evaluateResponse({
           data: response.data,
           endpoint: endpoint,

@@ -392,7 +392,7 @@ function detectDelimiter(buffer: Buffer): string {
     });
 
     if (detectedDelimiter.count === 0) {
-        return ' ';
+        return ',';
     }
 
     return detectedDelimiter.delimiter;

@@ -7,8 +7,8 @@ import { getIntrospectionQuery } from "graphql";
 import * as yaml from 'js-yaml';
 import { server_defaults } from '../default.js';
 import { LanguageModel } from '../llm/llm.js';
-import { parseJSON } from "./json-parser.js";
 import { getSharedHtmlMarkdownPool } from './html-markdown-pool.js';
+import { parseJSON } from "./json-parser.js";
 import { logMessage } from "./logs.js";
 import { callPostgres } from './postgres.js';
 import { composeUrl } from "./tools.js";
@@ -673,7 +673,25 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
 
     return { urls, sitemaps };
   }
-
+  private filterUrls(urls: string[]): string[] {
+    const filteredUrls = urls.filter(url => {
+      try {
+        const urlLower = new URL(url).pathname.toLowerCase();
+        for (const excludedKeyword of PlaywrightFetchingStrategy.EXCLUDED_LINK_KEYWORDS) {
+          if (urlLower.includes(excludedKeyword)) {
+            return false;
+          }
+        }
+        return true;
+      } catch {
+        return false;
+      }
+    });
+    if (filteredUrls.length > 0) {
+      return filteredUrls;
+    }
+    return urls;
+  }
   private async collectSitemapUrls(config: DocumentationConfig, metadata: Metadata): Promise<string[]> {
     if (!config.documentationUrl) return [];
 
@@ -719,15 +737,8 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
 
         const { urls, sitemaps } = this.parseSitemapContent(content, sitemapUrl);
 
-        const filteredUrls = urls.filter(url => {
-          const urlLower = url.toLowerCase();
-          for (const excludedKeyword of PlaywrightFetchingStrategy.EXCLUDED_LINK_KEYWORDS) {
-            if (urlLower.includes(excludedKeyword)) {
-              return false;
-            }
-          }
-          return true;
-        });
+
+        const filteredUrls = this.filterUrls(urls);
 
         if (filteredUrls.length > 0) {
           logMessage('debug', `Found ${urls.length} total URLs in sitemap, ${filteredUrls.length} after filtering. First few: ${filteredUrls.slice(0, 3).join(', ')}`, metadata);
@@ -959,7 +970,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
   public rankItems(items: string[] | { linkText: string, href: string }[], keywords: string[], fetchedLinks?: Set<string>): any[] {
     const normalizedItems = items.map((item, index) => {
       const isString = typeof item === 'string';
-      const url = isString ? item : item.href;
+      const url = isString ? new URL(item).pathname : new URL(item.href).pathname;
       const text = isString ? '' : item.linkText;
       const searchableContent = `${url} ${text}`.toLowerCase();
 
@@ -978,14 +989,22 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
       })
       : normalizedItems;
 
-    itemsToRank = itemsToRank.filter(item => {
+    const itemsToRankFiltered = itemsToRank.filter(item => {
+      try {
       for (const excludedKeyword of PlaywrightFetchingStrategy.EXCLUDED_LINK_KEYWORDS) {
-        if (item.searchableContent.includes(excludedKeyword)) {
+        if (item.url.includes(excludedKeyword)) {
           return false;
+          }
         }
+        return true;
+      } catch {
+        return false;
       }
-      return true;
     });
+    if (itemsToRankFiltered.length > 0) {
+      itemsToRank = itemsToRankFiltered;
+    }
+
 
     if (!keywords || keywords.length === 0) {
       return itemsToRank.map(item => item.original);
@@ -1074,7 +1093,7 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
   private isValidDocLink(href: string, linkText: string, baseUrl: string): boolean {
     if (!linkText || !href) return false;
 
-    const hrefLower = href.toLowerCase();
+    const hrefLower = new URL(href).pathname.toLowerCase();
     if (PlaywrightFetchingStrategy.EXCLUDED_LINK_KEYWORDS.some(kw => hrefLower.includes(kw))) {
       return false;
     }
