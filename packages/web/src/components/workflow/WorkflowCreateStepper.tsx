@@ -190,7 +190,10 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const handleSaveWorkflow = async (workflow: Workflow) => {
     try {
       setIsSaving(true);
-      const saved = await client.upsertWorkflow(workflow.id, workflow as any);
+      const currentWorkflowState = playgroundRef.current?.getCurrentWorkflow();
+      const workflowToSave = currentWorkflowState || workflow;
+
+      const saved = await client.upsertWorkflow(workflowToSave.id, workflowToSave as any);
       if (!saved) throw new Error('Failed to save workflow');
 
       toast({
@@ -215,7 +218,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const handleExecuteWorkflow = async () => {
     try {
       setIsExecuting(true);
-      await playgroundRef.current?.executeWorkflow();
+      await playgroundRef.current?.executeWorkflow({ selfHealing: selfHealingEnabled });
     } finally {
       setIsExecuting(false);
     }

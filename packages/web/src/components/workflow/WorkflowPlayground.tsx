@@ -12,7 +12,6 @@ import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
 import { WorkflowStepGallery } from "./WorkflowStepGallery";
 
-// Export the props interface for use in embedded mode
 export interface WorkflowPlaygroundProps {
   id?: string;
   embedded?: boolean;
@@ -30,10 +29,10 @@ export interface WorkflowPlaygroundProps {
   onSelfHealingChange?: (enabled: boolean) => void;
 }
 
-// Export handle interface for imperative control
 export interface WorkflowPlaygroundHandle {
-  executeWorkflow: () => Promise<void>;
+  executeWorkflow: (opts?: { selfHealing?: boolean }) => Promise<void>;
   saveWorkflow: () => Promise<void>;
+  getCurrentWorkflow: () => Workflow;
 }
 
 const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygroundProps>(({
@@ -57,8 +56,6 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
   const config = useConfig();
   const [workflowId, setWorkflowId] = useState(initialWorkflow?.id || "");
   const [steps, setSteps] = useState<any[]>(initialWorkflow?.steps || []);
-  // Track self-healed step configurations separately from the original steps
-  const [selfHealedSteps, setSelfHealedSteps] = useState<any[]>([]);
   const [finalTransform, setFinalTransform] = useState(initialWorkflow?.finalTransform || `(sourceData) => {
   return {
     result: sourceData
@@ -73,6 +70,12 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
       : `{"type": "object", "properties": {"payload": {"type": "object"}}}`
   );
   const [payload, setPayload] = useState<string>(initialPayload || '{}');
+
+  useEffect(() => {
+    if (initialPayload !== undefined) {
+      setPayload(initialPayload);
+    }
+  }, [initialPayload]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<WorkflowResult | null>(null);
@@ -87,11 +90,16 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
 
   const [integrations, setIntegrations] = useState<Integration[]>(providedIntegrations || []);
   const [instructions, setInstructions] = useState<string>(initialInstruction || '');
+
+  useEffect(() => {
+    if (embedded && initialInstruction !== undefined) {
+      setInstructions(initialInstruction);
+    }
+  }, [embedded, initialInstruction]);
   const [selfHealingEnabled, setSelfHealingEnabled] = useState(externalSelfHealingEnabled ?? true);
   const [isExecutingStep, setIsExecutingStep] = useState<number | undefined>(undefined);
   const [currentExecutingStepIndex, setCurrentExecutingStepIndex] = useState<number | undefined>(undefined);
 
-  // Handle external self-healing state changes
   useEffect(() => {
     if (externalSelfHealingEnabled !== undefined) {
       setSelfHealingEnabled(externalSelfHealingEnabled);
@@ -105,11 +113,25 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
     }
   };
 
-  // Expose imperative methods
   useImperativeHandle(ref, () => ({
     executeWorkflow,
-    saveWorkflow
-  }), []);
+    saveWorkflow,
+    getCurrentWorkflow: () => ({
+      id: workflowId,
+      steps: steps.map((step: ExecutionStep) => ({
+        ...step,
+        apiConfig: {
+          id: step.apiConfig.id || step.id,
+          ...step.apiConfig,
+          pagination: step.apiConfig.pagination || null
+        }
+      })),
+      responseSchema: responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null,
+      inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
+      finalTransform,
+      instruction: instructions
+    })
+  }), [workflowId, steps, responseSchema, inputSchema, finalTransform, instructions]);
 
   const client = useMemo(() => new SuperglueClient({
     endpoint: config.superglueEndpoint,
@@ -147,7 +169,6 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
   };
 
   const loadIntegrations = async () => {
-    // Skip if integrations are provided externally (embedded mode)
     if (providedIntegrations) return;
 
     try {
@@ -178,7 +199,6 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
       }
       setWorkflowId(workflow.id || '');
       setSteps(workflow?.steps?.map(step => ({ ...step, apiConfig: { ...step.apiConfig, id: step.apiConfig.id || step.id } })) || []);
-      setSelfHealedSteps([]); // Reset self-healed steps when loading a workflow
       setFinalTransform(workflow.finalTransform || `(sourceData) => {
         return {
           result: sourceData
@@ -218,9 +238,6 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
       const parsedSchema = JSON.parse(schema);
       const defaultValues = generateDefaultFromSchema(parsedSchema);
 
-      // Credentials handling removed
-
-      // Handle payload from schema
       if (defaultValues.payload !== undefined && defaultValues.payload !== null) {
         setPayload(JSON.stringify(defaultValues.payload, null, 1));
       } else {
@@ -231,28 +248,26 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
     }
   };
 
-  // Update the original function
   const constructFromInputSchema = (schema: string | null) => {
     constructFromInputSchemaWithCreds(schema, {});
   };
 
   useEffect(() => {
-    // Load integrations on component mount (only in non-embedded mode)
     if (!embedded && !providedIntegrations) {
       loadIntegrations();
     }
   }, [embedded, providedIntegrations]);
 
   useEffect(() => {
-    // Update integrations when provided externally (embedded mode)
     if (providedIntegrations) {
       setIntegrations(providedIntegrations);
     }
   }, [providedIntegrations]);
 
+  const [lastWorkflowId, setLastWorkflowId] = useState<string | undefined>(initialWorkflow?.id);
+
   useEffect(() => {
-    // Update workflow when provided externally (embedded mode)
-    if (initialWorkflow) {
+    if (initialWorkflow && initialWorkflow.id !== lastWorkflowId) {
       setWorkflowId(initialWorkflow.id || '');
       setSteps(initialWorkflow.steps?.map(step => ({
         ...step,
@@ -269,19 +284,17 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
         setResponseSchema(initialWorkflow.responseSchema ? JSON.stringify(initialWorkflow.responseSchema, null, 2) : '');
       }
       setInputSchema(initialWorkflow.inputSchema ? JSON.stringify(initialWorkflow.inputSchema, null, 2) : `{"type": "object", "properties": {"payload": {"type": "object"}}}`);
-      setInstructions(initialWorkflow.instruction || '');
+      setInstructions(initialInstruction || initialWorkflow.instruction || '');
+      setLastWorkflowId(initialWorkflow.id);
     }
-  }, [initialWorkflow, embedded]);
+  }, [initialWorkflow, embedded, lastWorkflowId, initialInstruction]);
 
   useEffect(() => {
-    // In non-embedded mode, handle workflow loading by ID
     if (!embedded && id) {
       loadWorkflow(id);
     } else if (!embedded && !id && !initialWorkflow) {
-      // Reset to a clean slate if id is removed or not provided (non-embedded mode)
       setWorkflowId("");
       setSteps([]);
-      setSelfHealedSteps([]);
       setInstructions("");
       setFinalTransform(`(sourceData) => {
   return {
@@ -324,8 +337,8 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
       }
       setSaving(true);
 
-      // Use self-healed steps if available and self-healing was enabled, otherwise use original steps
-      const stepsToSave = (selfHealedSteps && selfHealedSteps.length > 0) ? selfHealedSteps : steps;
+      // Always use the current steps (which include any self-healed updates)
+      const stepsToSave = steps;
 
       const workflowToSave: Workflow = {
         id: workflowId,
@@ -376,7 +389,7 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
     }
   };
 
-  const executeWorkflow = async () => {
+  const executeWorkflow = async (opts?: { selfHealing?: boolean }) => {
     setLoading(true);
     setCompletedSteps([]);
     setFailedSteps([]);
@@ -389,11 +402,10 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
       JSON.parse(responseSchema || '{}');
       JSON.parse(inputSchema || '{}');
 
-      // Use self-healed steps from a previous run only if:
-      // 1. They exist (from a previous successful self-healing run)  
-      // 2. The user hasn't edited steps/transform since then (editing clears selfHealedSteps)
-      const executionSteps = selfHealedSteps.length > 0 ? selfHealedSteps : steps;
+      // Always use the current steps for execution
+      const executionSteps = steps;
       const currentResponseSchema = responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null;
+      const effectiveSelfHealing = opts?.selfHealing ?? selfHealingEnabled;
 
       const workflow = {
         id: workflowId,
@@ -402,6 +414,9 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
         responseSchema: currentResponseSchema,
         inputSchema: inputSchema ? JSON.parse(inputSchema) : { type: "object" },
       } as any;
+
+      // Store original steps to compare against self-healed result
+      const originalStepsJson = JSON.stringify(executionSteps);
 
       const payloadObj = JSON.parse(payload || '{}');
       setCurrentExecutingStepIndex(0);
@@ -423,10 +438,20 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
             setFailedSteps(prev => Array.from(new Set([...prev, res.stepId])));
           }
         },
-        selfHealingEnabled
+        effectiveSelfHealing
       );
 
-      setSelfHealedSteps(state.currentWorkflow.steps);
+      // Update steps with self-healed configuration if self-healing made changes
+      if (effectiveSelfHealing && state.currentWorkflow.steps) {
+        const healedStepsJson = JSON.stringify(state.currentWorkflow.steps);
+        if (originalStepsJson !== healedStepsJson) {
+          setSteps(state.currentWorkflow.steps);
+          toast({
+            title: "Workflow configuration updated",
+            description: "Self-healing has modified the workflow configuration to fix issues.",
+          });
+        }
+      }
 
       const stepDataMap: Record<string, any> = {};
       Object.entries(state.stepResults).forEach(([stepId, result]) => {
@@ -460,7 +485,7 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
       setResult(wr);
 
       // Update finalTransform with the self-healed version if it was modified
-      if (state.currentWorkflow.finalTransform && selfHealingEnabled) {
+      if (state.currentWorkflow.finalTransform && effectiveSelfHealing) {
         setFinalTransform(state.currentWorkflow.finalTransform);
       }
       setCompletedSteps(state.completedSteps);
@@ -470,9 +495,16 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
         setNavigateToFinalSignal(Date.now());
       }
 
-      // Call onExecute callback if provided (embedded mode)
-      if (embedded && onExecute) {
-        onExecute(state.currentWorkflow, wr);
+      if (onExecute) {
+        const executedWorkflow = {
+          id: workflowId,
+          steps: executionSteps,
+          finalTransform: state.currentWorkflow.finalTransform || finalTransform,
+          responseSchema: currentResponseSchema,
+          inputSchema: inputSchema ? JSON.parse(inputSchema) : { type: "object" },
+          instruction: instructions
+        } as Workflow;
+        onExecute(executedWorkflow, wr);
       }
     } catch (error: any) {
       console.error("Error executing workflow:", error);
@@ -489,14 +521,12 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
 
   const handleStepsChange = (newSteps: any[]) => {
     setSteps(newSteps);
-    setSelfHealedSteps([]);
   };
 
   const handleStepEdit = (stepId: string, updatedStep: any) => {
     setSteps(prevSteps =>
       prevSteps.map(step => (step.id === stepId ? { ...updatedStep, apiConfig: { ...updatedStep.apiConfig, id: updatedStep.apiConfig.id || updatedStep.id } } : step))
     );
-    setSelfHealedSteps([]);
 
     // Find the index of the edited step
     const stepIndex = steps.findIndex(s => s.id === stepId);
@@ -627,7 +657,7 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
       </div>
       <Button
         variant="success"
-        onClick={executeWorkflow}
+        onClick={() => executeWorkflow()}
         disabled={loading || saving || (isExecutingStep !== undefined) || isExecutingTransform}
         className="h-9 px-4"
       >
@@ -683,11 +713,7 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
                 onStepEdit={handleStepEdit}
                 onExecuteStep={handleExecuteStep}
                 onExecuteTransform={handleExecuteTransform}
-                onFinalTransformChange={(transform: string) => {
-                  setFinalTransform(transform);
-                  // Clear self-healed steps when transform is edited - ensures edited transform is used
-                  setSelfHealedSteps([]);
-                }}
+                onFinalTransformChange={setFinalTransform}
                 onResponseSchemaChange={setResponseSchema}
                 onPayloadChange={setPayload}
                 onWorkflowIdChange={setWorkflowId}

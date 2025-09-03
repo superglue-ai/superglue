@@ -106,13 +106,14 @@ const inferSchema = (data: any): any => {
 };
 
 // Size-based truncation for display 
-const MAX_DISPLAY_SIZE = 1000 * 1024;
-const MAX_DISPLAY_LINES = 5000;
-const MAX_STRING_PREVIEW_LENGTH = 500;
+const MAX_DISPLAY_SIZE = 1000 * 1024; // 1MB limit for JSON display
+const MAX_DISPLAY_LINES = 5000; // Max lines to show in any JSON view
+const MAX_STRING_PREVIEW_LENGTH = 5000; // Max chars for individual string values
+const MAX_ARRAY_PREVIEW_ITEMS = 10; // Max array items to show before truncating
+const MAX_TRUNCATION_DEPTH = 5; // Max depth for nested object traversal
 
-// Special truncation that preserves object structure
 const truncateValue = (value: any, depth: number = 0): any => {
-    if (depth > 3) return '...';
+    if (depth > MAX_TRUNCATION_DEPTH) return '...';
 
     if (typeof value === 'string') {
         if (value.length > MAX_STRING_PREVIEW_LENGTH) {
@@ -122,8 +123,8 @@ const truncateValue = (value: any, depth: number = 0): any => {
     }
 
     if (Array.isArray(value)) {
-        if (value.length > 10) {
-            return [...value.slice(0, 10).map(v => truncateValue(v, depth + 1)), `... ${value.length - 10} more items`];
+        if (value.length > MAX_ARRAY_PREVIEW_ITEMS) {
+            return [...value.slice(0, MAX_ARRAY_PREVIEW_ITEMS).map(v => truncateValue(v, depth + 1)), `... ${value.length - MAX_ARRAY_PREVIEW_ITEMS} more items`];
         }
         return value.map(v => truncateValue(v, depth + 1));
     }
@@ -131,14 +132,8 @@ const truncateValue = (value: any, depth: number = 0): any => {
     if (typeof value === 'object' && value !== null) {
         const result: any = {};
         const keys = Object.keys(value);
-        const keysToShow = keys.slice(0, 20);
-
-        for (const key of keysToShow) {
+        for (const key of keys) {
             result[key] = truncateValue(value[key], depth + 1);
-        }
-
-        if (keys.length > 20) {
-            result['...'] = `${keys.length - 20} more keys`;
         }
 
         return result;
@@ -168,34 +163,22 @@ const truncateForDisplay = (data: any): { value: string, truncated: boolean } =>
     try {
         // For objects, first try to show the structure with truncated values
         const truncatedData = truncateValue(data);
-        const fullJson = JSON.stringify(truncatedData, null, 2);
+        let jsonString = JSON.stringify(truncatedData, null, 2);
 
-        // Check if even the truncated version is too large
-        if (fullJson.length > MAX_DISPLAY_SIZE) {
-            // Fall back to showing just the top-level keys
-            const keys = Object.keys(data);
-            const preview: any = {};
-            for (const key of keys.slice(0, 3)) {
-                const val = data[key];
-                if (typeof val === 'string') {
-                    preview[key] = val.length > 100 ? val.substring(0, 100) + '...' : val;
-                } else if (typeof val === 'object') {
-                    preview[key] = Array.isArray(val) ? `[Array with ${val.length} items]` : '{...}';
-                } else {
-                    preview[key] = val;
-                }
-            }
-            if (keys.length > 10) {
-                preview['...'] = `${keys.length - 10} more keys`;
+        if (jsonString.length > MAX_DISPLAY_SIZE) {
+            jsonString = jsonString.substring(0, MAX_DISPLAY_SIZE);
+            // Find last complete line to avoid cutting mid-line
+            const lastNewline = jsonString.lastIndexOf('\n');
+            if (lastNewline > 0) {
+                jsonString = jsonString.substring(0, lastNewline);
             }
             return {
-                value: JSON.stringify(preview, null, 2) + '\n\n... [Data structure truncated for display]',
+                value: jsonString + '\n\n... [Data truncated - exceeds size limit]',
                 truncated: true
             };
         }
 
-        // Check line count
-        const lines = fullJson.split('\n');
+        const lines = jsonString.split('\n');
         if (lines.length > MAX_DISPLAY_LINES) {
             return {
                 value: lines.slice(0, MAX_DISPLAY_LINES).join('\n') + '\n\n... [Truncated - too many lines]',
@@ -203,11 +186,11 @@ const truncateForDisplay = (data: any): { value: string, truncated: boolean } =>
             };
         }
 
-        // Check if we truncated anything
+        // Check if we truncated anything during value processing
         const originalJson = JSON.stringify(data, null, 2);
-        const wasTruncated = originalJson !== fullJson;
+        const wasTruncated = originalJson !== jsonString;
 
-        return { value: fullJson, truncated: wasTruncated };
+        return { value: jsonString, truncated: wasTruncated };
     } catch (e) {
         // Fallback for circular references or other issues
         const stringValue = String(data);
@@ -230,7 +213,6 @@ const truncateLines = (text: string, maxLines: number): string => {
     return lines.slice(0, maxLines).join('\n') + `\n... truncated ${lines.length - maxLines} more lines ...`;
 };
 
-// Helper to merge payload with step results progressively
 const buildEvolvingPayload = (initialPayload: any, steps: any[], stepResults: Record<string, any>, upToIndex: number) => {
     let evolvingPayload = { ...initialPayload };
 
@@ -259,8 +241,6 @@ const CopyButton = ({ text, getData }: { text?: string; getData?: () => any }) =
     const handleCopy = (e: React.MouseEvent) => {
         e.stopPropagation();
         e.preventDefault();
-
-        // Use getData if provided (for lazy evaluation), otherwise use text
         const textToCopy = getData ?
             (typeof getData() === 'string' ? getData() : JSON.stringify(getData(), null, 2)) :
             (text || '');
@@ -286,7 +266,6 @@ const CopyButton = ({ text, getData }: { text?: string; getData?: () => any }) =
     );
 };
 
-// Instruction Display Component with truncation and modal
 const InstructionDisplay = ({
     instruction,
     onEdit,
@@ -1012,7 +991,7 @@ const FinalTransformMiniStepCard = ({
                             let isTruncated = false;
                             if (inputViewMode === 'schema') {
                                 const schemaObj = inferSchema(stepInputs || {});
-                                inputString = truncateLines(JSON.stringify(schemaObj, null, 2), 1000);
+                                inputString = truncateLines(JSON.stringify(schemaObj, null, 2), MAX_DISPLAY_LINES);
                             } else {
                                 const displayData = truncateForDisplay(stepInputs);
                                 inputString = displayData.value;
@@ -1196,7 +1175,7 @@ const SpotlightStepCard = ({
                                 let isTruncated = false;
                                 if (inputViewMode === 'schema') {
                                     const schemaObj = inferSchema(evolvingPayload || {});
-                                    inputString = truncateLines(JSON.stringify(schemaObj, null, 2), 1000);
+                                    inputString = truncateLines(JSON.stringify(schemaObj, null, 2), MAX_DISPLAY_LINES);
                                 } else {
                                     const displayData = truncateForDisplay(evolvingPayload);
                                     inputString = displayData.value;
@@ -1207,8 +1186,8 @@ const SpotlightStepCard = ({
                                         <JsonCodeEditor
                                             value={inputString}
                                             readOnly={true}
-                                            minHeight="60px"
-                                            maxHeight="120px"
+                                            minHeight="150px"
+                                            maxHeight="300px"
                                             resizable={true}
                                             overlay={
                                                 <div className="flex items-center gap-1">
@@ -1275,7 +1254,7 @@ const SpotlightStepCard = ({
                                         }
                                     } else if (outputViewMode === 'schema') {
                                         const schemaObj = inferSchema(stepResult || {});
-                                        outputString = truncateLines(JSON.stringify(schemaObj, null, 2), 1000);
+                                        outputString = truncateLines(JSON.stringify(schemaObj, null, 2), MAX_DISPLAY_LINES);
                                     } else {
                                         const displayData = truncateForDisplay(stepResult);
                                         outputString = displayData.value;
@@ -1300,8 +1279,8 @@ const SpotlightStepCard = ({
                                                 <JsonCodeEditor
                                                     value={outputString}
                                                     readOnly={true}
-                                                    minHeight="60px"
-                                                    maxHeight="120px"
+                                                    minHeight="150px"
+                                                    maxHeight="300px"
                                                     resizable={true}
                                                     overlay={
                                                         <div className="flex items-center gap-1">
@@ -1392,17 +1371,15 @@ const MiniStepCard = ({
         const isCompleted = completedSteps.includes('__final_transform__');
         const isFailed = failedSteps.includes('__final_transform__');
         const getStatusDotColor = () => {
+            if (isTesting || isRunningAll) return "bg-yellow-500 animate-pulse";
             if (isFailed) return "bg-red-500";
             if (isCompleted) return "bg-green-500";
-            if (isTesting) return "bg-yellow-500 animate-pulse";
-            if (isRunningAll) return "bg-yellow-500 animate-pulse";
             return "bg-gray-400";
         };
         const getStatusLabel = () => {
+            if (isTesting || isRunningAll) return "Running...";
             if (isFailed) return "Failed";
             if (isCompleted) return "Completed";
-            if (isTesting) return "Running...";
-            if (isRunningAll) return "Running...";
             return "Pending";
         };
         return (
@@ -1470,16 +1447,15 @@ const MiniStepCard = ({
     const isCompleted = stepId ? completedSteps.includes(stepId) : false;
     const isFailed = stepId ? failedSteps.includes(stepId) : false;
     const getStatusDotColor = () => {
+        if (isTesting || (isRunningAll && stepId)) return "bg-yellow-500 animate-pulse";
         if (isFailed) return "bg-red-500";
         if (isCompleted) return "bg-green-500";
-        if (isTesting) return "bg-yellow-500 animate-pulse";
-        if (isRunningAll && stepId) return "bg-yellow-500 animate-pulse";
         return "bg-gray-400";
     };
     const getStatusLabel = () => {
+        if (isTesting || (isRunningAll && stepId)) return "Running...";
         if (isFailed) return "Failed";
         if (isCompleted) return "Completed";
-        if (isTesting || (isRunningAll && stepId)) return "Running...";
         return "Pending";
     };
 
