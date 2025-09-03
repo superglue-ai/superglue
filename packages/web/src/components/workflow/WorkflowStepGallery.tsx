@@ -111,6 +111,7 @@ const MAX_DISPLAY_LINES = 5000; // Max lines to show in any JSON view
 const MAX_STRING_PREVIEW_LENGTH = 5000; // Max chars for individual string values
 const MAX_ARRAY_PREVIEW_ITEMS = 10; // Max array items to show before truncating
 const MAX_TRUNCATION_DEPTH = 5; // Max depth for nested object traversal
+const MAX_OBJECT_PREVIEW_KEYS = 300; // Max object keys to show before truncating
 
 const truncateValue = (value: any, depth: number = 0): any => {
     if (depth > MAX_TRUNCATION_DEPTH) return '...';
@@ -132,8 +133,12 @@ const truncateValue = (value: any, depth: number = 0): any => {
     if (typeof value === 'object' && value !== null) {
         const result: any = {};
         const keys = Object.keys(value);
-        for (const key of keys) {
+        const keysToShow = keys.slice(0, MAX_OBJECT_PREVIEW_KEYS);
+        for (const key of keysToShow) {
             result[key] = truncateValue(value[key], depth + 1);
+        }
+        if (keys.length > MAX_OBJECT_PREVIEW_KEYS) {
+            result['...'] = `${(keys.length - MAX_OBJECT_PREVIEW_KEYS).toLocaleString()} more keys`;
         }
 
         return result;
@@ -152,12 +157,14 @@ const truncateForDisplay = (data: any): { value: string, truncated: boolean } =>
             const truncatedString = data.substring(0, MAX_STRING_PREVIEW_LENGTH);
             const lastNewline = truncatedString.lastIndexOf('\n');
             const cleanTruncated = truncatedString.substring(0, lastNewline > 0 ? lastNewline : MAX_STRING_PREVIEW_LENGTH);
+            const note = `\n\n... [String truncated - showing ${MAX_STRING_PREVIEW_LENGTH.toLocaleString()} of ${data.length.toLocaleString()} characters]`;
+            const combined = `${cleanTruncated}${note}`;
             return {
-                value: `"${cleanTruncated}"\n\n... [String truncated - showing ${MAX_STRING_PREVIEW_LENGTH.toLocaleString()} of ${data.length.toLocaleString()} characters]`,
+                value: JSON.stringify(combined),
                 truncated: true
             };
         }
-        return { value: `"${data}"`, truncated: false };
+        return { value: JSON.stringify(data), truncated: false };
     }
 
     try {
@@ -195,12 +202,13 @@ const truncateForDisplay = (data: any): { value: string, truncated: boolean } =>
         // Fallback for circular references or other issues
         const stringValue = String(data);
         if (stringValue.length > MAX_STRING_PREVIEW_LENGTH) {
+            const preview = stringValue.substring(0, MAX_STRING_PREVIEW_LENGTH) + '... [Truncated]';
             return {
-                value: stringValue.substring(0, MAX_STRING_PREVIEW_LENGTH) + '... [Truncated]',
+                value: JSON.stringify(preview),
                 truncated: true
             };
         }
-        return { value: stringValue, truncated: false };
+        return { value: JSON.stringify(stringValue), truncated: false };
     }
 };
 
@@ -449,7 +457,7 @@ const FinalResultsCard = ({ result }: { result: any }) => {
     );
 };
 
-const JavaScriptCodeEditor = ({
+const JavaScriptCodeEditor = React.memo(({
     value,
     onChange,
     readOnly = false,
@@ -470,6 +478,8 @@ const JavaScriptCodeEditor = ({
 }) => {
     const [currentHeight, setCurrentHeight] = useState(maxHeight);
     const effectiveHeight = resizable ? currentHeight : maxHeight;
+    const highlightTimer = useRef<number | null>(null);
+    const [allowHighlight, setAllowHighlight] = useState<boolean>(true);
 
     // Check if code already has the proper arrow function format
     const hasValidPattern = (code: string): boolean => {
@@ -495,6 +505,23 @@ const JavaScriptCodeEditor = ({
     // Handle value for transform editor
     const displayValue = value || '';
 
+    // Throttle prism highlighting while typing to keep typing snappy
+    useEffect(() => {
+        setAllowHighlight(false);
+        if (highlightTimer.current) {
+            window.clearTimeout(highlightTimer.current);
+        }
+        highlightTimer.current = window.setTimeout(() => {
+            setAllowHighlight(true);
+        }, 120);
+        return () => {
+            if (highlightTimer.current) {
+                window.clearTimeout(highlightTimer.current);
+                highlightTimer.current = null;
+            }
+        };
+    }, [displayValue]);
+
     const handleChange = (newValue: string) => {
         if (!onChange) return;
 
@@ -507,8 +534,8 @@ const JavaScriptCodeEditor = ({
         }
     };
 
-    // Calculate line numbers
-    const lineNumbers = (displayValue || '').split('\n').map((_, i) => String(i + 1));
+    // Calculate line numbers (memoized)
+    const lineNumbers = React.useMemo(() => (displayValue || '').split('\n').map((_, i) => String(i + 1)), [displayValue]);
 
     return (
         <div className="relative bg-muted/50 dark:bg-muted/20 rounded-lg border font-mono shadow-sm js-code-editor">
@@ -574,6 +601,7 @@ const JavaScriptCodeEditor = ({
                                 value={displayValue}
                                 onValueChange={handleChange}
                                 highlight={(code) => {
+                                    if (!allowHighlight) return code;
                                     try {
                                         return Prism.highlight(code, Prism.languages.javascript, 'javascript');
                                     } catch {
@@ -598,6 +626,7 @@ const JavaScriptCodeEditor = ({
                             value={value || ''}
                             onValueChange={onChange || (() => { })}
                             highlight={(code) => {
+                                if (!allowHighlight) return code;
                                 try {
                                     return Prism.highlight(code, Prism.languages.javascript, 'javascript');
                                 } catch {
@@ -628,7 +657,7 @@ const JavaScriptCodeEditor = ({
             `}</style>
         </div>
     );
-};
+});
 
 // JSON Code Editor without blue border
 const MAX_READONLY_RENDER_CHARS = 150000;
@@ -1013,11 +1042,7 @@ const FinalTransformMiniStepCard = ({
                                                         <TabsTrigger value="schema" className="h-5 px-2 text-[11px] rounded-md data-[state=active]:rounded-md">Schema</TabsTrigger>
                                                     </TabsList>
                                                 </Tabs>
-                                                <CopyButton getData={() =>
-                                                    inputViewMode === 'schema'
-                                                        ? inferSchema(stepInputs || {})
-                                                        : stepInputs
-                                                } />
+                                                <CopyButton text={inputString} />
                                             </div>
                                         }
                                     />
@@ -1549,6 +1574,21 @@ export function WorkflowStepGallery({
     const trackRef = useState<HTMLElement | null>(null)[0] as unknown as React.MutableRefObject<HTMLDivElement | null> || { current: null } as any;
     const listRef = useRef<HTMLDivElement | null>(null);
 
+    // Local workflowId editor state to reduce re-renders
+    const [localWorkflowId, setLocalWorkflowId] = useState<string>(workflowId ?? '');
+    const [isEditingWorkflowId, setIsEditingWorkflowId] = useState<boolean>(false);
+    useEffect(() => {
+        if (!isEditingWorkflowId) {
+            setLocalWorkflowId(workflowId ?? '');
+        }
+    }, [workflowId, isEditingWorkflowId]);
+    const commitWorkflowIdIfChanged = () => {
+        if (onWorkflowIdChange && localWorkflowId !== (workflowId ?? '')) {
+            onWorkflowIdChange(localWorkflowId);
+        }
+        setIsEditingWorkflowId(false);
+    };
+
     // Update window width on resize
     useEffect(() => {
         const handleResize = () => {
@@ -1700,8 +1740,21 @@ export function WorkflowStepGallery({
                                 <div className="flex items-center gap-3 px-3 py-1.5 bg-muted/50 rounded-md border h-[36px]">
                                     <span className="text-sm text-muted-foreground">Workflow ID:</span>
                                     <Input
-                                        value={workflowId ?? ''}
-                                        onChange={(e) => onWorkflowIdChange?.(e.target.value)}
+                                        value={localWorkflowId}
+                                        onChange={(e) => {
+                                            setLocalWorkflowId(e.target.value);
+                                            setIsEditingWorkflowId(true);
+                                        }}
+                                        onBlur={commitWorkflowIdIfChanged}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                commitWorkflowIdIfChanged();
+                                            } else if (e.key === 'Escape') {
+                                                setLocalWorkflowId(workflowId ?? '');
+                                                setIsEditingWorkflowId(false);
+                                            }
+                                        }}
                                         className="h-5 font-mono text-sm w-[200px] md:w-[280px] border-0 bg-transparent p-0 focus:ring-0"
                                         readOnly={readOnly || !onWorkflowIdChange}
                                     />
