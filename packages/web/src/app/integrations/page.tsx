@@ -291,24 +291,8 @@ export default function IntegrationsPage() {
                 title: 'OAuth Processing',
                 description: 'Client credentials OAuth flow is being processed in the background. The integration will be updated automatically.',
             });
-            
-            // Trigger OAuth by updating the scopes field to force OAuth refresh
-            const updatedIntegration = {
-                id: integration.id,
-                urlHost: integration.urlHost,
-                urlPath: integration.urlPath,
-                documentationUrl: integration.documentationUrl,
-                documentation: integration.documentation,
-                specificInstructions: integration.specificInstructions,
-                credentials: {
-                    ...integration.credentials,
-                    // Force OAuth refresh by updating scopes (adds a timestamp to make it unique)
-                    scopes: `${integration.credentials?.scopes || ''} ${Date.now()}`
-                }
-            };
-            
             // Save the integration to trigger the backend OAuth flow
-            handleSave(updatedIntegration);
+            handleSave(integration);
         } else {
             // For authorization code flow, use the existing popup logic
             const oauthFields = {

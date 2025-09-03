@@ -138,7 +138,7 @@ export async function handleClientCredentialsFlow(
             };
         }
 
-        const { client_id, client_secret, token_url, scopes } = integration.credentials || {};
+        const { client_id, client_secret, token_url, auth_url, scopes } = integration.credentials || {};
 
         if (!client_id || !client_secret) {
             return {
@@ -149,6 +149,10 @@ export async function handleClientCredentialsFlow(
 
         // Get token URL
         let finalTokenUrl = token_url as string;
+        if (!finalTokenUrl) {
+            // Fallback to auth_url if token_url is not set
+            finalTokenUrl = auth_url as string;
+        }
         if (!finalTokenUrl) {
             finalTokenUrl = getOAuthTokenUrl(integration);
             if (!finalTokenUrl) {
