@@ -644,7 +644,7 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
                               apiConfig: {
                                 ...prev.apiConfig,
                                 pagination: {
-                                  ...prev.apiConfig.pagination,
+                                  ...(prev.apiConfig.pagination || {}),
                                   type: value,
                                   pageSize: prev.apiConfig.pagination?.pageSize || '50',
                                   cursorPath: prev.apiConfig.pagination?.cursorPath || '',
@@ -677,7 +677,7 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
                                 apiConfig: {
                                   ...prev.apiConfig,
                                   pagination: {
-                                    ...prev.apiConfig.pagination!,
+                                    ...(prev.apiConfig.pagination || {}),
                                     pageSize: e.target.value
                                   }
                                 }
@@ -697,7 +697,7 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
                                   apiConfig: {
                                     ...prev.apiConfig,
                                     pagination: {
-                                      ...prev.apiConfig.pagination!,
+                                      ...(prev.apiConfig.pagination || {}),
                                       cursorPath: e.target.value
                                     }
                                   }
@@ -720,7 +720,7 @@ export function WorkflowStepCard({ step, isLast, onEdit, onRemove, integrations:
                                 apiConfig: {
                                   ...prev.apiConfig,
                                   pagination: {
-                                    ...prev.apiConfig.pagination!,
+                                    ...(prev.apiConfig.pagination || {}),
                                     stopCondition: e.target.value
                                   }
                                 }
