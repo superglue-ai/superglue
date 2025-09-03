@@ -114,7 +114,11 @@ const MAX_TRUNCATION_DEPTH = 10; // Max depth for nested object traversal
 const MAX_OBJECT_PREVIEW_KEYS = 100; // Max object keys to show before truncating
 
 const truncateValue = (value: any, depth: number = 0): any => {
-    if (depth > MAX_TRUNCATION_DEPTH) return '...';
+    if (depth > MAX_TRUNCATION_DEPTH) {
+        if (Array.isArray(value)) return '[...]';
+        if (typeof value === 'object' && value !== null) return '{...}';
+        return '...';
+    }
 
     if (typeof value === 'string') {
         if (value.length > MAX_STRING_PREVIEW_LENGTH) {
