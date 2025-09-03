@@ -238,8 +238,6 @@ const buildEvolvingPayload = (initialPayload: any, steps: any[], stepResults: Re
         const step = steps[i];
         const result = stepResults[step.id];
         if (result !== undefined && result !== null) {
-            // Extract just the data if result is a StepExecutionResult object
-            // Otherwise use the result as-is (for backward compatibility)
             const dataToMerge = (typeof result === 'object' && 'data' in result && 'success' in result)
                 ? result.data
                 : result;

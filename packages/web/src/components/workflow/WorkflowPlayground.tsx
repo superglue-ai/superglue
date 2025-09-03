@@ -424,11 +424,8 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
         selfHealingEnabled
       );
 
-      // Store self-healed steps separately - don't overwrite the original workflow structure
-      // The original steps should only be modified by explicit user edits
       setSelfHealedSteps(state.currentWorkflow.steps);
 
-      // Extract just the data from each step result for the UI
       const stepDataMap: Record<string, any> = {};
       Object.entries(state.stepResults).forEach(([stepId, result]) => {
         stepDataMap[stepId] = result.data;
