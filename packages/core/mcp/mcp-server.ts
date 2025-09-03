@@ -5,7 +5,7 @@ import {
   CallToolResult,
   isInitializeRequest
 } from "@modelcontextprotocol/sdk/types.js";
-import { SuperglueClient, WorkflowResult, Integration} from '@superglue/client';
+import { Integration, SuperglueClient, WorkflowResult } from '@superglue/client';
 import { LogEntry } from "@superglue/shared";
 import { getSDKCode } from '@superglue/shared/templates';
 import { flattenAndNamespaceWorkflowCredentials } from "@superglue/shared/utils";
@@ -91,7 +91,7 @@ export const CreateIntegrationInputSchema = {
   documentationUrl: z.string().optional().describe("URL to the API documentation."),
   specificInstructions: z.string().optional().describe("Specific guidance on how to use this integration (e.g., rate limits, special endpoints, authentication details). Max 2000 characters."),
   documentationKeywords: z.array(z.string()).optional().describe("Keywords to help with documentation search and ranking (e.g., endpoint names, data objects, key concepts)."),
-  credentials: z.record(z.string()).describe("Credentials for accessing the integration. Provide an empty object if no credentials are needed / given. Can be referenced by brackets: <<{integration_id}_{credential_name}>>. "),
+  credentials: z.record(z.string()).describe("Credentials for accessing the integration. Provide an empty object if no credentials are needed / given. Can be referenced by brackets: <<{integration_id}_{credential_name}>>. If the integration is OAuth, make sure this includes the client_id and client_secret. Additional fields can be grant_type, auth_url, token_url, scopes."),
 };
 
 export const ModifyIntegrationInputSchema = {
@@ -727,6 +727,7 @@ export const toolDefinitions: Record<string, any> = {
       - The credentials object is REQUIRED. Always store any credentials the user gives you as credentials (even dummy ones or ones embedded in a connection string) in the credentials field. Use placeholder references in the format: <<{integration_id}_{credential_name}>> to reference them.
       - if no credentials are given, ask the user for them. If no credentials are needed or the user explicitly says no, provide an empty object.
       - Always split information clearly: urlHost (without secrets), urlPath, credentials (with secrets), etc.
+      - For OAuth integrations, the user should provide the client_id and client_secret. Saved credentials should include: client_id, client_secret, auth_url, token_url, scopes. Supported grant types (flows): authorization_code (default, for user-based authentication), client_credentials (for service accounts and non-user-based authentication).
       - Providing a documentationUrl will trigger asynchronous API documentation processing.
       - When users mention API constraints (rate limits, special endpoints, auth requirements, etc.), capture them in 'specificInstructions' to guide workflow building.
       - Include relevant keywords in 'documentationKeywords' to improve documentation search (e.g., endpoint names, data objects, key concepts mentioned in conversation).
