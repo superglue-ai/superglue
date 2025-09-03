@@ -14,6 +14,7 @@ import {
 } from "@/src/components/ui/alert-dialog";
 import { Button } from '@/src/components/ui/button';
 import { DocStatus } from '@/src/components/utils/DocStatusSpinner';
+import { createOAuthErrorHandler, triggerOAuthFlow } from '@/src/components/utils/oauth-utils';
 import { useToast } from '@/src/hooks/use-toast';
 import { needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
 import { composeUrl, getIntegrationIcon as getIntegrationIconName } from '@/src/lib/utils';
@@ -32,26 +33,40 @@ export const detectAuthType = (credentials: any): 'oauth' | 'apikey' | 'none' =>
     if (!credentials || Object.keys(credentials).length === 0) return 'none';
 
     // Define OAuth-specific fields
-    const oauthSpecificFields = ['client_id', 'client_secret', 'auth_url', 'token_url', 'access_token', 'refresh_token', 'scopes', 'expires_at', 'token_type'];
+    const oauthSpecificFields = ['client_id', 'client_secret', 'auth_url', 'token_url', 'access_token', 'refresh_token', 'scopes', 'expires_at', 'token_type', 'grant_type'];
 
     // Get all credential keys
     const allKeys = Object.keys(credentials);
 
-    // Check if all keys are OAuth-specific
-    const containsOnlyOAuthKeys = allKeys.every(key => oauthSpecificFields.includes(key));
+    // Check if any OAuth-specific fields are present
+    const hasOAuthFields = allKeys.some(key => oauthSpecificFields.includes(key));
 
-    if (containsOnlyOAuthKeys) {
+    if (hasOAuthFields) {
         // It's OAuth-related, now check the status
-        if (credentials.access_token && credentials.refresh_token) {
-            return 'oauth'; // Will be shown as configured
-        } else if (credentials.client_id || credentials.client_secret) {
-            return 'oauth'; // Will be shown as pending
+        const grantType = credentials.grant_type || 'authorization_code';
+        
+        if (grantType === 'client_credentials') {
+            // For client credentials, only access_token is needed
+            if (credentials.access_token) {
+                return 'oauth'; // Will be shown as configured
+            } else if (credentials.client_id || credentials.client_secret) {
+                return 'oauth'; // Will be shown as pending
+            } else {
+                return 'none'; // Only has meta fields like token_url, scopes, etc.
+            }
         } else {
-            return 'none'; // Only has meta fields like auth_url, scopes, etc.
+            // Authorization code flow - needs both access_token and refresh_token
+            if (credentials.access_token && credentials.refresh_token) {
+                return 'oauth'; // Will be shown as configured
+            } else if (credentials.client_id || credentials.client_secret) {
+                return 'oauth'; // Will be shown as pending
+            } else {
+                return 'none'; // Only has meta fields like auth_url, scopes, etc.
+            }
         }
     }
 
-    // Has non-OAuth fields, so it's API key
+    // No OAuth fields present, so it's API key
     return 'apikey';
 };
 
@@ -70,8 +85,17 @@ export const getAuthBadge = (integration: Integration): {
     }
 
     if (authType === 'oauth') {
-        // OAuth is configured only when BOTH access_token AND refresh_token are present
-        const isConfigured = !!(creds.access_token && creds.refresh_token);
+        const grantType = creds.grant_type || 'authorization_code';
+        
+        let isConfigured = false;
+        if (grantType === 'client_credentials') {
+            // For client credentials, only access_token is needed
+            isConfigured = !!creds.access_token;
+        } else {
+            // For authorization code, both access_token AND refresh_token are needed
+            isConfigured = !!(creds.access_token && creds.refresh_token);
+        }
+        
         return isConfigured
             ? { type: 'oauth-configured', label: 'OAuth configured', color: 'blue', icon: 'key' }
             : { type: 'oauth-incomplete', label: 'OAuth incomplete', color: 'amber', icon: 'clock' };
@@ -111,11 +135,10 @@ export default function IntegrationsPage() {
             // Refresh integrations to show updated OAuth status
             refreshIntegrations();
         } else if (error) {
-            toast({
-                title: 'OAuth Error',
-                description: description || message || 'Failed to complete OAuth connection',
-                variant: 'destructive',
-            });
+            const errorMessage = description || message || 'Failed to complete OAuth connection';
+            const handleOAuthError = createOAuthErrorHandler(integration || 'unknown', toast);
+            handleOAuthError(errorMessage);
+            
             // Clear the URL params
             window.history.replaceState({}, '', '/integrations');
         }
@@ -129,6 +152,7 @@ export default function IntegrationsPage() {
 
             if (event.data.type === 'oauth-success') {
                 const integrationId = event.data.integrationId;
+                const tokens = event.data.tokens;
 
                 // Wait a moment for the backend to finish updating
                 await new Promise(resolve => setTimeout(resolve, 1000));
@@ -139,7 +163,18 @@ export default function IntegrationsPage() {
                 // We need to fetch the integration directly since the state might not be updated yet
                 try {
                     const updatedIntegration = await client.getIntegration(integrationId);
-                    if (updatedIntegration?.credentials?.access_token && updatedIntegration?.credentials?.refresh_token) {
+                    const grantType = updatedIntegration?.credentials?.grant_type || 'authorization_code';
+                    
+                    let hasValidTokens = false;
+                    if (grantType === 'client_credentials') {
+                        // For client credentials, only access_token is needed
+                        hasValidTokens = !!updatedIntegration?.credentials?.access_token;
+                    } else {
+                        // For authorization code, both access_token and refresh_token are needed
+                        hasValidTokens = !!(updatedIntegration?.credentials?.access_token && updatedIntegration?.credentials?.refresh_token);
+                    }
+                    
+                    if (hasValidTokens) {
                         toast({
                             title: 'OAuth Connection Successful',
                             description: `Successfully connected to ${integrationId}`,
@@ -159,11 +194,9 @@ export default function IntegrationsPage() {
                     });
                 }
             } else if (event.data.type === 'oauth-error') {
-                toast({
-                    title: 'OAuth Error',
-                    description: event.data.message || 'Failed to complete OAuth connection',
-                    variant: 'destructive',
-                });
+                const errorMessage = event.data.message || 'Failed to complete OAuth connection';
+                const handleOAuthError = createOAuthErrorHandler(event.data.integrationId || 'unknown', toast);
+                handleOAuthError(errorMessage);
             }
         };
 
@@ -247,12 +280,80 @@ export default function IntegrationsPage() {
         setAddFormOpen(true);
     };
 
+    const handleCompleteOAuth = (integration: Integration) => {
+        const grantType = integration.credentials?.grant_type || 'authorization_code';
+        
+        if (grantType === 'client_credentials') {
+            // For client credentials, the OAuth flow is handled automatically by the backend
+            // when the integration is saved. We just need to trigger a refresh by updating
+            // one of the OAuth fields to force the backend to re-run the OAuth flow
+            toast({
+                title: 'OAuth Processing',
+                description: 'Client credentials OAuth flow is being processed in the background. The integration will be updated automatically.',
+            });
+            // Save the integration to trigger the backend OAuth flow
+            handleSave(integration);
+        } else {
+            // For authorization code flow, use the existing popup logic
+            const oauthFields = {
+                access_token: integration.credentials?.access_token,
+                refresh_token: integration.credentials?.refresh_token,
+                client_id: integration.credentials?.client_id,
+                client_secret: integration.credentials?.client_secret,
+                scopes: integration.credentials?.scopes,
+                auth_url: integration.credentials?.auth_url,
+                token_url: integration.credentials?.token_url,
+                grant_type: grantType,
+            };
+
+            // Determine auth type dynamically (defensive programming)
+            const authType = detectAuthType(integration.credentials || {});
+
+            // Enhanced error handling using centralized utility
+            const handleOAuthError = createOAuthErrorHandler(integration.id, toast);
+
+            // Trigger OAuth flow with error handling
+            const cleanup = triggerOAuthFlow(
+                integration.id,
+                oauthFields,
+                integration.id, // Use integration ID as selectedIntegration
+                config.superglueApiKey,
+                authType,
+                handleOAuthError,
+                true // Force OAuth
+            );
+
+            // Store cleanup function for potential use
+            if (cleanup) {
+                // Cleanup will be called automatically when OAuth completes or fails
+            }
+        }
+    };
+
+    // Helper function to clean integration data for GraphQL input
+    const cleanIntegrationForInput = (integration: Integration) => {
+        return {
+            id: integration.id,
+            urlHost: integration.urlHost,
+            urlPath: integration.urlPath,
+            documentationUrl: integration.documentationUrl,
+            documentation: integration.documentation,
+            specificInstructions: integration.specificInstructions,
+            credentials: integration.credentials,
+            // Include documentationPending if it exists (for refresh docs functionality)
+            ...(integration.documentationPending !== undefined && { documentationPending: integration.documentationPending }),
+        };
+    };
+
     const handleSave = async (integration: Integration): Promise<Integration | null> => {
         try {
             if (integration.id) {
-                const mode = editingIntegration ? UpsertMode.UPDATE : UpsertMode.CREATE;
-                const savedIntegration = await client.upsertIntegration(integration.id, integration, mode);
-                const willTriggerDocFetch = needsUIToTriggerDocFetch(savedIntegration, editingIntegration);
+                // Determine mode based on whether integration exists, not edit mode
+                const existingIntegration = integrations.find(i => i.id === integration.id);
+                const mode = existingIntegration ? UpsertMode.UPDATE : UpsertMode.CREATE;
+                const cleanedIntegration = cleanIntegrationForInput(integration);
+                const savedIntegration = await client.upsertIntegration(integration.id, cleanedIntegration, mode);
+                const willTriggerDocFetch = needsUIToTriggerDocFetch(savedIntegration, existingIntegration);
 
                 if (willTriggerDocFetch) {
                     setPendingDocIds(prev => new Set([...prev, savedIntegration.id]));
@@ -296,14 +397,10 @@ export default function IntegrationsPage() {
 
         try {
             // Use documentationPending flag to trigger backend refresh
-            const upsertData = {
-                id: integration.id,
-                urlHost: integration.urlHost,
-                urlPath: integration.urlPath,
-                documentationUrl: integration.documentationUrl,
-                credentials: integration.credentials || {},
+            const upsertData = cleanIntegrationForInput({
+                ...integration,
                 documentationPending: true // Trigger refresh
-            };
+            });
 
             await client.upsertIntegration(integrationId, upsertData, UpsertMode.UPDATE);
 
@@ -335,15 +432,12 @@ export default function IntegrationsPage() {
             try {
                 const integration = integrations.find(i => i.id === integrationId);
                 if (integration) {
-                    await client.upsertIntegration(integrationId, {
-                        id: integration.id,
-                        urlHost: integration.urlHost,
-                        urlPath: integration.urlPath,
-                        documentationUrl: integration.documentationUrl,
-                        credentials: integration.credentials || {},
+                    const resetData = cleanIntegrationForInput({
+                        ...integration,
                         documentation: integration.documentation || '',
                         documentationPending: false
-                    }, UpsertMode.UPDATE);
+                    });
+                    await client.upsertIntegration(integrationId, resetData, UpsertMode.UPDATE);
                 }
             } catch (resetError) {
                 console.error('Error resetting documentationPending:', resetError);
@@ -474,12 +568,21 @@ export default function IntegrationsPage() {
                                                     variant="outline"
                                                     size="sm"
                                                     className="text-muted-foreground hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                                                    onClick={() => router.push(`/workflows?integration=${integration.id}`)}
-                                                    title={badge.type === 'oauth-incomplete' ? "OAuth configuration required" : "Build workflow with this integration"}
-                                                    disabled={badge.type === 'oauth-incomplete'}
+                                                    onClick={() => badge.type === 'oauth-incomplete' ? handleCompleteOAuth(integration) : router.push(`/workflows?integration=${integration.id}`)}
+                                                    title={badge.type === 'oauth-incomplete' ? "Start OAuth flow to complete configuration" : "Build workflow with this integration"}
+                                                    disabled={false}
                                                 >
-                                                    <Sparkles className="h-4 w-4 mr-2" />
-                                                    Build Workflow
+                                                    {badge.type === 'oauth-incomplete' ? (
+                                                        <>
+                                                            <Key className="h-4 w-4 mr-2" />
+                                                            Complete OAuth
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Sparkles className="h-4 w-4 mr-2" />
+                                                            Build Workflow
+                                                        </>
+                                                    )}
                                                 </Button>
                                                 <Button
                                                     variant="ghost"

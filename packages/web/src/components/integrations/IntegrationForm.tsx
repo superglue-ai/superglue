@@ -17,7 +17,8 @@ import { useToast } from '@/src/hooks/use-toast';
 import { cn, composeUrl } from '@/src/lib/utils';
 import type { Integration } from '@superglue/client';
 
-import { getOAuthConfig, integrations } from '@superglue/shared';
+import { buildOAuthUrlForIntegration, createOAuthErrorHandler, getOAuthCallbackUrl, triggerOAuthFlow } from '@/src/components/utils/oauth-utils';
+import { integrations } from '@superglue/shared';
 import { Check, ChevronRight, ChevronsUpDown, Copy, Globe, Link } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
@@ -92,8 +93,32 @@ export function IntegrationForm({
             refresh_token: creds.refresh_token || '',
             scopes: creds.scopes || '',
             expires_at: creds.expires_at || '',
-            token_type: creds.token_type || 'Bearer'
+            token_type: creds.token_type || 'Bearer',
+            grant_type: creds.grant_type || 'authorization_code'
         };
+    });
+
+    // Track initial OAuth field values to detect changes
+    const [initialOAuthFields, setInitialOAuthFields] = useState(() => {
+        const creds = integration?.credentials || {};
+        return {
+            client_id: creds.client_id || '',
+            client_secret: creds.client_secret || '',
+            auth_url: creds.auth_url || '',
+            token_url: creds.token_url || '',
+            scopes: creds.scopes || '',
+            grant_type: creds.grant_type || 'authorization_code'
+        };
+    });
+
+    // Track initial API credentials to detect changes
+    const [initialApiCredentials, setInitialApiCredentials] = useState(() => {
+        const creds = integration?.credentials || {};
+        if (initialAuthType === 'oauth' && integration) {
+            const { client_id, client_secret, auth_url, token_url, access_token, refresh_token, scopes, expires_at, ...additionalCreds } = creds;
+            return Object.keys(additionalCreds).length > 0 ? JSON.stringify(additionalCreds, null, 2) : '{}';
+        }
+        return Object.keys(creds).length > 0 ? JSON.stringify(creds, null, 2) : '{}';
     });
 
     // Initialize API key credentials as JSON string for CredentialsManager
@@ -226,6 +251,25 @@ export function IntegrationForm({
         }
     };
 
+    // Check if OAuth fields have changed
+    const hasOAuthFieldsChanged = () => {
+        if (authType !== 'oauth') return false;
+        
+        // Check if any OAuth field changed
+        const oauthFieldsChanged = 
+            oauthFields.client_id !== initialOAuthFields.client_id ||
+            oauthFields.client_secret !== initialOAuthFields.client_secret ||
+            oauthFields.auth_url !== initialOAuthFields.auth_url ||
+            oauthFields.token_url !== initialOAuthFields.token_url ||
+            oauthFields.scopes !== initialOAuthFields.scopes ||
+            oauthFields.grant_type !== initialOAuthFields.grant_type;
+        
+        // Check if additional API credentials changed
+        const apiCredentialsChanged = apiKeyCredentials !== initialApiCredentials;
+        
+        return oauthFieldsChanged || apiCredentialsChanged;
+    };
+
     const handleSubmit = async () => {
         const errors: Record<string, boolean> = {};
         if (!id.trim()) errors.id = true;
@@ -294,19 +338,36 @@ export function IntegrationForm({
                 return;
             }
 
-            // If OAuth and not already configured, trigger OAuth flow using the resolved integration ID
-            if (authType === 'oauth' && (!oauthFields.access_token || !oauthFields.refresh_token)) {
-                const authUrl = buildOAuthUrlForIntegration(savedIntegration.id);
-                if (authUrl) {
-                    const width = 600;
-                    const height = 700;
-                    const left = (window.screen.width - width) / 2;
-                    const top = (window.screen.height - height) / 2;
+            // Check if OAuth should be triggered
+            const grantType = oauthFields.grant_type || 'authorization_code';
+            const shouldTriggerOAuth = authType === 'oauth' && (
+                // For authorization code: trigger if OAuth is not configured yet
+                (grantType === 'authorization_code' && (!oauthFields.access_token || !oauthFields.refresh_token)) ||
+                // For client credentials: trigger if OAuth fields have changed (backend will handle it)
+                (grantType === 'client_credentials' && hasOAuthFieldsChanged()) ||
+                // OR if OAuth is forced (e.g., when fields changed)
+                hasOAuthFieldsChanged()
+            );
 
-                    const popup = window.open(
-                        authUrl,
-                        'oauth_popup',
-                        `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
+            if (shouldTriggerOAuth) {
+                if (grantType === 'client_credentials') {
+                    // For client credentials, show a message that OAuth is being processed
+                    toast({
+                        title: 'OAuth Processing',
+                        description: 'Client credentials OAuth flow is being processed in the background. The integration will be updated automatically.',
+                    });
+                } else {
+                    // For authorization code, trigger the popup flow
+                    const handleOAuthError = createOAuthErrorHandler(savedIntegration.id, toast);
+
+                    triggerOAuthFlow(
+                        savedIntegration.id,
+                        oauthFields,
+                        selectedIntegration,
+                        config.superglueApiKey,
+                        authType,
+                        handleOAuthError,
+                        hasOAuthFieldsChanged() // Force OAuth if fields changed
                     );
                 }
             }
@@ -316,11 +377,7 @@ export function IntegrationForm({
         }
     };
 
-    // Generate OAuth callback URL
-    const getOAuthCallbackUrl = () => {
-        const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-        return `${baseUrl}/api/auth/callback`; // No more integration ID needed
-    };
+
 
 
 
@@ -341,61 +398,10 @@ export function IntegrationForm({
         }
     };
 
-    // Helper to build OAuth authorization URL
-    const buildOAuthUrlForIntegration = (integrationId: string) => {
-        try {
-            const { client_id, scopes } = oauthFields;
-
-            if (!client_id) return null;
-
-            const redirectUri = getOAuthCallbackUrl();
-
-            // Get auth URL from OAuth fields or known providers
-            let authUrl = oauthFields.auth_url;
-            let defaultScopes = '';
-
-            if (!authUrl) {
-                const oauthConfig = getOAuthConfig(integrationId) || getOAuthConfig(selectedIntegration);
-                authUrl = oauthConfig?.authUrl;
-                defaultScopes = oauthConfig?.scopes || '';
-            }
-
-            if (!authUrl) return null;
-
-            const params = new URLSearchParams({
-                client_id,
-                redirect_uri: redirectUri,
-                response_type: 'code',
-                state: btoa(JSON.stringify({
-                    integrationId,
-                    timestamp: Date.now(),
-                    apiKey: config.superglueApiKey,
-                    redirectUri,
-                })),
-            });
-
-            // Use explicitly set scopes or fall back to defaults
-            const finalScopes = scopes || defaultScopes;
-            if (finalScopes) {
-                params.append('scope', finalScopes);
-            }
-
-            // Add Google-specific parameters if it's a Google service
-            if (authUrl.includes('google.com')) {
-                params.append('access_type', 'offline');
-                params.append('prompt', 'consent');
-            }
-
-            return `${authUrl}?${params.toString()}`;
-        } catch {
-            return null;
-        }
-    };
-
     // Legacy function that uses the form's current ID (for backward compatibility)
     const buildOAuthUrl = () => {
         const integrationId = isEditing ? integration!.id : id.trim();
-        return buildOAuthUrlForIntegration(integrationId);
+        return buildOAuthUrlForIntegration(integrationId, oauthFields, selectedIntegration, config.superglueApiKey);
     };
 
     return (
@@ -601,26 +607,28 @@ export function IntegrationForm({
                                 </div>
                             </div>
 
-                            <div className="border-t pt-3">
-                                <Label className="text-xs flex items-center gap-1">
-                                    Redirect URI
-                                    <HelpTooltip text="Copy this URL and add it to your OAuth app's allowed redirect URIs. This is where users will be sent after authorizing your app." />
-                                </Label>
-                                <div className="flex items-center gap-2 mt-1 mb-2">
-                                    <code className="text-xs bg-background px-2 py-1 rounded flex-1 overflow-x-auto">
-                                        {getOAuthCallbackUrl()}
-                                    </code>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8"
-                                        onClick={() => copyToClipboard(getOAuthCallbackUrl())}
-                                    >
-                                        <Copy className="h-4 w-4" />
-                                    </Button>
+                            {oauthFields.grant_type === 'authorization_code' && (
+                                <div className="border-t pt-3">
+                                    <Label className="text-xs flex items-center gap-1">
+                                        Redirect URI
+                                        <HelpTooltip text="Copy this URL and add it to your OAuth app's allowed redirect URIs. This is where users will be sent after authorizing your app." />
+                                    </Label>
+                                    <div className="flex items-center gap-2 mt-1 mb-2">
+                                        <code className="text-xs bg-background px-2 py-1 rounded flex-1 overflow-x-auto">
+                                            {getOAuthCallbackUrl()}
+                                        </code>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8"
+                                            onClick={() => copyToClipboard(getOAuthCallbackUrl())}
+                                        >
+                                            <Copy className="h-4 w-4" />
+                                        </Button>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
 
 
                         </div>
@@ -689,6 +697,27 @@ export function IntegrationForm({
                         {/* OAuth Advanced Settings */}
                         {authType === 'oauth' && (
                             <>
+                                <div>
+                                    <Label htmlFor="grant_type" className="text-xs flex items-center gap-1">
+                                        OAuth Grant Type
+                                        <HelpTooltip text="Authorization Code: User-based flow requiring browser popup for user consent. Client Credentials: Server-to-server flow using only client credentials, no user interaction needed." />
+                                    </Label>
+                                    <Select
+                                        value={oauthFields.grant_type}
+                                        onValueChange={(value: 'authorization_code' | 'client_credentials') => 
+                                            setOauthFields(prev => ({ ...prev, grant_type: value }))
+                                        }
+                                    >
+                                        <SelectTrigger className="h-9">
+                                            <SelectValue placeholder="Select grant type" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="authorization_code">Authorization Code (User-based)</SelectItem>
+                                            <SelectItem value="client_credentials">Client Credentials (Server-to-server)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
                                 <div>
                                     <Label htmlFor="scopes" className="text-xs">OAuth Scopes</Label>
                                     <HelpTooltip text="Permissions requested from the OAuth provider. Format varies by provider: Google uses URLs (https://www.googleapis.com/auth/...), others use simple strings (read write). Leave empty to use defaults." />

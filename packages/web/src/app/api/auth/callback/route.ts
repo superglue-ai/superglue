@@ -93,6 +93,54 @@ function buildRedirectUrl(origin: string, path: string, params: Record<string, s
     return url.toString();
 }
 
+// Centralized OAuth callback HTML response generator
+function createOAuthCallbackHTML(
+    type: 'success' | 'error',
+    message: string,
+    integrationId: string,
+    origin: string
+): string {
+    const isError = type === 'error';
+    const title = isError ? 'OAuth Connection Failed' : 'OAuth Connection Successful!';
+    const color = isError ? '#dc2626' : '#16a34a';
+    const actionText = isError ? 'You can close this window and try again.' : 'You can close this window now.';
+    
+    // Properly escape message for JavaScript
+    const escapedMessage = message.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
+    
+    return `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>OAuth ${isError ? 'Error' : 'Success'}</title>
+        </head>
+        <body>
+            <div style="text-align: center; padding: 50px; font-family: system-ui;">
+                <h2 style="color: ${color};">${title}</h2>
+                <p>${message}</p>
+                <p style="margin-top: 20px;">${actionText}</p>
+            </div>
+            <script>
+                if (window.opener) {
+                    try {
+                        window.opener.postMessage({ 
+                            type: 'oauth-${type}', 
+                            integrationId: '${integrationId}',
+                            message: '${escapedMessage}'
+                        }, '${origin}');
+                    } catch (e) {
+                        console.error('Failed to notify parent window:', e);
+                    }
+                    setTimeout(() => window.close(), 100);
+                } else {
+                    window.location.href = '${origin}/integrations?${isError ? 'error' : 'success'}=oauth_${type}&integration=${integrationId}&message=' + encodeURIComponent('${message}');
+                }
+            </script>
+        </body>
+        </html>
+    `;
+}
+
 export async function GET(request: NextRequest) {
     const { searchParams } = request.nextUrl;
 
@@ -123,31 +171,18 @@ export async function GET(request: NextRequest) {
     // Handle OAuth provider errors
     if (error) {
         const errorMsg = errorDescription || error;
-        const html = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>OAuth Error</title>
-            </head>
-            <body>
-                <div style="text-align: center; padding: 50px; font-family: system-ui;">
-                    <h2 style="color: #dc2626;">OAuth Authorization Failed</h2>
-                    <p>${errorMsg}</p>
-                    <p style="margin-top: 20px;">You can close this window and try again.</p>
-                </div>
-                <script>
-                    setTimeout(() => {
-                        if (window.opener) {
-                            window.close();
-                        } else {
-                            window.location.href = '${origin}/integrations?error=oauth_failed&description=' + encodeURIComponent('${errorMsg}');
-                        }
-                    }, 3000);
-                </script>
-            </body>
-            </html>
-        `;
-
+        // Try to extract integration ID from state if available
+        let integrationId = 'unknown';
+        try {
+            if (state) {
+                const stateData = JSON.parse(atob(state));
+                integrationId = stateData.integrationId || 'unknown';
+            }
+        } catch {
+            // Ignore state parsing errors, use default
+        }
+        
+        const html = createOAuthCallbackHTML('error', errorMsg, integrationId, origin);
         return new Response(html, {
             headers: { 'Content-Type': 'text/html' },
         });
@@ -221,33 +256,7 @@ export async function GET(request: NextRequest) {
 
         // Check if this is a popup window (opened by window.open)
         // If so, close it. Otherwise redirect normally.
-        const html = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>OAuth Success</title>
-            </head>
-            <body>
-                <div style="text-align: center; padding: 50px; font-family: system-ui;">
-                    <h2>OAuth Connection Successful!</h2>
-                    <p>You can close this window now.</p>
-                </div>
-                <script>
-                    // Try to close the window if it's a popup
-                    if (window.opener) {
-                        try {
-                            window.opener.postMessage({ type: 'oauth-success', integrationId: '${integrationId}' }, '${origin}');
-                        } catch (e) {
-                            console.error('Failed to notify parent window:', e);
-                        }
-                        setTimeout(() => window.close(), 100);
-                    } else {
-                        window.location.href = '${origin}/integrations?success=oauth_completed&integration=${integrationId}';
-                    }
-                </script>
-            </body>
-            </html>
-        `;
+        const html = createOAuthCallbackHTML('success', 'OAuth connection completed successfully!', integrationId, origin);
 
         return new Response(html, {
             headers: { 'Content-Type': 'text/html' },
@@ -255,43 +264,19 @@ export async function GET(request: NextRequest) {
     } catch (error) {
         console.error('OAuth callback error:', error);
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        
+        // Try to extract integration ID from state if available
+        let integrationId = 'unknown';
+        try {
+            if (state) {
+                const stateData = JSON.parse(atob(state));
+                integrationId = stateData.integrationId || 'unknown';
+            }
+        } catch {
+            // Ignore state parsing errors, use default
+        }
 
-        // Handle popup window case for errors too
-        const html = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>OAuth Error</title>
-            </head>
-            <body>
-                <div style="text-align: center; padding: 50px; font-family: system-ui;">
-                    <h2 style="color: #dc2626;">OAuth Connection Failed</h2>
-                    <p>${errorMessage}</p>
-                    <p style="margin-top: 20px;">You can close this window and try again.</p>
-                </div>
-                <script>
-                    if (window.opener) {
-                        try {
-                            window.opener.postMessage({ 
-                                type: 'oauth-error', 
-                                message: '${errorMessage.replace(/'/g, "\\'")}'
-                            }, '${origin}');
-                        } catch (e) {
-                            console.error('Failed to notify parent window:', e);
-                        }
-                    }
-                    setTimeout(() => {
-                        if (window.opener) {
-                            window.close();
-                        } else {
-                            window.location.href = '${origin}/integrations?error=oauth_error&message=' + encodeURIComponent('${errorMessage}');
-                        }
-                    }, 3000);
-                </script>
-            </body>
-            </html>
-        `;
-
+        const html = createOAuthCallbackHTML('error', errorMessage, integrationId, origin);
         return new Response(html, {
             headers: { 'Content-Type': 'text/html' },
         });
