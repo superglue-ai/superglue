@@ -428,19 +428,23 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
       // The original steps should only be modified by explicit user edits
       setSelfHealedSteps(state.currentWorkflow.steps);
 
-      const stepResults: Record<string, any> = state.stepResults;
-      setStepResultsMap(stepResults);
+      // Extract just the data from each step result for the UI
+      const stepDataMap: Record<string, any> = {};
+      Object.entries(state.stepResults).forEach(([stepId, result]) => {
+        stepDataMap[stepId] = result.data;
+      });
+      setStepResultsMap(stepDataMap);
 
-      const finalData = stepResults['__final_transform__']?.data;
+      const finalData = state.stepResults['__final_transform__']?.data;
       setFinalPreviewResult(finalData);
       const wr: WorkflowResult = {
         id: crypto.randomUUID(),
         success: state.failedSteps.length === 0,
         data: finalData,
-        error: stepResults['__final_transform__']?.error,
+        error: state.stepResults['__final_transform__']?.error,
         startedAt: new Date(),
         completedAt: new Date(),
-        stepResults: Object.entries(stepResults)
+        stepResults: Object.entries(state.stepResults)
           .filter(([key]) => key !== '__final_transform__')
           .map(([stepId, result]) => ({
             stepId,
