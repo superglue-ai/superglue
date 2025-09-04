@@ -104,7 +104,7 @@ export async function generateTransformCode(
 ${instruction ? `<user_instruction>${instruction}</user_instruction>` : ''}
 ${schema ? `<target_schema>${JSON.stringify(schema, null, 2)}</target_schema>` : ''}
 <source_data_structure>${getSchemaFromData(payload)}</source_data_structure>
-<source_data_sample>${JSON.stringify(sample(payload, 2), null, 2).slice(0, 50000)}</source_data_sample>
+<source_data_sample>${JSON.stringify(sample(payload, 20), null, 2).slice(0, 50000)}</source_data_sample>
 `;
       messages = [
         { role: "system", content: PROMPT_JS_TRANSFORM },
