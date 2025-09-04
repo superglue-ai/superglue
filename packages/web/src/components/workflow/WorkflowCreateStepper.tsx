@@ -75,6 +75,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [selfHealingEnabled, setSelfHealingEnabled] = useState(true);
+  const [shouldStopExecution, setShouldStopExecution] = useState(false);
 
   const [selectedIntegrationIds, setSelectedIntegrationIds] = useState<string[]>(() => {
     return preselectedIntegrationId && integrations.some(i => i.id === preselectedIntegrationId)
@@ -218,10 +219,19 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const handleExecuteWorkflow = async () => {
     try {
       setIsExecuting(true);
+      setShouldStopExecution(false);
       await playgroundRef.current?.executeWorkflow({ selfHealing: selfHealingEnabled });
     } finally {
       setIsExecuting(false);
     }
+  };
+
+  const handleStopExecution = () => {
+    setShouldStopExecution(true);
+    toast({
+      title: "Stopping workflow",
+      description: "Workflow will stop after the current step completes",
+    });
   };
 
   const handleNext = async () => {
@@ -747,6 +757,8 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                 onInstructionEdit={() => setStep('prompt')}
                 selfHealingEnabled={selfHealingEnabled}
                 onSelfHealingChange={setSelfHealingEnabled}
+                shouldStopExecution={shouldStopExecution}
+                onStopExecution={handleStopExecution}
                 headerActions={(
                   <div className="flex items-center gap-2">
                     <div className="flex items-center gap-2 mr-2">
@@ -765,14 +777,25 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                         </div>
                       </div>
                     </div>
-                    <Button
-                      variant="success"
-                      onClick={handleExecuteWorkflow}
-                      disabled={isSaving || isExecuting}
-                      className="h-9 px-4"
-                    >
-                      {isExecuting ? "Testing Workflow..." : "Test Workflow"}
-                    </Button>
+                    {isExecuting ? (
+                      <Button
+                        variant="destructive"
+                        onClick={handleStopExecution}
+                        disabled={isSaving}
+                        className="h-9 px-4"
+                      >
+                        Stop Execution
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="success"
+                        onClick={handleExecuteWorkflow}
+                        disabled={isSaving || isExecuting}
+                        className="h-9 px-4"
+                      >
+                        Test Workflow
+                      </Button>
+                    )}
                     <Button
                       variant="default"
                       onClick={() => playgroundRef.current?.saveWorkflow()}

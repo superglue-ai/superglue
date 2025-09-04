@@ -7,6 +7,7 @@ import JsonSchemaEditor from '@/src/components/utils/JsonSchemaEditor';
 import { canExecuteStep } from '@/src/lib/client-utils';
 import { cn } from '@/src/lib/utils';
 import { Integration } from "@superglue/client";
+import { inferJsonSchema } from '@superglue/shared';
 import { Check, ChevronLeft, ChevronRight, Code2, Copy, Database, Eye, FileJson, Package, Pencil, Play, Settings, Trash2, X } from 'lucide-react';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-javascript';
@@ -73,37 +74,7 @@ const highlightCode = (code: string, language: string) => {
     }
 };
 
-// Helper to infer JSON schema from data
-const inferSchema = (data: any): any => {
-    if (data === null || data === undefined) return { type: 'null' };
-
-    if (Array.isArray(data)) {
-        return {
-            type: 'array',
-            items: data.length > 0 ? inferSchema(data[0]) : { type: 'any' }
-        };
-    }
-
-    if (typeof data === 'object') {
-        const properties: Record<string, any> = {};
-        const required: string[] = [];
-
-        Object.keys(data).forEach(key => {
-            properties[key] = inferSchema(data[key]);
-            if (data[key] !== null && data[key] !== undefined) {
-                required.push(key);
-            }
-        });
-
-        return {
-            type: 'object',
-            properties,
-            ...(required.length > 0 ? { required } : {})
-        };
-    }
-
-    return { type: typeof data };
-};
+const inferSchema = inferJsonSchema;
 
 // Size-based truncation for display 
 const MAX_DISPLAY_SIZE = 1024 * 1024; // 1MB limit for JSON display

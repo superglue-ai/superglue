@@ -13,7 +13,12 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "openai": "^4.85.4"
+    "openai": "^4.85.4",
+    "lodash.isequal": "^4.5.0",
+    "lodash.xor": "^4.5.0",
+    "lodash.keys": "^4.2.0",
+    "lodash.merge": "^4.6.2",
+    "json-schema": "^0.4.0"
   },
   "devDependencies": {
     "@types/node": "^20.17.19",

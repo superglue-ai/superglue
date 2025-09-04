@@ -102,7 +102,8 @@ export async function executeWorkflowStepByStep(
   workflow: Workflow,
   payload: any,
   onStepComplete?: (stepIndex: number, result: StepExecutionResult) => void,
-  selfHealing: boolean = true
+  selfHealing: boolean = true,
+  shouldStop?: () => boolean
 ): Promise<WorkflowExecutionState> {
   const state: WorkflowExecutionState = {
     originalWorkflow: workflow,
@@ -117,6 +118,11 @@ export async function executeWorkflowStepByStep(
   const previousResults: Record<string, any> = {};
 
   for (let i = 0; i < workflow.steps.length; i++) {
+    if (shouldStop && shouldStop()) {
+      state.isExecuting = false;
+      return state;
+    }
+
     state.currentStepIndex = i;
     const step = workflow.steps[i];
 

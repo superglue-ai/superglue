@@ -27,6 +27,8 @@ export interface WorkflowPlaygroundProps {
   readOnly?: boolean;
   selfHealingEnabled?: boolean;
   onSelfHealingChange?: (enabled: boolean) => void;
+  shouldStopExecution?: boolean;
+  onStopExecution?: () => void;
 }
 
 export interface WorkflowPlaygroundHandle {
@@ -49,7 +51,9 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
   hideHeader = false,
   readOnly = false,
   selfHealingEnabled: externalSelfHealingEnabled,
-  onSelfHealingChange
+  onSelfHealingChange,
+  shouldStopExecution: externalShouldStop,
+  onStopExecution
 }, ref) => {
   const router = useRouter();
   const { toast } = useToast();
@@ -99,6 +103,10 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
   const [selfHealingEnabled, setSelfHealingEnabled] = useState(externalSelfHealingEnabled ?? true);
   const [isExecutingStep, setIsExecutingStep] = useState<number | undefined>(undefined);
   const [currentExecutingStepIndex, setCurrentExecutingStepIndex] = useState<number | undefined>(undefined);
+  const [shouldStopExecution, setShouldStopExecution] = useState(false);
+
+  // Use external stop state when embedded
+  const effectiveShouldStop = embedded && externalShouldStop !== undefined ? externalShouldStop : shouldStopExecution;
 
   useEffect(() => {
     if (externalSelfHealingEnabled !== undefined) {
@@ -110,6 +118,18 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
     setSelfHealingEnabled(enabled);
     if (onSelfHealingChange) {
       onSelfHealingChange(enabled);
+    }
+  };
+
+  const handleStopExecution = () => {
+    if (embedded && onStopExecution) {
+      onStopExecution();
+    } else {
+      setShouldStopExecution(true);
+      toast({
+        title: "Stopping workflow",
+        description: "Workflow will stop after the current step completes",
+      });
     }
   };
 
@@ -391,6 +411,9 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
 
   const executeWorkflow = async (opts?: { selfHealing?: boolean }) => {
     setLoading(true);
+    if (!embedded) {
+      setShouldStopExecution(false);
+    }
     setCompletedSteps([]);
     setFailedSteps([]);
     setResult(null);
@@ -438,7 +461,8 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
             setFailedSteps(prev => Array.from(new Set([...prev, res.stepId])));
           }
         },
-        effectiveSelfHealing
+        effectiveSelfHealing,
+        () => effectiveShouldStop
       );
 
       // Update steps with self-healed configuration if self-healing made changes
@@ -655,14 +679,25 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
           </div>
         </div>
       </div>
-      <Button
-        variant="success"
-        onClick={() => executeWorkflow()}
-        disabled={loading || saving || (isExecutingStep !== undefined) || isExecutingTransform}
-        className="h-9 px-4"
-      >
-        {loading ? "Testing Workflow..." : "Test Workflow"}
-      </Button>
+      {loading ? (
+        <Button
+          variant="destructive"
+          onClick={handleStopExecution}
+          disabled={saving || (isExecutingStep !== undefined) || isExecutingTransform}
+          className="h-9 px-4"
+        >
+          Stop Execution
+        </Button>
+      ) : (
+        <Button
+          variant="success"
+          onClick={() => executeWorkflow()}
+          disabled={loading || saving || (isExecutingStep !== undefined) || isExecutingTransform}
+          className="h-9 px-4"
+        >
+          Test Workflow
+        </Button>
+      )}
       <Button
         variant="default"
         onClick={saveWorkflow}
