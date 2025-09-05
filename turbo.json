@@ -27,6 +27,8 @@
   "globalEnv": [
     "GRAPHQL_ENDPOINT",
     "GRAPHQL_PORT",
+    "API_PORT",
+    "API_ENDPOINT",
     "WEB_PORT",
     "DATASTORE_TYPE",
     "REDIS_HOST",

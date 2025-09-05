@@ -27,6 +27,7 @@
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
     "@types/node": "^20.17.19",
+    "concurrently": "^9.1.0",
     "mcp-remote": "^0.1.5",
     "ts-node": "^10.9.2",
     "turbo": "^2.5.6",
