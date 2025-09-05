@@ -1,20 +1,20 @@
 import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
 import { Input } from '@/src/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
-import JsonSchemaEditor from '@/src/components/utils/JsonSchemaEditor';
 import { canExecuteStep } from '@/src/lib/client-utils';
-import { cn } from '@/src/lib/utils';
+import { cn, isEmptyData } from '@/src/lib/utils';
 import { Integration } from "@superglue/client";
 import { inferJsonSchema } from '@superglue/shared';
-import { Check, ChevronLeft, ChevronRight, Code2, Copy, Database, Eye, FileJson, Package, Pencil, Play, Settings, Trash2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Database, FileJson, Package, Play, Settings, Trash2 } from 'lucide-react';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-javascript';
 import 'prismjs/components/prism-json';
 import React, { useEffect, useRef, useState } from 'react';
 import Editor from 'react-simple-code-editor';
-import { WorkflowStepCard } from './WorkflowStepCard';
+import { CopyButton, FinalResultsCard, FinalTransformMiniStepCard, InstructionDisplay, JsonCodeEditor, MiniStepCard, PayloadMiniStepCard, truncateForDisplay, truncateLines } from './WorkflowMiniStepCards';
+import { WorkflowStepConfigurator } from './WorkflowStepConfigurator';
 
 interface WorkflowStepGalleryProps {
     steps: any[];
@@ -49,30 +49,10 @@ interface WorkflowStepGalleryProps {
     headerActions?: React.ReactNode;
     navigateToFinalSignal?: number;
     showStepOutputSignal?: number;
+    focusStepId?: string | null;
 }
 
-const MAX_HIGHLIGHT_CHARS = 100000;
-const highlightCode = (code: string, language: string) => {
-    if (!code || code.length > MAX_HIGHLIGHT_CHARS) return code;
-    try {
-        if (language === 'javascript' || language === 'js') {
-            // Ensure we're using the JavaScript language definition
-            const jsLang = Prism.languages.javascript || Prism.languages.js;
-            if (jsLang) {
-                return Prism.highlight(code, jsLang, 'javascript');
-            }
-        } else if (language === 'json') {
-            const jsonLang = Prism.languages.json;
-            if (jsonLang) {
-                return Prism.highlight(code, jsonLang, 'json');
-            }
-        }
-        return code;
-    } catch (error) {
-        console.error('Syntax highlighting error:', error);
-        return code;
-    }
-};
+// Highlighting moved to WorkflowMiniStepCards
 
 const inferSchema = inferJsonSchema;
 
@@ -122,79 +102,13 @@ const truncateValue = (value: any, depth: number = 0): any => {
     return value;
 };
 
-const truncateForDisplay = (data: any): { value: string, truncated: boolean } => {
-    if (data === null || data === undefined) {
-        return { value: '{}', truncated: false };
-    }
-
-    if (typeof data === 'string') {
-        if (data.length > MAX_STRING_PREVIEW_LENGTH) {
-            const truncatedString = data.substring(0, MAX_STRING_PREVIEW_LENGTH);
-            const lastNewline = truncatedString.lastIndexOf('\n');
-            const cleanTruncated = truncatedString.substring(0, lastNewline > 0 ? lastNewline : MAX_STRING_PREVIEW_LENGTH);
-            const note = `\n\n... [String truncated - showing ${MAX_STRING_PREVIEW_LENGTH.toLocaleString()} of ${data.length.toLocaleString()} characters]`;
-            const combined = `${cleanTruncated}${note}`;
-            return {
-                value: JSON.stringify(combined),
-                truncated: true
-            };
-        }
-        return { value: JSON.stringify(data), truncated: false };
-    }
-
-    try {
-        // For objects, first try to show the structure with truncated values
-        const truncatedData = truncateValue(data);
-        let jsonString = JSON.stringify(truncatedData, null, 2);
-
-        if (jsonString.length > MAX_DISPLAY_SIZE) {
-            jsonString = jsonString.substring(0, MAX_DISPLAY_SIZE);
-            // Find last complete line to avoid cutting mid-line
-            const lastNewline = jsonString.lastIndexOf('\n');
-            if (lastNewline > 0) {
-                jsonString = jsonString.substring(0, lastNewline);
-            }
-            return {
-                value: jsonString + '\n\n... [Data truncated - exceeds size limit]',
-                truncated: true
-            };
-        }
-
-        const lines = jsonString.split('\n');
-        if (lines.length > MAX_DISPLAY_LINES) {
-            return {
-                value: lines.slice(0, MAX_DISPLAY_LINES).join('\n') + '\n\n... [Truncated - too many lines]',
-                truncated: true
-            };
-        }
-
-        // Check if we truncated anything during value processing
-        const originalJson = JSON.stringify(data, null, 2);
-        const wasTruncated = originalJson !== jsonString;
-
-        return { value: jsonString, truncated: wasTruncated };
-    } catch (e) {
-        // Fallback for circular references or other issues
-        const stringValue = String(data);
-        if (stringValue.length > MAX_STRING_PREVIEW_LENGTH) {
-            const preview = stringValue.substring(0, MAX_STRING_PREVIEW_LENGTH) + '... [Truncated]';
-            return {
-                value: JSON.stringify(preview),
-                truncated: true
-            };
-        }
-        return { value: JSON.stringify(stringValue), truncated: false };
-    }
-};
+// moved to WorkflowMiniStepCards
+// truncateForDisplay moved to WorkflowMiniStepCards
 
 
 
-const truncateLines = (text: string, maxLines: number): string => {
-    if (!text) return text;
-    const lines = text.split('\n');
-    if (lines.length <= maxLines) return text;
-    return lines.slice(0, maxLines).join('\n') + `\n... truncated ${lines.length - maxLines} more lines ...`;
-};
+// moved to WorkflowMiniStepCards
+// truncateLines moved to WorkflowMiniStepCards
 
 const buildEvolvingPayload = (initialPayload: any, steps: any[], stepResults: Record<string, any>, upToIndex: number) => {
     let evolvingPayload = { ...initialPayload };
@@ -217,220 +131,13 @@ const buildEvolvingPayload = (initialPayload: any, steps: any[], stepResults: Re
     return evolvingPayload;
 };
 
-// Copy button component - supports both string and lazy data
-const CopyButton = ({ text, getData }: { text?: string; getData?: () => any }) => {
-    const [copied, setCopied] = useState(false);
+// CopyButton moved to WorkflowMiniStepCards
 
-    const handleCopy = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        e.preventDefault();
-        const textToCopy = getData ?
-            (typeof getData() === 'string' ? getData() : JSON.stringify(getData(), null, 2)) :
-            (text || '');
+/* Moved to WorkflowMiniStepCards */
+// InstructionDisplay moved to WorkflowMiniStepCards
 
-        navigator.clipboard.writeText(textToCopy);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
-    };
-
-    return (
-        <button
-            onClick={handleCopy}
-            className="h-6 w-6 flex items-center justify-center rounded hover:bg-background/80 transition-colors bg-background/60 backdrop-blur"
-            title="Copy"
-            type="button"
-        >
-            {copied ? (
-                <Check className="h-3 w-3 text-green-600" />
-            ) : (
-                <Copy className="h-3 w-3 text-muted-foreground" />
-            )}
-        </button>
-    );
-};
-
-const InstructionDisplay = ({
-    instruction,
-    onEdit,
-    showEditButton = true
-}: {
-    instruction: string;
-    onEdit?: () => void;
-    showEditButton?: boolean;
-}) => {
-    const [showFull, setShowFull] = useState(false);
-    const [copied, setCopied] = useState(false);
-    const MAX_LENGTH = 100;
-    const truncated = instruction.length > MAX_LENGTH
-        ? instruction.substring(0, MAX_LENGTH) + '...'
-        : instruction;
-
-    const handleCopy = () => {
-        navigator.clipboard.writeText(instruction);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
-    };
-
-    return (
-        <>
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 rounded-md border max-w-full overflow-hidden h-[36px]">
-                <div className="flex-1 min-w-0 flex items-center gap-2">
-                    <p className="text-sm text-muted-foreground font-medium">Instruction:</p>
-                    <p className="text-sm font-mono text-foreground truncate flex-1">
-                        {truncated}
-                    </p>
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                    {instruction.length > MAX_LENGTH && (
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6"
-                            onClick={() => setShowFull(true)}
-                            title="View full instruction"
-                        >
-                            <Eye className="h-3 w-3" />
-                        </Button>
-                    )}
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={handleCopy}
-                        title="Copy"
-                    >
-                        {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                    </Button>
-                    {onEdit && showEditButton && (
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6"
-                            onClick={onEdit}
-                            title="Edit"
-                        >
-                            <Pencil className="h-3 w-3" />
-                        </Button>
-                    )}
-                </div>
-            </div>
-
-            {/* Full Instruction Modal */}
-            {showFull && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setShowFull(false)}>
-                    <Card className="max-w-3xl w-full max-h-[80vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                        <div className="p-6 relative">
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-lg font-semibold">Workflow Instruction</h3>
-                                <div className="flex items-center gap-2">
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8"
-                                        onClick={() => {
-                                            navigator.clipboard.writeText(instruction);
-                                            setCopied(true);
-                                            setTimeout(() => setCopied(false), 1500);
-                                        }}
-                                        title="Copy"
-                                    >
-                                        {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => setShowFull(false)}
-                                    >
-                                        <X className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            </div>
-                            <div className="bg-muted/30 rounded-lg p-4 max-h-[60vh] overflow-y-auto">
-                                <p className="text-sm font-mono whitespace-pre-wrap">
-                                    {instruction}
-                                </p>
-                            </div>
-                        </div>
-                    </Card>
-                </div>
-            )}
-        </>
-    );
-};
-
-// Final Results Card with size-based truncation
-const FinalResultsCard = ({ result }: { result: any }) => {
-    const [copied, setCopied] = useState(false);
-
-    // Check if result is undefined (not run)
-    const isPending = result === undefined;
-
-    // Get truncated display and full data separately
-    const displayData = isPending ? { value: '', truncated: false } : truncateForDisplay(result);
-    const fullJson = result !== undefined ? JSON.stringify(result, null, 2) : '';
-    const bytes = isPending ? 0 : new Blob([fullJson]).size;
-
-    const handleCopy = () => {
-        // Always copy the full result, never truncated
-        navigator.clipboard.writeText(fullJson);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
-    };
-
-    return (
-        <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50">
-            <div className="p-6">
-                <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                        <Package className="h-4 w-4 text-muted-foreground" />
-                        <h3 className="text-lg font-semibold">Final Result</h3>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">{bytes.toLocaleString()} bytes</span>
-                        {!isPending && (
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 px-2 text-xs"
-                                onClick={handleCopy}
-                                title="Copy full result data"
-                            >
-                                {copied ? (
-                                    <><Check className="h-3 w-3 mr-1" /> Copied!</>
-                                ) : (
-                                    <><Copy className="h-3 w-3 mr-1" /> Copy Full Data</>
-                                )}
-                            </Button>
-                        )}
-                    </div>
-                </div>
-                <div className="relative">
-                    {isPending ? (
-                        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                            <Package className="h-8 w-8 mb-2 opacity-50" />
-                            <p className="text-sm">No results yet</p>
-                            <p className="text-xs mt-1">Run the workflow or test the transform to see results</p>
-                        </div>
-                    ) : (
-                        <>
-                            <JsonCodeEditor
-                                value={displayData.value}
-                                readOnly
-                                minHeight="220px"
-                                maxHeight="420px"
-                            />
-                            {displayData.truncated && (
-                                <div className="mt-2 text-xs text-amber-600 dark:text-amber-300">
-                                    Preview truncated for display performance. Use copy button to get full data.
-                                </div>
-                            )}
-                        </>
-                    )}
-                </div>
-            </div>
-        </Card>
-    );
-};
+/* Moved to WorkflowMiniStepCards */
+// FinalResultsCard moved to WorkflowMiniStepCards
 
 const JavaScriptCodeEditor = React.memo(({
     value,
@@ -634,102 +341,10 @@ const JavaScriptCodeEditor = React.memo(({
     );
 });
 
-// JSON Code Editor without blue border
-const MAX_READONLY_RENDER_CHARS = 150000;
-const JsonCodeEditor = ({
-    value,
-    onChange,
-    readOnly = false,
-    minHeight = '150px',
-    maxHeight = '400px',
-    placeholder = '{}',
-    overlay,
-    resizable = false
-}: {
-    value: string;
-    onChange?: (value: string) => void;
-    readOnly?: boolean;
-    minHeight?: string;
-    maxHeight?: string;
-    placeholder?: string;
-    overlay?: React.ReactNode;
-    resizable?: boolean;
-}) => {
-    const [currentHeight, setCurrentHeight] = useState(maxHeight);
-    const displayValue = React.useMemo(() => {
-        const base = value || placeholder;
-        if (readOnly && (base?.length || 0) > MAX_READONLY_RENDER_CHARS) {
-            return `${base.slice(0, MAX_READONLY_RENDER_CHARS)}\n...truncated...`;
-        }
-        return base;
-    }, [value, placeholder, readOnly]);
+// JsonCodeEditor moved to WorkflowMiniStepCards
 
-    return (
-        <div className={cn(
-            "relative rounded-lg border shadow-sm",
-            readOnly ? "bg-muted/30 border-dashed" : "bg-background border"
-        )}>
-            {overlay && (
-                <div className="absolute top-1 right-1 z-10 flex items-center gap-1">
-                    {overlay}
-                </div>
-            )}
-            {!overlay && (
-                <div className="absolute top-1 right-1 z-10">
-                    <CopyButton text={value || placeholder} />
-                </div>
-            )}
-            {resizable && (
-                <div
-                    className="absolute bottom-1 right-1 w-3 h-3 cursor-se-resize z-10"
-                    style={{
-                        background: 'linear-gradient(135deg, transparent 50%, rgba(100,100,100,0.3) 50%)',
-                    }}
-                    onMouseDown={(e) => {
-                        e.preventDefault();
-                        const startY = e.clientY;
-                        const startHeight = parseInt(currentHeight);
-
-                        const handleMouseMove = (e: MouseEvent) => {
-                            const deltaY = e.clientY - startY;
-                            const newHeight = Math.max(60, Math.min(600, startHeight + deltaY));
-                            setCurrentHeight(`${newHeight}px`);
-                        };
-
-                        const handleMouseUp = () => {
-                            document.removeEventListener('mousemove', handleMouseMove);
-                            document.removeEventListener('mouseup', handleMouseUp);
-                        };
-
-                        document.addEventListener('mousemove', handleMouseMove);
-                        document.addEventListener('mouseup', handleMouseUp);
-                    }}
-                />
-            )}
-            <div className={cn(
-                "p-3 pr-10 overflow-auto",
-                readOnly ? "cursor-not-allowed" : "cursor-text"
-            )} style={{ maxHeight: resizable ? currentHeight : maxHeight }}>
-                <Editor
-                    value={displayValue}
-                    onValueChange={onChange || (() => { })}
-                    highlight={(code) => highlightCode(code, 'json')}
-                    padding={0}
-                    disabled={readOnly}
-                    className="font-mono text-xs"
-                    textareaClassName="outline-none focus:outline-none"
-                    style={{
-                        minHeight,
-                        background: 'transparent',
-                    }}
-                />
-            </div>
-        </div>
-    );
-};
-
-// Initial Payload Card with Input Schema - compact version with tabs
-const PayloadMiniStepCard = ({
+// Remove local stub; use imported PayloadMiniStepCard
+/* const PayloadMiniStepCard = ({
     payload,
     inputSchema,
     onChange,
@@ -810,6 +425,9 @@ const PayloadMiniStepCard = ({
                             minHeight="150px"
                             maxHeight="200px"
                         />
+                        <div className="mt-2 text-[10px] text-muted-foreground">
+                            <HelpTooltip text="Payload is the concrete JSON sent when executing the workflow. It can include secrets merged from your credentials. Editing here does NOT save values to the workflow; it only affects this session/run. Use Input Schema to optionally describe the expected structure for validation and tooling." />
+                        </div>
                         {error && (
                             <div className="mt-2 text-xs text-destructive flex items-center gap-1">
                                 <span className="text-destructive">⚠</span> {error}
@@ -823,14 +441,18 @@ const PayloadMiniStepCard = ({
                             onChange={handleSchemaChange}
                             isOptional={true}
                         />
+                        <div className="mt-2 text-[10px] text-muted-foreground">
+                            <HelpTooltip text="Input Schema is optional and defines the expected payload shape for validation and AI guidance. Keep secrets out of the schema. Actual runtime values come from the Payload JSON merged with your credentials at execution time." />
+                        </div>
                     </TabsContent>
                 </Tabs>
             </div>
         </Card>
     );
-};
+}; */
 
-const FinalTransformMiniStepCard = ({
+// Remove local stub; use imported FinalTransformMiniStepCard
+/* const FinalTransformMiniStepCard = ({
     transform,
     responseSchema,
     onTransformChange,
@@ -1046,7 +668,7 @@ const FinalTransformMiniStepCard = ({
                     <TabsContent value="schema" className="mt-2">
                         <div className="space-y-3">
                             <JsonSchemaEditor
-                                value={localSchema}
+                                value={(localSchema && localSchema.trim().length > 0) ? localSchema : null}
                                 onChange={handleSchemaChange}
                                 isOptional={true}
                             />
@@ -1056,7 +678,7 @@ const FinalTransformMiniStepCard = ({
             </div>
         </Card>
     );
-};
+}; */
 
 // Spotlight Step Card with toggleable sections
 const SpotlightStepCard = ({
@@ -1214,7 +836,7 @@ const SpotlightStepCard = ({
 
                     {activePanel === 'config' && (
                         <div className="mt-1">
-                            <WorkflowStepCard
+                            <WorkflowStepConfigurator
                                 step={step}
                                 isLast={true}
                                 onEdit={onEdit}
@@ -1261,6 +883,7 @@ const SpotlightStepCard = ({
                                         isTruncated = displayData.truncated;
                                     }
                                 }
+                                const showEmptyWarning = !stepFailed && !isPending && !errorResult && outputViewMode === 'preview' && isEmptyData(outputString || '');
                                 return (
                                     <>
                                         {stepFailed && (
@@ -1296,6 +919,11 @@ const SpotlightStepCard = ({
                                                         </div>
                                                     }
                                                 />
+                                                {showEmptyWarning && (
+                                                    <div className="mt-1 text-[11px] text-amber-700 dark:text-amber-300 px-2">
+                                                        ⚠ No data returned. Is this expected?
+                                                    </div>
+                                                )}
                                                 {isTruncated && outputViewMode === 'preview' && (
                                                     <div className="mt-1 text-[10px] text-amber-600 dark:text-amber-300 px-2">
                                                         Preview truncated for display performance
@@ -1314,8 +942,8 @@ const SpotlightStepCard = ({
     );
 };
 
-// Enhanced Mini Step Card
-const MiniStepCard = ({
+// Remove local stub; use imported MiniStepCard
+/* const MiniStepCard = ({
     step,
     index,
     isActive,
@@ -1353,7 +981,7 @@ const MiniStepCard = ({
                 style={{ height: '100%' }}
             >
                 <Card className={cn(
-                    isActive ? "p-4 w-[228px] h-[130px]" : "p-4 w-[220px] h-[120px]",
+                    isActive ? "p-4 w-[228px] h-[130px]" : "p-4 w-[228px] h-[120px]",
                     "flex-shrink-0",
                     isActive && "ring-2 ring-primary shadow-lg"
                 )}>
@@ -1392,7 +1020,7 @@ const MiniStepCard = ({
                 style={{ height: '100%' }}
             >
                 <Card className={cn(
-                    isActive ? "p-4 w-[228px] h-[130px]" : "p-4 w-[220px] h-[120px]",
+                    isActive ? "p-4 w-[228px] h-[130px]" : "p-4 w-[228px] h-[120px]",
                     "flex-shrink-0",
                     isActive && "ring-2 ring-primary shadow-lg"
                 )}>
@@ -1426,7 +1054,7 @@ const MiniStepCard = ({
                 style={{ height: '100%' }}
             >
                 <Card className={cn(
-                    isActive ? "p-4 w-[228px] h-[130px]" : "p-4 w-[220px] h-[120px]",
+                    isActive ? "p-4 w-[228px] h-[130px]" : "p-4 w-[228px] h-[120px]",
                     "flex-shrink-0",
                     isActive && "ring-2 ring-primary shadow-lg"
                 )}>
@@ -1468,7 +1096,7 @@ const MiniStepCard = ({
             onClick={onClick}
         >
             <Card className={cn(
-                isActive ? "p-4 w-[228px] h-[130px]" : "p-4 w-[220px] h-[120px]",
+                isActive ? "p-4 w-[228px] h-[130px]" : "p-4 w-[228px] h-[120px]",
                 "flex-shrink-0",
                 isActive && "ring-2 ring-primary shadow-lg"
             )}>
@@ -1507,7 +1135,7 @@ const MiniStepCard = ({
             </Card>
         </div>
     );
-};
+}; */
 
 export function WorkflowStepGallery({
     steps,
@@ -1541,7 +1169,8 @@ export function WorkflowStepGallery({
     onInputSchemaChange,
     headerActions,
     navigateToFinalSignal,
-    showStepOutputSignal
+    showStepOutputSignal,
+    focusStepId
 }: WorkflowStepGalleryProps) {
     const [activeIndex, setActiveIndex] = useState(1); // Default to first workflow step, not payload
     const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
@@ -1587,6 +1216,29 @@ export function WorkflowStepGallery({
         return () => ro.disconnect();
     }, [listRef.current, containerWidth]);
 
+    // Local working payload that survives navigation; start from prop payload
+    const [workingPayload, setWorkingPayload] = useState<any>(payload || {});
+
+    // Keep workingPayload seeded from prop once (or when prop meaningfully changes shape)
+    useEffect(() => {
+        // Only seed if workingPayload is still empty object to prevent wiping user edits
+        if (!workingPayload || Object.keys(workingPayload).length === 0) {
+            setWorkingPayload(payload || {});
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [payload]);
+
+    // Wire payload editor to update workingPayload in parent via onPayloadChange and locally
+    const handlePayloadJsonChange = (jsonString: string) => {
+        if (onPayloadChange) onPayloadChange(jsonString);
+        try {
+            const parsed = JSON.parse(jsonString);
+            setWorkingPayload(parsed);
+        } catch {
+            // ignore invalid while typing
+        }
+    };
+
     // Convert stepResults array to object if needed
     const stepResultsMap = Array.isArray(stepResults)
         ? stepResults.reduce((acc: Record<string, any>, result: any) => {
@@ -1602,37 +1254,35 @@ export function WorkflowStepGallery({
         // Initial payload card
         {
             type: 'payload',
-            data: { payload, inputSchema },
+            data: { payload: workingPayload, inputSchema },
             stepResult: undefined,
-            evolvingPayload: payload || {}
+            evolvingPayload: workingPayload || {}
         },
         // Regular steps
         ...steps.map((step, index) => ({
             type: 'step',
             data: step,
             stepResult: stepResultsMap[step.id],
-            evolvingPayload: buildEvolvingPayload(payload || {}, steps, stepResultsMap, index - 1)
+            evolvingPayload: buildEvolvingPayload(workingPayload || {}, steps, stepResultsMap, index - 1)
         })),
         // Final transform if exists
         ...(finalTransform !== undefined ? [{
             type: 'transform',
             data: { transform: finalTransform, responseSchema },
             stepResult: finalResult,
-            evolvingPayload: buildEvolvingPayload(payload || {}, steps, stepResultsMap, steps.length - 1)
+            evolvingPayload: buildEvolvingPayload(workingPayload || {}, steps, stepResultsMap, steps.length - 1)
         }] : []),
         // Final result spotlight card (always present)
         {
             type: 'final',
             data: { result: transformResult || finalResult },
             stepResult: transformResult || finalResult,
-            evolvingPayload: buildEvolvingPayload(payload || {}, steps, stepResultsMap, steps.length)
+            evolvingPayload: buildEvolvingPayload(workingPayload || {}, steps, stepResultsMap, steps.length)
         }
     ];
 
     // Compute current item
     const currentItem = workflowItems[activeIndex];
-
-    // Indices for indicator dots: one per mini card (payload + steps + transform + final)
     const indicatorIndices = workflowItems.map((_, idx) => idx);
 
     const handleNavigation = (direction: 'prev' | 'next') => {
@@ -1703,6 +1353,22 @@ export function WorkflowStepGallery({
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [navigateToFinalSignal]);
+
+    // Focus a specific step and open Output panel when requested
+    useEffect(() => {
+        if (!showStepOutputSignal || !focusStepId) return;
+        const idx = steps.findIndex((s: any) => s.id === focusStepId);
+        if (idx >= 0) {
+            const globalIdx = idx + 1; // +1 to account for payload card at index 0
+            setActiveIndex(globalIdx);
+            const container = listRef.current;
+            const card = container?.children?.[globalIdx] as HTMLElement | undefined;
+            if (container && card) {
+                card.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+            }
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [showStepOutputSignal, focusStepId]);
 
     return (
         <div className="space-y-6">
@@ -1778,9 +1444,14 @@ export function WorkflowStepGallery({
                                     let startIdx = 0;
                                     let endIdx = totalCards;
                                     // Compute how many cards fit based on a minimum card width and gutter
-                                    const MIN_CARD_WIDTH = 220; // px
+                                    const CARD_WIDTH = 228; // px (matches card classes above)
+                                    const ARROW_WIDTH = 24; // px (ChevronRight ~20px, add buffer)
                                     const GUTTER = 8; // px
-                                    const cardsToShow = Math.max(1, Math.min(workflowItems.length, Math.floor(((containerWidth || windowWidth) + GUTTER) / (MIN_CARD_WIDTH + GUTTER))));
+                                    const BLOCK_WIDTH = CARD_WIDTH + ARROW_WIDTH;
+                                    const cardsToShow = Math.max(1, Math.min(
+                                        workflowItems.length,
+                                        Math.floor((((containerWidth || windowWidth) + GUTTER) / (BLOCK_WIDTH + GUTTER)))
+                                    ));
 
                                     // Calculate the range of cards to display
                                     if (totalCards <= cardsToShow) {
@@ -1890,7 +1561,7 @@ export function WorkflowStepGallery({
                             <PayloadMiniStepCard
                                 payload={currentItem.data.payload}
                                 inputSchema={currentItem.data.inputSchema}
-                                onChange={onPayloadChange}
+                                onChange={handlePayloadJsonChange}
                                 onInputSchemaChange={onInputSchemaChange}
                                 readOnly={readOnly}
                             />
@@ -1908,7 +1579,9 @@ export function WorkflowStepGallery({
                                 stepInputs={currentItem.evolvingPayload}
                             />
                         ) : currentItem.type === 'final' ? (
-                            <FinalResultsCard result={currentItem.data.result} />
+                            <FinalResultsCard
+                                result={currentItem.data.result}
+                            />
                         ) : (
                             <SpotlightStepCard
                                 step={currentItem.data}

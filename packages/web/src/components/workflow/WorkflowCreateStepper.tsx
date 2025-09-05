@@ -60,6 +60,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const [isBuilding, setIsBuilding] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -220,14 +221,17 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     try {
       setIsExecuting(true);
       setShouldStopExecution(false);
+      setIsStopping(false);
       await playgroundRef.current?.executeWorkflow({ selfHealing: selfHealingEnabled });
     } finally {
       setIsExecuting(false);
+      setIsStopping(false);
     }
   };
 
   const handleStopExecution = () => {
     setShouldStopExecution(true);
+    setIsStopping(true);
     toast({
       title: "Stopping workflow",
       description: "Workflow will stop after the current step completes",
@@ -781,10 +785,10 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                       <Button
                         variant="destructive"
                         onClick={handleStopExecution}
-                        disabled={isSaving}
+                        disabled={isSaving || isStopping}
                         className="h-9 px-4"
                       >
-                        Stop Execution
+                        {isStopping ? "Stopping..." : "Stop Execution"}
                       </Button>
                     ) : (
                       <Button

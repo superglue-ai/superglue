@@ -2,10 +2,11 @@
 import { useConfig } from "@/src/app/config-context";
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import { executeFinalTransform, executeSingleStep, executeWorkflowStepByStep, type StepExecutionResult } from "@/src/lib/client-utils";
+import { computeStepOutput } from "@/src/lib/utils";
 import { ExecutionStep, Integration, SuperglueClient, Workflow, WorkflowResult } from "@superglue/client";
 import { X } from "lucide-react";
 import { useRouter } from 'next/navigation';
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { useToast } from "../../hooks/use-toast";
 import { Button } from "../ui/button";
 import { Label } from "../ui/label";
@@ -88,6 +89,7 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
   const [failedSteps, setFailedSteps] = useState<string[]>([]);
   const [navigateToFinalSignal, setNavigateToFinalSignal] = useState<number>(0);
   const [showStepOutputSignal, setShowStepOutputSignal] = useState<number>(0);
+  const [focusStepId, setFocusStepId] = useState<string | null>(null);
   const [stepResultsMap, setStepResultsMap] = useState<Record<string, any>>({});
   const [isExecutingTransform, setIsExecutingTransform] = useState<boolean>(false);
   const [finalPreviewResult, setFinalPreviewResult] = useState<any>(null);
@@ -103,10 +105,9 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
   const [selfHealingEnabled, setSelfHealingEnabled] = useState(externalSelfHealingEnabled ?? true);
   const [isExecutingStep, setIsExecutingStep] = useState<number | undefined>(undefined);
   const [currentExecutingStepIndex, setCurrentExecutingStepIndex] = useState<number | undefined>(undefined);
-  const [shouldStopExecution, setShouldStopExecution] = useState(false);
-
-  // Use external stop state when embedded
-  const effectiveShouldStop = embedded && externalShouldStop !== undefined ? externalShouldStop : shouldStopExecution;
+  const [isStopping, setIsStopping] = useState(false);
+  // Single source of truth for stopping across modes (embedded/standalone)
+  const stopSignalRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (externalSelfHealingEnabled !== undefined) {
@@ -121,11 +122,21 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
     }
   };
 
+  // Track latest external stop signal (embedded mode) in the single ref
+  useEffect(() => {
+    if (embedded) {
+      stopSignalRef.current = !!externalShouldStop;
+    }
+  }, [externalShouldStop]);
+
   const handleStopExecution = () => {
     if (embedded && onStopExecution) {
+      // Set stop signal immediately in embedded mode too
+      stopSignalRef.current = true;
       onStopExecution();
     } else {
-      setShouldStopExecution(true);
+      stopSignalRef.current = true;
+      setIsStopping(true);
       toast({
         title: "Stopping workflow",
         description: "Workflow will stop after the current step completes",
@@ -298,11 +309,10 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
     result: sourceData
   }
 }`);
-      if (embedded) {
-        setResponseSchema('');  // Always disabled in create stepper
-      } else {
-        setResponseSchema(initialWorkflow.responseSchema ? JSON.stringify(initialWorkflow.responseSchema, null, 2) : '');
-      }
+      // In embedded mode we WANT response schema disabled by default regardless of backend value,
+      // unless the built workflow explicitly contains a non-empty schema.
+      const schemaString = initialWorkflow.responseSchema ? JSON.stringify(initialWorkflow.responseSchema, null, 2) : null;
+      setResponseSchema(embedded ? null : schemaString);
       setInputSchema(initialWorkflow.inputSchema ? JSON.stringify(initialWorkflow.inputSchema, null, 2) : `{"type": "object", "properties": {"payload": {"type": "object"}}}`);
       setInstructions(initialInstruction || initialWorkflow.instruction || '');
       setLastWorkflowId(initialWorkflow.id);
@@ -411,15 +421,16 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
 
   const executeWorkflow = async (opts?: { selfHealing?: boolean }) => {
     setLoading(true);
-    if (!embedded) {
-      setShouldStopExecution(false);
-    }
+    // Fully clear any stale stop signals from a previous run (both modes)
+    stopSignalRef.current = false;
+    setIsStopping(false);
     setCompletedSteps([]);
     setFailedSteps([]);
     setResult(null);
     setFinalPreviewResult(null);
     setStepResultsMap({});
     setError(null);
+    setFocusStepId(null);
 
     try {
       JSON.parse(responseSchema || '{}');
@@ -462,8 +473,15 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
           }
         },
         effectiveSelfHealing,
-        () => effectiveShouldStop
+        () => stopSignalRef.current
       );
+
+      if (state.interrupted) {
+        toast({
+          title: "Workflow interrupted",
+          description: `Stopped at step ${Math.min(state.currentStepIndex + 1, workflow.steps.length)} (${workflow.steps[state.currentStepIndex]?.id || 'n/a'})`,
+        });
+      }
 
       // Update steps with self-healed configuration if self-healing made changes
       if (effectiveSelfHealing && state.currentWorkflow.steps) {
@@ -478,8 +496,9 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
       }
 
       const stepDataMap: Record<string, any> = {};
-      Object.entries(state.stepResults).forEach(([stepId, result]) => {
-        stepDataMap[stepId] = result.data;
+      Object.entries(state.stepResults).forEach(([stepId, res]) => {
+        const normalized = computeStepOutput(res as StepExecutionResult);
+        stepDataMap[stepId] = normalized.output;
       });
       setStepResultsMap(stepDataMap);
 
@@ -515,8 +534,20 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
       setCompletedSteps(state.completedSteps);
       setFailedSteps(state.failedSteps);
 
-      if (state.failedSteps.length === 0) {
+      if (state.failedSteps.length === 0 && !state.interrupted) {
         setNavigateToFinalSignal(Date.now());
+      } else {
+        const firstFailed = state.failedSteps[0];
+        if (firstFailed) {
+          setFocusStepId(firstFailed);
+          setShowStepOutputSignal(Date.now());
+          const err = (state.stepResults[firstFailed] as any)?.error || 'Step execution failed';
+          toast({
+            title: "Step failed",
+            description: `${firstFailed}: ${typeof err === 'string' ? err : 'Execution error'}`,
+            variant: "destructive"
+          });
+        }
       }
 
       if (onExecute) {
@@ -539,7 +570,10 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
       });
     } finally {
       setLoading(false);
+      setIsStopping(false);
       setCurrentExecutingStepIndex(undefined);
+      // Ensure stop signal is reset after a run finishes/interrupted
+      stopSignalRef.current = false;
     }
   };
 
@@ -592,20 +626,24 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
         false
       );
       const sid = steps[idx].id;
-      if (single.success) {
-        setCompletedSteps(prev => Array.from(new Set([...prev.filter(id => id !== sid), sid])));
-        setFailedSteps(prev => prev.filter(id => id !== sid));
-        setStepResultsMap(prev => ({ ...prev, [sid]: single.data }));
-        // Trigger output panel display
-        setShowStepOutputSignal(Date.now());
-      } else {
+      const normalized = computeStepOutput(single);
+      const isFailure = !single.success;
+      if (isFailure) {
         setFailedSteps(prev => Array.from(new Set([...prev.filter(id => id !== sid), sid])));
         setCompletedSteps(prev => prev.filter(id => id !== sid));
-        // Store error message in step results for display
-        setStepResultsMap(prev => ({
-          ...prev,
-          [sid]: single.error || 'Step execution failed'
-        }));
+      } else {
+        setCompletedSteps(prev => Array.from(new Set([...prev.filter(id => id !== sid), sid])));
+        setFailedSteps(prev => prev.filter(id => id !== sid));
+      }
+      setStepResultsMap(prev => ({ ...prev, [sid]: normalized.output }));
+      setFocusStepId(sid);
+      setShowStepOutputSignal(Date.now());
+      if (isFailure) {
+        toast({
+          title: "Step failed",
+          description: `${sid}: ${single.error || 'Execution error'}`,
+          variant: "destructive"
+        });
       }
     } finally {
       setIsExecutingStep(undefined);
@@ -683,10 +721,10 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
         <Button
           variant="destructive"
           onClick={handleStopExecution}
-          disabled={saving || (isExecutingStep !== undefined) || isExecutingTransform}
+          disabled={saving || (isExecutingStep !== undefined) || isExecutingTransform || isStopping}
           className="h-9 px-4"
         >
-          Stop Execution
+          {isStopping ? "Stopping..." : "Stop Execution"}
         </Button>
       ) : (
         <Button
@@ -773,6 +811,7 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
                 headerActions={headerActions || (!embedded ? defaultHeaderActions : undefined)}
                 navigateToFinalSignal={navigateToFinalSignal}
                 showStepOutputSignal={showStepOutputSignal}
+                focusStepId={focusStepId}
               />
             </div>
           </div>
