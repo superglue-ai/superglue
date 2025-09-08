@@ -1,6 +1,8 @@
+import { logMessage } from "../utils/logs.js";
+
 export function validateEnvironment() {
   if (!process.env.API_PORT) {
-    throw new Error('API_PORT is not set.');
+    logMessage('warn', 'API_PORT is not set defaulting to 3000.');
   }
 
   if (!process.env.GRAPHQL_PORT) {
