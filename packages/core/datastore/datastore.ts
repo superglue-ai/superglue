@@ -1,17 +1,12 @@
 import { FileStore } from './filestore.js';
 import { MemoryStore } from './memory.js';
 import { PostgresService } from './postgres.js';
-import { RedisService } from './redis.js';
 import { DataStore } from './types.js';
 
 export function createDataStore(config: {
   type: 'redis' | 'memory' | 'file' | 'postgres';
 }): DataStore {
-  if (config.type === 'redis') {
-    const redisConfig = getRedisConfig();
-    return new RedisService(redisConfig);
-  }
-  else if (config.type === 'file') {
+  if (config.type === 'file') {
     const fileStoreConfig = getFileStoreConfig();
     return new FileStore(fileStoreConfig.storageDir);
   }
