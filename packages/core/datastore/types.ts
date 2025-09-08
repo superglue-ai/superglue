@@ -1,4 +1,4 @@
-import type { ApiConfig, ExtractConfig, Integration, RunResult, TransformConfig, Workflow } from "@superglue/client";
+import type { ApiConfig, ExtractConfig, Integration, RunResult, TransformConfig, Workflow, WorkflowSchedule } from "@superglue/client";
 
 export interface DataStore {
   // API Config Methods
@@ -43,4 +43,9 @@ export interface DataStore {
   upsertIntegration(params: { id: string; integration: Integration; orgId?: string }): Promise<Integration>;
   deleteIntegration(params: { id: string; orgId?: string }): Promise<boolean>;
   getManyIntegrations(params: { ids: string[]; includeDocs?: boolean; orgId?: string }): Promise<Integration[]>;
+
+  // Workflow Schedule
+  listWorkflowSchedules(params: { workflowId: string }): Promise<WorkflowSchedule[]>;
+  upsertWorkflowSchedule(params: { id: string; schedule: WorkflowSchedule })
+  deleteWorkflowSchedule(params: { id: string }): Promise<boolean>;
 }

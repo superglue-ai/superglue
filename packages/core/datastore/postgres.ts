@@ -1,4 +1,4 @@
-import type { ApiConfig, ExtractConfig, Integration, RunResult, TransformConfig, Workflow } from "@superglue/client";
+import type { ApiConfig, ExtractConfig, Integration, RunResult, TransformConfig, Workflow, WorkflowSchedule } from "@superglue/client";
 import { Pool, PoolConfig } from 'pg';
 import { credentialEncryption } from "../utils/encryption.js";
 import { logMessage } from "../utils/logs.js";
@@ -148,8 +148,8 @@ export class PostgresService implements DataStore {
     )
   `);
 
-        // New table for large integration fields
-        await client.query(`
+            // New table for large integration fields
+            await client.query(`
     CREATE TABLE IF NOT EXISTS integration_details (
       integration_id VARCHAR(255) NOT NULL,
       org_id VARCHAR(255),
@@ -174,9 +174,10 @@ export class PostgresService implements DataStore {
 
             await client.query(`
              CREATE TABLE IF NOT EXISTS workflow_schedules (
-                id VARCHAR(255) NOT NULL,
+                id UUID NOT NULL,
                 org_id TEXT NOT NULL,
                 workflow_id TEXT NOT NULL,
+                workflow_type TEXT NOT NULL,
                 cron_expression TEXT NOT NULL,
                 enabled BOOLEAN NOT NULL DEFAULT TRUE,
                 payload JSONB,
@@ -185,10 +186,11 @@ export class PostgresService implements DataStore {
                 next_run_at TIMESTAMP NOT NULL,
                 created_at TIMESTAMP NOT NULL DEFAULT NOW(),
                 updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
-                PRIMARY KEY (id, org_id)
+                PRIMARY KEY (id, org_id),
+                FOREIGN KEY (workflow_id, workflow_type, org_id) REFERENCES configurations(id, type, org_id) ON DELETE CASCADE
              )
             `);
-            
+
             await client.query(`CREATE INDEX IF NOT EXISTS idx_configurations_type_org ON configurations(type, org_id)`);
             await client.query(`CREATE INDEX IF NOT EXISTS idx_configurations_version ON configurations(version)`);
             await client.query(`CREATE INDEX IF NOT EXISTS idx_configurations_integration_ids ON configurations USING GIN(integration_ids)`);
@@ -499,6 +501,91 @@ export class PostgresService implements DataStore {
         return this.deleteConfig(id, 'workflow', orgId);
     }
 
+    // Workflow Schedule Methods
+    async listWorkflowSchedules(params: { workflowId: string, orgId: string }): Promise<WorkflowSchedule[]> {
+        const client = await this.pool.connect();
+
+        try {
+            const query = 'SELECT id, org_id, workflow_id, workflow_type, cron_expression, enabled, payload, options, last_run_at, next_run_at, created_at, updated_at FROM workflow_schedules WHERE workflow_id = $1 AND org_id = $2 AND workflow_type = $3';
+            const queryResult = await client.query(query, [params.workflowId, params.orgId, 'workflow']);
+
+            const schedules = queryResult.rows.map(this.mapWorkflowSchedule);
+            return schedules;
+        } finally {
+            client.release();
+        }
+    }
+
+    async upsertWorkflowSchedule(params: { id: string; orgId: string; schedule: WorkflowSchedule }): Promise<void> {
+        const { id, orgId, schedule } = params;
+
+        const client = await this.pool.connect();
+        try {
+            const query = `
+                INSERT INTO workflow_schedules (id, org_id, workflow_id, workflow_type, cron_expression, enabled, payload, options, last_run_at, next_run_at, updated_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP)
+                ON CONFLICT (id, org_id)
+                DO UPDATE SET 
+                workflow_id = $3,
+                workflow_type = $4,
+                cron_expression = $5,
+                enabled = $6,
+                payload = $7,
+                options = $8,
+                last_run_at = $9,
+                next_run_at = $10,
+                updated_at = CURRENT_TIMESTAMP
+            `;
+            
+            await client.query(query, [id, orgId, schedule.workflowId, 'workflow', schedule.cronExpression, schedule.enabled, JSON.stringify(schedule.payload), JSON.stringify(schedule.options), schedule.lastRunAt, schedule.nextRunAt]);
+        } finally {
+            client.release();
+        }
+    }
+
+    async deleteWorkflowSchedule(params: { id: string, orgId: string }): Promise<boolean> {
+        const { id, orgId } = params;
+        const client = await this.pool.connect();
+        try {
+            await client.query('DELETE FROM workflow_schedules WHERE id = $1 AND org_id = $2', [id, orgId]);
+            return true;
+        } finally {
+            client.release();
+        }
+    }
+
+    async listDueWorkflowSchedules(): Promise<WorkflowSchedule[]> {
+        const client = await this.pool.connect();
+        
+        try {
+            const query = `SELECT id, org_id, workflow_id, workflow_type, cron_expression, enabled, payload, options, last_run_at, next_run_at, created_at, updated_at FROM workflow_schedules WHERE enabled = true AND next_run_at <= NOW()`;
+
+            const queryResult = await client.query(query);
+            
+            const schedules = queryResult.rows.map(this.mapWorkflowSchedule);
+
+            return schedules;
+        }
+        finally {
+            client.release();
+        }
+    }
+
+    private mapWorkflowSchedule(row: any): WorkflowSchedule {
+        return {
+            id: row.id,
+            orgId: row.org_id,
+            workflowId: row.workflow_id,
+            cronExpression: row.cron_expression,
+            enabled: row.enabled,
+            payload: row.payload,
+            options: row.options,
+            lastRunAt: row.last_run_at,
+            nextRunAt: row.next_run_at,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at
+        };
+    }
 
     // Integration Methods
     async getIntegration(params: { id: string; includeDocs?: boolean; orgId?: string }): Promise<Integration | null> {
@@ -704,7 +791,7 @@ export class PostgresService implements DataStore {
                 'DELETE FROM integration_details WHERE integration_id = $1 AND org_id = $2',
                 [id, orgId || '']
             );
-            
+
             // Then delete the integration
             const result = await client.query(
                 'DELETE FROM integrations WHERE id = $1 AND org_id = $2',
