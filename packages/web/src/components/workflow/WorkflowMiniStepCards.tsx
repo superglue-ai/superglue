@@ -244,7 +244,7 @@ export const FinalResultsCard = ({ result }: { result: any }) => {
     );
 };
 
-const JavaScriptCodeEditor = React.memo(({ value, onChange, readOnly = false, minHeight = '200px', maxHeight = '350px', showCopy = true, resizable = false, isTransformEditor = false }: { value: string; onChange?: (value: string) => void; readOnly?: boolean; minHeight?: string; maxHeight?: string; showCopy?: boolean; resizable?: boolean; isTransformEditor?: boolean; }) => {
+export const JavaScriptCodeEditor = React.memo(({ value, onChange, readOnly = false, minHeight = '200px', maxHeight = '350px', showCopy = true, resizable = false, isTransformEditor = false }: { value: string; onChange?: (value: string) => void; readOnly?: boolean; minHeight?: string; maxHeight?: string; showCopy?: boolean; resizable?: boolean; isTransformEditor?: boolean; }) => {
     const [currentHeight, setCurrentHeight] = useState(maxHeight);
     const effectiveHeight = resizable ? currentHeight : maxHeight;
     const highlightTimer = useRef<number | null>(null);
@@ -355,25 +355,20 @@ export const JsonCodeEditor = ({ value, onChange, readOnly = false, minHeight = 
     );
 };
 
-export const PayloadMiniStepCard = ({ payload, inputSchema, onChange, onInputSchemaChange, readOnly }: { payload: any; inputSchema?: string; onChange?: (value: string) => void; onInputSchemaChange?: (value: string) => void; readOnly?: boolean; }) => {
+export const PayloadMiniStepCard = ({ payload, inputSchema, onChange, onInputSchemaChange, readOnly }: { payload: any; inputSchema?: string | null; onChange?: (value: string) => void; onInputSchemaChange?: (value: string | null) => void; readOnly?: boolean; }) => {
     const [activeTab, setActiveTab] = useState('payload');
     const [localPayload, setLocalPayload] = useState(() => payload ? JSON.stringify(payload, null, 2) : '{}');
-    const [localInputSchema, setLocalInputSchema] = useState(inputSchema || '{"type": "object", "properties": {"payload": {"type": "object"}}}');
+    const [localInputSchema, setLocalInputSchema] = useState(inputSchema || null);
     const [error, setError] = useState<string | null>(null);
     useEffect(() => { setLocalPayload(payload ? JSON.stringify(payload, null, 2) : '{}'); }, [payload]);
-    useEffect(() => { setLocalInputSchema(inputSchema || '{"type": "object", "properties": {"payload": {"type": "object"}}}'); }, [inputSchema]);
+    useEffect(() => { setLocalInputSchema(inputSchema || null); }, [inputSchema]);
     const handlePayloadChange = (value: string) => {
         setLocalPayload(value);
         try { JSON.parse(value); setError(null); if (onChange) onChange(value); } catch { setError('Invalid JSON'); }
     };
     const handleSchemaChange = (value: string | null) => {
-        if (value === null) {
-            setLocalInputSchema('{"type": "object", "properties": {"payload": {"type": "object"}}}');
-            if (onInputSchemaChange) onInputSchemaChange('{"type": "object", "properties": {"payload": {"type": "object"}}}');
-        } else {
-            setLocalInputSchema(value);
-            if (onInputSchemaChange) onInputSchemaChange(value);
-        }
+        setLocalInputSchema(value);
+        if (onInputSchemaChange) onInputSchemaChange(value);
     };
     return (
         <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50">
@@ -393,14 +388,14 @@ export const PayloadMiniStepCard = ({ payload, inputSchema, onChange, onInputSch
                     <TabsContent value="payload" className="mt-3">
                         <JsonCodeEditor value={localPayload} onChange={handlePayloadChange} readOnly={readOnly} minHeight="150px" maxHeight="200px" />
                         <div className="mt-2 text-[10px] text-muted-foreground">
-                            <HelpTooltip text="Payload is the concrete JSON sent when executing the workflow. It can include secrets merged from your credentials. Editing here does NOT save values to the workflow; it only affects this session/run. Use Input Schema to optionally describe the expected structure for validation and tooling." />
+                            <HelpTooltip text="Payload is the JSON input to workflow execution. Editing here does NOT save values to the workflow; it only affects this session/run. Use Input Schema to optionally describe the expected structure for validation and tooling." />
                         </div>
                         {error && (<div className="mt-2 text-xs text-destructive flex items-center gap-1"><span className="text-destructive">⚠</span> {error}</div>)}
                     </TabsContent>
                     <TabsContent value="schema" className="mt-3">
-                        <JsonSchemaEditor value={localInputSchema === '{"type": "object", "properties": {"payload": {"type": "object"}}}' ? null : localInputSchema} onChange={handleSchemaChange} isOptional={true} />
+                        <JsonSchemaEditor value={localInputSchema} onChange={handleSchemaChange} isOptional={true} />
                         <div className="mt-2 text-[10px] text-muted-foreground">
-                            <HelpTooltip text="Input Schema is optional and defines the expected payload shape for validation and AI guidance. Keep secrets out of the schema. Actual runtime values come from the Payload JSON merged with your credentials at execution time." />
+                            <HelpTooltip text="Input Schema is optional documentation/validation describing expected payload shape. The payload JSON is what runs; schema does not inject credentials nor drive payload. Leave disabled if not needed." />
                         </div>
                     </TabsContent>
                 </Tabs>

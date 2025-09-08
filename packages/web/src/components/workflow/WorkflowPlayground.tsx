@@ -72,7 +72,7 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
   const [inputSchema, setInputSchema] = useState<string | null>(
     initialWorkflow?.inputSchema
       ? JSON.stringify(initialWorkflow.inputSchema, null, 2)
-      : `{"type": "object", "properties": {"payload": {"type": "object"}}}`
+      : null
   );
   const [payload, setPayload] = useState<string>(initialPayload || '{}');
 
@@ -169,35 +169,6 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
     apiKey: config.superglueApiKey,
   }), [config.superglueEndpoint, config.superglueApiKey]);
 
-  const generateDefaultFromSchema = (schema: any): any => {
-    if (!schema || typeof schema !== 'object') return {};
-
-    if (schema.type === 'object' && schema.properties) {
-      const result: any = {};
-      for (const [key, propSchema] of Object.entries(schema.properties)) {
-        result[key] = generateDefaultFromSchema(propSchema);
-      }
-      return result;
-    }
-
-    if (schema.type === 'array') {
-      return [];
-    }
-
-    if (schema.type === 'string') {
-      return schema.default || '';
-    }
-
-    if (schema.type === 'number' || schema.type === 'integer') {
-      return schema.default || 0;
-    }
-
-    if (schema.type === 'boolean') {
-      return schema.default || false;
-    }
-
-    return schema.default || null;
-  };
 
   const loadIntegrations = async () => {
     if (providedIntegrations) return;
@@ -239,12 +210,8 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
       setInstructions(workflow.instruction || '');
       setResponseSchema(workflow.responseSchema ? JSON.stringify(workflow.responseSchema, null, 2) : '');
 
-      const inputSchemaStr = workflow.inputSchema
-        ? JSON.stringify(workflow.inputSchema, null, 2)
-        : `{"type": "object", "properties": {"payload": {"type": "object"}}}`;
-      setInputSchema(inputSchemaStr);
-
-      constructFromInputSchemaWithCreds(inputSchemaStr, {});
+      setInputSchema(workflow.inputSchema ? JSON.stringify(workflow.inputSchema, null, 2) : null);
+      // Don't modify payload when loading a workflow - keep existing or use empty object
 
       toast({
         title: "Workflow loaded",
@@ -262,26 +229,6 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
     }
   };
 
-  const constructFromInputSchemaWithCreds = (schema: string | null, _integCreds: Record<string, string>) => {
-    if (!schema) return;
-
-    try {
-      const parsedSchema = JSON.parse(schema);
-      const defaultValues = generateDefaultFromSchema(parsedSchema);
-
-      if (defaultValues.payload !== undefined && defaultValues.payload !== null) {
-        setPayload(JSON.stringify(defaultValues.payload, null, 1));
-      } else {
-        setPayload('{}');
-      }
-    } catch (error) {
-      console.warn('Failed to construct from input schema:', error);
-    }
-  };
-
-  const constructFromInputSchema = (schema: string | null) => {
-    constructFromInputSchemaWithCreds(schema, {});
-  };
 
   useEffect(() => {
     if (!embedded && !providedIntegrations) {
@@ -309,11 +256,9 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
     result: sourceData
   }
 }`);
-      // In embedded mode we WANT response schema disabled by default regardless of backend value,
-      // unless the built workflow explicitly contains a non-empty schema.
       const schemaString = initialWorkflow.responseSchema ? JSON.stringify(initialWorkflow.responseSchema, null, 2) : null;
       setResponseSchema(embedded ? null : schemaString);
-      setInputSchema(initialWorkflow.inputSchema ? JSON.stringify(initialWorkflow.inputSchema, null, 2) : `{"type": "object", "properties": {"payload": {"type": "object"}}}`);
+      setInputSchema(initialWorkflow.inputSchema ? JSON.stringify(initialWorkflow.inputSchema, null, 2) : null);
       setInstructions(initialInstruction || initialWorkflow.instruction || '');
       setLastWorkflowId(initialWorkflow.id);
     }
@@ -332,22 +277,13 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
   }
 }`);
       setResponseSchema('');
-      const defaultInputSchema = '{"type": "object", "properties": {"payload": {"type": "object"}}}';
-      setInputSchema(defaultInputSchema);
-      // Construct default credentials and payload from default schema
-      constructFromInputSchema(defaultInputSchema);
+      setInputSchema(null);
+      setPayload('{}');
       setResult(null);
       setFinalPreviewResult(null);
     }
   }, [id, embedded, initialWorkflow]);
 
-  // Effect to update payload when input schema changes (but not during workflow loading)
-  useEffect(() => {
-    // Only run this if we're not in the middle of loading a workflow and not in embedded mode with initial payload
-    if (!loading && !initialPayload) {
-      constructFromInputSchema(inputSchema);
-    }
-  }, [inputSchema, loading, initialPayload]);
 
   const saveWorkflow = async () => {
     try {
@@ -446,7 +382,7 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
         steps: executionSteps,
         finalTransform,
         responseSchema: currentResponseSchema,
-        inputSchema: inputSchema ? JSON.parse(inputSchema) : { type: "object" },
+        inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
       } as any;
 
       // Store original steps to compare against self-healed result
@@ -556,7 +492,7 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
           steps: executionSteps,
           finalTransform: state.currentWorkflow.finalTransform || finalTransform,
           responseSchema: currentResponseSchema,
-          inputSchema: inputSchema ? JSON.parse(inputSchema) : { type: "object" },
+          inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
           instruction: instructions
         } as Workflow;
         onExecute(executedWorkflow, wr);
@@ -800,7 +736,7 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
                 failedSteps={failedSteps}
                 readOnly={readOnly}
                 inputSchema={inputSchema}
-                onInputSchemaChange={setInputSchema}
+                onInputSchemaChange={(v) => setInputSchema(v)}
                 payload={(() => {
                   try {
                     return JSON.parse(payload || '{}');

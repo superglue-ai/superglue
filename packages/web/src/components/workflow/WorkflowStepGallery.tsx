@@ -44,8 +44,8 @@ interface WorkflowStepGalleryProps {
     transformResult?: any;
     readOnly?: boolean;
     payload?: any;
-    inputSchema?: string;
-    onInputSchemaChange?: (schema: string) => void;
+    inputSchema?: string | null;
+    onInputSchemaChange?: (schema: string | null) => void;
     headerActions?: React.ReactNode;
     navigateToFinalSignal?: number;
     showStepOutputSignal?: number;
@@ -352,16 +352,16 @@ const JavaScriptCodeEditor = React.memo(({
     readOnly
 }: {
     payload: any;
-    inputSchema?: string;
+    inputSchema?: string | null;
     onChange?: (value: string) => void;
-    onInputSchemaChange?: (value: string) => void;
+    onInputSchemaChange?: (value: string | null) => void;
     readOnly?: boolean;
 }) => {
     const [activeTab, setActiveTab] = useState('payload');
     const [localPayload, setLocalPayload] = useState(() =>
         payload ? JSON.stringify(payload, null, 2) : '{}'
     );
-    const [localInputSchema, setLocalInputSchema] = useState(inputSchema || '{"type": "object", "properties": {"payload": {"type": "object"}}}');
+    const [localInputSchema, setLocalInputSchema] = useState(inputSchema || null);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -369,7 +369,7 @@ const JavaScriptCodeEditor = React.memo(({
     }, [payload]);
 
     useEffect(() => {
-        setLocalInputSchema(inputSchema || '{"type": "object", "properties": {"payload": {"type": "object"}}}');
+        setLocalInputSchema(inputSchema || null);
     }, [inputSchema]);
 
     const handlePayloadChange = (value: string) => {
@@ -386,17 +386,9 @@ const JavaScriptCodeEditor = React.memo(({
     };
 
     const handleSchemaChange = (value: string | null) => {
-        if (value === null) {
-            // Schema editor is disabled
-            setLocalInputSchema('{"type": "object", "properties": {"payload": {"type": "object"}}}');
-            if (onInputSchemaChange) {
-                onInputSchemaChange('{"type": "object", "properties": {"payload": {"type": "object"}}}');
-            }
-        } else {
-            setLocalInputSchema(value);
-            if (onInputSchemaChange) {
-                onInputSchemaChange(value);
-            }
+        setLocalInputSchema(value);
+        if (onInputSchemaChange) {
+            onInputSchemaChange(value);
         }
     };
 
@@ -694,7 +686,8 @@ const SpotlightStepCard = ({
     integrations,
     readOnly,
     failedSteps = [],
-    showOutputSignal
+    showOutputSignal,
+    onConfigEditingChange
 }: {
     step: any;
     stepIndex: number;
@@ -710,6 +703,7 @@ const SpotlightStepCard = ({
     failedSteps?: string[];
     stepResultsMap?: Record<string, any>;
     showOutputSignal?: number;
+    onConfigEditingChange?: (editing: boolean) => void;
 }) => {
     const [activePanel, setActivePanel] = useState<'input' | 'config' | 'output'>('config');
     const [inputViewMode, setInputViewMode] = useState<'preview' | 'schema'>('preview');
@@ -842,6 +836,7 @@ const SpotlightStepCard = ({
                                 onEdit={onEdit}
                                 onRemove={() => { }}
                                 integrations={integrations}
+                                onEditingChange={onConfigEditingChange}
                             />
                         </div>
                     )}
@@ -942,200 +937,7 @@ const SpotlightStepCard = ({
     );
 };
 
-// Remove local stub; use imported MiniStepCard
-/* const MiniStepCard = ({
-    step,
-    index,
-    isActive,
-    onClick,
-    stepId,
-    isPayload = false,
-    isTransform = false,
-    isFinal = false,
-    isRunningAll = false,
-    isTesting = false,
-    completedSteps = [],
-    failedSteps = []
-}: {
-    step: any;
-    index: number;
-    isActive: boolean;
-    onClick: () => void;
-    stepId?: string | null;
-    isPayload?: boolean;
-    isTransform?: boolean;
-    isFinal?: boolean;
-    isRunningAll?: boolean;
-    isTesting?: boolean;
-    completedSteps?: string[];
-    failedSteps?: string[];
-}) => {
-    if (isPayload) {
-        return (
-            <div
-                className={cn(
-                    "cursor-pointer transition-all duration-300 ease-out transform flex items-center",
-                    "opacity-90 hover:opacity-100 hover:scale-[1.01]"
-                )}
-                onClick={onClick}
-                style={{ height: '100%' }}
-            >
-                <Card className={cn(
-                    isActive ? "p-4 w-[228px] h-[130px]" : "p-4 w-[228px] h-[120px]",
-                    "flex-shrink-0",
-                    isActive && "ring-2 ring-primary shadow-lg"
-                )}>
-                    <div className="flex flex-col items-center justify-center h-full leading-tight">
-                        <Package className="h-5 w-5 text-muted-foreground" />
-                        <span className="text-[11px] font-medium mt-0.5">Initial Payload</span>
-                        <span className="text-[10px] text-muted-foreground -mt-0.5">JSON</span>
-                    </div>
-                </Card>
-            </div>
-        );
-    }
 
-    if (isTransform) {
-        const isCompleted = completedSteps.includes('__final_transform__');
-        const isFailed = failedSteps.includes('__final_transform__');
-        const getStatusDotColor = () => {
-            if (isTesting || isRunningAll) return "bg-yellow-500 animate-pulse";
-            if (isFailed) return "bg-red-500";
-            if (isCompleted) return "bg-green-500";
-            return "bg-gray-400";
-        };
-        const getStatusLabel = () => {
-            if (isTesting || isRunningAll) return "Running...";
-            if (isFailed) return "Failed";
-            if (isCompleted) return "Completed";
-            return "Pending";
-        };
-        return (
-            <div
-                className={cn(
-                    "cursor-pointer transition-all duration-300 ease-out transform",
-                    "opacity-90 hover:opacity-100 hover:scale-[1.01]"
-                )}
-                onClick={onClick}
-                style={{ height: '100%' }}
-            >
-                <Card className={cn(
-                    isActive ? "p-4 w-[228px] h-[130px]" : "p-4 w-[228px] h-[120px]",
-                    "flex-shrink-0",
-                    isActive && "ring-2 ring-primary shadow-lg"
-                )}>
-                    <div className="h-full flex flex-col justify-between">
-                        <div className="flex-1 min-h-0 flex flex-col items-center justify-center leading-tight">
-                            <Code2 className="h-5 w-5 text-muted-foreground" />
-                            <span className="text-[11px] font-medium mt-0.5">Final Transform</span>
-                            <span className="text-[10px] text-muted-foreground -mt-0.5">JavaScript</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 mt-2">
-                            <div className={cn(
-                                "w-2 h-2 rounded-full transition-all",
-                                getStatusDotColor()
-                            )} />
-                            <span className="text-xs text-muted-foreground">{getStatusLabel()}</span>
-                        </div>
-                    </div>
-                </Card>
-            </div>
-        );
-    }
-
-    if (isFinal) {
-        return (
-            <div
-                className={cn(
-                    "cursor-pointer transition-all duration-300 ease-out transform flex items-center",
-                    "opacity-90 hover:opacity-100 hover:scale-[1.01]"
-                )}
-                onClick={onClick}
-                style={{ height: '100%' }}
-            >
-                <Card className={cn(
-                    isActive ? "p-4 w-[228px] h-[130px]" : "p-4 w-[228px] h-[120px]",
-                    "flex-shrink-0",
-                    isActive && "ring-2 ring-primary shadow-lg"
-                )}>
-                    <div className="flex flex-col items-center justify-center h-full leading-tight">
-                        <FileJson className="h-5 w-5 text-muted-foreground" />
-                        <span className="text-[11px] font-medium mt-0.5">Workflow Result</span>
-                        <span className="text-[10px] text-muted-foreground -mt-0.5">JSON</span>
-                    </div>
-                </Card>
-            </div>
-        );
-    }
-
-    const method = step.apiConfig?.method || 'GET';
-    const url = `${step.apiConfig?.urlHost || ''}${step.apiConfig?.urlPath || ''}`.trim() || 'No URL';
-
-    // Determine status dot color
-    const isCompleted = stepId ? completedSteps.includes(stepId) : false;
-    const isFailed = stepId ? failedSteps.includes(stepId) : false;
-    const getStatusDotColor = () => {
-        if (isTesting || (isRunningAll && stepId)) return "bg-yellow-500 animate-pulse";
-        if (isFailed) return "bg-red-500";
-        if (isCompleted) return "bg-green-500";
-        return "bg-gray-400";
-    };
-    const getStatusLabel = () => {
-        if (isTesting || (isRunningAll && stepId)) return "Running...";
-        if (isFailed) return "Failed";
-        if (isCompleted) return "Completed";
-        return "Pending";
-    };
-
-    return (
-        <div
-            className={cn(
-                "cursor-pointer transition-all duration-300 ease-out transform",
-                "opacity-90 hover:opacity-100 hover:scale-[1.01]"
-            )}
-            onClick={onClick}
-        >
-            <Card className={cn(
-                isActive ? "p-4 w-[228px] h-[130px]" : "p-4 w-[228px] h-[120px]",
-                "flex-shrink-0",
-                isActive && "ring-2 ring-primary shadow-lg"
-            )}>
-                <div className="h-full flex flex-col justify-between">
-                    <div className="flex items-center justify-between mb-2">
-                        <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-sm font-semibold">
-                            {index}
-                        </div>
-                        <span className={cn(
-                            "text-xs px-2 py-1 rounded font-medium",
-                            method === 'GET' && "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-                            method === 'POST' && "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-                            method === 'PUT' && "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
-                            method === 'DELETE' && "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-                            !['GET', 'POST', 'PUT', 'DELETE'].includes(method) && "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400"
-                        )}>
-                            {method}
-                        </span>
-                    </div>
-                    <div className="flex-1 min-h-0">
-                        <p className="text-sm font-semibold truncate">
-                            {step.id || `Step ${index}`}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate">
-                            {url}
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-1.5 mt-2">
-                        <div className={cn(
-                            "w-2 h-2 rounded-full transition-all",
-                            getStatusDotColor()
-                        )} />
-                        <span className="text-xs text-muted-foreground">{getStatusLabel()}</span>
-                    </div>
-                </div>
-            </Card>
-        </div>
-    );
-}; */
 
 export function WorkflowStepGallery({
     steps,
@@ -1177,6 +979,7 @@ export function WorkflowStepGallery({
     const [containerWidth, setContainerWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1200);
     const trackRef = useState<HTMLElement | null>(null)[0] as unknown as React.MutableRefObject<HTMLDivElement | null> || { current: null } as any;
     const listRef = useRef<HTMLDivElement | null>(null);
+    const [isConfiguratorEditing, setIsConfiguratorEditing] = useState<boolean>(false);
 
     // Local workflowId editor state to reduce re-renders
     const [localWorkflowId, setLocalWorkflowId] = useState<string>(workflowId ?? '');
@@ -1265,14 +1068,12 @@ export function WorkflowStepGallery({
             stepResult: stepResultsMap[step.id],
             evolvingPayload: buildEvolvingPayload(workingPayload || {}, steps, stepResultsMap, index - 1)
         })),
-        // Final transform if exists
         ...(finalTransform !== undefined ? [{
             type: 'transform',
             data: { transform: finalTransform, responseSchema },
             stepResult: finalResult,
             evolvingPayload: buildEvolvingPayload(workingPayload || {}, steps, stepResultsMap, steps.length - 1)
         }] : []),
-        // Final result spotlight card (always present)
         {
             type: 'final',
             data: { result: transformResult || finalResult },
@@ -1286,6 +1087,7 @@ export function WorkflowStepGallery({
     const indicatorIndices = workflowItems.map((_, idx) => idx);
 
     const handleNavigation = (direction: 'prev' | 'next') => {
+        if (isConfiguratorEditing) return;
         const newIndex = direction === 'prev'
             ? Math.max(0, activeIndex - 1)
             : Math.min(workflowItems.length - 1, activeIndex + 1);
@@ -1303,10 +1105,8 @@ export function WorkflowStepGallery({
     };
 
     const handleCardClick = (globalIndex: number) => {
-        // Close spotlight toggles to reduce jumpiness
-        // reset spotlight state for next render
-        // note: spotlight state is local to SpotlightStepCard; ensure future mounts default closed
-        // Smoothly select and center the card
+        if (isConfiguratorEditing) return;
+
         setTimeout(() => {
             setActiveIndex(globalIndex);
             const container = listRef.current;
@@ -1351,10 +1151,8 @@ export function WorkflowStepGallery({
                 card.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
             }
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [navigateToFinalSignal]);
 
-    // Focus a specific step and open Output panel when requested
     useEffect(() => {
         if (!showStepOutputSignal || !focusStepId) return;
         const idx = steps.findIndex((s: any) => s.id === focusStepId);
@@ -1542,7 +1340,7 @@ export function WorkflowStepGallery({
                         {indicatorIndices.map((globalIdx) => (
                             <button
                                 key={`dot-${globalIdx}`}
-                                onClick={() => setActiveIndex(globalIdx)}
+                                onClick={() => { if (isConfiguratorEditing) return; setActiveIndex(globalIdx); }}
                                 className={cn(
                                     "w-1.5 h-1.5 rounded-full transition-colors",
                                     globalIdx === activeIndex ? "bg-primary" : "bg-muted"
@@ -1597,12 +1395,11 @@ export function WorkflowStepGallery({
                                 readOnly={readOnly}
                                 failedSteps={failedSteps}
                                 showOutputSignal={showStepOutputSignal}
+                                onConfigEditingChange={setIsConfiguratorEditing}
                             />
                         )
                     )}
                 </div>
-
-                {/* Final results moved into a dedicated mini card and spotlight */}
             </div>
         </div>
     );

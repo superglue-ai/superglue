@@ -18,6 +18,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { HelpTooltip } from '../utils/HelpTooltip';
+import { JavaScriptCodeEditor } from './WorkflowMiniStepCards';
 
 interface WorkflowStepConfiguratorProps {
     step: any;
@@ -26,9 +27,10 @@ interface WorkflowStepConfiguratorProps {
     onRemove: (stepId: string) => void;
     integrations?: Integration[];
     onCreateIntegration?: () => void;
+    onEditingChange?: (editing: boolean) => void;
 }
 
-export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integrations: propIntegrations, onCreateIntegration }: WorkflowStepConfiguratorProps) {
+export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integrations: propIntegrations, onCreateIntegration, onEditingChange }: WorkflowStepConfiguratorProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [editedStep, setEditedStep] = useState({ ...step });
     const [showJson, setShowJson] = useState(false);
@@ -128,6 +130,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
         const updatedJson = JSON.stringify(updatedStep);
         if (originalJson !== updatedJson) { onEdit(step.id, updatedStep); }
         setIsEditing(false);
+        onEditingChange?.(false);
     };
 
     const handleCancel = () => {
@@ -149,6 +152,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
         setHeadersError(false);
         setQueryParamsError(false);
         setIsEditing(false);
+        onEditingChange?.(false);
     };
 
     const [rawJsonText, setRawJsonText] = useState<string>(() => JSON.stringify(editedStep, null, 2));
@@ -213,7 +217,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                     </div>
                                 ) : (
                                     <div className="flex items-center gap-1">
-                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsEditing(true)} title="Edit step">
+                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setIsEditing(true); onEditingChange?.(true); }} title="Edit step">
                                             <Pencil className="h-4 w-4" />
                                         </Button>
                                     </div>
@@ -384,7 +388,17 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                                     Loop Selector (JavaScript)
                                                     <HelpTooltip text="JavaScript arrow function to select an array from previous step outputs. The step will execute once for each item. Example: (sourceData) => sourceData.items" />
                                                 </Label>
-                                                <Input value={editedStep.loopSelector || ''} onChange={(e) => setEditedStep(prev => ({ ...prev, loopSelector: e.target.value }))} className="text-xs mt-1 focus:ring-0 focus:ring-offset-0" placeholder="e.g., (sourceData) => sourceData.items" />
+                                                <div className="mt-1">
+                                                    <JavaScriptCodeEditor
+                                                        value={editedStep.loopSelector || ''}
+                                                        onChange={(val) => setEditedStep(prev => ({ ...prev, loopSelector: val }))}
+                                                        readOnly={false}
+                                                        minHeight="80px"
+                                                        maxHeight="180px"
+                                                        resizable={true}
+                                                        isTransformEditor={false}
+                                                    />
+                                                </div>
                                             </div>
                                             <div>
                                                 <Label className="text-xs flex items-center gap-1">
