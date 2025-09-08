@@ -8,8 +8,6 @@ import { buildEvolvingPayload, cn, isEmptyData, truncateForDisplay, truncateLine
 import { Integration } from "@superglue/client";
 import { inferJsonSchema } from '@superglue/shared';
 import { ChevronLeft, ChevronRight, Database, FileJson, Package, Play, Settings, Trash2 } from 'lucide-react';
-import 'prismjs/components/prism-javascript';
-import 'prismjs/components/prism-json';
 import React, { useEffect, useRef, useState } from 'react';
 import { CopyButton, FinalResultsCard, FinalTransformMiniStepCard, InstructionDisplay, JsonCodeEditor, MiniStepCard, PayloadMiniStepCard } from './WorkflowMiniStepCards';
 import { WorkflowStepConfigurator } from './WorkflowStepConfigurator';
@@ -41,7 +39,7 @@ interface WorkflowStepGalleryProps {
     currentExecutingStepIndex?: number;
     transformResult?: any;
     readOnly?: boolean;
-    payload?: any;
+    payloadText?: string;
     inputSchema?: string | null;
     onInputSchemaChange?: (schema: string | null) => void;
     headerActions?: React.ReactNode;
@@ -345,7 +343,7 @@ export function WorkflowStepGallery({
     currentExecutingStepIndex,
     transformResult,
     readOnly = false,
-    payload,
+    payloadText,
     inputSchema,
     onInputSchemaChange,
     headerActions,
@@ -397,30 +395,33 @@ export function WorkflowStepGallery({
         return () => ro.disconnect();
     }, [listRef.current, containerWidth]);
 
-    // Local working payload that survives navigation; start from prop payload
-    const [workingPayload, setWorkingPayload] = useState<any>(payload || {});
 
-    // Keep workingPayload seeded from prop once (or when prop meaningfully changes shape)
+    const [rawPayloadText, setRawPayloadText] = useState<string>(payloadText || '');
+    const [workingPayload, setWorkingPayload] = useState<any>({});
+
     useEffect(() => {
-        // Only seed if workingPayload is still empty object to prevent wiping user edits
-        if (!workingPayload || Object.keys(workingPayload).length === 0) {
-            setWorkingPayload(payload || {});
+        const trimmed = (rawPayloadText || '').trim();
+        if (trimmed === '') {
+            setWorkingPayload({});
+            return;
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [payload]);
+        try {
+            const parsed = JSON.parse(rawPayloadText);
+            setWorkingPayload(parsed);
+        } catch {
+        }
+    }, [rawPayloadText]);
 
-    // Wire payload editor to update workingPayload in parent via onPayloadChange and locally
     const handlePayloadJsonChange = (jsonString: string) => {
-        if (onPayloadChange) onPayloadChange(jsonString);
+        setRawPayloadText(jsonString);
+        onPayloadChange?.(jsonString);
         try {
             const parsed = JSON.parse(jsonString);
             setWorkingPayload(parsed);
         } catch {
-            // ignore invalid while typing
         }
     };
 
-    // Convert stepResults array to object if needed
     const stepResultsMap = Array.isArray(stepResults)
         ? stepResults.reduce((acc: Record<string, any>, result: any) => {
             if (result.stepId) {
@@ -435,7 +436,7 @@ export function WorkflowStepGallery({
         // Initial payload card
         {
             type: 'payload',
-            data: { payload: workingPayload, inputSchema },
+            data: { payloadText: rawPayloadText, inputSchema },
             stepResult: undefined,
             evolvingPayload: workingPayload || {}
         },
@@ -735,7 +736,7 @@ export function WorkflowStepGallery({
                     {currentItem && (
                         currentItem.type === 'payload' ? (
                             <PayloadMiniStepCard
-                                payload={currentItem.data.payload}
+                                payloadText={currentItem.data.payloadText}
                                 inputSchema={currentItem.data.inputSchema}
                                 onChange={handlePayloadJsonChange}
                                 onInputSchemaChange={onInputSchemaChange}

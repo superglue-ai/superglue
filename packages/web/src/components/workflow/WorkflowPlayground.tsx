@@ -737,13 +737,7 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
                 readOnly={readOnly}
                 inputSchema={inputSchema}
                 onInputSchemaChange={(v) => setInputSchema(v)}
-                payload={(() => {
-                  try {
-                    return JSON.parse(payload || '{}');
-                  } catch {
-                    return {};
-                  }
-                })()}
+                payloadText={payload}
                 headerActions={headerActions || (!embedded ? defaultHeaderActions : undefined)}
                 navigateToFinalSignal={navigateToFinalSignal}
                 showStepOutputSignal={showStepOutputSignal}

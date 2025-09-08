@@ -378,8 +378,8 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                                         value={editedStep.loopSelector || ''}
                                                         onChange={(val) => setEditedStep(prev => ({ ...prev, loopSelector: val }))}
                                                         readOnly={false}
-                                                        minHeight="80px"
-                                                        maxHeight="180px"
+                                                        minHeight="120px"
+                                                        maxHeight="260px"
                                                         resizable={true}
                                                         isTransformEditor={false}
                                                     />

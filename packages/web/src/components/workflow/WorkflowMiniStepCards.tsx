@@ -175,7 +175,7 @@ export const JavaScriptCodeEditor = React.memo(({ value, onChange, readOnly = fa
         if (!onChange) return;
         onChange(newValue);
     };
-    const lineNumbers = React.useMemo(() => (displayValue || '').split('\n').map((_, i) => String(i + 1)), [displayValue]);
+    const lineNumbers = React.useMemo(() => (displayValue || '').split(/\r\n|\r|\n/).map((_, i) => String(i + 1)), [displayValue]);
     return (
         <div className="relative bg-muted/50 dark:bg-muted/20 rounded-lg border font-mono shadow-sm js-code-editor">
             {(showCopy || isTransformEditor) && (
@@ -197,7 +197,7 @@ export const JavaScriptCodeEditor = React.memo(({ value, onChange, readOnly = fa
                     document.addEventListener('mouseup', handleMouseUp);
                 }} />
             )}
-            <div className="flex overflow-auto" style={{ maxHeight: effectiveHeight }}>
+            <div className="flex overflow-auto" style={{ height: effectiveHeight }}>
                 <div className="flex-shrink-0 bg-muted/30 border-r px-2 py-2">
                     {lineNumbers.map((lineNum) => (
                         <div key={lineNum} className="text-[10px] text-muted-foreground text-right leading-[18px] select-none">{lineNum}</div>
@@ -261,16 +261,28 @@ export const JsonCodeEditor = ({ value, onChange, readOnly = false, minHeight = 
     );
 };
 
-export const PayloadMiniStepCard = ({ payload, inputSchema, onChange, onInputSchemaChange, readOnly }: { payload: any; inputSchema?: string | null; onChange?: (value: string) => void; onInputSchemaChange?: (value: string | null) => void; readOnly?: boolean; }) => {
+export const PayloadMiniStepCard = ({ payloadText, inputSchema, onChange, onInputSchemaChange, readOnly }: { payloadText: string; inputSchema?: string | null; onChange?: (value: string) => void; onInputSchemaChange?: (value: string | null) => void; readOnly?: boolean; }) => {
     const [activeTab, setActiveTab] = useState('payload');
-    const [localPayload, setLocalPayload] = useState(() => payload ? JSON.stringify(payload, null, 2) : '{}');
+    const [localPayload, setLocalPayload] = useState<string>(payloadText || '');
     const [localInputSchema, setLocalInputSchema] = useState(inputSchema || null);
     const [error, setError] = useState<string | null>(null);
-    useEffect(() => { setLocalPayload(payload ? JSON.stringify(payload, null, 2) : '{}'); }, [payload]);
+    useEffect(() => { setLocalPayload(payloadText || ''); }, [payloadText]);
     useEffect(() => { setLocalInputSchema(inputSchema || null); }, [inputSchema]);
     const handlePayloadChange = (value: string) => {
         setLocalPayload(value);
-        try { JSON.parse(value); setError(null); if (onChange) onChange(value); } catch { setError('Invalid JSON'); }
+        const trimmed = (value || '').trim();
+        if (trimmed === '') {
+            setError(null);
+            if (onChange) onChange(value);
+            return;
+        }
+        try {
+            JSON.parse(value);
+            setError(null);
+            if (onChange) onChange(value);
+        } catch {
+            setError('Invalid JSON');
+        }
     };
     const handleSchemaChange = (value: string | null) => {
         setLocalInputSchema(value);
@@ -283,7 +295,9 @@ export const PayloadMiniStepCard = ({ payload, inputSchema, onChange, onInputSch
                     <Package className="h-4 w-4 text-muted-foreground" />
                     <div>
                         <h3 className="text-base font-semibold">Initial Payload</h3>
-                        <span className="text-[10px] text-muted-foreground">Input Data & Schema</span>
+                    </div>
+                    <div className="mt-1 text-muted-foreground">
+                        <HelpTooltip text="Payload is the JSON input to workflow execution. Editing here does NOT save values to the workflow; it only affects this session/run. Use Input Schema to optionally describe the expected structure for validation and tooling." />
                     </div>
                 </div>
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -292,10 +306,7 @@ export const PayloadMiniStepCard = ({ payload, inputSchema, onChange, onInputSch
                         <TabsTrigger value="schema" className="text-xs">Input Schema</TabsTrigger>
                     </TabsList>
                     <TabsContent value="payload" className="mt-3">
-                        <JsonCodeEditor value={localPayload} onChange={handlePayloadChange} readOnly={readOnly} minHeight="150px" maxHeight="200px" />
-                        <div className="mt-2 text-[10px] text-muted-foreground">
-                            <HelpTooltip text="Payload is the JSON input to workflow execution. Editing here does NOT save values to the workflow; it only affects this session/run. Use Input Schema to optionally describe the expected structure for validation and tooling." />
-                        </div>
+                        <JsonCodeEditor value={localPayload} onChange={handlePayloadChange} readOnly={readOnly} minHeight="150px" maxHeight="200px" placeholder="" />
                         {error && (<div className="mt-2 text-xs text-destructive flex items-center gap-1"><span className="text-destructive">⚠</span> {error}</div>)}
                     </TabsContent>
                     <TabsContent value="schema" className="mt-3">
