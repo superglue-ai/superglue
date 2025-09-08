@@ -172,6 +172,23 @@ export class PostgresService implements DataStore {
         )
       `);
 
+            await client.query(`
+             CREATE TABLE IF NOT EXISTS workflow_schedules (
+                id VARCHAR(255) NOT NULL,
+                org_id TEXT NOT NULL,
+                workflow_id TEXT NOT NULL,
+                cron_expression TEXT NOT NULL,
+                enabled BOOLEAN NOT NULL DEFAULT TRUE,
+                payload JSONB,
+                options JSONB,
+                last_run_at TIMESTAMP,
+                next_run_at TIMESTAMP NOT NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                PRIMARY KEY (id, org_id)
+             )
+            `);
+            
             await client.query(`CREATE INDEX IF NOT EXISTS idx_configurations_type_org ON configurations(type, org_id)`);
             await client.query(`CREATE INDEX IF NOT EXISTS idx_configurations_version ON configurations(version)`);
             await client.query(`CREATE INDEX IF NOT EXISTS idx_configurations_integration_ids ON configurations USING GIN(integration_ids)`);
@@ -180,6 +197,7 @@ export class PostgresService implements DataStore {
             await client.query(`CREATE INDEX IF NOT EXISTS idx_integrations_type ON integrations(type, org_id)`);
             await client.query(`CREATE INDEX IF NOT EXISTS idx_integrations_url_host ON integrations(url_host)`);
             await client.query(`CREATE INDEX IF NOT EXISTS idx_integration_details_integration_id ON integration_details(integration_id, org_id)`);
+            await client.query(`CREATE INDEX IF NOT EXISTS idx_workflow_schedules_due ON workflow_schedules(next_run_at, enabled) WHERE enabled = true`);
         } finally {
             client.release();
         }
