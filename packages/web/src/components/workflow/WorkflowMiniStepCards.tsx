@@ -3,7 +3,7 @@ import { Card } from '@/src/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import JsonSchemaEditor from '@/src/components/utils/JsonSchemaEditor';
-import { cn, isEmptyData } from '@/src/lib/utils';
+import { cn, isEmptyData, truncateForDisplay, truncateLines } from '@/src/lib/utils';
 import { inferJsonSchema } from '@superglue/shared';
 import { Check, Code2, Copy, Eye, FileJson, Package, Play, X } from 'lucide-react';
 import Prism from 'prismjs';
@@ -29,95 +29,6 @@ const highlightCode = (code: string, language: string) => {
     }
 };
 
-const inferSchema = inferJsonSchema;
-
-const MAX_DISPLAY_SIZE = 1024 * 1024;
-const MAX_DISPLAY_LINES = 3000;
-const MAX_STRING_PREVIEW_LENGTH = 3000;
-const MAX_ARRAY_PREVIEW_ITEMS = 10;
-const MAX_TRUNCATION_DEPTH = 10;
-const MAX_OBJECT_PREVIEW_KEYS = 100;
-
-const truncateValue = (value: any, depth: number = 0): any => {
-    if (depth > MAX_TRUNCATION_DEPTH) {
-        if (Array.isArray(value)) return '[...]';
-        if (typeof value === 'object' && value !== null) return '{...}';
-        return '...';
-    }
-    if (typeof value === 'string') {
-        if (value.length > MAX_STRING_PREVIEW_LENGTH) {
-            return value.substring(0, MAX_STRING_PREVIEW_LENGTH) + `... [${value.length.toLocaleString()} chars total]`;
-        }
-        return value;
-    }
-    if (Array.isArray(value)) {
-        if (value.length > MAX_ARRAY_PREVIEW_ITEMS) {
-            return [...value.slice(0, MAX_ARRAY_PREVIEW_ITEMS).map(v => truncateValue(v, depth + 1)), `... ${value.length - MAX_ARRAY_PREVIEW_ITEMS} more items`];
-        }
-        return value.map(v => truncateValue(v, depth + 1));
-    }
-    if (typeof value === 'object' && value !== null) {
-        const result: any = {};
-        const keys = Object.keys(value);
-        const keysToShow = keys.slice(0, MAX_OBJECT_PREVIEW_KEYS);
-        for (const key of keysToShow) {
-            result[key] = truncateValue(value[key], depth + 1);
-        }
-        if (keys.length > MAX_OBJECT_PREVIEW_KEYS) {
-            result['...'] = `${(keys.length - MAX_OBJECT_PREVIEW_KEYS).toLocaleString()} more keys`;
-        }
-        return result;
-    }
-    return value;
-};
-
-const truncateForDisplay = (data: any): { value: string, truncated: boolean } => {
-    if (data === null || data === undefined) {
-        return { value: '{}', truncated: false };
-    }
-    if (typeof data === 'string') {
-        if (data.length > MAX_STRING_PREVIEW_LENGTH) {
-            const truncatedString = data.substring(0, MAX_STRING_PREVIEW_LENGTH);
-            const lastNewline = truncatedString.lastIndexOf('\n');
-            const cleanTruncated = truncatedString.substring(0, lastNewline > 0 ? lastNewline : MAX_STRING_PREVIEW_LENGTH);
-            const note = `\n\n... [String truncated - showing ${MAX_STRING_PREVIEW_LENGTH.toLocaleString()} of ${data.length.toLocaleString()} characters]`;
-            const combined = `${cleanTruncated}${note}`;
-            return { value: JSON.stringify(combined), truncated: true };
-        }
-        return { value: JSON.stringify(data), truncated: false };
-    }
-    try {
-        const truncatedData = truncateValue(data);
-        let jsonString = JSON.stringify(truncatedData, null, 2);
-        if (jsonString.length > MAX_DISPLAY_SIZE) {
-            jsonString = jsonString.substring(0, MAX_DISPLAY_SIZE);
-            const lastNewline = jsonString.lastIndexOf('\n');
-            if (lastNewline > 0) jsonString = jsonString.substring(0, lastNewline);
-            return { value: jsonString + '\n\n... [Data truncated - exceeds size limit]', truncated: true };
-        }
-        const lines = jsonString.split('\n');
-        if (lines.length > MAX_DISPLAY_LINES) {
-            return { value: lines.slice(0, MAX_DISPLAY_LINES).join('\n') + '\n\n... [Truncated - too many lines]', truncated: true };
-        }
-        const originalJson = JSON.stringify(data, null, 2);
-        const wasTruncated = originalJson !== jsonString;
-        return { value: jsonString, truncated: wasTruncated };
-    } catch {
-        const stringValue = String(data);
-        if (stringValue.length > MAX_STRING_PREVIEW_LENGTH) {
-            const preview = stringValue.substring(0, MAX_STRING_PREVIEW_LENGTH) + '... [Truncated]';
-            return { value: JSON.stringify(preview), truncated: true };
-        }
-        return { value: JSON.stringify(stringValue), truncated: false };
-    }
-};
-
-const truncateLines = (text: string, maxLines: number): string => {
-    if (!text) return text;
-    const lines = text.split('\n');
-    if (lines.length <= maxLines) return text;
-    return lines.slice(0, maxLines).join('\n') + `\n... truncated ${lines.length - maxLines} more lines ...`;
-};
 
 export const CopyButton = ({ text, getData }: { text?: string; getData?: () => any }) => {
     const [copied, setCopied] = useState(false);
@@ -253,11 +164,6 @@ export const JavaScriptCodeEditor = React.memo(({ value, onChange, readOnly = fa
         const arrowFunctionPattern = /^\s*\(\s*sourceData\s*\)\s*=>\s*\{[\s\S]*\}\s*$/;
         return arrowFunctionPattern.test(code);
     };
-    const ensureValidTransform = (code: string): string => {
-        if (!code || !code.trim()) return `(sourceData) => {\n  // Transform sourceData into final output\n  return sourceData;\n}`;
-        if (hasValidPattern(code)) return code;
-        return `(sourceData) => {\n${code}\n}`;
-    };
     const displayValue = value || '';
     useEffect(() => {
         setAllowHighlight(false);
@@ -267,7 +173,7 @@ export const JavaScriptCodeEditor = React.memo(({ value, onChange, readOnly = fa
     }, [displayValue]);
     const handleChange = (newValue: string) => {
         if (!onChange) return;
-        if (isTransformEditor) onChange(newValue); else onChange(newValue);
+        onChange(newValue);
     };
     const lineNumbers = React.useMemo(() => (displayValue || '').split('\n').map((_, i) => String(i + 1)), [displayValue]);
     return (
@@ -404,6 +310,7 @@ export const PayloadMiniStepCard = ({ payload, inputSchema, onChange, onInputSch
     );
 };
 
+const MAX_DISPLAY_LINES = 3000;
 export const FinalTransformMiniStepCard = ({ transform, responseSchema, onTransformChange, onResponseSchemaChange, readOnly, onExecuteTransform, isExecutingTransform, canExecute, transformResult, stepInputs }: { transform?: string; responseSchema?: string; onTransformChange?: (value: string) => void; onResponseSchemaChange?: (value: string) => void; readOnly?: boolean; onExecuteTransform?: (schema: string, transform: string) => void; isExecutingTransform?: boolean; canExecute?: boolean; transformResult?: any; stepInputs?: any; }) => {
     const [activeTab, setActiveTab] = useState('transform');
     const [localTransform, setLocalTransform] = useState(transform || '');
@@ -458,7 +365,7 @@ export const FinalTransformMiniStepCard = ({ transform, responseSchema, onTransf
                             let inputString = '';
                             let isTruncated = false;
                             if (inputViewMode === 'schema') {
-                                const schemaObj = inferSchema(stepInputs || {});
+                                const schemaObj = inferJsonSchema(stepInputs || {});
                                 inputString = truncateLines(JSON.stringify(schemaObj, null, 2), MAX_DISPLAY_LINES);
                             } else {
                                 const displayData = truncateForDisplay(stepInputs);

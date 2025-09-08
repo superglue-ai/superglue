@@ -4,7 +4,7 @@ import { getAuthBadge } from '@/src/app/integrations/page';
 import { IntegrationForm } from '@/src/components/integrations/IntegrationForm';
 import { useToast } from '@/src/hooks/use-toast';
 import { needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
-import { cn, composeUrl, getIntegrationIcon as getIntegrationIconName, inputErrorStyles } from '@/src/lib/utils';
+import { cn, composeUrl, getIntegrationIcon as getIntegrationIconName, getSimpleIcon, inputErrorStyles } from '@/src/lib/utils';
 import { Integration, IntegrationInput, SuperglueClient, UpsertMode, Workflow } from '@superglue/client';
 import { integrations as integrationTemplates } from "@superglue/shared";
 import { waitForIntegrationProcessing } from '@superglue/shared/utils';
@@ -14,8 +14,6 @@ import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Editor from 'react-simple-code-editor';
-import type { SimpleIcon } from 'simple-icons';
-import * as simpleIcons from 'simple-icons';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -367,20 +365,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       });
     } finally {
       setIsGeneratingSuggestions(false);
-    }
-  };
-
-  const getSimpleIcon = (name: string): SimpleIcon | null => {
-    if (!name || name === "default") return null;
-
-    const formatted = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
-    const iconKey = `si${formatted}`;
-    try {
-      // @ts-ignore - The type definitions don't properly handle string indexing
-      let icon = simpleIcons[iconKey];
-      return icon || null;
-    } catch (e) {
-      return null;
     }
   };
 

@@ -590,6 +590,7 @@ export async function executeApiCall({
         logMessage('warn', `API call failed. ${lastError}`, metadata);
       }
 
+      // hack to get the status code from the error
       if (!response?.statusCode) {
         response = response || {};
         response.statusCode = error instanceof ApiCallError ? error.statusCode : 500;

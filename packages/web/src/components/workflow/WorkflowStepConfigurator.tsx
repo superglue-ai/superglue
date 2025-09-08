@@ -2,15 +2,13 @@ import { useConfig } from '@/src/app/config-context';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/src/components/ui/select";
 import { Switch } from "@/src/components/ui/switch";
 import { useToast } from '@/src/hooks/use-toast';
-import { cn, getIntegrationIcon as getIntegrationIconName } from '@/src/lib/utils';
+import { cn, getIntegrationIcon as getIntegrationIconName, getSimpleIcon } from '@/src/lib/utils';
 import { Integration, SuperglueClient } from "@superglue/client";
 import { ArrowDown, Check, Copy, Globe, Pencil, RotateCw, Save, X } from 'lucide-react';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
 import { useEffect, useMemo, useState } from 'react';
 import Editor from 'react-simple-code-editor';
-import type { SimpleIcon } from 'simple-icons';
-import * as simpleIcons from 'simple-icons';
 import { Badge } from "../ui/badge";
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
@@ -67,19 +65,6 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
     useEffect(() => { if (isEditing) { loadIntegrations(); } }, [isEditing]);
 
     const integrations = propIntegrations || localIntegrations;
-
-    const getSimpleIcon = (name: string): SimpleIcon | null => {
-        if (!name || name === "default") return null;
-        const formatted = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
-        const iconKey = `si${formatted}`;
-        try {
-            // @ts-ignore
-            let icon = simpleIcons[iconKey];
-            return icon || null;
-        } catch (e) {
-            return null;
-        }
-    };
 
     const getIntegrationIcon = (integration: Integration) => {
         const iconName = getIntegrationIconName(integration);
