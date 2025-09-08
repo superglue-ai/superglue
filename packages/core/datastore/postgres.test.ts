@@ -362,7 +362,7 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
 
             it('should store and list workflow schedules', async () => {
                 await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow, orgId: testOrgId });
-                await store.upsertWorkflowSchedule({ id: testWorkflowSchedule.id, orgId: testOrgId, schedule: testWorkflowSchedule });
+                await store.upsertWorkflowSchedule({ id: testWorkflowSchedule.id, schedule: testWorkflowSchedule });
                 const retrieved = await store.listWorkflowSchedules({ workflowId: testWorkflow.id, orgId: testOrgId });
 
                 expect(retrieved).toHaveLength(1);
@@ -375,8 +375,11 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
 
             it('should delete workflow schedules', async () => {
                 await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow, orgId: testOrgId });
-                await store.upsertWorkflowSchedule({ id: testWorkflowSchedule.id, orgId: testOrgId, schedule: testWorkflowSchedule });
-                await store.deleteWorkflowSchedule({ id: testWorkflowSchedule.id, orgId: testOrgId });
+                await store.upsertWorkflowSchedule({ id: testWorkflowSchedule.id, schedule: testWorkflowSchedule });
+                
+                const success = await store.deleteWorkflowSchedule({ id: testWorkflowSchedule.id });
+                expect(success).toBe(true);
+                
                 const retrieved = await store.listWorkflowSchedules({ workflowId: testWorkflow.id, orgId: testOrgId });
                 expect(retrieved).toHaveLength(0);
             });
@@ -389,8 +392,8 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
                 };
 
                 await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow, orgId: testOrgId });
-                await store.upsertWorkflowSchedule({ id: testWorkflowSchedule.id, orgId: testOrgId, schedule: testWorkflowSchedule });
-                await store.upsertWorkflowSchedule({ id: futureSchedule.id, orgId: testOrgId, schedule: futureSchedule });
+                await store.upsertWorkflowSchedule({ id: testWorkflowSchedule.id, schedule: testWorkflowSchedule });
+                await store.upsertWorkflowSchedule({ id: futureSchedule.id, schedule: futureSchedule });
 
                 const retrieved = await store.listDueWorkflowSchedules();
                 
@@ -400,6 +403,18 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
                     createdAt: expect.any(Date),
                     updatedAt: expect.any(Date)
                 });
+            });
+
+            it('should update workflow schedule next run', async () => {
+                const newNextRunAt = new Date('2022-01-01T10:00:00.000Z');
+                await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow, orgId: testOrgId });
+                await store.upsertWorkflowSchedule({ id: testWorkflowSchedule.id, schedule: testWorkflowSchedule });
+
+                const success = await store.updateScheduleNextRun({ id: testWorkflowSchedule.id, nextRunAt: newNextRunAt, lastRunAt: new Date() });
+                expect(success).toBe(true);
+                
+                const retrieved = await store.listWorkflowSchedules({ workflowId: testWorkflow.id, orgId: testOrgId });
+                expect(retrieved[0].nextRunAt).toEqual(newNextRunAt);
             });
         });
 

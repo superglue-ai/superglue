@@ -516,8 +516,8 @@ export class PostgresService implements DataStore {
         }
     }
 
-    async upsertWorkflowSchedule(params: { id: string; orgId: string; schedule: WorkflowSchedule }): Promise<void> {
-        const { id, orgId, schedule } = params;
+    async upsertWorkflowSchedule(params: { id: string; schedule: WorkflowSchedule }): Promise<void> {
+        const { id, schedule } = params;
 
         const client = await this.pool.connect();
         try {
@@ -537,18 +537,17 @@ export class PostgresService implements DataStore {
                 updated_at = CURRENT_TIMESTAMP
             `;
             
-            await client.query(query, [id, orgId, schedule.workflowId, 'workflow', schedule.cronExpression, schedule.enabled, JSON.stringify(schedule.payload), JSON.stringify(schedule.options), schedule.lastRunAt, schedule.nextRunAt]);
+            await client.query(query, [id, schedule.orgId, schedule.workflowId, 'workflow', schedule.cronExpression, schedule.enabled, JSON.stringify(schedule.payload), JSON.stringify(schedule.options), schedule.lastRunAt, schedule.nextRunAt]);
         } finally {
             client.release();
         }
     }
 
-    async deleteWorkflowSchedule(params: { id: string, orgId: string }): Promise<boolean> {
-        const { id, orgId } = params;
+    async deleteWorkflowSchedule(params: { id: string }): Promise<boolean> {
         const client = await this.pool.connect();
         try {
-            await client.query('DELETE FROM workflow_schedules WHERE id = $1 AND org_id = $2', [id, orgId]);
-            return true;
+            const result = await client.query('DELETE FROM workflow_schedules WHERE id = $1', [params.id]);
+            return result.rowCount > 0;
         } finally {
             client.release();
         }
@@ -559,14 +558,22 @@ export class PostgresService implements DataStore {
         
         try {
             const query = `SELECT id, org_id, workflow_id, workflow_type, cron_expression, enabled, payload, options, last_run_at, next_run_at, created_at, updated_at FROM workflow_schedules WHERE enabled = true AND next_run_at <= NOW()`;
-
             const queryResult = await client.query(query);
             
-            const schedules = queryResult.rows.map(this.mapWorkflowSchedule);
-
-            return schedules;
+            return queryResult.rows.map(this.mapWorkflowSchedule);;
         }
         finally {
+            client.release();
+        }
+    }
+
+    async updateScheduleNextRun(params: { id: string; nextRunAt: Date; lastRunAt: Date; }): Promise<boolean> {
+        const client = await this.pool.connect();
+        try {
+            const query = 'UPDATE workflow_schedules SET next_run_at = $1, last_run_at = $2 WHERE id = $3';
+            const result = await client.query(query, [params.nextRunAt, params.lastRunAt, params.id]);
+            return result.rowCount > 0;
+        } finally {
             client.release();
         }
     }

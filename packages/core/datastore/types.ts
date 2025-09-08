@@ -48,4 +48,5 @@ export interface DataStore {
   listWorkflowSchedules(params: { workflowId: string }): Promise<WorkflowSchedule[]>;
   upsertWorkflowSchedule(params: { id: string; schedule: WorkflowSchedule })
   deleteWorkflowSchedule(params: { id: string }): Promise<boolean>;
+  updateScheduleNextRun(params: { id: string; nextRunAt: Date; lastRunAt: Date; }): Promise<boolean>;
 }
