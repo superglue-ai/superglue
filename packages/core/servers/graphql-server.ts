@@ -29,7 +29,7 @@ query Query {
 }`;
 
 export async function startGraphqlServer() {
-  const PORT = process.env.GRAPHQL_PORT || 3002;
+  const PORT = process.env.GRAPHQL_PORT ? parseInt(process.env.GRAPHQL_PORT) : 3002;
   
   // Initialize shared components
   const datastore = createDataStore({ type: String(process.env.DATASTORE_TYPE).toLowerCase() as 'redis' | 'memory' | 'file' | 'postgres' });
@@ -115,9 +115,13 @@ export async function startGraphqlServer() {
 
   app.use('/', expressMiddleware(server, { context: getHttpContext }));
 
-  await new Promise<void>((resolve) => httpServer.listen({ port: PORT }, resolve));
-
-  logMessage('info', `🚀 Express GraphQL server ready at http://localhost:${PORT}/ and ws://localhost:${PORT}/`);
+  try {
+    await new Promise<void>((resolve) => httpServer.listen({ port: PORT }, resolve));
+    logMessage('info', `🚀 Express GraphQL server ready at http://localhost:${PORT}/ and ws://localhost:${PORT}/`);
+  } catch (error) {
+    logMessage('error', `Failed to start GraphQL server: ${error}`);
+    throw error;
+  }
   
   return { server, httpServer, app };
 }
