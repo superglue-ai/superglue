@@ -519,104 +519,28 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                         </div>
                       </div>
                     )}
-                    {integrations
-                      .filter(sys =>
+                    {(() => {
+                      const filteredIntegrations = integrations.filter(sys =>
                         integrationSearch === '' ||
                         sys.id.toLowerCase().includes(integrationSearch.toLowerCase()) ||
                         sys.urlHost.toLowerCase().includes(integrationSearch.toLowerCase()) ||
                         sys.urlPath.toLowerCase().includes(integrationSearch.toLowerCase())
-                      )
-                      .map(sys => {
-                        const selected = selectedIntegrationIds.includes(sys.id);
-                        return (
-                          <div
-                            key={sys.id}
-                            className={cn(
-                              "flex items-center justify-between rounded-md px-4 py-3 transition-all duration-200 cursor-pointer",
-                              selected
-                                ? "bg-primary/10 dark:bg-primary/40 border border-primary/50 dark:border-primary/60 hover:bg-primary/15 dark:hover:bg-primary/25"
-                                : "bg-background border border-transparent hover:bg-accent/50 hover:border-border"
-                            )}
-                            onClick={() => {
-                              if (selected) {
-                                setSelectedIntegrationIds(ids => ids.filter(i => i !== sys.id));
-                              } else {
-                                setSelectedIntegrationIds(ids => [...ids, sys.id]);
-                              }
-                            }}
-                          >
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                              {(() => {
-                                const iconName = getIntegrationIconName(sys);
-                                const icon = iconName ? getSimpleIcon(iconName) : null;
-                                return icon ? (
-                                  <svg
-                                    width="20"
-                                    height="20"
-                                    viewBox="0 0 24 24"
-                                    fill={`#${icon.hex}`}
-                                    className="flex-shrink-0"
-                                  >
-                                    <path d={icon.path} />
-                                  </svg>
-                                ) : (
-                                  <Globe className="h-5 w-5 flex-shrink-0 text-foreground" />
-                                );
-                              })()}
-                              <div className="flex flex-col min-w-0">
-                                <span className="font-medium truncate max-w-[200px]">{sys.id}</span>
-                                <span className="text-xs text-muted-foreground truncate max-w-[240px]">
-                                  {composeUrl(sys.urlHost, sys.urlPath)}
-                                </span>
-                              </div>
-                              <div className="flex flex-col items-center gap-2">
-                                <div className="flex items-center gap-2">
-                                  <DocStatus
-                                    pending={pendingDocIds.has(sys.id)}
-                                    hasDocumentation={hasDocumentation(sys)}
-                                  />
-                                  {(() => {
-                                    const badge = getAuthBadge(sys);
-                                    const colorClasses = {
-                                      blue: 'text-blue-800 dark:text-blue-300 bg-blue-500/10',
-                                      amber: 'text-amber-800 dark:text-amber-300 bg-amber-500/10',
-                                      green: 'text-green-800 dark:text-green-300 bg-green-500/10'
-                                    };
+                      );
 
-                                    return (
-                                      <span className={`text-xs ${colorClasses[badge.color]} px-2 py-0.5 rounded flex items-center gap-1`}>
-                                        {badge.icon === 'clock' ? <Clock className="h-3 w-3" /> : <Key className="h-3 w-3" />}
-                                        {badge.label}
-                                      </span>
-                                    );
-                                  })()}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex gap-2 items-center">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
-                                onClick={e => {
-                                  e.stopPropagation();
-                                  setIntegrationFormEdit(sys);
-                                  setShowIntegrationForm(true);
-                                }}
-                                disabled={pendingDocIds.has(sys.id)}
-                                title={pendingDocIds.has(sys.id) ? "Documentation is being processed" : "Edit integration"}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <button
+                      return (
+                        <>
+                          {filteredIntegrations.map(sys => {
+                            const selected = selectedIntegrationIds.includes(sys.id);
+                            return (
+                              <div
+                                key={sys.id}
                                 className={cn(
-                                  "h-5 w-5 rounded border-2 transition-all duration-200 flex items-center justify-center",
+                                  "flex items-center justify-between rounded-md px-4 py-3 transition-all duration-200 cursor-pointer",
                                   selected
-                                    ? "bg-primary border-primary"
-                                    : "bg-background border-input hover:border-primary/50"
+                                    ? "bg-primary/10 dark:bg-primary/40 border border-primary/50 dark:border-primary/60 hover:bg-primary/15 dark:hover:bg-primary/25"
+                                    : "bg-background border border-transparent hover:bg-accent/50 hover:border-border"
                                 )}
-                                onClick={(e) => {
-                                  e.stopPropagation();
+                                onClick={() => {
                                   if (selected) {
                                     setSelectedIntegrationIds(ids => ids.filter(i => i !== sys.id));
                                   } else {
@@ -624,12 +548,130 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                                   }
                                 }}
                               >
-                                {selected && <Check className="h-3 w-3 text-primary-foreground" />}
-                              </button>
+                                <div className="flex items-center gap-3 flex-1 min-w-0">
+                                  {(() => {
+                                    const iconName = getIntegrationIconName(sys);
+                                    const icon = iconName ? getSimpleIcon(iconName) : null;
+                                    return icon ? (
+                                      <svg
+                                        width="20"
+                                        height="20"
+                                        viewBox="0 0 24 24"
+                                        fill={`#${icon.hex}`}
+                                        className="flex-shrink-0"
+                                      >
+                                        <path d={icon.path} />
+                                      </svg>
+                                    ) : (
+                                      <Globe className="h-5 w-5 flex-shrink-0 text-foreground" />
+                                    );
+                                  })()}
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="font-medium truncate max-w-[200px]">{sys.id}</span>
+                                    <span className="text-xs text-muted-foreground truncate max-w-[240px]">
+                                      {composeUrl(sys.urlHost, sys.urlPath)}
+                                    </span>
+                                  </div>
+                                  <div className="flex flex-col items-center gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <DocStatus
+                                        pending={pendingDocIds.has(sys.id)}
+                                        hasDocumentation={hasDocumentation(sys)}
+                                      />
+                                      {(() => {
+                                        const badge = getAuthBadge(sys);
+                                        const colorClasses = {
+                                          blue: 'text-blue-800 dark:text-blue-300 bg-blue-500/10',
+                                          amber: 'text-amber-800 dark:text-amber-300 bg-amber-500/10',
+                                          green: 'text-green-800 dark:text-green-300 bg-green-500/10'
+                                        };
+
+                                        return (
+                                          <span className={`text-xs ${colorClasses[badge.color]} px-2 py-0.5 rounded flex items-center gap-1`}>
+                                            {badge.icon === 'clock' ? <Clock className="h-3 w-3" /> : <Key className="h-3 w-3" />}
+                                            {badge.label}
+                                          </span>
+                                        );
+                                      })()}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex gap-2 items-center">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+                                    onClick={e => {
+                                      e.stopPropagation();
+                                      setIntegrationFormEdit(sys);
+                                      setShowIntegrationForm(true);
+                                    }}
+                                    disabled={pendingDocIds.has(sys.id)}
+                                    title={pendingDocIds.has(sys.id) ? "Documentation is being processed" : "Edit integration"}
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  <button
+                                    className={cn(
+                                      "h-5 w-5 rounded border-2 transition-all duration-200 flex items-center justify-center",
+                                      selected
+                                        ? "bg-primary border-primary"
+                                        : "bg-background border-input hover:border-primary/50"
+                                    )}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (selected) {
+                                        setSelectedIntegrationIds(ids => ids.filter(i => i !== sys.id));
+                                      } else {
+                                        setSelectedIntegrationIds(ids => [...ids, sys.id]);
+                                      }
+                                    }}
+                                  >
+                                    {selected && <Check className="h-3 w-3 text-primary-foreground" />}
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          
+                          {/* Show "Create new integration" option when search has no results */}
+                          {filteredIntegrations.length === 0 && integrationSearch.trim() !== '' && (
+                            <div
+                              className="flex items-center justify-between rounded-md px-4 py-3 transition-all duration-200 cursor-pointer bg-background border border-dashed border-muted-foreground/30 hover:bg-accent/50 hover:border-muted-foreground/50"
+                              onClick={() => setShowIntegrationForm(true)}
+                            >
+                              <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <div className="h-5 w-5 flex-shrink-0 rounded-full border-2 border-dashed border-muted-foreground/50 flex items-center justify-center">
+                                  <Plus className="h-3 w-3 text-muted-foreground" />
+                                </div>
+                                <div className="flex flex-col min-w-0">
+                                  <span className="font-medium text-muted-foreground">
+                                    Create "{integrationSearch}" integration
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">
+                                    Add a new integration for this API
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex gap-2 items-center">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    setShowIntegrationForm(true);
+                                  }}
+                                  title="Create new integration"
+                                >
+                                  <Plus className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
