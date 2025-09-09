@@ -10,7 +10,7 @@ import { useServer } from 'graphql-ws/use/ws';
 import http from 'http';
 import { WebSocketServer } from 'ws';
 import { authMiddleware, extractTokenFromExpressRequest, validateToken } from '../auth/auth.js';
-import { createDataStore } from '../datastore/datastore.js';
+import { DataStore } from '../datastore/types.js';
 import { resolvers, typeDefs } from '../graphql/graphql.js';
 import { mcpHandler } from '../mcp/mcp-server.js';
 import { logMessage } from "../utils/logs.js";
@@ -28,11 +28,8 @@ query Query {
   }
 }`;
 
-export async function startGraphqlServer() {
-  const PORT = process.env.GRAPHQL_PORT ? parseInt(process.env.GRAPHQL_PORT) : 3002;
-  
-  // Initialize shared components
-  const datastore = createDataStore({ type: String(process.env.DATASTORE_TYPE).toLowerCase() as 'redis' | 'memory' | 'file' | 'postgres' });
+export async function startGraphqlServer(datastore: DataStore) {
+  const PORT = process.env.GRAPHQL_PORT ? parseInt(process.env.GRAPHQL_PORT) : 3000;
 
   // Create the schema
   const schema = makeExecutableSchema({ typeDefs, resolvers });

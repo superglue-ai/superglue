@@ -2,7 +2,7 @@ import { logMessage } from "../utils/logs.js";
 
 export function validateEnvironment() {
   if (!process.env.API_PORT) {
-    logMessage('warn', 'API_PORT is not set defaulting to 3000.');
+    logMessage('warn', 'API_PORT is not set defaulting to 3002.');
   }
 
   if (!process.env.GRAPHQL_PORT) {

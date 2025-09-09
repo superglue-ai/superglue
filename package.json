@@ -21,7 +21,6 @@
   "dependencies": {
     "@playwright/test": "^1.50.1",
     "@superglue/client": "^2.3.46",
-    "concurrently": "^9.2.1",
     "dotenv": "^16.4.7",
     "dotenv-cli": "^8.0.0"
   },

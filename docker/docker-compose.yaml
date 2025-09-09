@@ -7,8 +7,8 @@ services:
       dockerfile: Dockerfile.server
     container_name: superglue-server
     ports:
-      - "${API_PORT:-3000}:3000"
-      - "${GRAPHQL_PORT:-3002}:3002"
+      - "${API_PORT:-3002}:3002"
+      - "${GRAPHQL_PORT:-3000}:3000"
     env_file:
       - .env
     volumes:

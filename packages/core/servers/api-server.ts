@@ -1,18 +1,21 @@
 import Fastify from 'fastify';
 import { registerAllRoutes } from '../api/index.js';
 import { extractTokenFromFastifyRequest, validateToken } from '../auth/auth.js';
-import { createDataStore } from '../datastore/datastore.js';
+import { DataStore } from '../datastore/types.js';
 import { logMessage } from "../utils/logs.js";
 
 
-export async function startApiServer() {
+export async function startApiServer(datastore: DataStore) {
   // Get REST API port
-  const PORT = process.env.API_PORT ? parseInt(process.env.API_PORT) : 3000;
-  
-  // Initialize shared components
-  const datastore = createDataStore({ 
-    type: String(process.env.DATASTORE_TYPE).toLowerCase() as 'redis' | 'memory' | 'file' | 'postgres' 
-  });
+  const DEFAULT_API_PORT = 3002;
+  let port = process.env.API_PORT ? parseInt(process.env.API_PORT) : DEFAULT_API_PORT;
+  const graphqlPort = process.env.GRAPHQL_PORT ? parseInt(process.env.GRAPHQL_PORT) : undefined;
+
+  if (graphqlPort !== undefined && port === graphqlPort) {
+    logMessage('warn', `API_PORT cannot be the same as GRAPHQL_PORT. Switching REST API port to ${port + 1}.`);
+    port = port + 1;
+  }
+  const PORT = port;
 
   // Configure Fastify logging to match the centralized logging format from utils/logs.ts
   const fastify = Fastify({
