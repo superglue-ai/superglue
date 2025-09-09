@@ -124,7 +124,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
 
 
   const integrationOptions = [
-    { value: "manual", label: "No Template", icon: "default" },
+    { value: "manual", label: "Custom API", icon: "default" },
     ...Object.entries(integrationTemplates).map(([key, integration]) => ({
       value: key,
       label: key.charAt(0).toUpperCase() + key.slice(1),

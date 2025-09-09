@@ -87,15 +87,15 @@ async function startServer() {
       const authResult = await validateToken(token);
 
       if (!authResult.success) {
-        logMessage('warn', `Subscription authentication failed for token: ${token}`);
+        logMessage('warn', `Websocket Subscription authentication failed for token: ${token}`);
         return false;
       }
 
-      logMessage('debug', `Subscription connected`);
+      logMessage('debug', `Websocket Subscription connected`);
       return { datastore, orgId: authResult.orgId };
     },
     onDisconnect(ctx, code, reason) {
-      logMessage('debug', `Subscription disconnected. code=${code} reason=${reason}`);
+      logMessage('debug', `Websocket Subscription disconnected. code=${code} reason=${reason}`);
     },
   }, wsServer);
 

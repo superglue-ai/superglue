@@ -217,7 +217,7 @@ export default function IntegrationsPage() {
     const [editingIntegration, setEditingIntegration] = useState<Integration | null>(null);
 
     const integrationOptions = [
-        { value: "manual", label: "No Template", icon: "default" },
+        { value: "manual", label: "Custom API", icon: "default" },
         ...Object.entries(integrationTemplates).map(([key, integration]) => ({
             value: key,
             label: key
