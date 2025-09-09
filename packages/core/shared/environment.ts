@@ -6,10 +6,10 @@ export function validateEnvironment() {
   }
 
   if (!process.env.GRAPHQL_PORT) {
-    throw new Error('GRAPHQL_PORT is not set.');
+    logMessage('warn', 'GRAPHQL_PORT is not set defaulting to 3000.');
   }
 
-  if ((process.env.LLM_PROVIDER !== 'GEMINI') && !process.env.OPENAI_API_KEY) {
+  if ((process.env.LLM_PROVIDER !== 'OPENAI') && !process.env.OPENAI_API_KEY) {
     throw new Error('OPENAI_API_KEY is not set.');
   }
 
@@ -17,8 +17,8 @@ export function validateEnvironment() {
     throw new Error('GEMINI_API_KEY is not set.');
   }
 
-  if (process.env.DATASTORE_TYPE === 'redis' && !process.env.REDIS_HOST) {
-    throw new Error('REDIS_HOST is not set.');
+  if ((process.env.LLM_PROVIDER === 'ANTHROPIC') && !process.env.ANTHROPIC_API_KEY) {
+    throw new Error('ANTHROPIC_API_KEY is not set.');
   }
 
   if (!process.env.AUTH_TOKEN && !process.env.NEXT_PUBLIC_SUPABASE_URL) {

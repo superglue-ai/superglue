@@ -11,7 +11,7 @@ import http from 'http';
 import { WebSocketServer } from 'ws';
 import { authMiddleware, extractTokenFromExpressRequest, validateToken } from '../auth/auth.js';
 import { DataStore } from '../datastore/types.js';
-import { resolvers, typeDefs } from '../graphql/graphql.js';
+import { resolvers, typeDefs } from './graphql.js';
 import { mcpHandler } from '../mcp/mcp-server.js';
 import { logMessage } from "../utils/logs.js";
 import { createTelemetryPlugin, telemetryMiddleware } from '../utils/telemetry.js';
@@ -60,15 +60,15 @@ export async function startGraphqlServer(datastore: DataStore) {
       const authResult = await validateToken(token);
 
       if (!authResult.success) {
-        logMessage('warn', `Subscription authentication failed for token: ${token}`);
+        logMessage('warn', `Websocket Subscription authentication failed for token: ${token}`);
         return false;
       }
 
-      logMessage('debug', `Subscription connected`);
+      logMessage('debug', `Websocket Subscription connected`);
       return { datastore, orgId: authResult.orgId };
     },
     onDisconnect(ctx, code, reason) {
-      logMessage('debug', `Subscription disconnected. code=${code} reason=${reason}`);
+      logMessage('debug', `Websocket Subscription disconnected. code=${code} reason=${reason}`);
     },
   }, wsServer);
 
