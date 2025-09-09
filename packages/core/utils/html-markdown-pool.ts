@@ -35,27 +35,27 @@ export class HtmlMarkdownPool {
     }
 
     private createWorker(): Worker {
-        // Try TypeScript file first (for tests/development)
-        const tsUrl = new URL('./html-markdown-worker.ts', import.meta.url);
-        const tsPath = fileURLToPath(tsUrl);
-        
-        if (existsSync(tsPath)) {
-            const worker = new Worker(tsUrl);
+        // Try compiled JavaScript in dist folder first (after npm run build), checking for .ts files here is pointless
+        const distUrl = new URL('../dist/utils/html-markdown-worker.js', import.meta.url);
+        const distPath = fileURLToPath(distUrl);
+
+        if (existsSync(distPath)) {
+            const worker = new Worker(distUrl);
             this.attachWorkerEvents(worker);
             return worker;
         }
-        
+
         // Try JavaScript file (for production or when TS can't be run directly)
         const jsUrl = new URL('./html-markdown-worker.js', import.meta.url);
         const jsPath = fileURLToPath(jsUrl);
-        
+
         if (existsSync(jsPath)) {
             const worker = new Worker(jsUrl);
             this.attachWorkerEvents(worker);
             return worker;
         }
-        
-        throw new Error('Worker file not found: neither .ts nor .js file exists');
+
+        throw new Error('Worker file not found: No compiled .js file found in dist/utils/ or utils/. Run "npm run build" first.');
     }
 
     private attachWorkerEvents(worker: Worker): void {
