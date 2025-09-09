@@ -308,6 +308,7 @@ export class MemoryStore implements DataStore {
     if (!id || !workflow) return null;
     const key = this.getKey('workflow', id, orgId);
     this.storage.workflows.set(key, workflow);
+    return { ...workflow, id };
   }
 
   async deleteWorkflow(params: { id: string; orgId?: string }): Promise<boolean> {
