@@ -17,7 +17,7 @@ import { useToast } from '@/src/hooks/use-toast';
 import { cn, composeUrl, inputErrorStyles } from '@/src/lib/utils';
 import type { Integration } from '@superglue/client';
 
-import { buildOAuthUrlForIntegration, createOAuthErrorHandler, getOAuthCallbackUrl, triggerOAuthFlow } from '@/src/components/utils/oauth-utils';
+import { buildOAuthUrlForIntegration, createOAuthErrorHandler, getOAuthCallbackUrl, triggerOAuthFlow } from '@/src/lib/oauth-utils';
 import { integrations } from '@superglue/shared';
 import { Check, ChevronRight, ChevronsUpDown, Copy, Globe, Link } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -252,19 +252,19 @@ export function IntegrationForm({
     // Check if OAuth fields have changed
     const hasOAuthFieldsChanged = () => {
         if (authType !== 'oauth') return false;
-        
+
         // Check if any OAuth field changed
-        const oauthFieldsChanged = 
+        const oauthFieldsChanged =
             oauthFields.client_id !== initialOAuthFields.client_id ||
             oauthFields.client_secret !== initialOAuthFields.client_secret ||
             oauthFields.auth_url !== initialOAuthFields.auth_url ||
             oauthFields.token_url !== initialOAuthFields.token_url ||
             oauthFields.scopes !== initialOAuthFields.scopes ||
             oauthFields.grant_type !== initialOAuthFields.grant_type;
-        
+
         // Check if additional API credentials changed
         const apiCredentialsChanged = apiKeyCredentials !== initialApiCredentials;
-        
+
         return oauthFieldsChanged || apiCredentialsChanged;
     };
 
@@ -702,7 +702,7 @@ export function IntegrationForm({
                                     </Label>
                                     <Select
                                         value={oauthFields.grant_type}
-                                        onValueChange={(value: 'authorization_code' | 'client_credentials') => 
+                                        onValueChange={(value: 'authorization_code' | 'client_credentials') =>
                                             setOauthFields(prev => ({ ...prev, grant_type: value }))
                                         }
                                     >

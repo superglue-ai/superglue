@@ -3,14 +3,10 @@
 import { Badge } from '@/src/components/ui/badge';
 import { Input } from '@/src/components/ui/input';
 import { splitUrl } from '@/src/lib/client-utils';
-import { cn } from '@/src/lib/utils';
+import { cn, getSimpleIcon } from '@/src/lib/utils';
 import { integrations } from '@superglue/shared';
 import { Link } from 'lucide-react';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import type { SimpleIcon } from 'simple-icons';
-
-// Import all icons
-import * as simpleIcons from 'simple-icons';
 
 interface URLFieldProps {
   url: string
@@ -63,21 +59,6 @@ export const URLField = forwardRef<URLFieldHandle, URLFieldProps>(function URLFi
     }
   }
 
-  const getSimpleIcon = (name: string): SimpleIcon | null => {
-    if (!name) return null
-
-    // Convert service name to proper format for simple-icons
-    const formatted = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase()
-    const iconKey = `si${formatted}`
-    try {
-      // Try the direct lookup first
-      // @ts-ignore - The type definitions don't properly handle string indexing
-      let icon = simpleIcons[iconKey]
-      return icon || null
-    } catch (e) {
-      return null
-    }
-  }
 
   const extractQueryParams = (url: string): Record<string, string> => {
     try {

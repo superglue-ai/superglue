@@ -24,6 +24,7 @@ export interface WorkflowExecutionState {
   failedSteps: string[];
   isExecuting: boolean;
   currentStepIndex: number;
+  interrupted?: boolean;
 }
 
 export function createSingleStepWorkflow(
@@ -102,7 +103,8 @@ export async function executeWorkflowStepByStep(
   workflow: Workflow,
   payload: any,
   onStepComplete?: (stepIndex: number, result: StepExecutionResult) => void,
-  selfHealing: boolean = true
+  selfHealing: boolean = true,
+  shouldStop?: () => boolean
 ): Promise<WorkflowExecutionState> {
   const state: WorkflowExecutionState = {
     originalWorkflow: workflow,
@@ -111,12 +113,19 @@ export async function executeWorkflowStepByStep(
     completedSteps: [],
     failedSteps: [],
     isExecuting: true,
-    currentStepIndex: 0
+    currentStepIndex: 0,
+    interrupted: false
   };
 
   const previousResults: Record<string, any> = {};
 
   for (let i = 0; i < workflow.steps.length; i++) {
+    if (shouldStop && shouldStop()) {
+      state.isExecuting = false;
+      state.interrupted = true;
+      return state;
+    }
+
     state.currentStepIndex = i;
     const step = workflow.steps[i];
 
@@ -158,10 +167,20 @@ export async function executeWorkflowStepByStep(
     if (onStepComplete) {
       onStepComplete(i, result);
     }
+    if (shouldStop && shouldStop()) {
+      state.isExecuting = false;
+      state.interrupted = true;
+      return state;
+    }
   }
 
-  // Execute final transformation if all steps succeeded
   if (workflow.finalTransform && state.failedSteps.length === 0) {
+    // Final guard before executing transform
+    if (shouldStop && shouldStop()) {
+      state.isExecuting = false;
+      state.interrupted = true;
+      return state;
+    }
     const finalResult = await executeFinalTransform(
       client,
       workflow.id || 'workflow',
@@ -381,3 +400,14 @@ export function needsUIToTriggerDocFetch(newIntegration: Integration, oldIntegra
 
   return false;
 }
+
+export const deepMergePreferRight = (left: any, right: any): any => {
+  if (Array.isArray(left) && Array.isArray(right)) return right;
+  if (typeof left !== 'object' || left === null) return right ?? left;
+  if (typeof right !== 'object' || right === null) return right ?? left;
+  const result: Record<string, any> = { ...left };
+  for (const key of new Set([...Object.keys(left), ...Object.keys(right)])) {
+    result[key] = deepMergePreferRight(left[key], right[key]);
+  }
+  return result;
+};
