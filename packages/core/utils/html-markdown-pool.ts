@@ -35,7 +35,7 @@ export class HtmlMarkdownPool {
     }
 
     private createWorker(): Worker {
-        // Try compiled JavaScript in dist folder first (after npm run build), checking for .ts files here is pointless
+        // For local dev and running tests, try compiled JavaScript in dist folder first, checking for .ts files here is pointless
         const distUrl = new URL('../dist/utils/html-markdown-worker.js', import.meta.url);
         const distPath = fileURLToPath(distUrl);
 
@@ -45,7 +45,7 @@ export class HtmlMarkdownPool {
             return worker;
         }
 
-        // Try JavaScript file (for production or when TS can't be run directly)
+        // Try JavaScript file (for production)
         const jsUrl = new URL('./html-markdown-worker.js', import.meta.url);
         const jsPath = fileURLToPath(jsUrl);
 
