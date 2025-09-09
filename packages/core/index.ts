@@ -1,6 +1,6 @@
 import { createDataStore } from './datastore/datastore.js';
-import { startApiServer } from './servers/api-server.js';
-import { startGraphqlServer } from './servers/graphql-server.js';
+import { startApiServer } from './api/api-server.js';
+import { startGraphqlServer } from './graphql/graphql-server.js';
 import { validateEnvironment } from './shared/environment.js';
 
 async function startServer() {
