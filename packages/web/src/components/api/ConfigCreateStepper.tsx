@@ -78,7 +78,7 @@ export function ConfigCreateStepper({ configId: initialConfigId, mode = 'create'
   const [latestLog, setLatestLog] = useState<string>('')
   const client = useMemo(() => {
     const wsLink = new GraphQLWsLink(createClient({
-      url: config.superglueEndpoint?.replace('https', 'wss')?.replace('http', 'ws') || 'ws://localhost:3002/graphql',
+      url: config.superglueEndpoint?.replace('https', 'wss')?.replace('http', 'ws') || 'ws://localhost:3000/graphql',
       connectionParams: {
         Authorization: `Bearer ${config.superglueApiKey}`
       },

@@ -49,7 +49,7 @@ export function LogSidebar() {
 
   const client = useMemo(() => {
     const wsLink = new GraphQLWsLink(createClient({
-      url: config.superglueEndpoint?.replace('https', 'wss')?.replace('http', 'ws') || 'ws://localhost:3002/graphql',
+      url: config.superglueEndpoint?.replace('https', 'wss')?.replace('http', 'ws') || 'ws://localhost:3000/graphql',
       connectionParams: {
         Authorization: `Bearer ${config.superglueApiKey}`
       },
