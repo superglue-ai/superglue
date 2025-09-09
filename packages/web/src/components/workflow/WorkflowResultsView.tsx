@@ -6,36 +6,18 @@ import { Check, Copy, Loader2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { AutoSizer, List } from 'react-virtualized';
 import { WorkflowCreateSuccess } from './WorkflowCreateSuccess';
+import { truncateForDisplay } from './WorkflowMiniStepCards';
 
-const MAX_DISPLAY_SIZE = 1024 * 1024; // 1MB limit
 const MAX_LINES = 10000; // Max lines to display
 
-// Helper function with performance optimizations
 const getResponseLines = (response: any): { lines: string[], truncated: boolean } => {
   if (!response) return { lines: ['No results yet...'], truncated: false };
-
-  const jsonString = JSON.stringify(response, null, 2);
-
-  // Check if data is too large
-  if (jsonString.length > MAX_DISPLAY_SIZE) {
-    const truncatedString = jsonString.substring(0, MAX_DISPLAY_SIZE) + '\n\n... [Data truncated - too large to display]';
-    return {
-      lines: truncatedString.split('\n'),
-      truncated: true
-    };
-  }
-
-  const lines = jsonString.split('\n');
-
-  // Limit number of lines
+  const display = truncateForDisplay(response);
+  const lines = display.value.split('\n');
   if (lines.length > MAX_LINES) {
-    return {
-      lines: [...lines.slice(0, MAX_LINES), '... [Output truncated - too many lines]'],
-      truncated: true
-    };
+    return { lines: [...lines.slice(0, MAX_LINES), '... [Output truncated - too many lines]'], truncated: true };
   }
-
-  return { lines, truncated: false };
+  return { lines, truncated: display.truncated };
 };
 
 interface WorkflowResultsViewProps {
@@ -172,12 +154,7 @@ export function WorkflowResultsView({
           executionResult ? (
             <div className="flex-grow overflow-hidden p-1 relative">
               {executionResult.stepResults && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute top-2 right-2 z-10 h-8 w-8"
-                  onClick={handleCopyRaw}
-                >
+                <Button variant="ghost" size="icon" className="absolute top-2 right-2 z-10 h-8 w-8" onClick={handleCopyRaw}>
                   {rawCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                 </Button>
               )}
@@ -253,12 +230,7 @@ export function WorkflowResultsView({
         ) : ( // activeTab === 'final'
           finalResult ? (
             <div className="flex-grow overflow-hidden p-1 relative">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute top-2 right-2 z-10 h-8 w-8"
-                onClick={handleCopyFinal}
-              >
+              <Button variant="ghost" size="icon" className="absolute top-2 right-2 z-10 h-8 w-8" onClick={handleCopyFinal}>
                 {finalCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
               </Button>
               {finalResultsData.truncated && (

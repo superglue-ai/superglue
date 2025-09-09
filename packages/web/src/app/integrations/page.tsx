@@ -14,9 +14,9 @@ import {
 } from "@/src/components/ui/alert-dialog";
 import { Button } from '@/src/components/ui/button';
 import { DocStatus } from '@/src/components/utils/DocStatusSpinner';
-import { createOAuthErrorHandler, triggerOAuthFlow } from '@/src/components/utils/oauth-utils';
 import { useToast } from '@/src/hooks/use-toast';
 import { needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
+import { createOAuthErrorHandler, triggerOAuthFlow } from '@/src/lib/oauth-utils';
 import { composeUrl, getIntegrationIcon as getIntegrationIconName } from '@/src/lib/utils';
 import type { Integration } from '@superglue/client';
 import { SuperglueClient, UpsertMode } from '@superglue/client';
@@ -44,7 +44,7 @@ export const detectAuthType = (credentials: any): 'oauth' | 'apikey' | 'none' =>
     if (hasOAuthFields) {
         // It's OAuth-related, now check the status
         const grantType = credentials.grant_type || 'authorization_code';
-        
+
         if (grantType === 'client_credentials') {
             // For client credentials, only access_token is needed
             if (credentials.access_token) {
@@ -86,7 +86,7 @@ export const getAuthBadge = (integration: Integration): {
 
     if (authType === 'oauth') {
         const grantType = creds.grant_type || 'authorization_code';
-        
+
         let isConfigured = false;
         if (grantType === 'client_credentials') {
             // For client credentials, only access_token is needed
@@ -95,7 +95,7 @@ export const getAuthBadge = (integration: Integration): {
             // For authorization code, both access_token AND refresh_token are needed
             isConfigured = !!(creds.access_token && creds.refresh_token);
         }
-        
+
         return isConfigured
             ? { type: 'oauth-configured', label: 'OAuth configured', color: 'blue', icon: 'key' }
             : { type: 'oauth-incomplete', label: 'OAuth incomplete', color: 'amber', icon: 'clock' };
@@ -138,7 +138,7 @@ export default function IntegrationsPage() {
             const errorMessage = description || message || 'Failed to complete OAuth connection';
             const handleOAuthError = createOAuthErrorHandler(integration || 'unknown', toast);
             handleOAuthError(errorMessage);
-            
+
             // Clear the URL params
             window.history.replaceState({}, '', '/integrations');
         }
@@ -164,7 +164,7 @@ export default function IntegrationsPage() {
                 try {
                     const updatedIntegration = await client.getIntegration(integrationId);
                     const grantType = updatedIntegration?.credentials?.grant_type || 'authorization_code';
-                    
+
                     let hasValidTokens = false;
                     if (grantType === 'client_credentials') {
                         // For client credentials, only access_token is needed
@@ -173,7 +173,7 @@ export default function IntegrationsPage() {
                         // For authorization code, both access_token and refresh_token are needed
                         hasValidTokens = !!(updatedIntegration?.credentials?.access_token && updatedIntegration?.credentials?.refresh_token);
                     }
-                    
+
                     if (hasValidTokens) {
                         toast({
                             title: 'OAuth Connection Successful',
@@ -280,7 +280,7 @@ export default function IntegrationsPage() {
 
     const handleCompleteOAuth = (integration: Integration) => {
         const grantType = integration.credentials?.grant_type || 'authorization_code';
-        
+
         if (grantType === 'client_credentials') {
             // For client credentials, the OAuth flow is handled automatically by the backend
             // when the integration is saved. We just need to trigger a refresh by updating

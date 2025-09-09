@@ -1,8 +1,7 @@
 import { ExecutionStep, Integration, Workflow } from "@superglue/client";
-import { Metadata } from "@superglue/shared";
+import { Metadata, toJsonSchema } from "@superglue/shared";
 import { type OpenAI } from "openai";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
-import { toJsonSchema } from "../external/json-schema.js";
 import { BUILD_WORKFLOW_SYSTEM_PROMPT } from "../llm/prompts.js";
 import { executeTool } from "../tools/tools.js";
 import { Documentation } from "../utils/documentation.js";

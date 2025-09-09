@@ -1,10 +1,10 @@
 import { HttpMethod, RequestOptions, SelfHealingMode } from "@superglue/client";
+import { inferJsonSchema } from '@superglue/shared';
 import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
 import { GraphQLResolveInfo } from "graphql";
 import ivm from 'isolated-vm';
 import jsonata from "jsonata";
 import { Validator } from "jsonschema";
-import { toJsonSchema } from "../external/json-schema.js";
 import { HttpMethodEnum } from "../mcp/mcp-server.js";
 import { ApiCallError } from "./api.js";
 import { parseJSON } from "./json-parser.js";
@@ -464,7 +464,9 @@ export function addNullableToOptional(schema: any, required: boolean = true): an
 
 export function getSchemaFromData(data: any): string {
   if (!data) return null;
-  return JSON.stringify(toJsonSchema(data, { arrays: { mode: 'first' } }), null, 2).slice(0, 50000);
+
+  const schema = inferJsonSchema(data);
+  return JSON.stringify(schema, null, 2).slice(0, 50000);
 }
 
 export function safeHttpMethod(method: any): HttpMethod {

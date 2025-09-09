@@ -4,7 +4,7 @@ import { getAuthBadge } from '@/src/app/integrations/page';
 import { IntegrationForm } from '@/src/components/integrations/IntegrationForm';
 import { useToast } from '@/src/hooks/use-toast';
 import { needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
-import { cn, composeUrl, getIntegrationIcon as getIntegrationIconName, inputErrorStyles } from '@/src/lib/utils';
+import { cn, composeUrl, getIntegrationIcon as getIntegrationIconName, getSimpleIcon, inputErrorStyles } from '@/src/lib/utils';
 import { Integration, IntegrationInput, SuperglueClient, UpsertMode, Workflow } from '@superglue/client';
 import { integrations as integrationTemplates } from "@superglue/shared";
 import { waitForIntegrationProcessing } from '@superglue/shared/utils';
@@ -14,8 +14,6 @@ import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Editor from 'react-simple-code-editor';
-import type { SimpleIcon } from 'simple-icons';
-import * as simpleIcons from 'simple-icons';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -60,6 +58,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const [isBuilding, setIsBuilding] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -75,6 +74,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [selfHealingEnabled, setSelfHealingEnabled] = useState(true);
+  const [shouldStopExecution, setShouldStopExecution] = useState(false);
 
   const [selectedIntegrationIds, setSelectedIntegrationIds] = useState<string[]>(() => {
     return preselectedIntegrationId && integrations.some(i => i.id === preselectedIntegrationId)
@@ -218,10 +218,22 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const handleExecuteWorkflow = async () => {
     try {
       setIsExecuting(true);
+      setShouldStopExecution(false);
+      setIsStopping(false);
       await playgroundRef.current?.executeWorkflow({ selfHealing: selfHealingEnabled });
     } finally {
       setIsExecuting(false);
+      setIsStopping(false);
     }
+  };
+
+  const handleStopExecution = () => {
+    setShouldStopExecution(true);
+    setIsStopping(true);
+    toast({
+      title: "Stopping workflow",
+      description: "Workflow will stop after the current step completes",
+    });
   };
 
   const handleNext = async () => {
@@ -353,20 +365,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       });
     } finally {
       setIsGeneratingSuggestions(false);
-    }
-  };
-
-  const getSimpleIcon = (name: string): SimpleIcon | null => {
-    if (!name || name === "default") return null;
-
-    const formatted = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
-    const iconKey = `si${formatted}`;
-    try {
-      // @ts-ignore - The type definitions don't properly handle string indexing
-      let icon = simpleIcons[iconKey];
-      return icon || null;
-    } catch (e) {
-      return null;
     }
   };
 
@@ -747,6 +745,8 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                 onInstructionEdit={() => setStep('prompt')}
                 selfHealingEnabled={selfHealingEnabled}
                 onSelfHealingChange={setSelfHealingEnabled}
+                shouldStopExecution={shouldStopExecution}
+                onStopExecution={handleStopExecution}
                 headerActions={(
                   <div className="flex items-center gap-2">
                     <div className="flex items-center gap-2 mr-2">
@@ -765,14 +765,25 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                         </div>
                       </div>
                     </div>
-                    <Button
-                      variant="success"
-                      onClick={handleExecuteWorkflow}
-                      disabled={isSaving || isExecuting}
-                      className="h-9 px-4"
-                    >
-                      {isExecuting ? "Testing Workflow..." : "Test Workflow"}
-                    </Button>
+                    {isExecuting ? (
+                      <Button
+                        variant="destructive"
+                        onClick={handleStopExecution}
+                        disabled={isSaving || isStopping}
+                        className="h-9 px-4"
+                      >
+                        {isStopping ? "Stopping..." : "Stop Execution"}
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="success"
+                        onClick={handleExecuteWorkflow}
+                        disabled={isSaving || isExecuting}
+                        className="h-9 px-4"
+                      >
+                        Test Workflow
+                      </Button>
+                    )}
                     <Button
                       variant="default"
                       onClick={() => playgroundRef.current?.saveWorkflow()}
