@@ -418,8 +418,8 @@ export function IntegrationForm({
                 "flex-1 overflow-y-auto"
             )}>
                 <div>
-                    <Label htmlFor="integrationSelect">From Template</Label>
-                    <HelpTooltip text="Select from known integrations or choose No Template for any other API." />
+                    <Label htmlFor="integrationSelect">Integration Template</Label>
+                    <HelpTooltip text="Choose a pre-configured template to get started quickly, or select 'Custom API' to set up any API manually. Templates are optional but make setup easier." />
                     <Popover open={integrationDropdownOpen} onOpenChange={setIntegrationDropdownOpen}>
                         <PopoverTrigger asChild>
                             <Button
@@ -462,8 +462,17 @@ export function IntegrationForm({
                         </PopoverTrigger>
                         <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0 pointer-events-auto z-[9999]">
                             <Command className="w-full">
-                                <CommandInput placeholder="Search integrations..." />
-                                <CommandEmpty>No integration found.</CommandEmpty>
+                                <CommandInput placeholder="Search templates..." />
+                                <CommandEmpty>
+                                    <div className="text-center py-4">
+                                        <div className="text-sm text-muted-foreground mb-2">
+                                            No template found
+                                        </div>
+                                        <div className="text-xs text-muted-foreground">
+                                            Don't worry! You can still create this integration using "Custom API"
+                                        </div>
+                                    </div>
+                                </CommandEmpty>
                                 <CommandGroup className="max-h-[300px] overflow-y-auto">
                                     {integrationOptions.map((option) => (
                                         <CommandItem

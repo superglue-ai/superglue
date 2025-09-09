@@ -390,7 +390,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                                     Max Iterations
                                                     <HelpTooltip text="Maximum number of loop iterations to prevent infinite loops. Default is 1000." />
                                                 </Label>
-                                                <Input type="number" value={editedStep.loopMaxIters || ''} defaultValue={1000} onChange={(e) => setEditedStep(prev => ({ ...prev, loopMaxIters: parseInt(e.target.value) || undefined }))} className="text-xs mt-1 w-32" />
+                                                <Input type="number" value={editedStep.loopMaxIters || ''} onChange={(e) => setEditedStep(prev => ({ ...prev, loopMaxIters: parseInt(e.target.value) || undefined }))} className="text-xs mt-1 w-32" placeholder="1000" />
                                             </div>
                                         </>
                                     )}
