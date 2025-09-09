@@ -721,14 +721,40 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     }
 
     const MAX_SITEMAP_DEPTH = server_defaults.DOCUMENTATION.MAX_SITEMAP_DEPTH;
+    const MAX_SITEMAPS_PER_DEPTH = server_defaults.DOCUMENTATION.MAX_SITEMAPS_PER_DEPTH;
+    const MAX_TOTAL_SITEMAPS = server_defaults.DOCUMENTATION.MAX_TOTAL_SITEMAPS;
+
     let depth = 0;
     const allSitemapUrls: string[] = [];
+
     while (sitemapQueue.length > 0 && depth < MAX_SITEMAP_DEPTH) {
+      // Global limit check - stop if we've processed enough sitemaps overall
+      if (processedSitemaps.size >= MAX_TOTAL_SITEMAPS) {
+        logMessage('debug', `Reached global sitemap limit (${MAX_TOTAL_SITEMAPS}), stopping sitemap discovery`, metadata);
+        break;
+      }
+
       const currentBatch = [...sitemapQueue];
       sitemapQueue.length = 0;
       depth++;
 
-      for (const sitemapUrl of currentBatch) {
+      // Rank and limit sitemaps at this depth level
+      let sitemapsToProcess = currentBatch;
+      if (currentBatch.length > MAX_SITEMAPS_PER_DEPTH) {
+        const keywords = this.getMergedKeywords(config.keywords);
+        sitemapsToProcess = this.rankItems(currentBatch, keywords) as string[];
+        sitemapsToProcess = sitemapsToProcess.slice(0, MAX_SITEMAPS_PER_DEPTH);
+        logMessage('debug', `Ranked and limited sitemaps at depth ${depth} from ${currentBatch.length} to ${sitemapsToProcess.length}`, metadata);
+      }
+
+      // Further limit by remaining global budget
+      const remainingBudget = MAX_TOTAL_SITEMAPS - processedSitemaps.size;
+      if (sitemapsToProcess.length > remainingBudget) {
+        sitemapsToProcess = sitemapsToProcess.slice(0, remainingBudget);
+        logMessage('debug', `Further limited sitemaps to ${sitemapsToProcess.length} based on global budget`, metadata);
+      }
+
+      for (const sitemapUrl of sitemapsToProcess) {
         if (processedSitemaps.has(sitemapUrl)) continue;
         processedSitemaps.add(sitemapUrl);
 
@@ -736,8 +762,6 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
         if (!content) continue;
 
         const { urls, sitemaps } = this.parseSitemapContent(content, sitemapUrl);
-
-
         const filteredUrls = this.filterUrls(urls);
 
         if (filteredUrls.length > 0) {
@@ -745,6 +769,11 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
         }
 
         allSitemapUrls.push(...filteredUrls);
+
+        // Only process nested sitemaps if we haven't hit the global limit
+        if (processedSitemaps.size >= MAX_TOTAL_SITEMAPS) {
+          continue;
+        }
 
         // Filter sitemaps to only include relevant ones based on the documentation URL
         const relevantSitemaps = sitemaps.filter(s => {
@@ -788,17 +817,21 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
               return true;
             }
 
-            return false; // Skip irrelevant sitemaps
+            return false;
           } catch {
-            return false; // Invalid URL
+            return false;
           }
         });
 
         if (relevantSitemaps.length > 0) {
-          logMessage('debug', `Adding ${relevantSitemaps.length} relevant sitemaps to queue (filtered from ${sitemaps.length} total)`, metadata);
+          // Only add if we have room in the global budget
+          const roomLeft = MAX_TOTAL_SITEMAPS - processedSitemaps.size;
+          if (roomLeft > 0) {
+            const sitemapsToAdd = relevantSitemaps.slice(0, roomLeft);
+            logMessage('debug', `Adding ${sitemapsToAdd.length} relevant sitemaps to queue (filtered from ${sitemaps.length} total, limited by budget)`, metadata);
+            sitemapQueue.push(...sitemapsToAdd);
+          }
         }
-
-        sitemapQueue.push(...relevantSitemaps);
       }
     }
 
@@ -991,9 +1024,9 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
 
     const itemsToRankFiltered = itemsToRank.filter(item => {
       try {
-      for (const excludedKeyword of PlaywrightFetchingStrategy.EXCLUDED_LINK_KEYWORDS) {
-        if (item.url.includes(excludedKeyword)) {
-          return false;
+        for (const excludedKeyword of PlaywrightFetchingStrategy.EXCLUDED_LINK_KEYWORDS) {
+          if (item.url.includes(excludedKeyword)) {
+            return false;
           }
         }
         return true;
