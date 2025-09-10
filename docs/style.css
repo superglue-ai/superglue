@@ -1,3 +1,24 @@
-.nav-logo{
-    min-height: 40px!important;
+.nav-logo {
+    min-height: 40px !important;
+}
+
+/* Hide header anchor link buttons */
+h1>div.absolute,
+h2>div.absolute,
+h3>div.absolute,
+h4>div.absolute,
+h5>div.absolute,
+h6>div.absolute {
+    display: none !important;
+}
+
+/* Disable click-to-copy on headers */
+h1 span.cursor-pointer,
+h2 span.cursor-pointer,
+h3 span.cursor-pointer,
+h4 span.cursor-pointer,
+h5 span.cursor-pointer,
+h6 span.cursor-pointer {
+    pointer-events: none !important;
+    cursor: default !important;
 }
