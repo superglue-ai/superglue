@@ -30,7 +30,9 @@ export function Sidebar() {
     <aside className="bg-background text-foreground border-r border-border h-full flex flex-col">
       <div className="p-6">
         <div className="relative mx-auto">
-          <img src="/logo.svg" alt="superglue Logo" className="max-w-full h-[50px] w-[200px] ml-auto mr-auto" />
+          <Link href="/">
+            <img src="/logo.svg" alt="superglue Logo" className="max-w-full h-[50px] w-[200px] ml-auto mr-auto cursor-pointer transition-opacity" />
+          </Link>
         </div>
       </div>
       <nav className="flex-1">
