@@ -34,12 +34,15 @@ const baseWorkflowSchema = {
               type: 'object',
               properties: {
                 id: { type: 'string' },
+                version: { type: 'string' },
+                createdAt: { type: 'string', format: 'date-time' },
+                updatedAt: { type: 'string', format: 'date-time' },
                 urlHost: { type: 'string' },
                 urlPath: { type: 'string' },
                 instruction: { type: 'string' },
                 method: { type: 'string', enum: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'] },
-                queryParams: { type: 'string' },
-                headers: { type: 'string' },
+                queryParams: { type: 'object', additionalProperties: true },
+                headers: { type: 'object', additionalProperties: true },
                 body: { type: 'string' },
                 documentationUrl: { type: 'string' },
                 responseSchema: { type: 'object', additionalProperties: true },
@@ -86,7 +89,11 @@ const baseWorkflowSchema = {
         type: 'object',
         description: 'Original response schema before any modifications'
       },
-      // for the future, we could also return updatedAt and version from the database
+      createdAt: {
+        type: 'string',
+        format: 'date-time',
+        description: 'When the workflow was created'
+      },
       updatedAt: {
         type: 'string',
         format: 'date-time',
