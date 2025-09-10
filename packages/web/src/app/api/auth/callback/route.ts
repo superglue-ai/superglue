@@ -161,6 +161,11 @@ export async function GET(request: NextRequest) {
     } else {
         origin = request.nextUrl.origin;
     }
+    
+    // Force HTTPS for production domains
+    if (origin.startsWith('http://') && origin.includes('superglue.cloud')) {
+        origin = origin.replace('http://', 'https://');
+    }
 
     // Extract OAuth parameters
     const code = searchParams.get('code');
