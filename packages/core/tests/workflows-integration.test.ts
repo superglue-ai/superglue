@@ -13,7 +13,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // Configuration
-const BASE_URL = 'http://localhost:3002/v1';
+const BASE_URL = `${process.env.API_ENDPOINT}/v1`;
 const API_KEY = process.env.AUTH_TOKEN;
 
 // Colors for output
