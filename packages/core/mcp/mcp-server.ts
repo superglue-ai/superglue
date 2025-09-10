@@ -374,10 +374,6 @@ const validateIntegrationCreation = (args: any) => {
     errors.push("Documentation URL must be a string if provided.");
   }
 
-  if (!args.documentationUrl && args.documentationPending) {
-    errors.push("Documentation URL is required if documentationPending is true.");
-  }
-
   return errors;
 };
 
@@ -732,7 +728,7 @@ export const toolDefinitions: Record<string, any> = {
       - if no credentials are given, ask the user for them. If no credentials are needed or the user explicitly says no, provide an empty object.
       - Always split information clearly: urlHost (without secrets), urlPath, credentials (with secrets), etc.
       - For OAuth integrations, the user should provide the client_id and client_secret. Saved credentials should include: client_id, client_secret, auth_url, token_url, scopes. Supported grant types (flows): authorization_code (default, for user-based authentication), client_credentials (for service accounts and non-user-based authentication).
-      - Providing a documentationUrl will trigger asynchronous API documentation processing. If you do not provide a documentationUrl, NEVER set documentationPending to true.
+      - Providing a documentationUrl will trigger asynchronous API documentation processing.
       - When users mention API constraints (rate limits, special endpoints, auth requirements, etc.), capture them in 'specificInstructions' to guide workflow building.
       - Include relevant keywords in 'documentationKeywords' to improve documentation search (e.g., endpoint names, data objects, key concepts mentioned in conversation).
     </important_notes>
