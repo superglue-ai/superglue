@@ -13,11 +13,7 @@ The superglue API provides GraphQL endpoints for creating integrations, building
 
 All API requests require a bearer token in the Authorization header:
 
-```
-http
-```
-
-```
+```http
 Authorization: Bearer YOUR_AUTH_TOKEN
 ```
 
@@ -33,11 +29,7 @@ https://graphql.superglue.cloud
 
 First, set up integrations pointing to different versions of your API using the `upsertIntegration` mutation:
 
-```
-graphql
-```
-
-```
+```graphql
 mutation CreateTestIntegration {
   upsertIntegration(
     id: "products-api-v1"
@@ -62,11 +54,7 @@ mutation CreateTestIntegration {
 
 Create a second integration for comparison:
 
-```
-graphql
-```
-
-```
+```graphql
 mutation CreateTestIntegrationV2 {
   upsertIntegration(
     id: "products-api-v2"
@@ -93,11 +81,7 @@ mutation CreateTestIntegrationV2 {
 
 Use the `buildAndRunWorkflow` mutation to create workflows that test your schemas:
 
-```
-graphql
-```
-
-```
+```graphql
 mutation TestSchemaV1 {
   buildAndRunWorkflow(
     input: {
@@ -139,11 +123,7 @@ mutation TestSchemaV1 {
 
 Execute the same test against different schema versions:
 
-```
-graphql
-```
-
-```
+```graphql
 mutation TestSchemaV2 {
   buildAndRunWorkflow(
     input: {
@@ -185,11 +165,7 @@ mutation TestSchemaV2 {
 
 Save workflows that pass testing for future use:
 
-```
-graphql
-```
-
-```
+```graphql
 mutation SaveWorkflow {
   upsertWorkflow(
     id: "product-sync-v1"
@@ -228,11 +204,7 @@ mutation SaveWorkflow {
 
 Here's a complete Node.js example that tests two schema versions and compares their performance:
 
-```
-javascript
-```
-
-```
+```javascript
 const SUPERGLUE_ENDPOINT = 'https://graphql.superglue.cloud';
 const API_KEY = 'your_api_key_here';
 
@@ -414,11 +386,7 @@ runSchemaComparison();
 
 Test existing workflows against new API versions to detect breaking changes:
 
-```
-graphql
-```
-
-```
+```graphql
 query ListExistingWorkflows {
   listWorkflows(limit: 100) {
     items {
@@ -437,11 +405,7 @@ query ListExistingWorkflows {
 
 Then execute each workflow with updated integration IDs:
 
-```
-graphql
-```
-
-```
+```graphql
 mutation TestBreakingChanges($workflowId: ID!, $payload: JSON, $credentials: JSON) {
   executeWorkflow(
     input: { id: $workflowId }
@@ -463,11 +427,7 @@ mutation TestBreakingChanges($workflowId: ID!, $payload: JSON, $credentials: JSO
 
 ### **Batch Testing Multiple Use Cases**
 
-```
-javascript
-```
-
-```
+```javascript
 const testCases = [
   {
     name: "Product Catalog Sync",
@@ -526,11 +486,7 @@ async function runBatchTests(integrationId) {
 
 ### **Performance Benchmarking**
 
-```
-javascript
-```
-
-```
+```javascript
 async function benchmarkSchema(integrationId, iterations = 5) {
   const times = [];
 
@@ -555,11 +511,7 @@ async function benchmarkSchema(integrationId, iterations = 5) {
 
 ### **GitHub Actions Example**
 
-```
-yaml
-```
-
-```
+```yaml
 name: API Schema Testing
 on:
   pull_request:
@@ -611,11 +563,7 @@ jobs:
 
 Always include proper error handling in your schema tests:
 
-```
-javascript
-```
-
-```
+```javascript
 async function safeTestWorkflow(integrationId, testName) {
   try {
     const result = await testSchemaWorkflow(integrationId, testName);
@@ -649,11 +597,7 @@ Be aware of API rate limits when running automated tests:
 - Consider adding delays between batch operations
 - Use exponential backoff for retries
 
-```
-javascript
-```
-
-```
+```javascript
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }

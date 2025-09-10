@@ -8,8 +8,7 @@ import { AutoSizer, List } from 'react-virtualized';
 import { WorkflowCreateSuccess } from './WorkflowCreateSuccess';
 import { truncateForDisplay } from './WorkflowMiniStepCards';
 
-const MAX_LINES = 10000; // Max lines to display
-
+const MAX_LINES = 10000;
 const getResponseLines = (response: any): { lines: string[], truncated: boolean } => {
   if (!response) return { lines: ['No results yet...'], truncated: false };
   const display = truncateForDisplay(response);

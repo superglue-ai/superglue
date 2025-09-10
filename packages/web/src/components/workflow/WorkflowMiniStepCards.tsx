@@ -3,7 +3,7 @@ import { Card } from '@/src/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import JsonSchemaEditor from '@/src/components/utils/JsonSchemaEditor';
-import { cn, isEmptyData, truncateForDisplay, truncateLines } from '@/src/lib/utils';
+import { cn, formatJavaScriptCode, isEmptyData, truncateForDisplay, truncateLines } from '@/src/lib/utils';
 import { inferJsonSchema } from '@superglue/shared';
 import { Check, Code2, Copy, Eye, FileJson, Package, Play, X } from 'lucide-react';
 import Prism from 'prismjs';
@@ -160,11 +160,23 @@ export const JavaScriptCodeEditor = React.memo(({ value, onChange, readOnly = fa
     const effectiveHeight = resizable ? currentHeight : maxHeight;
     const highlightTimer = useRef<number | null>(null);
     const [allowHighlight, setAllowHighlight] = useState<boolean>(true);
+    const [hasFormatted, setHasFormatted] = useState(false);
     const hasValidPattern = (code: string): boolean => {
-        const arrowFunctionPattern = /^\s*\(\s*sourceData\s*\)\s*=>\s*\{[\s\S]*\}\s*$/;
+        const arrowFunctionPattern = /^\s*\(\s*sourceData\s*\)\s*=>\s*\{[\s\S]*\}\s*;?\s*$/;
         return arrowFunctionPattern.test(code);
     };
     const displayValue = value || '';
+
+    useEffect(() => {
+        if (!onChange || hasFormatted || !displayValue.trim()) return;
+        formatJavaScriptCode(displayValue).then(formatted => {
+            if (formatted !== displayValue) {
+                onChange(formatted);
+            }
+            setHasFormatted(true);
+        });
+    }, []);
+
     useEffect(() => {
         setAllowHighlight(false);
         if (highlightTimer.current) window.clearTimeout(highlightTimer.current);
@@ -203,7 +215,7 @@ export const JavaScriptCodeEditor = React.memo(({ value, onChange, readOnly = fa
                         <div key={lineNum} className="text-[10px] text-muted-foreground text-right leading-[18px] select-none">{lineNum}</div>
                     ))}
                 </div>
-                <div className="flex-1 px-3 py-2">
+                <div className="flex-1 px-3 py-2 whitespace-pre">
                     {isTransformEditor ? (
                         <>
                             {displayValue && !hasValidPattern(displayValue) && (
@@ -212,10 +224,10 @@ export const JavaScriptCodeEditor = React.memo(({ value, onChange, readOnly = fa
                                     <span>Code will be auto-wrapped with (sourceData) =&gt; {'{'} ... {'}'} when executed</span>
                                 </div>
                             )}
-                            <Editor value={displayValue} onValueChange={handleChange} highlight={(code) => { if (!allowHighlight) return code; try { return Prism.highlight(code, Prism.languages.javascript, 'javascript'); } catch { return code; } }} padding={0} disabled={readOnly} className="font-mono text-[11px] leading-[18px]" textareaClassName="outline-none focus:outline-none" textareaId="transform-editor" placeholder="(sourceData) => { return sourceData; }" style={{ background: 'transparent', lineHeight: '18px', minHeight: '100px' }} />
+                            <Editor value={displayValue} onValueChange={handleChange} highlight={(code) => { if (!allowHighlight) return code; try { return Prism.highlight(code, Prism.languages.javascript, 'javascript'); } catch { return code; } }} padding={0} disabled={readOnly} className="font-mono text-[11px] leading-[18px]" textareaClassName="outline-none focus:outline-none" textareaId="transform-editor" placeholder="(sourceData) => { return sourceData; }" style={{ background: 'transparent', lineHeight: '18px', minHeight: '100px', whiteSpace: 'pre' }} />
                         </>
                     ) : (
-                        <Editor value={value || ''} onValueChange={onChange || (() => { })} highlight={(code) => { if (!allowHighlight) return code; try { return Prism.highlight(code, Prism.languages.javascript, 'javascript'); } catch { return code; } }} padding={0} disabled={readOnly} className="font-mono text-[11px] leading-[18px]" textareaClassName="outline-none focus:outline-none" style={{ minHeight, background: 'transparent', lineHeight: '18px' }} />
+                        <Editor value={value || ''} onValueChange={onChange || (() => { })} highlight={(code) => { if (!allowHighlight) return code; try { return Prism.highlight(code, Prism.languages.javascript, 'javascript'); } catch { return code; } }} padding={0} disabled={readOnly} className="font-mono text-[11px] leading-[18px]" textareaClassName="outline-none focus:outline-none" style={{ minHeight, background: 'transparent', lineHeight: '18px', whiteSpace: 'pre' }} />
                     )}
                 </div>
             </div>
@@ -335,7 +347,7 @@ export const FinalTransformMiniStepCard = ({ transform, responseSchema, onTransf
     const handleSchemaChange = (value: string | null) => { if (value === null) { setLocalSchema(''); if (onResponseSchemaChange) onResponseSchemaChange(''); } else { setLocalSchema(value); if (onResponseSchemaChange) onResponseSchemaChange(value); } };
     const ensureValidTransform = (code: string): string => {
         if (!code || !code.trim()) return `(sourceData) => {\n  return sourceData;\n}`;
-        const arrowFunctionPattern = /^\s*\(\s*sourceData\s*\)\s*=>\s*\{[\s\S]*\}\s*$/;
+        const arrowFunctionPattern = /^\s*\(\s*sourceData\s*\)\s*=>\s*\{[\s\S]*\}\s*;?\s*$/;
         if (arrowFunctionPattern.test(code)) return code;
         return `(sourceData) => {\n${code}\n}`;
     };
