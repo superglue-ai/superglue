@@ -208,7 +208,6 @@ function shouldTriggerDocFetch(input: Integration, existingIntegration?: Integra
   const docUrlChanged = input.documentationUrl !== existingIntegration.documentationUrl;
   const hostChanged = input.urlHost !== existingIntegration.urlHost;
   const pathChanged = input.urlPath !== existingIntegration.urlPath;
-
   const hasRelevantChanges = docUrlChanged || hostChanged || pathChanged;
 
   return hasRelevantChanges;
