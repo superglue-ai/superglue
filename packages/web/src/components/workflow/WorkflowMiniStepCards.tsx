@@ -161,10 +161,21 @@ export const JavaScriptCodeEditor = React.memo(({ value, onChange, readOnly = fa
     const highlightTimer = useRef<number | null>(null);
     const [allowHighlight, setAllowHighlight] = useState<boolean>(true);
     const hasValidPattern = (code: string): boolean => {
-        const arrowFunctionPattern = /^\s*\(\s*sourceData\s*\)\s*=>\s*\{[\s\S]*\}\s*$/;
+        const arrowFunctionPattern = /^\s*\(\s*sourceData\s*\)\s*=>\s*\{[\s\S]*\}\s*;?\s*$/;
         return arrowFunctionPattern.test(code);
     };
     const displayValue = value || '';
+    const handleFormat = async () => {
+        try {
+            const prettier: any = await import('prettier/standalone');
+            const babel: any = await import('prettier/plugins/babel');
+            const estree: any = await import('prettier/plugins/estree');
+            const formatted = await prettier.format(displayValue, { parser: 'babel', plugins: [babel, estree], printWidth: 100, singleQuote: true, semi: true });
+            if (onChange) onChange(formatted);
+        } catch (e) {
+            // silently ignore formatting errors
+        }
+    };
     useEffect(() => {
         setAllowHighlight(false);
         if (highlightTimer.current) window.clearTimeout(highlightTimer.current);
@@ -203,7 +214,7 @@ export const JavaScriptCodeEditor = React.memo(({ value, onChange, readOnly = fa
                         <div key={lineNum} className="text-[10px] text-muted-foreground text-right leading-[18px] select-none">{lineNum}</div>
                     ))}
                 </div>
-                <div className="flex-1 px-3 py-2">
+                <div className="flex-1 px-3 py-2 whitespace-pre">
                     {isTransformEditor ? (
                         <>
                             {displayValue && !hasValidPattern(displayValue) && (
@@ -212,10 +223,10 @@ export const JavaScriptCodeEditor = React.memo(({ value, onChange, readOnly = fa
                                     <span>Code will be auto-wrapped with (sourceData) =&gt; {'{'} ... {'}'} when executed</span>
                                 </div>
                             )}
-                            <Editor value={displayValue} onValueChange={handleChange} highlight={(code) => { if (!allowHighlight) return code; try { return Prism.highlight(code, Prism.languages.javascript, 'javascript'); } catch { return code; } }} padding={0} disabled={readOnly} className="font-mono text-[11px] leading-[18px]" textareaClassName="outline-none focus:outline-none" textareaId="transform-editor" placeholder="(sourceData) => { return sourceData; }" style={{ background: 'transparent', lineHeight: '18px', minHeight: '100px' }} />
+                            <Editor value={displayValue} onValueChange={handleChange} highlight={(code) => { if (!allowHighlight) return code; try { return Prism.highlight(code, Prism.languages.javascript, 'javascript'); } catch { return code; } }} padding={0} disabled={readOnly} className="font-mono text-[11px] leading-[18px]" textareaClassName="outline-none focus:outline-none" textareaId="transform-editor" placeholder="(sourceData) => { return sourceData; }" style={{ background: 'transparent', lineHeight: '18px', minHeight: '100px', whiteSpace: 'pre' }} />
                         </>
                     ) : (
-                        <Editor value={value || ''} onValueChange={onChange || (() => { })} highlight={(code) => { if (!allowHighlight) return code; try { return Prism.highlight(code, Prism.languages.javascript, 'javascript'); } catch { return code; } }} padding={0} disabled={readOnly} className="font-mono text-[11px] leading-[18px]" textareaClassName="outline-none focus:outline-none" style={{ minHeight, background: 'transparent', lineHeight: '18px' }} />
+                        <Editor value={value || ''} onValueChange={onChange || (() => { })} highlight={(code) => { if (!allowHighlight) return code; try { return Prism.highlight(code, Prism.languages.javascript, 'javascript'); } catch { return code; } }} padding={0} disabled={readOnly} className="font-mono text-[11px] leading-[18px]" textareaClassName="outline-none focus:outline-none" style={{ minHeight, background: 'transparent', lineHeight: '18px', whiteSpace: 'pre' }} />
                     )}
                 </div>
             </div>
@@ -289,7 +300,7 @@ export const PayloadMiniStepCard = ({ payloadText, inputSchema, onChange, onInpu
         if (onInputSchemaChange) onInputSchemaChange(value);
     };
     return (
-        <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50">
+        <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50" onClick={(e) => { if ((window as any)?.__sg_is_editing__) { e.preventDefault(); e.stopPropagation(); const f = (window as any).__sg_flash_save_cancel__; if (typeof f === 'function') { f(); } } }}>
             <div className="p-4">
                 <div className="flex items-center gap-2 mb-3">
                     <Package className="h-4 w-4 text-muted-foreground" />
@@ -335,7 +346,7 @@ export const FinalTransformMiniStepCard = ({ transform, responseSchema, onTransf
     const handleSchemaChange = (value: string | null) => { if (value === null) { setLocalSchema(''); if (onResponseSchemaChange) onResponseSchemaChange(''); } else { setLocalSchema(value); if (onResponseSchemaChange) onResponseSchemaChange(value); } };
     const ensureValidTransform = (code: string): string => {
         if (!code || !code.trim()) return `(sourceData) => {\n  return sourceData;\n}`;
-        const arrowFunctionPattern = /^\s*\(\s*sourceData\s*\)\s*=>\s*\{[\s\S]*\}\s*$/;
+        const arrowFunctionPattern = /^\s*\(\s*sourceData\s*\)\s*=>\s*\{[\s\S]*\}\s*;?\s*$/;
         if (arrowFunctionPattern.test(code)) return code;
         return `(sourceData) => {\n${code}\n}`;
     };
@@ -346,7 +357,7 @@ export const FinalTransformMiniStepCard = ({ transform, responseSchema, onTransf
         if (onExecuteTransform) onExecuteTransform(localSchema, validTransform);
     };
     return (
-        <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50">
+        <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50" onClick={(e) => { if ((window as any)?.__sg_is_editing__) { e.preventDefault(); e.stopPropagation(); const f = (window as any).__sg_flash_save_cancel__; if (typeof f === 'function') { f(); } } }}>
             <div className="p-3">
                 <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
@@ -408,7 +419,7 @@ export const FinalTransformMiniStepCard = ({ transform, responseSchema, onTransf
 export const MiniStepCard = ({ step, index, isActive, onClick, stepId, isPayload = false, isTransform = false, isFinal = false, isRunningAll = false, isTesting = false, completedSteps = [], failedSteps = [] }: { step: any; index: number; isActive: boolean; onClick: () => void; stepId?: string | null; isPayload?: boolean; isTransform?: boolean; isFinal?: boolean; isRunningAll?: boolean; isTesting?: boolean; completedSteps?: string[]; failedSteps?: string[]; }) => {
     if (isPayload) {
         return (
-            <div className={cn("cursor-pointer transition-all duration-300 ease-out transform flex items-center", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={onClick} style={{ height: '100%' }}>
+            <div className={cn("cursor-pointer transition-all duration-300 ease-out transform flex items-center", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={(e) => { if ((window as any)?.__sg_is_editing__) { e.preventDefault(); e.stopPropagation(); const f = (window as any).__sg_flash_save_cancel__; if (typeof f === 'function') { f(); } return; } onClick(); }} style={{ height: '100%' }}>
                 <Card className={cn(isActive ? "p-4 w-[228px] h-[130px]" : "p-4 w-[228px] h-[120px]", "flex-shrink-0", isActive && "ring-2 ring-primary shadow-lg")}>
                     <div className="flex flex-col items-center justify-center h-full leading-tight">
                         <Package className="h-5 w-5 text-muted-foreground" />
@@ -435,7 +446,7 @@ export const MiniStepCard = ({ step, index, isActive, onClick, stepId, isPayload
             return "Pending";
         };
         return (
-            <div className={cn("cursor-pointer transition-all duration-300 ease-out transform", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={onClick} style={{ height: '100%' }}>
+            <div className={cn("cursor-pointer transition-all duration-300 ease-out transform", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={(e) => { if ((window as any)?.__sg_is_editing__) { e.preventDefault(); e.stopPropagation(); const f = (window as any).__sg_flash_save_cancel__; if (typeof f === 'function') { f(); } return; } onClick(); }} style={{ height: '100%' }}>
                 <Card className={cn(isActive ? "p-4 w-[228px] h-[130px]" : "p-4 w-[228px] h-[120px]", "flex-shrink-0", isActive && "ring-2 ring-primary shadow-lg")}>
                     <div className="h-full flex flex-col justify-between">
                         <div className="flex-1 min-h-0 flex flex-col items-center justify-center leading-tight">
@@ -454,7 +465,7 @@ export const MiniStepCard = ({ step, index, isActive, onClick, stepId, isPayload
     }
     if (isFinal) {
         return (
-            <div className={cn("cursor-pointer transition-all duration-300 ease-out transform flex items-center", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={onClick} style={{ height: '100%' }}>
+            <div className={cn("cursor-pointer transition-all duration-300 ease-out transform flex items-center", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={(e) => { if ((window as any)?.__sg_is_editing__) { e.preventDefault(); e.stopPropagation(); const f = (window as any).__sg_flash_save_cancel__; if (typeof f === 'function') { f(); } return; } onClick(); }} style={{ height: '100%' }}>
                 <Card className={cn(isActive ? "p-4 w-[228px] h-[130px]" : "p-4 w-[228px] h-[120px]", "flex-shrink-0", isActive && "ring-2 ring-primary shadow-lg")}>
                     <div className="flex flex-col items-center justify-center h-full leading-tight">
                         <FileJson className="h-5 w-5 text-muted-foreground" />
@@ -482,7 +493,7 @@ export const MiniStepCard = ({ step, index, isActive, onClick, stepId, isPayload
         return "Pending";
     };
     return (
-        <div className={cn("cursor-pointer transition-all duration-300 ease-out transform", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={onClick}>
+        <div className={cn("cursor-pointer transition-all duration-300 ease-out transform", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={(e) => { if ((window as any)?.__sg_is_editing__) { e.preventDefault(); e.stopPropagation(); const f = (window as any).__sg_flash_save_cancel__; if (typeof f === 'function') { f(); } return; } onClick(); }}>
             <Card className={cn(isActive ? "p-4 w-[228px] h-[130px]" : "p-4 w-[228px] h-[120px]", "flex-shrink-0", isActive && "ring-2 ring-primary shadow-lg")}>
                 <div className="h-full flex flex-col justify-between">
                     <div className="flex items-center justify-between mb-2">

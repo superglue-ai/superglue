@@ -31,7 +31,9 @@ interface WorkflowStepConfiguratorProps {
 export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integrations: propIntegrations, onCreateIntegration, onEditingChange }: WorkflowStepConfiguratorProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [editedStep, setEditedStep] = useState({ ...step });
+    const [didFormatLoopSelector, setDidFormatLoopSelector] = useState(false);
     const [showJson, setShowJson] = useState(false);
+    const [flashButtons, setFlashButtons] = useState(false);
     const [localIntegrations, setLocalIntegrations] = useState<Integration[]>([]);
     const [loadingIntegrations, setLoadingIntegrations] = useState(false);
     const [headersText, setHeadersText] = useState('');
@@ -75,6 +77,23 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
 
     useEffect(() => {
         if (isEditing) {
+            // Auto-format loop selector once when entering edit mode
+            (async () => {
+                if (didFormatLoopSelector) return;
+                const code = editedStep.loopSelector || '';
+                if (!code || typeof code !== 'string') { setDidFormatLoopSelector(true); return; }
+                try {
+                    const prettier: any = await import('prettier/standalone');
+                    const babel: any = await import('prettier/plugins/babel');
+                    const estree: any = await import('prettier/plugins/estree');
+                    const formatted = await prettier.format(code, { parser: 'babel', plugins: [babel, estree], printWidth: 100, singleQuote: true, semi: true });
+                    setEditedStep(prev => ({ ...prev, loopSelector: formatted }));
+                } catch {
+                    // ignore formatting failures silently
+                } finally {
+                    setDidFormatLoopSelector(true);
+                }
+            })();
             try {
                 const headers = editedStep.apiConfig?.headers;
                 const headersJson = headers !== undefined && headers !== null ? JSON.stringify(headers, null, 2) : '{}';
@@ -96,7 +115,26 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                 setQueryParamsError(false);
             }
         }
-    }, [isEditing, editedStep.apiConfig?.headers, editedStep.apiConfig?.queryParams]);
+    }, [isEditing, editedStep.apiConfig?.headers, editedStep.apiConfig?.queryParams, editedStep.loopSelector, didFormatLoopSelector]);
+
+    useEffect(() => { if (!isEditing) { setDidFormatLoopSelector(false); } }, [isEditing]);
+
+    useEffect(() => {
+        if (!flashButtons) return;
+        const t = window.setTimeout(() => setFlashButtons(false), 1000);
+        return () => window.clearTimeout(t);
+    }, [flashButtons]);
+
+    // Provide a global hook so mini step cards can trigger the flash subtly
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        (window as any).__sg_is_editing__ = isEditing;
+        (window as any).__sg_flash_save_cancel__ = () => setFlashButtons(true);
+        return () => {
+            (window as any).__sg_is_editing__ = undefined;
+            (window as any).__sg_flash_save_cancel__ = undefined;
+        };
+    }, [isEditing]);
 
     const handleSave = () => {
         if (headersError || queryParamsError) {
@@ -158,7 +196,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
 
     return (
         <div className="flex flex-col items-center">
-            <Card className={cn("w-full", isEditing ? "border-primary" : "bg-muted/50")}>
+            <Card className={cn("w-full", isEditing ? "border-primary ring-1 ring-primary/10 dark:ring-primary/15" : "bg-muted/50")}>
                 <CardHeader className="pb-2">
                     <div className="flex items-center justify-between min-w-0">
                         <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -190,12 +228,15 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                         <div className="flex items-center gap-2 flex-shrink-0">
                             <div className="flex gap-1 flex-shrink-0">
                                 {isEditing ? (
-                                    <div className="flex items-center gap-2">
-                                        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={handleCancel}>
+                                    <div className={cn(
+                                        "flex items-center gap-2 rounded-md transition-colors",
+                                        flashButtons && "bg-primary/20 dark:bg-primary/80"
+                                    )}>
+                                        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs shadow-none" onClick={handleCancel}>
                                             <X className="h-3 w-3 mr-0.5" />
                                             Cancel
                                         </Button>
-                                        <Button variant="default" size="sm" className="h-7 px-2 text-xs" onClick={handleSave} disabled={headersError || queryParamsError}>
+                                        <Button variant="default" size="sm" className="h-7 px-2 text-xs shadow-none" onClick={handleSave} disabled={headersError || queryParamsError}>
                                             <Save className="h-3 w-3 mr-0.5" />
                                             Save
                                         </Button>
@@ -407,7 +448,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                             {editedStep.executionMode === 'LOOP' && editedStep.loopSelector && (
                                 <div>
                                     <Label className="text-xs text-muted-foreground">Loop Over</Label>
-                                    <div className="font-mono text-xs bg-background/50 p-2 rounded mt-1 overflow-x-auto">
+                                    <div className="font-mono text-xs bg-background/50 p-2 rounded mt-1 overflow-x-auto whitespace-pre-wrap break-words">
                                         {editedStep.loopSelector}
                                         {editedStep.loopMaxIters && ` (max ${editedStep.loopMaxIters} iterations)`}
                                     </div>

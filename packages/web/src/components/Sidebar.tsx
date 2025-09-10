@@ -12,7 +12,7 @@ const navItems = [
   { icon: Globe, label: "Integrations", href: "/integrations" },
   { icon: History, label: "Runs", href: "/runs" },
   { icon: PlayCircle, label: "Playground", href: "/playground" },
-  { icon: Bot, label: "MCP Setup", href: "https://docs.superglue.cloud/mcp", target: "_blank" },
+  { icon: Bot, label: "MCP Setup", href: "https://docs.superglue.cloud/agent-builders/quickstart", target: "_blank" },
   { icon: Book, label: "Documentation", href: "https://docs.superglue.cloud", target: "_blank" },
   /*  { icon: AlertCircle, label: 'Error Monitoring', href: '/analytics' },
   { icon: Shield, label: 'Access Control', href: '/access-control' },
