@@ -238,6 +238,7 @@ export const createOAuthErrorHandler = (
     toast: (props: { title: string; description: string; variant?: 'default' | 'destructive' }) => any
 ) => {
     return (error: string) => {
+        console.error('oauth error', integrationId, error);
         const errorInfo = parseOAuthError(error, integrationId);
         
         // Combine error message and action into a single toast
