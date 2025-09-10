@@ -1,5 +1,8 @@
 import { findMatchingIntegration, integrations } from '@superglue/shared';
 import { clsx, type ClassValue } from "clsx";
+import prettierPluginBabel from 'prettier/plugins/babel';
+import prettierPluginEstree from 'prettier/plugins/estree';
+import prettier from 'prettier/standalone';
 import type { SimpleIcon } from 'simple-icons';
 import * as simpleIcons from 'simple-icons';
 import { twMerge } from "tailwind-merge";
@@ -226,22 +229,17 @@ export const buildEvolvingPayload = (initialPayload: any, steps: any[], stepResu
   return evolvingPayload;
 };
 
-/**
- * Format JavaScript code using Prettier standalone
- * Similar to the approach used in packages/core/utils/transform.ts
- */
+const PRETTIER_PLUGINS = [
+  (prettierPluginBabel as any).default ?? (prettierPluginBabel as any),
+  (prettierPluginEstree as any).default ?? (prettierPluginEstree as any),
+];
+
 export async function formatJavaScriptCode(code: string): Promise<string> {
   if (!code || typeof code !== 'string') return code;
-
   try {
-    // Dynamic imports for better code splitting and lazy loading
-    const prettier = await import('prettier/standalone');
-    const babelPlugin = await import('prettier/plugins/babel');
-    const estreePlugin = await import('prettier/plugins/estree');
-
     const formatted = await prettier.format(code, {
       parser: 'babel',
-      plugins: [babelPlugin.default || babelPlugin, estreePlugin.default || estreePlugin],
+      plugins: PRETTIER_PLUGINS,
       semi: true,
       singleQuote: true,
       trailingComma: 'es5',
@@ -249,10 +247,8 @@ export async function formatJavaScriptCode(code: string): Promise<string> {
       printWidth: 100,
       arrowParens: 'always'
     });
-
     return formatted.trimEnd();
   } catch (error) {
-    // Silent fail - return original code if formatting fails
     console.debug('Code formatting failed:', error);
     return code;
   }
