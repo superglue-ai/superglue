@@ -9,11 +9,12 @@
  */
 
 import { execSync } from 'child_process';
-import { readFileSync, writeFileSync } from 'fs';
+import dotenv from 'dotenv';
+dotenv.config();
 
 // Configuration
 const BASE_URL = 'http://localhost:3002/v1';
-const API_KEY = '10c93ba05a1c4dbca00d21dc6c4c20bf';
+const API_KEY = process.env.AUTH_TOKEN;
 
 // Colors for output
 const colors = {
