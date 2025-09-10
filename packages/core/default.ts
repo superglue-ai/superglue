@@ -49,7 +49,7 @@ export const server_defaults = {
         DEFAULT_RETRY_DELAY: 1000, // 1 second
     },
     LLM: {
-        REQUEST_TIMEOUT_MS: 60000, // 60 seconds per LLM API request
+        REQUEST_TIMEOUT_MS: 120000, // 120 seconds per LLM API request
         MAX_INTERNAL_RETRIES: 0,
     }
 }
