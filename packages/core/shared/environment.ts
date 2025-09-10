@@ -24,4 +24,9 @@ export function validateEnvironment() {
   if (!process.env.AUTH_TOKEN && !process.env.NEXT_PUBLIC_SUPABASE_URL) {
     throw new Error('AUTH_TOKEN is not set and no other authentication provider is configured.');
   }
+
+  if (process.env.DATASTORE_TYPE === 'postgres' && (!process.env.POSTGRES_HOST || !process.env.POSTGRES_PORT || !process.env.POSTGRES_USERNAME || !process.env.POSTGRES_PASSWORD || !process.env.POSTGRES_DB)) {
+    throw new Error('POSTGRES_HOST, POSTGRES_PORT, POSTGRES_USERNAME, POSTGRES_PASSWORD, and POSTGRES_DB are not set.');
+  }
+  
 }
