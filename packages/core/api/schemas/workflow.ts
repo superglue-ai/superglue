@@ -30,7 +30,26 @@ const baseWorkflowSchema = {
           type: 'object',
           properties: {
             id: { type: 'string' },
-            apiConfig: { type: 'object' },
+            apiConfig: { 
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                urlHost: { type: 'string' },
+                urlPath: { type: 'string' },
+                instruction: { type: 'string' },
+                method: { type: 'string', enum: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'] },
+                queryParams: { type: 'string' },
+                headers: { type: 'string' },
+                body: { type: 'string' },
+                documentationUrl: { type: 'string' },
+                responseSchema: { type: 'object', additionalProperties: true },
+                responseMapping: { type: 'string' },
+                authentication: { type: 'string', enum: ['NONE', 'OAUTH2', 'HEADER', 'QUERY_PARAM'] },
+                pagination: { type: 'object', properties: { type: { type: 'string', enum: ['OFFSET_BASED', 'PAGE_BASED', 'CURSOR_BASED', 'DISABLED'] }, pageSize: { type: 'string' }, cursorPath: { type: 'string' }, stopCondition: { type: 'string' } } },
+                dataPath: { type: 'string' }
+              },
+              required: ['id', 'instruction']
+            },
             integrationId: { type: 'string' },
             executionMode: { type: 'string', enum: ['DIRECT', 'LOOP'] },
             loopSelector: { type: 'string' },
