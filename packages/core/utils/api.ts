@@ -357,6 +357,10 @@ export async function generateApiConfig({
     const documentation = fullDocs?.content?.length < LanguageModel.contextLength / 4 ?
       fullDocs?.content :
       await integrationManager?.searchDocumentation(apiConfig.urlPath || apiConfig.instruction);
+    let payloadString = JSON.stringify(payload || {});
+    if (payloadString.length > LanguageModel.contextLength / 10) {
+      payloadString = JSON.stringify(sample(payload || {}, 5)).slice(0, LanguageModel.contextLength / 10);
+    }
     const userPrompt = `Generate API configuration for the following:
 
 <instruction>
@@ -388,7 +392,7 @@ ${Object.keys(credentials || {}).map(v => `<<${v}>>`).join(", ")}
 </available_credentials>
 
 <example_payload>
-${JSON.stringify(sample(payload || {}, 5)).slice(0, LanguageModel.contextLength / 10)}
+${payloadString}
 </example_payload>`;
 
     messages.push({
