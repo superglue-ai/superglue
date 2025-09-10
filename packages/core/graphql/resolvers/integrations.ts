@@ -98,10 +98,8 @@ export const upsertIntegrationResolver = async (
       updatedAt: now
     };
 
-    // Save the integration first
     const savedIntegration = await context.datastore.upsertIntegration({ id: input.id, integration: integrationToSave, orgId: context.orgId });
 
-    // THEN trigger async operations after the integration is saved
     if (shouldFetchDoc) {
       triggerAsyncDocumentationFetch(input, context); // Fire-and-forget, will fetch docs in background and update integration documentation, documentationPending and metadata fields once its done
     }
