@@ -3,7 +3,7 @@ import { Card } from '@/src/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import JsonSchemaEditor from '@/src/components/utils/JsonSchemaEditor';
-import { cn, isEmptyData, truncateForDisplay, truncateLines } from '@/src/lib/utils';
+import { cn, formatJavaScriptCode, isEmptyData, truncateForDisplay, truncateLines } from '@/src/lib/utils';
 import { inferJsonSchema } from '@superglue/shared';
 import { Check, Code2, Copy, Eye, FileJson, Package, Play, X } from 'lucide-react';
 import Prism from 'prismjs';
@@ -160,22 +160,23 @@ export const JavaScriptCodeEditor = React.memo(({ value, onChange, readOnly = fa
     const effectiveHeight = resizable ? currentHeight : maxHeight;
     const highlightTimer = useRef<number | null>(null);
     const [allowHighlight, setAllowHighlight] = useState<boolean>(true);
+    const [hasFormatted, setHasFormatted] = useState(false);
     const hasValidPattern = (code: string): boolean => {
         const arrowFunctionPattern = /^\s*\(\s*sourceData\s*\)\s*=>\s*\{[\s\S]*\}\s*;?\s*$/;
         return arrowFunctionPattern.test(code);
     };
     const displayValue = value || '';
-    const handleFormat = async () => {
-        try {
-            const prettier: any = await import('prettier/standalone');
-            const babel: any = await import('prettier/plugins/babel');
-            const estree: any = await import('prettier/plugins/estree');
-            const formatted = await prettier.format(displayValue, { parser: 'babel', plugins: [babel, estree], printWidth: 100, singleQuote: true, semi: true });
-            if (onChange) onChange(formatted);
-        } catch (e) {
-            // silently ignore formatting errors
-        }
-    };
+
+    useEffect(() => {
+        if (!onChange || hasFormatted || !displayValue.trim()) return;
+        formatJavaScriptCode(displayValue).then(formatted => {
+            if (formatted !== displayValue) {
+                onChange(formatted);
+            }
+            setHasFormatted(true);
+        });
+    }, []);
+
     useEffect(() => {
         setAllowHighlight(false);
         if (highlightTimer.current) window.clearTimeout(highlightTimer.current);
@@ -300,7 +301,7 @@ export const PayloadMiniStepCard = ({ payloadText, inputSchema, onChange, onInpu
         if (onInputSchemaChange) onInputSchemaChange(value);
     };
     return (
-        <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50" onClick={(e) => { if ((window as any)?.__sg_is_editing__) { e.preventDefault(); e.stopPropagation(); const f = (window as any).__sg_flash_save_cancel__; if (typeof f === 'function') { f(); } } }}>
+        <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50">
             <div className="p-4">
                 <div className="flex items-center gap-2 mb-3">
                     <Package className="h-4 w-4 text-muted-foreground" />
@@ -357,7 +358,7 @@ export const FinalTransformMiniStepCard = ({ transform, responseSchema, onTransf
         if (onExecuteTransform) onExecuteTransform(localSchema, validTransform);
     };
     return (
-        <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50" onClick={(e) => { if ((window as any)?.__sg_is_editing__) { e.preventDefault(); e.stopPropagation(); const f = (window as any).__sg_flash_save_cancel__; if (typeof f === 'function') { f(); } } }}>
+        <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50">
             <div className="p-3">
                 <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
@@ -419,7 +420,7 @@ export const FinalTransformMiniStepCard = ({ transform, responseSchema, onTransf
 export const MiniStepCard = ({ step, index, isActive, onClick, stepId, isPayload = false, isTransform = false, isFinal = false, isRunningAll = false, isTesting = false, completedSteps = [], failedSteps = [] }: { step: any; index: number; isActive: boolean; onClick: () => void; stepId?: string | null; isPayload?: boolean; isTransform?: boolean; isFinal?: boolean; isRunningAll?: boolean; isTesting?: boolean; completedSteps?: string[]; failedSteps?: string[]; }) => {
     if (isPayload) {
         return (
-            <div className={cn("cursor-pointer transition-all duration-300 ease-out transform flex items-center", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={(e) => { if ((window as any)?.__sg_is_editing__) { e.preventDefault(); e.stopPropagation(); const f = (window as any).__sg_flash_save_cancel__; if (typeof f === 'function') { f(); } return; } onClick(); }} style={{ height: '100%' }}>
+            <div className={cn("cursor-pointer transition-all duration-300 ease-out transform flex items-center", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={onClick} style={{ height: '100%' }}>
                 <Card className={cn(isActive ? "p-4 w-[228px] h-[130px]" : "p-4 w-[228px] h-[120px]", "flex-shrink-0", isActive && "ring-2 ring-primary shadow-lg")}>
                     <div className="flex flex-col items-center justify-center h-full leading-tight">
                         <Package className="h-5 w-5 text-muted-foreground" />
@@ -446,7 +447,7 @@ export const MiniStepCard = ({ step, index, isActive, onClick, stepId, isPayload
             return "Pending";
         };
         return (
-            <div className={cn("cursor-pointer transition-all duration-300 ease-out transform", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={(e) => { if ((window as any)?.__sg_is_editing__) { e.preventDefault(); e.stopPropagation(); const f = (window as any).__sg_flash_save_cancel__; if (typeof f === 'function') { f(); } return; } onClick(); }} style={{ height: '100%' }}>
+            <div className={cn("cursor-pointer transition-all duration-300 ease-out transform", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={onClick} style={{ height: '100%' }}>
                 <Card className={cn(isActive ? "p-4 w-[228px] h-[130px]" : "p-4 w-[228px] h-[120px]", "flex-shrink-0", isActive && "ring-2 ring-primary shadow-lg")}>
                     <div className="h-full flex flex-col justify-between">
                         <div className="flex-1 min-h-0 flex flex-col items-center justify-center leading-tight">
@@ -465,7 +466,7 @@ export const MiniStepCard = ({ step, index, isActive, onClick, stepId, isPayload
     }
     if (isFinal) {
         return (
-            <div className={cn("cursor-pointer transition-all duration-300 ease-out transform flex items-center", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={(e) => { if ((window as any)?.__sg_is_editing__) { e.preventDefault(); e.stopPropagation(); const f = (window as any).__sg_flash_save_cancel__; if (typeof f === 'function') { f(); } return; } onClick(); }} style={{ height: '100%' }}>
+            <div className={cn("cursor-pointer transition-all duration-300 ease-out transform flex items-center", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={onClick} style={{ height: '100%' }}>
                 <Card className={cn(isActive ? "p-4 w-[228px] h-[130px]" : "p-4 w-[228px] h-[120px]", "flex-shrink-0", isActive && "ring-2 ring-primary shadow-lg")}>
                     <div className="flex flex-col items-center justify-center h-full leading-tight">
                         <FileJson className="h-5 w-5 text-muted-foreground" />
@@ -493,7 +494,7 @@ export const MiniStepCard = ({ step, index, isActive, onClick, stepId, isPayload
         return "Pending";
     };
     return (
-        <div className={cn("cursor-pointer transition-all duration-300 ease-out transform", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={(e) => { if ((window as any)?.__sg_is_editing__) { e.preventDefault(); e.stopPropagation(); const f = (window as any).__sg_flash_save_cancel__; if (typeof f === 'function') { f(); } return; } onClick(); }}>
+        <div className={cn("cursor-pointer transition-all duration-300 ease-out transform", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={onClick}>
             <Card className={cn(isActive ? "p-4 w-[228px] h-[130px]" : "p-4 w-[228px] h-[120px]", "flex-shrink-0", isActive && "ring-2 ring-primary shadow-lg")}>
                 <div className="h-full flex flex-col justify-between">
                     <div className="flex items-center justify-between mb-2">

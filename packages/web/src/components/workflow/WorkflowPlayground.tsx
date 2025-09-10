@@ -419,15 +419,18 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
         });
       }
 
-      // Update steps with self-healed configuration if self-healing made changes
-      if (effectiveSelfHealing && state.currentWorkflow.steps) {
-        const healedStepsJson = JSON.stringify(state.currentWorkflow.steps);
-        if (originalStepsJson !== healedStepsJson) {
+      // Always update steps with returned configuration (API may normalize/update even without self-healing)
+      if (state.currentWorkflow.steps) {
+        const returnedStepsJson = JSON.stringify(state.currentWorkflow.steps);
+        if (originalStepsJson !== returnedStepsJson) {
           setSteps(state.currentWorkflow.steps);
-          toast({
-            title: "Workflow configuration updated",
-            description: "Self-healing has modified the workflow configuration to fix issues.",
-          });
+          // Only show toast if self-healing was enabled (otherwise it's likely just normalization)
+          if (effectiveSelfHealing) {
+            toast({
+              title: "Workflow configuration updated",
+              description: "Self-healing has modified the workflow configuration to fix issues.",
+            });
+          }
         }
       }
 
@@ -564,6 +567,14 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
       const sid = steps[idx].id;
       const normalized = computeStepOutput(single);
       const isFailure = !single.success;
+
+      // Update step configuration if API returned changes
+      if (single.updatedStep) {
+        setSteps(prevSteps =>
+          prevSteps.map((step, i) => i === idx ? single.updatedStep : step)
+        );
+      }
+
       if (isFailure) {
         setFailedSteps(prev => Array.from(new Set([...prev.filter(id => id !== sid), sid])));
         setCompletedSteps(prev => prev.filter(id => id !== sid));

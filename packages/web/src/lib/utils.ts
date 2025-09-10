@@ -225,3 +225,35 @@ export const buildEvolvingPayload = (initialPayload: any, steps: any[], stepResu
 
   return evolvingPayload;
 };
+
+/**
+ * Format JavaScript code using Prettier standalone
+ * Similar to the approach used in packages/core/utils/transform.ts
+ */
+export async function formatJavaScriptCode(code: string): Promise<string> {
+  if (!code || typeof code !== 'string') return code;
+
+  try {
+    // Dynamic imports for better code splitting and lazy loading
+    const prettier = await import('prettier/standalone');
+    const babelPlugin = await import('prettier/plugins/babel');
+    const estreePlugin = await import('prettier/plugins/estree');
+
+    const formatted = await prettier.format(code, {
+      parser: 'babel',
+      plugins: [babelPlugin.default || babelPlugin, estreePlugin.default || estreePlugin],
+      semi: true,
+      singleQuote: true,
+      trailingComma: 'es5',
+      tabWidth: 2,
+      printWidth: 100,
+      arrowParens: 'always'
+    });
+
+    return formatted.trimEnd();
+  } catch (error) {
+    // Silent fail - return original code if formatting fails
+    console.debug('Code formatting failed:', error);
+    return code;
+  }
+}
