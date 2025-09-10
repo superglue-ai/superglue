@@ -1,11 +1,11 @@
 import { vi } from 'vitest';
 import Fastify from 'fastify';
-import { DataStore } from '../../datastore/types.js';
-import { Workflow, HttpMethod } from '@superglue/client';
+import { DataStore } from '../datastore/types.js';
+import { Workflow, HttpMethod, Integration } from '@superglue/client';
 
 // Mock authentication setup
 export const setupAuthMocks = () => {
-  vi.mock('../../auth/auth.js', () => ({
+  vi.mock('../auth/auth.js', () => ({
     extractTokenFromFastifyRequest: vi.fn(() => 'mock-token'),
     validateToken: vi.fn(() => Promise.resolve({ 
       success: true, 
@@ -14,8 +14,38 @@ export const setupAuthMocks = () => {
     }))
   }));
 
-  vi.mock('../../utils/logs.js', () => ({
+  vi.mock('../utils/logs.js', () => ({
     logMessage: vi.fn()
+  }));
+
+  // Mock shared utilities
+  vi.mock('@superglue/shared/utils', () => ({
+    generateUniqueId: vi.fn(() => Promise.resolve('generated-workflow-id')),
+    waitForIntegrationProcessing: vi.fn(() => Promise.resolve([
+      { id: 'github', name: 'GitHub', type: 'github' } as Integration
+    ]))
+  }));
+
+  // Mock workflow builder
+  vi.mock('../workflow/workflow-builder.js', () => ({
+    WorkflowBuilder: vi.fn().mockImplementation(() => ({
+      buildWorkflow: vi.fn(() => Promise.resolve({
+        id: 'generated-workflow-id',
+        steps: [{
+          id: 'step-1',
+          apiConfig: {
+            id: 'step-1',
+            instruction: 'Get all repositories for a specific GitHub user',
+            urlHost: 'https://api.github.com',
+            urlPath: '/users/{username}/repos',
+            method: 'GET'
+          },
+          integrationId: 'github'
+        }],
+        integrationIds: ['github'],
+        instruction: 'Get all repositories for a specific GitHub user'
+      }))
+    }))
   }));
 };
 
@@ -111,6 +141,6 @@ export const createMockWorkflowWithPost = (id: string = 'workflow-2'): Workflow 
 
 // Helper to register routes
 export const registerRoutes = async (app: any) => {
-  const { registerAllRoutes } = await import('../registry.js');
+  const { registerAllRoutes } = await import('../api/registry.js');
   await registerAllRoutes(app);
 };

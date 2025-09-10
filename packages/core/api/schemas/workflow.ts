@@ -288,5 +288,40 @@ export const workflowSchemas = {
       404: baseErrorSchema,
       500: baseErrorSchema
     }
+  },
+
+  buildWorkflow: {
+    body: {
+      type: 'object',
+      required: ['instruction', 'integrationIds'],
+      properties: {
+        instruction: {
+          type: 'string',
+          minLength: 1,
+          description: 'Natural language instruction describing what the workflow should do'
+        },
+        payload: {
+          type: 'object',
+          additionalProperties: true,
+          description: 'Sample payload data to help build the workflow'
+        },
+        integrationIds: {
+          type: 'array',
+          items: { type: 'string' },
+          minItems: 1,
+          description: 'Array of integration IDs to use in the workflow'
+        },
+        responseSchema: {
+          type: 'object',
+          additionalProperties: true,
+          description: 'Expected response schema for the workflow'
+        }
+      }
+    },
+    response: {
+      200: baseWorkflowSchema,
+      400: baseErrorSchema,
+      500: baseErrorSchema
+    }
   }
 };

@@ -8,7 +8,7 @@ import {
   createMockWorkflow, 
   createMockWorkflowWithPost,
   registerRoutes 
-} from './test-utils.js';
+} from '../../tests/api-unit-test-utils.js';
 
 // Setup mocks
 setupAuthMocks();
@@ -374,6 +374,73 @@ describe('Workflows API', () => {
       expect(response.json()).toEqual({
         error: 'INTERNAL_ERROR',
         message: 'Failed to delete workflow'
+      });
+    });
+  });
+
+  describe('POST /v1/workflows/build', () => {
+    it('should build a workflow successfully', async () => {
+      const requestBody = {
+        instruction: 'Get all repositories for a specific GitHub user',
+        integrationIds: ['github'],
+        payload: {},
+        responseSchema: {}
+      };
+
+      const response = await app.inject({
+        method: HttpMethod.POST,
+        url: '/v1/workflows/build',
+        payload: requestBody
+      });
+
+      expect(response.statusCode).toBe(200);
+      const workflow = response.json();
+      
+      expect(workflow.id).toBe('generated-workflow-id');
+      expect(workflow.steps).toHaveLength(1);
+      expect(workflow.steps[0].integrationId).toBe('github');
+      expect(workflow.integrationIds).toEqual(['github']);
+      expect(workflow.instruction).toBe('Get all repositories for a specific GitHub user');
+    });
+
+    it('should return 400 for missing instruction', async () => {
+      const requestBody = {
+        integrationIds: ['github'],
+        payload: {},
+        responseSchema: {}
+      };
+
+      const response = await app.inject({
+        method: HttpMethod.POST,
+        url: '/v1/workflows/build',
+        payload: requestBody
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toEqual({
+        error: 'Bad Request',
+        message: 'body must have required property \'instruction\''
+      });
+    });
+
+    it('should return 400 for empty integrationIds', async () => {
+      const requestBody = {
+        instruction: 'Get all repositories for a specific GitHub user',
+        integrationIds: [],
+        payload: {},
+        responseSchema: {}
+      };
+
+      const response = await app.inject({
+        method: HttpMethod.POST,
+        url: '/v1/workflows/build',
+        payload: requestBody
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toEqual({
+        error: 'Bad Request',
+        message: 'body/integrationIds must NOT have fewer than 1 items'
       });
     });
   });

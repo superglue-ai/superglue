@@ -3,7 +3,10 @@ import { logMessage } from '../utils/logs.js';
 import { registerApiModule } from './registry.js';
 import { AuthenticatedFastifyRequest } from './types.js';
 import { workflowSchemas } from './schemas/workflow.js';
-import { Workflow } from '@superglue/client';
+import { Workflow, Integration } from '@superglue/client';
+import { generateUniqueId, waitForIntegrationProcessing } from '@superglue/shared/utils';
+import { WorkflowBuilder } from '../workflow/workflow-builder.js';
+import { JSONSchema } from 'openai/lib/jsonschema.mjs';
 
 interface GetWorkflowsRequest extends AuthenticatedFastifyRequest {
   query: {
@@ -36,6 +39,15 @@ interface UpdateWorkflowRequest extends AuthenticatedFastifyRequest {
 
 interface DeleteWorkflowRequest extends AuthenticatedFastifyRequest {
   params: { id: string };
+}
+
+interface BuildWorkflowRequest extends AuthenticatedFastifyRequest {
+  body: {
+    instruction: string;
+    payload?: Record<string, unknown>;
+    integrationIds: string[];
+    responseSchema?: JSONSchema;
+  };
 }
 
 const getWorkflows = async (request: GetWorkflowsRequest, reply: FastifyReply) => {
@@ -176,6 +188,68 @@ const deleteWorkflow = async (request: DeleteWorkflowRequest, reply: FastifyRepl
   }
 };
 
+const buildWorkflow = async (request: BuildWorkflowRequest, reply: FastifyReply) => {
+  // This endpoint
+  // 1. validate the request
+  // 2. fetches the integrations (possibly waiting for the docs to be processed)
+  // 3. build the workflow
+  // 4. generate a unique ID for the workflow
+  // 5. return the workflow
+  try {
+    const { datastore, orgId, body } = request;
+    const { instruction, payload = {}, integrationIds, responseSchema } = body;
+
+    if (!instruction || instruction.trim() === "") {
+      reply.code(400);
+      return { error: 'VALIDATION_ERROR', message: 'Instruction is required' };
+    }
+
+    if (!integrationIds || integrationIds.length === 0) {
+      reply.code(400);
+      return { error: 'VALIDATION_ERROR', message: 'At least one integration is required' };
+    }
+
+    const metadata = { orgId, runId: crypto.randomUUID() };
+
+    // Validate that all integration IDs exist
+    const datastoreAdapter = {
+      getManyIntegrations: async (ids: string[]): Promise<Integration[]> => {
+        return await datastore.getManyIntegrations({ ids, includeDocs: true, orgId });
+      }
+    };
+
+    const resolvedIntegrations = await waitForIntegrationProcessing(datastoreAdapter, integrationIds);
+
+    const builder = new WorkflowBuilder(
+      instruction,
+      resolvedIntegrations,
+      payload,
+      responseSchema,
+      metadata
+    );
+    
+    const workflow = await builder.buildWorkflow();
+
+    // Generate unique ID
+    workflow.id = await generateUniqueId({
+      baseId: workflow.id,
+      exists: async (id) => !!(await datastore.getWorkflow({ id, orgId }))
+    });
+
+    logMessage('info', `Workflow built: ${workflow.id}`, { 
+      orgId, 
+      workflowId: workflow.id,
+      instruction: instruction.substring(0, 100) + (instruction.length > 100 ? '...' : '')
+    });
+
+    return workflow;
+  } catch (error) {
+    logMessage('error', `Failed to build workflow: ${error}`, { orgId: request.orgId });
+    reply.code(500);
+    return { error: 'INTERNAL_ERROR', message: 'Failed to build workflow' };
+  }
+};
+
 // Register the workflow routes
 registerApiModule({
   name: 'workflows',
@@ -209,6 +283,12 @@ registerApiModule({
       path: '/workflows/:id',
       handler: deleteWorkflow,
       schema: workflowSchemas.deleteWorkflow
+    },
+    {
+      method: 'POST',
+      path: '/workflows/build',
+      handler: buildWorkflow,
+      schema: workflowSchemas.buildWorkflow
     }
   ]
 });
