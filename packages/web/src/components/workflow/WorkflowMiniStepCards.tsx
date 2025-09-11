@@ -3,9 +3,10 @@ import { Card } from '@/src/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import JsonSchemaEditor from '@/src/components/utils/JsonSchemaEditor';
+import { formatBytes, isAllowedFileType, MAX_TOTAL_FILE_SIZE, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { cn, formatJavaScriptCode, isEmptyData, truncateForDisplay, truncateLines } from '@/src/lib/utils';
 import { inferJsonSchema } from '@superglue/shared';
-import { Check, Code2, Copy, Eye, FileJson, Package, Play, X } from 'lucide-react';
+import { Check, Code2, Copy, Eye, FileJson, Package, Play, Upload, X } from 'lucide-react';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-javascript';
 import 'prismjs/components/prism-json';
@@ -273,13 +274,38 @@ export const JsonCodeEditor = ({ value, onChange, readOnly = false, minHeight = 
     );
 };
 
-export const PayloadMiniStepCard = ({ payloadText, inputSchema, onChange, onInputSchemaChange, readOnly }: { payloadText: string; inputSchema?: string | null; onChange?: (value: string) => void; onInputSchemaChange?: (value: string | null) => void; readOnly?: boolean; }) => {
+export const PayloadSpotlight = ({
+    payloadText,
+    inputSchema,
+    onChange,
+    onInputSchemaChange,
+    readOnly,
+    onFilesUpload,
+    uploadedFiles = [],
+    onFileRemove,
+    isProcessingFiles = false,
+    totalFileSize = 0
+}: {
+    payloadText: string;
+    inputSchema?: string | null;
+    onChange?: (value: string) => void;
+    onInputSchemaChange?: (value: string | null) => void;
+    readOnly?: boolean;
+    onFilesUpload?: (files: File[]) => Promise<void>;
+    uploadedFiles?: UploadedFileInfo[];
+    onFileRemove?: (fileName: string) => void;
+    isProcessingFiles?: boolean;
+    totalFileSize?: number;
+}) => {
     const [activeTab, setActiveTab] = useState('payload');
     const [localPayload, setLocalPayload] = useState<string>(payloadText || '');
     const [localInputSchema, setLocalInputSchema] = useState(inputSchema || null);
     const [error, setError] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
     useEffect(() => { setLocalPayload(payloadText || ''); }, [payloadText]);
     useEffect(() => { setLocalInputSchema(inputSchema || null); }, [inputSchema]);
+
     const handlePayloadChange = (value: string) => {
         setLocalPayload(value);
         const trimmed = (value || '').trim();
@@ -296,10 +322,156 @@ export const PayloadMiniStepCard = ({ payloadText, inputSchema, onChange, onInpu
             setError('Invalid JSON');
         }
     };
+
     const handleSchemaChange = (value: string | null) => {
         setLocalInputSchema(value);
         if (onInputSchemaChange) onInputSchemaChange(value);
     };
+
+    const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files || []);
+        if (files.length === 0) return;
+
+        // Validate file types
+        const invalidFiles = files.filter(f => !isAllowedFileType(f.name));
+        if (invalidFiles.length > 0) {
+            setError(`Unsupported file types: ${invalidFiles.map(f => f.name).join(', ')}`);
+            return;
+        }
+
+        // Check total size
+        const newSize = files.reduce((sum, f) => sum + f.size, 0);
+        if (totalFileSize + newSize > MAX_TOTAL_FILE_SIZE) {
+            setError(`Total file size cannot exceed ${formatBytes(MAX_TOTAL_FILE_SIZE)}`);
+            return;
+        }
+
+        if (onFilesUpload) {
+            await onFilesUpload(files);
+        }
+
+        // Reset input
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
+
+    return (
+        <>
+            <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept=".json,.csv,.txt,.xml,.xlsx,.xls"
+                onChange={handleFileInputChange}
+                className="hidden"
+            />
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList className="grid w-full grid-cols-2 mb-3 h-8">
+                    <TabsTrigger value="payload" className="text-xs">Payload JSON</TabsTrigger>
+                    <TabsTrigger value="schema" className="text-xs">Input Schema</TabsTrigger>
+                </TabsList>
+                <TabsContent value="payload" className="mt-3">
+                    {!readOnly && onFilesUpload && (
+                        <div className="mb-3 space-y-2">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        disabled={isProcessingFiles || totalFileSize >= MAX_TOTAL_FILE_SIZE}
+                                        className="h-8"
+                                    >
+                                        {isProcessingFiles ? (
+                                            <>
+                                                <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent mr-2" />
+                                                Processing...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Upload className="h-3 w-3 mr-2" />
+                                                Upload Files
+                                            </>
+                                        )}
+                                    </Button>
+                                    <span className="text-xs text-muted-foreground">
+                                        {formatBytes(totalFileSize)} / {formatBytes(MAX_TOTAL_FILE_SIZE)} used
+                                    </span>
+                                    <HelpTooltip text="Upload CSV, JSON, XML, or Excel files. Files are automatically parsed and added to the payload with their filename as the key." />
+                                </div>
+                            </div>
+
+                            {uploadedFiles.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5">
+                                    {uploadedFiles.map(file => (
+                                        <div
+                                            key={file.key}
+                                            className={cn(
+                                                "flex items-center gap-1.5 px-2 py-1 rounded-md text-xs",
+                                                file.status === 'error' ? "bg-destructive/10 text-destructive" : "bg-muted"
+                                            )}
+                                        >
+                                            <FileJson className="h-3 w-3 flex-shrink-0" />
+                                            <span className="max-w-[150px] truncate" title={file.name}>
+                                                {file.name}
+                                            </span>
+                                            <span className="text-muted-foreground">
+                                                ({formatBytes(file.size)})
+                                            </span>
+                                            {file.status === 'processing' && (
+                                                <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                            )}
+                                            {file.status === 'error' && file.error && (
+                                                <span className="text-xs" title={file.error}>⚠</span>
+                                            )}
+                                            {onFileRemove && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-4 w-4 ml-0.5 hover:bg-background/80"
+                                                    onClick={() => onFileRemove(file.key)}
+                                                    disabled={file.status === 'processing'}
+                                                >
+                                                    <X className="h-3 w-3" />
+                                                </Button>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    <JsonCodeEditor
+                        value={localPayload}
+                        onChange={handlePayloadChange}
+                        readOnly={readOnly}
+                        minHeight="150px"
+                        maxHeight="200px"
+                        placeholder="{}"
+                    />
+                    {error && (
+                        <div className="mt-2 text-xs text-destructive flex items-center gap-1">
+                            <span className="text-destructive">⚠</span> {error}
+                        </div>
+                    )}
+                </TabsContent>
+                <TabsContent value="schema" className="mt-3">
+                    <JsonSchemaEditor
+                        value={localInputSchema}
+                        onChange={handleSchemaChange}
+                        isOptional={true}
+                    />
+                    <div className="mt-2 text-[10px] text-muted-foreground">
+                        <HelpTooltip text="Input Schema is optional documentation/validation describing expected payload shape. The payload JSON is what runs; schema does not inject credentials nor drive payload. Leave disabled if not needed." />
+                    </div>
+                </TabsContent>
+            </Tabs>
+        </>
+    );
+};
+
+export const PayloadMiniStepCard = ({ payloadText, inputSchema, onChange, onInputSchemaChange, readOnly }: { payloadText: string; inputSchema?: string | null; onChange?: (value: string) => void; onInputSchemaChange?: (value: string | null) => void; readOnly?: boolean; }) => {
     return (
         <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50">
             <div className="p-4">
@@ -312,22 +484,13 @@ export const PayloadMiniStepCard = ({ payloadText, inputSchema, onChange, onInpu
                         <HelpTooltip text="Payload is the JSON input to workflow execution. Editing here does NOT save values to the workflow; it only affects this session/run. Use Input Schema to optionally describe the expected structure for validation and tooling." />
                     </div>
                 </div>
-                <Tabs value={activeTab} onValueChange={setActiveTab}>
-                    <TabsList className="grid w-full grid-cols-2 mb-3 h-8">
-                        <TabsTrigger value="payload" className="text-xs">Payload JSON</TabsTrigger>
-                        <TabsTrigger value="schema" className="text-xs">Input Schema</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="payload" className="mt-3">
-                        <JsonCodeEditor value={localPayload} onChange={handlePayloadChange} readOnly={readOnly} minHeight="150px" maxHeight="200px" placeholder="" />
-                        {error && (<div className="mt-2 text-xs text-destructive flex items-center gap-1"><span className="text-destructive">⚠</span> {error}</div>)}
-                    </TabsContent>
-                    <TabsContent value="schema" className="mt-3">
-                        <JsonSchemaEditor value={localInputSchema} onChange={handleSchemaChange} isOptional={true} />
-                        <div className="mt-2 text-[10px] text-muted-foreground">
-                            <HelpTooltip text="Input Schema is optional documentation/validation describing expected payload shape. The payload JSON is what runs; schema does not inject credentials nor drive payload. Leave disabled if not needed." />
-                        </div>
-                    </TabsContent>
-                </Tabs>
+                <PayloadSpotlight
+                    payloadText={payloadText}
+                    inputSchema={inputSchema}
+                    onChange={onChange}
+                    onInputSchemaChange={onInputSchemaChange}
+                    readOnly={readOnly}
+                />
             </div>
         </Card>
     );

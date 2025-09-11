@@ -4,16 +4,15 @@ import { getAuthBadge } from '@/src/app/integrations/page';
 import { IntegrationForm } from '@/src/components/integrations/IntegrationForm';
 import { useToast } from '@/src/hooks/use-toast';
 import { needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
+import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { cn, composeUrl, getIntegrationIcon as getIntegrationIconName, getSimpleIcon, inputErrorStyles } from '@/src/lib/utils';
 import { Integration, IntegrationInput, SuperglueClient, UpsertMode, Workflow } from '@superglue/client';
 import { integrations as integrationTemplates } from "@superglue/shared";
 import { waitForIntegrationProcessing } from '@superglue/shared/utils';
 import { ArrowRight, Check, Clock, Globe, Key, Loader2, Pencil, Plus, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import Editor from 'react-simple-code-editor';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -23,6 +22,7 @@ import { DocStatus } from '../utils/DocStatusSpinner';
 import { HelpTooltip } from '../utils/HelpTooltip';
 import { StepIndicator, WORKFLOW_CREATE_STEPS } from '../utils/StepIndicator';
 import { WorkflowCreateSuccess } from './WorkflowCreateSuccess';
+import { PayloadSpotlight } from './WorkflowMiniStepCards';
 import WorkflowPlayground, { WorkflowPlaygroundHandle } from './WorkflowPlayground';
 
 type WorkflowCreateStep = 'integrations' | 'prompt' | 'review' | 'success';
@@ -75,6 +75,11 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [selfHealingEnabled, setSelfHealingEnabled] = useState(true);
   const [shouldStopExecution, setShouldStopExecution] = useState(false);
+
+  // File upload state
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFileInfo[]>([]);
+  const [totalFileSize, setTotalFileSize] = useState(0);
+  const [isProcessingFiles, setIsProcessingFiles] = useState(false);
 
   const [selectedIntegrationIds, setSelectedIntegrationIds] = useState<string[]>(() => {
     return preselectedIntegrationId && integrations.some(i => i.id === preselectedIntegrationId)
@@ -132,9 +137,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     }))
   ];
 
-  const highlightJson = (code: string) => {
-    return Prism.highlight(code, Prism.languages.json, 'json');
-  };
 
   const hasDocumentation = (integration: Integration) => {
     // Check if integration has documentation URL and is not pending
@@ -366,6 +368,111 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     } finally {
       setIsGeneratingSuggestions(false);
     }
+  };
+
+  const handleFilesUpload = async (files: File[]) => {
+    setIsProcessingFiles(true);
+
+    try {
+      // Check total size limit
+      const newSize = files.reduce((sum, f) => sum + f.size, 0);
+      if (totalFileSize + newSize > MAX_TOTAL_FILE_SIZE) {
+        toast({
+          title: 'Size limit exceeded',
+          description: `Total file size cannot exceed ${formatBytes(MAX_TOTAL_FILE_SIZE)}`,
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      const currentPayload = JSON.parse(payload || '{}');
+      const existingKeys = Object.keys(currentPayload);
+      const newFiles: UploadedFileInfo[] = [];
+
+      for (const file of files) {
+        try {
+          // Generate unique key
+          const baseKey = sanitizeFileName(file.name);
+          const key = generateUniqueKey(baseKey, [...existingKeys, ...newFiles.map(f => f.key)]);
+
+          // Add to processing state
+          const fileInfo: UploadedFileInfo = {
+            name: file.name,
+            size: file.size,
+            key,
+            status: 'processing'
+          };
+          newFiles.push(fileInfo);
+          setUploadedFiles(prev => [...prev, fileInfo]);
+
+          // Always use backend parsing for consistency
+          const extractResult = await client.extract({
+            file: file,
+            endpoint: {
+              id: `extract-${Date.now()}`,
+              instruction: "Extract structured data from this file"
+            }
+          });
+
+          if (!extractResult.success) {
+            throw new Error(extractResult.error || 'Failed to extract data');
+          }
+          const parsedData = extractResult.data;
+
+          // Update payload
+          currentPayload[key] = parsedData;
+          existingKeys.push(key);
+
+          // Update file status
+          setUploadedFiles(prev => prev.map(f =>
+            f.key === key ? { ...f, status: 'ready' } : f
+          ));
+
+        } catch (error: any) {
+          // Update file status with error
+          const fileInfo = newFiles.find(f => f.name === file.name);
+          if (fileInfo) {
+            setUploadedFiles(prev => prev.map(f =>
+              f.key === fileInfo.key
+                ? { ...f, status: 'error', error: error.message }
+                : f
+            ));
+          }
+
+          toast({
+            title: 'File processing failed',
+            description: `Failed to parse ${file.name}: ${error.message}`,
+            variant: 'destructive'
+          });
+        }
+      }
+
+      // Update payload and total size
+      setPayload(JSON.stringify(currentPayload, null, 2));
+      setTotalFileSize(prev => prev + newSize);
+
+    } finally {
+      setIsProcessingFiles(false);
+    }
+  };
+
+  const handleFileRemove = (key: string) => {
+    // Find the file to remove
+    const fileToRemove = uploadedFiles.find(f => f.key === key);
+    if (!fileToRemove) return;
+
+    // Update payload
+    try {
+      const currentPayload = JSON.parse(payload || '{}');
+      delete currentPayload[key];
+      setPayload(JSON.stringify(currentPayload, null, 2));
+    } catch (error) {
+      console.error('Error updating payload:', error);
+    }
+
+    // Update files list and total size
+    setUploadedFiles(prev => prev.filter(f => f.key !== key));
+    setTotalFileSize(prev => Math.max(0, prev - fileToRemove.size));
   };
 
   return (
@@ -633,7 +740,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                               </div>
                             );
                           })}
-                          
+
                           {/* Show "Create new integration" option when search has no results */}
                           {filteredIntegrations.length === 0 && integrationSearch.trim() !== '' && (
                             <div
@@ -742,15 +849,15 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
               )}
 
               <div className="space-y-1">
-                <Label htmlFor="payload">Workflow Variables (Optional, JSON)</Label>
-                <HelpTooltip text="Provide the payload for the workflow as a JSON object. You can reference these variables throughout the config. You can change them when you use the workflow later." />
+                <Label htmlFor="payload">Initial Payload (Optional)</Label>
+                <HelpTooltip text="Provide the initial payload for the workflow. You can upload files (CSV, JSON, XML, Excel) which will be automatically parsed, or enter JSON directly. These values can be changed when executing the workflow later." />
                 <div className={cn(
-                  "h-64 rounded-md border border-input bg-transparent code-editor",
-                  validationErrors.payload && inputErrorStyles
+                  validationErrors.payload && "ring-2 ring-destructive ring-offset-2"
                 )}>
-                  <Editor
-                    value={payload}
-                    onValueChange={(code) => {
+                  <PayloadSpotlight
+                    payloadText={payload}
+                    inputSchema={null}
+                    onChange={(code) => {
                       setPayload(code);
                       try {
                         JSON.parse(code || '{}');
@@ -759,15 +866,17 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                         setValidationErrors(prev => ({ ...prev, payload: true }));
                       }
                     }}
-                    highlight={highlightJson}
-                    padding={10}
-                    tabSize={2}
-                    insertSpaces={true}
-                    className="font-mono text-xs w-full h-64 [&_textarea]:outline-none [&_textarea]:w-full [&_textarea]:resize-none [&_textarea]:p-0 [&_textarea]:border-0 [&_textarea]:bg-transparent"
+                    onInputSchemaChange={() => { }}
+                    readOnly={false}
+                    onFilesUpload={handleFilesUpload}
+                    uploadedFiles={uploadedFiles}
+                    onFileRemove={handleFileRemove}
+                    isProcessingFiles={isProcessingFiles}
+                    totalFileSize={totalFileSize}
                   />
                 </div>
                 {validationErrors.payload && (
-                  <p className="text-xs text-destructive">Invalid JSON format</p>
+                  <p className="text-xs text-destructive mt-1">Invalid JSON format</p>
                 )}
               </div>
             </div>
