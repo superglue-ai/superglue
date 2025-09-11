@@ -213,7 +213,6 @@ const SpotlightStepCard = ({
                                 onEdit={onEdit}
                                 onRemove={() => { }}
                                 integrations={integrations}
-                                onEditingChange={onConfigEditingChange}
                             />
                         </div>
                     )}
