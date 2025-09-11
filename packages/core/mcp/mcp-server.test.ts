@@ -437,7 +437,7 @@ describe('superglue_find_relevant_integrations', () => {
 
   it('returns relevant integrations for instruction', async () => {
     const mockIntegrations = [
-      { id: 'crm-integration', reason: 'Matches CRM functionality' }
+      { integration: { id: 'crm-integration' }, reason: 'Matches CRM functionality' }
     ];
     const client = {
       findRelevantIntegrations: vi.fn().mockResolvedValue(mockIntegrations)
