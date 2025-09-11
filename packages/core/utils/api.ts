@@ -224,7 +224,6 @@ config: ${maskedConfig}`;
     let dataPathSuccess = true;
 
     // TODO: we need to remove the data path and just join the data with the next page of data, otherwise we will have to do a lot of gymnastics to get the data path right
-
     let responseData = lastResponse.data;
 
     // callAxios now always returns a Buffer, so we always need to parse it
@@ -238,7 +237,7 @@ config: ${maskedConfig}`;
     else if (responseData && typeof responseData === 'string') {
       responseData = await parseFile(Buffer.from(responseData), FileType.AUTO);
     }
-
+    const parsedResponseData = responseData;
     if (endpoint.dataPath) {
       const pathParts = endpoint.dataPath.split('.');
       for (const part of pathParts) {
@@ -344,8 +343,7 @@ config: ${maskedConfig}`;
       offset += parseInt(endpoint.pagination?.pageSize || "50");
     } else if (endpoint.pagination?.type === PaginationType.CURSOR_BASED) {
       const cursorParts = (endpoint.pagination?.cursorPath || 'next_cursor').split('.');
-      // Use the parsed responseData instead of raw lastResponse.data
-      let nextCursor = responseData;
+      let nextCursor = parsedResponseData;
       for (const part of cursorParts) {
         nextCursor = nextCursor?.[part];
       }
