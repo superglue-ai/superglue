@@ -1,5 +1,5 @@
 import { ExecutionStep, Integration, Workflow } from "@superglue/client";
-import { Metadata, toJsonSchema } from "@superglue/shared";
+import { inferJsonSchema, Metadata, toJsonSchema } from "@superglue/shared";
 import { type OpenAI } from "openai";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { BUILD_WORKFLOW_SYSTEM_PROMPT } from "../llm/prompts.js";
@@ -51,8 +51,8 @@ export class WorkflowBuilder {
     }
   }
 
-  private generateIntegrationDescriptions(): string {
-    return Object.values(this.integrations).map(int => {
+  private generateIntegrationDescriptions(maxChars: number = 100000): string {
+    const descriptions = Object.values(this.integrations).map(int => {
       if (!int.documentation) {
         return `<${int.id}>
   Base URL: ${composeUrl(int.urlHost, int.urlPath)}
@@ -101,22 +101,29 @@ ${authSection}
   </documentation>
 </${int.id}>`;
     }).join("\n");
+
+    if (descriptions.length > maxChars) {
+      return descriptions.slice(0, maxChars) + "\n... [integrations documentation truncated]";
+    }
+    return descriptions;
   }
 
-  private generatePayloadDescription(maxLength: number = 4000): string {
+  private generatePayloadDescription(maxChars: number = 100000): string {
     if (!this.initialPayload || Object.keys(this.initialPayload).length === 0) {
       return 'No initial payload provided';
     }
 
-    let payloadText = JSON.stringify(this.initialPayload);
-    if (payloadText.length > maxLength) {
-      payloadText = JSON.stringify(sample(this.initialPayload, 3), null, 2);
-    }
-    if (payloadText.length > maxLength) {
-      payloadText = payloadText.slice(0, maxLength) + '...[truncated]';
+    const schemaString = JSON.stringify(inferJsonSchema(this.initialPayload), null, 2);
+    const sampleString = JSON.stringify(sample(this.initialPayload, 20), null, 2);
+
+    let payloadContext = `<payload_structure>\n${schemaString}\n</payload_structure>\n\n`;
+    payloadContext += `<payload_sample>\n${sampleString}\n</payload_sample>`;
+
+    if (payloadContext.length > maxChars) {
+      return payloadContext.slice(0, maxChars) + "\n... [payload truncated]";
     }
 
-    return `Initial Input Payload contains keys: ${Object.keys(this.initialPayload).join(", ")}\nPayload example: ${payloadText}`;
+    return payloadContext;
   }
 
   private prepareBuildingContext(): ChatMessage[] {
@@ -158,17 +165,29 @@ Ensure that the final output matches the instruction and you use ONLY the availa
   private validateWorkflow(workflow: Workflow): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
     const availableIntegrationIds = Object.keys(this.integrations);
+    const hasSteps = workflow.steps && workflow.steps.length > 0;
+    const hasFinalTransform = workflow.finalTransform && workflow.finalTransform !== "$" && workflow.finalTransform !== "(sourceData) => sourceData";
 
-    workflow.steps?.forEach((step, index) => {
-      if (!step.integrationId) {
-        errors.push(`Step ${index + 1} (${step.id}): Missing integrationId`);
-      } else if (!availableIntegrationIds.includes(step.integrationId)) {
-        errors.push(`Step ${index + 1} (${step.id}): Invalid integrationId '${step.integrationId}'. Available integrations: ${availableIntegrationIds.join(', ')}`);
-      }
-      if (!step.apiConfig?.urlHost) {
-        errors.push(`Step ${index + 1} (${step.id}): Missing URL configuration (urlHost: '${step.apiConfig?.urlHost || 'undefined'}'). Please ensure that all steps correspond to a single API call, or merge this step with the previous one.`);
-      }
-    });
+    if (!hasSteps && !hasFinalTransform) {
+      errors.push("Workflow must have either steps or a finalTransform to process data");
+    }
+
+    if (hasSteps && availableIntegrationIds.length === 0) {
+      errors.push("Workflow has steps but no integrations are available. Either provide integrations or use a transform-only workflow.");
+    }
+
+    if (hasSteps) {
+      workflow.steps?.forEach((step, index) => {
+        if (!step.integrationId) {
+          errors.push(`Step ${index + 1} (${step.id}): Missing integrationId`);
+        } else if (!availableIntegrationIds.includes(step.integrationId)) {
+          errors.push(`Step ${index + 1} (${step.id}): Invalid integrationId '${step.integrationId}'. Available integrations: ${availableIntegrationIds.join(', ')}`);
+        }
+        if (!step.apiConfig?.urlHost) {
+          errors.push(`Step ${index + 1} (${step.id}): Missing URL configuration (urlHost: '${step.apiConfig?.urlHost || 'undefined'}'). Please ensure that all steps correspond to a single API call, or merge this step with the previous one.`);
+        }
+      });
+    }
 
     return {
       valid: errors.length === 0,
