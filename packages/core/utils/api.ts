@@ -30,6 +30,34 @@ export class AbortError extends Error {
   }
 }
 
+/**
+ * Checks if response data appears to be an HTML error page
+ * @param data - Response data (Buffer, string, or other)
+ * @returns Object with isHTML flag and a preview string if HTML was detected
+ */
+function detectHtmlErrorResponse(data: any): { isHtml: boolean; preview?: string } {
+  const MAX_HTML_CHECK_BYTES = 1024; // Only check first 1KB for efficiency
+  let dataPrefix = '';
+
+  if (data instanceof Buffer) {
+    // Only convert first 1KB to string for HTML detection
+    const bytesToRead = Math.min(data.length, MAX_HTML_CHECK_BYTES);
+    dataPrefix = data.subarray(0, bytesToRead).toString('utf-8');
+  } else if (typeof data === 'string') {
+    dataPrefix = data.slice(0, MAX_HTML_CHECK_BYTES);
+  } else {
+    return { isHtml: false };
+  }
+
+  const trimmedLower = dataPrefix.slice(0, 100).trim().toLowerCase();
+  const isHtml = trimmedLower.startsWith('<!doctype html') || trimmedLower.startsWith('<html');
+  
+  return {
+    isHtml,
+    preview: dataPrefix
+  };
+}
+
 export function convertBasicAuthToBase64(headerValue: string) {
   if (!headerValue) return headerValue;
   // Get the part of the 'Basic '
@@ -148,6 +176,7 @@ export async function callEndpoint({ endpoint, payload, credentials, options }: 
 
     const processedUrl = composeUrl(processedUrlHost, processedUrlPath);
 
+
     const axiosConfig: AxiosRequestConfig = {
       method: endpoint.method,
       url: processedUrl,
@@ -163,7 +192,10 @@ export async function callEndpoint({ endpoint, payload, credentials, options }: 
       lastResponse.data?.error ||
       (Array.isArray(lastResponse?.data?.errors) && lastResponse?.data?.errors.length > 0)
     ) {
-      const error = JSON.stringify(lastResponse?.data?.error || lastResponse.data?.errors || lastResponse?.data || lastResponse?.statusText || "undefined");
+      // Handle Buffer data in error responses
+      const errorData = lastResponse?.data instanceof Buffer ? 
+        lastResponse.data.toString('utf-8') : lastResponse?.data;
+      const error = JSON.stringify(errorData?.error || errorData?.errors || errorData || lastResponse?.statusText || "undefined");
       const maskedConfig = maskCredentials(JSON.stringify(axiosConfig));
       let message = `${endpoint.method} ${processedUrl} failed with status ${lastResponse.status}.
 Response: ${String(error).slice(0, 1000)}
@@ -181,12 +213,12 @@ config: ${maskedConfig}`;
       throw new ApiCallError(`API call failed with status ${lastResponse.status}. Response: ${message}`, lastResponse.status);
     }
 
-    if (typeof lastResponse.data === 'string' &&
-      (lastResponse.data.slice(0, 100).trim().toLowerCase().startsWith('<!doctype html') ||
-        lastResponse.data.slice(0, 100).trim().toLowerCase().startsWith('<html'))) {
+    // Check for HTML error pages
+    const htmlCheck = detectHtmlErrorResponse(lastResponse.data);
+    if (htmlCheck.isHtml) {
       const maskedUrl = maskCredentials(processedUrl, { ...credentials, ...payload });
       throw new ApiCallError(`Received HTML response instead of expected JSON data from ${maskedUrl}. 
-        This usually indicates an error page or invalid endpoint.\nResponse: ${lastResponse.data.slice(0, 2000)}`, lastResponse.status);
+        This usually indicates an error page or invalid endpoint.\nResponse: ${htmlCheck.preview}`, lastResponse.status);
     }
 
     let dataPathSuccess = true;
@@ -195,7 +227,15 @@ config: ${maskedConfig}`;
 
     let responseData = lastResponse.data;
 
-    if (responseData && typeof responseData === 'string') {
+    // callAxios now always returns a Buffer, so we always need to parse it
+    if (responseData instanceof Buffer) {
+      responseData = await parseFile(responseData, FileType.AUTO);
+    }
+    // Fallback for any legacy code paths or special cases - we can remove this later
+    else if (responseData && (responseData instanceof ArrayBuffer)) {
+      responseData = await parseFile(Buffer.from(responseData), FileType.AUTO);
+    }
+    else if (responseData && typeof responseData === 'string') {
       responseData = await parseFile(Buffer.from(responseData), FileType.AUTO);
     }
 
@@ -304,7 +344,8 @@ config: ${maskedConfig}`;
       offset += parseInt(endpoint.pagination?.pageSize || "50");
     } else if (endpoint.pagination?.type === PaginationType.CURSOR_BASED) {
       const cursorParts = (endpoint.pagination?.cursorPath || 'next_cursor').split('.');
-      let nextCursor = lastResponse.data;
+      // Use the parsed responseData instead of raw lastResponse.data
+      let nextCursor = responseData;
       for (const part of cursorParts) {
         nextCursor = nextCursor?.[part];
       }
