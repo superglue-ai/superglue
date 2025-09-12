@@ -1,6 +1,6 @@
 # Build stage
 FROM node:22-slim AS builder
- 
+
 WORKDIR /usr/src/app
 
 # Copy package files first to leverage layer caching
@@ -28,7 +28,7 @@ COPY . .
 
 # After copying files but before building
 RUN npm run build
-    
+
 
 # Production stage
 FROM node:22-slim
@@ -58,7 +58,7 @@ COPY --from=builder /usr/src/app/packages/web/public ./packages/web/public
 COPY --from=builder /usr/src/app/packages/shared/dist ./packages/shared/dist
 
 # Expose ports for both servers
-EXPOSE 3000 3001
+EXPOSE 3000 3001 3002
 
 # Start both servers using turbo
 CMD ["npm", "run", "start"]
