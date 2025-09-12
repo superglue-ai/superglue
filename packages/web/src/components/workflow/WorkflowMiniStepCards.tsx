@@ -237,7 +237,7 @@ export const JavaScriptCodeEditor = React.memo(({ value, onChange, readOnly = fa
                     )}
                 </div>
             </div>
-            <style jsx global>{`
+            <style>{`
                 .js-code-editor .token.property { color: rgb(156, 163, 175); }
                 .js-code-editor .token.string { color: rgb(134, 239, 172); }
                 .js-code-editor .token.function { color: rgb(147, 197, 253); }
