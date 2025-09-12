@@ -2,6 +2,7 @@
 import { useConfig } from "@/src/app/config-context";
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import { executeFinalTransform, executeSingleStep, executeWorkflowStepByStep, type StepExecutionResult } from "@/src/lib/client-utils";
+import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { computeStepOutput } from "@/src/lib/utils";
 import { ExecutionStep, Integration, SuperglueClient, Workflow, WorkflowResult } from "@superglue/client";
 import { X } from "lucide-react";
@@ -30,6 +31,13 @@ export interface WorkflowPlaygroundProps {
   onSelfHealingChange?: (enabled: boolean) => void;
   shouldStopExecution?: boolean;
   onStopExecution?: () => void;
+  // File upload props
+  uploadedFiles?: UploadedFileInfo[];
+  onFilesUpload?: (files: File[]) => Promise<void>;
+  onFileRemove?: (key: string) => void;
+  isProcessingFiles?: boolean;
+  totalFileSize?: number;
+  filePayloads?: Record<string, any>;
 }
 
 export interface WorkflowPlaygroundHandle {
@@ -54,7 +62,14 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
   selfHealingEnabled: externalSelfHealingEnabled,
   onSelfHealingChange,
   shouldStopExecution: externalShouldStop,
-  onStopExecution
+  onStopExecution,
+  // File upload props from parent (embedded mode)
+  uploadedFiles: parentUploadedFiles,
+  onFilesUpload: parentOnFilesUpload,
+  onFileRemove: parentOnFileRemove,
+  isProcessingFiles: parentIsProcessingFiles,
+  totalFileSize: parentTotalFileSize,
+  filePayloads: parentFilePayloads
 }, ref) => {
   const router = useRouter();
   const { toast } = useToast();
@@ -75,6 +90,16 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
       : null
   );
   const [payload, setPayload] = useState<string>(initialPayload || '{}');
+
+  // File upload state - use parent's if provided (embedded), otherwise use local
+  const [localUploadedFiles, setLocalUploadedFiles] = useState<UploadedFileInfo[]>([]);
+  const [localTotalFileSize, setLocalTotalFileSize] = useState(0);
+  const [localIsProcessingFiles, setLocalIsProcessingFiles] = useState(false);
+
+  // Use parent state if available, otherwise use local state
+  const uploadedFiles = parentUploadedFiles || localUploadedFiles;
+  const totalFileSize = parentTotalFileSize ?? localTotalFileSize;
+  const isProcessingFiles = parentIsProcessingFiles ?? localIsProcessingFiles;
 
   useEffect(() => {
     if (initialPayload !== undefined) {
@@ -168,6 +193,95 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
     endpoint: config.superglueEndpoint,
     apiKey: config.superglueApiKey,
   }), [config.superglueEndpoint, config.superglueApiKey]);
+
+  // Unified file upload handlers
+  const handleFilesUpload = async (files: File[]) => {
+    // Use parent handler if available, otherwise handle locally
+    if (parentOnFilesUpload) {
+      return parentOnFilesUpload(files);
+    }
+
+    // Local handling for non-embedded mode
+    setLocalIsProcessingFiles(true);
+
+    try {
+      const newSize = files.reduce((sum, f) => sum + f.size, 0);
+      if (localTotalFileSize + newSize > MAX_TOTAL_FILE_SIZE) {
+        toast({
+          title: 'Size limit exceeded',
+          description: `Total file size cannot exceed ${formatBytes(MAX_TOTAL_FILE_SIZE)}`,
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      const existingKeys = localUploadedFiles.map(f => f.key);
+      const newFiles: UploadedFileInfo[] = [];
+
+      for (const file of files) {
+        try {
+          const baseKey = sanitizeFileName(file.name);
+          const key = generateUniqueKey(baseKey, [...existingKeys, ...newFiles.map(f => f.key)]);
+
+          const fileInfo: UploadedFileInfo = {
+            name: file.name,
+            size: file.size,
+            key,
+            status: 'processing'
+          };
+          newFiles.push(fileInfo);
+          setLocalUploadedFiles(prev => [...prev, fileInfo]);
+
+          const extractResult = await client.extract({
+            file: file
+          });
+
+          if (!extractResult.success) {
+            throw new Error(extractResult.error || 'Failed to extract data');
+          }
+          existingKeys.push(key);
+
+          setLocalUploadedFiles(prev => prev.map(f =>
+            f.key === key ? { ...f, status: 'ready' } : f
+          ));
+
+        } catch (error: any) {
+          const fileInfo = newFiles.find(f => f.name === file.name);
+          if (fileInfo) {
+            setLocalUploadedFiles(prev => prev.map(f =>
+              f.key === fileInfo.key
+                ? { ...f, status: 'error', error: error.message }
+                : f
+            ));
+          }
+
+          toast({
+            title: 'File processing failed',
+            description: `Failed to parse ${file.name}: ${error.message}`,
+            variant: 'destructive'
+          });
+        }
+      }
+      setLocalTotalFileSize(prev => prev + newSize);
+
+    } finally {
+      setLocalIsProcessingFiles(false);
+    }
+  };
+
+  const handleFileRemove = (key: string) => {
+    // Use parent handler if available
+    if (parentOnFileRemove) {
+      return parentOnFileRemove(key);
+    }
+
+    // Local handling
+    const fileToRemove = localUploadedFiles.find(f => f.key === key);
+    if (!fileToRemove) return;
+
+    setLocalUploadedFiles(prev => prev.filter(f => f.key !== key));
+    setLocalTotalFileSize(prev => Math.max(0, prev - fileToRemove.size));
+  };
 
 
   const loadIntegrations = async () => {
@@ -388,7 +502,9 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
       // Store original steps to compare against self-healed result
       const originalStepsJson = JSON.stringify(executionSteps);
 
-      const payloadObj = JSON.parse(payload || '{}');
+      // Merge manual payload with file payloads for execution
+      const manualPayload = JSON.parse(payload || '{}');
+      const payloadObj = parentFilePayloads ? { ...manualPayload, ...parentFilePayloads } : manualPayload;
       setCurrentExecutingStepIndex(0);
 
       const state = await executeWorkflowStepByStep(
@@ -714,11 +830,8 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
       )}
 
       <div className="w-full">
-        {/* Workflow Configuration */}
         <div className="w-full">
-          {/* Steps and Schema Editors */}
           <div className="space-y-4">
-            {/* Workflow Steps - response schema now integrated in final transform */}
             <div className={embedded ? "" : "mb-4"}>
               <WorkflowStepGallery
                 steps={steps}
@@ -753,6 +866,11 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
                 navigateToFinalSignal={navigateToFinalSignal}
                 showStepOutputSignal={showStepOutputSignal}
                 focusStepId={focusStepId}
+                uploadedFiles={uploadedFiles}
+                onFilesUpload={handleFilesUpload}
+                onFileRemove={handleFileRemove}
+                isProcessingFiles={isProcessingFiles}
+                totalFileSize={totalFileSize}
               />
             </div>
           </div>

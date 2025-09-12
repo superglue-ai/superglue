@@ -81,7 +81,6 @@ export function InteractiveApiPlayground({
       })
   }
 
-  // Fetch config on mount
   useEffect(() => {
     if (configId) {
       fetchConfig()
@@ -89,7 +88,6 @@ export function InteractiveApiPlayground({
   }, [configId])
 
   const handleRun = async () => {
-    // TODO: deduplicate this with ConfigCreateStepper.tsx
     if (onRun) {
       return onRun()
     }
@@ -100,14 +98,12 @@ export function InteractiveApiPlayground({
         apiKey: superglueConfig.superglueApiKey
       })
 
-      // 1. First upsert the API config with the new schema and instruction
       await superglueClient.upsertApi(configId, {
         id: configId,
         instruction,
         responseSchema: JSON.parse(responseSchema)
       })
 
-      // 2. Call the API using the config ID and get mapped response
       const mappedResult = await superglueClient.call({
         id: configId,
         options: {
@@ -119,7 +115,6 @@ export function InteractiveApiPlayground({
         throw new Error(mappedResult.error)
       }
 
-      // 3. Set the mapped response
       setMappedResponse(mappedResult.data)
       onMappedResponse?.(mappedResult.data)
       setActiveTab('mapped')
@@ -135,7 +130,6 @@ export function InteractiveApiPlayground({
     }
   }
 
-  // Update mapped response when it comes from props
   useEffect(() => {
     if (mappedResponseData) {
       setMappedResponse(mappedResponseData)
@@ -143,7 +137,6 @@ export function InteractiveApiPlayground({
     }
   }, [mappedResponseData])
 
-  // Memoize the line splitting for each content type
   const rawResponseLines = useMemo(() => {
     return rawResponse ? JSON.stringify(rawResponse, null, 2).split('\n') : ['Response will appear here...']
   }, [rawResponse])
@@ -177,7 +170,6 @@ export function InteractiveApiPlayground({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full">
-      {/* Left Column */}
       <div className="flex flex-col space-y-4 overflow-hidden h-full">
         <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
           <div className="flex-1 min-h-0 bg-background h-full">
@@ -209,7 +201,6 @@ export function InteractiveApiPlayground({
         )}
       </div>
 
-      {/* Right Column */}
       <div className="flex flex-col h-full overflow-hidden rounded-lg">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
           <Card className="h-full flex flex-col">

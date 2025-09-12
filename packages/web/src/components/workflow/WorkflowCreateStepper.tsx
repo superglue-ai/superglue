@@ -80,6 +80,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFileInfo[]>([]);
   const [totalFileSize, setTotalFileSize] = useState(0);
   const [isProcessingFiles, setIsProcessingFiles] = useState(false);
+  const [filePayloads, setFilePayloads] = useState<Record<string, any>>({});
 
   const [selectedIntegrationIds, setSelectedIntegrationIds] = useState<string[]>(() => {
     return preselectedIntegrationId && integrations.some(i => i.id === preselectedIntegrationId)
@@ -281,9 +282,10 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       setIsBuilding(true);
       try {
         const parsedPayload = JSON.parse(payload || '{}');
+        const effectivePayload = { ...parsedPayload, ...filePayloads };
         const response = await client.buildWorkflow({
           instruction: instruction,
-          payload: parsedPayload,
+          payload: effectivePayload,
           integrationIds: selectedIntegrationIds,
           save: false
         });
@@ -385,8 +387,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         return;
       }
 
-      const currentPayload = JSON.parse(payload || '{}');
-      const existingKeys = Object.keys(currentPayload);
+      const existingKeys = Object.keys(filePayloads);
       const newFiles: UploadedFileInfo[] = [];
 
       for (const file of files) {
@@ -395,7 +396,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
           const baseKey = sanitizeFileName(file.name);
           const key = generateUniqueKey(baseKey, [...existingKeys, ...newFiles.map(f => f.key)]);
 
-          // Add to processing state
           const fileInfo: UploadedFileInfo = {
             name: file.name,
             size: file.size,
@@ -405,25 +405,17 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
           newFiles.push(fileInfo);
           setUploadedFiles(prev => [...prev, fileInfo]);
 
-          // Always use backend parsing for consistency
           const extractResult = await client.extract({
-            file: file,
-            endpoint: {
-              id: `extract-${Date.now()}`,
-              instruction: "Extract structured data from this file"
-            }
+            file: file
           });
 
           if (!extractResult.success) {
             throw new Error(extractResult.error || 'Failed to extract data');
           }
           const parsedData = extractResult.data;
-
-          // Update payload
-          currentPayload[key] = parsedData;
+          setFilePayloads(prev => ({ ...prev, [key]: parsedData }));
           existingKeys.push(key);
 
-          // Update file status
           setUploadedFiles(prev => prev.map(f =>
             f.key === key ? { ...f, status: 'ready' } : f
           ));
@@ -446,9 +438,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
           });
         }
       }
-
-      // Update payload and total size
-      setPayload(JSON.stringify(currentPayload, null, 2));
       setTotalFileSize(prev => prev + newSize);
 
     } finally {
@@ -461,14 +450,12 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     const fileToRemove = uploadedFiles.find(f => f.key === key);
     if (!fileToRemove) return;
 
-    // Update payload
-    try {
-      const currentPayload = JSON.parse(payload || '{}');
-      delete currentPayload[key];
-      setPayload(JSON.stringify(currentPayload, null, 2));
-    } catch (error) {
-      console.error('Error updating payload:', error);
-    }
+    // Update file payloads map
+    setFilePayloads(prev => {
+      const copy = { ...prev };
+      delete copy[key];
+      return copy;
+    });
 
     // Update files list and total size
     setUploadedFiles(prev => prev.filter(f => f.key !== key));
@@ -477,7 +464,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
 
   return (
     <div className="flex-1 flex flex-col h-full p-6">
-      {/* Header */}
       <div className="flex-none mb-4">
         <div className="flex flex-col lg:flex-row items-center justify-between gap-4 mb-4">
           <h1 className="text-2xl font-semibold">
@@ -499,11 +485,8 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         <StepIndicator currentStep={step} steps={WORKFLOW_CREATE_STEPS} />
       </div>
 
-      {/* Content Area */}
       <div className="flex-1 overflow-hidden flex flex-col">
-        {/* Main Content */}
         <div className="overflow-y-auto px-1 min-h-0">
-          {/* Step 1: Integrations */}
           {step === 'integrations' && (
             <div className="space-y-4">
               <div className="mb-4 flex items-center justify-between gap-4">
@@ -525,7 +508,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                   </div>
                 ) : (
                   <div className="gap-2 flex flex-col">
-                    {/* Header row */}
                     <div className="flex items-center justify-between py-2 pr-4 text-sm font-medium text-foreground border-b gap-4">
                       <Input
                         placeholder="Search integrations..."
@@ -584,10 +566,8 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                             const allSelected = filteredIds.length > 0 && selectedCount === filteredIds.length;
 
                             if (allSelected || selectedCount > 0) {
-                              // Unselect all filtered
                               setSelectedIntegrationIds(ids => ids.filter(id => !filteredIds.includes(id)));
                             } else {
-                              // Select all filtered
                               setSelectedIntegrationIds(ids => [...new Set([...ids, ...filteredIds])]);
                             }
                           }}
@@ -741,7 +721,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                             );
                           })}
 
-                          {/* Show "Create new integration" option when search has no results */}
                           {filteredIntegrations.length === 0 && integrationSearch.trim() !== '' && (
                             <div
                               className="flex items-center justify-between rounded-md px-4 py-3 transition-all duration-200 cursor-pointer bg-background border border-dashed border-muted-foreground/30 hover:bg-accent/50 hover:border-muted-foreground/50"
@@ -799,7 +778,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
             </div>
           )}
 
-          {/* Step 2: Prompt */}
           {step === 'prompt' && (
             <div className="space-y-4">
               <div className="space-y-2">
@@ -841,7 +819,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                 )}
               </div>
 
-              {/* Show loading state */}
               {isGeneratingSuggestions && (
                 <div className="flex items-center justify-center py-4">
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -850,7 +827,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
 
               <div className="space-y-1">
                 <Label htmlFor="payload">Initial Payload (Optional)</Label>
-                <HelpTooltip text="Provide the initial payload for the workflow. You can upload files (CSV, JSON, XML, Excel) which will be automatically parsed, or enter JSON directly. These values can be changed when executing the workflow later." />
+                <HelpTooltip text="Provide the initial payload for the workflow. Uploaded files (CSV, JSON, XML, Excel) will be automatically parsed and merged with the manual payload when the workflow executes." />
                 <div className={cn(
                   validationErrors.payload && "ring-2 ring-destructive ring-offset-2"
                 )}>
@@ -881,8 +858,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
               </div>
             </div>
           )}
-
-          {/* Step 3: Review - Use WorkflowPlayground in embedded mode */}
           {step === 'review' && currentWorkflow && (
             <div className="w-full">
               <WorkflowPlayground
@@ -898,6 +873,12 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                 onSelfHealingChange={setSelfHealingEnabled}
                 shouldStopExecution={shouldStopExecution}
                 onStopExecution={handleStopExecution}
+                uploadedFiles={uploadedFiles}
+                onFilesUpload={handleFilesUpload}
+                onFileRemove={handleFileRemove}
+                isProcessingFiles={isProcessingFiles}
+                totalFileSize={totalFileSize}
+                filePayloads={filePayloads}
                 headerActions={(
                   <div className="flex items-center gap-2">
                     <div className="flex items-center gap-2 mr-2">
@@ -948,8 +929,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
               />
             </div>
           )}
-
-          {/* Step 4: Success */}
           {step === 'success' && currentWorkflow && (
             <div className="space-y-4">
               <p className="text-lg font-medium">
@@ -996,7 +975,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         </div>
       </div>
 
-      {/* Footer Buttons */}
       <div className="flex-none mt-4 pt-4 border-t flex justify-between items-center">
         <Button
           variant="outline"

@@ -274,6 +274,26 @@ export const JsonCodeEditor = ({ value, onChange, readOnly = false, minHeight = 
     );
 };
 
+// File type colors and icons
+const getFileTypeInfo = (filename: string): { color: string; bgColor: string; icon: string } => {
+    const ext = filename.toLowerCase().split('.').pop() || '';
+    switch (ext) {
+        case 'json':
+            return { color: 'text-blue-600 dark:text-blue-400', bgColor: 'bg-blue-50 dark:bg-blue-950/30', icon: '{}' };
+        case 'csv':
+            return { color: 'text-green-600 dark:text-green-400', bgColor: 'bg-green-50 dark:bg-green-950/30', icon: '▤' };
+        case 'xml':
+            return { color: 'text-orange-600 dark:text-orange-400', bgColor: 'bg-orange-50 dark:bg-orange-950/30', icon: '<>' };
+        case 'xlsx':
+        case 'xls':
+            return { color: 'text-emerald-600 dark:text-emerald-400', bgColor: 'bg-emerald-50 dark:bg-emerald-950/30', icon: '⊞' };
+        case 'txt':
+            return { color: 'text-gray-600 dark:text-gray-400', bgColor: 'bg-gray-50 dark:bg-gray-950/30', icon: '≡' };
+        default:
+            return { color: 'text-gray-600 dark:text-gray-400', bgColor: 'bg-gray-50 dark:bg-gray-950/30', icon: '📄' };
+    }
+};
+
 export const PayloadSpotlight = ({
     payloadText,
     inputSchema,
@@ -303,7 +323,9 @@ export const PayloadSpotlight = ({
     const [error, setError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    useEffect(() => { setLocalPayload(payloadText || ''); }, [payloadText]);
+    useEffect(() => {
+        setLocalPayload(payloadText || '');
+    }, [payloadText]);
     useEffect(() => { setLocalInputSchema(inputSchema || null); }, [inputSchema]);
 
     const handlePayloadChange = (value: string) => {
@@ -332,14 +354,12 @@ export const PayloadSpotlight = ({
         const files = Array.from(e.target.files || []);
         if (files.length === 0) return;
 
-        // Validate file types
         const invalidFiles = files.filter(f => !isAllowedFileType(f.name));
         if (invalidFiles.length > 0) {
             setError(`Unsupported file types: ${invalidFiles.map(f => f.name).join(', ')}`);
             return;
         }
 
-        // Check total size
         const newSize = files.reduce((sum, f) => sum + f.size, 0);
         if (totalFileSize + newSize > MAX_TOTAL_FILE_SIZE) {
             setError(`Total file size cannot exceed ${formatBytes(MAX_TOTAL_FILE_SIZE)}`);
@@ -350,7 +370,6 @@ export const PayloadSpotlight = ({
             await onFilesUpload(files);
         }
 
-        // Reset input
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
@@ -371,88 +390,99 @@ export const PayloadSpotlight = ({
                     <TabsTrigger value="payload" className="text-xs">Payload JSON</TabsTrigger>
                     <TabsTrigger value="schema" className="text-xs">Input Schema</TabsTrigger>
                 </TabsList>
-                <TabsContent value="payload" className="mt-3">
+                <TabsContent value="payload" className="mt-3 space-y-3">
+                    <JsonSchemaEditor
+                        value={localPayload || '{}'}
+                        onChange={(val) => handlePayloadChange(val || '')}
+                        isOptional={false}
+                        readOnly={!!readOnly}
+                        forceCodeMode={true}
+                        showModeToggle={false}
+                    />
                     {!readOnly && onFilesUpload && (
-                        <div className="mb-3 space-y-2">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => fileInputRef.current?.click()}
-                                        disabled={isProcessingFiles || totalFileSize >= MAX_TOTAL_FILE_SIZE}
-                                        className="h-8"
-                                    >
-                                        {isProcessingFiles ? (
-                                            <>
-                                                <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent mr-2" />
-                                                Processing...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Upload className="h-3 w-3 mr-2" />
-                                                Upload Files
-                                            </>
-                                        )}
-                                    </Button>
-                                    <span className="text-xs text-muted-foreground">
-                                        {formatBytes(totalFileSize)} / {formatBytes(MAX_TOTAL_FILE_SIZE)} used
-                                    </span>
-                                    <HelpTooltip text="Upload CSV, JSON, XML, or Excel files. Files are automatically parsed and added to the payload with their filename as the key." />
+                        <div className="pt-3 border-t border-border/50 space-y-3">
+                            <div className="flex flex-col items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    disabled={isProcessingFiles || totalFileSize >= MAX_TOTAL_FILE_SIZE}
+                                    className="h-9 px-4"
+                                >
+                                    {isProcessingFiles ? (
+                                        <>
+                                            <div className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent mr-2" />
+                                            Processing Files...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Upload className="h-3.5 w-3.5 mr-2" />
+                                            Upload Files
+                                        </>
+                                    )}
+                                </Button>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <span>{formatBytes(totalFileSize)} / {formatBytes(MAX_TOTAL_FILE_SIZE)}</span>
+                                    <HelpTooltip text="Upload CSV, JSON, XML, or Excel files. Files will be automatically parsed to JSON and merged with the manual payload when the workflow executes." />
                                 </div>
                             </div>
 
                             {uploadedFiles.length > 0 && (
-                                <div className="flex flex-wrap gap-1.5">
-                                    {uploadedFiles.map(file => (
-                                        <div
-                                            key={file.key}
-                                            className={cn(
-                                                "flex items-center gap-1.5 px-2 py-1 rounded-md text-xs",
-                                                file.status === 'error' ? "bg-destructive/10 text-destructive" : "bg-muted"
-                                            )}
-                                        >
-                                            <FileJson className="h-3 w-3 flex-shrink-0" />
-                                            <span className="max-w-[150px] truncate" title={file.name}>
-                                                {file.name}
-                                            </span>
-                                            <span className="text-muted-foreground">
-                                                ({formatBytes(file.size)})
-                                            </span>
-                                            {file.status === 'processing' && (
-                                                <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                                            )}
-                                            {file.status === 'error' && file.error && (
-                                                <span className="text-xs" title={file.error}>⚠</span>
-                                            )}
-                                            {onFileRemove && (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-4 w-4 ml-0.5 hover:bg-background/80"
-                                                    onClick={() => onFileRemove(file.key)}
-                                                    disabled={file.status === 'processing'}
-                                                >
-                                                    <X className="h-3 w-3" />
-                                                </Button>
-                                            )}
-                                        </div>
-                                    ))}
+                                <div className="space-y-1.5">
+                                    {uploadedFiles.map(file => {
+                                        const fileInfo = getFileTypeInfo(file.name);
+                                        return (
+                                            <div
+                                                key={file.key}
+                                                className={cn(
+                                                    "flex items-center justify-between px-3 py-2 rounded-md transition-all",
+                                                    file.status === 'error'
+                                                        ? "bg-destructive/10 border border-destructive/20"
+                                                        : file.status === 'processing'
+                                                            ? "bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800"
+                                                            : `${fileInfo.bgColor} border border-border/50`
+                                                )}
+                                            >
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <span className={cn("font-mono text-sm", fileInfo.color)}>
+                                                        {fileInfo.icon}
+                                                    </span>
+                                                    <div className="flex flex-col min-w-0">
+                                                        <span className="text-xs font-medium truncate" title={file.name}>
+                                                            {file.name}
+                                                        </span>
+                                                        <span className="text-[10px] text-muted-foreground">
+                                                            {file.status === 'processing'
+                                                                ? 'Parsing...'
+                                                                : file.status === 'error'
+                                                                    ? file.error || 'Failed to parse'
+                                                                    : `${formatBytes(file.size)} • Key: ${file.key}`}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                    {file.status === 'processing' && (
+                                                        <div className="h-3 w-3 animate-spin rounded-full border-2 border-amber-600 dark:border-amber-400 border-t-transparent" />
+                                                    )}
+                                                    {file.status === 'ready' && (
+                                                        <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
+                                                    )}
+                                                    {onFileRemove && file.status !== 'processing' && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-5 w-5 hover:bg-background/80"
+                                                            onClick={() => onFileRemove(file.key)}
+                                                        >
+                                                            <X className="h-3 w-3" />
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             )}
-                        </div>
-                    )}
-                    <JsonCodeEditor
-                        value={localPayload}
-                        onChange={handlePayloadChange}
-                        readOnly={readOnly}
-                        minHeight="150px"
-                        maxHeight="200px"
-                        placeholder="{}"
-                    />
-                    {error && (
-                        <div className="mt-2 text-xs text-destructive flex items-center gap-1">
-                            <span className="text-destructive">⚠</span> {error}
                         </div>
                     )}
                 </TabsContent>
@@ -461,6 +491,7 @@ export const PayloadSpotlight = ({
                         value={localInputSchema}
                         onChange={handleSchemaChange}
                         isOptional={true}
+                        showModeToggle={true}
                     />
                     <div className="mt-2 text-[10px] text-muted-foreground">
                         <HelpTooltip text="Input Schema is optional documentation/validation describing expected payload shape. The payload JSON is what runs; schema does not inject credentials nor drive payload. Leave disabled if not needed." />
@@ -471,7 +502,29 @@ export const PayloadSpotlight = ({
     );
 };
 
-export const PayloadMiniStepCard = ({ payloadText, inputSchema, onChange, onInputSchemaChange, readOnly }: { payloadText: string; inputSchema?: string | null; onChange?: (value: string) => void; onInputSchemaChange?: (value: string | null) => void; readOnly?: boolean; }) => {
+export const PayloadMiniStepCard = ({
+    payloadText,
+    inputSchema,
+    onChange,
+    onInputSchemaChange,
+    readOnly,
+    onFilesUpload,
+    uploadedFiles,
+    onFileRemove,
+    isProcessingFiles,
+    totalFileSize
+}: {
+    payloadText: string;
+    inputSchema?: string | null;
+    onChange?: (value: string) => void;
+    onInputSchemaChange?: (value: string | null) => void;
+    readOnly?: boolean;
+    onFilesUpload?: (files: File[]) => Promise<void>;
+    uploadedFiles?: UploadedFileInfo[];
+    onFileRemove?: (key: string) => void;
+    isProcessingFiles?: boolean;
+    totalFileSize?: number;
+}) => {
     return (
         <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50">
             <div className="p-4">
@@ -490,6 +543,11 @@ export const PayloadMiniStepCard = ({ payloadText, inputSchema, onChange, onInpu
                     onChange={onChange}
                     onInputSchemaChange={onInputSchemaChange}
                     readOnly={readOnly}
+                    onFilesUpload={onFilesUpload}
+                    uploadedFiles={uploadedFiles}
+                    onFileRemove={onFileRemove}
+                    isProcessingFiles={isProcessingFiles}
+                    totalFileSize={totalFileSize}
                 />
             </div>
         </Card>

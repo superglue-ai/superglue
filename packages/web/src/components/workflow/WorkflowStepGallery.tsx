@@ -4,6 +4,7 @@ import { Input } from '@/src/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import { canExecuteStep } from '@/src/lib/client-utils';
+import { type UploadedFileInfo } from '@/src/lib/file-utils';
 import { buildEvolvingPayload, cn, isEmptyData, truncateForDisplay, truncateLines } from '@/src/lib/utils';
 import { Integration } from "@superglue/client";
 import { inferJsonSchema } from '@superglue/shared';
@@ -46,6 +47,12 @@ interface WorkflowStepGalleryProps {
     navigateToFinalSignal?: number;
     showStepOutputSignal?: number;
     focusStepId?: string | null;
+    // File upload props
+    uploadedFiles?: UploadedFileInfo[];
+    onFilesUpload?: (files: File[]) => Promise<void>;
+    onFileRemove?: (key: string) => void;
+    isProcessingFiles?: boolean;
+    totalFileSize?: number;
 }
 
 const MAX_DISPLAY_LINES = 3000;
@@ -158,7 +165,6 @@ const SpotlightStepCard = ({
                                 </TabsTrigger>
                             </TabsList>
                         </Tabs>
-                        {/* Removed secondary Run Step button; keep only Test Step above */}
                     </div>
 
                     {activePanel === 'input' && (
@@ -348,7 +354,13 @@ export function WorkflowStepGallery({
     headerActions,
     navigateToFinalSignal,
     showStepOutputSignal,
-    focusStepId
+    focusStepId,
+    // File upload props
+    uploadedFiles,
+    onFilesUpload,
+    onFileRemove,
+    isProcessingFiles,
+    totalFileSize
 }: WorkflowStepGalleryProps) {
     const [activeIndex, setActiveIndex] = useState(1); // Default to first workflow step, not payload
     const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
@@ -410,6 +422,13 @@ export function WorkflowStepGallery({
         } catch {
         }
     }, [rawPayloadText]);
+
+    // Keep local payload text in sync with external prop so uploads reflect immediately
+    useEffect(() => {
+        if (typeof payloadText === 'string') {
+            setRawPayloadText(payloadText);
+        }
+    }, [payloadText]);
 
     const handlePayloadJsonChange = (jsonString: string) => {
         setRawPayloadText(jsonString);
@@ -548,7 +567,6 @@ export function WorkflowStepGallery({
 
     return (
         <div className="space-y-6">
-            {/* Header */}
             <div className="space-y-3">
                 <div className="flex items-center justify-center gap-3 flex-wrap">
                     <div className="flex items-center gap-3 min-w-0 w-full">
@@ -593,7 +611,6 @@ export function WorkflowStepGallery({
                     </div>
                 )}
 
-                {/* Navigation Controls with scroll-snap carousel */}
                 <div className="flex items-center gap-2">
                     <Button
                         variant="outline"
@@ -606,7 +623,6 @@ export function WorkflowStepGallery({
                         <ChevronLeft className="h-4 w-4" />
                     </Button>
 
-                    {/* Card gallery - fully responsive to width */}
                     <div className="flex-1 overflow-hidden px-2 sm:px-4 md:px-6 lg:px-8 xl:px-10 2xl:px-12">
                         <div className="relative">
                             <div
@@ -615,11 +631,9 @@ export function WorkflowStepGallery({
                                 style={{ minHeight: '150px' }}
                             >
                                 {(() => {
-                                    // Calculate which 3 cards to show
                                     const totalCards = workflowItems.length;
                                     let startIdx = 0;
                                     let endIdx = totalCards;
-                                    // Compute how many cards fit based on a minimum card width and gutter
                                     const CARD_WIDTH = 228; // px (matches card classes above)
                                     const ARROW_WIDTH = 24; // px (ChevronRight ~20px, add buffer)
                                     const GUTTER = 8; // px
@@ -629,13 +643,11 @@ export function WorkflowStepGallery({
                                         Math.floor((((containerWidth || windowWidth) + GUTTER) / (BLOCK_WIDTH + GUTTER)))
                                     ));
 
-                                    // Calculate the range of cards to display
                                     if (totalCards <= cardsToShow) {
                                         // Show all cards if we have fewer than cardsToShow
                                         startIdx = 0;
                                         endIdx = totalCards;
                                     } else {
-                                        // Center the active card within the visible window
                                         const halfWindow = Math.floor(cardsToShow / 2);
                                         startIdx = Math.max(0, Math.min(activeIndex - halfWindow, totalCards - cardsToShow));
                                         endIdx = startIdx + cardsToShow;
@@ -648,10 +660,8 @@ export function WorkflowStepGallery({
 
                                     return (
                                         <>
-                                            {/* Left indicator - positioned between left arrow and first card */}
                                             {hasHiddenLeft && null}
 
-                                            {/* Cards with Arrows */}
                                             {visibleItems.map((item, idx) => {
                                                 const globalIdx = visibleIndices[idx];
                                                 const showArrow = idx < visibleItems.length - 1;
@@ -691,7 +701,6 @@ export function WorkflowStepGallery({
                                                 );
                                             })}
 
-                                            {/* Right indicator - positioned between last card and right arrow */}
                                             {hasHiddenRight && null}
                                         </>
                                     );
@@ -712,7 +721,6 @@ export function WorkflowStepGallery({
                     </Button>
                 </div>
 
-                {/* Simplified indicator dots: one per mini card */}
                 <div className="flex justify-center items-center gap-2">
                     <div className="flex gap-1">
                         {indicatorIndices.map((globalIdx) => (
@@ -730,7 +738,6 @@ export function WorkflowStepGallery({
                     </div>
                 </div>
 
-                {/* Spotlight Card */}
                 <div className="min-h-[220px] max-w-6xl mx-auto">
                     {currentItem && (
                         currentItem.type === 'payload' ? (
@@ -740,6 +747,11 @@ export function WorkflowStepGallery({
                                 onChange={handlePayloadJsonChange}
                                 onInputSchemaChange={onInputSchemaChange}
                                 readOnly={readOnly}
+                                onFilesUpload={onFilesUpload}
+                                uploadedFiles={uploadedFiles}
+                                onFileRemove={onFileRemove}
+                                isProcessingFiles={isProcessingFiles}
+                                totalFileSize={totalFileSize}
                             />
                         ) : currentItem.type === 'transform' ? (
                             <FinalTransformMiniStepCard
