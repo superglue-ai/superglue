@@ -481,7 +481,7 @@ export const toolDefinitions: Record<string, any> = {
     </use_case>
 
     <important_notes>
-      - This tool returns a list of suggested integration IDs, a reason for each suggestion, and the names of the available credentials for each integration.
+      - This tool returns a list of suggested integrations (inclusing IDs & credentials), and a reason for each suggestion.
       - If no instruction is provided, returns all available integrations with their IDs and the names of the credentials saved in the integration.
       - If no integrations exist, it returns an empty list. If no specific matches are found, it returns all existing integrations.
       - Use this list to make a final decision on which integrations to use for building a workflow. 
@@ -615,6 +615,8 @@ export const toolDefinitions: Record<string, any> = {
           responseSchema,
           save: false
         });
+
+        logMessage('info', `MCP_UPDATE:build_and_run:WORKFLOW_BUILD_SUCCESS:${JSON.stringify(builtWorkflow)}`, { orgId: orgId });
 
         const result = await client.executeWorkflow({
           workflow: builtWorkflow,

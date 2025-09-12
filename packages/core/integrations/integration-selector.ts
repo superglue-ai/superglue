@@ -11,9 +11,8 @@ type ChatMessage = OpenAI.Chat.ChatCompletionMessageParam;
 
 // Define the structure for a suggested integration
 export interface SuggestedIntegration {
-    id: string;
+    integration: Integration;
     reason: string;
-    savedCredentials: string[];
 }
 
 export class IntegrationSelector {
@@ -37,9 +36,8 @@ export class IntegrationSelector {
         if (!instruction || instruction.trim() === "" || instruction.trim() === "*" || instruction.trim() === "all") {
             logMessage('info', 'No specific instruction provided, returning all available integrations.', this.metadata);
             return integrations.map(int => ({
-                id: int.id,
-                reason: "Available integration (no specific instruction provided)",
-                savedCredentials: Object.keys(int.credentials || {})
+                integration: int,
+                reason: "Available integration (no specific instruction provided)"
             }));
         }
 
@@ -84,23 +82,26 @@ Return a JSON object conforming to the schema, containing a list of suggested in
             );
 
             if (rawSelection && rawSelection.suggestedIntegrations && Array.isArray(rawSelection.suggestedIntegrations)) {
-                // Enrich LLM suggestions with credentials
-                const suggestions = rawSelection.suggestedIntegrations.map(suggestion => {
-                    const integration = integrations.find(int => int.id === suggestion.id);
-                    return {
-                        id: suggestion.id,
-                        reason: suggestion.reason,
-                        savedCredentials: integration ? Object.keys(integration.credentials || {}) : []
-                    };
-                });
+                // Enrich LLM suggestions with full integration data
+                const suggestions = rawSelection.suggestedIntegrations
+                    .map(suggestion => {
+                        const integration = integrations.find(int => int.id === suggestion.id);
+                        if (!integration) {
+                            return null;
+                        }
+                        return {
+                            integration,
+                            reason: suggestion.reason
+                        };
+                    })
+                    .filter((suggestion): suggestion is NonNullable<typeof suggestion> => suggestion !== null);
 
                 // If LLM returned no specific integrations, fallback to all integrations
                 if (suggestions.length === 0) {
                     logMessage('info', 'Integration selector returned no specific integrations. Returning all available integrations as a fallback.', this.metadata);
                     return integrations.map(int => ({
-                        id: int.id,
-                        reason: "No specific match found for your request, but this integration is available for use",
-                        savedCredentials: Object.keys(int.credentials || {})
+                        integration: int,
+                        reason: "No specific match found for your request, but this integration is available for use"
                     }));
                 }
 
@@ -110,18 +111,16 @@ Return a JSON object conforming to the schema, containing a list of suggested in
             logMessage('warn', "Integration selection returned an unexpected format. Returning all available integrations as fallback.", this.metadata);
             // Return all integrations as fallback if the format is not as expected
             return integrations.map(int => ({
-                id: int.id,
-                reason: "Selection failed, but this integration is available for use",
-                savedCredentials: Object.keys(int.credentials || {})
+                integration: int,
+                reason: "Selection failed, but this integration is available for use"
             }));
 
         } catch (error) {
             logMessage('error', `Error during integration selection: ${error}`, this.metadata);
             logMessage('info', 'Returning all available integrations as fallback due to selection error.', this.metadata);
             return integrations.map(int => ({
-                id: int.id,
-                reason: "Selection failed due to error, but this integration is available for use",
-                savedCredentials: Object.keys(int.credentials || {})
+                integration: int,
+                reason: "Selection failed due to error, but this integration is available for use"
             }));
         }
     }
