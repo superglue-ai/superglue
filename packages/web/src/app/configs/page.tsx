@@ -110,6 +110,7 @@ const ConfigTable = () => {
       setTotal(combinedConfigs.length);
     } catch (error) {
       console.error('Error fetching configs:', error);
+      // Consider setting an error state to show in the UI
     } finally {
       setLoading(false);
       setIsRefreshing(false);
@@ -372,6 +373,7 @@ const ConfigTable = () => {
                 <TableRow
                   key={`${configType}-${config.id}`}
                   className="hover:bg-secondary"
+                // Consider adding onClick={() => handleRowClick(config)} if needed
                 >
                   <TableCell className="w-[100px]">
                     <Button
@@ -411,6 +413,7 @@ const ConfigTable = () => {
                     </div>
                   </TableCell>
                   <TableCell className="w-[100px]">
+                    {/* Use different variants or specific names */}
                     <Badge variant={isApi ? 'secondary' : isExtract ? 'default' : isTransform ? 'outline' : 'outline'}>
                       {isApi ? 'API' : isExtract ? 'Extract' : isTransform ? 'Transform' : 'Workflow'}
                     </Badge>
@@ -425,8 +428,9 @@ const ConfigTable = () => {
                     {config.updatedAt ? new Date(config.updatedAt).toLocaleDateString() : (config.createdAt ? new Date(config.createdAt).toLocaleDateString() : '')}
                   </TableCell>
                   <TableCell className="w-[100px]">
-                    <div className="flex justify-end gap-1">
+                    <div className="flex justify-end gap-1"> {/* Reduced gap */}
                       <TooltipProvider>
+                        {/* Common Actions */}
                         {isApi && (
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -461,6 +465,7 @@ const ConfigTable = () => {
                           </Tooltip>
                         )}
 
+                        {/* Delete Action (Available for all types) */}
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button

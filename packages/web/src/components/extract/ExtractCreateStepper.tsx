@@ -873,6 +873,17 @@ if (transformResult?.success) {
                 Back
               </Button>
               <div className="flex gap-2">
+                {/* not implemented yet 
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    router.push(`/configs/${extractId}/edit`)
+                    onOpenChange(false)
+                  }}
+                >
+                  Advanced Edit
+                </Button>
+                */}
                 <Button
                   onClick={() => {
                     router.push('/configs')

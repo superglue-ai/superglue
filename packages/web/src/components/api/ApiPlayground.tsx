@@ -59,6 +59,7 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
     });
   };
 
+  // Save user inputs to sessionStorage instead of localStorage
   const saveUserInputs = useCallback(() => {
     if (!id) return;
     const credentialsObj = Object.fromEntries(credentials.map(c => [c.key, c.value]));
@@ -67,6 +68,7 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
     sessionStorage.setItem(`sg-playground-manual-vars-${id}`, JSON.stringify(manualVars));
   }, [id, credentials]);
 
+  // Load user inputs from sessionStorage
   const loadUserInputs = useCallback(() => {
     if (!id) return;
     const savedCredentials = sessionStorage.getItem(`sg-playground-credentials-${id}`);
@@ -83,6 +85,7 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
             value: parsed[cred.key] || cred.value
           }));
 
+          // Add manual variables that were saved but not in auto-detected ones
           const existingKeys = new Set(existing.map(c => c.key));
           const additionalManual = manualVars
             .filter((key: string) => !existingKeys.has(key) && parsed[key] !== undefined)
@@ -101,6 +104,7 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
     }
   }, [id]);
 
+  // Keep only this useEffect that loads config and calls loadUserInputs once
   useEffect(() => {
     const loadConfig = async () => {
       try {
@@ -119,6 +123,7 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
         ].flatMap(value => findTemplateVars(String(value)));
         const allVars = [...new Set(varMatches)].filter(v => !['limit', 'offset', 'page'].includes(v));
 
+        // Set credentials with unique IDs
         setCredentials(allVars.map(key => ({
           id: crypto.randomUUID(),
           key,
@@ -126,6 +131,7 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
           isManual: false
         })));
 
+        // Load saved values after setting initial credentials
         loadUserInputs();
       } catch (err) {
         setError('Failed to load API configuration');
@@ -139,6 +145,7 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
     e.preventDefault();  // Prevent any form submission
     if (!config) return;
 
+    // Check for empty credentials and mark them as invalid
     const emptyCredentials = credentials
       .filter(c => c.value === "")
       .map(c => c.key);
@@ -148,8 +155,10 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
       return;
     }
 
+    // Clear invalid fields if all are filled
     setInvalidFields(new Set());
 
+    // Save inputs before running
     saveUserInputs();
 
     setLoading(true);
@@ -160,14 +169,17 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
     const startTime = Date.now();
 
     try {
+      // Parse JSON values if they are valid JSON strings
       const credentialsObj = Object.fromEntries(
         credentials.map(c => {
           let value = c.value;
           try {
+            // Check if the value looks like JSON (starts with { or [)
             if (/^[\[\{]/.test(value.trim())) {
               value = JSON.parse(value);
             }
           } catch (e) {
+            // If parsing fails, use the original string value
             console.debug(`Failed to parse JSON for ${c.key}, using raw string`);
           }
           return [c.key, value];
@@ -185,6 +197,7 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
           cacheMode: CacheMode.READONLY
         }
       });
+      // Call the callback if it exists
       if (onRunApi) {
         onRunApi(response.config as ApiConfig);
       }
@@ -247,6 +260,7 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
     <>
       <style>{invalidFieldAnimation}</style>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Request Section */}
         <div className="space-y-6 lg:mx-6">
           <Card>
             <CardHeader>
@@ -354,6 +368,7 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
           </Card>
         </div>
 
+        {/* Response Section */}
         <div className="space-y-6">
           {response ? (
             <Card className="min-h-full">

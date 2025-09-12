@@ -135,6 +135,8 @@ ${authSection}
       ...Object.keys(this.initialPayload || {}).map(k => `<<${k}>>`)
     ].join(", ");
 
+    const hasIntegrations = Object.keys(this.integrations).length > 0;
+
     const buildingPromptForAgent = `
 Build a complete workflow to fulfill the user's request.
 
@@ -142,19 +144,21 @@ Build a complete workflow to fulfill the user's request.
 ${this.instruction}
 </user_instruction>
 
-<available_integrations_and_documentation>
+${hasIntegrations ? `<available_integrations_and_documentation>
 ${integrationDescriptions}
-</available_integrations_and_documentation>
+</available_integrations_and_documentation>` : '<no_integrations_available>No integrations provided. Build a transform-only workflow using finalTransform to process the payload data.</no_integrations_available>'}
 
 <available_variables>
-${availableVariables}
+${availableVariables || 'No variables available'}
 </available_variables>
 
 <initial_payload>
 ${initialPayloadDescription}
 </initial_payload>
 
-Ensure that the final output matches the instruction and you use ONLY the available integration ids.`;
+${hasIntegrations
+        ? 'Ensure that the final output matches the instruction and you use ONLY the available integration ids.'
+        : 'Since no integrations are available, create a transform-only workflow with no steps, using only the finalTransform to process the payload data.'}`;
 
     return [
       { role: "system", content: BUILD_WORKFLOW_SYSTEM_PROMPT },

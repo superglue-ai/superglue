@@ -425,7 +425,7 @@ type Mutation {
   buildWorkflow(
     instruction: String!
     payload: JSON
-    integrationIds: [ID!]!
+    integrationIds: [ID!]
     responseSchema: JSONSchema
   ): Workflow!
 
