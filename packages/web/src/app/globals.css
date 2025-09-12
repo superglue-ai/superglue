@@ -383,18 +383,17 @@ html.dark {
 }
 
 .code-editor textarea {
-  @apply border-0 outline-none focus:outline-none focus:ring-0;
-  box-shadow: none;
+  @apply flex min-h-[60px] w-full rounded-md border-0 bg-transparent px-3 py-2 shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50 font-mono text-xs;
 }
 
 .code-editor {
-  border: 0 !important;
-  box-shadow: none !important;
+  @apply rounded-md border border-input bg-transparent;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .code-editor:focus-within {
-  box-shadow: none !important;
-  border-color: transparent !important;
+  border-color: hsl(var(--ring));
+  box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2);
 }
 
 .switch-on,
