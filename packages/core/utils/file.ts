@@ -256,10 +256,26 @@ export async function parseXML(buffer: Buffer): Promise<any> {
 
 async function parseExcel(buffer: Buffer): Promise<{ [sheetName: string]: any[] }> {
     try {
-        const workbook = XLSX.read(buffer, {
-            type: 'buffer',
-            cellDates: true
+        const parsePromise = new Promise<XLSX.WorkBook>((resolve, reject) => {
+            try {
+                const workbook = XLSX.read(buffer, {
+                    type: 'buffer',
+                    cellDates: true,
+                    dense: false, // Use sparse mode which is sometimes more stable
+                    cellStyles: false // Don't parse styles (can cause issues)
+                });
+                resolve(workbook);
+            } catch (error) {
+                reject(error);
+            }
         });
+
+        // Timeout after 30 seconds
+        const timeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error('Excel parsing timeout after 60 seconds')), 60000);
+        });
+
+        const workbook = await Promise.race([parsePromise, timeoutPromise]);
         const result: { [sheetName: string]: any[] } = {};
 
         for (const sheetName of workbook.SheetNames) {
@@ -278,14 +294,19 @@ async function parseExcel(buffer: Buffer): Promise<{ [sheetName: string]: any[] 
                 continue;
             }
 
-            // Find the row with max length from first 20 rows
-            const headerRowIndex = rawRows
-                .slice(0, 20)
-                .reduce((maxIndex, row, currentIndex, rows) =>
-                    (row.length > rows[maxIndex]?.length || 0) ? currentIndex : maxIndex
-                    , 0);
+            // Find the first non-empty row to use as headers
+            // A row is considered "empty" if it has fewer than 2 non-null values
+            let headerRowIndex = 0;
+            for (let i = 0; i < Math.min(rawRows.length, 10); i++) {
+                const row = rawRows[i] || [];
+                const nonNullCount = row.filter((v: any) => v !== null && v !== undefined && v !== '').length;
+                if (nonNullCount >= 2) {
+                    headerRowIndex = i;
+                    break;
+                }
+            }
 
-            // Get headers from the detected row
+            // Get headers from the first non-empty row
             const headers = rawRows[headerRowIndex].map((header: any, index: number) =>
                 header ? String(header).trim() : `Column ${index + 1}`
             );
@@ -315,9 +336,18 @@ async function detectFileType(buffer: Buffer): Promise<FileType> {
     const xlsxSignature = buffer.slice(0, 4).toString('hex');
     if (xlsxSignature === '504b0304') { // XLSX files are ZIP files
         try {
-            XLSX.read(buffer, { type: 'buffer' });
-            return FileType.EXCEL;
-        } catch { }
+            const zipStream = await unzipper.Open.buffer(buffer);
+            const hasExcelSignature = zipStream.files.some(f =>
+                f.path === '[Content_Types].xml' ||
+                f.path === 'xl/workbook.xml' ||
+                f.path.startsWith('xl/worksheets/')
+            );
+            if (hasExcelSignature) {
+                return FileType.EXCEL;
+            }
+        } catch (error) { 
+            console.error('Failed to detect Excel file:', error);
+        }
     }
     const sampleSize = Math.min(buffer.length, 4096);
     const sample = buffer.slice(0, sampleSize).toString('utf8');
