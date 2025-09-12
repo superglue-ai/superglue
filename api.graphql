@@ -290,9 +290,8 @@ type Log {
 }
 
 type SuggestedIntegration {
-  id: String!
   reason: String!
-  savedCredentials: [String!]!
+  integration: Integration!
 }
 
 type Query {
