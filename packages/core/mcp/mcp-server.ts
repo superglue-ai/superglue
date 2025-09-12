@@ -616,6 +616,8 @@ export const toolDefinitions: Record<string, any> = {
           save: false
         });
 
+        logMessage('info', `MCP_UPDATE:build_and_run:WORKFLOW_BUILD_SUCCESS:${JSON.stringify(builtWorkflow)}`, { orgId: orgId });
+
         const result = await client.executeWorkflow({
           workflow: builtWorkflow,
           payload: payload,
