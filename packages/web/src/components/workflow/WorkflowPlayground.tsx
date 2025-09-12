@@ -95,11 +95,13 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
   const [localUploadedFiles, setLocalUploadedFiles] = useState<UploadedFileInfo[]>([]);
   const [localTotalFileSize, setLocalTotalFileSize] = useState(0);
   const [localIsProcessingFiles, setLocalIsProcessingFiles] = useState(false);
+  const [localFilePayloads, setLocalFilePayloads] = useState<Record<string, any>>({});
 
   // Use parent state if available, otherwise use local state
   const uploadedFiles = parentUploadedFiles || localUploadedFiles;
   const totalFileSize = parentTotalFileSize ?? localTotalFileSize;
   const isProcessingFiles = parentIsProcessingFiles ?? localIsProcessingFiles;
+  const filePayloads = parentFilePayloads || localFilePayloads;
 
   useEffect(() => {
     if (initialPayload !== undefined) {
@@ -239,6 +241,8 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
           if (!extractResult.success) {
             throw new Error(extractResult.error || 'Failed to extract data');
           }
+          const parsedData = extractResult.data;
+          setLocalFilePayloads(prev => ({ ...prev, [key]: parsedData }));
           existingKeys.push(key);
 
           setLocalUploadedFiles(prev => prev.map(f =>
@@ -279,6 +283,11 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
     const fileToRemove = localUploadedFiles.find(f => f.key === key);
     if (!fileToRemove) return;
 
+    setLocalFilePayloads(prev => {
+      const newPayloads = { ...prev };
+      delete newPayloads[key];
+      return newPayloads;
+    });
     setLocalUploadedFiles(prev => prev.filter(f => f.key !== key));
     setLocalTotalFileSize(prev => Math.max(0, prev - fileToRemove.size));
   };
@@ -504,7 +513,7 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
 
       // Merge manual payload with file payloads for execution
       const manualPayload = JSON.parse(payload || '{}');
-      const payloadObj = parentFilePayloads ? { ...manualPayload, ...parentFilePayloads } : manualPayload;
+      const payloadObj = { ...manualPayload, ...filePayloads };
       setCurrentExecutingStepIndex(0);
 
       const state = await executeWorkflowStepByStep(
@@ -871,6 +880,7 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
                 onFileRemove={handleFileRemove}
                 isProcessingFiles={isProcessingFiles}
                 totalFileSize={totalFileSize}
+                filePayloads={filePayloads}
               />
             </div>
           </div>

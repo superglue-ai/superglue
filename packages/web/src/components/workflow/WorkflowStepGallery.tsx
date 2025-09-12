@@ -53,6 +53,7 @@ interface WorkflowStepGalleryProps {
     onFileRemove?: (key: string) => void;
     isProcessingFiles?: boolean;
     totalFileSize?: number;
+    filePayloads?: Record<string, any>;
 }
 
 const MAX_DISPLAY_LINES = 3000;
@@ -360,7 +361,8 @@ export function WorkflowStepGallery({
     onFilesUpload,
     onFileRemove,
     isProcessingFiles,
-    totalFileSize
+    totalFileSize,
+    filePayloads
 }: WorkflowStepGalleryProps) {
     const [activeIndex, setActiveIndex] = useState(1); // Default to first workflow step, not payload
     const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
@@ -408,20 +410,37 @@ export function WorkflowStepGallery({
 
 
     const [rawPayloadText, setRawPayloadText] = useState<string>(payloadText || '');
-    const [workingPayload, setWorkingPayload] = useState<any>({});
+    // Initialize workingPayload with filePayloads if available
+    const [workingPayload, setWorkingPayload] = useState<any>(() => {
+        const trimmed = (payloadText || '').trim();
+        if (trimmed === '') {
+            return filePayloads || {};
+        }
+        try {
+            const parsed = JSON.parse(payloadText);
+            return filePayloads ? { ...parsed, ...filePayloads } : parsed;
+        } catch {
+            return filePayloads || {};
+        }
+    });
 
     useEffect(() => {
         const trimmed = (rawPayloadText || '').trim();
         if (trimmed === '') {
-            setWorkingPayload({});
+            // Even with empty manual payload, include file payloads
+            setWorkingPayload(filePayloads || {});
             return;
         }
         try {
             const parsed = JSON.parse(rawPayloadText);
-            setWorkingPayload(parsed);
+            // Merge manual payload with file payloads
+            const merged = filePayloads ? { ...parsed, ...filePayloads } : parsed;
+            setWorkingPayload(merged);
         } catch {
+            // On parse error, still include file payloads
+            setWorkingPayload(filePayloads || {});
         }
-    }, [rawPayloadText]);
+    }, [rawPayloadText, filePayloads]);
 
     // Keep local payload text in sync with external prop so uploads reflect immediately
     useEffect(() => {
@@ -435,8 +454,12 @@ export function WorkflowStepGallery({
         onPayloadChange?.(jsonString);
         try {
             const parsed = JSON.parse(jsonString);
-            setWorkingPayload(parsed);
+            // Always merge with file payloads when manually editing
+            const merged = filePayloads ? { ...parsed, ...filePayloads } : parsed;
+            setWorkingPayload(merged);
         } catch {
+            // On parse error, still include file payloads
+            setWorkingPayload(filePayloads || {});
         }
     };
 

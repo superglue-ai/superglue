@@ -128,11 +128,16 @@ export const FinalResultsCard = ({ result }: { result: any }) => {
                         <h3 className="text-lg font-semibold">Final Result</h3>
                     </div>
                     <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">{bytes.toLocaleString()} bytes</span>
+                        <span className="text-[10px] text-muted-foreground">{bytes.toLocaleString()} bytes</span>
                         {!isPending && (
-                            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={handleCopy} title="Copy full result data">
-                                {copied ? (<><Check className="h-3 w-3 mr-1" /> Copied!</>) : (<><Copy className="h-3 w-3 mr-1" /> Copy Full Data</>)}
-                            </Button>
+                            <button
+                                onClick={handleCopy}
+                                className="h-6 w-6 flex items-center justify-center rounded hover:bg-background/80 transition-colors bg-background/60 backdrop-blur"
+                                title="Copy full result data"
+                                type="button"
+                            >
+                                {copied ? <Check className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3 text-muted-foreground" />}
+                            </button>
                         )}
                     </div>
                 </div>
@@ -616,9 +621,11 @@ export const FinalTransformMiniStepCard = ({ transform, responseSchema, onTransf
                                 inputString = displayData.value;
                                 isTruncated = displayData.truncated;
                             }
+                            const fullJson = stepInputs !== undefined ? JSON.stringify(stepInputs, null, 2) : '';
+                            const bytes = stepInputs === undefined ? 0 : new Blob([fullJson]).size;
                             return (
                                 <>
-                                    <JsonCodeEditor value={inputString} readOnly={true} minHeight="150px" maxHeight="250px" resizable={true} overlay={<div className="flex items-center gap-1"><Tabs value={inputViewMode} onValueChange={(v) => setInputViewMode(v as 'preview' | 'schema')} className="w-auto"><TabsList className="h-6 rounded-md"><TabsTrigger value="preview" className="h-5 px-2 text-[11px] rounded-md data-[state=active]:rounded-md">Preview</TabsTrigger><TabsTrigger value="schema" className="h-5 px-2 text-[11px] rounded-md data-[state=active]:rounded-md">Schema</TabsTrigger></TabsList></Tabs><CopyButton text={inputString} /></div>} />
+                                    <JsonCodeEditor value={inputString} readOnly={true} minHeight="150px" maxHeight="250px" resizable={true} overlay={<div className="flex items-center gap-2"><Tabs value={inputViewMode} onValueChange={(v) => setInputViewMode(v as 'preview' | 'schema')} className="w-auto"><TabsList className="h-6 rounded-md"><TabsTrigger value="preview" className="h-5 px-2 text-[11px] rounded-md data-[state=active]:rounded-md">Preview</TabsTrigger><TabsTrigger value="schema" className="h-5 px-2 text-[11px] rounded-md data-[state=active]:rounded-md">Schema</TabsTrigger></TabsList></Tabs><span className="text-[10px] text-muted-foreground">{bytes.toLocaleString()} bytes</span><CopyButton text={fullJson} /></div>} />
                                     {isTruncated && inputViewMode === 'preview' && (<div className="mt-1 text-[10px] text-amber-600 dark:text-amber-300 px-2">Preview truncated for display performance</div>)}
                                 </>
                             );
