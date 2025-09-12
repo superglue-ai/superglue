@@ -31,7 +31,6 @@ export interface WorkflowPlaygroundProps {
   onSelfHealingChange?: (enabled: boolean) => void;
   shouldStopExecution?: boolean;
   onStopExecution?: () => void;
-  // File upload props
   uploadedFiles?: UploadedFileInfo[];
   onFilesUpload?: (files: File[]) => Promise<void>;
   onFileRemove?: (key: string) => void;
@@ -63,7 +62,6 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
   onSelfHealingChange,
   shouldStopExecution: externalShouldStop,
   onStopExecution,
-  // File upload props from parent (embedded mode)
   uploadedFiles: parentUploadedFiles,
   onFilesUpload: parentOnFilesUpload,
   onFileRemove: parentOnFileRemove,

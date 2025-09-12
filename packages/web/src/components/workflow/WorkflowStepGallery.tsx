@@ -47,7 +47,6 @@ interface WorkflowStepGalleryProps {
     navigateToFinalSignal?: number;
     showStepOutputSignal?: number;
     focusStepId?: string | null;
-    // File upload props
     uploadedFiles?: UploadedFileInfo[];
     onFilesUpload?: (files: File[]) => Promise<void>;
     onFileRemove?: (key: string) => void;
@@ -356,7 +355,6 @@ export function WorkflowStepGallery({
     navigateToFinalSignal,
     showStepOutputSignal,
     focusStepId,
-    // File upload props
     uploadedFiles,
     onFilesUpload,
     onFileRemove,
