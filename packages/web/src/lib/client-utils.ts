@@ -233,6 +233,10 @@ export async function executeFinalTransform(
       ...previousResults
     };
 
+    // Debug logging to see what we're sending
+    console.log('Final transform payload:', finalPayload);
+    console.log('Has file field:', typeof finalPayload === 'object' && finalPayload !== null && 'file' in finalPayload);
+
     const result = await client.executeWorkflow({
       workflow: {
         id: `${workflowId}_final_transform`,

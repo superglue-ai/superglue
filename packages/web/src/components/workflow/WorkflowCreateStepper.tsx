@@ -4,25 +4,24 @@ import { getAuthBadge } from '@/src/app/integrations/page';
 import { IntegrationForm } from '@/src/components/integrations/IntegrationForm';
 import { useToast } from '@/src/hooks/use-toast';
 import { needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
-import { cn, composeUrl, getIntegrationIcon as getIntegrationIconName, getSimpleIcon, inputErrorStyles } from '@/src/lib/utils';
+import { cn, composeUrl, getIntegrationIcon as getIntegrationIconName, getSimpleIcon } from '@/src/lib/utils';
 import { Integration, IntegrationInput, SuperglueClient, UpsertMode, Workflow } from '@superglue/client';
 import { integrations as integrationTemplates } from "@superglue/shared";
 import { waitForIntegrationProcessing } from '@superglue/shared/utils';
-import { ArrowRight, Check, Clock, Globe, Key, Loader2, Pencil, Plus, X } from 'lucide-react';
+import { Check, Clock, Globe, Key, Loader2, Pencil, Plus, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import Editor from 'react-simple-code-editor';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Switch } from '../ui/switch';
-import { Textarea } from '../ui/textarea';
 import { DocStatus } from '../utils/DocStatusSpinner';
 import { HelpTooltip } from '../utils/HelpTooltip';
 import { StepIndicator, WORKFLOW_CREATE_STEPS } from '../utils/StepIndicator';
 import { WorkflowCreateSuccess } from './WorkflowCreateSuccess';
+import { InstructionMiniStepCard, PayloadMiniStepCard } from './WorkflowMiniStepCards';
 import WorkflowPlayground, { WorkflowPlaygroundHandle } from './WorkflowPlayground';
 
 type WorkflowCreateStep = 'integrations' | 'prompt' | 'review' | 'success';
@@ -241,18 +240,12 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     const currentIndex = steps.indexOf(step);
 
     if (step === 'integrations') {
-      if (selectedIntegrationIds.length === 0) {
-        toast({
-          title: 'Add Integrations',
-          description: 'Please select at least one integration.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
+      // Allow proceeding without integrations for file-based workflows
       setIsGeneratingSuggestions(true);
       try {
-        await handleGenerateInstructions();
+        if (selectedIntegrationIds.length > 0) {
+          await handleGenerateInstructions();
+        }
         setStep(steps[currentIndex + 1]);
       } finally {
         setIsGeneratingSuggestions(false);
@@ -260,12 +253,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     } else if (step === 'prompt') {
       const errors: Record<string, boolean> = {};
       if (!instruction.trim()) errors.instruction = true;
-      try {
-        JSON.parse(payload || '{}');
-      } catch {
-        errors.payload = true;
-      }
-
+      
       setValidationErrors(errors);
 
       if (Object.keys(errors).length > 0) {
@@ -278,7 +266,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       }
       setIsBuilding(true);
       try {
-        const parsedPayload = JSON.parse(payload || '{}');
+        let parsedPayload = JSON.parse(payload || '{}');
         const response = await client.buildWorkflow({
           instruction: instruction,
           payload: parsedPayload,
@@ -401,7 +389,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
             <div className="space-y-4">
               <div className="mb-4 flex items-center justify-between gap-4">
                 <h3 className="font-medium">
-                  Select one or more integrations to use in your workflow. You can add new integrations as needed.
+                  Select integrations to connect to APIs, or skip this step to create file-based workflows only.
                 </h3>
                 <Button variant="outline" size="sm" className="h-9 shrink-0" onClick={() => setShowIntegrationForm(true)}>
                   <Plus className="mr-2 h-4 w-4" /> Add Integration
@@ -509,13 +497,13 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                     </div>
                     {selectedIntegrationIds.length === 0 && integrations.length > 0 && (
                       <div>
-                        <div className="text-xs text-amber-800 dark:text-amber-300 flex items-center gap-1.5 bg-amber-500/10 py-2 px-4 rounded-md">
+                        <div className="text-xs text-blue-800 dark:text-blue-300 flex items-center gap-1.5 bg-blue-500/10 py-2 px-4 rounded-md">
                           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                            <line x1="12" y1="9" x2="12" y2="13" />
-                            <line x1="12" y1="17" x2="12.01" y2="17" />
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M12 16v-4"/>
+                            <path d="M12 8h.01"/>
                           </svg>
-                          Select at least one integration to continue
+                          No integrations selected. You can create workflows with file uploads only, or select integrations to connect to APIs.
                         </div>
                       </div>
                     )}
@@ -695,44 +683,19 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
           {/* Step 2: Prompt */}
           {step === 'prompt' && (
             <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="instruction">Workflow Instruction*</Label>
-                <HelpTooltip text="Describe what you want this workflow to achieve using the integrations you defined. Be specific!" />
-                <div className="relative">
-                  <Textarea
-                    id="instruction"
-                    value={instruction}
-                    onChange={(e) => {
-                      setInstruction(e.target.value);
-                      if (e.target.value.trim()) {
-                        setValidationErrors(prev => ({ ...prev, instruction: false }));
-                      }
-                    }}
-                    placeholder="e.g., 'Fetch customer details from CRM using the input email, then get their recent orders from productApi.'"
-                    className={cn("min-h-64", validationErrors.instruction && inputErrorStyles)}
-                  />
-                  {suggestions.length > 0 && !instruction && (
-                    <div className="absolute bottom-0 p-3 pointer-events-none w-full">
-                      <div className="flex gap-2 overflow-x-auto whitespace-nowrap w-full pointer-events-auto">
-                        {suggestions.map((suggestion, index) => (
-                          <Button
-                            key={index}
-                            variant="outline"
-                            className="text-sm py-2 px-4 h-auto font-normal bg-background/80 hover:bg-accent hover:text-accent-foreground transition-colors flex items-center gap-2 pointer-events-auto"
-                            onClick={() => setInstruction(suggestion)}
-                          >
-                            <ArrowRight className="h-3 w-3" />
-                            {suggestion}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-                {validationErrors.instruction && (
-                  <p className="text-sm text-destructive mt-1">Workflow instruction is required</p>
-                )}
-              </div>
+              <InstructionMiniStepCard
+                instruction={instruction}
+                suggestions={suggestions}
+                onChange={(value) => {
+                  setInstruction(value);
+                  if (value.trim()) {
+                    setValidationErrors(prev => ({ ...prev, instruction: false }));
+                  }
+                }}
+                onSuggestionClick={setInstruction}
+                validationError={validationErrors.instruction}
+                readOnly={false}
+              />
 
               {/* Show loading state */}
               {isGeneratingSuggestions && (
@@ -741,35 +704,15 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                 </div>
               )}
 
-              <div className="space-y-1">
-                <Label htmlFor="payload">Workflow Variables (Optional, JSON)</Label>
-                <HelpTooltip text="Provide the payload for the workflow as a JSON object. You can reference these variables throughout the config. You can change them when you use the workflow later." />
-                <div className={cn(
-                  "h-64 rounded-md border border-input bg-transparent code-editor",
-                  validationErrors.payload && inputErrorStyles
-                )}>
-                  <Editor
-                    value={payload}
-                    onValueChange={(code) => {
-                      setPayload(code);
-                      try {
-                        JSON.parse(code || '{}');
-                        setValidationErrors(prev => ({ ...prev, payload: false }));
-                      } catch (e) {
-                        setValidationErrors(prev => ({ ...prev, payload: true }));
-                      }
-                    }}
-                    highlight={highlightJson}
-                    padding={10}
-                    tabSize={2}
-                    insertSpaces={true}
-                    className="font-mono text-xs w-full h-64 [&_textarea]:outline-none [&_textarea]:w-full [&_textarea]:resize-none [&_textarea]:p-0 [&_textarea]:border-0 [&_textarea]:bg-transparent"
-                  />
-                </div>
-                {validationErrors.payload && (
-                  <p className="text-xs text-destructive">Invalid JSON format</p>
-                )}
-              </div>
+              <PayloadMiniStepCard
+                  payloadText={payload}
+                  inputSchema={null}
+                  onChange={(value) => {
+                    setPayload(value);
+                  }}
+                  onInputSchemaChange={() => {}}
+                  readOnly={false}
+                />
             </div>
           )}
 
@@ -906,8 +849,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
               disabled={
                 isBuilding ||
                 isSaving ||
-                isGeneratingSuggestions ||
-                (step === 'integrations' && selectedIntegrationIds.length === 0)
+                isGeneratingSuggestions
               }
             >
               {isBuilding ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Building...</> :

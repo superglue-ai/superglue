@@ -1,4 +1,4 @@
-import { Integration, RequestOptions, Workflow, WorkflowResult } from "@superglue/client";
+import { FileType, Integration, RequestOptions, Workflow, WorkflowResult } from "@superglue/client";
 import { flattenAndNamespaceWorkflowCredentials, generateUniqueId, waitForIntegrationProcessing } from "@superglue/shared/utils";
 import type { GraphQLResolveInfo } from "graphql";
 import { WorkflowExecutor } from "../../workflow/workflow-executor.js";
@@ -6,6 +6,7 @@ import { Context, Metadata } from '../types.js';
 
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { IntegrationManager } from "../../integrations/integration-manager.js";
+import { parseFile } from "../../utils/file.js";
 import { parseJSON } from "../../utils/json-parser.js";
 import { logMessage } from "../../utils/logs.js";
 import { replaceVariables } from "../../utils/tools.js";
@@ -65,6 +66,12 @@ export const executeWorkflowResolver = async (
     }
     if (workflow.responseSchema && typeof workflow.responseSchema === 'string') {
       workflow.responseSchema = parseJSON(workflow.responseSchema);
+    }
+    // Handle payload parsing for different formats
+    if (args.payload && typeof args.payload === 'object' && args.payload !== null && 'file' in args.payload) {
+        console.log('Parsing file field in payload:', typeof args.payload.file, args.payload.file?.substring?.(0, 50));
+        args.payload.file = await parseFile(args.payload.file, FileType.AUTO);
+        console.log('Parsed file field result:', typeof args.payload.file, Array.isArray(args.payload.file) ? 'Array' : 'Object');
     }
 
     let mergedCredentials = args.credentials || {};
@@ -264,14 +271,15 @@ export const buildWorkflowResolver = async (
 
   try {
     const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
-    const { instruction, payload = {}, integrationIds, responseSchema } = args;
+    let { instruction, payload = {}, integrationIds, responseSchema } = args;
 
     if (!instruction || instruction.trim() === "") {
       throw new Error("Instruction is required to build a workflow.");
     }
-    if (!integrationIds || integrationIds.length === 0) {
-      throw new Error("At least one integration is required.");
+    if(payload.file && typeof payload.file === 'string') {
+      payload.file = await parseFile(payload.file, FileType.AUTO);
     }
+
 
     // Validate that all integration IDs exist
     const datastoreAdapter = {

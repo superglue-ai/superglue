@@ -44,7 +44,7 @@ export async function decompressZip(buffer: Buffer): Promise<Buffer> {
         if (isExcel) {
             return buffer;
         }
-        const firstFile = zipStream.files?.[0];
+        const firstFile = zipStream.files.find(f => f.type !== 'Directory' && !f.path.startsWith('__MACOSX/'));
         const fileStream = firstFile.stream();
         const chunks: Buffer[] = [];
         for await (const chunk of fileStream) {
@@ -56,11 +56,107 @@ export async function decompressZip(buffer: Buffer): Promise<Buffer> {
     }
 }
 
-export async function parseFile(buffer: Buffer, fileType: FileType): Promise<any> {
+function inputToBuffer(input: string | Buffer | Record<string, any>): Buffer {
+    if (typeof input === 'string') {
+        // Handle string input - check for base64 prefix
+        if (input.startsWith('data:base64,')) {
+            const base64Content = input.substring('data:base64,'.length);
+            try {
+                return Buffer.from(base64Content, 'base64');
+            } catch (error) {
+                throw new Error(`Invalid base64 content: ${error}`);
+            }
+        } else {
+            // Regular string, convert to UTF-8 buffer
+            return Buffer.from(input, 'utf8');
+        }
+    } else if (Buffer.isBuffer(input)) {
+        return input;
+    } else if (typeof input === 'object' && input !== null && 'file' in input) {
+        // Handle new JSON payload structure with file field
+        const fileContent = input.file as string;
+        if (typeof fileContent === 'string') {
+            if (fileContent.startsWith('data:base64,')) {
+                const base64Content = fileContent.substring('data:base64,'.length);
+                try {
+                    return Buffer.from(base64Content, 'base64');
+                } catch (error) {
+                    throw new Error(`Invalid base64 content in file field: ${error}`);
+                }
+            } else {
+                // Regular string content in file field
+                return Buffer.from(fileContent, 'utf8');
+            }
+        } else {
+            throw new Error('File field must contain string content');
+        }
+    } else {
+        // For other objects, stringify them
+        return Buffer.from(JSON.stringify(input), 'utf8');
+    }
+}
+
+export async function parseFile(input: string | Buffer | Record<string, any>, fileType: FileType): Promise<any> {
+    // Check if input is a JSON object with file field
+    if (typeof input === 'object' && input !== null && !Buffer.isBuffer(input) && 'file' in input) {
+        // Extract additional metadata if available
+        const metadata = {
+            filename: input.filename || 'unknown',
+            contentType: input.contentType || 'application/octet-stream'
+        };
+        
+        // Parse the file content
+        let buffer = inputToBuffer(input);
+        
+        if (!buffer || buffer.length == 0) return null;
+
+        if (fileType === FileType.AUTO) {
+            const { fileType: detectedFileType, buffer: detectedBuffer } = await detectFileType(buffer);
+            fileType = detectedFileType;
+            buffer = detectedBuffer;
+        }
+
+        let result: any;
+        switch (fileType) {
+            case FileType.JSON:
+                result = parseJSON(buffer);
+                break;
+            case FileType.XML:
+                result = parseXML(buffer);
+                break;
+            case FileType.CSV:
+                result = parseCSV(buffer);
+                break;
+            case FileType.EXCEL:
+                result = parseExcel(buffer);
+                break;
+            case FileType.RAW:
+                result = buffer.toString('utf8');
+                break;
+            default:
+                throw new Error('Unsupported file type');
+        }
+
+        // Include metadata in the result if it's an object
+        if (typeof result === 'object' && result !== null && !Array.isArray(result)) {
+            return {
+                ...result,
+                _metadata: metadata
+            };
+        }
+
+        return result;
+    }
+
+    // Handle legacy format (direct string or buffer)
+    let buffer = inputToBuffer(input);
+
     if (!buffer || buffer.length == 0) return null;
 
     if (fileType === FileType.AUTO) {
-        fileType = await detectFileType(buffer);
+        const { fileType: detectedFileType, buffer: detectedBuffer } = await detectFileType(buffer);
+        fileType = detectedFileType;
+        buffer = detectedBuffer;
     }
 
     switch (fileType) {
@@ -332,9 +428,9 @@ async function parseExcel(buffer: Buffer): Promise<{ [sheetName: string]: any[] 
     }
 }
 
-async function detectFileType(buffer: Buffer): Promise<FileType> {
-    const xlsxSignature = buffer.slice(0, 4).toString('hex');
-    if (xlsxSignature === '504b0304') { // XLSX files are ZIP files
+async function detectFileType(buffer: Buffer): Promise<{ fileType: FileType, buffer: Buffer }> {
+    const zipSignature = buffer.slice(0, 4).toString('hex');
+    if (zipSignature === '504b0304') { // XLSX files are ZIP files
         try {
             const zipStream = await unzipper.Open.buffer(buffer);
             const hasExcelSignature = zipStream.files.some(f =>
@@ -343,7 +439,10 @@ async function detectFileType(buffer: Buffer): Promise<FileType> {
                 f.path.startsWith('xl/worksheets/')
             );
             if (hasExcelSignature) {
-                return FileType.EXCEL;
+                return { fileType: FileType.EXCEL, buffer };
+            }
+            else {
+                buffer = await decompressZip(buffer);
             }
         } catch (error) { 
             console.error('Failed to detect Excel file:', error);
@@ -356,13 +455,13 @@ async function detectFileType(buffer: Buffer): Promise<FileType> {
         const trimmedLine = sample.trim();
 
         if (trimmedLine.startsWith('{') || trimmedLine.startsWith('[')) {
-            return FileType.JSON;
+            return { fileType: FileType.JSON, buffer };
         } else if (trimmedLine.startsWith('<?xml') || trimmedLine.startsWith('<')) {
-            return FileType.XML;
+            return { fileType: FileType.XML, buffer };
         } else if (isLikelyCSV(buffer)) {
-            return FileType.CSV;
+            return { fileType: FileType.CSV, buffer };
         } else {
-            return FileType.RAW;
+            return { fileType: FileType.RAW, buffer };
         }
     } catch (error) {
         throw new Error(`Error reading file: ${error.message}`);
@@ -483,3 +582,5 @@ function splitRespectingQuotes(text: string): string[] {
 
     return rows;
 }
+
+

@@ -1,18 +1,124 @@
 import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
+import { Textarea } from '@/src/components/ui/textarea';
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import JsonSchemaEditor from '@/src/components/utils/JsonSchemaEditor';
 import { cn, formatJavaScriptCode, isEmptyData, truncateForDisplay, truncateLines } from '@/src/lib/utils';
 import { inferJsonSchema } from '@superglue/shared';
-import { Check, Code2, Copy, Eye, FileJson, Package, Play, X } from 'lucide-react';
+import { ArrowRight, Check, Code2, Copy, Eye, FileJson, FileUp, Package, Play, Upload, X } from 'lucide-react';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-javascript';
 import 'prismjs/components/prism-json';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Editor from 'react-simple-code-editor';
 
 const MAX_HIGHLIGHT_CHARS = 100000;
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
+const FileUploadButton = ({ onFileContent, className }: { onFileContent: (content: string, filename: string) => void; className?: string; }) => {
+    const [isProcessing, setIsProcessing] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const processFile = useCallback(async (file: File) => {
+        if (file.size > MAX_FILE_SIZE) {
+            console.error(`File size exceeds 10MB limit. File size: ${Math.round(file.size / 1024 / 1024 * 100) / 100}MB`);
+            return;
+        }
+
+        setIsProcessing(true);
+        try {
+            // Check if file is likely binary (Excel, images, etc.)
+            const BINARY_EXTENSIONS = ['.xlsx', '.xls', '.pdf', '.doc', '.docx', '.zip', '.rar', '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.mp3', '.mp4', '.avi', '.exe'];
+            const isBinaryFile = BINARY_EXTENSIONS.some(ext => file.name.toLowerCase().endsWith(ext));
+            
+            if (isBinaryFile) {
+                // For binary files, create JSON payload with file field containing base64
+                const arrayBuffer = await file.arrayBuffer();
+                const bytes = new Uint8Array(arrayBuffer);
+                let binary = '';
+                const chunkSize = 8192; // Process in chunks to avoid stack overflow
+                for (let i = 0; i < bytes.length; i += chunkSize) {
+                    const chunk = bytes.slice(i, i + chunkSize);
+                    binary += String.fromCharCode.apply(null, Array.from(chunk));
+                }
+                const base64Content = btoa(binary);
+                const jsonPayload = JSON.stringify({
+                    file: `data:base64,${base64Content}`,
+                    filename: file.name,
+                    contentType: file.type || 'application/octet-stream'
+                }, null, 2);
+                onFileContent(jsonPayload, file.name);
+            } else {
+                // For text files, check if it's already valid JSON or CSV
+                const content = await file.text();
+                const trimmed = content.trim();
+                
+                if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+                    // Already JSON, use as-is
+                    onFileContent(content, file.name);
+                } else {
+                    // For CSV or other text files, wrap in JSON with file field
+                    const jsonPayload = JSON.stringify({
+                        file: content,
+                        filename: file.name,
+                        contentType: file.type || 'text/plain'
+                    }, null, 2);
+                    onFileContent(jsonPayload, file.name);
+                }
+            }
+        } catch (error: any) {
+            console.error('Error processing file:', error);
+        } finally {
+            setIsProcessing(false);
+        }
+    }, [onFileContent]);
+
+    const handleFileInput = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = e.target.files;
+        if (files && files.length > 0) {
+            await processFile(files[0]);
+        }
+        // Reset input value to allow same file selection
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    }, [processFile]);
+
+    const handleClick = useCallback(() => {
+        if (!isProcessing && fileInputRef.current) {
+            fileInputRef.current.click();
+        }
+    }, [isProcessing]);
+
+    return (
+        <>
+            <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                onChange={handleFileInput}
+                disabled={isProcessing}
+                accept="*"
+            />
+            <Button
+                variant="outline"
+                size="sm"
+                onClick={handleClick}
+                disabled={isProcessing}
+                className={cn("bg-background/80 backdrop-blur-sm border-muted-foreground/20 hover:bg-background/90", className)}
+            >
+                {isProcessing ? (
+                    <div className="animate-spin rounded-full h-3 w-3 border-b border-current mr-1" />
+                ) : (
+                    <Upload className="h-3 w-3 mr-1" />
+                )}
+                {isProcessing ? 'Loading...' : 'Upload'}
+            </Button>
+        </>
+    );
+};
+
 const highlightCode = (code: string, language: string) => {
     if (!code || code.length > MAX_HIGHLIGHT_CHARS) return code;
     try {
@@ -273,11 +379,86 @@ export const JsonCodeEditor = ({ value, onChange, readOnly = false, minHeight = 
     );
 };
 
+export const InstructionMiniStepCard = ({ instruction, suggestions, onChange, onSuggestionClick, validationError, readOnly }: { instruction: string; suggestions?: string[]; onChange?: (value: string) => void; onSuggestionClick?: (suggestion: string) => void; validationError?: boolean; readOnly?: boolean; }) => {
+    const [localInstruction, setLocalInstruction] = useState<string>(instruction || '');
+    
+    useEffect(() => { setLocalInstruction(instruction || ''); }, [instruction]);
+    
+    const handleInstructionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        const value = e.target.value;
+        setLocalInstruction(value);
+        if (onChange) onChange(value);
+    };
+
+    return (
+        <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50">
+            <div className="p-4">
+                <div className="flex items-center gap-2 mb-3">
+                    <Code2 className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                        <h3 className="text-base font-semibold">Workflow Instruction</h3>
+                    </div>
+                    <div className="mt-1 text-muted-foreground">
+                        <HelpTooltip text="Describe what you want this workflow to achieve. Be specific about the steps and data transformations needed." />
+                    </div>
+                </div>
+                <div className="relative">
+                    <Textarea
+                        value={localInstruction}
+                        onChange={handleInstructionChange}
+                        placeholder="e.g., 'Fetch customer details from CRM using the input email, then get their recent orders from productApi.'"
+                        className={cn("min-h-64 resize-none", validationError && "border-destructive focus:border-destructive")}
+                        readOnly={readOnly}
+                    />
+                    {suggestions && suggestions.length > 0 && !localInstruction && !readOnly && (
+                        <div className="absolute bottom-0 p-3 pointer-events-none w-full">
+                            <div className="flex gap-2 overflow-x-auto whitespace-nowrap w-full pointer-events-auto">
+                                {suggestions.map((suggestion, index) => (
+                                    <Button
+                                        key={index}
+                                        variant="outline"
+                                        className="text-sm py-2 px-4 h-auto font-normal bg-background/80 hover:bg-accent hover:text-accent-foreground transition-colors flex items-center gap-2 pointer-events-auto"
+                                        onClick={() => {
+                                            setLocalInstruction(suggestion);
+                                            if (onSuggestionClick) onSuggestionClick(suggestion);
+                                        }}
+                                    >
+                                        <ArrowRight className="h-3 w-3" />
+                                        {suggestion}
+                                    </Button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+                {validationError && (
+                    <p className="text-sm text-destructive mt-2">Workflow instruction is required</p>
+                )}
+            </div>
+        </Card>
+    );
+};
+
 export const PayloadMiniStepCard = ({ payloadText, inputSchema, onChange, onInputSchemaChange, readOnly }: { payloadText: string; inputSchema?: string | null; onChange?: (value: string) => void; onInputSchemaChange?: (value: string | null) => void; readOnly?: boolean; }) => {
-    const [activeTab, setActiveTab] = useState('payload');
+    const [activeTab, setActiveTab] = useState('paste-payload');
     const [localPayload, setLocalPayload] = useState<string>(payloadText || '');
     const [localInputSchema, setLocalInputSchema] = useState(inputSchema || null);
     const [error, setError] = useState<string | null>(null);
+    const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+    
+    // Check if current payload contains a file field with base64 or other content
+    const hasFileField = (() => {
+        try {
+            if (localPayload && localPayload.trim().startsWith('{')) {
+                const parsed = JSON.parse(localPayload);
+                return parsed.file !== undefined;
+            }
+        } catch (e) {
+            // Not JSON or invalid JSON
+        }
+        return false;
+    })();
+    
     useEffect(() => { setLocalPayload(payloadText || ''); }, [payloadText]);
     useEffect(() => { setLocalInputSchema(inputSchema || null); }, [inputSchema]);
     const handlePayloadChange = (value: string) => {
@@ -288,14 +469,36 @@ export const PayloadMiniStepCard = ({ payloadText, inputSchema, onChange, onInpu
             if (onChange) onChange(value);
             return;
         }
-        try {
-            JSON.parse(value);
+        
+        // Only validate JSON when content looks like JSON
+        if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+            try {
+                JSON.parse(value);
+                setError(null);
+                if (onChange) onChange(value);
+            } catch {
+                setError('Invalid JSON');
+            }
+        } else {
+            // For non-JSON payload, don't validate
             setError(null);
             if (onChange) onChange(value);
-        } catch {
-            setError('Invalid JSON');
         }
     };
+
+    const handleFileContent = useCallback((content: string, filename: string) => {
+        setLocalPayload(content);
+        setUploadedFileName(filename);
+        setError(null);
+        if (onChange) onChange(content);
+    }, [onChange]);
+
+    const handleClearFile = useCallback(() => {
+        setLocalPayload('{}');
+        setUploadedFileName(null);
+        setError(null);
+        if (onChange) onChange('{}');
+    }, [onChange]);
     const handleSchemaChange = (value: string | null) => {
         setLocalInputSchema(value);
         if (onInputSchemaChange) onInputSchemaChange(value);
@@ -309,17 +512,75 @@ export const PayloadMiniStepCard = ({ payloadText, inputSchema, onChange, onInpu
                         <h3 className="text-base font-semibold">Initial Payload</h3>
                     </div>
                     <div className="mt-1 text-muted-foreground">
-                        <HelpTooltip text="Payload is the JSON input to workflow execution. Editing here does NOT save values to the workflow; it only affects this session/run. Use Input Schema to optionally describe the expected structure for validation and tooling." />
+                        <HelpTooltip text="Payload is the input to workflow execution. Can be JSON or raw file content. Editing here does NOT save values to the workflow; it only affects this session/run." />
                     </div>
                 </div>
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
                     <TabsList className="grid w-full grid-cols-2 mb-3 h-8">
-                        <TabsTrigger value="payload" className="text-xs">Payload JSON</TabsTrigger>
+                        <TabsTrigger value="paste-payload" className="text-xs">
+                            Input Payload
+                        </TabsTrigger>
                         <TabsTrigger value="schema" className="text-xs">Input Schema</TabsTrigger>
                     </TabsList>
-                    <TabsContent value="payload" className="mt-3">
-                        <JsonCodeEditor value={localPayload} onChange={handlePayloadChange} readOnly={readOnly} minHeight="150px" maxHeight="200px" placeholder="" />
-                        {error && (<div className="mt-2 text-xs text-destructive flex items-center gap-1"><span className="text-destructive">⚠</span> {error}</div>)}
+                    <TabsContent value="paste-payload" className="mt-3">
+                        <div className="space-y-3">
+                            {/* File Upload Row */}
+                            {uploadedFileName ? (
+                                <div className="flex items-center justify-between p-2 bg-muted/50 rounded border">
+                                    <div className="flex items-center gap-2">
+                                        <FileUp className="h-4 w-4 text-muted-foreground" />
+                                        <span className="text-sm font-medium">{uploadedFileName}</span>
+                                    </div>
+                                    {!readOnly && (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={handleClearFile}
+                                            className="h-6 w-6 p-0"
+                                        >
+                                            <X className="h-3 w-3" />
+                                        </Button>
+                                    )}
+                                </div>
+                            ) : (
+                                <FileUploadButton onFileContent={handleFileContent} className="w-full" />
+                            )}
+                            
+                            {/* JSON Payload Editor */}
+                            {hasFileField ? (
+                                <div className="space-y-2">
+                                    <div className="border rounded-lg p-4 bg-muted/20 min-h-[60px] flex items-center justify-center">
+                                        <div className="text-center text-muted-foreground">
+                                            <FileUp className="h-6 w-6 mx-auto mb-1" />
+                                            <p className="text-sm font-medium">File uploaded in JSON payload</p>
+                                            <p className="text-xs">JSON payload contains file data in "file" field</p>
+                                        </div>
+                                    </div>
+                                    <JsonCodeEditor 
+                                        value={localPayload} 
+                                        onChange={handlePayloadChange} 
+                                        readOnly={readOnly} 
+                                        minHeight="100px" 
+                                        maxHeight="150px" 
+                                        placeholder="Enter JSON payload..." 
+                                    />
+                                </div>
+                            ) : (
+                                <JsonCodeEditor 
+                                    value={localPayload} 
+                                    onChange={handlePayloadChange} 
+                                    readOnly={readOnly} 
+                                    minHeight="150px" 
+                                    maxHeight="200px" 
+                                    placeholder="Enter JSON payload..." 
+                                />
+                            )}
+                            {error && (
+                                <div className="mt-2 text-xs text-destructive flex items-center gap-1">
+                                    <span className="text-destructive">⚠</span> {error}
+                                </div>
+                            )}
+                        </div>
                     </TabsContent>
                     <TabsContent value="schema" className="mt-3">
                         <JsonSchemaEditor value={localInputSchema} onChange={handleSchemaChange} isOptional={true} />

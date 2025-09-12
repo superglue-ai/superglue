@@ -388,7 +388,15 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
       // Store original steps to compare against self-healed result
       const originalStepsJson = JSON.stringify(executionSteps);
 
-      const payloadObj = JSON.parse(payload || '{}');
+      let payloadObj = payload || '{}';
+      try {
+        if (typeof payloadObj === 'string') {
+          payloadObj = JSON.parse(payloadObj);
+        }
+        // payloadObj is now an object - it could be regular JSON or have a file field
+      } catch (e) {
+        // If parsing fails, treat as string payload
+      }
       setCurrentExecutingStepIndex(0);
 
       const state = await executeWorkflowStepByStep(
@@ -553,6 +561,15 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
     try {
       // mark testing state for indicator without freezing entire UI
       setIsExecutingStep(idx);
+      let payloadObj = payload || '{}';
+      try {
+        if (typeof payloadObj === 'string') {
+          payloadObj = JSON.parse(payloadObj);
+        }
+        // payloadObj is now an object - it could be regular JSON or have a file field
+      } catch (e) {
+        // If parsing fails, treat as string payload
+      }
       const single = await executeSingleStep(
         client,
         {
@@ -560,7 +577,7 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
           steps
         } as any,
         idx,
-        JSON.parse(payload || '{}'),
+        payloadObj,
         stepResultsMap,  // Pass accumulated results
         false
       );
@@ -609,14 +626,22 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
         }
       });
       const parsedResponseSchema = schemaStr && schemaStr.trim() ? JSON.parse(schemaStr) : null;
-
+      let payloadObj = payload || '{}';
+      try {
+        if (typeof payloadObj === 'string') {
+          payloadObj = JSON.parse(payloadObj);
+        }
+        // payloadObj is now an object - it could be regular JSON or have a file field
+      } catch (e) {
+        // If parsing fails, treat as string payload
+      }
       const result = await executeFinalTransform(
         client,
         workflowId || 'test',
         transformStr || finalTransform,
         parsedResponseSchema,
         inputSchema ? JSON.parse(inputSchema) : null,
-        JSON.parse(payload || '{}'),
+        payloadObj,
         stepData,
         false
       );

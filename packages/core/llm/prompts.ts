@@ -175,6 +175,7 @@ Further:
 - Aggregation, grouping, sorting, filtering is covered by a separate final transformation and does not need to be added as a dedicated step. However, if the API supports e.g. filtering when retrieving, this should be part of the retrieval step, just do not add an extra one.
 - Step instructions should DESCRIBE what data to retrieve, and how the response should be structured, without prescribing a rigid response structure.
 - The API's actual response structure will be discovered during execution - don't prescribe it
+- If no integrations are available but you have an initial payload, add no steps, just a final transformation.
 </STEP_CREATION>
 
 <EXECUTION_MODES>
