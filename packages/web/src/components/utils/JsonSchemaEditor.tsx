@@ -15,8 +15,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/src/components/ui/tooltip";
-import { cn } from "@/src/lib/utils";
-import { Plus, Trash2 } from "lucide-react";
+import { cn, MAX_DISPLAY_LINES, MAX_DISPLAY_SIZE } from "@/src/lib/utils";
+import { Check, Copy, Plus, Trash2 } from "lucide-react";
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
 import React from 'react';
@@ -27,6 +27,10 @@ interface JsonSchemaEditorProps {
   onChange: (value: string | null) => void;
   isOptional?: boolean;
   title?: string;
+  readOnly?: boolean;
+  onBlur?: () => void;
+  forceCodeMode?: boolean;
+  showModeToggle?: boolean;
 }
 
 const SCHEMA_TYPES = ['object', 'string', 'number', 'boolean', 'integer', 'any', 'string[]', 'number[]', 'boolean[]', 'integer[]', 'object[]', 'any[]'];
@@ -59,23 +63,32 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
   value,
   onChange,
   isOptional = false,
+  readOnly = false,
+  onBlur,
+  forceCodeMode = false,
+  showModeToggle = true,
 }) => {
-  const [isCodeMode, setIsCodeMode] = React.useState(false);
+  const [isCodeMode, setIsCodeMode] = React.useState(forceCodeMode || false);
   const [jsonError, setJsonError] = React.useState<string | null>(null);
   const [localIsEnabled, setLocalIsEnabled] = React.useState<boolean>(!isOptional || (value !== null && value !== undefined));
 
   React.useEffect(() => {
+    if (forceCodeMode) {
+      setIsCodeMode(true);
+      return;
+    }
     const savedMode = localStorage?.getItem('jsonSchemaEditorCodeMode');
     if (savedMode !== null) {
       setIsCodeMode(savedMode === 'true');
     }
-  }, []);
+  }, [forceCodeMode]);
 
   React.useEffect(() => {
+    if (forceCodeMode) return;
     if (typeof window !== 'undefined') {
       localStorage.setItem('jsonSchemaEditorCodeMode', isCodeMode.toString());
     }
-  }, [isCodeMode]);
+  }, [isCodeMode, forceCodeMode]);
 
   React.useEffect(() => {
     if (isOptional) {
@@ -111,26 +124,22 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
       setJsonError(null);
       return;
     }
-    // Handle empty string as valid empty content (not disabled)
     if (value === '') {
       setVisualSchema({});
       setJsonError(null);
       return;
     }
+    // Accept raw JSON strings like "{}" or {} and never re-wrap as quoted JSON strings
     try {
-      const parsed = JSON.parse(value);
+      const val = typeof value === 'string' ? value : String(value);
+      const parsed = JSON.parse(val);
       setVisualSchema(parsed);
       setJsonError(null);
-
-      // Normalize the format to ensure consistency
-      const formattedValue = JSON.stringify(parsed, null, 2);
-      if (formattedValue !== value) {
-        onChange(formattedValue);
-      }
+      // Do not auto-normalize content by writing back formatted value here; leave caret/typing intact
     } catch (e) {
       setJsonError((e as Error).message);
     }
-  }, [value, onChange]);
+  }, [value]);
 
   const updateVisualSchema = (path: string[], newValue: any) => {
     const newSchema = { ...visualSchema };
@@ -294,8 +303,9 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
             <div
               className={cn(
                 "w-36 px-2 py-0.5 min-h-[32px] rounded hover:bg-secondary cursor-pointer flex items-center gap-0.5",
-                "text-[11px] xs:text-[12px] sm:text-[14px]"
+                "text-[11px] xs:text-[12px] sm:text-[14px] truncate"
               )}
+              title={fieldName}
               onClick={() => {
                 // Initialize the temp field name with the current field name
                 setTempFieldName(fieldName);
@@ -310,7 +320,6 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
               )}
             </div>
           ))}
-          {/* Render non-editable root field */}
           {isRoot && (
             <div
               className={cn(
@@ -361,7 +370,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
               }
             }}
           >
-            <SelectTrigger className="w-24 h-8 text-xs sm:text-sm">
+            <SelectTrigger className="w-28 h-8 text-xs sm:text-sm">
               <SelectValue placeholder="Type" />
             </SelectTrigger>
             <SelectContent className="text-xs sm:text-sm">
@@ -556,11 +565,8 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
   // Add this highlight function
   const highlightJson = (code: string) => {
     try {
-      // Format the JSON before highlighting
-      const formatted = JSON.stringify(JSON.parse(code), null, 2);
-      return Prism.highlight(formatted, Prism.languages.json, 'json');
+      return Prism.highlight(code, Prism.languages.json, 'json');
     } catch {
-      // If JSON is invalid, just return the raw code
       return code;
     }
   };
@@ -584,8 +590,8 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
   return (
     <div className="space-y-1 flex flex-col h-full mb-4 gap-2">
       <div className="flex items-center gap-4 ml-auto shrink-0">
-        <div className="flex items-center gap-4"> {/* Increased gap for clarity */}
-          {(localIsEnabled || !isOptional) && (
+        <div className="flex items-center gap-4">
+          {showModeToggle && (localIsEnabled || !isOptional) && (
             <div className="flex items-center gap-2">
               <Label htmlFor="editorMode" className="text-xs">Code Mode</Label>
               <Switch className="custom-switch" id="editorMode" checked={isCodeMode} onCheckedChange={setIsCodeMode} />
@@ -605,17 +611,31 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
         </div>
       </div>
 
+      {isCodeMode && jsonError && (
+        <div className="p-2 bg-destructive/10 border border-destructive/20 text-destructive text-xs rounded-md">
+          {jsonError}
+        </div>
+      )}
+      {isCodeMode && readOnly && value && (value.length > MAX_DISPLAY_SIZE || (value.split('\n').length > MAX_DISPLAY_LINES)) && (
+        <div className="p-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-xs rounded-md text-amber-800 dark:text-amber-200">
+          Preview may be truncated for performance
+        </div>
+      )}
+
       {localIsEnabled ? (
         <div className="flex-1 min-h-0 border rounded-md min-h-32">
           {isCodeMode ? (
-            <div className="h-full font-mono relative bg-transparent code-editor">
+            <div className="h-full font-mono relative bg-transparent">
               <div className="overflow-auto h-full">
+                <div className="absolute top-1 right-1 z-10">
+                  <IconCopyButton text={value ?? ''} />
+                </div>
                 <Editor
-                  value={value || ""} // Editor expects string, use "" if value is null but enabled (e.g. just re-enabled)
+                  value={value ?? ''}
                   onValueChange={(code) => {
                     onChange(code);
                     try {
-                      JSON.parse(code || '{}');
+                      JSON.parse((code || '{}'));
                       setJsonError(null);
                     } catch (e) {
                       setJsonError((e as Error).message);
@@ -625,22 +645,21 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
                   padding={10}
                   tabSize={2}
                   insertSpaces={true}
+                  disabled={readOnly}
+                  onBlur={onBlur}
                   className={cn(
-                    "font-mono text-xs w-full min-h-full",
-                    jsonError && "border-red-500"
+                    "font-mono text-xs w-full min-h-full border-0 border-transparent outline-none focus:outline-none focus-visible:outline-0 ring-0 focus:ring-0 focus-visible:ring-0"
                   )}
-                  textareaClassName="outline-none focus:outline-none"
+                  textareaClassName="border-0 border-transparent focus:border-0 focus:border-transparent outline-none focus:outline-none focus-visible:outline-0 ring-0 focus:ring-0 focus-visible:ring-0"
                   style={{
                     fontFamily: 'var(--font-mono)',
                     minHeight: '100%',
+                    outline: 'none',
+                    boxShadow: 'none',
+                    border: '0',
                   }}
                 />
               </div>
-              {jsonError && (
-                <div className="absolute bottom-0 left-0 right-0 bg-red-500/10 text-red-500 p-2 text-xs">
-                  {jsonError}
-                </div>
-              )}
             </div>
           ) : (
             <div className="h-full flex flex-col min-h-0">
@@ -680,4 +699,25 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
   );
 };
 
-export default JsonSchemaEditor; 
+export default JsonSchemaEditor;
+
+const IconCopyButton = ({ text }: { text: string }) => {
+  const [copied, setCopied] = React.useState(false);
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    navigator.clipboard.writeText(text || '');
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+  return (
+    <button
+      onClick={handleCopy}
+      className="h-6 w-6 flex items-center justify-center rounded hover:bg-background/80 transition-colors bg-background/60 backdrop-blur"
+      title="Copy"
+      type="button"
+    >
+      {copied ? <Check className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3 text-muted-foreground" />}
+    </button>
+  );
+};

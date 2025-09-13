@@ -62,12 +62,12 @@ Executes a workflow (multiple APIs or Endpoints) in a single call. Returns detai
 
 ### buildWorkflow
 
-Builds a workflow automatically based on instructions and available integrations. Uses AI to determine the optimal sequence of API calls and data transformations.
+Builds a workflow automatically based on instructions and available integrations. Uses AI to determine the optimal sequence of API calls and data transformations. Supports both API-based workflows and transform-only workflows for data processing.
 
 **Parameters:**
 - `instruction`: String! - Natural language description of what the workflow should do (required)
-- `payload`: JSON - Sample input data to help with workflow generation (optional)
-- `integrationIds`: [ID!]! - List of integration IDs to use in the workflow (required)
+- `payload`: JSON - Sample input data to help with workflow generation (optional, supports file upload data)
+- `integrationIds`: [ID!] - List of integration IDs to use in the workflow (optional - omit for transform-only workflows)
 - `responseSchema`: JSONSchema - Desired output format (optional, auto-generated if not provided)
 
 **Returns:** Complete `Workflow` configuration ready for execution
@@ -78,7 +78,7 @@ Builds a workflow automatically based on instructions and available integrations
     mutation BuildWorkflow(
       $instruction: String!,
       $payload: JSON,
-      $integrationIds: [ID!]!,
+      $integrationIds: [ID!],
       $responseSchema: JSONSchema
     ) {
       buildWorkflow(
@@ -113,7 +113,8 @@ Builds a workflow automatically based on instructions and available integrations
   </Tab>
   <Tab title="Client">
     ```typescript
-    const workflow = await client.buildWorkflow({
+    // API-based workflow with integrations
+    const apiWorkflow = await client.buildWorkflow({
       instruction: "Get user profile and their recent posts",
       payload: { userId: "123" },
       integrationIds: ["user-api", "posts-api"],
@@ -122,6 +123,26 @@ Builds a workflow automatically based on instructions and available integrations
         properties: {
           user: { type: "object" },
           posts: { type: "array" }
+        }
+      }
+    });
+
+    // Transform-only workflow for file processing (no integrations)
+    const transformWorkflow = await client.buildWorkflow({
+      instruction: "Extract customer names and total amounts from invoices",
+      payload: {
+        invoice_001: { /* parsed CSV/JSON data from file upload */ },
+        invoice_002: { /* parsed Excel data from file upload */ }
+      },
+      // No integrationIds needed for transform-only workflows
+      responseSchema: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            customerName: { type: "string" },
+            totalAmount: { type: "number" }
+          }
         }
       }
     });

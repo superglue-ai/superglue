@@ -5,10 +5,9 @@ import { useToast } from '@/src/hooks/use-toast';
 import { formatJavaScriptCode, getIntegrationIcon as getIntegrationIconName, getSimpleIcon } from '@/src/lib/utils';
 import { Integration, SuperglueClient } from "@superglue/client";
 import { ArrowDown, Check, Copy, Globe, RotateCw } from 'lucide-react';
-import Prism from 'prismjs';
-import 'prismjs/components/prism-json';
+
+import JsonSchemaEditor from '@/src/components/utils/JsonSchemaEditor';
 import { useEffect, useMemo, useState } from 'react';
-import Editor from 'react-simple-code-editor';
 import { Badge } from "../ui/badge";
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
@@ -188,7 +187,13 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                                 {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                                             </Button>
                                         </div>
-                                        <Editor value={rawJsonText} onValueChange={(val) => { setRawJsonText(val); }} highlight={(code) => Prism.highlight(code, Prism.languages.json, 'json')} padding={10} tabSize={2} insertSpaces={true} className="font-mono text-xs min-h[260px]" textareaClassName="outline-none focus:outline-none" style={{ background: 'transparent' }} onBlur={() => { try { const parsed = JSON.parse(rawJsonText); handleFieldChange(parsed); } catch { } }} />
+                                        <JsonSchemaEditor
+                                            value={rawJsonText}
+                                            onChange={(val) => { setRawJsonText(val || ''); }}
+                                            isOptional={false}
+                                            forceCodeMode={true}
+                                            onBlur={() => { try { const parsed = JSON.parse(rawJsonText); handleFieldChange(parsed); } catch { } }}
+                                        />
                                     </div>
                                 </div>
                             ) : (
