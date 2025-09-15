@@ -1,25 +1,25 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { _resetAuthManager, authMiddleware, extractToken, validateToken } from './auth.js'
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { _resetAuthManager, authMiddleware, extractTokenFromExpressRequest, validateToken } from './auth.js';
 
 vi.mock('./localKeyManager.js')
 vi.mock('./supabaseKeyManager.js')
 vi.mock('../utils/logs.js')
 
 describe('Auth Module', () => {
-  describe('extractToken', () => {
+  describe('extractTokenFromExpressRequest', () => {
     it('extracts token from HTTP Authorization header', () => {
       const req = { headers: { authorization: 'Bearer test123' } }
-      expect(extractToken(req)).toBe('test123')
+      expect(extractTokenFromExpressRequest(req)).toBe('test123')
     })
 
     it('extracts token from query parameter', () => {
       const req = { headers: {}, query: { token: 'test123' } }
-      expect(extractToken(req)).toBe('test123')
+      expect(extractTokenFromExpressRequest(req)).toBe('test123')
     })
 
     it('extracts token from WebSocket connectionParams', () => {
       const conn = { connectionParams: { Authorization: 'Bearer test123' } }
-      expect(extractToken(conn)).toBe('test123')
+      expect(extractTokenFromExpressRequest(conn)).toBe('test123')
     })
 
     it('extracts token from WebSocket URL', () => {
@@ -27,7 +27,7 @@ describe('Auth Module', () => {
         connectionParams: {},
         extra: { request: { url: 'ws://localhost?token=test123&other=param' } }
       }
-      expect(extractToken(conn)).toBe('test123')
+      expect(extractTokenFromExpressRequest(conn)).toBe('test123')
     })
   })
 

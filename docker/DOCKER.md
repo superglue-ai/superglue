@@ -8,19 +8,22 @@ This project supports two Docker deployment approaches:
 ## Quick Start
 
 ## Option 1: Monolithic Deployment
+
 Single container running both web and server services:
+
 ```bash
 # Build the image
 docker build -t superglue:latest -f docker/Dockerfile .
 
 # Quick testing (data lost on restart)
-docker run -p 3000:3000 -p 3001:3001 --env-file .env superglue:latest
+docker run -p 3000:3000 -p 3001:3001 -p 3002:3002 --env-file .env superglue:latest
 
 # Production/Development with data persistence
-docker run -p 3000:3000 -p 3001:3001 -v superglue_data:/data --env-file .env superglue:latest
+docker run -p 3000:3000 -p 3001:3001 -p 3002:3002 -v superglue_data:/data --env-file .env superglue:latest
 ```
 
 ## Option 2: Microservices Deployment
+
 Separate containers for better scalability and resource management:
 
 ```bash
@@ -38,6 +41,7 @@ docker-compose down
 ```
 
 ## CI/CD Integration
+
 1. **Nightly Base Image Workflow** (`.github/workflows/nightly-base-image.yml`):
    - Builds a multi-architecture base image daily (2am UTC)
    - Pushes to DockerHub as `superglueai/superglue-base:latest`
@@ -45,4 +49,3 @@ docker-compose down
 2. **Application Image Workflow** (`.github/workflows/docker-publish.yml`):
    - Triggered on pushes to main, updates dependencies from base image
    - Pushes to DockerHub as `superglueai/superglue:latest`
-
