@@ -1,8 +1,8 @@
-import type { ApiConfig, ExtractConfig, Integration, RunResult, TransformConfig, Workflow, WorkflowSchedule } from "@superglue/client";
+import type { ApiConfig, ExtractConfig, Integration, RunResult, TransformConfig, Workflow } from "@superglue/client";
 import { Pool, PoolConfig } from 'pg';
 import { credentialEncryption } from "../utils/encryption.js";
 import { logMessage } from "../utils/logs.js";
-import type { DataStore } from "./types.js";
+import type { DataStore, WorkflowScheduleInternal } from "./types.js";
 
 type ConfigType = 'api' | 'extract' | 'transform' | 'workflow';
 type ConfigData = ApiConfig | ExtractConfig | TransformConfig | Workflow;
@@ -186,7 +186,7 @@ export class PostgresService implements DataStore {
                 next_run_at TIMESTAMP NOT NULL,
                 created_at TIMESTAMP NOT NULL DEFAULT NOW(),
                 updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
-                PRIMARY KEY (id, org_id),
+                PRIMARY KEY (id),
                 FOREIGN KEY (workflow_id, workflow_type, org_id) REFERENCES configurations(id, type, org_id) ON DELETE CASCADE
              )
             `);
@@ -502,23 +502,36 @@ export class PostgresService implements DataStore {
     }
 
     // Workflow Schedule Methods
-    async listWorkflowSchedules(params: { workflowId: string, orgId: string }): Promise<WorkflowSchedule[]> {
+    async listWorkflowSchedules(params: { workflowId: string, orgId: string }): Promise<WorkflowScheduleInternal[]> {
         const client = await this.pool.connect();
 
         try {
             const query = 'SELECT id, org_id, workflow_id, workflow_type, cron_expression, enabled, payload, options, last_run_at, next_run_at, created_at, updated_at FROM workflow_schedules WHERE workflow_id = $1 AND org_id = $2 AND workflow_type = $3';
             const queryResult = await client.query(query, [params.workflowId, params.orgId, 'workflow']);
 
-            const schedules = queryResult.rows.map(this.mapWorkflowSchedule);
-            return schedules;
+            return queryResult.rows.map(this.mapWorkflowSchedule);
         } finally {
             client.release();
         }
     }
 
-    async upsertWorkflowSchedule(params: { id: string; schedule: WorkflowSchedule }): Promise<void> {
-        const { id, schedule } = params;
+    async getWorkflowSchedule({ id, orgId }: { id: string; orgId?: string }): Promise<WorkflowScheduleInternal | null> {
+        const client = await this.pool.connect();
+        try {
+            const query = 'SELECT id, org_id, workflow_id, workflow_type, cron_expression, enabled, payload, options, last_run_at, next_run_at, created_at, updated_at FROM workflow_schedules WHERE id = $1 AND org_id = $2';
+            
+            const queryResult = await client.query(query, [id, orgId || '']);
+            if (!queryResult.rows[0]) {
+                return null;
+            }
 
+            return this.mapWorkflowSchedule(queryResult.rows[0]);
+        } finally {
+            client.release();
+        }
+    }
+
+    async upsertWorkflowSchedule({ schedule }: { schedule: WorkflowScheduleInternal }): Promise<void> {
         const client = await this.pool.connect();
         try {
             const query = `
@@ -537,30 +550,30 @@ export class PostgresService implements DataStore {
                 updated_at = CURRENT_TIMESTAMP
             `;
             
-            await client.query(query, [id, schedule.orgId, schedule.workflowId, 'workflow', schedule.cronExpression, schedule.enabled, JSON.stringify(schedule.payload), JSON.stringify(schedule.options), schedule.lastRunAt, schedule.nextRunAt]);
+            await client.query(query, [schedule.id, schedule.orgId, schedule.workflowId, 'workflow', schedule.cronExpression, schedule.enabled, JSON.stringify(schedule.payload), JSON.stringify(schedule.options), schedule.lastRunAt, schedule.nextRunAt]);
         } finally {
             client.release();
         }
     }
 
-    async deleteWorkflowSchedule(params: { id: string }): Promise<boolean> {
+    async deleteWorkflowSchedule({id, orgId}: { id: string, orgId: string }): Promise<boolean> {
         const client = await this.pool.connect();
         try {
-            const result = await client.query('DELETE FROM workflow_schedules WHERE id = $1', [params.id]);
+            const result = await client.query('DELETE FROM workflow_schedules WHERE id = $1 AND org_id = $2', [id, orgId]);
             return result.rowCount > 0;
         } finally {
             client.release();
         }
     }
 
-    async listDueWorkflowSchedules(): Promise<WorkflowSchedule[]> {
+    async listDueWorkflowSchedules(): Promise<WorkflowScheduleInternal[]> {
         const client = await this.pool.connect();
         
         try {
             const query = `SELECT id, org_id, workflow_id, workflow_type, cron_expression, enabled, payload, options, last_run_at, next_run_at, created_at, updated_at FROM workflow_schedules WHERE enabled = true AND next_run_at <= NOW()`;
             const queryResult = await client.query(query);
-            
-            return queryResult.rows.map(this.mapWorkflowSchedule);;
+    
+            return queryResult.rows.map(this.mapWorkflowSchedule);
         }
         finally {
             client.release();
@@ -578,11 +591,11 @@ export class PostgresService implements DataStore {
         }
     }
 
-    private mapWorkflowSchedule(row: any): WorkflowSchedule {
+    private mapWorkflowSchedule(row: any): WorkflowScheduleInternal {
         return {
             id: row.id,
-            orgId: row.org_id,
             workflowId: row.workflow_id,
+            orgId: row.org_id,
             cronExpression: row.cron_expression,
             enabled: row.enabled,
             payload: row.payload,

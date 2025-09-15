@@ -45,9 +45,14 @@ export interface DataStore {
   getManyIntegrations(params: { ids: string[]; includeDocs?: boolean; orgId?: string }): Promise<Integration[]>;
 
   // Workflow Schedule
-  listWorkflowSchedules(params: { workflowId: string }): Promise<WorkflowSchedule[]>;
-  upsertWorkflowSchedule(params: { id: string; schedule: WorkflowSchedule })
-  deleteWorkflowSchedule(params: { id: string }): Promise<boolean>;
-  listDueWorkflowSchedules(): Promise<WorkflowSchedule[]>;
+  listWorkflowSchedules(params: { workflowId: string, orgId: string }): Promise<WorkflowScheduleInternal[]>;
+  getWorkflowSchedule(params: { id: string; orgId?: string }): Promise<WorkflowScheduleInternal | null>;
+  upsertWorkflowSchedule(params: { schedule: WorkflowScheduleInternal })
+  deleteWorkflowSchedule(params: { id: string, orgId: string }): Promise<boolean>;
+  listDueWorkflowSchedules(): Promise<WorkflowScheduleInternal[]>;
   updateScheduleNextRun(params: { id: string; nextRunAt: Date; lastRunAt: Date; }): Promise<boolean>;
+}
+
+export type WorkflowScheduleInternal = WorkflowSchedule & {
+  orgId: string;
 }

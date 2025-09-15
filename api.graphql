@@ -81,6 +81,12 @@ type RunResult {
   startedAt: DateTime!
   completedAt: DateTime!
   config: ConfigType
+  source: RunSource!
+}
+
+enum RunSource {
+  CLIENT
+  SCHEDULER
 }
 
 type Pagination {
@@ -314,7 +320,7 @@ type Query {
   generateInstructions(integrations: [IntegrationInput!]!): [String!]!
   getTenantInfo: TenantInfo
 
-  # Workflow queries
+  listWorkflowSchedules(workflowId: String!): [WorkflowSchedule!]!
 }
 
 type TenantInfo {
@@ -380,6 +386,19 @@ type WorkflowResult {
   stepResults: [WorkflowStepResult!]
 }
 
+type WorkflowSchedule {
+  id: ID!
+  workflowId: String!
+  cronExpression: String!
+  enabled: Boolean!
+  payload: JSON
+  options: JSON
+  lastRunAt: DateTime
+  nextRunAt: DateTime!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
 input WorkflowInput {
   id: String!
   steps: [ExecutionStepInput!]
@@ -389,6 +408,15 @@ input WorkflowInput {
   responseSchema: JSONSchema
   version: String
   instruction: String
+}
+
+input WorkflowScheduleInput {
+  id: ID
+  workflowId: ID
+  cronExpression: String
+  enabled: Boolean
+  payload: JSON
+  options: JSON
 }
 
 type Mutation {
@@ -430,6 +458,9 @@ type Mutation {
 
   upsertWorkflow(id: ID!, input: JSON!): Workflow!
   deleteWorkflow(id: ID!): Boolean!
+
+  upsertWorkflowSchedule(schedule: WorkflowScheduleInput!): WorkflowSchedule!
+  deleteWorkflowSchedule(id: ID!): Boolean!
 
   upsertApi(id: ID!, input: JSON!): ApiConfig!
   deleteApi(id: ID!): Boolean!

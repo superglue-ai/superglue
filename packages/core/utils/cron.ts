@@ -11,8 +11,7 @@ export function calculateNextRun(cronExpression: string, from?: Date): Date {
 }
 
 export function validateCronExpression(cronExpression: string): boolean {
-    // @ts-ignore - TS can't resolve it as function, probably because cron-validate is a CommonJS module.
-    const result = cronValidate(cronExpression, {
+    const result = cronValidate.default(cronExpression, {
         preset: 'default',
         override: {
             useSeconds: false,
@@ -22,7 +21,6 @@ export function validateCronExpression(cronExpression: string): boolean {
             useLastDayOfMonth: false,
             useLastDayOfWeek: false,
             useNearestWeekday: false,
-            useOnlyLastDayOfMonth: false,
         },
     });
 
