@@ -77,16 +77,7 @@ export const upsertIntegrationResolver = async (
     }
 
     const shouldFetchDoc = shouldTriggerDocFetch(input, existingIntegrationOrNull);
-
-    if (shouldFetchDoc) {
-      triggerAsyncDocumentationFetch(input, context); // Fire-and-forget, will fetch docs in background and update integration documentation, documentationPending and metadata fields once its done
-    }
-
     const shouldTriggerOAuth: boolean = shouldTriggerClientCredentialsOAuthFlow(input, existingIntegrationOrNull);
-
-    if (shouldTriggerOAuth) {
-      triggerAsyncClientCredentialsOAuth(input, context); // Fire-and-forget, will fetch OAuth tokens in background
-    }
 
     const integrationToSave = {
       id: input.id,
@@ -106,7 +97,18 @@ export const upsertIntegrationResolver = async (
       createdAt: existingIntegrationOrNull?.createdAt || now,
       updatedAt: now
     };
-    return await context.datastore.upsertIntegration({ id: input.id, integration: integrationToSave, orgId: context.orgId });
+
+    const savedIntegration = await context.datastore.upsertIntegration({ id: input.id, integration: integrationToSave, orgId: context.orgId });
+
+    if (shouldFetchDoc) {
+      triggerAsyncDocumentationFetch(input, context); // Fire-and-forget, will fetch docs in background and update integration documentation, documentationPending and metadata fields once its done
+    }
+
+    if (shouldTriggerOAuth) {
+      triggerAsyncClientCredentialsOAuth(input, context); // Fire-and-forget, will fetch OAuth tokens in background
+    }
+
+    return savedIntegration;
   } catch (error) {
     logMessage('error', `Error upserting integration with id ${input.id}: ${String(error)}`, { orgId: context.orgId });
     throw error;
@@ -178,24 +180,37 @@ function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined
 }
 
 function shouldTriggerDocFetch(input: Integration, existingIntegration?: Integration | null): boolean {
-  // Special case: Manual refresh - if input explicitly sets documentationPending to true. Manual refresh only possible when doc fetching not in progress, so no conflict with condition one.
-  if (input.documentationPending === true) return true;
-  // If a doc fetch is already in progress, never trigger a new one
-  if (existingIntegration?.documentationPending === true) return false;
-  // Check if documentationUrl is a file:// URL (no need to fetch)
-  if (input.documentationUrl?.startsWith('file://')) return false;
-  // Trigger a fetch if:
-  // 1. This is a new integration (no existing integration)
-  if (!existingIntegration) return true;
+  // Early exit conditions
+  const isManualRefresh = input.documentationPending === true;
+  if (isManualRefresh) return true;
 
-  // 2. The documentation URL has changed (including from empty to populated)
-  if (input.documentationUrl !== existingIntegration.documentationUrl) return true;
-  // 3. The URL host/path has changed (affects API endpoint discovery)
-  // This can trigger doc fetch even without documentationUrl (e.g., GraphQL introspection)
-  if (input.urlHost !== existingIntegration.urlHost) return true;
-  if (input.urlPath !== existingIntegration.urlPath) return true;
-  // Otherwise, don't trigger a new fetch
-  return false;
+  const isFetchInProgress = existingIntegration?.documentationPending === true;
+  if (isFetchInProgress) return false;
+
+  const isFileUrl = input.documentationUrl?.startsWith('file://');
+  if (isFileUrl) return false;
+
+  // Check if we have something to fetch
+  const hasDocumentationUrl = input.documentationUrl && input.documentationUrl.trim().length > 0;
+  const hasApiUrl = input.urlHost && input.urlHost.trim().length > 0;
+  const isGraphQLEndpoint = input.urlHost?.includes('graphql');
+  const isPostgresEndpoint = input.urlHost?.startsWith('postgres://') ||
+    input.urlHost?.startsWith('postgresql://');
+  const canIntrospect = hasApiUrl && (isGraphQLEndpoint || isPostgresEndpoint);
+
+  const hasFetchableSource = hasDocumentationUrl || canIntrospect;
+  if (!hasFetchableSource) return false;
+
+  // Check if we need to trigger a fetch
+  const isNewIntegration = !existingIntegration;
+  if (isNewIntegration) return true;
+
+  const docUrlChanged = input.documentationUrl !== existingIntegration.documentationUrl;
+  const hostChanged = input.urlHost !== existingIntegration.urlHost;
+  const pathChanged = input.urlPath !== existingIntegration.urlPath;
+  const hasRelevantChanges = docUrlChanged || hostChanged || pathChanged;
+
+  return hasRelevantChanges;
 }
 
 async function triggerAsyncDocumentationFetch(
@@ -282,20 +297,20 @@ function uniqueKeywords(keywords: string[] | undefined): string[] {
 function shouldTriggerClientCredentialsOAuthFlow(input: Integration, existingIntegration?: Integration | null): boolean {
   const credentials = input.credentials || {};
   const grantType = credentials.grant_type;
-  
+
   // Only trigger for client_credentials grant type
   if (grantType !== 'client_credentials') return false;
-  
+
   // Check if we have the required OAuth fields
   const hasRequiredFields = credentials.client_id && credentials.client_secret;
   if (!hasRequiredFields) return false;
-  
+
   // For new integrations, trigger if we have the required fields
   if (!existingIntegration) return true;
-  
+
   // For existing integrations, trigger if OAuth fields have changed
   const existingCredentials = existingIntegration.credentials || {};
-  const oauthFieldsChanged = 
+  const oauthFieldsChanged =
     credentials.client_id !== existingCredentials.client_id ||
     credentials.client_secret !== existingCredentials.client_secret ||
     credentials.auth_url !== existingCredentials.auth_url ||
@@ -304,7 +319,7 @@ function shouldTriggerClientCredentialsOAuthFlow(input: Integration, existingInt
     credentials.grant_type !== existingCredentials.grant_type;
   // Also trigger if we don't have an access token yet
   const needsToken = !credentials.access_token;
-  
+
   return oauthFieldsChanged || needsToken;
 }
 

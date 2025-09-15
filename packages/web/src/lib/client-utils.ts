@@ -86,7 +86,7 @@ export async function executeSingleStep(
       success: result.success,
       data: stepResult?.data || stepResult?.transformedData || stepResult || result.data,
       error: result.error,
-      // If self-healing modified the step, capture the updated configuration
+      // Capture any updated configuration returned by the API (normalization, self-healing, etc.)
       updatedStep: result.config?.steps?.[0]
     };
   } catch (error: any) {
@@ -144,7 +144,7 @@ export async function executeWorkflowStepByStep(
       state.completedSteps.push(step.id);
       previousResults[step.id] = result.data;
 
-      // Update the workflow if self-healing modified the step
+      // Update the workflow with any returned step configuration (normalization, self-healing, etc.)
       if (result.updatedStep) {
         state.currentWorkflow = {
           ...state.currentWorkflow,

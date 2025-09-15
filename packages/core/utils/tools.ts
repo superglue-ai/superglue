@@ -218,6 +218,7 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
 
   config.headers = {
     "Accept": "*/*",
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
     ...config.headers,
   };
 
@@ -239,7 +240,11 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
     try {
       response = await axios({
         ...config,
+        responseType: 'arraybuffer', // ALWAYS use arraybuffer to preserve data integrity
         validateStatus: null, // Don't throw on any status
+        maxContentLength: Infinity, // No limit on response size
+        maxBodyLength: Infinity, // No limit on response body size
+        decompress: true, // Ensure gzip/deflate responses are decompressed
       });
 
       if (response.status === 429) {
@@ -261,6 +266,10 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
 
         // Check if we've exceeded the maximum wait time
         if (totalRateLimitWaitTime + waitTime > maxRateLimitWaitMs) {
+          // Convert ArrayBuffer to Buffer even for error responses
+          if (response.data instanceof ArrayBuffer) {
+            response.data = Buffer.from(response.data);
+          }
           return response; // Return the 429 response, caller will handle the error
         }
 
@@ -271,6 +280,10 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
         continue; // Skip the regular retry logic and try again immediately
       }
 
+      // Convert ArrayBuffer to Buffer for consistent handling
+      if (response.data instanceof ArrayBuffer) {
+        response.data = Buffer.from(response.data);
+      }
       return response;
     } catch (error) {
       if (retryCount >= maxRetries) throw new ApiCallError(error.message, response?.status);

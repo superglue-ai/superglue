@@ -12,7 +12,7 @@ const navItems = [
   { icon: Globe, label: "Integrations", href: "/integrations" },
   { icon: History, label: "Runs", href: "/runs" },
   { icon: PlayCircle, label: "Playground", href: "/playground" },
-  { icon: Bot, label: "MCP Setup", href: "https://docs.superglue.cloud/mcp", target: "_blank" },
+  { icon: Bot, label: "MCP Setup", href: "https://docs.superglue.cloud/agent-builders/quickstart", target: "_blank" },
   { icon: Book, label: "Documentation", href: "https://docs.superglue.cloud", target: "_blank" },
   /*  { icon: AlertCircle, label: 'Error Monitoring', href: '/analytics' },
   { icon: Shield, label: 'Access Control', href: '/access-control' },
@@ -30,7 +30,9 @@ export function Sidebar() {
     <aside className="bg-background text-foreground border-r border-border h-full flex flex-col">
       <div className="p-6">
         <div className="relative mx-auto">
-          <img src="/logo.svg" alt="superglue Logo" className="max-w-full h-[50px] w-[200px] ml-auto mr-auto" />
+          <Link href="/">
+            <img src="/logo.svg" alt="superglue Logo" className="max-w-full h-[50px] w-[200px] ml-auto mr-auto cursor-pointer transition-opacity" />
+          </Link>
         </div>
       </div>
       <nav className="flex-1">
