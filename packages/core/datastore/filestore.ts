@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { credentialEncryption } from "../utils/encryption.js";
 import { logMessage } from "../utils/logs.js";
-import type { DataStore } from "./types.js";
+import type { DataStore, WorkflowScheduleInternal } from "./types.js";
 
 export class FileStore implements DataStore {
 
@@ -12,6 +12,7 @@ export class FileStore implements DataStore {
     extracts: Map<string, ExtractConfig>;
     transforms: Map<string, TransformConfig>;
     workflows: Map<string, Workflow>;
+    workflowSchedules: Map<string, WorkflowScheduleInternal>;
     integrations: Map<string, Integration>;
     tenant: {
       email: string | null;
@@ -30,6 +31,7 @@ export class FileStore implements DataStore {
       extracts: new Map(),
       transforms: new Map(),
       workflows: new Map(),
+      workflowSchedules: new Map(),
       integrations: new Map(),
       tenant: {
         email: null,
@@ -85,6 +87,7 @@ export class FileStore implements DataStore {
           extracts: new Map(Object.entries(parsed.extracts || {})),
           transforms: new Map(Object.entries(parsed.transforms || {})),
           workflows: new Map(Object.entries(parsed.workflows || {})),
+          workflowSchedules: new Map(Object.entries(parsed.workflowSchedules || {})),
           integrations: new Map(Object.entries(parsed.integrations || {})),
           tenant: {
             email: parsed.tenant?.email || null,
@@ -132,6 +135,7 @@ export class FileStore implements DataStore {
         extracts: Object.fromEntries(this.storage.extracts),
         transforms: Object.fromEntries(this.storage.transforms),
         workflows: Object.fromEntries(this.storage.workflows),
+        workflowSchedules: Object.fromEntries(this.storage.workflowSchedules),
         integrations: Object.fromEntries(this.storage.integrations),
         tenant: this.storage.tenant
       };
@@ -520,6 +524,7 @@ export class FileStore implements DataStore {
     this.storage.extracts.clear();
     this.storage.transforms.clear();
     this.storage.workflows.clear();
+    this.storage.workflowSchedules.clear();
     this.storage.integrations.clear();
     await this.persist();
 
@@ -685,5 +690,72 @@ export class FileStore implements DataStore {
     const deleted = this.storage.integrations.delete(key);
     await this.persist();
     return deleted;
+  }
+
+  // Workflow Schedule Methods
+  async listWorkflowSchedules(params: { workflowId: string, orgId: string }): Promise<WorkflowScheduleInternal[]> {
+    await this.ensureInitialized();
+    const { workflowId, orgId } = params;
+    return this.getOrgItems(this.storage.workflowSchedules, 'workflow-schedule', orgId)
+      .filter(schedule => schedule.workflowId === workflowId);
+  }
+
+  async getWorkflowSchedule(params: { id: string; orgId?: string }): Promise<WorkflowScheduleInternal | null> {
+    await this.ensureInitialized();
+    const { id, orgId } = params;
+    if (!id) return null;
+    const key = this.getKey('workflow-schedule', id, orgId);
+    const schedule = this.storage.workflowSchedules.get(key);
+    return schedule ? { ...schedule, id } : null;
+  }
+
+  async upsertWorkflowSchedule(params: { schedule: WorkflowScheduleInternal }): Promise<void> {
+    await this.ensureInitialized();
+    const { schedule } = params;
+    if (!schedule || !schedule.id) return;
+    const key = this.getKey('workflow-schedule', schedule.id, schedule.orgId);
+    this.storage.workflowSchedules.set(key, schedule);
+    await this.persist();
+  }
+
+  async deleteWorkflowSchedule(params: { id: string, orgId: string }): Promise<boolean> {
+    await this.ensureInitialized();
+    const { id, orgId } = params;
+    if (!id) return false;
+    const key = this.getKey('workflow-schedule', id, orgId);
+    const deleted = this.storage.workflowSchedules.delete(key);
+    await this.persist();
+    return deleted;
+  }
+
+  async listDueWorkflowSchedules(): Promise<WorkflowScheduleInternal[]> {
+    await this.ensureInitialized();
+    const now = new Date();
+    return Array.from(this.storage.workflowSchedules.entries())
+      .filter(([key]) => key.includes(':workflow-schedule:'))
+      .map(([key, value]) => ({ ...value, id: key.split(':').pop() }))
+      .filter(schedule => schedule.enabled && schedule.nextRunAt <= now);
+  }
+
+  async updateScheduleNextRun(params: { id: string; nextRunAt: Date; lastRunAt: Date; }): Promise<boolean> {
+    await this.ensureInitialized();
+    const { id, nextRunAt, lastRunAt } = params;
+    if (!id) return false;
+    
+    // Find the schedule by searching all orgs since we don't have orgId in params
+    for (const [key, schedule] of this.storage.workflowSchedules.entries()) {
+      if (schedule.id === id) {
+        const updatedSchedule = {
+          ...schedule,
+          nextRunAt,
+          lastRunAt,
+          updatedAt: new Date()
+        };
+        this.storage.workflowSchedules.set(key, updatedSchedule);
+        await this.persist();
+        return true;
+      }
+    }
+    return false;
   }
 } 
