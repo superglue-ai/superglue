@@ -2,9 +2,9 @@ import { useConfig } from '@/src/app/config-context';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/src/components/ui/select";
 import { Switch } from "@/src/components/ui/switch";
 import { useToast } from '@/src/hooks/use-toast';
-import { cn, getIntegrationIcon as getIntegrationIconName, getSimpleIcon } from '@/src/lib/utils';
+import { formatJavaScriptCode, getIntegrationIcon as getIntegrationIconName, getSimpleIcon } from '@/src/lib/utils';
 import { Integration, SuperglueClient } from "@superglue/client";
-import { ArrowDown, Check, Copy, Globe, Pencil, RotateCw, Save, X } from 'lucide-react';
+import { ArrowDown, Check, Copy, Globe, RotateCw } from 'lucide-react';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
 import { useEffect, useMemo, useState } from 'react';
@@ -25,12 +25,11 @@ interface WorkflowStepConfiguratorProps {
     onRemove: (stepId: string) => void;
     integrations?: Integration[];
     onCreateIntegration?: () => void;
-    onEditingChange?: (editing: boolean) => void;
 }
 
-export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integrations: propIntegrations, onCreateIntegration, onEditingChange }: WorkflowStepConfiguratorProps) {
-    const [isEditing, setIsEditing] = useState(false);
+export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integrations: propIntegrations, onCreateIntegration }: WorkflowStepConfiguratorProps) {
     const [editedStep, setEditedStep] = useState({ ...step });
+    const [didFormatLoopSelector, setDidFormatLoopSelector] = useState(false);
     const [showJson, setShowJson] = useState(false);
     const [localIntegrations, setLocalIntegrations] = useState<Integration[]>([]);
     const [loadingIntegrations, setLoadingIntegrations] = useState(false);
@@ -62,7 +61,12 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
         }
     };
 
-    useEffect(() => { if (isEditing) { loadIntegrations(); } }, [isEditing]);
+    // Load integrations on mount if not provided
+    useEffect(() => {
+        if (!propIntegrations) {
+            loadIntegrations();
+        }
+    }, []);
 
     const integrations = propIntegrations || localIntegrations;
 
@@ -71,73 +75,59 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
         return iconName ? getSimpleIcon(iconName) : null;
     };
 
-    useEffect(() => { if (!isEditing) { setEditedStep({ ...step }); } }, [step, isEditing]);
-
+    // Sync with parent step prop changes
     useEffect(() => {
-        if (isEditing) {
-            try {
-                const headers = editedStep.apiConfig?.headers;
-                const headersJson = headers !== undefined && headers !== null ? JSON.stringify(headers, null, 2) : '{}';
-                setHeadersText(headersJson);
-                try { JSON.parse(headersJson); setHeadersError(false); } catch { setHeadersError(true); }
-            } catch (error) {
-                console.warn('Failed to stringify headers:', error);
-                setHeadersText('{}');
-                setHeadersError(false);
-            }
-            try {
-                const queryParams = editedStep.apiConfig?.queryParams;
-                const queryParamsJson = queryParams !== undefined && queryParams !== null ? JSON.stringify(queryParams, null, 2) : '{}';
-                setQueryParamsText(queryParamsJson);
-                try { JSON.parse(queryParamsJson); setQueryParamsError(false); } catch { setQueryParamsError(true); }
-            } catch (error) {
-                console.warn('Failed to stringify queryParams:', error);
-                setQueryParamsText('{}');
-                setQueryParamsError(false);
-            }
-        }
-    }, [isEditing, editedStep.apiConfig?.headers, editedStep.apiConfig?.queryParams]);
-
-    const handleSave = () => {
-        if (headersError || queryParamsError) {
-            toast({ title: 'Invalid JSON', description: 'Please fix the JSON errors in Headers or Query Parameters before saving.', variant: 'destructive' });
-            return;
-        }
-        const updatedStep = {
-            ...step,
-            ...editedStep,
-            executionMode: editedStep.executionMode,
-            loopSelector: editedStep.loopSelector,
-            loopMaxIters: editedStep.loopMaxIters,
-            apiConfig: { ...step.apiConfig, ...editedStep.apiConfig }
-        };
-        const originalJson = JSON.stringify(step);
-        const updatedJson = JSON.stringify(updatedStep);
-        if (originalJson !== updatedJson) { onEdit(step.id, updatedStep); }
-        setIsEditing(false);
-        onEditingChange?.(false);
-    };
-
-    const handleCancel = () => {
         setEditedStep({ ...step });
+        // Reset headers and query params text
         try {
             const headers = step.apiConfig?.headers;
-            setHeadersText(headers !== undefined && headers !== null ? JSON.stringify(headers, null, 2) : '{}');
+            const headersJson = headers !== undefined && headers !== null ? JSON.stringify(headers, null, 2) : '{}';
+            setHeadersText(headersJson);
+            setHeadersError(false);
         } catch (error) {
-            console.warn('Failed to stringify headers on cancel:', error);
+            console.warn('Failed to stringify headers:', error);
             setHeadersText('{}');
+            setHeadersError(false);
         }
         try {
             const queryParams = step.apiConfig?.queryParams;
-            setQueryParamsText(queryParams !== undefined && queryParams !== null ? JSON.stringify(queryParams, null, 2) : '{}');
+            const queryParamsJson = queryParams !== undefined && queryParams !== null ? JSON.stringify(queryParams, null, 2) : '{}';
+            setQueryParamsText(queryParamsJson);
+            setQueryParamsError(false);
         } catch (error) {
-            console.warn('Failed to stringify queryParams on cancel:', error);
+            console.warn('Failed to stringify queryParams:', error);
             setQueryParamsText('{}');
+            setQueryParamsError(false);
         }
-        setHeadersError(false);
-        setQueryParamsError(false);
-        setIsEditing(false);
-        onEditingChange?.(false);
+    }, [step]);
+
+    // Format loop selector on first load
+    useEffect(() => {
+        if (!didFormatLoopSelector && editedStep.loopSelector) {
+            formatJavaScriptCode(editedStep.loopSelector).then(formatted => {
+                if (formatted !== editedStep.loopSelector) {
+                    handleFieldChange({ loopSelector: formatted });
+                }
+                setDidFormatLoopSelector(true);
+            });
+        }
+    }, [editedStep.loopSelector]);
+
+    // Auto-save helper - debounced to avoid too many updates
+    const handleFieldChange = (updates: Partial<typeof editedStep>) => {
+        const newStep = { ...editedStep, ...updates };
+        setEditedStep(newStep);
+
+        // Immediately propagate changes to parent
+        const updatedStep = {
+            ...step,
+            ...newStep,
+            executionMode: newStep.executionMode,
+            loopSelector: newStep.loopSelector,
+            loopMaxIters: newStep.loopMaxIters,
+            apiConfig: { ...step.apiConfig, ...newStep.apiConfig }
+        };
+        onEdit(step.id, updatedStep);
     };
 
     const [rawJsonText, setRawJsonText] = useState<string>(() => JSON.stringify(editedStep, null, 2));
@@ -158,14 +148,14 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
 
     return (
         <div className="flex flex-col items-center">
-            <Card className={cn("w-full", isEditing ? "border-primary" : "bg-muted/50")}>
+            <Card className="w-full border-primary/50">
                 <CardHeader className="pb-2">
                     <div className="flex items-center justify-between min-w-0">
                         <div className="flex items-center gap-2 min-w-0 flex-1">
                             <CardTitle className="text-sm font-medium flex items-center gap-2 min-w-0">
                                 {editedStep.executionMode === 'LOOP' && (<RotateCw className="h-4 w-4 text-muted-foreground flex-shrink-0" />)}
                                 <span className="font-mono truncate">{step.id}</span>
-                                {linkedIntegration && !isEditing && (
+                                {linkedIntegration && (
                                     <Badge variant="outline" className="text-xs flex-shrink-0">
                                         <div className="text-xs flex items-center gap-1">
                                             {getIntegrationIcon(linkedIntegration) ? (
@@ -180,50 +170,25 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                     </Badge>
                                 )}
                             </CardTitle>
-                            {isEditing && (
-                                <div className="flex items-center gap-1 ml-2">
-                                    <Label className="text-xs text-muted-foreground">Code Mode</Label>
-                                    <Switch checked={showJson} onCheckedChange={setShowJson} className="custom-switch" />
-                                </div>
-                            )}
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                            <div className="flex gap-1 flex-shrink-0">
-                                {isEditing ? (
-                                    <div className="flex items-center gap-2">
-                                        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={handleCancel}>
-                                            <X className="h-3 w-3 mr-0.5" />
-                                            Cancel
-                                        </Button>
-                                        <Button variant="default" size="sm" className="h-7 px-2 text-xs" onClick={handleSave} disabled={headersError || queryParamsError}>
-                                            <Save className="h-3 w-3 mr-0.5" />
-                                            Save
-                                        </Button>
-                                    </div>
-                                ) : (
-                                    <div className="flex items-center gap-1">
-                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setIsEditing(true); onEditingChange?.(true); }} title="Edit step">
-                                            <Pencil className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                )}
+                            <div className="flex items-center gap-1 ml-2">
+                                <Label className="text-xs text-muted-foreground">Code Mode</Label>
+                                <Switch checked={showJson} onCheckedChange={setShowJson} className="custom-switch" />
                             </div>
                         </div>
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-3 text-sm">
-                    {isEditing ? (
+                    {
                         <>
                             {showJson ? (
                                 <div className="space-y-2">
-                                    <Label className="text-xs flex items-center gap-1">Step JSON</Label>
                                     <div className="relative bg-muted/30 rounded-lg border">
                                         <div className="absolute top-2 right-2 flex items-center gap-1 z-10">
                                             <Button variant="ghost" size="icon" className="h-6 w-6 bg-background/80 hover:bg-background" onClick={() => { navigator.clipboard.writeText(rawJsonText); setCopied(true); setTimeout(() => setCopied(false), 1500); }} title="Copy JSON">
                                                 {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                                             </Button>
                                         </div>
-                                        <Editor value={rawJsonText} onValueChange={(val) => { setRawJsonText(val); }} highlight={(code) => Prism.highlight(code, Prism.languages.json, 'json')} padding={10} tabSize={2} insertSpaces={true} className="font-mono text-xs min-h[260px]" textareaClassName="outline-none focus:outline-none" style={{ background: 'transparent' }} onBlur={() => { try { const parsed = JSON.parse(rawJsonText); setEditedStep(parsed); } catch { } }} />
+                                        <Editor value={rawJsonText} onValueChange={(val) => { setRawJsonText(val); }} highlight={(code) => Prism.highlight(code, Prism.languages.json, 'json')} padding={10} tabSize={2} insertSpaces={true} className="font-mono text-xs min-h[260px]" textareaClassName="outline-none focus:outline-none" style={{ background: 'transparent' }} onBlur={() => { try { const parsed = JSON.parse(rawJsonText); handleFieldChange(parsed); } catch { } }} />
                                     </div>
                                 </div>
                             ) : (
@@ -243,7 +208,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                                 Integration
                                                 <HelpTooltip text="Select an integration to link this step to. This will pre-fill the API configuration with the integration's base URL and credentials." />
                                             </Label>
-                                            <Select value={editedStep.integrationId || step.integrationId} onValueChange={(value) => { if (value === "CREATE_NEW") { onCreateIntegration?.(); } else { const selectedIntegration = integrations?.find(integration => integration.id === value); setEditedStep(prev => ({ ...prev, integrationId: value, apiConfig: { ...prev.apiConfig, urlHost: selectedIntegration?.urlHost || prev.apiConfig.urlHost, urlPath: selectedIntegration?.urlPath || prev.apiConfig.urlPath, headers: selectedIntegration?.credentials ? Object.entries(selectedIntegration.credentials).reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {}) : prev.apiConfig.headers } })); } }}>
+                                            <Select value={editedStep.integrationId || step.integrationId} onValueChange={(value) => { if (value === "CREATE_NEW") { onCreateIntegration?.(); } else { const selectedIntegration = integrations?.find(integration => integration.id === value); handleFieldChange({ integrationId: value, apiConfig: { ...editedStep.apiConfig, urlHost: selectedIntegration?.urlHost || editedStep.apiConfig.urlHost, urlPath: selectedIntegration?.urlPath || editedStep.apiConfig.urlPath, headers: selectedIntegration?.credentials ? Object.entries(selectedIntegration.credentials).reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {}) : editedStep.apiConfig.headers } }); } }}>
                                                 <SelectTrigger className="h-9 mt-1">
                                                     <SelectValue placeholder="Select integration" />
                                                 </SelectTrigger>
@@ -272,7 +237,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                                 <Label className="text-xs">Mode</Label>
                                                 <HelpTooltip text="DIRECT: Execute once with input data. LOOP: Execute multiple times iterating over an array from previous steps." />
                                             </div>
-                                            <Select value={editedStep.executionMode} onValueChange={(value) => setEditedStep(prev => ({ ...prev, executionMode: value }))}>
+                                            <Select value={editedStep.executionMode} onValueChange={(value) => handleFieldChange({ executionMode: value })}>
                                                 <SelectTrigger className="h-9 w-28 mt-1">
                                                     <SelectValue placeholder="Mode" />
                                                 </SelectTrigger>
@@ -290,7 +255,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                         </Label>
                                         <div className="space-y-2 mt-1">
                                             <div className="flex gap-2">
-                                                <Select value={editedStep.apiConfig.method} onValueChange={(value) => setEditedStep(prev => ({ ...prev, apiConfig: { ...prev.apiConfig, method: value } }))}>
+                                                <Select value={editedStep.apiConfig.method} onValueChange={(value) => handleFieldChange({ apiConfig: { ...editedStep.apiConfig, method: value } })}>
                                                     <SelectTrigger className="h-9 flex-1">
                                                         <SelectValue placeholder="Method" />
                                                     </SelectTrigger>
@@ -298,8 +263,8 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                                         {['GET', 'POST', 'PUT', 'DELETE', 'PATCH'].map(method => (<SelectItem key={method} value={method}>{method}</SelectItem>))}
                                                     </SelectContent>
                                                 </Select>
-                                                <Input value={editedStep.apiConfig.urlHost} onChange={(e) => setEditedStep(prev => ({ ...prev, apiConfig: { ...prev.apiConfig, urlHost: e.target.value } }))} className="text-xs flex-1 focus:ring-0 focus:ring-offset-0" placeholder="Host" />
-                                                <Input value={editedStep.apiConfig.urlPath} onChange={(e) => setEditedStep(prev => ({ ...prev, apiConfig: { ...prev.apiConfig, urlPath: e.target.value } }))} className="text-xs flex-1 focus:ring-0 focus:ring-offset-0" placeholder="Path" />
+                                                <Input value={editedStep.apiConfig.urlHost} onChange={(e) => handleFieldChange({ apiConfig: { ...editedStep.apiConfig, urlHost: e.target.value } })} className="text-xs flex-1 focus:ring-0 focus:ring-offset-0" placeholder="Host" />
+                                                <Input value={editedStep.apiConfig.urlPath} onChange={(e) => handleFieldChange({ apiConfig: { ...editedStep.apiConfig, urlPath: e.target.value } })} className="text-xs flex-1 focus:ring-0 focus:ring-offset-0" placeholder="Path" />
                                             </div>
                                         </div>
                                     </div>
@@ -308,7 +273,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                             Headers (JSON)
                                             <HelpTooltip text="HTTP headers to include with the request. Use JSON format. Common headers include Content-Type, Authorization, etc." />
                                         </Label>
-                                        <Textarea value={headersText} onChange={(e) => { const newValue = e.target.value; setHeadersText(newValue); if (!newValue.trim()) { setEditedStep(prev => ({ ...prev, apiConfig: { ...prev.apiConfig, headers: {} } })); setHeadersError(false); return; } try { const headers = JSON.parse(newValue); setEditedStep(prev => ({ ...prev, apiConfig: { ...prev.apiConfig, headers } })); setHeadersError(false); } catch { setHeadersError(true); } }} className="font-mono text-xs h-20 mt-1 focus:ring-0 focus:ring-offset-0" placeholder="{}" />
+                                        <Textarea value={headersText} onChange={(e) => { const newValue = e.target.value; setHeadersText(newValue); if (!newValue.trim()) { handleFieldChange({ apiConfig: { ...editedStep.apiConfig, headers: {} } }); setHeadersError(false); return; } try { const headers = JSON.parse(newValue); handleFieldChange({ apiConfig: { ...editedStep.apiConfig, headers } }); setHeadersError(false); } catch { setHeadersError(true); } }} className="font-mono text-xs h-20 mt-1 focus:ring-0 focus:ring-offset-0" placeholder="{}" />
                                         {headersError && (<div className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5 bg-red-500/10 dark:bg-red-500/20 py-1.5 px-2.5 rounded-md mt-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg><span>Invalid JSON format</span></div>)}
                                     </div>
                                     <div>
@@ -316,7 +281,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                             Query Parameters (JSON)
                                             <HelpTooltip text='URL query parameters to append to the request. Use JSON format like {"param1": "value1", "param2": "value2"}' />
                                         </Label>
-                                        <Textarea value={queryParamsText} onChange={(e) => { const newValue = e.target.value; setQueryParamsText(newValue); if (!newValue.trim()) { setEditedStep(prev => ({ ...prev, apiConfig: { ...prev.apiConfig, queryParams: {} } })); setQueryParamsError(false); return; } try { const queryParams = JSON.parse(newValue); setEditedStep(prev => ({ ...prev, apiConfig: { ...prev.apiConfig, queryParams } })); setQueryParamsError(false); } catch { setQueryParamsError(true); } }} className="font-mono text-xs h-20 mt-1 focus:ring-0 focus:ring-offset-0" placeholder="{}" />
+                                        <Textarea value={queryParamsText} onChange={(e) => { const newValue = e.target.value; setQueryParamsText(newValue); if (!newValue.trim()) { handleFieldChange({ apiConfig: { ...editedStep.apiConfig, queryParams: {} } }); setQueryParamsError(false); return; } try { const queryParams = JSON.parse(newValue); handleFieldChange({ apiConfig: { ...editedStep.apiConfig, queryParams } }); setQueryParamsError(false); } catch { setQueryParamsError(true); } }} className="font-mono text-xs h-20 mt-1 focus:ring-0 focus:ring-offset-0" placeholder="{}" />
                                         {queryParamsError && (<div className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5 bg-red-500/10 dark:bg-red-500/20 py-1.5 px-2.5 rounded-md mt-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg><span>Invalid JSON format</span></div>)}
                                     </div>
                                     <div>
@@ -324,7 +289,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                             Body
                                             <HelpTooltip text="Request body content. Can be JSON, form data, or plain text. Use JavaScript expressions to transform data from previous steps." />
                                         </Label>
-                                        <Textarea value={editedStep.apiConfig.body || ''} onChange={(e) => setEditedStep(prev => ({ ...prev, apiConfig: { ...prev.apiConfig, body: e.target.value } }))} className="font-mono text-xs h-20 mt-1 focus:ring-0 focus:ring-offset-0" />
+                                        <Textarea value={editedStep.apiConfig.body || ''} onChange={(e) => handleFieldChange({ apiConfig: { ...editedStep.apiConfig, body: e.target.value } })} className="font-mono text-xs h-20 mt-1 focus:ring-0 focus:ring-offset-0" />
                                     </div>
                                     <div>
                                         <Label className="text-xs flex items-center gap-1">
@@ -332,7 +297,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                             <HelpTooltip text="Configure pagination if the API returns data in pages. Only set this if you're using pagination variables like {'<<offset>>'}, {'<<page>>'}, or {'<<cursor>>'} in your request." />
                                         </Label>
                                         <div className="space-y-2 mt-1">
-                                            <Select value={editedStep.apiConfig.pagination?.type || 'none'} onValueChange={(value) => { if (value === 'none') { setEditedStep(prev => ({ ...prev, apiConfig: { ...prev.apiConfig, pagination: undefined } })); } else { setEditedStep(prev => ({ ...prev, apiConfig: { ...prev.apiConfig, pagination: { ...(prev.apiConfig.pagination || {}), type: value, pageSize: prev.apiConfig.pagination?.pageSize || '50', cursorPath: prev.apiConfig.pagination?.cursorPath || '', stopCondition: prev.apiConfig.pagination?.stopCondition || '(response, pageInfo) => !response.data || response.data.length === 0' } } })); } }}>
+                                            <Select value={editedStep.apiConfig.pagination?.type || 'none'} onValueChange={(value) => { if (value === 'none') { handleFieldChange({ apiConfig: { ...editedStep.apiConfig, pagination: undefined } }); } else { handleFieldChange({ apiConfig: { ...editedStep.apiConfig, pagination: { ...(editedStep.apiConfig.pagination || {}), type: value, pageSize: editedStep.apiConfig.pagination?.pageSize || '50', cursorPath: editedStep.apiConfig.pagination?.cursorPath || '', stopCondition: editedStep.apiConfig.pagination?.stopCondition || '(response, pageInfo) => !response.data || response.data.length === 0' } } }); } }}>
                                                 <SelectTrigger className="h-9">
                                                     <SelectValue placeholder="No pagination" />
                                                 </SelectTrigger>
@@ -347,12 +312,12 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                                 <>
                                                     <div>
                                                         <Label className="text-xs">Page Size</Label>
-                                                        <Input value={editedStep.apiConfig.pagination.pageSize || '50'} onChange={(e) => setEditedStep(prev => ({ ...prev, apiConfig: { ...prev.apiConfig, pagination: { ...(prev.apiConfig.pagination || {}), pageSize: e.target.value } } }))} className="text-xs mt-1 focus:ring-0 focus:ring-offset-0" placeholder="50" />
+                                                        <Input value={editedStep.apiConfig.pagination.pageSize || '50'} onChange={(e) => handleFieldChange({ apiConfig: { ...editedStep.apiConfig, pagination: { ...(editedStep.apiConfig.pagination || {}), pageSize: e.target.value } } })} className="text-xs mt-1 focus:ring-0 focus:ring-offset-0" placeholder="50" />
                                                     </div>
                                                     {editedStep.apiConfig.pagination.type === 'CURSOR_BASED' && (
                                                         <div>
                                                             <Label className="text-xs">Cursor Path</Label>
-                                                            <Input value={editedStep.apiConfig.pagination.cursorPath || ''} onChange={(e) => setEditedStep(prev => ({ ...prev, apiConfig: { ...prev.apiConfig, pagination: { ...(prev.apiConfig.pagination || {}), cursorPath: e.target.value } } }))} className="text-xs mt-1 focus:ring-0 focus:ring-offset-0" placeholder="e.g., response.nextCursor" />
+                                                            <Input value={editedStep.apiConfig.pagination.cursorPath || ''} onChange={(e) => handleFieldChange({ apiConfig: { ...editedStep.apiConfig, pagination: { ...(editedStep.apiConfig.pagination || {}), cursorPath: e.target.value } } })} className="text-xs mt-1 focus:ring-0 focus:ring-offset-0" placeholder="e.g., response.nextCursor" />
                                                         </div>
                                                     )}
                                                     <div>
@@ -360,7 +325,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                                             Stop Condition (JavaScript)
                                                             <HelpTooltip text="JavaScript function that returns true when pagination should stop. Receives (response, pageInfo) where pageInfo has: page, offset, cursor, total fetched." />
                                                         </Label>
-                                                        <Textarea value={editedStep.apiConfig.pagination.stopCondition || '(response, pageInfo) => !response.data || response.data.length === 0'} onChange={(e) => setEditedStep(prev => ({ ...prev, apiConfig: { ...prev.apiConfig, pagination: { ...(prev.apiConfig.pagination || {}), stopCondition: e.target.value } } }))} className="font-mono text-xs h-16 mt-1" placeholder="(response, pageInfo) => !response.data || response.data.length === 0" />
+                                                        <Textarea value={editedStep.apiConfig.pagination.stopCondition || '(response, pageInfo) => !response.data || response.data.length === 0'} onChange={(e) => handleFieldChange({ apiConfig: { ...editedStep.apiConfig, pagination: { ...(editedStep.apiConfig.pagination || {}), stopCondition: e.target.value } } })} className="font-mono text-xs h-16 mt-1" placeholder="(response, pageInfo) => !response.data || response.data.length === 0" />
                                                     </div>
                                                 </>
                                             )}
@@ -376,7 +341,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                                 <div className="mt-1">
                                                     <JavaScriptCodeEditor
                                                         value={editedStep.loopSelector || ''}
-                                                        onChange={(val) => setEditedStep(prev => ({ ...prev, loopSelector: val }))}
+                                                        onChange={(val) => handleFieldChange({ loopSelector: val })}
                                                         readOnly={false}
                                                         minHeight="120px"
                                                         maxHeight="260px"
@@ -390,31 +355,14 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                                     Max Iterations
                                                     <HelpTooltip text="Maximum number of loop iterations to prevent infinite loops. Default is 1000." />
                                                 </Label>
-                                                <Input type="number" value={editedStep.loopMaxIters || ''} onChange={(e) => setEditedStep(prev => ({ ...prev, loopMaxIters: parseInt(e.target.value) || undefined }))} className="text-xs mt-1 w-32" placeholder="1000" />
+                                                <Input type="number" value={editedStep.loopMaxIters || ''} onChange={(e) => handleFieldChange({ loopMaxIters: parseInt(e.target.value) || undefined })} className="text-xs mt-1 w-32" placeholder="1000" />
                                             </div>
                                         </>
                                     )}
                                 </div>
                             )}
                         </>
-                    ) : (
-                        <>
-                            <div>
-                                <div className="font-mono text-xs bg-background/50 p-2 rounded mt-1 overflow-x-auto">
-                                    <div>{editedStep.apiConfig.method || 'GET'} {editedStep.apiConfig.urlHost}{editedStep.apiConfig.urlPath}</div>
-                                </div>
-                            </div>
-                            {editedStep.executionMode === 'LOOP' && editedStep.loopSelector && (
-                                <div>
-                                    <Label className="text-xs text-muted-foreground">Loop Over</Label>
-                                    <div className="font-mono text-xs bg-background/50 p-2 rounded mt-1 overflow-x-auto">
-                                        {editedStep.loopSelector}
-                                        {editedStep.loopMaxIters && ` (max ${editedStep.loopMaxIters} iterations)`}
-                                    </div>
-                                </div>
-                            )}
-                        </>
-                    )}
+                    }
                 </CardContent>
             </Card>
             {!isLast && (<div className="my-2 text-muted-foreground"><ArrowDown className="h-4 w-4" /></div>)}
