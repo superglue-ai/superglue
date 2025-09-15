@@ -33,6 +33,14 @@ export class WorkflowScheduler {
         let existingScheduleOrNull = null; 
         if (params.id) {
             existingScheduleOrNull = await this.datastore.getWorkflowSchedule({ id: params.id, orgId: params.orgId });
+
+            if (!existingScheduleOrNull) {
+                throw new Error("Failed to upsert workflow schedule: Schedule not found");
+            }
+        }
+
+        if(!params.cronExpression && !existingScheduleOrNull?.cronExpression) {
+            throw new Error("Failed to upsert workflow schedule: Cron expression is required for create");
         }
 
         const id = existingScheduleOrNull?.id ?? crypto.randomUUID();
@@ -46,7 +54,7 @@ export class WorkflowScheduler {
             orgId: existingScheduleOrNull?.orgId ?? params.orgId,
             workflowId,
             cronExpression: cronExpressionToSave,
-            enabled: params.enabled ?? existingScheduleOrNull?.enabled,
+            enabled: params.enabled ?? existingScheduleOrNull?.enabled ?? true,
             payload: params.payload ?? existingScheduleOrNull?.payload,
             options: params.options ?? existingScheduleOrNull?.options,
             nextRunAt: nextRunAt,
