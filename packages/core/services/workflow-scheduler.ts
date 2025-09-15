@@ -25,8 +25,8 @@ export class WorkflowScheduler {
         if (params.id && params.workflowId) {
             throw new Error("Failed to upsert workflow schedule: Provide either ID or Workflow ID, not both");
         }
-        
-        if (params.cronExpression && !validateCronExpression(params.cronExpression)) {
+
+        if (params.cronExpression !== undefined && !validateCronExpression(params.cronExpression)) {
             throw new Error("Failed to upsert workflow schedule: Invalid cron expression");
         }
 
