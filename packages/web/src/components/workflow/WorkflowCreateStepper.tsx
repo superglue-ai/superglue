@@ -6,7 +6,7 @@ import { useToast } from '@/src/hooks/use-toast';
 import { needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
 import { cn, composeUrl, getIntegrationIcon as getIntegrationIconName, getSimpleIcon, inputErrorStyles } from '@/src/lib/utils';
 import { Integration, IntegrationInput, SuperglueClient, UpsertMode, Workflow } from '@superglue/client';
-import { integrations as integrationTemplates } from "@superglue/shared";
+import { integrationOptions } from "@superglue/shared";
 import { waitForIntegrationProcessing } from '@superglue/shared/utils';
 import { ArrowRight, Check, Clock, Globe, Key, Loader2, Pencil, Plus, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -121,16 +121,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       setValidationErrors({});
     }
   }, [step]);
-
-
-  const integrationOptions = [
-    { value: "manual", label: "Custom API", icon: "default" },
-    ...Object.entries(integrationTemplates).map(([key, integration]) => ({
-      value: key,
-      label: key.charAt(0).toUpperCase() + key.slice(1),
-      icon: integration.icon || "default"
-    }))
-  ];
 
   const highlightJson = (code: string) => {
     return Prism.highlight(code, Prism.languages.json, 'json');
