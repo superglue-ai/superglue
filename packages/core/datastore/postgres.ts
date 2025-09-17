@@ -183,10 +183,10 @@ export class PostgresService implements DataStore {
                 enabled BOOLEAN NOT NULL DEFAULT TRUE,
                 payload JSONB,
                 options JSONB,
-                last_run_at TIMESTAMP,
-                next_run_at TIMESTAMP NOT NULL,
-                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                last_run_at TIMESTAMPTZ,
+                next_run_at TIMESTAMPTZ NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (id, org_id),
                 FOREIGN KEY (workflow_id, workflow_type, org_id) REFERENCES configurations(id, type, org_id) ON DELETE CASCADE
              )
@@ -572,7 +572,7 @@ export class PostgresService implements DataStore {
         try {
             const query = `SELECT id, org_id, workflow_id, cron_expression, timezone, enabled, payload, options, last_run_at, next_run_at, created_at, updated_at FROM workflow_schedules WHERE enabled = true AND next_run_at <= CURRENT_TIMESTAMP`;
             const queryResult = await client.query(query);
-    
+
             return queryResult.rows.map(this.mapWorkflowSchedule);
         }
         finally {

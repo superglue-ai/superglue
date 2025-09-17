@@ -22,6 +22,8 @@ export class WorkflowScheduler {
 
         this.isRunning = true;
         this.intervalId = setInterval(this.pollAndExecute.bind(this), this.intervalMs);
+
+        logMessage('info', 'Workflow scheduler started');
     }
 
     public stop(): void {
@@ -34,14 +36,16 @@ export class WorkflowScheduler {
             clearInterval(this.intervalId);
             this.intervalId = null;
         }
+
+        logMessage('info', 'Workflow scheduler stopped');
     }
 
     private async pollAndExecute(): Promise<void> {      
-        const schedules = await this.datastore.listDueWorkflowSchedules();        
+        const schedules = await this.datastore.listDueWorkflowSchedules();
 
         for (const schedule of schedules) {
             try {
-                logMessage('debug', `Running scheduled workflow ${schedule.workflowId}`, { orgId: schedule.orgId });
+                logMessage('debug', `Running scheduled workflow ${schedule.workflowId}`);
 
                 const now = new Date();
                 const nextRun = calculateNextRun(schedule.cronExpression, schedule.timezone, now);
