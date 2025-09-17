@@ -460,9 +460,10 @@ export const toolDefinitions: Record<string, any> = {
       const { client }: { client: SuperglueClient; } = args;
       try {
         const result: WorkflowResult = await client.executeWorkflow(args);
+        // TODO: do not return all results, only return some workflow info and data - LLM does not need to know step results
         return {
           ...result,
-          usage_tip: "Use the superglue_get_workflow_integration_code tool to integrate this workflow into your applications"
+          usage_tip: "Workflow results may be truncated. Use the superglue_get_workflow_integration_code tool to integrate this workflow into your applications"
         };
       } catch (error: any) {
         return {
@@ -641,7 +642,7 @@ export const toolDefinitions: Record<string, any> = {
           error: result.error,
           integrationIds: integrationIds,
           config: result.config,
-          id: result.id,
+          id: result.config?.id || builtWorkflow.id, // Use workflow ID, not execution ID so that LLM uses this ID for saving the workflow
           data: result.data,
         };
 
