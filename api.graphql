@@ -81,12 +81,6 @@ type RunResult {
   startedAt: DateTime!
   completedAt: DateTime!
   config: ConfigType
-  source: RunSource!
-}
-
-enum RunSource {
-  CLIENT
-  SCHEDULER
 }
 
 type Pagination {
