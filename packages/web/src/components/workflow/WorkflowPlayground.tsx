@@ -30,6 +30,7 @@ export interface WorkflowPlaygroundProps {
   onSelfHealingChange?: (enabled: boolean) => void;
   shouldStopExecution?: boolean;
   onStopExecution?: () => void;
+  disableNavigation?: boolean; // New prop to prevent navigation after save
 }
 
 export interface WorkflowPlaygroundHandle {
@@ -54,7 +55,8 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
   selfHealingEnabled: externalSelfHealingEnabled,
   onSelfHealingChange,
   shouldStopExecution: externalShouldStop,
-  onStopExecution
+  onStopExecution,
+  disableNavigation = false
 }, ref) => {
   const router = useRouter();
   const { toast } = useToast();
@@ -341,7 +343,10 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
           description: `"${savedWorkflow.id}" saved successfully`,
         });
 
-        router.push(`/workflows/${savedWorkflow.id}`);
+        // Only navigate if navigation is not disabled (i.e., not in a sheet)
+        if (!disableNavigation) {
+          router.push(`/workflows/${savedWorkflow.id}`);
+        }
       }
     } catch (error: any) {
       console.error("Error saving workflow:", error);
