@@ -185,8 +185,8 @@ export class PostgresService implements DataStore {
                 options JSONB,
                 last_run_at TIMESTAMP,
                 next_run_at TIMESTAMP NOT NULL,
-                created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-                updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (id, org_id),
                 FOREIGN KEY (workflow_id, workflow_type, org_id) REFERENCES configurations(id, type, org_id) ON DELETE CASCADE
              )
@@ -507,8 +507,8 @@ export class PostgresService implements DataStore {
         const client = await this.pool.connect();
 
         try {
-            const query = 'SELECT id, org_id, workflow_id, workflow_type, cron_expression, timezone, enabled, payload, options, last_run_at, next_run_at, created_at, updated_at FROM workflow_schedules WHERE workflow_id = $1 AND org_id = $2 AND workflow_type = $3';
-            const queryResult = await client.query(query, [params.workflowId, params.orgId, 'workflow']);
+            const query = 'SELECT id, org_id, workflow_id, cron_expression, timezone, enabled, payload, options, last_run_at, next_run_at, created_at, updated_at FROM workflow_schedules WHERE workflow_id = $1 AND org_id = $2';
+            const queryResult = await client.query(query, [params.workflowId, params.orgId]);
 
             return queryResult.rows.map(this.mapWorkflowSchedule);
         } finally {
@@ -519,7 +519,7 @@ export class PostgresService implements DataStore {
     async getWorkflowSchedule({ id, orgId }: { id: string; orgId?: string }): Promise<WorkflowScheduleInternal | null> {
         const client = await this.pool.connect();
         try {
-            const query = 'SELECT id, org_id, workflow_id, workflow_type, cron_expression, timezone, enabled, payload, options, last_run_at, next_run_at, created_at, updated_at FROM workflow_schedules WHERE id = $1 AND org_id = $2';
+            const query = 'SELECT id, org_id, workflow_id, cron_expression, timezone, enabled, payload, options, last_run_at, next_run_at, created_at, updated_at FROM workflow_schedules WHERE id = $1 AND org_id = $2';
             
             const queryResult = await client.query(query, [id, orgId || '']);
             if (!queryResult.rows[0]) {
@@ -547,10 +547,10 @@ export class PostgresService implements DataStore {
                     options = $9,
                     last_run_at = $10,
                     next_run_at = $11,
-                    updated_at = $12
+                    updated_at = CURRENT_TIMESTAMP
             `;
             
-            await client.query(query, [schedule.id, schedule.orgId, schedule.workflowId, 'workflow', schedule.cronExpression, schedule.timezone, schedule.enabled, JSON.stringify(schedule.payload), JSON.stringify(schedule.options), schedule.lastRunAt, schedule.nextRunAt, schedule.updatedAt]);
+            await client.query(query, [schedule.id, schedule.orgId, schedule.workflowId, 'workflow', schedule.cronExpression, schedule.timezone, schedule.enabled, JSON.stringify(schedule.payload), JSON.stringify(schedule.options), schedule.lastRunAt, schedule.nextRunAt]);
         } finally {
             client.release();
         }
@@ -570,7 +570,7 @@ export class PostgresService implements DataStore {
         const client = await this.pool.connect();
         
         try {
-            const query = `SELECT id, org_id, workflow_id, workflow_type, cron_expression, timezone, enabled, payload, options, last_run_at, next_run_at, created_at, updated_at FROM workflow_schedules WHERE enabled = true AND next_run_at <= NOW()`;
+            const query = `SELECT id, org_id, workflow_id, cron_expression, timezone, enabled, payload, options, last_run_at, next_run_at, created_at, updated_at FROM workflow_schedules WHERE enabled = true AND next_run_at <= CURRENT_TIMESTAMP`;
             const queryResult = await client.query(query);
     
             return queryResult.rows.map(this.mapWorkflowSchedule);
