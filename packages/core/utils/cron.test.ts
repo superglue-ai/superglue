@@ -6,7 +6,7 @@ describe('calculateNextRun', () => {
         const cronExpression = '* * * * *';
         const from = new Date('2024-01-01T12:00:00Z');
         
-        const nextRun = calculateNextRun(cronExpression, from);
+        const nextRun = calculateNextRun(cronExpression, 'UTC', from);
         
         expect(nextRun).toEqual(new Date('2024-01-01T12:01:00Z'));
     });
@@ -15,7 +15,7 @@ describe('calculateNextRun', () => {
         const cronExpression = '0 0 * * *';
         const from = new Date('2024-01-01T12:30:00Z');
         
-        const nextRun = calculateNextRun(cronExpression, from);
+        const nextRun = calculateNextRun(cronExpression, 'UTC', from);
         
         expect(nextRun).toEqual(new Date('2024-01-02T00:00:00Z'));
     });
@@ -24,7 +24,7 @@ describe('calculateNextRun', () => {
         const cronExpression = '0 9 * * 1';
         const from = new Date('2024-01-01T12:00:00Z');
         
-        const nextRun = calculateNextRun(cronExpression, from);
+        const nextRun = calculateNextRun(cronExpression, 'UTC', from);
         
         expect(nextRun).toEqual(new Date('2024-01-08T09:00:00Z'));
     });
@@ -33,7 +33,7 @@ describe('calculateNextRun', () => {
         const cronExpression = '* * * * *';
         const before = new Date();
         
-        const nextRun = calculateNextRun(cronExpression);
+        const nextRun = calculateNextRun(cronExpression, 'UTC');
         
         const after = new Date();
         expect(nextRun.getTime()).toBeGreaterThan(before.getTime());
@@ -44,7 +44,7 @@ describe('calculateNextRun', () => {
         const cronExpression = '30 14 * * 1-5';
         const from = new Date('2024-01-01T10:00:00Z');
         
-        const nextRun = calculateNextRun(cronExpression, from);
+        const nextRun = calculateNextRun(cronExpression, 'UTC', from);
         
         expect(nextRun).toEqual(new Date('2024-01-01T14:30:00Z'));
     });
@@ -52,7 +52,17 @@ describe('calculateNextRun', () => {
     it('should throw error for invalid cron expression', () => {
         const invalidCron = 'invalid cron';
         
-        expect(() => calculateNextRun(invalidCron)).toThrow();
+        expect(() => calculateNextRun(invalidCron, 'UTC')).toThrow();
+    });
+
+    it('should calculate next run for cron expression in a non-UTC timezone', () => {
+        // It's currently 00:00 UTC, which is 8:00 AM in Asia/Shanghai. The cron is set to run at 9:00 AM local time, which means it should execute at 01:00 UTC.
+        const cronExpression = '0 9 * * *'; // local time
+        const from = new Date('2024-02-02T00:00:00Z'); // utc time
+        
+        const nextRun = calculateNextRun(cronExpression, 'Asia/Shanghai', from);
+        
+        expect(nextRun.toISOString()).toEqual('2024-02-02T01:00:00.000Z');
     });
 });
 

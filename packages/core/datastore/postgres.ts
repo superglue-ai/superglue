@@ -179,6 +179,7 @@ export class PostgresService implements DataStore {
                 workflow_id TEXT NOT NULL,
                 workflow_type TEXT NOT NULL,
                 cron_expression TEXT NOT NULL,
+                timezone TEXT NOT NULL,
                 enabled BOOLEAN NOT NULL DEFAULT TRUE,
                 payload JSONB,
                 options JSONB,
@@ -186,7 +187,7 @@ export class PostgresService implements DataStore {
                 next_run_at TIMESTAMP NOT NULL,
                 created_at TIMESTAMP NOT NULL DEFAULT NOW(),
                 updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
-                PRIMARY KEY (id),
+                PRIMARY KEY (id, org_id),
                 FOREIGN KEY (workflow_id, workflow_type, org_id) REFERENCES configurations(id, type, org_id) ON DELETE CASCADE
              )
             `);
@@ -506,7 +507,7 @@ export class PostgresService implements DataStore {
         const client = await this.pool.connect();
 
         try {
-            const query = 'SELECT id, org_id, workflow_id, workflow_type, cron_expression, enabled, payload, options, last_run_at, next_run_at, created_at, updated_at FROM workflow_schedules WHERE workflow_id = $1 AND org_id = $2 AND workflow_type = $3';
+            const query = 'SELECT id, org_id, workflow_id, workflow_type, cron_expression, timezone, enabled, payload, options, last_run_at, next_run_at, created_at, updated_at FROM workflow_schedules WHERE workflow_id = $1 AND org_id = $2 AND workflow_type = $3';
             const queryResult = await client.query(query, [params.workflowId, params.orgId, 'workflow']);
 
             return queryResult.rows.map(this.mapWorkflowSchedule);
@@ -518,7 +519,7 @@ export class PostgresService implements DataStore {
     async getWorkflowSchedule({ id, orgId }: { id: string; orgId?: string }): Promise<WorkflowScheduleInternal | null> {
         const client = await this.pool.connect();
         try {
-            const query = 'SELECT id, org_id, workflow_id, workflow_type, cron_expression, enabled, payload, options, last_run_at, next_run_at, created_at, updated_at FROM workflow_schedules WHERE id = $1 AND org_id = $2';
+            const query = 'SELECT id, org_id, workflow_id, workflow_type, cron_expression, timezone, enabled, payload, options, last_run_at, next_run_at, created_at, updated_at FROM workflow_schedules WHERE id = $1 AND org_id = $2';
             
             const queryResult = await client.query(query, [id, orgId || '']);
             if (!queryResult.rows[0]) {
@@ -535,22 +536,21 @@ export class PostgresService implements DataStore {
         const client = await this.pool.connect();
         try {
             const query = `
-                INSERT INTO workflow_schedules (id, org_id, workflow_id, workflow_type, cron_expression, enabled, payload, options, last_run_at, next_run_at, updated_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP)
+                INSERT INTO workflow_schedules (id, org_id, workflow_id, workflow_type, cron_expression, timezone, enabled, payload, options, last_run_at, next_run_at, updated_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP)
                 ON CONFLICT (id, org_id)
                 DO UPDATE SET 
-                workflow_id = $3,
-                workflow_type = $4,
-                cron_expression = $5,
-                enabled = $6,
-                payload = $7,
-                options = $8,
-                last_run_at = $9,
-                next_run_at = $10,
-                updated_at = CURRENT_TIMESTAMP
+                    cron_expression = $5,
+                    timezone = $6,
+                    enabled = $7,
+                    payload = $8,
+                    options = $9,
+                    last_run_at = $10,
+                    next_run_at = $11,
+                    updated_at = $12
             `;
             
-            await client.query(query, [schedule.id, schedule.orgId, schedule.workflowId, 'workflow', schedule.cronExpression, schedule.enabled, JSON.stringify(schedule.payload), JSON.stringify(schedule.options), schedule.lastRunAt, schedule.nextRunAt]);
+            await client.query(query, [schedule.id, schedule.orgId, schedule.workflowId, 'workflow', schedule.cronExpression, schedule.timezone, schedule.enabled, JSON.stringify(schedule.payload), JSON.stringify(schedule.options), schedule.lastRunAt, schedule.nextRunAt, schedule.updatedAt]);
         } finally {
             client.release();
         }
@@ -570,7 +570,7 @@ export class PostgresService implements DataStore {
         const client = await this.pool.connect();
         
         try {
-            const query = `SELECT id, org_id, workflow_id, workflow_type, cron_expression, enabled, payload, options, last_run_at, next_run_at, created_at, updated_at FROM workflow_schedules WHERE enabled = true AND next_run_at <= NOW()`;
+            const query = `SELECT id, org_id, workflow_id, workflow_type, cron_expression, timezone, enabled, payload, options, last_run_at, next_run_at, created_at, updated_at FROM workflow_schedules WHERE enabled = true AND next_run_at <= NOW()`;
             const queryResult = await client.query(query);
     
             return queryResult.rows.map(this.mapWorkflowSchedule);
@@ -597,6 +597,7 @@ export class PostgresService implements DataStore {
             workflowId: row.workflow_id,
             orgId: row.org_id,
             cronExpression: row.cron_expression,
+            timezone: row.timezone,
             enabled: row.enabled,
             payload: row.payload,
             options: row.options,

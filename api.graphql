@@ -390,6 +390,7 @@ type WorkflowSchedule {
   id: ID!
   workflowId: String!
   cronExpression: String!
+  timezone: String!
   enabled: Boolean!
   payload: JSON
   options: JSON
@@ -414,6 +415,7 @@ input WorkflowScheduleInput {
   id: ID
   workflowId: ID
   cronExpression: String
+  timezone: String
   enabled: Boolean
   payload: JSON
   options: JSON

@@ -10,6 +10,7 @@ function toPublicSchedule(internal: WorkflowScheduleInternal): WorkflowSchedule 
         id: internal.id,
         workflowId: internal.workflowId,
         cronExpression: internal.cronExpression,
+        timezone: internal.timezone,
         enabled: internal.enabled,
         payload: internal.payload,
         options: internal.options,
@@ -42,6 +43,7 @@ type UpsertWorkflowScheduleArgs = {
         id?: string,
         workflowId?: string;
         cronExpression?: string;
+        timezone?: string;
         enabled?: boolean;
         payload?: Record<string, any>;
         options?: Record<string, any>;
@@ -62,6 +64,7 @@ export const upsertWorkflowScheduleResolver = async (
             workflowId: schedule.workflowId,
             orgId: context.orgId,
             cronExpression: schedule.cronExpression,
+            timezone: schedule.timezone,
             enabled: schedule.enabled,
             payload: schedule.payload,
             options: schedule.options

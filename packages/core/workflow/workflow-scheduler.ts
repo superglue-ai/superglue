@@ -44,7 +44,7 @@ export class WorkflowScheduler {
                 logMessage('debug', `Running scheduled workflow ${schedule.workflowId}`, { orgId: schedule.orgId });
 
                 const now = new Date();
-                const nextRun = calculateNextRun(schedule.cronExpression, now);
+                const nextRun = calculateNextRun(schedule.cronExpression, schedule.timezone, now);
                 await this.datastore.updateScheduleNextRun({ id: schedule.id, nextRunAt: nextRun, lastRunAt: now });
 
                 const context = {

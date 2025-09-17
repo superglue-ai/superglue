@@ -359,6 +359,7 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
                 options: null,
                 lastRunAt: null,
                 cronExpression: '0 0 * * *',
+                timezone: 'UTC',
                 enabled: true,
                 nextRunAt: new Date('2020-01-01T10:00:00.000Z'),
                 createdAt: new Date(),

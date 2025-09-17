@@ -1,17 +1,20 @@
 import { CronExpressionParser } from 'cron-parser';
 import cronValidate from 'cron-validate';
 
-export function calculateNextRun(cronExpression: string, from?: Date): Date {
+export function calculateNextRun(cronExpression: string, timezone: string, from?: Date): Date {
     const parsed = CronExpressionParser.parse(cronExpression, {
         currentDate: from,
-        tz: 'UTC',
+        tz: timezone,
     });
 
     return parsed.next().toDate();
 }
 
 export function validateCronExpression(cronExpression: string): boolean {
-    const result = cronValidate.default(cronExpression, {
+    // todo: fix this before merging!
+    const validator = cronValidate.default ? cronValidate.default : cronValidate as any;
+    
+    const result = validator(cronExpression, {
         preset: 'default',
         override: {
             useSeconds: false,
