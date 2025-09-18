@@ -20,7 +20,7 @@ import { createOAuthErrorHandler, triggerOAuthFlow } from '@/src/lib/oauth-utils
 import { composeUrl, getIntegrationIcon as getIntegrationIconName } from '@/src/lib/utils';
 import type { Integration } from '@superglue/client';
 import { SuperglueClient, UpsertMode } from '@superglue/client';
-import { integrations as integrationTemplates } from '@superglue/shared';
+import { integrationOptions } from '@superglue/shared';
 import { waitForIntegrationProcessing } from '@superglue/shared/utils';
 import { Clock, FileDown, Globe, Key, Pencil, Plus, RotateCw, Sparkles, Trash2 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -215,18 +215,6 @@ export default function IntegrationsPage() {
     }), [client]);
 
     const [editingIntegration, setEditingIntegration] = useState<Integration | null>(null);
-
-    const integrationOptions = [
-        { value: "manual", label: "Custom API", icon: "default" },
-        ...Object.entries(integrationTemplates).map(([key, integration]) => ({
-            value: key,
-            label: key
-                .replace(/([A-Z])/g, ' $1')  // Add space before capital letters
-                .replace(/^./, str => str.toUpperCase())  // Capitalize first letter
-                .trim(),  // Remove leading space
-            icon: integration.icon || "default"
-        }))
-    ];
 
     const getSimpleIcon = (name: string): SimpleIcon | null => {
         if (!name || name === "default") return null;

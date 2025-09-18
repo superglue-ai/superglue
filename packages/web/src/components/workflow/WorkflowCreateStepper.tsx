@@ -7,10 +7,11 @@ import { needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
 import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { cn, composeUrl, getIntegrationIcon as getIntegrationIconName, getSimpleIcon, inputErrorStyles } from '@/src/lib/utils';
 import { Integration, IntegrationInput, SuperglueClient, UpsertMode, Workflow } from '@superglue/client';
-import { integrations as integrationTemplates } from "@superglue/shared";
+import { integrationOptions as integrationTemplates } from "@superglue/shared";
 import { waitForIntegrationProcessing } from '@superglue/shared/utils';
 import { ArrowRight, Check, Clock, Globe, Key, Loader2, Pencil, Plus, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../ui/button';
@@ -138,14 +139,15 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     }))
   ];
 
+  const highlightJson = (code: string) => {
+    return Prism.highlight(code, Prism.languages.json, 'json');
+  };
 
   const hasDocumentation = (integration: Integration) => {
-    // Check if integration has documentation URL and is not pending
     return !!(integration.documentationUrl?.trim() && !pendingDocIds.has(integration.id));
   };
 
   const handleIntegrationFormSave = async (integration: Integration): Promise<Integration | null> => {
-    // Close form immediately
     setShowIntegrationForm(false);
     setIntegrationFormEdit(null);
 

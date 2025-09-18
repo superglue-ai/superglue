@@ -461,8 +461,6 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
           title: "Workflow saved",
           description: `"${savedWorkflow.id}" saved successfully`,
         });
-
-        router.push(`/workflows/${savedWorkflow.id}`);
       }
     } catch (error: any) {
       console.error("Error saving workflow:", error);
