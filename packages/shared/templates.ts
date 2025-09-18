@@ -1483,6 +1483,18 @@ export interface IntegrationConfig {
       preferredAuthType: "apikey",
     }
   }
+
+  export const integrationOptions = [
+    { value: "manual", label: "Custom API", icon: "default" },
+    ...Object.entries(integrations).map(([key, integration]) => ({
+      value: key,
+      label: key
+        .replace(/([A-Z])/g, ' $1')  // Add space before capital letters
+        .replace(/^./, str => str.toUpperCase())  // Capitalize first letter
+        .trim(),  // Remove leading space
+      icon: integration.icon || "default"
+    }))
+  ];
   
   /**
    * Find matching integration for a given URL
