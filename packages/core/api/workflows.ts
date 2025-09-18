@@ -115,8 +115,7 @@ const createWorkflow = async (request: CreateWorkflowRequest, reply: FastifyRepl
     // Log important business events (not routine operations)
     logMessage('info', `Workflow created: ${body.id}`, { 
       orgId, 
-      workflowId: body.id,
-      version: body.version 
+      workflowId: body.id
     });
     
     reply.code(201);
@@ -190,11 +189,11 @@ const deleteWorkflow = async (request: DeleteWorkflowRequest, reply: FastifyRepl
 
 const buildWorkflow = async (request: BuildWorkflowRequest, reply: FastifyReply) => {
   // This endpoint
-  // 1. validate the request
+  // 1. validates the request
   // 2. fetches the integrations (possibly waiting for the docs to be processed)
-  // 3. build the workflow
-  // 4. generate a unique ID for the workflow
-  // 5. return the workflow
+  // 3. builds the workflow
+  // 4. generates a unique ID for the workflow
+  // 5. returns the workflow
   try {
     const { datastore, orgId, body } = request;
     const { instruction, payload = {}, integrationIds, responseSchema } = body;
@@ -204,21 +203,17 @@ const buildWorkflow = async (request: BuildWorkflowRequest, reply: FastifyReply)
       return { error: 'VALIDATION_ERROR', message: 'Instruction is required' };
     }
 
-    if (!integrationIds || integrationIds.length === 0) {
-      reply.code(400);
-      return { error: 'VALIDATION_ERROR', message: 'At least one integration is required' };
-    }
-
     const metadata = { orgId, runId: crypto.randomUUID() };
 
-    // Validate that all integration IDs exist
-    const datastoreAdapter = {
-      getManyIntegrations: async (ids: string[]): Promise<Integration[]> => {
-        return await datastore.getManyIntegrations({ ids, includeDocs: true, orgId });
-      }
-    };
-
-    const resolvedIntegrations = await waitForIntegrationProcessing(datastoreAdapter, integrationIds);
+    let resolvedIntegrations: Integration[] = [];
+    if (integrationIds && integrationIds.length > 0) {
+      const datastoreAdapter = {
+        getManyIntegrations: async (ids: string[]): Promise<Integration[]> => {
+          return await datastore.getManyIntegrations({ ids, includeDocs: true, orgId: orgId });
+        }
+      };
+      resolvedIntegrations = await waitForIntegrationProcessing(datastoreAdapter, integrationIds);
+    }
 
     const builder = new WorkflowBuilder(
       instruction,
@@ -239,7 +234,6 @@ const buildWorkflow = async (request: BuildWorkflowRequest, reply: FastifyReply)
     logMessage('info', `Workflow built: ${workflow.id}`, { 
       orgId, 
       workflowId: workflow.id,
-      instruction: instruction.substring(0, 100) + (instruction.length > 100 ? '...' : '')
     });
 
     return workflow;

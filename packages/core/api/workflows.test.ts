@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { DataStore } from '../../datastore/types.js';
+import { DataStore } from '../datastore/types.js';
 import { Workflow, HttpMethod } from '@superglue/client';
 import { 
   setupAuthMocks, 
@@ -8,13 +8,13 @@ import {
   createMockWorkflow, 
   createMockWorkflowWithPost,
   registerRoutes 
-} from '../../tests/api-unit-test-utils.js';
+} from '../tests/api-unit-test-utils.js';
 
 // Setup mocks
 setupAuthMocks();
 
 // Import the workflows module to register routes
-import '../workflows.js';
+import './workflows.js';
 
 describe('Workflows API', () => {
   let app: any;

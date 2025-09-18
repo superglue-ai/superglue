@@ -104,7 +104,11 @@ const baseWorkflowSchema = {
         description: 'Version of the workflow'
       },
     },
-    required: ['id','steps']
+    required: ['id'],
+    anyOf: [
+      { required: ["steps"] },
+      { required: ["finalTransform"] }
+    ]
   };
 
 const basePaginationSchema = {
