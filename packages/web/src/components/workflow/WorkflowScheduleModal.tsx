@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Input } from '../ui/input';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { Check, ChevronsUpDown } from 'lucide-react';
+import { Check, ChevronsUpDown, CheckCircle, XCircle } from 'lucide-react';
 import { cn, getGroupedTimezones } from '@/src/lib/utils';
 import { Switch } from "@/src/components/ui/switch";
 import Editor from 'react-simple-code-editor';
@@ -32,12 +32,17 @@ interface WorkflowScheduleModalProps {
 }
 
 const WorkflowScheduleModal = ({ workflowId, isOpen, schedule, onClose }: WorkflowScheduleModalProps) => {
-  const [scheduleSelectedItem, setScheduleSelectedItem] = React.useState<string | null>(null);
-  const [customCronExpression, setCustomCronExpression] = React.useState<string | null>(null);
+  const [enabled, setEnabled] = useState(true);
+  const [scheduleSelectedItem, setScheduleSelectedItem] = React.useState<string>('0 0 * * *'); // default to daily
+  const [customCronExpression, setCustomCronExpression] = React.useState<string>('');
   const [customCronValidationError, setCustomCronValidationError] = React.useState<string | null>(null);
   const [timezoneOpen, setTimezoneOpen] = useState(false);
-  const [selectedTimezone, setTimezone] = useState<{value: string, label: string} | null>(null);
-  const [schedulePayload, setPayload] = useState<string | null>(null);
+  const [selectedTimezone, setTimezone] = useState<{value: string, label: string}>({
+    value: 'Europe/Berlin',
+    label: 'Europe/Berlin'
+  });
+  const [schedulePayload, setPayload] = useState<string>('{}');
+  const [isJsonValid, setIsJsonValid] = useState(true);
 
   const groupedTimezones = useMemo(() => getGroupedTimezones(), []); // only once
 
@@ -46,6 +51,8 @@ const WorkflowScheduleModal = ({ workflowId, isOpen, schedule, onClose }: Workfl
       return;
     }
 
+    setEnabled(schedule.enabled ?? true);
+
     if (DEFAULT_SCHEDULES.some((s) => s.value === schedule.cronExpression)) {
       setScheduleSelectedItem(schedule.cronExpression);
     } else {
@@ -53,8 +60,19 @@ const WorkflowScheduleModal = ({ workflowId, isOpen, schedule, onClose }: Workfl
       setCustomCronExpression(schedule.cronExpression);
     }
 
-    setPayload(schedule.payload ? JSON.stringify(schedule.payload) : null);
+    const payload = schedule.payload ? JSON.stringify(schedule.payload, null, 2) : '{}';
+    setPayload(payload);
+    validateJson(payload);
   }, [schedule]);
+
+  const validateJson = (jsonString: string) => {
+    try {
+      JSON.parse(jsonString);
+      setIsJsonValid(true);
+    } catch {
+      setIsJsonValid(false);
+    }
+  };
 
   const handleSubmit = () => {
     console.log('submit');
@@ -70,11 +88,17 @@ const WorkflowScheduleModal = ({ workflowId, isOpen, schedule, onClose }: Workfl
     }
   }
 
-  function handleEnabledChange(newState: boolean) {
-    console.log('enabled change', newState);
+  const handleEnabledChange = (newState: boolean) => {
+    setEnabled(newState);
   }
 
+  const handlePayloadChange = (code: string) => {
+    setPayload(code);
+    validateJson(code);
+  };
+
   const highlightJson = (code: string) => {
+    if (!code) return '';
     return Prism.highlight(code, Prism.languages.json, 'json');
   };
 
@@ -85,26 +109,29 @@ const WorkflowScheduleModal = ({ workflowId, isOpen, schedule, onClose }: Workfl
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">
-                {schedule ? "Edit Schedule" : "Add Schedule"}
+                Add Schedule for Workflow: {workflowId}
               </CardTitle>
             </CardHeader>
-            <CardContent className="flex flex-col gap-4">
+            <CardContent className="flex flex-col gap-6">
               {/* enabled switch */}
-              <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-3">
+                <Label htmlFor="enabled">Enable schedule</Label>
                 <Switch
-                  checked={schedule.enabled}
+                  id="enabled"
+                  checked={enabled}
                   onCheckedChange={handleEnabledChange}
                 />
               </div>
-              {/* schedule select */}
+              
+              {/* frequency select */}
               <div className="flex flex-col gap-2">
-                <Label htmlFor="cronExpression">Schedule</Label>
+                <Label htmlFor="frequency">Frequency</Label>
                 <Select
                   value={scheduleSelectedItem}
                   onValueChange={setScheduleSelectedItem}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Choose schedule" />
+                    <SelectValue placeholder="Choose frequency" />
                   </SelectTrigger>
                   <SelectContent>
                     {DEFAULT_SCHEDULES.map((schedule) => (
@@ -134,6 +161,7 @@ const WorkflowScheduleModal = ({ workflowId, isOpen, schedule, onClose }: Workfl
                   </div>
                 )}
               </div>
+              
               {/* timezone */}
               <div className="flex flex-col gap-2">
                 <Label htmlFor="timezone">Timezone</Label>
@@ -166,7 +194,7 @@ const WorkflowScheduleModal = ({ workflowId, isOpen, schedule, onClose }: Workfl
                                   onSelect={(currentValue) => {
                                     setTimezone(
                                       currentValue === selectedTimezone?.value
-                                        ? null
+                                        ? selectedTimezone
                                         : timezone
                                     );
                                     setTimezoneOpen(false);
@@ -191,20 +219,34 @@ const WorkflowScheduleModal = ({ workflowId, isOpen, schedule, onClose }: Workfl
                   </PopoverContent>
                 </Popover>
               </div>
+              
               {/* payload */}
               <div className="flex flex-col gap-2">
                 <Label htmlFor="payload">JSON Payload (Optional)</Label>
-                <Editor
-                  value={schedulePayload}
-                  padding={10}
-                  tabSize={2}
-                  highlight={highlightJson}
-                  onValueChange={(code) => {
-                    setPayload(code);
-                  }}
-                  insertSpaces={true}
-                  className="font-mono text-xs w-full h-64 [&_textarea]:outline-none [&_textarea]:w-full [&_textarea]:resize-none [&_textarea]:p-0 [&_textarea]:border-0 [&_textarea]:bg-transparent"
-                />
+                <div className="border rounded-md p-3 bg-muted/50">
+                  <Editor
+                    value={schedulePayload}
+                    padding={10}
+                    tabSize={2}
+                    highlight={highlightJson}
+                    onValueChange={handlePayloadChange}
+                    insertSpaces={true}
+                    className="font-mono text-sm min-h-[120px] [&_textarea]:outline-none [&_textarea]:w-full [&_textarea]:resize-none [&_textarea]:p-0 [&_textarea]:border-0 [&_textarea]:bg-transparent"
+                  />
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  {isJsonValid ? (
+                    <>
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <span className="text-green-600">Valid JSON</span>
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="h-4 w-4 text-red-600" />
+                      <span className="text-red-600">Invalid JSON</span>
+                    </>
+                  )}
+                </div>
               </div>
             </CardContent>
             <CardFooter>
@@ -212,7 +254,7 @@ const WorkflowScheduleModal = ({ workflowId, isOpen, schedule, onClose }: Workfl
                 <Button variant="outline" onClick={onClose}>
                   Cancel
                 </Button>
-                <Button onClick={handleSubmit}>
+                <Button onClick={handleSubmit} disabled={!isJsonValid}>
                   {schedule ? "Save Changes" : "Add Schedule"}
                 </Button>
               </div>
