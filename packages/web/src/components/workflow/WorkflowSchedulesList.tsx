@@ -1,0 +1,164 @@
+"use client"
+
+import React from 'react';
+import { Edit, Loader2, Plus, Trash2 } from "lucide-react";
+
+import { SuperglueClient, WorkflowSchedule } from '@superglue/client';
+import { useConfig } from '@/src/app/config-context';
+import { Button } from "@/src/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/src/components/ui/table";
+import cronstrue from 'cronstrue';
+import { Switch } from "@/src/components/ui/switch";
+import WorkflowScheduleModal from './WorkflowScheduleModal';
+
+
+const WorkflowSchedulesList = ({ workflowId }: { workflowId: string }) => {
+    const config = useConfig();
+    const [workflowSchedules, setWorkflowSchedules] = React.useState<WorkflowSchedule[]>([]);
+    const [loadingSchedules, setLoadingSchedules] = React.useState(false);
+    const [loadingTimeout, setTimeoutLoading] = React.useState<NodeJS.Timeout | null>(null);
+    const [modalOpen, setModalOpen] = React.useState(false);
+    const [modalSchedule, setModalSchedule] = React.useState<WorkflowSchedule | null>(null);
+
+    React.useEffect(() => {
+      loadSchedules();
+    }, [workflowId]);
+
+    const loadSchedules = async () => {
+      setLoadingSchedules(true);
+
+      const superglueClient = new SuperglueClient({
+        endpoint: config.superglueEndpoint,
+        apiKey: config.superglueApiKey
+      });
+
+      const schedules = await superglueClient.listWorkflowSchedules(workflowId);
+      
+      setWorkflowSchedules(schedules);
+      setLoadingSchedules(false);
+    };
+
+    const handleScheduleDelete = async (e: React.MouseEvent, scheduleId: string) => {
+      e.stopPropagation();
+  
+      // optimistic update
+      setWorkflowSchedules(prevSchedules =>
+        prevSchedules.filter(schedule => schedule.id !== scheduleId)
+      );
+
+      const superglueClient = new SuperglueClient({
+        endpoint: config.superglueEndpoint,
+        apiKey: config.superglueApiKey
+      });
+  
+      await superglueClient.deleteWorkflowSchedule(scheduleId);
+      loadSchedules();
+    };
+    
+    const handleScheduleStateToggle = async (newState: boolean, scheduleId: string) => {
+      // optimistic update
+      setWorkflowSchedules(prevSchedules =>
+        prevSchedules.map(schedule =>
+          schedule.id === scheduleId
+            ? { ...schedule, enabled: newState }
+            : schedule
+        )
+      );
+    
+      const superglueClient = new SuperglueClient({
+        endpoint: config.superglueEndpoint,
+        apiKey: config.superglueApiKey
+      });
+    
+      await superglueClient.upsertWorkflowSchedule({
+        id: scheduleId,
+        enabled: newState
+      });
+
+      loadSchedules();
+    };
+
+    const handleModalOpen = (schedule?: WorkflowSchedule) => {
+      setModalSchedule(schedule);
+      setModalOpen(true);
+    };
+
+    const handleModalClose = () => {
+      setModalOpen(false);
+      setModalSchedule(null);
+    };
+  
+    return ( loadingSchedules ? (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    ) : (
+      <div className="p-4">
+        <div className="flex justify-between items-center">
+          <h3 className="text-lg font-semibold">Schedules</h3>
+          <Button size="sm" onClick={() => handleModalOpen()}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Schedule
+          </Button>
+        </div>
+        {workflowSchedules.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="text-muted-foreground text-sm mb-4">
+              No schedules configured for this workflow
+            </div>
+          </div>
+        ) : (
+          <Table className="mt-1">
+            <TableHeader>
+              <TableRow className="!border-b">
+                <TableHead className="pl-0">Enabled</TableHead>
+                <TableHead>Schedule</TableHead>
+                <TableHead>Cron</TableHead>
+                <TableHead>Timezone</TableHead>
+                <TableHead>Last Run At</TableHead>
+                <TableHead>Next Run At</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {workflowSchedules.map((schedule) => (
+                <TableRow key={schedule.id}>
+                  <TableCell className="w-[200px] pl-0">
+                    <Switch
+                      checked={schedule.enabled}
+                      onCheckedChange={(newState) => handleScheduleStateToggle(newState, schedule.id)}
+                    />
+                  </TableCell>
+                  <TableCell className="w-[200px]">{cronstrue.toString(schedule.cronExpression)}</TableCell>
+                  <TableCell className="w-[200px]">{schedule.cronExpression}</TableCell>
+                  <TableCell className="w-[200px]">{schedule.timezone}</TableCell>
+                  <TableCell className="w-[300px]">{schedule.lastRunAt ? new Date(schedule.lastRunAt).toLocaleString() : 'Never'}</TableCell>
+                  <TableCell className="w-[300px]">{schedule.nextRunAt ? new Date(schedule.nextRunAt).toLocaleString() : 'Never'}</TableCell>
+                  <TableCell>
+                    <Button variant="ghost" size="icon" onClick={() => handleModalOpen(schedule)}>
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" 
+                      className="text-destructive" 
+                      size="icon"
+                      onClick={(e) => handleScheduleDelete(e, schedule.id)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+        <WorkflowScheduleModal isOpen={modalOpen} workflowId={workflowId} schedule={modalSchedule} onClose={handleModalClose} />
+      </div>
+    ));
+};
+
+export default WorkflowSchedulesList;

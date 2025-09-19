@@ -253,3 +253,19 @@ export async function formatJavaScriptCode(code: string): Promise<string> {
     return code;
   }
 }
+
+export function getGroupedTimezones(): Record<string, Array<{value: string, label: string}>> {
+  const timezones = Intl.supportedValuesOf('timeZone').map(tz => ({
+    value: tz,
+    label: tz.replace(/_/g, ' ')
+  }));
+
+  return timezones.reduce((acc, timezone) => {
+    const group = timezone.value.split('/')[0]; // Use value instead of label for grouping
+    if (!acc[group]) {
+      acc[group] = [];
+    }
+    acc[group].push(timezone);
+    return acc;
+  }, {} as Record<string, Array<{value: string, label: string}>>);
+}
