@@ -29,7 +29,7 @@ interface ExecuteWorkflowArgs {
 interface BuildWorkflowArgs {
   instruction: string;
   payload?: Record<string, unknown>;
-  integrationIds: string[];
+  integrationIds?: string[];
   responseSchema?: JSONSchema;
 }
 
@@ -269,18 +269,16 @@ export const buildWorkflowResolver = async (
     if (!instruction || instruction.trim() === "") {
       throw new Error("Instruction is required to build a workflow.");
     }
-    if (!integrationIds || integrationIds.length === 0) {
-      throw new Error("At least one integration is required.");
+
+    let resolvedIntegrations: Integration[] = [];
+    if (integrationIds && integrationIds.length > 0) {
+      const datastoreAdapter = {
+        getManyIntegrations: async (ids: string[]): Promise<Integration[]> => {
+          return await context.datastore.getManyIntegrations({ ids, includeDocs: true, orgId: context.orgId });
+        }
+      };
+      resolvedIntegrations = await waitForIntegrationProcessing(datastoreAdapter, integrationIds);
     }
-
-    // Validate that all integration IDs exist
-    const datastoreAdapter = {
-      getManyIntegrations: async (ids: string[]): Promise<Integration[]> => {
-        return await context.datastore.getManyIntegrations({ ids, includeDocs: true, orgId: context.orgId });
-      }
-    };
-
-    const resolvedIntegrations = await waitForIntegrationProcessing(datastoreAdapter, integrationIds);
 
     const builder = new WorkflowBuilder(
       instruction,

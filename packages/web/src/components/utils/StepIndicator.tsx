@@ -1,5 +1,5 @@
-import { cn } from '@/src/lib/utils'
-import { Check } from 'lucide-react'
+import { cn } from '@/src/lib/utils';
+import { Check } from 'lucide-react';
 
 export type StepperStep = 'basic' | 'try_and_output' | 'success'
 export type WorkflowCreateStep = 'integrations' | 'prompt' | 'review' | 'success';
@@ -48,17 +48,15 @@ interface StepIndicatorProps {
   steps: StepConfig[]
 }
 
-export function StepIndicator({ currentStep, steps }: StepIndicatorProps) {  
+export function StepIndicator({ currentStep, steps }: StepIndicatorProps) {
   const currentIndex = steps.findIndex(s => s.id === currentStep)
 
   return (
     <div className="py-3">
       <div className="relative">
-        {/* Progress bar background */}
         <div className="absolute top-4 left-0 w-full h-0.5 bg-muted z-0" />
-        
-        {/* Active progress bar */}
-        <div 
+
+        <div
           className="absolute top-4 left-0 h-0.5 bg-primary transition-all duration-500 ease-in-out z-0"
           style={{ width: `${(currentIndex / (steps.length - 1)) * 100}%` }}
         />
