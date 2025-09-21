@@ -1,4 +1,4 @@
-import { WorkflowSchedule } from '@superglue/client';
+import { WorkflowSchedule, SuperglueClient } from '@superglue/client';
 import React, { useMemo, useState } from 'react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -7,35 +7,39 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Input } from '../ui/input';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { Check, ChevronsUpDown, CheckCircle, XCircle } from 'lucide-react';
+import { Check, ChevronsUpDown, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { cn, getGroupedTimezones } from '@/src/lib/utils';
 import { Switch } from "@/src/components/ui/switch";
 import Editor from 'react-simple-code-editor';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
+import { useConfig } from '@/src/app/config-context';
+import { useToast } from '@/src/hooks/use-toast';
+import { validateCronExpression } from '@superglue/shared';
+import { HelpTooltip } from '../utils/HelpTooltip';
 
 const DEFAULT_SCHEDULES = [
-  { value: '*/2 * * * *', label: 'Every 2 minutes' },
-  { value: '*/15 * * * *', label: 'Every 15 minutes' },
+  { value: '*/5 * * * *', label: 'Every 5 minutes' },
   { value: '*/30 * * * *', label: 'Every 30 minutes' },
   { value: '0 * * * *', label: 'Hourly' },
-  { value: '0 0 * * *', label: 'Daily' },
-  { value: '0 0 * * 0', label: 'Weekly' },
-  { value: '0 0 1 * *', label: 'Monthly' },
+  { value: '0 0 * * *', label: 'Daily at midnight' },
+  { value: '0 0 * * 0', label: 'Weekly on Sunday at midnight' },
+  { value: '0 0 1 * *', label: 'Monthly on the 1st' },
 ];
 
 interface WorkflowScheduleModalProps {
   workflowId: string;
   isOpen: boolean;
-  schedule?: WorkflowSchedule
+  schedule?: WorkflowSchedule;
   onClose: () => void;
+  onSave?: () => void;
 }
 
-const WorkflowScheduleModal = ({ workflowId, isOpen, schedule, onClose }: WorkflowScheduleModalProps) => {
+const WorkflowScheduleModal = ({ workflowId, isOpen, schedule, onClose, onSave }: WorkflowScheduleModalProps) => {
   const [enabled, setEnabled] = useState(true);
   const [scheduleSelectedItem, setScheduleSelectedItem] = React.useState<string>('0 0 * * *'); // default to daily
   const [customCronExpression, setCustomCronExpression] = React.useState<string>('');
-  const [customCronValidationError, setCustomCronValidationError] = React.useState<string | null>(null);
+  const [isCustomCronValid, setIsCustomCronValid] = React.useState(true);
   const [timezoneOpen, setTimezoneOpen] = useState(false);
   const [selectedTimezone, setTimezone] = useState<{value: string, label: string}>({
     value: 'Europe/Berlin',
@@ -43,8 +47,11 @@ const WorkflowScheduleModal = ({ workflowId, isOpen, schedule, onClose }: Workfl
   });
   const [schedulePayload, setPayload] = useState<string>('{}');
   const [isJsonValid, setIsJsonValid] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const groupedTimezones = useMemo(() => getGroupedTimezones(), []); // only once
+  const config = useConfig();
+  const { toast } = useToast();
+  const groupedTimezones = useMemo(() => getGroupedTimezones(), []);
 
   React.useEffect(() => {
     if(!schedule) {
@@ -65,6 +72,16 @@ const WorkflowScheduleModal = ({ workflowId, isOpen, schedule, onClose }: Workfl
     validateJson(payload);
   }, [schedule]);
 
+  React.useEffect(() => {
+    if (scheduleSelectedItem === 'custom') {
+      if (customCronExpression === '') {
+        setIsCustomCronValid(false);
+      } else {
+        setIsCustomCronValid(validateCronExpression(customCronExpression));
+      }
+    }
+  }, [scheduleSelectedItem]);
+
   const validateJson = (jsonString: string) => {
     try {
       JSON.parse(jsonString);
@@ -74,17 +91,71 @@ const WorkflowScheduleModal = ({ workflowId, isOpen, schedule, onClose }: Workfl
     }
   };
 
-  const handleSubmit = () => {
-    console.log('submit');
-  }
+  const handleSubmit = async () => {
+    if (!isJsonValid) {
+      toast({
+        title: "Invalid JSON",
+        description: "Please fix the JSON payload before saving.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (scheduleSelectedItem === 'custom' && !isCustomCronValid) {
+      toast({
+        title: "Invalid Cron Expression",
+        description: "Please fix the cron expression before saving.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const superglueClient = new SuperglueClient({
+        endpoint: config.superglueEndpoint,
+        apiKey: config.superglueApiKey
+      });
+
+      const cronExpression = scheduleSelectedItem === 'custom' ? customCronExpression : scheduleSelectedItem;
+      const payload = schedulePayload.trim() === '{}' ? null : JSON.parse(schedulePayload);
+
+      await superglueClient.upsertWorkflowSchedule({
+        id: schedule?.id,
+        workflowId,
+        cronExpression,
+        timezone: selectedTimezone.value,
+        enabled,
+        payload
+      });
+
+      toast({
+        title: "Schedule saved",
+        description: schedule ? "Schedule updated successfully." : "Schedule created successfully."
+      });
+
+      onClose();
+      onSave?.();
+    } catch (error) {
+      console.error('Failed to save schedule:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save schedule. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const onCustomCronChange = (newValue: string) => {
     setCustomCronExpression(newValue);
 
-    if (false) { // todo: validate cron expression
-      setCustomCronValidationError(null);
+    if (newValue.trim() === '') {
+      setIsCustomCronValid(true);
     } else {
-      setCustomCronValidationError('Invalid cron expression');
+      setIsCustomCronValid(validateCronExpression(newValue));
     }
   }
 
@@ -128,7 +199,9 @@ const WorkflowScheduleModal = ({ workflowId, isOpen, schedule, onClose }: Workfl
                 <Label htmlFor="frequency">Frequency</Label>
                 <Select
                   value={scheduleSelectedItem}
-                  onValueChange={setScheduleSelectedItem}
+                  onValueChange={(value) => {
+                    setScheduleSelectedItem(value);
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Choose frequency" />
@@ -147,15 +220,21 @@ const WorkflowScheduleModal = ({ workflowId, isOpen, schedule, onClose }: Workfl
                 {/* custom cron */}
                 {scheduleSelectedItem === "custom" && (
                   <div>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="cronExpression" className="text-sm">
+                        Cron Expression
+                      </Label>
+                      <HelpTooltip text="Cron expressions use 5 fields: minute (0-59), hour (0-23), day of month (1-31), month (1-12), day of week (0-6). Use * for any value, / for intervals, and , for lists. Example: '0 9 * * 1-5' runs weekdays at 9 AM. Learn more at crontab.guru" />
+                    </div>
                     <Input
                       id="cronExpression"
-                      placeholder="Enter a custom cron expression"
+                      placeholder="Enter a custom cron expression (e.g., '0 9 * * 1-5')"
                       value={customCronExpression}
                       onChange={(e) => onCustomCronChange(e.target.value)}
                     />
-                    {customCronValidationError && (
+                    {!isCustomCronValid && (
                       <p className="text-sm text-destructive mt-1">
-                        {customCronValidationError}
+                        Invalid cron expression
                       </p>
                     )}
                   </div>
@@ -254,7 +333,8 @@ const WorkflowScheduleModal = ({ workflowId, isOpen, schedule, onClose }: Workfl
                 <Button variant="outline" onClick={onClose}>
                   Cancel
                 </Button>
-                <Button onClick={handleSubmit} disabled={!isJsonValid}>
+                <Button onClick={handleSubmit} disabled={!isJsonValid || isSubmitting || !isCustomCronValid}>
+                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   {schedule ? "Save Changes" : "Add Schedule"}
                 </Button>
               </div>

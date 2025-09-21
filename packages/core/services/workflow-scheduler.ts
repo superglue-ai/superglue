@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { DataStore, WorkflowScheduleInternal } from "../datastore/types.js";
-import { calculateNextRun, validateCronExpression } from "../utils/cron.js";
+import { calculateNextRun, validateCronExpression } from "@superglue/shared";
 import { isValidTimezone } from "../utils/timezone.js";
 
 export class WorkflowScheduler {
@@ -21,11 +21,7 @@ export class WorkflowScheduler {
         options?: Record<string, any>
     }) : Promise<WorkflowScheduleInternal> {
         if (!params.id && !params.workflowId) {
-            throw new Error("Failed to upsert workflow schedule: ID or Workflow ID is required");
-        }
-
-        if (params.id && params.workflowId) {
-            throw new Error("Failed to upsert workflow schedule: Provide either ID or Workflow ID, not both");
+            throw new Error("Failed to upsert workflow schedule: Provide either ID (for updates) or Workflow ID (for new schedules)");
         }
 
         if (params.cronExpression !== undefined && !validateCronExpression(params.cronExpression)) {

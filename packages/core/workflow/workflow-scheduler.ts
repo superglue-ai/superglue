@@ -1,6 +1,6 @@
 import { DataStore } from "../datastore/types.js";
 import { executeWorkflowResolver } from "../graphql/resolvers/workflow.js";
-import { calculateNextRun } from "../utils/cron.js";
+import { calculateNextRun } from "@superglue/shared";
 import { logMessage } from "../utils/logs.js";
 import { GraphQLResolveInfo } from "graphql";
 

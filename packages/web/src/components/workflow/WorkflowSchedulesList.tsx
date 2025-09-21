@@ -81,8 +81,6 @@ const WorkflowSchedulesList = ({ workflowId }: { workflowId: string }) => {
         id: scheduleId,
         enabled: newState
       });
-
-      loadSchedules();
     };
 
     const handleModalOpen = (schedule?: WorkflowSchedule) => {
@@ -123,7 +121,7 @@ const WorkflowSchedulesList = ({ workflowId }: { workflowId: string }) => {
                 <TableHead>Cron</TableHead>
                 <TableHead>Timezone</TableHead>
                 <TableHead>Last Run At</TableHead>
-                <TableHead>Next Run At</TableHead>
+                <TableHead>Next Run At (Local Time)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -141,22 +139,24 @@ const WorkflowSchedulesList = ({ workflowId }: { workflowId: string }) => {
                   <TableCell className="w-[300px]">{schedule.lastRunAt ? new Date(schedule.lastRunAt).toLocaleString() : 'Never'}</TableCell>
                   <TableCell className="w-[300px]">{schedule.nextRunAt ? new Date(schedule.nextRunAt).toLocaleString() : 'Never'}</TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="icon" onClick={() => handleModalOpen(schedule)}>
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" 
-                      className="text-destructive" 
-                      size="icon"
-                      onClick={(e) => handleScheduleDelete(e, schedule.id)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => handleModalOpen(schedule)}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" 
+                        className="text-destructive" 
+                        size="icon"
+                        onClick={(e) => handleScheduleDelete(e, schedule.id)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         )}
-        <WorkflowScheduleModal isOpen={modalOpen} workflowId={workflowId} schedule={modalSchedule} onClose={handleModalClose} />
+        <WorkflowScheduleModal isOpen={modalOpen} workflowId={workflowId} schedule={modalSchedule} onClose={handleModalClose} onSave={loadSchedules} />
       </div>
     ));
 };
