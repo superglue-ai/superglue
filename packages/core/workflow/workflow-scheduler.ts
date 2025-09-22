@@ -23,7 +23,7 @@ export class WorkflowScheduler {
         this.isRunning = true;
         this.intervalId = setInterval(this.pollAndExecute.bind(this), this.intervalMs);
 
-        logMessage('info', 'Workflow scheduler started');
+        logMessage('info', 'WORKFLOW SCHEDULER: Async scheduler service started');
     }
 
     public stop(): void {
@@ -37,7 +37,7 @@ export class WorkflowScheduler {
             this.intervalId = null;
         }
 
-        logMessage('info', 'Workflow scheduler stopped');
+        logMessage('info', 'WORKFLOW SCHEDULER: Scheduler service stopped');
     }
 
     private async pollAndExecute(): Promise<void> {      
@@ -45,7 +45,7 @@ export class WorkflowScheduler {
 
         for (const schedule of schedules) {
             try {
-                logMessage('debug', `Running scheduled workflow ${schedule.workflowId}`);
+                logMessage('debug', `WORKFLOW SCHEDULER: Running scheduled workflow ${schedule.workflowId}`);
 
                 const now = new Date();
                 const nextRun = calculateNextRun(schedule.cronExpression, schedule.timezone, now);
@@ -68,7 +68,7 @@ export class WorkflowScheduler {
                     {} as GraphQLResolveInfo // not needed
                 );
             } catch (error) {
-                logMessage('error', `Failed to run scheduled workflow ${schedule.workflowId}: ${error}`);
+                logMessage('error', `WORKFLOW SCHEDULER: Failed to run scheduled workflow ${schedule.workflowId}: ${error}`);
             }
         }
     }

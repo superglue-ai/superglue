@@ -385,7 +385,7 @@ const ConfigTable = () => {
                     className="hover:bg-secondary"
                   // Consider adding onClick={() => handleRowClick(config)} if needed
                   >
-                    <TableCell className="w-[200px]">
+                    <TableCell className="w-[210px]">
                       <Button
                         variant="default"
                         size="sm"
@@ -396,13 +396,13 @@ const ConfigTable = () => {
                         Run
                       </Button>
                       <Button
-                        variant="default"
+                        variant="outline"
                         size="sm"
                         onClick={(e) => handleScheduleClick(e, config.id)}
                         className="gap-2 ml-2"
                       >
                         <Calendar className="h-4 w-4" />
-                        Schedule
+                        Schedules
                       </Button>
                     </TableCell>
                     <TableCell className="font-medium max-w-[200px] truncate relative group">

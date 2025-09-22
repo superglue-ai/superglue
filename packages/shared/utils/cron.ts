@@ -8,7 +8,7 @@ export function calculateNextRun(cronExpression: string, timezone: string, from?
         tz: timezone,
     });
 
-    // cron-parser already returns UTC dates (even when timezone is specified - only used to inteprete the cron expression)
+    // cron-parser already returns UTC dates (even when timezone is specified - only used to interpret the cron expression)
     return parsed.next().toDate();
 }
 
