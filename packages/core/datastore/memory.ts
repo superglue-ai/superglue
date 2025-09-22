@@ -1,6 +1,6 @@
 import { ApiConfig, ExtractConfig, Integration, RunResult, TransformConfig, Workflow } from "@superglue/client";
 import { createHash } from 'node:crypto';
-import type { DataStore } from "./types.js";
+import type { DataStore, WorkflowScheduleInternal } from "./types.js";
 
 export class MemoryStore implements DataStore {
   private storage: {
@@ -10,6 +10,7 @@ export class MemoryStore implements DataStore {
     runs: Map<string, RunResult>;
     runsIndex: Map<string, { id: string; timestamp: number; configId: string }[]>;
     workflows: Map<string, Workflow>;
+    workflowSchedules: Map<string, WorkflowScheduleInternal>;
     integrations: Map<string, Integration>;
   };
 
@@ -26,6 +27,7 @@ export class MemoryStore implements DataStore {
       runs: new Map(),
       runsIndex: new Map(),
       workflows: new Map(),
+      workflowSchedules: new Map(),
       integrations: new Map()
     };
   }
@@ -251,6 +253,7 @@ export class MemoryStore implements DataStore {
     this.storage.runs.clear();
     this.storage.runsIndex.clear();
     this.storage.workflows.clear();
+    this.storage.workflowSchedules.clear();
     this.storage.integrations.clear();
   }
 
@@ -357,5 +360,61 @@ export class MemoryStore implements DataStore {
     if (!id) return false;
     const key = this.getKey('integration', id, orgId);
     return this.storage.integrations.delete(key);
+  }
+
+  // Workflow Schedule Methods
+  async listWorkflowSchedules(params: { workflowId: string, orgId: string }): Promise<WorkflowScheduleInternal[]> {
+    const { workflowId, orgId } = params;
+    return this.getOrgItems(this.storage.workflowSchedules, 'workflow-schedule', orgId)
+      .filter(schedule => schedule.workflowId === workflowId);
+  }
+
+  async getWorkflowSchedule(params: { id: string; orgId?: string }): Promise<WorkflowScheduleInternal | null> {
+    const { id, orgId } = params;
+    if (!id) return null;
+    const key = this.getKey('workflow-schedule', id, orgId);
+    const schedule = this.storage.workflowSchedules.get(key);
+    return schedule ? { ...schedule, id } : null;
+  }
+
+  async upsertWorkflowSchedule(params: { schedule: WorkflowScheduleInternal }): Promise<void> {
+    const { schedule } = params;
+    if (!schedule || !schedule.id) return;
+    const key = this.getKey('workflow-schedule', schedule.id, schedule.orgId);
+    this.storage.workflowSchedules.set(key, schedule);
+  }
+
+  async deleteWorkflowSchedule(params: { id: string, orgId: string }): Promise<boolean> {
+    const { id, orgId } = params;
+    if (!id) return false;
+    const key = this.getKey('workflow-schedule', id, orgId);
+    return this.storage.workflowSchedules.delete(key);
+  }
+
+  async listDueWorkflowSchedules(): Promise<WorkflowScheduleInternal[]> {
+    const now = new Date();
+    return Array.from(this.storage.workflowSchedules.entries())
+      .filter(([key]) => key.includes(':workflow-schedule:'))
+      .map(([key, value]) => ({ ...value, id: key.split(':').pop() }))
+      .filter(schedule => schedule.enabled && schedule.nextRunAt <= now);
+  }
+
+  async updateScheduleNextRun(params: { id: string; nextRunAt: Date; lastRunAt: Date; }): Promise<boolean> {
+    const { id, nextRunAt, lastRunAt } = params;
+    if (!id) return false;
+    
+    for (const [key, schedule] of this.storage.workflowSchedules.entries()) {
+      if (schedule.id === id) {
+        const updatedSchedule = {
+          ...schedule,
+          nextRunAt,
+          lastRunAt,
+          updatedAt: new Date()
+        };
+        this.storage.workflowSchedules.set(key, updatedSchedule);
+        return true;
+      }
+    }
+    return false;
   }
 } 

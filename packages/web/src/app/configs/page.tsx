@@ -32,9 +32,10 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/src/components/ui/tooltip";
 import EmptyStateActions from '@/src/components/utils/EmptyStateActions';
 import { ApiConfig, ExecutionStep, ExtractConfig, SuperglueClient, TransformConfig, Workflow } from '@superglue/client';
-import { Check, Copy, GitBranch, History, Loader2, Play, Plus, RotateCw, Settings, Trash2, Zap } from "lucide-react";
+import { Calendar, Check, Copy, GitBranch, History, Loader2, Play, Plus, RotateCw, Settings, Trash2, Zap } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import React from 'react';
+import WorkflowSchedulesList from '@/src/components/workflow/WorkflowSchedulesList';
 
 const ConfigTable = () => {
   const router = useRouter();
@@ -50,6 +51,7 @@ const ConfigTable = () => {
   const [configStepperProps, setConfigStepperProps] = React.useState<{ prefillData?: any }>({});
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
   const [showHiddenOptions, setShowHiddenOptions] = React.useState(false);
+  const [expandedWorkflowId, setExpandedWorkflowId] = React.useState<string | null>(null);
 
   // Add effect to track Command/Shift key presses
   React.useEffect(() => {
@@ -239,6 +241,13 @@ const ConfigTable = () => {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const handleScheduleClick = async (e: React.MouseEvent, workflowId: string) => {
+    e.stopPropagation();
+
+    const newExpandedWorkflowId = workflowId === expandedWorkflowId ? null : workflowId;
+    setExpandedWorkflowId(newExpandedWorkflowId);
+  };
+
   const totalPages = Math.ceil(total / pageSize);
 
   if (loading) {
@@ -370,130 +379,153 @@ const ConfigTable = () => {
               };
 
               return (
-                <TableRow
-                  key={`${configType}-${config.id}`}
-                  className="hover:bg-secondary"
-                // Consider adding onClick={() => handleRowClick(config)} if needed
-                >
-                  <TableCell className="w-[100px]">
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={handleRunClick}
-                      className="gap-2"
-                    >
-                      {isWorkflow ? <GitBranch className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                      Run
-                    </Button>
-                  </TableCell>
-                  <TableCell className="font-medium max-w-[200px] truncate relative group">
-                    <div className="flex items-center space-x-1">
-                      <span className="truncate">{config.id}</span>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={(e) => handleCopyId(e, config.id)}
-                            >
-                              {copiedId === config.id ? (
-                                <Check className="h-3.5 w-3.5 text-green-500" />
-                              ) : (
-                                <Copy className="h-3.5 w-3.5" />
-                              )}
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent side="top">
-                            <p>{copiedId === config.id ? "Copied!" : "Copy ID"}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-                  </TableCell>
-                  <TableCell className="w-[100px]">
-                    {/* Use different variants or specific names */}
-                    <Badge variant={isApi ? 'secondary' : isExtract ? 'default' : isTransform ? 'outline' : 'outline'}>
-                      {isApi ? 'API' : isExtract ? 'Extract' : isTransform ? 'Transform' : 'Workflow'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="max-w-[300px] truncate">
-                    {configType === 'api' || configType === 'extract' || configType === 'transform' ?
-                      (config as ApiConfig | ExtractConfig | TransformConfig).instruction :
-                      (config as Workflow).steps.map((step: ExecutionStep) => step.id).join(' => ')
-                    }
-                  </TableCell>
-                  <TableCell className="w-[150px]">
-                    {config.updatedAt ? new Date(config.updatedAt).toLocaleDateString() : (config.createdAt ? new Date(config.createdAt).toLocaleDateString() : '')}
-                  </TableCell>
-                  <TableCell className="w-[100px]">
-                    <div className="flex justify-end gap-1"> {/* Reduced gap */}
-                      <TooltipProvider>
-                        {/* Common Actions */}
-                        {isApi && (
+                <React.Fragment key={`${configType}-${config.id}`}>
+                  <TableRow
+                    key={`${configType}-${config.id}`}
+                    className="hover:bg-secondary"
+                  // Consider adding onClick={() => handleRowClick(config)} if needed
+                  >
+                    <TableCell className="w-[210px]">
+                      <div className="flex items-center gap-2 whitespace-nowrap">
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={handleRunClick}
+                          className="gap-2"
+                        >
+                          {isWorkflow ? <GitBranch className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                          Run
+                        </Button>
+                        {isWorkflow && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => handleScheduleClick(e, config.id)}
+                            className="gap-2"
+                          >
+                            <Calendar className="h-4 w-4" />
+                            Schedules
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-medium max-w-[200px] truncate relative group">
+                      <div className="flex items-center space-x-1">
+                        <span className="truncate">{config.id}</span>
+                        <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={(e) => handleViewLogs(e, config.id)}
+                                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={(e) => handleCopyId(e, config.id)}
                               >
-                                <History className="h-4 w-4" />
+                                {copiedId === config.id ? (
+                                  <Check className="h-3.5 w-3.5 text-green-500" />
+                                ) : (
+                                  <Copy className="h-3.5 w-3.5" />
+                                )}
                               </Button>
                             </TooltipTrigger>
-                            <TooltipContent>
-                              <p>View Run History</p>
+                            <TooltipContent side="top">
+                              <p>{copiedId === config.id ? "Copied!" : "Copy ID"}</p>
                             </TooltipContent>
                           </Tooltip>
-                        )}
+                        </TooltipProvider>
+                      </div>
+                    </TableCell>
+                    <TableCell className="w-[100px]">
+                      {/* Use different variants or specific names */}
+                      <Badge variant={isApi ? 'secondary' : isExtract ? 'default' : isTransform ? 'outline' : 'outline'}>
+                        {isApi ? 'API' : isExtract ? 'Extract' : isTransform ? 'Transform' : 'Workflow'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="max-w-[300px] truncate">
+                      {configType === 'api' || configType === 'extract' || configType === 'transform' ?
+                        (config as ApiConfig | ExtractConfig | TransformConfig).instruction :
+                        (config as Workflow).steps.map((step: ExecutionStep) => step.id).join(' => ')
+                      }
+                    </TableCell>
+                    <TableCell className="w-[150px]">
+                      {config.updatedAt ? new Date(config.updatedAt).toLocaleDateString() : (config.createdAt ? new Date(config.createdAt).toLocaleDateString() : '')}
+                    </TableCell>
+                    <TableCell className="w-[100px]">
+                      <div className="flex justify-end gap-1"> {/* Reduced gap */}
+                        <TooltipProvider>
+                          {/* Common Actions */}
+                          {isApi && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => handleViewLogs(e, config.id)}
+                                >
+                                  <History className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>View Run History</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
 
-                        {(isApi || isWorkflow) && ( // Edit for API and Workflow
+                          {(isApi || isWorkflow) && ( // Edit for API and Workflow
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => isApi ? handleEdit(e, config.id) : handleEditWorkflow(e, config.id)}
+                                >
+                                  <Settings className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>{isApi ? 'Edit Configuration' : 'Edit Workflow'}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+
+                          {/* Delete Action (Available for all types) */}
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button
                                 variant="ghost"
+                                className="text-destructive"
                                 size="icon"
-                                onClick={(e) => isApi ? handleEdit(e, config.id) : handleEditWorkflow(e, config.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setConfigToDelete(config);
+                                }}
                               >
-                                <Settings className="h-4 w-4" />
+                                <Trash2 className="h-4 w-4" />
                               </Button>
                             </TooltipTrigger>
                             <TooltipContent>
-                              <p>{isApi ? 'Edit Configuration' : 'Edit Workflow'}</p>
+                              <p>Delete {isApi ? 'Configuration' : isExtract ? 'Configuration' : isTransform ? 'Transform' : 'Workflow'}</p>
                             </TooltipContent>
                           </Tooltip>
-                        )}
+                        </TooltipProvider>
+                      </div>
+                    </TableCell>
+                  </TableRow>
 
-                        {/* Delete Action (Available for all types) */}
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              className="text-destructive"
-                              size="icon"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setConfigToDelete(config);
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Delete {isApi ? 'Configuration' : isExtract ? 'Configuration' : isTransform ? 'Transform' : 'Workflow'}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-                  </TableCell>
-                </TableRow>
+                  {/* Expanded Details Row */}
+                  {expandedWorkflowId === config.id && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="p-0">
+                        <WorkflowSchedulesList workflowId={config.id} />
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </React.Fragment>
               );
             })}
           </TableBody>
         </Table>
       </div>
-
       <div className="flex items-center justify-center space-x-2 py-4">
         <Button
           variant="outline"

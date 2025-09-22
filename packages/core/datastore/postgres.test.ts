@@ -1,6 +1,7 @@
 import { ApiConfig, ExtractConfig, HttpMethod, Integration, RunResult, TransformConfig, Workflow } from '@superglue/client';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { PostgresService } from './postgres.js';
+import { WorkflowScheduleInternal } from './types.js';
 
 // Mock Postgres client configuration
 const testConfig = {
@@ -21,6 +22,7 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
     describe('PostgresService', () => {
         let store: PostgresService;
         const testOrgId = 'test-org';
+        const testOrgId2 = 'test-org-2';
 
         // Create a single connection for all tests
         beforeAll(async () => {
@@ -46,7 +48,8 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
         beforeEach(async () => {
             // Clear all data for the test org
             await store.clearAll(testOrgId);
-            
+            await store.clearAll(testOrgId2);
+
             // Also clean up tenant_info table since clearAll doesn't handle it
             const client = await store['pool'].connect();
             try {
@@ -335,6 +338,170 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
                 });
                 expect(result).toHaveLength(2);
                 expect(result.map(w => w.id).sort()).toEqual([testWorkflow.id, wf2.id].sort());
+            });
+        });
+
+        describe('Workflow Schedule', () => {
+            const testWorkflow: Workflow = {
+                id: 'test-workflow-id',
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                instruction: 'Test workflow',
+                steps: [],
+                inputSchema: {}
+            };
+
+            const testWorkflowSchedule: WorkflowScheduleInternal = {
+                id: '68d51b90-605d-4e85-8c9a-c82bad2c7337',
+                orgId: testOrgId,
+                workflowId: testWorkflow.id,
+                payload: null,
+                options: null,
+                lastRunAt: null,
+                cronExpression: '0 0 * * *',
+                timezone: 'UTC',
+                enabled: true,
+                nextRunAt: new Date('2020-01-01T10:00:00.000Z'),
+                createdAt: new Date(),
+                updatedAt: new Date(),
+            };
+
+            it('upserting should store new workflow schedule', async () => {
+                await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow, orgId: testOrgId });
+                await store.upsertWorkflowSchedule({ schedule: testWorkflowSchedule });
+                const retrieved = await store.listWorkflowSchedules({ workflowId: testWorkflow.id, orgId: testOrgId });
+
+                expect(retrieved).toHaveLength(1);
+                expect(retrieved[0]).toMatchObject({
+                    ...testWorkflowSchedule,
+                    updatedAt: expect.any(Date),
+                    createdAt: expect.any(Date)
+                });
+            });
+
+            it('upserting should update existing workflow schedule', async () => {
+                await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow, orgId: testOrgId });
+                await store.upsertWorkflowSchedule({ schedule: testWorkflowSchedule });
+                const updatedSchedule = {
+                    ...testWorkflowSchedule,
+                    cronExpression: '*/15 * * * * *',
+                };
+
+                await store.upsertWorkflowSchedule({ schedule: updatedSchedule });
+
+                const retrieved = await store.getWorkflowSchedule({ id: testWorkflowSchedule.id, orgId: testOrgId });
+                expect(retrieved).toMatchObject({
+                    ...updatedSchedule,
+                    updatedAt: expect.any(Date),
+                    createdAt: expect.any(Date)
+                });
+            });
+
+            it('should delete workflow schedules', async () => {
+                await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow, orgId: testOrgId });
+                await store.upsertWorkflowSchedule({ schedule: testWorkflowSchedule });
+                
+                const success = await store.deleteWorkflowSchedule({ id: testWorkflowSchedule.id, orgId: testOrgId });
+                expect(success).toBe(true);
+                
+                const retrieved = await store.listWorkflowSchedules({ workflowId: testWorkflow.id, orgId: testOrgId });
+                expect(retrieved).toHaveLength(0);
+            });
+
+            it('should only return workflow schedules for the specified org', async () => {
+                await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow, orgId: testOrgId });
+                await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow, orgId: testOrgId2 });
+
+                await store.upsertWorkflowSchedule({ schedule: {
+                    ...testWorkflowSchedule,
+                    orgId: testOrgId
+                } });
+
+                await store.upsertWorkflowSchedule({ schedule: {
+                    ...testWorkflowSchedule,
+                    orgId: testOrgId2
+                } });
+
+                const workflowSchedulesFromFirstOrg = await store.listWorkflowSchedules({ workflowId: testWorkflow.id, orgId: testOrgId });
+                expect(workflowSchedulesFromFirstOrg).toHaveLength(1);
+                expect(workflowSchedulesFromFirstOrg[0]).toMatchObject({
+                    ...testWorkflowSchedule,
+                    orgId: testOrgId,
+                    updatedAt: expect.any(Date),
+                    createdAt: expect.any(Date)
+                });
+
+                const workflowSchedulesFromSecondOrg = await store.listWorkflowSchedules({ workflowId: testWorkflow.id, orgId: testOrgId2 });
+                expect(workflowSchedulesFromSecondOrg).toHaveLength(1);
+                expect(workflowSchedulesFromSecondOrg[0]).toMatchObject({
+                    ...testWorkflowSchedule,
+                    orgId: testOrgId2,
+                    updatedAt: expect.any(Date),
+                    createdAt: expect.any(Date)
+                });
+            });
+
+            it('should list due workflow schedules only', async () => {
+                const futureSchedule: WorkflowScheduleInternal = {
+                    ...testWorkflowSchedule,
+                    id: '57f65914-69fa-40ad-a4d1-6d2c372619c4',
+                    nextRunAt: new Date(Date.now() + 1000 * 60),
+                };
+
+                await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow, orgId: testOrgId });
+                await store.upsertWorkflowSchedule({ schedule: testWorkflowSchedule });
+                await store.upsertWorkflowSchedule({ schedule: futureSchedule });
+
+                const retrieved = await store.listDueWorkflowSchedules();
+                
+                expect(retrieved).toHaveLength(1);
+                expect(retrieved[0]).toMatchObject({
+                    ...testWorkflowSchedule,
+                    createdAt: expect.any(Date),
+                    updatedAt: expect.any(Date)
+                });
+            });
+
+            it('should list enabled due workflow schedules only', async () => {
+                const disabledSchedule: WorkflowScheduleInternal = {
+                    ...testWorkflowSchedule,
+                    id: '57f65914-69fa-40ad-a4d1-6d2c372619c4',
+                    enabled: false,
+                };
+
+                await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow, orgId: testOrgId });
+                await store.upsertWorkflowSchedule({ schedule: testWorkflowSchedule });
+                await store.upsertWorkflowSchedule({ schedule: disabledSchedule });
+
+                const retrieved = await store.listDueWorkflowSchedules();
+                expect(retrieved).toHaveLength(1);
+                expect(retrieved[0]).toMatchObject({
+                    ...testWorkflowSchedule,
+                    createdAt: expect.any(Date),
+                    updatedAt: expect.any(Date)
+                });
+            });
+
+            it('should return null for missing workflow schedule', async () => {
+                const retrieved = await store.getWorkflowSchedule({ id: '550e8400-e29b-41d4-a716-446655440005', orgId: testOrgId });
+                expect(retrieved).toBeNull();
+            });
+
+            it('should update workflow schedule next run', async () => {
+                const newNextRunAt = new Date('2022-01-01T10:00:00.000Z');
+                await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow, orgId: testOrgId });
+                await store.upsertWorkflowSchedule({ schedule: testWorkflowSchedule });
+
+                const success = await store.updateScheduleNextRun({ id: testWorkflowSchedule.id, nextRunAt: newNextRunAt, lastRunAt: new Date() });
+                expect(success).toBe(true);
+                
+                const retrieved = await store.listWorkflowSchedules({ workflowId: testWorkflow.id, orgId: testOrgId });
+                expect(retrieved[0].nextRunAt).toEqual(newNextRunAt);
+            });
+
+            it('should return false if workflow schedule is not found', async () => {
+                const success = await store.updateScheduleNextRun({ id: testWorkflowSchedule.id, nextRunAt: new Date(), lastRunAt: new Date() });
+                expect(success).toBe(false);
             });
         });
 

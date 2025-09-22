@@ -26,6 +26,12 @@ RUN npm install && \
 # Copy source code
 COPY . .
 
+# Install workspace dependencies specifically
+RUN npm install
+
+# Install @superglue/client specifically in shared package for TypeScript resolution
+RUN cd packages/shared && npm install @superglue/client
+
 # After copying files but before building
 RUN npm run build
 
@@ -48,8 +54,12 @@ RUN npm ci --omit=dev && \
     npm install -g next turbo cross-env && \
     apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get upgrade -y libxml2 && \ 
-    DEBIAN_FRONTEND=noninteractive apt-get install -y fontconfig fontconfig-config libfontconfig1 && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y fontconfig fontconfig-config libfontconfig1 curl && \
     npx playwright install --with-deps chromium
+
+# Install @superglue/client in both core and shared packages for runtime
+RUN cd packages/core && npm install @superglue/client
+RUN cd packages/shared && npm install @superglue/client
 
 # Copy built files from builder stage
 COPY --from=builder /usr/src/app/packages/core/dist ./packages/core/dist
