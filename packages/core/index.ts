@@ -12,8 +12,10 @@ async function startServer() {
     type: String(process.env.DATASTORE_TYPE).toLowerCase() as 'redis' | 'memory' | 'file' | 'postgres' 
   });
 
-  const workflowScheduler = new WorkflowScheduler(datastore);
-  workflowScheduler.start();
+  if (process.env.START_SCHEDULER_SERVER === 'true') {
+    const workflowScheduler = new WorkflowScheduler(datastore);
+    workflowScheduler.start();
+  }
 
   await Promise.all([
     startApiServer(datastore),
