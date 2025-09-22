@@ -730,6 +730,8 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
         }
       });
       const parsedResponseSchema = schemaStr && schemaStr.trim() ? JSON.parse(schemaStr) : null;
+      const manualPayload = JSON.parse(payload || '{}');
+      const fullPayload = { ...manualPayload, ...filePayloads };
 
       const result = await executeFinalTransform(
         client,
@@ -737,7 +739,7 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
         transformStr || finalTransform,
         parsedResponseSchema,
         inputSchema ? JSON.parse(inputSchema) : null,
-        JSON.parse(payload || '{}'),
+        fullPayload,
         stepData,
         false
       );

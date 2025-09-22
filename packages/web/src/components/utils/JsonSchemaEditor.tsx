@@ -70,7 +70,12 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
 }) => {
   const [isCodeMode, setIsCodeMode] = React.useState(forceCodeMode || false);
   const [jsonError, setJsonError] = React.useState<string | null>(null);
-  const [localIsEnabled, setLocalIsEnabled] = React.useState<boolean>(!isOptional || (value !== null && value !== undefined));
+  // For optional editors, default to disabled
+  const [localIsEnabled, setLocalIsEnabled] = React.useState<boolean>(() => {
+    if (!isOptional) return true;
+    // Start disabled for optional editors
+    return false;
+  });
 
   React.useEffect(() => {
     if (forceCodeMode) {
@@ -89,14 +94,6 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
       localStorage.setItem('jsonSchemaEditorCodeMode', isCodeMode.toString());
     }
   }, [isCodeMode, forceCodeMode]);
-
-  React.useEffect(() => {
-    if (isOptional) {
-      setLocalIsEnabled(value !== null && value !== undefined);
-    } else {
-      setLocalIsEnabled(true);
-    }
-  }, [value, isOptional]);
 
   const [visualSchema, setVisualSchema] = React.useState<any>({});
   const [editingField, setEditingField] = React.useState<string | null>(null);
@@ -633,10 +630,16 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
                 <Editor
                   value={value ?? ''}
                   onValueChange={(code) => {
-                    onChange(code);
+                    // Pass the code even if it's empty - let the parent handle it
+                    onChange(code || '');
                     try {
-                      JSON.parse((code || '{}'));
-                      setJsonError(null);
+                      // For validation, treat empty as valid (will be handled as empty schema)
+                      if (code === '' || code === null) {
+                        setJsonError(null);
+                      } else {
+                        JSON.parse(code);
+                        setJsonError(null);
+                      }
                     } catch (e) {
                       setJsonError((e as Error).message);
                     }

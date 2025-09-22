@@ -396,6 +396,62 @@ export const PayloadSpotlight = ({
                     <TabsTrigger value="schema" className="text-xs">Input Schema</TabsTrigger>
                 </TabsList>
                 <TabsContent value="payload" className="mt-3 space-y-3">
+                    {!readOnly && onFilesUpload && uploadedFiles.length > 0 && (
+                        <div className="space-y-1.5">
+                            {uploadedFiles.map(file => {
+                                const fileInfo = getFileTypeInfo(file.name);
+                                return (
+                                    <div
+                                        key={file.key}
+                                        className={cn(
+                                            "flex items-center justify-between px-3 py-2 rounded-md transition-all",
+                                            file.status === 'error'
+                                                ? "bg-destructive/10 border border-destructive/20"
+                                                : file.status === 'processing'
+                                                    ? "bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800"
+                                                    : `${fileInfo.bgColor} border border-border/50`
+                                        )}
+                                    >
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <span className={cn("font-mono text-sm", fileInfo.color)}>
+                                                {fileInfo.icon}
+                                            </span>
+                                            <div className="flex flex-col min-w-0">
+                                                <span className="text-xs font-medium truncate" title={file.name}>
+                                                    {file.name}
+                                                </span>
+                                                <span className="text-[10px] text-muted-foreground">
+                                                    {file.status === 'processing'
+                                                        ? 'Parsing...'
+                                                        : file.status === 'error'
+                                                            ? file.error || 'Failed to parse'
+                                                            : `${formatBytes(file.size)} • Key: ${file.key}`}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            {file.status === 'processing' && (
+                                                <div className="h-3 w-3 animate-spin rounded-full border-2 border-amber-600 dark:border-amber-400 border-t-transparent" />
+                                            )}
+                                            {file.status === 'ready' && (
+                                                <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
+                                            )}
+                                            {onFileRemove && file.status !== 'processing' && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-5 w-5 hover:bg-background/80"
+                                                    onClick={() => onFileRemove(file.key)}
+                                                >
+                                                    <X className="h-3 w-3" />
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
                     <JsonSchemaEditor
                         value={localPayload || '{}'}
                         onChange={(val) => handlePayloadChange(val || '')}
@@ -431,63 +487,6 @@ export const PayloadSpotlight = ({
                                     <HelpTooltip text="Upload CSV, JSON, XML, or Excel files. Files will be automatically parsed to JSON and merged with the manual payload when the workflow executes." />
                                 </div>
                             </div>
-
-                            {uploadedFiles.length > 0 && (
-                                <div className="space-y-1.5">
-                                    {uploadedFiles.map(file => {
-                                        const fileInfo = getFileTypeInfo(file.name);
-                                        return (
-                                            <div
-                                                key={file.key}
-                                                className={cn(
-                                                    "flex items-center justify-between px-3 py-2 rounded-md transition-all",
-                                                    file.status === 'error'
-                                                        ? "bg-destructive/10 border border-destructive/20"
-                                                        : file.status === 'processing'
-                                                            ? "bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800"
-                                                            : `${fileInfo.bgColor} border border-border/50`
-                                                )}
-                                            >
-                                                <div className="flex items-center gap-2 min-w-0">
-                                                    <span className={cn("font-mono text-sm", fileInfo.color)}>
-                                                        {fileInfo.icon}
-                                                    </span>
-                                                    <div className="flex flex-col min-w-0">
-                                                        <span className="text-xs font-medium truncate" title={file.name}>
-                                                            {file.name}
-                                                        </span>
-                                                        <span className="text-[10px] text-muted-foreground">
-                                                            {file.status === 'processing'
-                                                                ? 'Parsing...'
-                                                                : file.status === 'error'
-                                                                    ? file.error || 'Failed to parse'
-                                                                    : `${formatBytes(file.size)} • Key: ${file.key}`}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-1">
-                                                    {file.status === 'processing' && (
-                                                        <div className="h-3 w-3 animate-spin rounded-full border-2 border-amber-600 dark:border-amber-400 border-t-transparent" />
-                                                    )}
-                                                    {file.status === 'ready' && (
-                                                        <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
-                                                    )}
-                                                    {onFileRemove && file.status !== 'processing' && (
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-5 w-5 hover:bg-background/80"
-                                                            onClick={() => onFileRemove(file.key)}
-                                                        >
-                                                            <X className="h-3 w-3" />
-                                                        </Button>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
                         </div>
                     )}
                 </TabsContent>
@@ -570,7 +569,15 @@ export const FinalTransformMiniStepCard = ({ transform, responseSchema, onTransf
     useEffect(() => { if (!schemaInitialized) { setLocalSchema(responseSchema || ''); setSchemaInitialized(true); } }, [responseSchema, schemaInitialized]);
     useEffect(() => { const handleTabChange = () => { if (onTransformChange && localTransform !== transform) onTransformChange(localTransform); if (onResponseSchemaChange && localSchema !== responseSchema) onResponseSchemaChange(localSchema); }; handleTabChange(); }, [activeTab]);
     const handleTransformChange = (value: string) => { setLocalTransform(value); };
-    const handleSchemaChange = (value: string | null) => { if (value === null) { setLocalSchema(''); if (onResponseSchemaChange) onResponseSchemaChange(''); } else { setLocalSchema(value); if (onResponseSchemaChange) onResponseSchemaChange(value); } };
+    const handleSchemaChange = (value: string | null) => {
+        if (value === null || value === '') {
+            setLocalSchema('');
+            if (onResponseSchemaChange) onResponseSchemaChange('');
+        } else {
+            setLocalSchema(value);
+            if (onResponseSchemaChange) onResponseSchemaChange(value);
+        }
+    };
     const ensureValidTransform = (code: string): string => {
         if (!code || !code.trim()) return `(sourceData) => {\n  return sourceData;\n}`;
         const arrowFunctionPattern = /^\s*\(\s*sourceData\s*\)\s*=>\s*\{[\s\S]*\}\s*;?\s*$/;
@@ -613,19 +620,22 @@ export const FinalTransformMiniStepCard = ({ transform, responseSchema, onTransf
                         {(() => {
                             let inputString = '';
                             let isTruncated = false;
+                            let copyText = '';
                             if (inputViewMode === 'schema') {
                                 const schemaObj = inferJsonSchema(stepInputs || {});
                                 inputString = truncateLines(JSON.stringify(schemaObj, null, 2), MAX_DISPLAY_LINES);
+                                copyText = inputString;
                             } else {
                                 const displayData = truncateForDisplay(stepInputs);
                                 inputString = displayData.value;
                                 isTruncated = displayData.truncated;
+                                copyText = inputString;
                             }
                             const fullJson = stepInputs !== undefined ? JSON.stringify(stepInputs, null, 2) : '';
                             const bytes = stepInputs === undefined ? 0 : new Blob([fullJson]).size;
                             return (
                                 <>
-                                    <JsonCodeEditor value={inputString} readOnly={true} minHeight="150px" maxHeight="250px" resizable={true} overlay={<div className="flex items-center gap-2"><Tabs value={inputViewMode} onValueChange={(v) => setInputViewMode(v as 'preview' | 'schema')} className="w-auto"><TabsList className="h-6 rounded-md"><TabsTrigger value="preview" className="h-5 px-2 text-[11px] rounded-md data-[state=active]:rounded-md">Preview</TabsTrigger><TabsTrigger value="schema" className="h-5 px-2 text-[11px] rounded-md data-[state=active]:rounded-md">Schema</TabsTrigger></TabsList></Tabs><span className="text-[10px] text-muted-foreground">{bytes.toLocaleString()} bytes</span><CopyButton text={fullJson} /></div>} />
+                                    <JsonCodeEditor value={inputString} readOnly={true} minHeight="150px" maxHeight="250px" resizable={true} overlay={<div className="flex items-center gap-2"><Tabs value={inputViewMode} onValueChange={(v) => setInputViewMode(v as 'preview' | 'schema')} className="w-auto"><TabsList className="h-6 rounded-md"><TabsTrigger value="preview" className="h-5 px-2 text-[11px] rounded-md data-[state=active]:rounded-md">Preview</TabsTrigger><TabsTrigger value="schema" className="h-5 px-2 text-[11px] rounded-md data-[state=active]:rounded-md">Schema</TabsTrigger></TabsList></Tabs><span className="text-[10px] text-muted-foreground">{bytes.toLocaleString()} bytes</span><CopyButton text={copyText} /></div>} />
                                     {isTruncated && inputViewMode === 'preview' && (<div className="mt-1 text-[10px] text-amber-600 dark:text-amber-300 px-2">Preview truncated for display performance</div>)}
                                 </>
                             );
@@ -636,7 +646,7 @@ export const FinalTransformMiniStepCard = ({ transform, responseSchema, onTransf
                     </TabsContent>
                     <TabsContent value="schema" className="mt-2">
                         <div className="space-y-3">
-                            <JsonSchemaEditor value={(localSchema && localSchema.trim().length > 0) ? localSchema : null} onChange={handleSchemaChange} isOptional={true} />
+                            <JsonSchemaEditor value={localSchema || ''} onChange={handleSchemaChange} isOptional={true} showModeToggle={true} />
                         </div>
                     </TabsContent>
                 </Tabs>
