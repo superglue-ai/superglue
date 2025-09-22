@@ -122,9 +122,9 @@ export async function callPostgres(endpoint: ApiConfig, payload: Record<string, 
   const poolConfig: PoolConfig = {
     connectionString,
     statement_timeout: options?.timeout || server_defaults.POSTGRES.DEFAULT_TIMEOUT,
-    ssl: {
-      rejectUnauthorized: false
-    }    
+    ssl: connectionString.includes('sslmode=') || connectionString.includes('localhost') === false 
+      ? { rejectUnauthorized: false }
+      : false
   };
 
   // Get or create pool from cache

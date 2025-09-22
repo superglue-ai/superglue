@@ -32,6 +32,33 @@ export interface IntegrationFormProps {
 }
 
 function sanitizeIntegrationId(id: string) {
+    // Handle PostgreSQL connection strings specially
+    if (id.startsWith('postgres://') || id.startsWith('postgresql://')) {
+        try {
+            const url = new URL(id);
+            let host = url.hostname;
+            const database = url.pathname.substring(1); // Remove leading slash
+            
+            // Truncate host if too long (keep first 20 chars)
+            if (host.length > 20) {
+                host = host.substring(0, 20);
+            }
+            
+            // Create ID with DB: prefix
+            let cleanId = `DB-${host}-${database}`;
+            
+            // Clean up and return
+            return cleanId
+                .toLowerCase()
+                .replace(/[^a-z0-9-]/g, '-')  // Replace non-alphanumeric with hyphens
+                .replace(/-+/g, '-')          // Replace multiple hyphens with single
+                .replace(/^-|-$/g, '');       // Remove leading/trailing hyphens
+        } catch {
+            // Fall back to regular processing if URL parsing fails
+        }
+    }
+
+    // Regular URL processing for non-PostgreSQL
     // Remove protocol if present
     let cleanId = id.replace(/^.*:\/\//, '');
 
