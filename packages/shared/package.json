@@ -13,6 +13,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@superglue/client": "^2.3.52",
     "openai": "^4.85.4",
     "lodash.isequal": "^4.5.0",
     "lodash.xor": "^4.5.0",
