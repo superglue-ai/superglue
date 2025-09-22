@@ -386,26 +386,28 @@ const ConfigTable = () => {
                   // Consider adding onClick={() => handleRowClick(config)} if needed
                   >
                     <TableCell className="w-[210px]">
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={handleRunClick}
-                        className="gap-2"
-                      >
-                        {isWorkflow ? <GitBranch className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                        Run
-                      </Button>
-                      {isWorkflow && (
+                      <div className="flex items-center gap-2 whitespace-nowrap">
                         <Button
-                          variant="outline"
+                          variant="default"
                           size="sm"
-                          onClick={(e) => handleScheduleClick(e, config.id)}
-                          className="gap-2 ml-2"
+                          onClick={handleRunClick}
+                          className="gap-2"
                         >
-                          <Calendar className="h-4 w-4" />
-                          Schedules
+                          {isWorkflow ? <GitBranch className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                          Run
                         </Button>
-                      )}
+                        {isWorkflow && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => handleScheduleClick(e, config.id)}
+                            className="gap-2"
+                          >
+                            <Calendar className="h-4 w-4" />
+                            Schedules
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="font-medium max-w-[200px] truncate relative group">
                       <div className="flex items-center space-x-1">
