@@ -25,6 +25,12 @@ RUN npm install && \
 COPY packages/web ./packages/web
 COPY packages/shared ./packages/shared
 
+# Install workspace dependencies specifically
+RUN npm install
+
+# Install @superglue/client specifically in shared package for TypeScript resolution
+RUN cd packages/shared && npm install @superglue/client
+
 # Build web and shared packages
 RUN npx turbo run build --filter=@superglue/web --filter=@superglue/shared
 
@@ -44,6 +50,9 @@ COPY packages/shared/package*.json ./packages/shared/
 
 # Install production dependencies
 RUN npm ci --omit=dev
+
+# Install @superglue/client in shared packages for runtime
+RUN cd packages/shared && npm install @superglue/client
 
 # Copy built files from builder stage
 COPY --from=builder /usr/src/app/packages/web/.next ./packages/web/.next
