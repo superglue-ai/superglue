@@ -67,9 +67,7 @@ describe('PostgreSQL Utilities', () => {
         max: 10,
         idleTimeoutMillis: server_defaults.POSTGRES.DEFAULT_TIMEOUT,
         connectionTimeoutMillis: 5000,
-        ssl: {
-          rejectUnauthorized: false
-        }
+        ssl: false
       });
       
       // Check query was called
@@ -126,9 +124,7 @@ describe('PostgreSQL Utilities', () => {
         max: 10,
         idleTimeoutMillis: server_defaults.POSTGRES.DEFAULT_TIMEOUT,
         connectionTimeoutMillis: 5000,
-        ssl: {
-          rejectUnauthorized: false
-        }
+        ssl: false
       });
     });
 
