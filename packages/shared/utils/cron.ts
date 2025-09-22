@@ -3,13 +3,17 @@ import cronValidate from 'cron-validate';
 
 export function calculateNextRun(cronExpression: string, timezone: string, from?: Date): Date {
     // calculates the next run using the cron expression and timezone and returns the date in utc
+    const currentDate = from || new Date(Date.now()); // Use provided date or current UTC time
     const parsed = CronExpressionParser.parse(cronExpression, {
-        currentDate: from,
+        currentDate,
         tz: timezone,
     });
 
-    // cron-parser already returns UTC dates (even when timezone is specified - only used to interpret the cron expression)
-    return parsed.next().toDate();
+    // cron-parser returns dates in the specified timezone, so we need to convert to UTC
+    const nextRunInTimezone = parsed.next().toDate();
+    
+    // Convert to UTC by using the ISO string representation
+    return new Date(nextRunInTimezone.toISOString());
 }
 
 export function validateCronExpression(cronExpression: string): boolean {

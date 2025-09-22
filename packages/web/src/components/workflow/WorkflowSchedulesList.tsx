@@ -59,7 +59,6 @@ const WorkflowSchedulesList = ({ workflowId }: { workflowId: string }) => {
       });
   
       await superglueClient.deleteWorkflowSchedule(scheduleId);
-      loadSchedules();
     };
     
     const handleScheduleStateToggle = async (newState: boolean, scheduleId: string) => {
@@ -120,8 +119,18 @@ const WorkflowSchedulesList = ({ workflowId }: { workflowId: string }) => {
                 <TableHead>Schedule</TableHead>
                 <TableHead>Cron</TableHead>
                 <TableHead>Timezone</TableHead>
-                <TableHead>Last Run At</TableHead>
-                <TableHead>Next Run At (Local Time)</TableHead>
+                <TableHead>
+                  Last Run
+                  <div className="text-xs text-muted-foreground font-normal">
+                    (Local Time)
+                  </div>
+                </TableHead>
+                <TableHead>
+                  Next Run
+                  <div className="text-xs text-muted-foreground font-normal">
+                    (Local Time)
+                  </div>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

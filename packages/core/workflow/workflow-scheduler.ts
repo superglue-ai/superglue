@@ -42,12 +42,13 @@ export class WorkflowScheduler {
 
     private async pollAndExecute(): Promise<void> {      
         const schedules = await this.datastore.listDueWorkflowSchedules();
+        logMessage('debug', `WORKFLOW SCHEDULER: Found ${schedules.length} due schedules`);
 
         for (const schedule of schedules) {
             try {
                 logMessage('debug', `WORKFLOW SCHEDULER: Running scheduled workflow ${schedule.workflowId}`);
 
-                const now = new Date();
+                const now = new Date(Date.now());
                 const nextRun = calculateNextRun(schedule.cronExpression, schedule.timezone, now);
                 await this.datastore.updateScheduleNextRun({ id: schedule.id, nextRunAt: nextRun, lastRunAt: now });
 

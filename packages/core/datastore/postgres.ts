@@ -183,8 +183,8 @@ export class PostgresService implements DataStore {
                 enabled BOOLEAN NOT NULL DEFAULT TRUE,
                 payload JSONB,
                 options JSONB,
-                last_run_at TIMESTAMP,
-                next_run_at TIMESTAMP NOT NULL,
+                last_run_at TIMESTAMPTZ,
+                next_run_at TIMESTAMPTZ NOT NULL,
                 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (id, org_id),
@@ -442,8 +442,8 @@ export class PostgresService implements DataStore {
                 run.config?.id,
                 orgId || '',
                 JSON.stringify(run),
-                run.startedAt,
-                run.completedAt
+                run.startedAt ? run.startedAt.toISOString() : null,
+                run.completedAt ? run.completedAt.toISOString() : null
             ]);
 
             return run;
@@ -550,7 +550,22 @@ export class PostgresService implements DataStore {
                     updated_at = CURRENT_TIMESTAMP
             `;
             
-            await client.query(query, [schedule.id, schedule.orgId, schedule.workflowId, 'workflow', schedule.cronExpression, schedule.timezone, schedule.enabled, JSON.stringify(schedule.payload), JSON.stringify(schedule.options), schedule.lastRunAt, schedule.nextRunAt]);
+            await client.query(
+                query,
+                [
+                    schedule.id,
+                    schedule.orgId,
+                    schedule.workflowId,
+                    'workflow',
+                    schedule.cronExpression,
+                    schedule.timezone,
+                    schedule.enabled,
+                    JSON.stringify(schedule.payload),
+                    JSON.stringify(schedule.options),
+                    schedule.lastRunAt ? schedule.lastRunAt.toISOString() : null,
+                    schedule.nextRunAt ? schedule.nextRunAt.toISOString() : null
+                ]
+            );
         } finally {
             client.release();
         }
@@ -585,7 +600,7 @@ export class PostgresService implements DataStore {
         const client = await this.pool.connect();
         try {
             const query = 'UPDATE workflow_schedules SET next_run_at = $1, last_run_at = $2 WHERE id = $3';
-            const result = await client.query(query, [params.nextRunAt, params.lastRunAt, params.id]);
+            const result = await client.query(query, [params.nextRunAt ? params.nextRunAt.toISOString() : null, params.lastRunAt ? params.lastRunAt.toISOString() : null, params.id]);
             return result.rowCount > 0;
         } finally {
             client.release();

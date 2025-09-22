@@ -395,15 +395,17 @@ const ConfigTable = () => {
                         {isWorkflow ? <GitBranch className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                         Run
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => handleScheduleClick(e, config.id)}
-                        className="gap-2 ml-2"
-                      >
-                        <Calendar className="h-4 w-4" />
-                        Schedules
-                      </Button>
+                      {isWorkflow && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => handleScheduleClick(e, config.id)}
+                          className="gap-2 ml-2"
+                        >
+                          <Calendar className="h-4 w-4" />
+                          Schedules
+                        </Button>
+                      )}
                     </TableCell>
                     <TableCell className="font-medium max-w-[200px] truncate relative group">
                       <div className="flex items-center space-x-1">

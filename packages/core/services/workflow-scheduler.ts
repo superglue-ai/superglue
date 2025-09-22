@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { DataStore, WorkflowScheduleInternal } from "../datastore/types.js";
 import { calculateNextRun, validateCronExpression } from "@superglue/shared";
 import { isValidTimezone } from "../utils/timezone.js";
+import { logMessage } from "../utils/logs.js";
 
 export class WorkflowScheduler {
     private datastore: DataStore;
@@ -59,7 +60,8 @@ export class WorkflowScheduler {
         const cronExpressionChanged = params.cronExpression !== undefined && params.cronExpression !== existingScheduleOrNull?.cronExpression;
         const timezoneChanged = params.timezone !== undefined && params.timezone !== existingScheduleOrNull?.timezone;
         if(cronExpressionChanged || timezoneChanged) {
-            nextRunAt = calculateNextRun(cronExpression, timezone);
+            const currentDate = new Date(Date.now());
+            nextRunAt = calculateNextRun(cronExpression, timezone, currentDate);
         }
 
         const scheduleToSave: WorkflowScheduleInternal = {
