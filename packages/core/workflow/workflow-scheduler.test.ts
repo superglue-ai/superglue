@@ -8,7 +8,7 @@ vi.mock('../graphql/resolvers/workflow.js', () => ({
 
 const MOCK_NEXT_RUN = new Date('2024-01-02T00:00:00Z');
 
-vi.mock('../utils/cron.js', () => ({
+vi.mock('@superglue/shared', () => ({
     calculateNextRun: vi.fn(() => MOCK_NEXT_RUN)
 }));
 
