@@ -655,7 +655,7 @@ export function WorkflowStepGallery({
                     </div>
                 )}
 
-                <div className="flex items-center gap-2 pr-2">
+                <div className="flex items-center gap-0">
                     <Button
                         variant="outline"
                         size="icon"
@@ -667,11 +667,11 @@ export function WorkflowStepGallery({
                         <ChevronLeft className="h-4 w-4" />
                     </Button>
 
-                    <div className="flex-1 overflow-hidden px-2 sm:px-4 md:px-6 lg:px-8 xl:px-10 2xl:px-12">
+                    <div className="flex-1 overflow-hidden px-0">
                         <div className="relative">
                             <div
                                 ref={listRef}
-                                className="flex gap-2 justify-center items-center overflow-visible py-3"
+                                className="flex justify-center items-center overflow-visible py-3"
                                 style={{ minHeight: '150px' }}
                             >
                                 {(() => {
@@ -680,12 +680,22 @@ export function WorkflowStepGallery({
                                     let endIdx = totalCards;
                                     const CARD_WIDTH = 228; // px (matches card classes above)
                                     const ARROW_WIDTH = 24; // px (ChevronRight ~20px, add buffer)
-                                    const GUTTER = 8; // px
-                                    const BLOCK_WIDTH = CARD_WIDTH + ARROW_WIDTH;
-                                    const cardsToShow = Math.max(1, Math.min(
-                                        workflowItems.length,
-                                        Math.floor((((containerWidth || windowWidth) + GUTTER) / (BLOCK_WIDTH + GUTTER)))
-                                    ));
+                                    const GUTTER = 16; // px (doubled spacing)
+                                    const SAFE_MARGIN = 12; // px extra space to avoid clipping
+                                    const available = Math.max(0, (containerWidth || windowWidth) - SAFE_MARGIN);
+                                    let cardsToShow = 1;
+                                    const maxCandidates = Math.min(workflowItems.length, 12);
+                                    for (let c = 1; c <= maxCandidates; c++) {
+                                        const needed = (c * CARD_WIDTH) + ((c - 1) * (ARROW_WIDTH + GUTTER));
+                                        if (needed <= available) {
+                                            cardsToShow = c;
+                                        } else {
+                                            break;
+                                        }
+                                    }
+
+                                    // Always be slightly conservative to avoid cramping at any breakpoint
+                                    cardsToShow = Math.max(1, cardsToShow - 1);
 
                                     if (totalCards <= cardsToShow) {
                                         // Show all cards if we have fewer than cardsToShow
@@ -701,22 +711,31 @@ export function WorkflowStepGallery({
                                     const visibleIndices = visibleItems.map((_, i) => startIdx + i);
                                     const hasHiddenLeft = startIdx > 0;
                                     const hasHiddenRight = endIdx < totalCards;
+                                    const sepWidth = ARROW_WIDTH + GUTTER;
+                                    const edgeWidth = sepWidth;
+                                    const count = Math.max(1, visibleItems.length);
+                                    const innerAvailable = Math.max(0, (containerWidth || windowWidth) - SAFE_MARGIN - (2 * edgeWidth) - ((count - 1) * sepWidth));
+                                    const baseCardWidth = Math.floor(innerAvailable / count);
+                                    const widthRemainder = innerAvailable - (baseCardWidth * count);
 
                                     return (
                                         <>
                                             {hasHiddenLeft && null}
 
+                                            {visibleItems.length > 0 && (
+                                                <div style={{ flex: `0 0 ${sepWidth}px`, width: `${sepWidth}px` }} />
+                                            )}
                                             {visibleItems.map((item, idx) => {
                                                 const globalIdx = visibleIndices[idx];
                                                 const showArrow = idx < visibleItems.length - 1;
                                                 return (
                                                     <React.Fragment key={globalIdx}>
                                                         <div
-                                                            className="flex items-center justify-center px-1"
+                                                            className="flex items-center justify-center"
                                                             style={{
-                                                                flex: `0 0 ${100 / cardsToShow}%`,
-                                                                minWidth: `${100 / cardsToShow}%`,
-                                                                maxWidth: `${100 / cardsToShow}%`
+                                                                flex: `0 0 ${baseCardWidth + (idx < widthRemainder ? 1 : 0)}px`,
+                                                                width: `${baseCardWidth + (idx < widthRemainder ? 1 : 0)}px`,
+                                                                maxWidth: `${baseCardWidth + (idx < widthRemainder ? 1 : 0)}px`
                                                             }}
                                                         >
                                                             <MiniStepCard
@@ -739,11 +758,16 @@ export function WorkflowStepGallery({
                                                             />
                                                         </div>
                                                         {showArrow && (
-                                                            <ChevronRight className="h-5 w-5 text-muted-foreground/50 flex-shrink-0" />
+                                                            <div style={{ flex: `0 0 ${sepWidth}px`, width: `${sepWidth}px` }} className="flex items-center justify-center">
+                                                                <ChevronRight className="h-5 w-5 text-muted-foreground/50" />
+                                                            </div>
                                                         )}
                                                     </React.Fragment>
                                                 );
                                             })}
+                                            {visibleItems.length > 0 && (
+                                                <div style={{ flex: `0 0 ${sepWidth}px`, width: `${sepWidth}px` }} />
+                                            )}
 
                                             {hasHiddenRight && null}
                                         </>
