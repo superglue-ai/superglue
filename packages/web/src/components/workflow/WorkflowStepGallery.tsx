@@ -390,8 +390,9 @@ export function WorkflowStepGallery({
     filePayloads
 }: WorkflowStepGalleryProps) {
     const [activeIndex, setActiveIndex] = useState(1); // Default to first workflow step, not payload
-    const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
-    const [containerWidth, setContainerWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1200);
+    const [windowWidth, setWindowWidth] = useState(1200);
+    const [containerWidth, setContainerWidth] = useState<number>(1200);
+    const [isHydrated, setIsHydrated] = useState(false);
     const listRef = useRef<HTMLDivElement | null>(null);
     const [isConfiguratorEditing, setIsConfiguratorEditing] = useState<boolean>(false);
 
@@ -410,17 +411,26 @@ export function WorkflowStepGallery({
         setIsEditingWorkflowId(false);
     };
 
+    // Hydration effect
+    useEffect(() => {
+        setIsHydrated(true);
+        setWindowWidth(window.innerWidth);
+        setContainerWidth(window.innerWidth);
+    }, []);
+
     // Update window width on resize
     useEffect(() => {
+        if (!isHydrated) return;
         const handleResize = () => {
             setWindowWidth(window.innerWidth);
         };
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
-    }, []);
+    }, [isHydrated]);
 
     // Observe container width (e.g., when logs panel opens/closes) to responsively adjust cards
     useEffect(() => {
+        if (!isHydrated) return;
         const container = listRef.current?.parentElement?.parentElement as HTMLElement | null;
         if (!container || typeof ResizeObserver === 'undefined') return;
         const ro = new ResizeObserver((entries) => {
@@ -431,7 +441,7 @@ export function WorkflowStepGallery({
         });
         ro.observe(container);
         return () => ro.disconnect();
-    }, [listRef.current, containerWidth]);
+    }, [isHydrated, listRef.current, containerWidth]);
 
 
     const [rawPayloadText, setRawPayloadText] = useState<string>(payloadText || '');
@@ -674,7 +684,12 @@ export function WorkflowStepGallery({
                                 className="flex justify-center items-center overflow-visible py-3"
                                 style={{ minHeight: '150px' }}
                             >
-                                {(() => {
+                                {!isHydrated ? (
+                                    // Show a simple loading state during hydration
+                                    <div className="flex items-center justify-center">
+                                        <div className="w-48 h-24 bg-muted/20 rounded-md animate-pulse" />
+                                    </div>
+                                ) : (() => {
                                     const totalCards = workflowItems.length;
                                     let startIdx = 0;
                                     let endIdx = totalCards;
