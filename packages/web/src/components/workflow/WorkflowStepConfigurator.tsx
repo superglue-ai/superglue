@@ -20,13 +20,15 @@ import { JavaScriptCodeEditor } from './WorkflowMiniStepCards';
 interface WorkflowStepConfiguratorProps {
     step: any;
     isLast: boolean;
-    onEdit: (stepId: string, updatedStep: any) => void;
+    onEdit: (stepId: string, updatedStep: any, isUserInitiated?: boolean) => void;
     onRemove: (stepId: string) => void;
     integrations?: Integration[];
     onCreateIntegration?: () => void;
+    onEditingChange?: (editing: boolean) => void;
+    disabled?: boolean;
 }
 
-export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integrations: propIntegrations, onCreateIntegration }: WorkflowStepConfiguratorProps) {
+export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integrations: propIntegrations, onCreateIntegration, onEditingChange, disabled = false }: WorkflowStepConfiguratorProps) {
     const [editedStep, setEditedStep] = useState({ ...step });
     const [didFormatLoopSelector, setDidFormatLoopSelector] = useState(false);
     const [showJson, setShowJson] = useState(false);
@@ -74,31 +76,40 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
         return iconName ? getSimpleIcon(iconName) : null;
     };
 
-    // Sync with parent step prop changes
+    // Sync from parent when switching steps (step.id changes)
     useEffect(() => {
-        setEditedStep({ ...step });
-        // Reset headers and query params text
-        try {
-            const headers = step.apiConfig?.headers;
-            const headersJson = headers !== undefined && headers !== null ? JSON.stringify(headers, null, 2) : '{}';
-            setHeadersText(headersJson);
-            setHeadersError(false);
-        } catch (error) {
-            console.warn('Failed to stringify headers:', error);
-            setHeadersText('{}');
-            setHeadersError(false);
+        if (step.id !== editedStep.id) {
+            const next = { ...step };
+            setEditedStep(next);
+            // Keep JSON text in sync as single source
+            try {
+                setRawJsonText(JSON.stringify(next, null, 2));
+            } catch {
+                // ignore
+            }
+            // Reset headers and query params text
+            try {
+                const headers = step.apiConfig?.headers;
+                const headersJson = headers !== undefined && headers !== null ? JSON.stringify(headers, null, 2) : '{}';
+                setHeadersText(headersJson);
+                setHeadersError(false);
+            } catch (error) {
+                console.warn('Failed to stringify headers:', error);
+                setHeadersText('{}');
+                setHeadersError(false);
+            }
+            try {
+                const queryParams = step.apiConfig?.queryParams;
+                const queryParamsJson = queryParams !== undefined && queryParams !== null ? JSON.stringify(queryParams, null, 2) : '{}';
+                setQueryParamsText(queryParamsJson);
+                setQueryParamsError(false);
+            } catch (error) {
+                console.warn('Failed to stringify queryParams:', error);
+                setQueryParamsText('{}');
+                setQueryParamsError(false);
+            }
         }
-        try {
-            const queryParams = step.apiConfig?.queryParams;
-            const queryParamsJson = queryParams !== undefined && queryParams !== null ? JSON.stringify(queryParams, null, 2) : '{}';
-            setQueryParamsText(queryParamsJson);
-            setQueryParamsError(false);
-        } catch (error) {
-            console.warn('Failed to stringify queryParams:', error);
-            setQueryParamsText('{}');
-            setQueryParamsError(false);
-        }
-    }, [step]);
+    }, [step.id]);
 
     // Format loop selector on first load
     useEffect(() => {
@@ -112,10 +123,20 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
         }
     }, [editedStep.loopSelector]);
 
-    // Auto-save helper - debounced to avoid too many updates
     const handleFieldChange = (updates: Partial<typeof editedStep>) => {
+        if (disabled) return;
         const newStep = { ...editedStep, ...updates };
         setEditedStep(newStep);
+        // Update canonical JSON string
+        try {
+            setRawJsonText(JSON.stringify(newStep, null, 2));
+        } catch {
+            // ignore
+        }
+
+        if (onEditingChange) {
+            onEditingChange(true);
+        }
 
         // Immediately propagate changes to parent
         const updatedStep = {
@@ -126,11 +147,51 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
             loopMaxIters: newStep.loopMaxIters,
             apiConfig: { ...step.apiConfig, ...newStep.apiConfig }
         };
-        onEdit(step.id, updatedStep);
+        onEdit(step.id, updatedStep, true);
+
+        if (onEditingChange) {
+            setTimeout(() => onEditingChange(false), 100);
+        }
     };
 
-    const [rawJsonText, setRawJsonText] = useState<string>(() => JSON.stringify(editedStep, null, 2));
-    useEffect(() => { setRawJsonText(JSON.stringify(editedStep, null, 2)); }, [step.id]);
+    const [rawJsonText, setRawJsonText] = useState<string>(() => {
+        try { return JSON.stringify(editedStep, null, 2); } catch { return '{}'; }
+    });
+
+    // Debounce-parse canonical JSON text into object and emit onEdit when valid
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            try {
+                const parsed = JSON.parse(rawJsonText);
+                // Only update/emit if content actually changed
+                const changed = JSON.stringify(parsed) !== JSON.stringify(editedStep);
+                if (changed) {
+                    setEditedStep(parsed);
+                    // Keep ancillary text fields in sync for headers/query params
+                    try {
+                        const headers = parsed.apiConfig?.headers;
+                        setHeadersText(headers !== undefined && headers !== null ? JSON.stringify(headers, null, 2) : '{}');
+                        setHeadersError(false);
+                    } catch {
+                        // keep previous
+                    }
+                    try {
+                        const queryParams = parsed.apiConfig?.queryParams;
+                        setQueryParamsText(queryParams !== undefined && queryParams !== null ? JSON.stringify(queryParams, null, 2) : '{}');
+                        setQueryParamsError(false);
+                    } catch {
+                        // keep previous
+                    }
+                    if (onEditingChange) onEditingChange(true);
+                    onEdit(step.id, parsed, true);
+                    if (onEditingChange) setTimeout(() => onEditingChange(false), 100);
+                }
+            } catch {
+                // invalid JSON - do nothing until valid
+            }
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [rawJsonText]);
 
     const handleRemove = () => { onRemove(step.id); };
 
@@ -140,14 +201,21 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
     });
 
     useEffect(() => {
-        if (linkedIntegration && !editedStep.integrationId) {
-            setEditedStep(prev => ({ ...prev, integrationId: linkedIntegration.id }));
+        if (linkedIntegration && !editedStep.integrationId && !step.integrationId) {
+            // Only update local state, don't trigger onEdit
+            // This is automatic linking, not user-initiated change
+            setEditedStep(prev => {
+                if (prev.integrationId === linkedIntegration.id) {
+                    return prev; // No change needed
+                }
+                return { ...prev, integrationId: linkedIntegration.id };
+            });
         }
-    }, [linkedIntegration, editedStep.integrationId, step.integrationId]);
+    }, [linkedIntegration?.id, step.id]);
 
     return (
         <div className="flex flex-col items-center">
-            <Card className="w-full border-primary/50">
+            <Card className="w-full border-primary/50 opacity-100">
                 <CardHeader className="pb-2">
                     <div className="flex items-center justify-between min-w-0">
                         <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -171,7 +239,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                             </CardTitle>
                             <div className="flex items-center gap-1 ml-2">
                                 <Label className="text-xs text-muted-foreground">Code Mode</Label>
-                                <Switch checked={showJson} onCheckedChange={setShowJson} className="custom-switch" />
+                                <Switch checked={showJson} onCheckedChange={setShowJson} className="custom-switch" disabled={disabled} />
                             </div>
                         </div>
                     </div>
@@ -189,10 +257,11 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                         </div>
                                         <JsonSchemaEditor
                                             value={rawJsonText}
-                                            onChange={(val) => { setRawJsonText(val || ''); }}
+                                            onChange={(val) => { if (disabled) return; setRawJsonText(val || ''); if (onEditingChange) onEditingChange(true); }}
                                             isOptional={false}
                                             forceCodeMode={true}
-                                            onBlur={() => { try { const parsed = JSON.parse(rawJsonText); handleFieldChange(parsed); } catch { } }}
+                                            showModeToggle={false}
+                                            readOnly={disabled}
                                         />
                                     </div>
                                 </div>
@@ -213,8 +282,8 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                                 Integration
                                                 <HelpTooltip text="Select an integration to link this step to. This will pre-fill the API configuration with the integration's base URL and credentials." />
                                             </Label>
-                                            <Select value={editedStep.integrationId || step.integrationId} onValueChange={(value) => { if (value === "CREATE_NEW") { onCreateIntegration?.(); } else { const selectedIntegration = integrations?.find(integration => integration.id === value); handleFieldChange({ integrationId: value, apiConfig: { ...editedStep.apiConfig, urlHost: selectedIntegration?.urlHost || editedStep.apiConfig.urlHost, urlPath: selectedIntegration?.urlPath || editedStep.apiConfig.urlPath, headers: selectedIntegration?.credentials ? Object.entries(selectedIntegration.credentials).reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {}) : editedStep.apiConfig.headers } }); } }}>
-                                                <SelectTrigger className="h-9 mt-1">
+                                            <Select value={editedStep.integrationId || step.integrationId} onValueChange={(value) => { if (disabled) return; if (value === "CREATE_NEW") { onCreateIntegration?.(); } else { const selectedIntegration = integrations?.find(integration => integration.id === value); handleFieldChange({ integrationId: value, apiConfig: { ...editedStep.apiConfig, urlHost: selectedIntegration?.urlHost || editedStep.apiConfig.urlHost, urlPath: selectedIntegration?.urlPath || editedStep.apiConfig.urlPath, headers: selectedIntegration?.credentials ? Object.entries(selectedIntegration.credentials).reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {}) : editedStep.apiConfig.headers } }); } }}>
+                                                <SelectTrigger className="h-9 mt-1" disabled={disabled}>
                                                     <SelectValue placeholder="Select integration" />
                                                 </SelectTrigger>
                                                 <SelectContent>
@@ -242,8 +311,8 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                                 <Label className="text-xs">Mode</Label>
                                                 <HelpTooltip text="DIRECT: Execute once with input data. LOOP: Execute multiple times iterating over an array from previous steps." />
                                             </div>
-                                            <Select value={editedStep.executionMode} onValueChange={(value) => handleFieldChange({ executionMode: value })}>
-                                                <SelectTrigger className="h-9 w-28 mt-1">
+                                            <Select value={editedStep.executionMode} onValueChange={(value) => { if (disabled) return; handleFieldChange({ executionMode: value }); }}>
+                                                <SelectTrigger className="h-9 w-28 mt-1" disabled={disabled}>
                                                     <SelectValue placeholder="Mode" />
                                                 </SelectTrigger>
                                                 <SelectContent>
@@ -260,16 +329,16 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                         </Label>
                                         <div className="space-y-2 mt-1">
                                             <div className="flex gap-2">
-                                                <Select value={editedStep.apiConfig.method} onValueChange={(value) => handleFieldChange({ apiConfig: { ...editedStep.apiConfig, method: value } })}>
-                                                    <SelectTrigger className="h-9 flex-1">
+                                                <Select value={editedStep.apiConfig.method} onValueChange={(value) => { if (disabled) return; handleFieldChange({ apiConfig: { ...editedStep.apiConfig, method: value } }); }}>
+                                                    <SelectTrigger className="h-9 flex-1" disabled={disabled}>
                                                         <SelectValue placeholder="Method" />
                                                     </SelectTrigger>
                                                     <SelectContent>
                                                         {['GET', 'POST', 'PUT', 'DELETE', 'PATCH'].map(method => (<SelectItem key={method} value={method}>{method}</SelectItem>))}
                                                     </SelectContent>
                                                 </Select>
-                                                <Input value={editedStep.apiConfig.urlHost} onChange={(e) => handleFieldChange({ apiConfig: { ...editedStep.apiConfig, urlHost: e.target.value } })} className="text-xs flex-1 focus:ring-0 focus:ring-offset-0" placeholder="Host" />
-                                                <Input value={editedStep.apiConfig.urlPath} onChange={(e) => handleFieldChange({ apiConfig: { ...editedStep.apiConfig, urlPath: e.target.value } })} className="text-xs flex-1 focus:ring-0 focus:ring-offset-0" placeholder="Path" />
+                                                <Input value={editedStep.apiConfig.urlHost} onChange={(e) => handleFieldChange({ apiConfig: { ...editedStep.apiConfig, urlHost: e.target.value } })} className="text-xs flex-1 focus:ring-0 focus:ring-offset-0" placeholder="Host" disabled={disabled} />
+                                                <Input value={editedStep.apiConfig.urlPath} onChange={(e) => handleFieldChange({ apiConfig: { ...editedStep.apiConfig, urlPath: e.target.value } })} className="text-xs flex-1 focus:ring-0 focus:ring-offset-0" placeholder="Path" disabled={disabled} />
                                             </div>
                                         </div>
                                     </div>
@@ -278,7 +347,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                             Headers (JSON)
                                             <HelpTooltip text="HTTP headers to include with the request. Use JSON format. Common headers include Content-Type, Authorization, etc." />
                                         </Label>
-                                        <Textarea value={headersText} onChange={(e) => { const newValue = e.target.value; setHeadersText(newValue); if (!newValue.trim()) { handleFieldChange({ apiConfig: { ...editedStep.apiConfig, headers: {} } }); setHeadersError(false); return; } try { const headers = JSON.parse(newValue); handleFieldChange({ apiConfig: { ...editedStep.apiConfig, headers } }); setHeadersError(false); } catch { setHeadersError(true); } }} className="font-mono text-xs h-20 mt-1 focus:ring-0 focus:ring-offset-0" placeholder="{}" />
+                                        <Textarea value={headersText} onChange={(e) => { if (disabled) return; const newValue = e.target.value; setHeadersText(newValue); if (!newValue.trim()) { handleFieldChange({ apiConfig: { ...editedStep.apiConfig, headers: {} } }); setHeadersError(false); return; } try { const headers = JSON.parse(newValue); handleFieldChange({ apiConfig: { ...editedStep.apiConfig, headers } }); setHeadersError(false); } catch { setHeadersError(true); } }} className="font-mono text-xs h-20 mt-1 focus:ring-0 focus:ring-offset-0" placeholder="{}" disabled={disabled} />
                                         {headersError && (<div className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5 bg-red-500/10 dark:bg-red-500/20 py-1.5 px-2.5 rounded-md mt-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg><span>Invalid JSON format</span></div>)}
                                     </div>
                                     <div>
@@ -286,7 +355,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                             Query Parameters (JSON)
                                             <HelpTooltip text='URL query parameters to append to the request. Use JSON format like {"param1": "value1", "param2": "value2"}' />
                                         </Label>
-                                        <Textarea value={queryParamsText} onChange={(e) => { const newValue = e.target.value; setQueryParamsText(newValue); if (!newValue.trim()) { handleFieldChange({ apiConfig: { ...editedStep.apiConfig, queryParams: {} } }); setQueryParamsError(false); return; } try { const queryParams = JSON.parse(newValue); handleFieldChange({ apiConfig: { ...editedStep.apiConfig, queryParams } }); setQueryParamsError(false); } catch { setQueryParamsError(true); } }} className="font-mono text-xs h-20 mt-1 focus:ring-0 focus:ring-offset-0" placeholder="{}" />
+                                        <Textarea value={queryParamsText} onChange={(e) => { if (disabled) return; const newValue = e.target.value; setQueryParamsText(newValue); if (!newValue.trim()) { handleFieldChange({ apiConfig: { ...editedStep.apiConfig, queryParams: {} } }); setQueryParamsError(false); return; } try { const queryParams = JSON.parse(newValue); handleFieldChange({ apiConfig: { ...editedStep.apiConfig, queryParams } }); setQueryParamsError(false); } catch { setQueryParamsError(true); } }} className="font-mono text-xs h-20 mt-1 focus:ring-0 focus:ring-offset-0" placeholder="{}" disabled={disabled} />
                                         {queryParamsError && (<div className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5 bg-red-500/10 dark:bg-red-500/20 py-1.5 px-2.5 rounded-md mt-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg><span>Invalid JSON format</span></div>)}
                                     </div>
                                     <div>
@@ -294,7 +363,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                             Body
                                             <HelpTooltip text="Request body content. Can be JSON, form data, or plain text. Use JavaScript expressions to transform data from previous steps." />
                                         </Label>
-                                        <Textarea value={editedStep.apiConfig.body || ''} onChange={(e) => handleFieldChange({ apiConfig: { ...editedStep.apiConfig, body: e.target.value } })} className="font-mono text-xs h-20 mt-1 focus:ring-0 focus:ring-offset-0" />
+                                        <Textarea value={editedStep.apiConfig.body || ''} onChange={(e) => handleFieldChange({ apiConfig: { ...editedStep.apiConfig, body: e.target.value } })} className="font-mono text-xs h-20 mt-1 focus:ring-0 focus:ring-offset-0" disabled={disabled} />
                                     </div>
                                     <div>
                                         <Label className="text-xs flex items-center gap-1">
@@ -302,8 +371,8 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                             <HelpTooltip text="Configure pagination if the API returns data in pages. Only set this if you're using pagination variables like {'<<offset>>'}, {'<<page>>'}, or {'<<cursor>>'} in your request." />
                                         </Label>
                                         <div className="space-y-2 mt-1">
-                                            <Select value={editedStep.apiConfig.pagination?.type || 'none'} onValueChange={(value) => { if (value === 'none') { handleFieldChange({ apiConfig: { ...editedStep.apiConfig, pagination: undefined } }); } else { handleFieldChange({ apiConfig: { ...editedStep.apiConfig, pagination: { ...(editedStep.apiConfig.pagination || {}), type: value, pageSize: editedStep.apiConfig.pagination?.pageSize || '50', cursorPath: editedStep.apiConfig.pagination?.cursorPath || '', stopCondition: editedStep.apiConfig.pagination?.stopCondition || '(response, pageInfo) => !response.data || response.data.length === 0' } } }); } }}>
-                                                <SelectTrigger className="h-9">
+                                            <Select value={editedStep.apiConfig.pagination?.type || 'none'} onValueChange={(value) => { if (disabled) return; if (value === 'none') { handleFieldChange({ apiConfig: { ...editedStep.apiConfig, pagination: undefined } }); } else { handleFieldChange({ apiConfig: { ...editedStep.apiConfig, pagination: { ...(editedStep.apiConfig.pagination || {}), type: value, pageSize: editedStep.apiConfig.pagination?.pageSize || '50', cursorPath: editedStep.apiConfig.pagination?.cursorPath || '', stopCondition: editedStep.apiConfig.pagination?.stopCondition || '(response, pageInfo) => !response.data || response.data.length === 0' } } }); } }}>
+                                                <SelectTrigger className="h-9" disabled={disabled}>
                                                     <SelectValue placeholder="No pagination" />
                                                 </SelectTrigger>
                                                 <SelectContent>
@@ -317,12 +386,12 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                                 <>
                                                     <div>
                                                         <Label className="text-xs">Page Size</Label>
-                                                        <Input value={editedStep.apiConfig.pagination.pageSize || '50'} onChange={(e) => handleFieldChange({ apiConfig: { ...editedStep.apiConfig, pagination: { ...(editedStep.apiConfig.pagination || {}), pageSize: e.target.value } } })} className="text-xs mt-1 focus:ring-0 focus:ring-offset-0" placeholder="50" />
+                                                        <Input value={editedStep.apiConfig.pagination.pageSize || '50'} onChange={(e) => handleFieldChange({ apiConfig: { ...editedStep.apiConfig, pagination: { ...(editedStep.apiConfig.pagination || {}), pageSize: e.target.value } } })} className="text-xs mt-1 focus:ring-0 focus:ring-offset-0" placeholder="50" disabled={disabled} />
                                                     </div>
                                                     {editedStep.apiConfig.pagination.type === 'CURSOR_BASED' && (
                                                         <div>
                                                             <Label className="text-xs">Cursor Path</Label>
-                                                            <Input value={editedStep.apiConfig.pagination.cursorPath || ''} onChange={(e) => handleFieldChange({ apiConfig: { ...editedStep.apiConfig, pagination: { ...(editedStep.apiConfig.pagination || {}), cursorPath: e.target.value } } })} className="text-xs mt-1 focus:ring-0 focus:ring-offset-0" placeholder="e.g., response.nextCursor" />
+                                                            <Input value={editedStep.apiConfig.pagination.cursorPath || ''} onChange={(e) => handleFieldChange({ apiConfig: { ...editedStep.apiConfig, pagination: { ...(editedStep.apiConfig.pagination || {}), cursorPath: e.target.value } } })} className="text-xs mt-1 focus:ring-0 focus:ring-offset-0" placeholder="e.g., response.nextCursor" disabled={disabled} />
                                                         </div>
                                                     )}
                                                     <div>
@@ -330,7 +399,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                                             Stop Condition (JavaScript)
                                                             <HelpTooltip text="JavaScript function that returns true when pagination should stop. Receives (response, pageInfo) where pageInfo has: page, offset, cursor, total fetched." />
                                                         </Label>
-                                                        <Textarea value={editedStep.apiConfig.pagination.stopCondition || '(response, pageInfo) => !response.data || response.data.length === 0'} onChange={(e) => handleFieldChange({ apiConfig: { ...editedStep.apiConfig, pagination: { ...(editedStep.apiConfig.pagination || {}), stopCondition: e.target.value } } })} className="font-mono text-xs h-16 mt-1" placeholder="(response, pageInfo) => !response.data || response.data.length === 0" />
+                                                        <Textarea value={editedStep.apiConfig.pagination.stopCondition || '(response, pageInfo) => !response.data || response.data.length === 0'} onChange={(e) => handleFieldChange({ apiConfig: { ...editedStep.apiConfig, pagination: { ...(editedStep.apiConfig.pagination || {}), stopCondition: e.target.value } } })} className="font-mono text-xs h-16 mt-1" placeholder="(response, pageInfo) => !response.data || response.data.length === 0" disabled={disabled} />
                                                     </div>
                                                 </>
                                             )}
@@ -347,7 +416,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                                     <JavaScriptCodeEditor
                                                         value={editedStep.loopSelector || ''}
                                                         onChange={(val) => handleFieldChange({ loopSelector: val })}
-                                                        readOnly={false}
+                                                        readOnly={disabled}
                                                         minHeight="120px"
                                                         maxHeight="260px"
                                                         resizable={true}
@@ -360,7 +429,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                                     Max Iterations
                                                     <HelpTooltip text="Maximum number of loop iterations to prevent infinite loops. Default is 1000." />
                                                 </Label>
-                                                <Input type="number" value={editedStep.loopMaxIters || ''} onChange={(e) => handleFieldChange({ loopMaxIters: parseInt(e.target.value) || undefined })} className="text-xs mt-1 w-32" placeholder="1000" />
+                                                <Input type="number" value={editedStep.loopMaxIters || ''} onChange={(e) => handleFieldChange({ loopMaxIters: parseInt(e.target.value) || undefined })} className="text-xs mt-1 w-32" placeholder="1000" disabled={disabled} />
                                             </div>
                                         </>
                                     )}

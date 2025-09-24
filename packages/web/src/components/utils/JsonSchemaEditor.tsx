@@ -70,11 +70,11 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
 }) => {
   const [isCodeMode, setIsCodeMode] = React.useState(forceCodeMode || false);
   const [jsonError, setJsonError] = React.useState<string | null>(null);
-  // For optional editors, default to disabled
+  // For optional editors, check if there's an existing value to determine initial state
   const [localIsEnabled, setLocalIsEnabled] = React.useState<boolean>(() => {
     if (!isOptional) return true;
-    // Start disabled for optional editors
-    return false;
+    // For optional editors, enable if there's a non-null, non-empty value
+    return value !== null && value !== '' && value !== undefined;
   });
 
   React.useEffect(() => {
@@ -94,6 +94,16 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
       localStorage.setItem('jsonSchemaEditorCodeMode', isCodeMode.toString());
     }
   }, [isCodeMode, forceCodeMode]);
+
+  // Update enabled state when value changes for optional schemas
+  React.useEffect(() => {
+    if (isOptional) {
+      const shouldBeEnabled = value !== null && value !== '' && value !== undefined;
+      if (shouldBeEnabled !== localIsEnabled) {
+        setLocalIsEnabled(shouldBeEnabled);
+      }
+    }
+  }, [value, isOptional]);
 
   const [visualSchema, setVisualSchema] = React.useState<any>({});
   const [editingField, setEditingField] = React.useState<string | null>(null);
@@ -584,29 +594,33 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
     }
   };
 
+  const shouldShowHeader = (showModeToggle && (localIsEnabled || !isOptional)) || isOptional;
+
   return (
     <div className="space-y-1 flex flex-col h-full mb-4 gap-2">
-      <div className="flex items-center gap-4 ml-auto shrink-0">
-        <div className="flex items-center gap-4">
-          {showModeToggle && (localIsEnabled || !isOptional) && (
-            <div className="flex items-center gap-2">
-              <Label htmlFor="editorMode" className="text-xs">Code Mode</Label>
-              <Switch className="custom-switch" id="editorMode" checked={isCodeMode} onCheckedChange={setIsCodeMode} />
-            </div>
-          )}
-          {isOptional && (
-            <div className="flex items-center gap-2">
-              <Label htmlFor="schemaOptionalToggle" className="text-xs">Enabled</Label>
-              <Switch
-                className="custom-switch"
-                id="schemaOptionalToggle"
-                checked={localIsEnabled}
-                onCheckedChange={handleEnabledChange}
-              />
-            </div>
-          )}
+      {shouldShowHeader && (
+        <div className="flex items-center gap-4 ml-auto shrink-0">
+          <div className="flex items-center gap-4">
+            {showModeToggle && (localIsEnabled || !isOptional) && (
+              <div className="flex items-center gap-2">
+                <Label htmlFor="editorMode" className="text-xs">Code Mode</Label>
+                <Switch className="custom-switch" id="editorMode" checked={isCodeMode} onCheckedChange={setIsCodeMode} />
+              </div>
+            )}
+            {isOptional && (
+              <div className="flex items-center gap-2">
+                <Label htmlFor="schemaOptionalToggle" className="text-xs">Enabled</Label>
+                <Switch
+                  className="custom-switch"
+                  id="schemaOptionalToggle"
+                  checked={localIsEnabled}
+                  onCheckedChange={handleEnabledChange}
+                />
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {isCodeMode && jsonError && (
         <div className="p-2 bg-destructive/10 border border-destructive/20 text-destructive text-xs rounded-md">

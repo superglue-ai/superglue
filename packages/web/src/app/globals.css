@@ -5,6 +5,13 @@
 body {
   overflow: hidden;
   font-family: var(--font-jetbrains-sans);
+  scrollbar-gutter: stable both-edges;
+}
+
+/* Stable scrollbars for scrollable sections to prevent horizontal layout shift */
+.stable-scrollbar,
+[data-stable-scrollbar="true"] {
+  scrollbar-gutter: stable both-edges;
 }
 
 code,

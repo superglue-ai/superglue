@@ -377,8 +377,8 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
     result: sourceData
   }
 }`);
-      const schemaString = initialWorkflow.responseSchema ? JSON.stringify(initialWorkflow.responseSchema, null, 2) : null;
-      setResponseSchema(embedded ? null : schemaString);
+      const schemaString = initialWorkflow.responseSchema ? JSON.stringify(initialWorkflow.responseSchema, null, 2) : '';
+      setResponseSchema(schemaString);
       setInputSchema(initialWorkflow.inputSchema ? JSON.stringify(initialWorkflow.inputSchema, null, 2) : null);
       setInstructions(initialInstruction || initialWorkflow.instruction || '');
       setLastWorkflowId(initialWorkflow.id);
@@ -528,6 +528,12 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
           } else {
             setFailedSteps(prev => Array.from(new Set([...prev, res.stepId])));
           }
+
+          // Make step output available immediately during workflow run
+          try {
+            const normalized = computeStepOutput(res);
+            setStepResultsMap(prev => ({ ...prev, [res.stepId]: normalized.output }));
+          } catch { }
         },
         effectiveSelfHealing,
         () => stopSignalRef.current
@@ -641,32 +647,26 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
     setSteps(newSteps);
   };
 
-  const handleStepEdit = (stepId: string, updatedStep: any) => {
+  const handleStepEdit = (stepId: string, updatedStep: any, _isUserInitiated: boolean = false) => {
+    // Always update the step; onEdit originates from user actions only
     setSteps(prevSteps =>
       prevSteps.map(step => (step.id === stepId ? { ...updatedStep, apiConfig: { ...updatedStep.apiConfig, id: updatedStep.apiConfig.id || updatedStep.id } } : step))
     );
 
-    // Find the index of the edited step
+    // Always reset downstream state on any onEdit
     const stepIndex = steps.findIndex(s => s.id === stepId);
     if (stepIndex !== -1) {
-      // Reset completion status for edited step and all subsequent steps
       const stepsToReset = steps.slice(stepIndex).map(s => s.id);
-
-      // Clear both completed and failed states
-      setCompletedSteps(prev => prev.filter(id => !stepsToReset.includes(id)));
-      setFailedSteps(prev => prev.filter(id => !stepsToReset.includes(id)));
-
-      // Clear execution results for reset steps
+      setCompletedSteps(prev => prev.filter(id => !stepsToReset.includes(id) && id !== '__final_transform__'));
+      setFailedSteps(prev => prev.filter(id => !stepsToReset.includes(id) && id !== '__final_transform__'));
       setStepResultsMap(prev => {
         const next = { ...prev } as Record<string, any>;
         stepsToReset.forEach(id => delete next[id]);
-        // Also clear final transform if it exists
         delete next['__final_transform__'];
         return next;
       });
-
-      // Reset final transform states
       setFinalPreviewResult(null);
+      setResult(null);
     }
   };
 
@@ -818,7 +818,7 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
   );
 
   return (
-    <div className={embedded ? "w-full" : "p-6 max-w-none w-full"}>
+    <div className={embedded ? "w-full" : "p-6 max-w-none w-full"} style={{ scrollbarGutter: 'stable both-edges' }}>
       {!embedded && !hideHeader && (
         <>
           <div className="flex justify-end items-center mb-2">
@@ -836,7 +836,7 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
         </>
       )}
 
-      <div className="w-full">
+      <div className="w-full overflow-y-auto" style={{ maxHeight: 'calc(100vh - 140px)', scrollbarGutter: 'stable both-edges' }}>
         <div className="w-full">
           <div className="space-y-4">
             <div className={embedded ? "" : "mb-4"}>

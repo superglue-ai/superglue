@@ -4,11 +4,12 @@ import { Input } from '@/src/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import { canExecuteStep } from '@/src/lib/client-utils';
+import { downloadJson } from '@/src/lib/download-utils';
 import { type UploadedFileInfo } from '@/src/lib/file-utils';
 import { buildEvolvingPayload, cn, isEmptyData, truncateForDisplay, truncateLines } from '@/src/lib/utils';
 import { Integration } from "@superglue/client";
 import { inferJsonSchema } from '@superglue/shared';
-import { ChevronLeft, ChevronRight, Database, FileJson, Package, Play, Settings, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Database, Download, FileJson, Package, Play, Settings, Trash2 } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { CopyButton, FinalResultsCard, FinalTransformMiniStepCard, InstructionDisplay, JsonCodeEditor, MiniStepCard, PayloadMiniStepCard } from './WorkflowMiniStepCards';
 import { WorkflowStepConfigurator } from './WorkflowStepConfigurator';
@@ -22,7 +23,7 @@ interface WorkflowStepGalleryProps {
     workflowId?: string;
     instruction?: string;
     onStepsChange?: (steps: any[]) => void;
-    onStepEdit?: (stepId: string, updatedStep: any) => void;
+    onStepEdit?: (stepId: string, updatedStep: any, isUserInitiated?: boolean) => void;
     onFinalTransformChange?: (transform: string) => void;
     onResponseSchemaChange?: (schema: string) => void;
     onPayloadChange?: (payload: string) => void;
@@ -67,6 +68,7 @@ const SpotlightStepCard = ({
     onExecuteStep,
     canExecute,
     isExecuting,
+    isGlobalExecuting,
     integrations,
     readOnly,
     failedSteps = [],
@@ -77,11 +79,12 @@ const SpotlightStepCard = ({
     stepIndex: number;
     evolvingPayload: any;
     stepResult?: any;
-    onEdit?: (stepId: string, updatedStep: any) => void;
+    onEdit?: (stepId: string, updatedStep: any, isUserInitiated?: boolean) => void;
     onRemove?: (stepId: string) => void;
     onExecuteStep?: () => Promise<void>;
     canExecute?: boolean;
     isExecuting?: boolean;
+    isGlobalExecuting?: boolean;
     integrations?: Integration[];
     readOnly?: boolean;
     failedSteps?: string[];
@@ -101,7 +104,7 @@ const SpotlightStepCard = ({
     }, [showOutputSignal]);
 
     return (
-        <Card className="w-full max-w-6xl mx-auto shadow-md bg-accent/10 dark:bg-accent/5 border border-accent/30 dark:border-accent/20">
+        <Card className="w-full max-w-6xl mx-auto shadow-md bg-accent/10 dark:bg-accent/5 border border-accent/30 dark:border-accent/20 overflow-hidden" style={{ scrollbarGutter: 'stable both-edges' }}>
             <div className="p-3">
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
@@ -150,7 +153,7 @@ const SpotlightStepCard = ({
                     </div>
                 </div>
 
-                <div className="space-y-3">
+                <div className="space-y-3" style={{ scrollbarGutter: 'stable both-edges' }}>
                     <div className="flex items-center justify-between">
                         <Tabs value={activePanel} onValueChange={(v) => setActivePanel(v as 'input' | 'config' | 'output')}>
                             <TabsList className="h-9 p-1 rounded-md">
@@ -167,152 +170,176 @@ const SpotlightStepCard = ({
                         </Tabs>
                     </div>
 
-                    {activePanel === 'input' && (
-                        <div>
-                            {(() => {
-                                let inputString = '';
-                                let isTruncated = false;
-                                if (inputViewMode === 'schema') {
-                                    const schemaObj = inferJsonSchema(evolvingPayload || {});
-                                    inputString = truncateLines(JSON.stringify(schemaObj, null, 2), MAX_DISPLAY_LINES);
-                                } else {
-                                    const displayData = truncateForDisplay(evolvingPayload);
-                                    inputString = displayData.value;
-                                    isTruncated = displayData.truncated;
-                                }
-                                return (
-                                    <>
-                                        <JsonCodeEditor
-                                            value={inputString}
-                                            readOnly={true}
-                                            minHeight="150px"
-                                            maxHeight="300px"
-                                            resizable={true}
-                                            overlay={
-                                                <div className="flex items-center gap-1">
-                                                    <Tabs value={inputViewMode} onValueChange={(v) => setInputViewMode(v as 'preview' | 'schema')} className="w-auto">
-                                                        <TabsList className="h-6 p-0.5 rounded-md">
-                                                            <TabsTrigger value="preview" className="h-full px-2 text-[11px] rounded-sm data-[state=active]:rounded-sm">Preview</TabsTrigger>
-                                                            <TabsTrigger value="schema" className="h-full px-2 text-[11px] rounded-sm data-[state=active]:rounded-sm">Schema</TabsTrigger>
-                                                        </TabsList>
-                                                    </Tabs>
-                                                    <CopyButton text={inputString} />
-                                                </div>
-                                            }
-                                        />
-                                        {isTruncated && inputViewMode === 'preview' && (
-                                            <div className="mt-1 text-[10px] text-amber-600 dark:text-amber-300 px-2">
-                                                Preview truncated for display performance
-                                            </div>
-                                        )}
-                                    </>
-                                );
-                            })()}
-                        </div>
-                    )}
-
-                    {activePanel === 'config' && (
-                        <div className="mt-1">
-                            <WorkflowStepConfigurator
-                                step={step}
-                                isLast={true}
-                                onEdit={onEdit}
-                                onRemove={() => { }}
-                                integrations={integrations}
-                            />
-                        </div>
-                    )}
-
-                    {activePanel === 'output' && (
-                        <div>
-                            {(() => {
-                                // Check if step has failed and we should show error
-                                const stepFailed = failedSteps?.includes(step.id);
-                                const errorResult = stepFailed && (!stepResult || typeof stepResult === 'string');
-
-                                // Check if result is pending
-                                const isPending = !stepFailed && stepResult === undefined;
-
-                                let outputString = '';
-                                let isTruncated = false;
-                                if (!isPending) {
-                                    if (errorResult) {
-                                        // Show error message if step failed
-                                        if (stepResult) {
-                                            if (typeof stepResult === 'string') {
-                                                // Truncate long error strings
-                                                outputString = stepResult.length > MAX_DISPLAY_SIZE ?
-                                                    stepResult.substring(0, MAX_DISPLAY_SIZE) + '\n... [Error message truncated]' :
-                                                    stepResult;
-                                            } else {
-                                                const displayData = truncateForDisplay(stepResult);
-                                                outputString = displayData.value;
-                                            }
-                                        } else {
-                                            outputString = '{\n  "error": "Step execution failed"\n}';
-                                        }
-                                    } else if (outputViewMode === 'schema') {
-                                        const schemaObj = inferJsonSchema(stepResult || {});
-                                        outputString = truncateLines(JSON.stringify(schemaObj, null, 2), MAX_DISPLAY_LINES);
+                    <div className="mt-1 overflow-y-scroll" style={{ maxHeight: '60vh', scrollbarGutter: 'stable both-edges' }}>
+                        {activePanel === 'input' && (
+                            <div>
+                                {(() => {
+                                    let inputString = '';
+                                    let isTruncated = false;
+                                    if (inputViewMode === 'schema') {
+                                        const schemaObj = inferJsonSchema(evolvingPayload || {});
+                                        inputString = truncateLines(JSON.stringify(schemaObj, null, 2), MAX_DISPLAY_LINES);
                                     } else {
-                                        const displayData = truncateForDisplay(stepResult);
-                                        outputString = displayData.value;
+                                        const displayData = truncateForDisplay(evolvingPayload);
+                                        inputString = displayData.value;
                                         isTruncated = displayData.truncated;
                                     }
-                                }
-                                const showEmptyWarning = !stepFailed && !isPending && !errorResult && outputViewMode === 'preview' && isEmptyData(outputString || '');
-                                return (
-                                    <>
-                                        {stepFailed && (
-                                            <div className="mb-2 p-2 bg-destructive/10 border border-destructive/20 rounded-md">
-                                                <p className="text-xs text-destructive">Step execution failed</p>
-                                            </div>
-                                        )}
-                                        {isPending ? (
-                                            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground border rounded-md bg-muted/5">
-                                                <Database className="h-6 w-6 mb-2 opacity-50" />
-                                                <p className="text-xs">No output yet</p>
-                                                <p className="text-[10px] mt-1">Test this step to see its output</p>
-                                            </div>
-                                        ) : (
-                                            <>
-                                                <JsonCodeEditor
-                                                    value={outputString}
-                                                    readOnly={true}
-                                                    minHeight="150px"
-                                                    maxHeight="300px"
-                                                    resizable={true}
-                                                    overlay={
-                                                        <div className="flex items-center gap-1">
-                                                            {!errorResult && (
-                                                                <Tabs value={outputViewMode} onValueChange={(v) => setOutputViewMode(v as 'preview' | 'schema')} className="w-auto">
-                                                                    <TabsList className="h-6 p-0.5 rounded-md">
-                                                                        <TabsTrigger value="preview" className="h-full px-2 text-[11px] rounded-sm data-[state=active]:rounded-sm">Preview</TabsTrigger>
-                                                                        <TabsTrigger value="schema" className="h-full px-2 text-[11px] rounded-sm data-[state=active]:rounded-sm">Schema</TabsTrigger>
-                                                                    </TabsList>
-                                                                </Tabs>
-                                                            )}
-                                                            <CopyButton text={outputString} />
+                                    return (
+                                        <>
+                                            <JsonCodeEditor
+                                                value={inputString}
+                                                readOnly={true}
+                                                minHeight="150px"
+                                                maxHeight="300px"
+                                                resizable={true}
+                                                overlay={
+                                                    <div className="flex items-center gap-1">
+                                                        <Tabs value={inputViewMode} onValueChange={(v) => setInputViewMode(v as 'preview' | 'schema')} className="w-auto">
+                                                            <TabsList className="h-6 p-0.5 rounded-md">
+                                                                <TabsTrigger value="preview" className="h-full px-2 text-[11px] rounded-sm data-[state=active]:rounded-sm">Preview</TabsTrigger>
+                                                                <TabsTrigger value="schema" className="h-full px-2 text-[11px] rounded-sm data-[state=active]:rounded-sm">Schema</TabsTrigger>
+                                                            </TabsList>
+                                                        </Tabs>
+                                                        <CopyButton text={inputString} />
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-6 w-6"
+                                                            onClick={() => downloadJson(evolvingPayload, `step_${step.id}_input.json`)}
+                                                            title="Download step input as JSON"
+                                                        >
+                                                            <Download className="h-3 w-3" />
+                                                        </Button>
+                                                    </div>
+                                                }
+                                            />
+                                            {isTruncated && inputViewMode === 'preview' && (
+                                                <div className="mt-1 text-[10px] text-amber-600 dark:text-amber-300 px-2">
+                                                    Preview truncated for display performance
+                                                </div>
+                                            )}
+                                        </>
+                                    );
+                                })()}
+                            </div>
+                        )}
+
+                        {activePanel === 'config' && (
+                            <div className="mt-1">
+                                <WorkflowStepConfigurator
+                                    step={step}
+                                    isLast={true}
+                                    onEdit={onEdit}
+                                    onRemove={() => { }}
+                                    integrations={integrations}
+                                    onEditingChange={onConfigEditingChange}
+                                    disabled={!!(isExecuting || isGlobalExecuting)}
+                                />
+                            </div>
+                        )}
+
+                        {activePanel === 'output' && (
+                            <div>
+                                {(() => {
+                                    // Check if step has failed and we should show error
+                                    const stepFailed = failedSteps?.includes(step.id);
+                                    const errorResult = stepFailed && (!stepResult || typeof stepResult === 'string');
+
+                                    // Check if result is pending
+                                    const isPending = !stepFailed && stepResult === undefined;
+
+                                    let outputString = '';
+                                    let isTruncated = false;
+                                    if (!isPending) {
+                                        if (errorResult) {
+                                            // Show error message if step failed
+                                            if (stepResult) {
+                                                if (typeof stepResult === 'string') {
+                                                    // Truncate long error strings
+                                                    outputString = stepResult.length > MAX_DISPLAY_SIZE ?
+                                                        stepResult.substring(0, MAX_DISPLAY_SIZE) + '\n... [Error message truncated]' :
+                                                        stepResult;
+                                                } else {
+                                                    const displayData = truncateForDisplay(stepResult);
+                                                    outputString = displayData.value;
+                                                }
+                                            } else {
+                                                outputString = '{\n  "error": "Step execution failed"\n}';
+                                            }
+                                        } else if (outputViewMode === 'schema') {
+                                            const schemaObj = inferJsonSchema(stepResult || {});
+                                            outputString = truncateLines(JSON.stringify(schemaObj, null, 2), MAX_DISPLAY_LINES);
+                                        } else {
+                                            const displayData = truncateForDisplay(stepResult);
+                                            outputString = displayData.value;
+                                            isTruncated = displayData.truncated;
+                                        }
+                                    }
+                                    const showEmptyWarning = !stepFailed && !isPending && !errorResult && outputViewMode === 'preview' && isEmptyData(outputString || '');
+                                    return (
+                                        <>
+                                            {stepFailed && (
+                                                <div className="mb-2 p-2 bg-destructive/10 border border-destructive/20 rounded-md">
+                                                    <p className="text-xs text-destructive">Step execution failed</p>
+                                                </div>
+                                            )}
+                                            {isPending ? (
+                                                <div className="flex flex-col items-center justify-center py-8 text-muted-foreground border rounded-md bg-muted/5">
+                                                    <Database className="h-6 w-6 mb-2 opacity-50" />
+                                                    <p className="text-xs">No output yet</p>
+                                                    <p className="text-[10px] mt-1">Test this step to see its output</p>
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <JsonCodeEditor
+                                                        value={outputString}
+                                                        readOnly={true}
+                                                        minHeight="150px"
+                                                        maxHeight="300px"
+                                                        resizable={true}
+                                                        overlay={
+                                                            <div className="flex items-center gap-1">
+                                                                {!errorResult && (
+                                                                    <Tabs value={outputViewMode} onValueChange={(v) => setOutputViewMode(v as 'preview' | 'schema')} className="w-auto">
+                                                                        <TabsList className="h-6 p-0.5 rounded-md">
+                                                                            <TabsTrigger value="preview" className="h-full px-2 text-[11px] rounded-sm data-[state=active]:rounded-sm">Preview</TabsTrigger>
+                                                                            <TabsTrigger value="schema" className="h-full px-2 text-[11px] rounded-sm data-[state=active]:rounded-sm">Schema</TabsTrigger>
+                                                                        </TabsList>
+                                                                    </Tabs>
+                                                                )}
+                                                                <CopyButton text={outputString} />
+                                                                {!errorResult && (
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-6 w-6"
+                                                                        onClick={() => downloadJson(stepResult, `step_${step.id}_output.json`)}
+                                                                        title="Download step output as JSON"
+                                                                    >
+                                                                        <Download className="h-3 w-3" />
+                                                                    </Button>
+                                                                )}
+                                                            </div>
+                                                        }
+                                                    />
+                                                    {showEmptyWarning && (
+                                                        <div className="mt-1 text-[11px] text-amber-700 dark:text-amber-300 px-2">
+                                                            ⚠ No data returned. Is this expected?
                                                         </div>
-                                                    }
-                                                />
-                                                {showEmptyWarning && (
-                                                    <div className="mt-1 text-[11px] text-amber-700 dark:text-amber-300 px-2">
-                                                        ⚠ No data returned. Is this expected?
-                                                    </div>
-                                                )}
-                                                {isTruncated && outputViewMode === 'preview' && (
-                                                    <div className="mt-1 text-[10px] text-amber-600 dark:text-amber-300 px-2">
-                                                        Preview truncated for display performance
-                                                    </div>
-                                                )}
-                                            </>
-                                        )}
-                                    </>
-                                );
-                            })()}
-                        </div>
-                    )}
+                                                    )}
+                                                    {isTruncated && outputViewMode === 'preview' && (
+                                                        <div className="mt-1 text-[10px] text-amber-600 dark:text-amber-300 px-2">
+                                                            Preview truncated for display performance
+                                                        </div>
+                                                    )}
+                                                </>
+                                            )}
+                                        </>
+                                    );
+                                })()}
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </Card>
@@ -802,6 +829,7 @@ export function WorkflowStepGallery({
                                 onExecuteStep={onExecuteStep ? () => onExecuteStep(activeIndex - 1) : undefined}
                                 canExecute={canExecuteStep(activeIndex - 1, completedSteps, { steps } as any, stepResultsMap)}
                                 isExecuting={isExecutingStep === activeIndex - 1}
+                                isGlobalExecuting={!!(isExecuting || isExecutingTransform)}
                                 integrations={integrations}
                                 readOnly={readOnly}
                                 failedSteps={failedSteps}

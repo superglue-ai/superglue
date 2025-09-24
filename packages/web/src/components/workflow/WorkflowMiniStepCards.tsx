@@ -3,10 +3,11 @@ import { Card } from '@/src/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import JsonSchemaEditor from '@/src/components/utils/JsonSchemaEditor';
+import { downloadJson } from '@/src/lib/download-utils';
 import { formatBytes, isAllowedFileType, MAX_TOTAL_FILE_SIZE, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { cn, formatJavaScriptCode, isEmptyData, truncateForDisplay, truncateLines } from '@/src/lib/utils';
 import { inferJsonSchema } from '@superglue/shared';
-import { Check, Code2, Copy, Eye, FileJson, Package, Play, Upload, X } from 'lucide-react';
+import { Check, Code2, Copy, Download, Eye, FileJson, Package, Play, Upload, X } from 'lucide-react';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-javascript';
 import 'prismjs/components/prism-json';
@@ -119,6 +120,9 @@ export const FinalResultsCard = ({ result }: { result: any }) => {
         setCopied(true);
         setTimeout(() => setCopied(false), 1500);
     };
+    const handleDownload = () => {
+        downloadJson(result, 'workflow_final_result.json');
+    };
     return (
         <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50">
             <div className="p-6">
@@ -130,14 +134,28 @@ export const FinalResultsCard = ({ result }: { result: any }) => {
                     <div className="flex items-center gap-2">
                         <span className="text-[10px] text-muted-foreground">{bytes.toLocaleString()} bytes</span>
                         {!isPending && (
-                            <button
-                                onClick={handleCopy}
-                                className="h-6 w-6 flex items-center justify-center rounded hover:bg-background/80 transition-colors bg-background/60 backdrop-blur"
-                                title="Copy full result data"
-                                type="button"
-                            >
-                                {copied ? <Check className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3 text-muted-foreground" />}
-                            </button>
+                            <>
+                                <div className="flex items-center gap-1">
+                                    <span className="text-[11px] text-muted-foreground">Copy Result</span>
+                                    <button
+                                        onClick={handleCopy}
+                                        className="h-6 w-6 flex items-center justify-center rounded hover:bg-background/80 transition-colors bg-background/60 backdrop-blur"
+                                        title="Copy full result data"
+                                        type="button"
+                                    >
+                                        {copied ? <Check className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3 text-muted-foreground" />}
+                                    </button>
+                                </div>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={handleDownload}
+                                    title="Download as JSON"
+                                >
+                                    <Download className="h-3 w-3" />
+                                </Button>
+                            </>
                         )}
                     </div>
                 </div>
@@ -272,7 +290,7 @@ export const JsonCodeEditor = ({ value, onChange, readOnly = false, minHeight = 
                     document.addEventListener('mouseup', handleMouseUp);
                 }} />
             )}
-            <div className={cn("p-3 pr-10 overflow-auto", readOnly ? "cursor-not-allowed" : "cursor-text")} style={{ maxHeight: resizable ? currentHeight : maxHeight }}>
+            <div className={cn("p-3 pr-10 overflow-auto", readOnly ? "cursor-not-allowed" : "cursor-text")} style={{ maxHeight: resizable ? currentHeight : maxHeight, scrollbarGutter: 'stable both-edges' }}>
                 <Editor value={displayValue} onValueChange={onChange || (() => { })} highlight={(code) => highlightCode(code, 'json')} padding={0} disabled={readOnly} className="font-mono text-xs" textareaClassName="outline-none focus:outline-none" style={{ minHeight, background: 'transparent' }} />
             </div>
         </div>
@@ -635,7 +653,7 @@ export const FinalTransformMiniStepCard = ({ transform, responseSchema, onTransf
                             const bytes = stepInputs === undefined ? 0 : new Blob([fullJson]).size;
                             return (
                                 <>
-                                    <JsonCodeEditor value={inputString} readOnly={true} minHeight="150px" maxHeight="250px" resizable={true} overlay={<div className="flex items-center gap-2"><Tabs value={inputViewMode} onValueChange={(v) => setInputViewMode(v as 'preview' | 'schema')} className="w-auto"><TabsList className="h-6 rounded-md"><TabsTrigger value="preview" className="h-5 px-2 text-[11px] rounded-md data-[state=active]:rounded-md">Preview</TabsTrigger><TabsTrigger value="schema" className="h-5 px-2 text-[11px] rounded-md data-[state=active]:rounded-md">Schema</TabsTrigger></TabsList></Tabs><span className="text-[10px] text-muted-foreground">{bytes.toLocaleString()} bytes</span><CopyButton text={copyText} /></div>} />
+                                    <JsonCodeEditor value={inputString} readOnly={true} minHeight="150px" maxHeight="250px" resizable={true} overlay={<div className="flex items-center gap-2"><Tabs value={inputViewMode} onValueChange={(v) => setInputViewMode(v as 'preview' | 'schema')} className="w-auto"><TabsList className="h-6 rounded-md"><TabsTrigger value="preview" className="h-5 px-2 text-[11px] rounded-md data-[state=active]:rounded-md">Preview</TabsTrigger><TabsTrigger value="schema" className="h-5 px-2 text-[11px] rounded-md data-[state=active]:rounded-md">Schema</TabsTrigger></TabsList></Tabs><span className="text-[10px] text-muted-foreground">{bytes.toLocaleString()} bytes</span><CopyButton text={copyText} /><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => downloadJson(stepInputs, 'transform_step_inputs.json')} title="Download transform inputs as JSON"><Download className="h-3 w-3" /></Button></div>} />
                                     {isTruncated && inputViewMode === 'preview' && (<div className="mt-1 text-[10px] text-amber-600 dark:text-amber-300 px-2">Preview truncated for display performance</div>)}
                                 </>
                             );
