@@ -70,10 +70,8 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
 }) => {
   const [isCodeMode, setIsCodeMode] = React.useState(forceCodeMode || false);
   const [jsonError, setJsonError] = React.useState<string | null>(null);
-  // For optional editors, check if there's an existing value to determine initial state
   const [localIsEnabled, setLocalIsEnabled] = React.useState<boolean>(() => {
     if (!isOptional) return true;
-    // For optional editors, enable if there's a non-null, non-empty value
     return value !== null && value !== '' && value !== undefined;
   });
 
@@ -95,7 +93,6 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
     }
   }, [isCodeMode, forceCodeMode]);
 
-  // Update enabled state when value changes for optional schemas
   React.useEffect(() => {
     if (isOptional) {
       const shouldBeEnabled = value !== null && value !== '' && value !== undefined;
@@ -644,10 +641,8 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
                 <Editor
                   value={value ?? ''}
                   onValueChange={(code) => {
-                    // Pass the code even if it's empty - let the parent handle it
                     onChange(code || '');
                     try {
-                      // For validation, treat empty as valid (will be handled as empty schema)
                       if (code === '' || code === null) {
                         setJsonError(null);
                       } else {

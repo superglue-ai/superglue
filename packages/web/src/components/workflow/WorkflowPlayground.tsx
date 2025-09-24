@@ -531,8 +531,6 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
           } else {
             setFailedSteps(prev => Array.from(new Set([...prev, res.stepId])));
           }
-
-          // Make step output available immediately during workflow run
           try {
             const normalized = computeStepOutput(res);
             setStepResultsMap(prev => ({ ...prev, [res.stepId]: normalized.output }));
@@ -651,6 +649,15 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
   };
 
   const handleStepEdit = (stepId: string, updatedStep: any, isUserInitiated: boolean = false) => {
+    // No-op guard: avoid cascades if nothing actually changed
+    const idx = steps.findIndex(s => s.id === stepId);
+    if (idx !== -1) {
+      const current = steps[idx];
+      const currHash = hashStepConfig(current);
+      const nextHash = hashStepConfig(updatedStep);
+      if (currHash === nextHash) return;
+    }
+
     // Update the steps immediately
     setSteps(prevSteps =>
       prevSteps.map(step => (step.id === stepId ? {
