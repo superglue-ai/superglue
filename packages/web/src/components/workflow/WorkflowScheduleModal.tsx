@@ -1,21 +1,21 @@
-import { WorkflowSchedule, SuperglueClient } from '@superglue/client';
-import React, { useMemo, useState } from 'react';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../ui/card';
-import { Button } from '../ui/button';
-import { Label } from '../ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Input } from '../ui/input';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { Check, ChevronsUpDown, CheckCircle, XCircle, Loader2 } from 'lucide-react';
-import { cn, getGroupedTimezones } from '@/src/lib/utils';
+import { useConfig } from '@/src/app/config-context';
 import { Switch } from "@/src/components/ui/switch";
-import Editor from 'react-simple-code-editor';
+import { useToast } from '@/src/hooks/use-toast';
+import { cn, getGroupedTimezones } from '@/src/lib/utils';
+import { SuperglueClient, WorkflowSchedule } from '@superglue/client';
+import { validateCronExpression } from '@superglue/shared';
+import { Check, CheckCircle, ChevronsUpDown, Loader2, XCircle } from 'lucide-react';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
-import { useConfig } from '@/src/app/config-context';
-import { useToast } from '@/src/hooks/use-toast';
-import { validateCronExpression } from '@superglue/shared';
+import React, { useMemo, useState } from 'react';
+import Editor from 'react-simple-code-editor';
+import { Button } from '../ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../ui/card';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { HelpTooltip } from '../utils/HelpTooltip';
 
 const DEFAULT_SCHEDULES = [
@@ -41,7 +41,7 @@ const WorkflowScheduleModal = ({ workflowId, isOpen, schedule, onClose, onSave }
   const [customCronExpression, setCustomCronExpression] = React.useState<string>('');
   const [isCustomCronValid, setIsCustomCronValid] = React.useState(true);
   const [timezoneOpen, setTimezoneOpen] = useState(false);
-  const [selectedTimezone, setTimezone] = useState<{value: string, label: string}>({
+  const [selectedTimezone, setTimezone] = useState<{ value: string, label: string }>({
     value: 'Europe/Berlin',
     label: 'Europe/Berlin'
   });
@@ -54,7 +54,7 @@ const WorkflowScheduleModal = ({ workflowId, isOpen, schedule, onClose, onSave }
   const groupedTimezones = useMemo(() => getGroupedTimezones(), []);
 
   React.useEffect(() => {
-    if(!schedule) {
+    if (!schedule) {
       return;
     }
 
@@ -191,9 +191,10 @@ const WorkflowScheduleModal = ({ workflowId, isOpen, schedule, onClose, onSave }
                   id="enabled"
                   checked={enabled}
                   onCheckedChange={handleEnabledChange}
+                  className="custom-switch"
                 />
               </div>
-              
+
               {/* frequency select */}
               <div className="flex flex-col gap-2">
                 <Label htmlFor="frequency">Frequency</Label>
@@ -240,7 +241,7 @@ const WorkflowScheduleModal = ({ workflowId, isOpen, schedule, onClose, onSave }
                   </div>
                 )}
               </div>
-              
+
               {/* timezone */}
               <div className="flex flex-col gap-2">
                 <Label htmlFor="timezone">Timezone</Label>
@@ -298,7 +299,7 @@ const WorkflowScheduleModal = ({ workflowId, isOpen, schedule, onClose, onSave }
                   </PopoverContent>
                 </Popover>
               </div>
-              
+
               {/* payload */}
               <div className="flex flex-col gap-2">
                 <Label htmlFor="payload">JSON Payload (Optional)</Label>
