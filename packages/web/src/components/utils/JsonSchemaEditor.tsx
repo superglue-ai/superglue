@@ -70,7 +70,10 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
 }) => {
   const [isCodeMode, setIsCodeMode] = React.useState(forceCodeMode || false);
   const [jsonError, setJsonError] = React.useState<string | null>(null);
-  const [localIsEnabled, setLocalIsEnabled] = React.useState<boolean>(!isOptional || (value !== null && value !== undefined));
+  const [localIsEnabled, setLocalIsEnabled] = React.useState<boolean>(() => {
+    if (!isOptional) return true;
+    return value !== null && value !== '' && value !== undefined;
+  });
 
   React.useEffect(() => {
     if (forceCodeMode) {
@@ -92,9 +95,10 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
 
   React.useEffect(() => {
     if (isOptional) {
-      setLocalIsEnabled(value !== null && value !== undefined);
-    } else {
-      setLocalIsEnabled(true);
+      const shouldBeEnabled = value !== null && value !== '' && value !== undefined;
+      if (shouldBeEnabled !== localIsEnabled) {
+        setLocalIsEnabled(shouldBeEnabled);
+      }
     }
   }, [value, isOptional]);
 
@@ -587,29 +591,33 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
     }
   };
 
+  const shouldShowHeader = (showModeToggle && (localIsEnabled || !isOptional)) || isOptional;
+
   return (
     <div className="space-y-1 flex flex-col h-full mb-4 gap-2">
-      <div className="flex items-center gap-4 ml-auto shrink-0">
-        <div className="flex items-center gap-4">
-          {showModeToggle && (localIsEnabled || !isOptional) && (
-            <div className="flex items-center gap-2">
-              <Label htmlFor="editorMode" className="text-xs">Code Mode</Label>
-              <Switch className="custom-switch" id="editorMode" checked={isCodeMode} onCheckedChange={setIsCodeMode} />
-            </div>
-          )}
-          {isOptional && (
-            <div className="flex items-center gap-2">
-              <Label htmlFor="schemaOptionalToggle" className="text-xs">Enabled</Label>
-              <Switch
-                className="custom-switch"
-                id="schemaOptionalToggle"
-                checked={localIsEnabled}
-                onCheckedChange={handleEnabledChange}
-              />
-            </div>
-          )}
+      {shouldShowHeader && (
+        <div className="flex items-center gap-4 ml-auto shrink-0">
+          <div className="flex items-center gap-4">
+            {showModeToggle && (localIsEnabled || !isOptional) && (
+              <div className="flex items-center gap-2">
+                <Label htmlFor="editorMode" className="text-xs">Code Mode</Label>
+                <Switch className="custom-switch" id="editorMode" checked={isCodeMode} onCheckedChange={setIsCodeMode} />
+              </div>
+            )}
+            {isOptional && (
+              <div className="flex items-center gap-2">
+                <Label htmlFor="schemaOptionalToggle" className="text-xs">Enabled</Label>
+                <Switch
+                  className="custom-switch"
+                  id="schemaOptionalToggle"
+                  checked={localIsEnabled}
+                  onCheckedChange={handleEnabledChange}
+                />
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {isCodeMode && jsonError && (
         <div className="p-2 bg-destructive/10 border border-destructive/20 text-destructive text-xs rounded-md">
@@ -633,10 +641,14 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
                 <Editor
                   value={value ?? ''}
                   onValueChange={(code) => {
-                    onChange(code);
+                    onChange(code || '');
                     try {
-                      JSON.parse((code || '{}'));
-                      setJsonError(null);
+                      if (code === '' || code === null) {
+                        setJsonError(null);
+                      } else {
+                        JSON.parse(code);
+                        setJsonError(null);
+                      }
                     } catch (e) {
                       setJsonError((e as Error).message);
                     }
