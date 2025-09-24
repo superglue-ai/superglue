@@ -118,6 +118,9 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
   const [stepResultsMap, setStepResultsMap] = useState<Record<string, any>>({});
   const [isExecutingTransform, setIsExecutingTransform] = useState<boolean>(false);
   const [finalPreviewResult, setFinalPreviewResult] = useState<any>(null);
+  // Track last user-edited step and previous step hashes to drive robust cascades
+  const lastUserEditedStepIdRef = useRef<string | null>(null);
+  const prevStepHashesRef = useRef<string[]>([]);
 
   const [integrations, setIntegrations] = useState<Integration[]>(providedIntegrations || []);
   const [instructions, setInstructions] = useState<string>(initialInstruction || '');
@@ -647,16 +650,57 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
     setSteps(newSteps);
   };
 
-  const handleStepEdit = (stepId: string, updatedStep: any, _isUserInitiated: boolean = false) => {
-    // Always update the step; onEdit originates from user actions only
+  const handleStepEdit = (stepId: string, updatedStep: any, isUserInitiated: boolean = false) => {
+    // Update the steps immediately
     setSteps(prevSteps =>
-      prevSteps.map(step => (step.id === stepId ? { ...updatedStep, apiConfig: { ...updatedStep.apiConfig, id: updatedStep.apiConfig.id || updatedStep.id } } : step))
+      prevSteps.map(step => (step.id === stepId ? {
+        ...updatedStep,
+        apiConfig: { ...updatedStep.apiConfig, id: updatedStep.apiConfig.id || updatedStep.id }
+      } : step))
     );
 
-    // Always reset downstream state on any onEdit
-    const stepIndex = steps.findIndex(s => s.id === stepId);
-    if (stepIndex !== -1) {
-      const stepsToReset = steps.slice(stepIndex).map(s => s.id);
+    // Mark which step was edited by the user (used by steps effect to cascade resets)
+    if (isUserInitiated) {
+      lastUserEditedStepIdRef.current = stepId;
+    }
+  };
+
+  // Compute a stable hash for a step's configuration that affects execution
+  const hashStepConfig = (s: any): string => {
+    try {
+      const exec = {
+        id: s.id,
+        executionMode: s.executionMode,
+        loopSelector: s.loopSelector,
+        loopMaxIters: s.loopMaxIters,
+        integrationId: s.integrationId,
+        apiConfig: s.apiConfig,
+      };
+      return JSON.stringify(exec);
+    } catch {
+      return '';
+    }
+  };
+
+  // Drive cascading resets off of the source-of-truth: steps changes
+  useEffect(() => {
+    const currentHashes = steps.map(hashStepConfig);
+    const prevHashes = prevStepHashesRef.current;
+
+    // Find first changed index
+    let changedIndex = -1;
+    for (let i = 0; i < Math.max(prevHashes.length, currentHashes.length); i++) {
+      if (prevHashes[i] !== currentHashes[i]) { changedIndex = i; break; }
+    }
+
+    // Only cascade when change was user-initiated (set in handleStepEdit)
+    if (changedIndex !== -1 && lastUserEditedStepIdRef.current) {
+      const editedId = lastUserEditedStepIdRef.current;
+      // Ensure the changed index corresponds to or precedes the edited step
+      const idxOfEdited = steps.findIndex(s => s.id === editedId);
+      const cascadeFrom = idxOfEdited !== -1 ? Math.min(changedIndex, idxOfEdited) : changedIndex;
+      const stepsToReset = steps.slice(cascadeFrom).map(s => s.id);
+
       setCompletedSteps(prev => prev.filter(id => !stepsToReset.includes(id) && id !== '__final_transform__'));
       setFailedSteps(prev => prev.filter(id => !stepsToReset.includes(id) && id !== '__final_transform__'));
       setStepResultsMap(prev => {
@@ -667,8 +711,14 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
       });
       setFinalPreviewResult(null);
       setResult(null);
+
+      // Clear marker after cascading
+      lastUserEditedStepIdRef.current = null;
     }
-  };
+
+    // Update previous hashes after processing
+    prevStepHashesRef.current = currentHashes;
+  }, [steps]);
 
   const handleExecuteStep = async (idx: number) => {
     try {

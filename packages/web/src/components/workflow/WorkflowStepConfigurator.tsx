@@ -7,7 +7,7 @@ import { Integration, SuperglueClient } from "@superglue/client";
 import { ArrowDown, Check, Copy, Globe, RotateCw } from 'lucide-react';
 
 import JsonSchemaEditor from '@/src/components/utils/JsonSchemaEditor';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Badge } from "../ui/badge";
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
@@ -158,10 +158,14 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
         try { return JSON.stringify(editedStep, null, 2); } catch { return '{}'; }
     });
 
+    // Track if rawJsonText changes came from code editor (user), not programmatic sync
+    const isCodeEditingRef = useRef<boolean>(false);
+
     // Debounce-parse canonical JSON text into object and emit onEdit when valid
     useEffect(() => {
         const timer = setTimeout(() => {
             try {
+                if (!isCodeEditingRef.current) return; // only react to actual code editor edits
                 const parsed = JSON.parse(rawJsonText);
                 // Only update/emit if content actually changed
                 const changed = JSON.stringify(parsed) !== JSON.stringify(editedStep);
@@ -189,6 +193,8 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
             } catch {
                 // invalid JSON - do nothing until valid
             }
+            // reset flag after debounce window
+            isCodeEditingRef.current = false;
         }, 300);
         return () => clearTimeout(timer);
     }, [rawJsonText]);
@@ -257,7 +263,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                         </div>
                                         <JsonSchemaEditor
                                             value={rawJsonText}
-                                            onChange={(val) => { if (disabled) return; setRawJsonText(val || ''); if (onEditingChange) onEditingChange(true); }}
+                                            onChange={(val) => { if (disabled) return; isCodeEditingRef.current = true; setRawJsonText(val || ''); }}
                                             isOptional={false}
                                             forceCodeMode={true}
                                             showModeToggle={false}

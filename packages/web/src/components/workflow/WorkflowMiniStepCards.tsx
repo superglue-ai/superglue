@@ -471,7 +471,7 @@ export const PayloadSpotlight = ({
                         </div>
                     )}
                     <JsonSchemaEditor
-                        value={localPayload || '{}'}
+                        value={localPayload}
                         onChange={(val) => handlePayloadChange(val || '')}
                         isOptional={false}
                         readOnly={!!readOnly}

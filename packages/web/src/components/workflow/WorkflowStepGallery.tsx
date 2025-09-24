@@ -6,7 +6,7 @@ import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import { canExecuteStep } from '@/src/lib/client-utils';
 import { downloadJson } from '@/src/lib/download-utils';
 import { type UploadedFileInfo } from '@/src/lib/file-utils';
-import { buildEvolvingPayload, cn, isEmptyData, truncateForDisplay, truncateLines } from '@/src/lib/utils';
+import { buildEvolvingPayload, cn, isEmptyData, MAX_DISPLAY_LINES, MAX_DISPLAY_SIZE, truncateForDisplay, truncateLines } from '@/src/lib/utils';
 import { Integration } from "@superglue/client";
 import { inferJsonSchema } from '@superglue/shared';
 import { ChevronLeft, ChevronRight, Database, Download, FileJson, Package, Play, Settings, Trash2 } from 'lucide-react';
@@ -56,8 +56,6 @@ interface WorkflowStepGalleryProps {
     filePayloads?: Record<string, any>;
 }
 
-const MAX_DISPLAY_LINES = 3000;
-const MAX_DISPLAY_SIZE = 1024 * 1024;
 const SpotlightStepCard = ({
     step,
     stepIndex,
@@ -572,21 +570,17 @@ export function WorkflowStepGallery({
         }
     };
 
-    // Wrap onStepEdit to reset completion status when a step is edited
-    const onStepEdit = (stepId: string, updatedStep: any) => {
+    // Wrap onStepEdit and forward user-initiated flag for proper cascading
+    const onStepEdit = (stepId: string, updatedStep: any, isUserInitiated: boolean = false) => {
         if (originalOnStepEdit) {
-            originalOnStepEdit(stepId, updatedStep);
-            // The parent component should handle resetting the completion status
-            // by clearing the stepId from completedSteps array
+            originalOnStepEdit(stepId, updatedStep, isUserInitiated);
         }
     };
 
-    // Auto-select first workflow step on mount (index 1, not 0 which is payload)
     useEffect(() => {
         setActiveIndex(steps.length > 0 ? 1 : 0);
     }, []);
 
-    // Navigate to final card when requested
     useEffect(() => {
         if (navigateToFinalSignal) {
             setActiveIndex(workflowItems.length - 1);
