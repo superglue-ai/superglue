@@ -893,7 +893,7 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
         </>
       )}
 
-      <div className="w-full overflow-y-auto" style={{ maxHeight: 'calc(100vh - 140px)', scrollbarGutter: 'stable both-edges' }}>
+      <div className="w-full overflow-y-auto pr-4" style={{ maxHeight: 'calc(100vh - 140px)', scrollbarGutter: 'stable both-edges' }}>
         <div className="w-full">
           <div className="space-y-4">
             <div className={embedded ? "" : "mb-4"}>
@@ -914,7 +914,7 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
                 onResponseSchemaChange={setResponseSchema}
                 onPayloadChange={setPayload}
                 onWorkflowIdChange={setWorkflowId}
-                onInstructionEdit={embedded ? onInstructionEdit : undefined} // Only show edit button in embedded mode
+                onInstructionEdit={embedded ? onInstructionEdit : undefined}
                 integrations={integrations}
                 isExecuting={loading}
                 isExecutingStep={isExecutingStep}

@@ -52,8 +52,6 @@ export const CopyButton = ({ text, getData }: { text?: string; getData?: () => a
 export const InstructionDisplay = ({ instruction, onEdit, showEditButton = true }: { instruction: string; onEdit?: () => void; showEditButton?: boolean; }) => {
     const [showFull, setShowFull] = useState(false);
     const [copied, setCopied] = useState(false);
-    const MAX_LENGTH = 100;
-    const truncated = instruction.length > MAX_LENGTH ? instruction.substring(0, MAX_LENGTH) + '...' : instruction;
     const handleCopy = () => {
         navigator.clipboard.writeText(instruction);
         setCopied(true);
@@ -64,10 +62,10 @@ export const InstructionDisplay = ({ instruction, onEdit, showEditButton = true 
             <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 rounded-md border max-w-full overflow-hidden h-[36px]">
                 <div className="flex-1 min-w-0 flex items-center gap-2">
                     <p className="text-sm text-muted-foreground font-medium">Instruction:</p>
-                    <p className="text-sm font-mono text-foreground truncate flex-1">{truncated}</p>
+                    <p className="text-sm font-mono text-foreground truncate flex-1">{instruction}</p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                    {instruction.length > MAX_LENGTH && (
+                    {instruction.length > 160 && (
                         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowFull(true)} title="View full instruction">
                             <Eye className="h-3 w-3" />
                         </Button>

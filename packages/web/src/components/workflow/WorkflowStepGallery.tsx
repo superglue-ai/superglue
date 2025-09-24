@@ -168,7 +168,7 @@ const SpotlightStepCard = ({
                         </Tabs>
                     </div>
 
-                    <div className="mt-1 overflow-y-scroll" style={{ maxHeight: '60vh', scrollbarGutter: 'stable both-edges' }}>
+                    <div className="mt-1" style={{ scrollbarGutter: 'stable both-edges' }}>
                         {activePanel === 'input' && (
                             <div>
                                 {(() => {
@@ -283,9 +283,11 @@ const SpotlightStepCard = ({
                                             )}
                                             {isPending ? (
                                                 <div className="flex flex-col items-center justify-center py-8 text-muted-foreground border rounded-md bg-muted/5">
-                                                    <Database className="h-6 w-6 mb-2 opacity-50" />
-                                                    <p className="text-xs">No output yet</p>
-                                                    <p className="text-[10px] mt-1">Test this step to see its output</p>
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <div className="h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+                                                        <span className="text-xs">Currently running...</span>
+                                                    </div>
+                                                    <p className="text-[10px]">Step outputs will be shown shortly</p>
                                                 </div>
                                             ) : (
                                                 <>
@@ -653,7 +655,7 @@ export function WorkflowStepGallery({
                     </div>
                 )}
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 pr-2">
                     <Button
                         variant="outline"
                         size="icon"
