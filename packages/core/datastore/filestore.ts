@@ -621,13 +621,13 @@ export class FileStore implements DataStore {
     const key = this.getKey('integration', id, orgId);
     const integration = this.storage.integrations.get(key);
     if (!integration) return null;
-    
+
     // Decrypt credentials if encryption is enabled
     const decryptedIntegration = { ...integration, id };
     if (decryptedIntegration.credentials) {
       decryptedIntegration.credentials = credentialEncryption.decrypt(decryptedIntegration.credentials);
     }
-    
+
     return decryptedIntegration;
   }
 
@@ -670,13 +670,13 @@ export class FileStore implements DataStore {
     const { id, integration, orgId } = params;
     if (!id || !integration) return null;
     const key = this.getKey('integration', id, orgId);
-    
+
     // Encrypt credentials if encryption is enabled and credentials exist
     const toStore = { ...integration };
     if (toStore.credentials) {
       toStore.credentials = credentialEncryption.encrypt(toStore.credentials);
     }
-    
+
     this.storage.integrations.set(key, toStore);
     await this.persist();
     return { ...integration, id };
@@ -741,7 +741,7 @@ export class FileStore implements DataStore {
     await this.ensureInitialized();
     const { id, nextRunAt, lastRunAt } = params;
     if (!id) return false;
-    
+
     // Find the schedule by searching all orgs since we don't have orgId in params
     for (const [key, schedule] of this.storage.workflowSchedules.entries()) {
       if (schedule.id === id) {
@@ -757,5 +757,11 @@ export class FileStore implements DataStore {
       }
     }
     return false;
+  }
+
+  async getTemplateOAuthCredentials(templateId: string): Promise<{ client_id: string; client_secret: string } | null> {
+    // FileStore doesn't support template OAuth credentials
+    // This is only available in PostgresStore with database configuration
+    return null;
   }
 } 

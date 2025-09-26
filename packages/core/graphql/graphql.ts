@@ -13,6 +13,7 @@ import { getTenantInfoResolver, setTenantInfoResolver } from "./resolvers/tenant
 import { transformResolver } from "./resolvers/transform.js";
 import { updateApiConfigIdResolver } from "./resolvers/update-id.js";
 import { upsertApiResolver, upsertExtractResolver, upsertTransformResolver } from "./resolvers/upsert.js";
+import { deleteWorkflowScheduleResolver, listWorkflowSchedulesResolver, upsertWorkflowScheduleResolver } from "./resolvers/workflow-scheduler.js";
 import {
   buildWorkflowResolver,
   deleteWorkflowResolver,
@@ -21,7 +22,6 @@ import {
   listWorkflowsResolver,
   upsertWorkflowResolver
 } from "./resolvers/workflow.js";
-import { listWorkflowSchedulesResolver, upsertWorkflowScheduleResolver, deleteWorkflowScheduleResolver } from "./resolvers/workflow-scheduler.js";
 
 export const resolvers = {
   Query: {
