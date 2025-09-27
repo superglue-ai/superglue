@@ -3,10 +3,11 @@ import { Card } from '@/src/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import JsonSchemaEditor from '@/src/components/utils/JsonSchemaEditor';
+import { downloadJson } from '@/src/lib/download-utils';
 import { formatBytes, isAllowedFileType, MAX_TOTAL_FILE_SIZE, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { cn, formatJavaScriptCode, isEmptyData, truncateForDisplay, truncateLines } from '@/src/lib/utils';
 import { inferJsonSchema } from '@superglue/shared';
-import { Check, Code2, Copy, Eye, FileJson, Package, Play, Upload, X } from 'lucide-react';
+import { Check, Code2, Copy, Download, Eye, FileJson, Package, Play, Upload, X } from 'lucide-react';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-javascript';
 import 'prismjs/components/prism-json';
@@ -51,8 +52,6 @@ export const CopyButton = ({ text, getData }: { text?: string; getData?: () => a
 export const InstructionDisplay = ({ instruction, onEdit, showEditButton = true }: { instruction: string; onEdit?: () => void; showEditButton?: boolean; }) => {
     const [showFull, setShowFull] = useState(false);
     const [copied, setCopied] = useState(false);
-    const MAX_LENGTH = 100;
-    const truncated = instruction.length > MAX_LENGTH ? instruction.substring(0, MAX_LENGTH) + '...' : instruction;
     const handleCopy = () => {
         navigator.clipboard.writeText(instruction);
         setCopied(true);
@@ -63,10 +62,10 @@ export const InstructionDisplay = ({ instruction, onEdit, showEditButton = true 
             <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 rounded-md border max-w-full overflow-hidden h-[36px]">
                 <div className="flex-1 min-w-0 flex items-center gap-2">
                     <p className="text-sm text-muted-foreground font-medium">Instruction:</p>
-                    <p className="text-sm font-mono text-foreground truncate flex-1">{truncated}</p>
+                    <p className="text-sm font-mono text-foreground truncate flex-1">{instruction}</p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                    {instruction.length > MAX_LENGTH && (
+                    {instruction.length > 160 && (
                         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowFull(true)} title="View full instruction">
                             <Eye className="h-3 w-3" />
                         </Button>
@@ -119,6 +118,9 @@ export const FinalResultsCard = ({ result }: { result: any }) => {
         setCopied(true);
         setTimeout(() => setCopied(false), 1500);
     };
+    const handleDownload = () => {
+        downloadJson(result, 'workflow_final_result.json');
+    };
     return (
         <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50">
             <div className="p-6">
@@ -130,14 +132,28 @@ export const FinalResultsCard = ({ result }: { result: any }) => {
                     <div className="flex items-center gap-2">
                         <span className="text-[10px] text-muted-foreground">{bytes.toLocaleString()} bytes</span>
                         {!isPending && (
-                            <button
-                                onClick={handleCopy}
-                                className="h-6 w-6 flex items-center justify-center rounded hover:bg-background/80 transition-colors bg-background/60 backdrop-blur"
-                                title="Copy full result data"
-                                type="button"
-                            >
-                                {copied ? <Check className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3 text-muted-foreground" />}
-                            </button>
+                            <>
+                                <div className="flex items-center gap-1">
+                                    <span className="text-[11px] text-muted-foreground">Copy Result</span>
+                                    <button
+                                        onClick={handleCopy}
+                                        className="h-6 w-6 flex items-center justify-center rounded hover:bg-background/80 transition-colors bg-background/60 backdrop-blur"
+                                        title="Copy full result data"
+                                        type="button"
+                                    >
+                                        {copied ? <Check className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3 text-muted-foreground" />}
+                                    </button>
+                                </div>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={handleDownload}
+                                    title="Download as JSON"
+                                >
+                                    <Download className="h-3 w-3" />
+                                </Button>
+                            </>
                         )}
                     </div>
                 </div>
@@ -272,7 +288,7 @@ export const JsonCodeEditor = ({ value, onChange, readOnly = false, minHeight = 
                     document.addEventListener('mouseup', handleMouseUp);
                 }} />
             )}
-            <div className={cn("p-3 pr-10 overflow-auto", readOnly ? "cursor-not-allowed" : "cursor-text")} style={{ maxHeight: resizable ? currentHeight : maxHeight }}>
+            <div className={cn("p-3 pr-10 overflow-auto", readOnly ? "cursor-not-allowed" : "cursor-text")} style={{ maxHeight: resizable ? currentHeight : maxHeight, scrollbarGutter: 'stable both-edges' }}>
                 <Editor value={displayValue} onValueChange={onChange || (() => { })} highlight={(code) => highlightCode(code, 'json')} padding={0} disabled={readOnly} className="font-mono text-xs" textareaClassName="outline-none focus:outline-none" style={{ minHeight, background: 'transparent' }} />
             </div>
         </div>
@@ -396,8 +412,64 @@ export const PayloadSpotlight = ({
                     <TabsTrigger value="schema" className="text-xs">Input Schema</TabsTrigger>
                 </TabsList>
                 <TabsContent value="payload" className="mt-3 space-y-3">
+                    {!readOnly && onFilesUpload && uploadedFiles.length > 0 && (
+                        <div className="space-y-1.5">
+                            {uploadedFiles.map(file => {
+                                const fileInfo = getFileTypeInfo(file.name);
+                                return (
+                                    <div
+                                        key={file.key}
+                                        className={cn(
+                                            "flex items-center justify-between px-3 py-2 rounded-md transition-all",
+                                            file.status === 'error'
+                                                ? "bg-destructive/10 border border-destructive/20"
+                                                : file.status === 'processing'
+                                                    ? "bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800"
+                                                    : `${fileInfo.bgColor} border border-border/50`
+                                        )}
+                                    >
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <span className={cn("font-mono text-sm", fileInfo.color)}>
+                                                {fileInfo.icon}
+                                            </span>
+                                            <div className="flex flex-col min-w-0">
+                                                <span className="text-xs font-medium truncate" title={file.name}>
+                                                    {file.name}
+                                                </span>
+                                                <span className="text-[10px] text-muted-foreground">
+                                                    {file.status === 'processing'
+                                                        ? 'Parsing...'
+                                                        : file.status === 'error'
+                                                            ? file.error || 'Failed to parse'
+                                                            : `${formatBytes(file.size)} • Key: ${file.key}`}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            {file.status === 'processing' && (
+                                                <div className="h-3 w-3 animate-spin rounded-full border-2 border-amber-600 dark:border-amber-400 border-t-transparent" />
+                                            )}
+                                            {file.status === 'ready' && (
+                                                <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
+                                            )}
+                                            {onFileRemove && file.status !== 'processing' && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-5 w-5 hover:bg-background/80"
+                                                    onClick={() => onFileRemove(file.key)}
+                                                >
+                                                    <X className="h-3 w-3" />
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
                     <JsonSchemaEditor
-                        value={localPayload || '{}'}
+                        value={localPayload}
                         onChange={(val) => handlePayloadChange(val || '')}
                         isOptional={false}
                         readOnly={!!readOnly}
@@ -431,63 +503,6 @@ export const PayloadSpotlight = ({
                                     <HelpTooltip text="Upload CSV, JSON, XML, or Excel files. Files will be automatically parsed to JSON and merged with the manual payload when the workflow executes." />
                                 </div>
                             </div>
-
-                            {uploadedFiles.length > 0 && (
-                                <div className="space-y-1.5">
-                                    {uploadedFiles.map(file => {
-                                        const fileInfo = getFileTypeInfo(file.name);
-                                        return (
-                                            <div
-                                                key={file.key}
-                                                className={cn(
-                                                    "flex items-center justify-between px-3 py-2 rounded-md transition-all",
-                                                    file.status === 'error'
-                                                        ? "bg-destructive/10 border border-destructive/20"
-                                                        : file.status === 'processing'
-                                                            ? "bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800"
-                                                            : `${fileInfo.bgColor} border border-border/50`
-                                                )}
-                                            >
-                                                <div className="flex items-center gap-2 min-w-0">
-                                                    <span className={cn("font-mono text-sm", fileInfo.color)}>
-                                                        {fileInfo.icon}
-                                                    </span>
-                                                    <div className="flex flex-col min-w-0">
-                                                        <span className="text-xs font-medium truncate" title={file.name}>
-                                                            {file.name}
-                                                        </span>
-                                                        <span className="text-[10px] text-muted-foreground">
-                                                            {file.status === 'processing'
-                                                                ? 'Parsing...'
-                                                                : file.status === 'error'
-                                                                    ? file.error || 'Failed to parse'
-                                                                    : `${formatBytes(file.size)} • Key: ${file.key}`}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-1">
-                                                    {file.status === 'processing' && (
-                                                        <div className="h-3 w-3 animate-spin rounded-full border-2 border-amber-600 dark:border-amber-400 border-t-transparent" />
-                                                    )}
-                                                    {file.status === 'ready' && (
-                                                        <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
-                                                    )}
-                                                    {onFileRemove && file.status !== 'processing' && (
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-5 w-5 hover:bg-background/80"
-                                                            onClick={() => onFileRemove(file.key)}
-                                                        >
-                                                            <X className="h-3 w-3" />
-                                                        </Button>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
                         </div>
                     )}
                 </TabsContent>
@@ -570,7 +585,15 @@ export const FinalTransformMiniStepCard = ({ transform, responseSchema, onTransf
     useEffect(() => { if (!schemaInitialized) { setLocalSchema(responseSchema || ''); setSchemaInitialized(true); } }, [responseSchema, schemaInitialized]);
     useEffect(() => { const handleTabChange = () => { if (onTransformChange && localTransform !== transform) onTransformChange(localTransform); if (onResponseSchemaChange && localSchema !== responseSchema) onResponseSchemaChange(localSchema); }; handleTabChange(); }, [activeTab]);
     const handleTransformChange = (value: string) => { setLocalTransform(value); };
-    const handleSchemaChange = (value: string | null) => { if (value === null) { setLocalSchema(''); if (onResponseSchemaChange) onResponseSchemaChange(''); } else { setLocalSchema(value); if (onResponseSchemaChange) onResponseSchemaChange(value); } };
+    const handleSchemaChange = (value: string | null) => {
+        if (value === null || value === '') {
+            setLocalSchema('');
+            if (onResponseSchemaChange) onResponseSchemaChange('');
+        } else {
+            setLocalSchema(value);
+            if (onResponseSchemaChange) onResponseSchemaChange(value);
+        }
+    };
     const ensureValidTransform = (code: string): string => {
         if (!code || !code.trim()) return `(sourceData) => {\n  return sourceData;\n}`;
         const arrowFunctionPattern = /^\s*\(\s*sourceData\s*\)\s*=>\s*\{[\s\S]*\}\s*;?\s*$/;
@@ -613,19 +636,22 @@ export const FinalTransformMiniStepCard = ({ transform, responseSchema, onTransf
                         {(() => {
                             let inputString = '';
                             let isTruncated = false;
+                            let copyText = '';
                             if (inputViewMode === 'schema') {
                                 const schemaObj = inferJsonSchema(stepInputs || {});
                                 inputString = truncateLines(JSON.stringify(schemaObj, null, 2), MAX_DISPLAY_LINES);
+                                copyText = inputString;
                             } else {
                                 const displayData = truncateForDisplay(stepInputs);
                                 inputString = displayData.value;
                                 isTruncated = displayData.truncated;
+                                copyText = inputString;
                             }
                             const fullJson = stepInputs !== undefined ? JSON.stringify(stepInputs, null, 2) : '';
                             const bytes = stepInputs === undefined ? 0 : new Blob([fullJson]).size;
                             return (
                                 <>
-                                    <JsonCodeEditor value={inputString} readOnly={true} minHeight="150px" maxHeight="250px" resizable={true} overlay={<div className="flex items-center gap-2"><Tabs value={inputViewMode} onValueChange={(v) => setInputViewMode(v as 'preview' | 'schema')} className="w-auto"><TabsList className="h-6 rounded-md"><TabsTrigger value="preview" className="h-5 px-2 text-[11px] rounded-md data-[state=active]:rounded-md">Preview</TabsTrigger><TabsTrigger value="schema" className="h-5 px-2 text-[11px] rounded-md data-[state=active]:rounded-md">Schema</TabsTrigger></TabsList></Tabs><span className="text-[10px] text-muted-foreground">{bytes.toLocaleString()} bytes</span><CopyButton text={fullJson} /></div>} />
+                                    <JsonCodeEditor value={inputString} readOnly={true} minHeight="150px" maxHeight="250px" resizable={true} overlay={<div className="flex items-center gap-2"><Tabs value={inputViewMode} onValueChange={(v) => setInputViewMode(v as 'preview' | 'schema')} className="w-auto"><TabsList className="h-6 rounded-md"><TabsTrigger value="preview" className="h-5 px-2 text-[11px] rounded-md data-[state=active]:rounded-md">Preview</TabsTrigger><TabsTrigger value="schema" className="h-5 px-2 text-[11px] rounded-md data-[state=active]:rounded-md">Schema</TabsTrigger></TabsList></Tabs><span className="text-[10px] text-muted-foreground">{bytes.toLocaleString()} bytes</span><CopyButton text={copyText} /><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => downloadJson(stepInputs, 'transform_step_inputs.json')} title="Download transform inputs as JSON"><Download className="h-3 w-3" /></Button></div>} />
                                     {isTruncated && inputViewMode === 'preview' && (<div className="mt-1 text-[10px] text-amber-600 dark:text-amber-300 px-2">Preview truncated for display performance</div>)}
                                 </>
                             );
@@ -636,7 +662,7 @@ export const FinalTransformMiniStepCard = ({ transform, responseSchema, onTransf
                     </TabsContent>
                     <TabsContent value="schema" className="mt-2">
                         <div className="space-y-3">
-                            <JsonSchemaEditor value={(localSchema && localSchema.trim().length > 0) ? localSchema : null} onChange={handleSchemaChange} isOptional={true} />
+                            <JsonSchemaEditor value={localSchema || ''} onChange={handleSchemaChange} isOptional={true} showModeToggle={true} />
                         </div>
                     </TabsContent>
                 </Tabs>

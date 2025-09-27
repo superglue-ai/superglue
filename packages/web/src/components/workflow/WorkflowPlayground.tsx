@@ -118,6 +118,9 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
   const [stepResultsMap, setStepResultsMap] = useState<Record<string, any>>({});
   const [isExecutingTransform, setIsExecutingTransform] = useState<boolean>(false);
   const [finalPreviewResult, setFinalPreviewResult] = useState<any>(null);
+  // Track last user-edited step and previous step hashes to drive robust cascades
+  const lastUserEditedStepIdRef = useRef<string | null>(null);
+  const prevStepHashesRef = useRef<string[]>([]);
 
   const [integrations, setIntegrations] = useState<Integration[]>(providedIntegrations || []);
   const [instructions, setInstructions] = useState<string>(initialInstruction || '');
@@ -377,8 +380,8 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
     result: sourceData
   }
 }`);
-      const schemaString = initialWorkflow.responseSchema ? JSON.stringify(initialWorkflow.responseSchema, null, 2) : null;
-      setResponseSchema(embedded ? null : schemaString);
+      const schemaString = initialWorkflow.responseSchema ? JSON.stringify(initialWorkflow.responseSchema, null, 2) : '';
+      setResponseSchema(schemaString);
       setInputSchema(initialWorkflow.inputSchema ? JSON.stringify(initialWorkflow.inputSchema, null, 2) : null);
       setInstructions(initialInstruction || initialWorkflow.instruction || '');
       setLastWorkflowId(initialWorkflow.id);
@@ -528,6 +531,10 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
           } else {
             setFailedSteps(prev => Array.from(new Set([...prev, res.stepId])));
           }
+          try {
+            const normalized = computeStepOutput(res);
+            setStepResultsMap(prev => ({ ...prev, [res.stepId]: normalized.output }));
+          } catch { }
         },
         effectiveSelfHealing,
         () => stopSignalRef.current
@@ -641,34 +648,84 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
     setSteps(newSteps);
   };
 
-  const handleStepEdit = (stepId: string, updatedStep: any) => {
+  const handleStepEdit = (stepId: string, updatedStep: any, isUserInitiated: boolean = false) => {
+    // No-op guard: avoid cascades if nothing actually changed
+    const idx = steps.findIndex(s => s.id === stepId);
+    if (idx !== -1) {
+      const current = steps[idx];
+      const currHash = hashStepConfig(current);
+      const nextHash = hashStepConfig(updatedStep);
+      if (currHash === nextHash) return;
+    }
+
+    // Update the steps immediately
     setSteps(prevSteps =>
-      prevSteps.map(step => (step.id === stepId ? { ...updatedStep, apiConfig: { ...updatedStep.apiConfig, id: updatedStep.apiConfig.id || updatedStep.id } } : step))
+      prevSteps.map(step => (step.id === stepId ? {
+        ...updatedStep,
+        apiConfig: { ...updatedStep.apiConfig, id: updatedStep.apiConfig.id || updatedStep.id }
+      } : step))
     );
 
-    // Find the index of the edited step
-    const stepIndex = steps.findIndex(s => s.id === stepId);
-    if (stepIndex !== -1) {
-      // Reset completion status for edited step and all subsequent steps
-      const stepsToReset = steps.slice(stepIndex).map(s => s.id);
+    // Mark which step was edited by the user (used by steps effect to cascade resets)
+    if (isUserInitiated) {
+      lastUserEditedStepIdRef.current = stepId;
+    }
+  };
 
-      // Clear both completed and failed states
-      setCompletedSteps(prev => prev.filter(id => !stepsToReset.includes(id)));
-      setFailedSteps(prev => prev.filter(id => !stepsToReset.includes(id)));
+  // Compute a stable hash for a step's configuration that affects execution
+  const hashStepConfig = (s: any): string => {
+    try {
+      const exec = {
+        id: s.id,
+        executionMode: s.executionMode,
+        loopSelector: s.loopSelector,
+        loopMaxIters: s.loopMaxIters,
+        integrationId: s.integrationId,
+        apiConfig: s.apiConfig,
+      };
+      return JSON.stringify(exec);
+    } catch {
+      return '';
+    }
+  };
 
-      // Clear execution results for reset steps
+  // Drive cascading resets off of the source-of-truth: steps changes
+  useEffect(() => {
+    const currentHashes = steps.map(hashStepConfig);
+    const prevHashes = prevStepHashesRef.current;
+
+    // Find first changed index
+    let changedIndex = -1;
+    for (let i = 0; i < Math.max(prevHashes.length, currentHashes.length); i++) {
+      if (prevHashes[i] !== currentHashes[i]) { changedIndex = i; break; }
+    }
+
+    // Only cascade when change was user-initiated (set in handleStepEdit)
+    if (changedIndex !== -1 && lastUserEditedStepIdRef.current) {
+      const editedId = lastUserEditedStepIdRef.current;
+      // Ensure the changed index corresponds to or precedes the edited step
+      const idxOfEdited = steps.findIndex(s => s.id === editedId);
+      const cascadeFrom = idxOfEdited !== -1 ? Math.min(changedIndex, idxOfEdited) : changedIndex;
+      const stepsToReset = steps.slice(cascadeFrom).map(s => s.id);
+
+      setCompletedSteps(prev => prev.filter(id => !stepsToReset.includes(id) && id !== '__final_transform__'));
+      setFailedSteps(prev => prev.filter(id => !stepsToReset.includes(id) && id !== '__final_transform__'));
       setStepResultsMap(prev => {
         const next = { ...prev } as Record<string, any>;
         stepsToReset.forEach(id => delete next[id]);
-        // Also clear final transform if it exists
         delete next['__final_transform__'];
         return next;
       });
-
-      // Reset final transform states
       setFinalPreviewResult(null);
+      setResult(null);
+
+      // Clear marker after cascading
+      lastUserEditedStepIdRef.current = null;
     }
-  };
+
+    // Update previous hashes after processing
+    prevStepHashesRef.current = currentHashes;
+  }, [steps]);
 
   const handleExecuteStep = async (idx: number) => {
     try {
@@ -730,6 +787,8 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
         }
       });
       const parsedResponseSchema = schemaStr && schemaStr.trim() ? JSON.parse(schemaStr) : null;
+      const manualPayload = JSON.parse(payload || '{}');
+      const fullPayload = { ...manualPayload, ...filePayloads };
 
       const result = await executeFinalTransform(
         client,
@@ -737,7 +796,7 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
         transformStr || finalTransform,
         parsedResponseSchema,
         inputSchema ? JSON.parse(inputSchema) : null,
-        JSON.parse(payload || '{}'),
+        fullPayload,
         stepData,
         false
       );
@@ -816,7 +875,7 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
   );
 
   return (
-    <div className={embedded ? "w-full" : "p-6 max-w-none w-full"}>
+    <div className={embedded ? "w-full" : "p-6 max-w-none w-full"} style={{ scrollbarGutter: 'stable both-edges' }}>
       {!embedded && !hideHeader && (
         <>
           <div className="flex justify-end items-center mb-2">
@@ -834,7 +893,7 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
         </>
       )}
 
-      <div className="w-full">
+      <div className="w-full overflow-y-auto pr-4" style={{ maxHeight: 'calc(100vh - 140px)', scrollbarGutter: 'stable both-edges' }}>
         <div className="w-full">
           <div className="space-y-4">
             <div className={embedded ? "" : "mb-4"}>
@@ -855,7 +914,7 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
                 onResponseSchemaChange={setResponseSchema}
                 onPayloadChange={setPayload}
                 onWorkflowIdChange={setWorkflowId}
-                onInstructionEdit={embedded ? onInstructionEdit : undefined} // Only show edit button in embedded mode
+                onInstructionEdit={embedded ? onInstructionEdit : undefined}
                 integrations={integrations}
                 isExecuting={loading}
                 isExecutingStep={isExecutingStep}

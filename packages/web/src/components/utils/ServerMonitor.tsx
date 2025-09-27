@@ -8,30 +8,40 @@ export function ServerMonitor() {
   const serverConfig = useConfig();
 
   useEffect(() => {
-    const checkServer = async () => {
+    const checkServer = async (retryCount = 0) => {
       try {
         const endpoint = serverConfig.superglueEndpoint.replace(/\/$/, '');
         const response = await fetch(`${endpoint}/health`);
         if (!response.ok) {
           throw new Error("Server is down");
         }
-        setIsServerDown(!response.ok);
+        setIsServerDown(false);
       } catch (error) {
-        toast({
-          title: "Connection could not be established",
-          description: `Please check your connection.\nEndpoint: ${serverConfig.superglueEndpoint}`,
-          variant: "destructive",
-        })
+        // Only show toast after 2 retries to avoid false positives during page load
+        if (retryCount >= 2) {
+          toast({
+            title: "Connection could not be established",
+            description: `Please check your connection.\nEndpoint: ${serverConfig.superglueEndpoint}`,
+            variant: "destructive",
+          });
+        }
         setIsServerDown(true);
       }
     };
 
-    // Check immediately and then every 10 seconds
-    checkServer();
-    const interval = setInterval(checkServer, 10000);
+    // Add small delay before first check to avoid false positives during page load
+    const initialTimeout = setTimeout(() => {
+      checkServer();
+    }, 1000);
 
-    return () => clearInterval(interval);
-  }, [isServerDown, toast]);
+    // Then check every 10 seconds
+    const interval = setInterval(() => checkServer(2), 10000);
+
+    return () => {
+      clearTimeout(initialTimeout);
+      clearInterval(interval);
+    };
+  }, [serverConfig.superglueEndpoint, toast]);
 
   return null;
 } 
