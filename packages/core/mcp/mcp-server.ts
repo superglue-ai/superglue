@@ -1001,9 +1001,9 @@ AGENT WORKFLOW:
 5. SCHEDULE (Optional): Use 'superglue_create_workflow_schedule' to scheduled executions of saved workflows to run automatically.
 
 WORKFLOW SCHEDULING:
-- Use 'superglue_list_workflow_schedules' to see existing schedules for a workflow
-- Use 'superglue_create_workflow_schedule' to create new schedules with cron expressions
-- Use 'superglue_update_workflow_schedule' to modify existing schedules (enable/disable, change timing, etc.)
+- Use 'superglue_list_workflow_schedules' to see existing scheduled executions for a workflow
+- Use 'superglue_create_workflow_schedule' to create new scheduled executions of saved workflows using cron expressions
+- Use 'superglue_update_workflow_schedule' to modify existing schedules (enable/disable, change timing, change timezone, change payload)
 
 BEST PRACTICES:
 - Always start with 'superglue_find_relevant_integrations' for discovery.
@@ -1014,7 +1014,6 @@ BEST PRACTICES:
 - Ask user before saving workflows.
 - When saving workflows, NEVER set fields to null - omit optional fields if no value available.
 - Copy actual values from build_and_run results, don't assume fields are empty.
-- For scheduling, use standard cron expressions (5 fields: minute hour day month dayofweek) and valid IANA timezones.
     `,
   },
     {
