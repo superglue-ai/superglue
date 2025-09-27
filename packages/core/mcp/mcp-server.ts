@@ -878,7 +878,7 @@ export const toolDefinitions: Record<string, any> = {
   superglue_create_workflow_schedule: {
     description: `
     <use_case>
-      Creates a new scheduled execution for a workflow. Schedules allow workflows to run automatically at specified times using cron expressions.
+      Creates a new scheduled execution for a workflow. Schedules allow workflows to run automatically on a server at specified times using cron expressions.
     </use_case>
 
     <important_notes>
