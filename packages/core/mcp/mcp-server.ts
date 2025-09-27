@@ -159,6 +159,28 @@ export const ListIntegrationsInputSchema = {
   offset: z.number().int().optional().default(0).describe("Offset for pagination (default: 0)"),
 };
 
+// Workflow Schedule Input Schemas
+export const ListWorkflowSchedulesInputSchema = {
+  workflowId: z.string().describe("The ID of the workflow to get schedules for"),
+};
+
+export const CreateWorkflowScheduleInputSchema = {
+  workflowId: z.string().describe("The ID of the workflow to create a schedule for"),
+  cronExpression: z.string().describe("Cron expression for the schedule (e.g., '0 9 * * 1-5' for weekdays at 9 AM)"),
+  timezone: z.string().describe("Timezone for the schedule (e.g., 'Europe/Berlin', 'America/New_York')"),
+  enabled: z.boolean().optional().default(true).describe("Whether the schedule is enabled"),
+  payload: z.record(z.unknown()).optional().describe("Optional JSON payload to pass to the workflow when executed"),
+};
+
+export const UpdateWorkflowScheduleInputSchema = {
+  id: z.string().describe("The ID of the schedule to update"),
+  workflowId: z.string().optional().describe("The ID of the workflow (optional, for validation)"),
+  cronExpression: z.string().optional().describe("Cron expression for the schedule"),
+  timezone: z.string().optional().describe("Timezone for the schedule"),
+  enabled: z.boolean().optional().describe("Whether the schedule is enabled"),
+  payload: z.record(z.unknown()).optional().describe("Optional JSON payload to pass to the workflow when executed"),
+};
+
 
 
 // --- Tool Definitions ---
@@ -703,6 +725,7 @@ export const toolDefinitions: Record<string, any> = {
           note: `Workflow ${savedWorkflow.id} has been saved successfully.`,
           success: true,
           saved_workflow: savedWorkflow,
+          usage_tip: `Use the ${savedWorkflow.id} in to create a scheduled execution of this workflow using 'superglue_create_workflow_schedule'.`,
         };
 
       } catch (error: any) {
@@ -804,6 +827,160 @@ export const toolDefinitions: Record<string, any> = {
         };
       }
     },
+  },
+
+  superglue_list_workflow_schedules: {
+    description: `
+    <use_case>
+      Lists all schedules for a specific workflow. Use this to see existing schedules, their cron expressions, and when the next run is scheduled.
+    </use_case>
+
+    <important_notes>
+      - Returns all schedules configured for the specified workflow
+      - Shows schedule details including cron expression, timezone, enabled status, and run times
+      - Use schedule IDs with superglue_update_workflow_schedule to modify existing schedules
+    </important_notes>
+    `,
+    inputSchema: ListWorkflowSchedulesInputSchema,
+    execute: async (args: any & { client: SuperglueClient; orgId: string; }, request) => {
+      const { client, workflowId } = args;
+
+      try {
+        const schedules = await client.listWorkflowSchedules(workflowId);
+        
+        return {
+          success: true,
+          schedules: schedules.map(schedule => ({
+            id: schedule.id,
+            workflowId: schedule.workflowId,
+            cronExpression: schedule.cronExpression,
+            timezone: schedule.timezone,
+            enabled: schedule.enabled,
+            payload: schedule.payload,
+            lastRunAt: schedule.lastRunAt,
+            nextRunAt: schedule.nextRunAt,
+            createdAt: schedule.createdAt,
+            updatedAt: schedule.updatedAt
+          })),
+          total: schedules.length,
+          usage_tip: "Use schedule IDs with superglue_update_workflow_schedule to modify existing schedules"
+        };
+      } catch (error: any) {
+        return {
+          success: false,
+          error: error.message,
+          suggestion: "Check that the workflow ID exists and you have access to it"
+        };
+      }
+    },
+  },
+
+  superglue_create_workflow_schedule: {
+    description: `
+    <use_case>
+      Creates a new scheduled execution for a workflow. Schedules allow workflows to run automatically on a server at specified times using cron expressions.
+    </use_case>
+
+    <important_notes>
+      - Requires a valid workflow ID and cron expression
+      - Cron expressions use 5 fields: minute (0-59), hour (0-23), day of month (1-31), month (1-12), day of week (0-6)
+      - Use * for any value, / for intervals, and , for lists. Example: '0 9 * * 1-5' runs weekdays at 9 AM
+      - Timezone should be a valid IANA timezone (e.g., 'Europe/Berlin', 'America/New_York')
+      - Optional payload will be passed to the workflow when it runs
+      - If available, use the workflow ID from the save_workflow result to create a schedule
+    </important_notes>
+    `,
+    inputSchema: CreateWorkflowScheduleInputSchema,
+    execute: async (args: any & { client: SuperglueClient; orgId: string; }, request) => {
+      const { client, workflowId, cronExpression, timezone, enabled = true, payload } = args;
+
+      try {
+        const schedule = await client.upsertWorkflowSchedule({
+          workflowId,
+          cronExpression,
+          timezone,
+          enabled,
+          payload
+        });
+
+        return {
+          success: true,
+          schedule: {
+            id: schedule.id,
+            workflowId: schedule.workflowId,
+            cronExpression: schedule.cronExpression,
+            timezone: schedule.timezone,
+            enabled: schedule.enabled,
+            payload: schedule.payload,
+            lastRunAt: schedule.lastRunAt,
+            nextRunAt: schedule.nextRunAt,
+            createdAt: schedule.createdAt,
+            updatedAt: schedule.updatedAt
+          },
+          note: "Schedule created successfully. The workflow will now run according to the specified schedule."
+        };
+      } catch (error: any) {
+        return {
+          success: false,
+          error: error.message,
+          suggestion: "Check that the workflow ID exists, the cron expression is valid, and the timezone is correct"
+        };
+      }
+    },
+  },
+
+  superglue_update_workflow_schedule: {
+    description: `
+    <use_case>
+      Updates an existing workflow schedule. Use this to modify cron expressions, timezones, enable/disable schedules, or change payloads.
+    </use_case>
+
+    <important_notes>
+      - Requires the schedule ID (use superglue_list_workflow_schedules to find schedule IDs)
+      - Only provide the fields you want to change - other fields will remain unchanged
+      - Cron expressions use 5 fields: minute (0-59), hour (0-23), day of month (1-31), month (1-12), day of week (0-6)
+      - Timezone should be a valid IANA timezone (e.g., 'Europe/Berlin', 'America/New_York')
+    </important_notes>
+    `,
+    inputSchema: UpdateWorkflowScheduleInputSchema,
+    execute: async (args: any & { client: SuperglueClient; orgId: string; }, request) => {
+      const { client, id, workflowId, cronExpression, timezone, enabled, payload } = args;
+
+      try {
+        // Build update object with only provided fields
+        const updateData: any = { id };
+        if (workflowId !== undefined) updateData.workflowId = workflowId;
+        if (cronExpression !== undefined) updateData.cronExpression = cronExpression;
+        if (timezone !== undefined) updateData.timezone = timezone;
+        if (enabled !== undefined) updateData.enabled = enabled;
+        if (payload !== undefined) updateData.payload = payload;
+
+        const schedule = await client.upsertWorkflowSchedule(updateData);
+
+        return {
+          success: true,
+          schedule: {
+            id: schedule.id,
+            workflowId: schedule.workflowId,
+            cronExpression: schedule.cronExpression,
+            timezone: schedule.timezone,
+            enabled: schedule.enabled,
+            payload: schedule.payload,
+            lastRunAt: schedule.lastRunAt,
+            nextRunAt: schedule.nextRunAt,
+            createdAt: schedule.createdAt,
+            updatedAt: schedule.updatedAt
+          },
+          note: "Schedule updated successfully."
+        };
+      } catch (error: any) {
+        return {
+          success: false,
+          error: error.message,
+          suggestion: "Check that the schedule ID exists and all provided values are valid"
+        };
+      }
+    },
   }
 };
 
@@ -821,6 +998,12 @@ AGENT WORKFLOW:
 2. BUILD & TEST: Use 'superglue_build_and_run' with instruction and integrations. Iterate until successful. If no credentials are saved with the integration, add them to the build_and_run request.
 3. SAVE (Optional): Ask user if they want to save the workflow, then use 'superglue_save_workflow' with the workflow data.
 4. EXECUTE: Use 'superglue_execute_workflow' for saved workflows.
+5. SCHEDULE (Optional): Use 'superglue_create_workflow_schedule' to scheduled executions of saved workflows to run automatically.
+
+WORKFLOW SCHEDULING:
+- Use 'superglue_list_workflow_schedules' to see existing scheduled executions for a workflow
+- Use 'superglue_create_workflow_schedule' to create new scheduled executions of saved workflows using cron expressions
+- Use 'superglue_update_workflow_schedule' to modify existing schedules (enable/disable, change timing, change timezone, change payload)
 
 BEST PRACTICES:
 - Always start with 'superglue_find_relevant_integrations' for discovery.
