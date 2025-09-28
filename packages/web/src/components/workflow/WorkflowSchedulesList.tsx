@@ -155,7 +155,7 @@ const WorkflowSchedulesList = ({ workflowId }: { workflowId: string }) => {
                 <TableCell className="w-[200px]">{schedule.timezone}</TableCell>
                 <TableCell className="w-[300px]">{schedule.lastRunAt ? new Date(schedule.lastRunAt).toLocaleString() : 'Never'}</TableCell>
                 <TableCell className="w-[300px]">
-                  {!schedule.enabled ? 'Disabled' : (schedule.nextRunAt ? new Date(schedule.nextRunAt).toLocaleString() : 'Never')}
+                  {!schedule.enabled ? 'Disabled' : (new Date(schedule.nextRunAt).toLocaleString())}
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1">
