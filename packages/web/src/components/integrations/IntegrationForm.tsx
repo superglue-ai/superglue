@@ -1,6 +1,5 @@
 import { useConfig } from '@/src/app/config-context';
 import { detectAuthType } from '@/src/app/integrations/page';
-import { Badge } from '@/src/components/ui/badge';
 import { Button } from '@/src/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/src/components/ui/command';
@@ -8,6 +7,7 @@ import { Input } from '@/src/components/ui/input';
 import { Label } from '@/src/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/src/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/src/components/ui/select';
+import { Switch } from '@/src/components/ui/switch';
 import { Textarea } from '@/src/components/ui/textarea';
 import { CredentialsManager } from '@/src/components/utils/CredentialManager';
 import { DocumentationField } from '@/src/components/utils/DocumentationField';
@@ -19,7 +19,7 @@ import type { Integration } from '@superglue/client';
 
 import { buildOAuthUrlForIntegration, createOAuthErrorHandler, getOAuthCallbackUrl, triggerOAuthFlow } from '@/src/lib/oauth-utils';
 import { integrations } from '@superglue/shared';
-import { Check, ChevronRight, ChevronsUpDown, Copy, Globe, Link } from 'lucide-react';
+import { Check, ChevronRight, ChevronsUpDown, Copy, Globe } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 export interface IntegrationFormProps {
@@ -38,15 +38,15 @@ function sanitizeIntegrationId(id: string) {
             const url = new URL(id);
             let host = url.hostname;
             const database = url.pathname.substring(1); // Remove leading slash
-            
+
             // Truncate host if too long (keep first 20 chars)
             if (host.length > 20) {
                 host = host.substring(0, 20);
             }
-            
+
             // Create ID with DB: prefix
             let cleanId = `DB-${host}-${database}`;
-            
+
             // Clean up and return
             return cleanId
                 .toLowerCase()
@@ -159,31 +159,81 @@ export function IntegrationForm({
 
     const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
     const [showAdvanced, setShowAdvanced] = useState(false);
+    const [showOAuth, setShowOAuth] = useState(false);
+    const [useSuperglueOAuth, setUseSuperglueOAuth] = useState<boolean>(false);
+    const [connectLoading, setConnectLoading] = useState(false);
     const [hasUploadedFile, setHasUploadedFile] = useState(
         // Check if existing integration has file upload
         integration?.documentationUrl?.startsWith('file://') || false
     );
 
+    const { toast } = useToast();
+
+    useEffect(() => {
+        const handleOAuthMessage = (event: MessageEvent) => {
+            if (event.origin !== window.location.origin) return;
+            const messageIntegrationId = event.data?.integrationId;
+            if (!messageIntegrationId || (integration?.id && messageIntegrationId !== integration.id && messageIntegrationId !== id)) {
+                return;
+            }
+
+            if (event.data?.type === 'oauth-success') {
+                setConnectLoading(false);
+                const tokens = event.data.tokens as { access_token?: string; refresh_token?: string; token_type?: string; expires_at?: string } | undefined;
+                if (tokens) {
+                    setOauthFields(prev => ({
+                        ...prev,
+                        access_token: tokens.access_token || prev.access_token,
+                        refresh_token: tokens.refresh_token || prev.refresh_token,
+                        token_type: tokens.token_type || prev.token_type,
+                        expires_at: tokens.expires_at || prev.expires_at,
+                    }));
+
+                    // Show success feedback for client_credentials flow
+                    if (oauthFields.grant_type === 'client_credentials') {
+                        toast({
+                            title: 'OAuth Connected',
+                            description: 'Successfully authenticated with client credentials',
+                        });
+                    }
+                }
+            } else if (event.data?.type === 'oauth-error') {
+                setConnectLoading(false);
+            }
+        };
+        window.addEventListener('message', handleOAuthMessage);
+        return () => window.removeEventListener('message', handleOAuthMessage);
+    }, [id, integration?.id, oauthFields.grant_type, toast]);
+
     const urlFieldRef = useRef<any>(null);
     const isEditing = !!integration;
     const config = useConfig();
-    const { toast } = useToast();
 
 
-    // Pre-fill OAuth URLs when auth type changes to OAuth
+    // Pre-fill OAuth fields when auth type/template changes; enable SG toggle if template has client_id
     useEffect(() => {
-        if (authType === 'oauth' && selectedIntegration && selectedIntegration !== 'manual') {
-            const integrationTemplate = integrations[selectedIntegration];
-            if (integrationTemplate?.oauth) {
-                setOauthFields(prev => ({
-                    ...prev,
-                    auth_url: prev.auth_url || integrationTemplate.oauth!.authUrl,
-                    token_url: prev.token_url || integrationTemplate.oauth!.tokenUrl,
-                    scopes: prev.scopes || integrationTemplate.oauth!.scopes || ''
-                }));
-            }
-        }
+        if (authType !== 'oauth' || !selectedIntegration || selectedIntegration === 'manual') return;
+        const integrationTemplate = integrations[selectedIntegration];
+        const templateOAuth: any = integrationTemplate?.oauth;
+        setUseSuperglueOAuth(prev => (isEditing ? prev : !!(templateOAuth?.client_id && String(templateOAuth.client_id).trim().length > 0)));
+        setOauthFields(prev => ({
+            ...prev,
+            client_id: prev.client_id || (templateOAuth?.client_id || ''),
+            auth_url: prev.auth_url || (templateOAuth?.authUrl || ''),
+            token_url: prev.token_url || (templateOAuth?.tokenUrl || ''),
+            scopes: prev.scopes || (templateOAuth?.scopes || ''),
+            grant_type: (templateOAuth?.grant_type as 'authorization_code' | 'client_credentials') || prev.grant_type || 'authorization_code'
+        }));
     }, [authType, selectedIntegration]);
+
+    useEffect(() => {
+        if (!isEditing || authType !== 'oauth' || !selectedIntegration || selectedIntegration === 'manual') return;
+        const templateClientId = integrations[selectedIntegration]?.oauth?.client_id;
+        const savedClientId = (integration?.credentials || {}).client_id || oauthFields.client_id;
+        if (templateClientId && savedClientId && savedClientId === templateClientId) {
+            setUseSuperglueOAuth(true);
+        }
+    }, [isEditing, authType, selectedIntegration, integration, oauthFields.client_id]);
 
     // Function to handle file upload
     const handleFileUpload = (extractedText: string) => {
@@ -245,17 +295,20 @@ export function IntegrationForm({
                 setAuthType(integrationTemplate.preferredAuthType);
             }
 
-            // Pre-fill OAuth URLs if OAuth is available and selected
-            if (integrationTemplate.oauth) {
-                // Only pre-fill OAuth URLs if user has OAuth selected
-                if (integrationTemplate.preferredAuthType === 'oauth') {
-                    setOauthFields(prev => ({
-                        ...prev,
-                        auth_url: integrationTemplate.oauth!.authUrl || prev.auth_url,
-                        token_url: integrationTemplate.oauth!.tokenUrl || prev.token_url,
-                        scopes: integrationTemplate.oauth!.scopes || prev.scopes || ''
-                    }));
-                }
+            // Pre-fill OAuth fields if OAuth is preferred/available
+            if (integrationTemplate.oauth && integrationTemplate.preferredAuthType === 'oauth') {
+                const templateOAuth: any = integrationTemplate.oauth;
+                setOauthFields(prev => ({
+                    ...prev,
+                    client_id: templateOAuth?.client_id || prev.client_id,
+                    auth_url: templateOAuth?.authUrl || prev.auth_url,
+                    token_url: templateOAuth?.tokenUrl || prev.token_url,
+                    scopes: templateOAuth?.scopes || prev.scopes || '',
+                    grant_type: (templateOAuth?.grant_type as 'authorization_code' | 'client_credentials') || prev.grant_type || 'authorization_code'
+                }));
+                setUseSuperglueOAuth(!!(templateOAuth?.client_id && String(templateOAuth.client_id).trim().length > 0));
+            } else {
+                setUseSuperglueOAuth(false);
             }
         }
     };
@@ -295,6 +348,131 @@ export function IntegrationForm({
         return oauthFieldsChanged || apiCredentialsChanged;
     };
 
+    const getTemplateOAuth = () => {
+        if (!selectedIntegration || selectedIntegration === 'manual') return null as any;
+        return (integrations[selectedIntegration]?.oauth as any) || null;
+    };
+
+    const buildEffectiveOAuthFields = (): typeof oauthFields => {
+        const templateOAuth = getTemplateOAuth();
+        if (useSuperglueOAuth && templateOAuth) {
+            return {
+                ...oauthFields,
+                client_id: templateOAuth.client_id || oauthFields.client_id,
+                auth_url: templateOAuth.authUrl || oauthFields.auth_url,
+                token_url: templateOAuth.tokenUrl || oauthFields.token_url,
+                scopes: templateOAuth.scopes || oauthFields.scopes,
+                grant_type: (templateOAuth.grant_type as 'authorization_code' | 'client_credentials') || oauthFields.grant_type || 'authorization_code'
+            };
+        }
+        return oauthFields;
+    };
+
+    const effectiveGrantType = (integration?.credentials as any)?.grant_type || oauthFields.grant_type || 'authorization_code';
+    const effectiveAccessToken = (integration?.credentials as any)?.access_token || oauthFields.access_token;
+    const effectiveRefreshToken = (integration?.credentials as any)?.refresh_token || oauthFields.refresh_token;
+    const isOAuthConfigured: boolean = effectiveGrantType === 'client_credentials'
+        ? Boolean(effectiveAccessToken)
+        : Boolean(effectiveAccessToken && effectiveRefreshToken);
+
+    const isConnectDisabled = () => {
+        if (authType !== 'oauth') return true;
+        if (useSuperglueOAuth) return false;
+        const ef = buildEffectiveOAuthFields();
+        const isClientCreds = ef.grant_type === 'client_credentials';
+        if (isClientCreds) {
+            return !(ef.client_id && ef.client_secret && ef.token_url);
+        }
+        return !(ef.client_id && ef.client_secret && ef.token_url && ef.auth_url && ef.scopes);
+    };
+
+    const handleConnect = async () => {
+        if (authType !== 'oauth') return;
+        setConnectLoading(true);
+        const ef = buildEffectiveOAuthFields();
+        const errors: Record<string, boolean> = {};
+        if (!useSuperglueOAuth) {
+            const isClientCreds = ef.grant_type === 'client_credentials';
+            if (!ef.client_id) errors.client_id = true;
+            if (!ef.client_secret) errors.client_secret = true;
+            if (!ef.token_url) errors.token_url = true;
+            if (!isClientCreds) {
+                if (!ef.auth_url) errors.auth_url = true;
+                if (!ef.scopes) errors.scopes = true;
+            }
+            setValidationErrors(prev => ({ ...prev, ...errors }));
+            if (Object.keys(errors).length > 0) {
+                setConnectLoading(false);
+                return;
+            }
+        }
+
+        let creds: any = {};
+        try {
+            const additional = JSON.parse(apiKeyCredentials || '{}');
+            creds = { ...ef, ...additional };
+        } catch {
+            creds = { ...ef };
+        }
+
+        const integrationData = {
+            id: isEditing ? integration!.id : (id || '').trim(),
+            urlHost: urlHost.trim(),
+            urlPath: urlPath.trim(),
+            documentationUrl: documentationUrl.trim(),
+            documentation: documentation.trim(),
+            specificInstructions: specificInstructions.trim(),
+            credentials: creds,
+        } as Integration;
+
+        try {
+            const templateInfo = useSuperglueOAuth ? {
+                templateId: selectedIntegration,
+                clientId: ef.client_id
+            } : undefined;
+
+            const handleOAuthError = (error: string) => {
+                setConnectLoading(false);
+                const errorHandler = createOAuthErrorHandler(integrationData.id, toast);
+                errorHandler(error);
+            };
+
+            const handleOAuthSuccess = (tokens: any) => {
+                setConnectLoading(false);
+                if (tokens) {
+                    setOauthFields(prev => ({
+                        ...prev,
+                        access_token: tokens.access_token || prev.access_token,
+                        refresh_token: tokens.refresh_token || prev.refresh_token,
+                        token_type: tokens.token_type || prev.token_type,
+                        expires_at: tokens.expires_at || prev.expires_at,
+                    }));
+
+                    toast({
+                        title: 'OAuth Connected',
+                        description: 'Successfully authenticated',
+                    });
+                }
+            };
+
+            triggerOAuthFlow(
+                integrationData.id,
+                ef,
+                selectedIntegration,
+                config.superglueApiKey,
+                authType,
+                handleOAuthError,
+                true,
+                templateInfo,
+                handleOAuthSuccess
+            );
+
+        } catch (error) {
+            console.error('Error connecting OAuth:', error);
+            setConnectLoading(false);
+        }
+    };
+
     const handleSubmit = async () => {
         const errors: Record<string, boolean> = {};
         if (!id.trim()) errors.id = true;
@@ -305,28 +483,29 @@ export function IntegrationForm({
 
         // Build credentials based on auth type
         if (authType === 'oauth') {
-            // Validate OAuth required fields
-            if (!oauthFields.client_id) errors.client_id = true;
-            if (!oauthFields.client_secret) errors.client_secret = true;
-
-            // Start with OAuth fields
-            const oauthCreds = Object.fromEntries(
+            const ef = buildEffectiveOAuthFields();
+            const oauthCredsRaw = Object.fromEntries(
                 Object.entries({
-                    ...oauthFields,
-                    scopes: oauthFields.scopes || integrations[selectedIntegration]?.oauth?.scopes || ''
+                    ...ef,
+                    scopes: ef.scopes || integrations[selectedIntegration]?.oauth?.scopes || ''
                 }).filter(([_, value]) => value !== '')
-            );
+            ) as Record<string, any>;
 
             // Parse and merge additional credentials if provided
-            let additionalCreds = {};
+            let additionalCreds: Record<string, any> = {};
             try {
                 additionalCreds = JSON.parse(apiKeyCredentials);
             } catch {
-                // If parsing fails, just use OAuth credentials
             }
 
-            // Merge OAuth and additional credentials
-            creds = { ...oauthCreds, ...additionalCreds };
+            // Remove sensitive fields for authorization_code from being persisted
+            const shouldStripSecret = (oauthCredsRaw.grant_type || 'authorization_code') === 'authorization_code';
+            if (shouldStripSecret) {
+                if ('client_secret' in oauthCredsRaw) delete oauthCredsRaw.client_secret;
+                if ('client_secret' in additionalCreds) delete additionalCreds.client_secret;
+            }
+
+            creds = { ...oauthCredsRaw, ...additionalCreds };
         } else if (authType === 'apikey') {
             try {
                 creds = JSON.parse(apiKeyCredentials);
@@ -362,43 +541,7 @@ export function IntegrationForm({
                 });
                 return;
             }
-
-            // Check if OAuth should be triggered
-            const grantType = oauthFields.grant_type || 'authorization_code';
-            const shouldTriggerOAuth = authType === 'oauth' && (
-                // For authorization code: trigger if OAuth is not configured yet
-                (grantType === 'authorization_code' && (!oauthFields.access_token || !oauthFields.refresh_token)) ||
-                // For client credentials: trigger if OAuth fields have changed (backend will handle it)
-                (grantType === 'client_credentials' && hasOAuthFieldsChanged()) ||
-                // OR if OAuth is forced (e.g., when fields changed)
-                hasOAuthFieldsChanged()
-            );
-
-            if (shouldTriggerOAuth) {
-                if (grantType === 'client_credentials') {
-                    // For client credentials, show a message that OAuth is being processed
-                    toast({
-                        title: 'OAuth Processing',
-                        description: 'Client credentials OAuth flow is being processed in the background. The integration will be updated automatically.',
-                    });
-                } else {
-                    // For authorization code, trigger the popup flow
-                    const handleOAuthError = createOAuthErrorHandler(savedIntegration.id, toast);
-
-                    triggerOAuthFlow(
-                        savedIntegration.id,
-                        oauthFields,
-                        selectedIntegration,
-                        config.superglueApiKey,
-                        authType,
-                        handleOAuthError,
-                        hasOAuthFieldsChanged() // Force OAuth if fields changed
-                    );
-                }
-            }
         } catch (error) {
-            // Error handling is done in the parent component
-            console.error('Error in form submission:', error);
         }
     };
 
@@ -426,7 +569,11 @@ export function IntegrationForm({
     // Legacy function that uses the form's current ID (for backward compatibility)
     const buildOAuthUrl = () => {
         const integrationId = isEditing ? integration!.id : id.trim();
-        return buildOAuthUrlForIntegration(integrationId, oauthFields, selectedIntegration, config.superglueApiKey);
+        const templateInfo = useSuperglueOAuth ? {
+            templateId: selectedIntegration,
+            clientId: oauthFields.client_id
+        } : undefined;
+        return buildOAuthUrlForIntegration(integrationId, oauthFields, selectedIntegration, config.superglueApiKey, templateInfo);
     };
 
     return (
@@ -596,76 +743,255 @@ export function IntegrationForm({
                     </div>
 
                     {authType === 'oauth' && (
-                        <div className="">
-                            <div className="text-sm font-medium mb-2 flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    OAuth Configuration
-                                    {oauthFields.access_token && oauthFields.refresh_token && (
-                                        <>
-                                            <Check className="h-4 w-4 text-green-600" />
-                                            <span className="text-green-600 text-xs font-normal">Successfully configured</span>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <Label htmlFor="client_id" className="text-xs flex items-center gap-1">
-                                        Client ID*
-                                        <HelpTooltip text="The unique identifier for your OAuth app. Find this in your OAuth provider's app settings (e.g., Google Cloud Console, GitHub App Settings)." />
-                                    </Label>
-                                    <Input
-                                        id="client_id"
-                                        value={oauthFields.client_id}
-                                        onChange={e => setOauthFields(prev => ({ ...prev, client_id: e.target.value }))}
-                                        placeholder="Your OAuth app client ID"
-                                        className={cn("h-9", validationErrors.client_id && inputErrorStyles)}
-                                        autoComplete="off"
-                                    />
-                                </div>
-                                <div>
-                                    <Label htmlFor="client_secret" className="text-xs flex items-center gap-1">
-                                        Client Secret*
-                                        <HelpTooltip text="The secret key for your OAuth app. Keep this confidential! Find this in your OAuth provider's app settings alongside the Client ID." />
-                                    </Label>
-                                    <Input
-                                        id="client_secret"
-                                        type="password"
-                                        value={oauthFields.client_secret}
-                                        onChange={e => setOauthFields(prev => ({ ...prev, client_secret: e.target.value }))}
-                                        placeholder="Your OAuth app client secret"
-                                        className={cn("h-9", validationErrors.client_secret && inputErrorStyles)}
-                                        autoComplete="new-password"
-                                    />
-                                </div>
-                            </div>
-
-                            {oauthFields.grant_type === 'authorization_code' && (
-                                <div className="border-t pt-3">
-                                    <Label className="text-xs flex items-center gap-1">
-                                        Redirect URI
-                                        <HelpTooltip text="Copy this URL and add it to your OAuth app's allowed redirect URIs. This is where users will be sent after authorizing your app." />
-                                    </Label>
-                                    <div className="flex items-center gap-2 mt-1 mb-2">
-                                        <code className="text-xs bg-background px-2 py-1 rounded flex-1 overflow-x-auto">
-                                            {getOAuthCallbackUrl()}
-                                        </code>
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-8 w-8"
-                                            onClick={() => copyToClipboard(getOAuthCallbackUrl())}
-                                        >
-                                            <Copy className="h-4 w-4" />
-                                        </Button>
-                                    </div>
+                        <>
+                            {(useSuperglueOAuth || isOAuthConfigured) && (
+                                <div className="pt-1">
+                                    <Button
+                                        type="button"
+                                        disabled={connectLoading}
+                                        onClick={handleConnect}
+                                        className="w-full h-11 justify-center text-base"
+                                    >
+                                        <span className="inline-flex items-center gap-2">
+                                            {isOAuthConfigured ? (
+                                                <>
+                                                    <Check className="h-4 w-4 text-green-600" />
+                                                    <span>Connected — Reauthenticate</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    Connect to {integrationOptions.find(option => option.value === selectedIntegration)?.label}
+                                                    {(() => {
+                                                        const icon = getSimpleIcon(
+                                                            integrationOptions.find(opt => opt.value === selectedIntegration)?.icon || ''
+                                                        );
+                                                        return icon ? (
+                                                            <svg
+                                                                width="16"
+                                                                height="16"
+                                                                viewBox="0 0 24 24"
+                                                                fill={`#${icon.hex}`}
+                                                                className="flex-shrink-0"
+                                                            >
+                                                                <path d={icon.path} />
+                                                            </svg>
+                                                        ) : (
+                                                            <Globe className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                                                        );
+                                                    })()}
+                                                </>
+                                            )}
+                                        </span>
+                                    </Button>
                                 </div>
                             )}
+                            <div>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowOAuth(!showOAuth)}
+                                    className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                                >
+                                    <ChevronRight
+                                        className={cn(
+                                            "h-4 w-4 transition-transform",
+                                            showOAuth && "rotate-90"
+                                        )}
+                                    />
+                                    OAuth Setup
+                                </button>
+                            </div>
+                            {showOAuth && (
+                                <div className="space-y-4">
+                                    {(() => {
+                                        const template = integrations[selectedIntegration as keyof typeof integrations];
+                                        const templateOAuth: any = template?.oauth || null;
+                                        const hasTemplateClient = !!(templateOAuth?.client_id && String(templateOAuth.client_id).trim().length > 0);
+                                        return hasTemplateClient ? (
+                                            <div className="flex items-center justify-between border rounded-md p-3">
+                                                <div className="text-sm">
+                                                    <div className="font-medium">Use Superglue OAuth client</div>
+                                                    <div className="text-xs text-muted-foreground">Preconfigured client for {integrationOptions.find(o => o.value === selectedIntegration)?.label}</div>
+                                                </div>
+                                                <Switch
+                                                    checked={useSuperglueOAuth}
+                                                    onCheckedChange={(v) => setUseSuperglueOAuth(Boolean(v))}
+                                                    className="custom-switch"
+                                                />
+                                            </div>
+                                        ) : null;
+                                    })()}
 
+                                    {!useSuperglueOAuth && (
+                                        <>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div>
+                                                    <Label htmlFor="client_id" className="text-xs flex items-center gap-1">
+                                                        Client ID*
+                                                        <HelpTooltip text="Found in your OAuth provider app settings." />
+                                                    </Label>
+                                                    <Input
+                                                        id="client_id"
+                                                        value={oauthFields.client_id}
+                                                        onChange={e => setOauthFields(prev => ({ ...prev, client_id: e.target.value }))}
+                                                        placeholder="Your OAuth app client ID"
+                                                        className={cn("h-9", validationErrors.client_id && inputErrorStyles)}
+                                                        autoComplete="off"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <Label htmlFor="client_secret" className="text-xs flex items-center gap-1">
+                                                        Client Secret*
+                                                        <HelpTooltip text="Secret from your OAuth provider app settings." />
+                                                    </Label>
+                                                    <Input
+                                                        id="client_secret"
+                                                        type="password"
+                                                        value={oauthFields.client_secret}
+                                                        onChange={e => setOauthFields(prev => ({ ...prev, client_secret: e.target.value }))}
+                                                        placeholder="Your OAuth app client secret"
+                                                        className={cn("h-9", validationErrors.client_secret && inputErrorStyles)}
+                                                        autoComplete="new-password"
+                                                    />
+                                                </div>
+                                            </div>
 
-                        </div>
+                                            <div>
+                                                <Label htmlFor="grant_type" className="text-xs flex items-center gap-1">
+                                                    OAuth Grant Type
+                                                    <HelpTooltip text="Authorization Code = user consent; Client Credentials = server-to-server." />
+                                                </Label>
+                                                <Select
+                                                    value={oauthFields.grant_type}
+                                                    onValueChange={(value: 'authorization_code' | 'client_credentials') =>
+                                                        setOauthFields(prev => ({ ...prev, grant_type: value }))
+                                                    }
+                                                >
+                                                    <SelectTrigger className="h-9">
+                                                        <SelectValue placeholder="Select grant type" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="authorization_code">Authorization Code</SelectItem>
+                                                        <SelectItem value="client_credentials">Client Credentials</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+
+                                            {oauthFields.grant_type === 'authorization_code' && (
+                                                <div>
+                                                    <Label htmlFor="scopes" className="text-xs">OAuth Scopes*</Label>
+                                                    <HelpTooltip text="Space-separated scopes. Leave empty to use defaults." />
+                                                    <Input
+                                                        id="scopes"
+                                                        value={oauthFields.scopes}
+                                                        onChange={e => setOauthFields(prev => ({ ...prev, scopes: e.target.value }))}
+                                                        placeholder="e.g., read write"
+                                                        className={cn("h-9", validationErrors.scopes && inputErrorStyles)}
+                                                    />
+                                                </div>
+                                            )}
+
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div>
+                                                    <Label htmlFor="auth_url" className="text-xs">Authorization URL{oauthFields.grant_type === 'authorization_code' ? '*' : ''}</Label>
+                                                    <HelpTooltip text="OAuth authorization endpoint." />
+                                                    <Input
+                                                        id="auth_url"
+                                                        value={oauthFields.auth_url}
+                                                        onChange={e => setOauthFields(prev => ({ ...prev, auth_url: e.target.value }))}
+                                                        placeholder="OAuth authorization endpoint"
+                                                        className={cn("h-9", validationErrors.auth_url && inputErrorStyles)}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <Label htmlFor="token_url" className="text-xs">Token URL*</Label>
+                                                    <HelpTooltip text="OAuth token endpoint." />
+                                                    <Input
+                                                        id="token_url"
+                                                        value={oauthFields.token_url}
+                                                        onChange={e => setOauthFields(prev => ({ ...prev, token_url: e.target.value }))}
+                                                        placeholder="OAuth token endpoint"
+                                                        className={cn("h-9", validationErrors.token_url && inputErrorStyles)}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            {oauthFields.grant_type === 'authorization_code' && (
+                                                <div className="border-t pt-3">
+                                                    <Label className="text-xs flex items-center gap-1">
+                                                        Redirect URI
+                                                        <HelpTooltip text="Add this URL to your OAuth app allowed redirect URIs." />
+                                                    </Label>
+                                                    <div className="flex items-center gap-2 mt-1 mb-2">
+                                                        <code className="text-xs bg-background px-2 py-1 rounded flex-1 overflow-x-auto">
+                                                            {getOAuthCallbackUrl()}
+                                                        </code>
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8"
+                                                            onClick={() => copyToClipboard(getOAuthCallbackUrl())}
+                                                        >
+                                                            <Copy className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            <div className="text-xs text-muted-foreground">
+                                                {oauthFields.grant_type === 'client_credentials' ? (
+                                                    <span>Required: client ID, client secret, token URL.</span>
+                                                ) : (
+                                                    <span>Required: client ID, client secret, token URL, auth URL, scopes.</span>
+                                                )}
+                                            </div>
+                                        </>
+                                    )}
+
+                                    {!useSuperglueOAuth && !isOAuthConfigured && (
+                                        <div className="pt-1">
+                                            <Button
+                                                type="button"
+                                                disabled={isConnectDisabled() || connectLoading}
+                                                onClick={handleConnect}
+                                                className="w-full h-11 justify-center text-base"
+                                            >
+                                                <span className="inline-flex items-center gap-2">
+                                                    {isOAuthConfigured ? (
+                                                        <>
+                                                            <Check className="h-4 w-4 text-green-600" />
+                                                            <span>Connected — Reauthenticate</span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            Connect to {integrationOptions.find(option => option.value === selectedIntegration)?.label}
+                                                            {(() => {
+                                                                const icon = getSimpleIcon(
+                                                                    integrationOptions.find(opt => opt.value === selectedIntegration)?.icon || ''
+                                                                );
+                                                                return icon ? (
+                                                                    <svg
+                                                                        width="16"
+                                                                        height="16"
+                                                                        viewBox="0 0 24 24"
+                                                                        fill={`#${icon.hex}`}
+                                                                        className="flex-shrink-0"
+                                                                    >
+                                                                        <path d={icon.path} />
+                                                                    </svg>
+                                                                ) : (
+                                                                    <Globe className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                                                                );
+                                                            })()}
+                                                        </>
+                                                    )}
+                                                </span>
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </>
                     )}
 
                     {authType === 'apikey' && (
@@ -728,115 +1054,20 @@ export function IntegrationForm({
                             </div>
                         )}
 
-                        {/* OAuth Advanced Settings */}
-                        {authType === 'oauth' && (
-                            <>
-                                <div>
-                                    <Label htmlFor="grant_type" className="text-xs flex items-center gap-1">
-                                        OAuth Grant Type
-                                        <HelpTooltip text="Authorization Code: User-based flow requiring browser popup for user consent. Client Credentials: Server-to-server flow using only client credentials, no user interaction needed." />
-                                    </Label>
-                                    <Select
-                                        value={oauthFields.grant_type}
-                                        onValueChange={(value: 'authorization_code' | 'client_credentials') =>
-                                            setOauthFields(prev => ({ ...prev, grant_type: value }))
-                                        }
-                                    >
-                                        <SelectTrigger className="h-9">
-                                            <SelectValue placeholder="Select grant type" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="authorization_code">Authorization Code (User-based)</SelectItem>
-                                            <SelectItem value="client_credentials">Client Credentials (Server-to-server)</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                <div>
-                                    <Label htmlFor="scopes" className="text-xs">OAuth Scopes</Label>
-                                    <HelpTooltip text="Permissions requested from the OAuth provider. Format varies by provider: Google uses URLs (https://www.googleapis.com/auth/...), others use simple strings (read write). Leave empty to use defaults." />
-                                    <Input
-                                        id="scopes"
-                                        value={oauthFields.scopes}
-                                        onChange={e => setOauthFields(prev => ({ ...prev, scopes: e.target.value }))}
-                                        placeholder="Space-separated scopes (e.g., read write)"
-                                        className="h-9"
-                                    />
-                                    {!oauthFields.scopes && integrations[selectedIntegration]?.oauth?.scopes && (
-                                        <p className="text-xs text-muted-foreground mt-1">
-                                            Default: {integrations[selectedIntegration]?.oauth?.scopes}
-                                        </p>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <Label htmlFor="auth_url" className="text-xs">Authorization URL</Label>
-                                    <HelpTooltip text="OAuth authorization endpoint. Leave empty to use the default for this provider." />
-                                    <div className="relative">
-                                        <Input
-                                            id="auth_url"
-                                            value={oauthFields.auth_url}
-                                            onChange={e => setOauthFields(prev => ({ ...prev, auth_url: e.target.value }))}
-                                            placeholder="OAuth authorization endpoint"
-                                            className="h-9 pr-20"
-                                        />
-                                        <Badge
-                                            variant="outline"
-                                            className="absolute right-2 top-1/2 -translate-y-1/2 bg-background border"
-                                        >
-                                            <Link className="h-3 w-3 mr-1" />
-                                            URL
-                                        </Badge>
-                                    </div>
-                                    {!oauthFields.auth_url && integrations[selectedIntegration]?.oauth?.authUrl && (
-                                        <p className="text-xs text-muted-foreground mt-1">
-                                            Default: {integrations[selectedIntegration]?.oauth?.authUrl}
-                                        </p>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <Label htmlFor="token_url" className="text-xs">Token URL</Label>
-                                    <HelpTooltip text="OAuth token endpoint. Leave empty to use the default for this provider." />
-                                    <div className="relative">
-                                        <Input
-                                            id="token_url"
-                                            value={oauthFields.token_url}
-                                            onChange={e => setOauthFields(prev => ({ ...prev, token_url: e.target.value }))}
-                                            placeholder="OAuth token endpoint"
-                                            className="h-9 pr-20"
-                                        />
-                                        <Badge
-                                            variant="outline"
-                                            className="absolute right-2 top-1/2 -translate-y-1/2 bg-background border"
-                                        >
-                                            <Link className="h-3 w-3 mr-1" />
-                                            URL
-                                        </Badge>
-                                    </div>
-                                    {!oauthFields.token_url && integrations[selectedIntegration]?.oauth?.tokenUrl && (
-                                        <p className="text-xs text-muted-foreground mt-1">
-                                            Default: {integrations[selectedIntegration]?.oauth?.tokenUrl}
-                                        </p>
-                                    )}
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="additionalCredentials" className="flex items-center gap-2 text-xs">
-                                        Additional API Credentials
-                                        <HelpTooltip text="Some APIs require additional credentials alongside OAuth. Common examples: developer_token (Google Ads), account_id, workspace_id. Add any extra key-value pairs needed." />
-                                    </Label>
-                                    <div className="w-full">
-                                        <CredentialsManager
-                                            value={apiKeyCredentials}
-                                            onChange={setApiKeyCredentials}
-                                            className={cn('min-h-20', validationErrors.credentials && inputErrorStyles)}
-                                        />
-                                    </div>
-                                    {validationErrors.credentials && <p className="text-sm text-destructive">Credentials must be valid JSON.</p>}
-                                </div>
-                            </>
-                        )}
+                        <div className="space-y-2">
+                            <Label htmlFor="additionalCredentials" className="flex items-center gap-2 text-xs">
+                                Additional API Credentials
+                                <HelpTooltip text="Some APIs require additional credentials alongside OAuth. Common examples: developer_token (Google Ads), account_id, workspace_id. Add any extra key-value pairs needed." />
+                            </Label>
+                            <div className="w-full">
+                                <CredentialsManager
+                                    value={apiKeyCredentials}
+                                    onChange={setApiKeyCredentials}
+                                    className={cn('min-h-20', validationErrors.credentials && inputErrorStyles)}
+                                />
+                            </div>
+                            {validationErrors.credentials && <p className="text-sm text-destructive">Credentials must be valid JSON.</p>}
+                        </div>
 
                         <div>
                             <Label htmlFor="specificInstructions">Specific Instructions</Label>

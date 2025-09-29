@@ -6,10 +6,11 @@ export interface IntegrationConfig {
   openApiUrl?: string;
   preferredAuthType?: 'oauth' | 'apikey' | 'none';
   oauth?: {
-    authUrl: string;
-    tokenUrl: string;
+    authUrl?: string;
+    tokenUrl?: string;
     scopes?: string;
     client_id?: string; // Public client ID (non-sensitive, can be in template)
+    grant_type?: "authorization_code" | "client_credentials";
   };
   keywords?: string[];
 }
@@ -455,6 +456,7 @@ export const integrations: Record<string, IntegrationConfig> = {
       authUrl: "https://login.salesforce.com/services/oauth2/authorize",
       tokenUrl: "https://login.salesforce.com/services/oauth2/token",
       scopes: "full",
+      grant_type: "authorization_code",
       client_id: "3MVG9rZjd7MXFdLh_gnrsdT0JY5BfNPxarDdhPQvng2.N9lbP0RCh9Rov2Mx.QYjNVNjlCuJMlYOouwbYOMAx"
     },
     keywords: ["accounts", "contacts", "leads", "opportunities", "cases", "campaigns", "products", "price books", "quotes", "contracts", "orders", "custom objects", "soql", "query", "search", "sobjects", "oauth"]

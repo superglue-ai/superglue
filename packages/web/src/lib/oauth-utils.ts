@@ -1,4 +1,45 @@
+import { SuperglueClient } from '@superglue/client';
 import { getOAuthConfig } from '@superglue/shared';
+
+export class ExtendedSuperglueClient extends SuperglueClient {
+    private async graphQL<T = any>(query: string, variables?: any): Promise<T> {
+        const endpoint = (this as any)['endpoint'] as string;
+        const apiKey = (this as any)['apiKey'] as string;
+        const res = await fetch(`${endpoint.replace(/\/$/, '')}/graphql`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({ query, variables })
+        });
+        if (!res.ok) throw new Error(`GraphQL ${res.status}`);
+        const json = await res.json();
+        if (json.errors && json.errors.length) throw new Error(json.errors[0]?.message || 'GraphQL error');
+        return json.data as T;
+    }
+
+    async cacheOauthClientSecrets(args: { clientSecretUid: string; clientId: string; clientSecret: string }): Promise<boolean> {
+        const data = await this.graphQL<{ cacheOauthClientSecrets: boolean }>(`
+            mutation CacheOauthClientSecrets($clientSecretUid: String!, $clientId: String!, $clientSecret: String!) {
+                cacheOauthClientSecrets(clientSecretUid: $clientSecretUid, clientId: $clientId, clientSecret: $clientSecret)
+            }
+        `, args);
+        return Boolean(data?.cacheOauthClientSecrets);
+    }
+
+    async getOAuthClientSecrets(args: { clientId?: string; templateId?: string; clientSecretUid?: string }): Promise<{ client_id: string; client_secret: string }> {
+        const data = await this.graphQL<{ getOAuthClientSecrets: { client_id: string; client_secret: string } }>(`
+            mutation GetOAuthClientSecrets($clientId: String, $templateId: ID, $clientSecretUid: String) {
+                getOAuthClientSecrets(clientId: $clientId, templateId: $templateId, clientSecretUid: $clientSecretUid) {
+                    client_id
+                    client_secret
+                }
+            }
+        `, args);
+        return data.getOAuthClientSecrets;
+    }
+}
 
 /**
  * Generate OAuth callback URL for the current application
@@ -19,7 +60,9 @@ export const buildOAuthUrlForIntegration = (
         auth_url?: string;
     },
     selectedIntegration?: string,
-    apiKey?: string
+    apiKey?: string,
+    templateInfo?: { templateId?: string; clientId?: string },
+    stateExtras?: Record<string, any>
 ): string | null => {
     try {
         const { client_id, scopes } = oauthFields;
@@ -49,6 +92,9 @@ export const buildOAuthUrlForIntegration = (
                 timestamp: Date.now(),
                 apiKey,
                 redirectUri,
+                ...(templateInfo || {}),
+                token_url: (oauthFields as any).token_url,
+                ...(stateExtras || {}),
             })),
         });
 
@@ -94,7 +140,7 @@ export const monitorOAuthPopup = (
     onUserCancelled: () => void,
     checkInterval: number = 1000
 ): (() => void) => {
-    if (!popup) return () => {};
+    if (!popup) return () => { };
 
     let isCompleted = false;
     let intervalId: NodeJS.Timeout;
@@ -121,7 +167,7 @@ export const monitorOAuthPopup = (
             // Check if popup navigated to an error page (common OAuth error patterns)
             try {
                 const popupUrl = popup.location.href;
-                if (popupUrl.includes('error=') || 
+                if (popupUrl.includes('error=') ||
                     popupUrl.includes('error_description=') ||
                     popupUrl.includes('access_denied') ||
                     popupUrl.includes('invalid_request') ||
@@ -186,16 +232,12 @@ export const triggerOAuthFlow = (
     apiKey?: string,
     authType?: string,
     onError?: (error: string) => void,
-    forceOAuth?: boolean
+    forceOAuth?: boolean,
+    templateInfo?: { templateId?: string; clientId?: string },
+    onSuccess?: (tokens: any) => void
 ): (() => void) | null => {
     const grantType = oauthFields.grant_type || 'authorization_code';
-    
-    // For client credentials, the backend handles the OAuth flow automatically
-    // when the integration is saved, so we don't need to do anything here
-    if (grantType === 'client_credentials') {
-        return null;
-    }
-    
+
     // For authorization code flow, check if we should trigger OAuth
     const shouldTriggerOAuth = authType === 'oauth' && (
         // Trigger if OAuth is not configured yet
@@ -205,34 +247,128 @@ export const triggerOAuthFlow = (
     );
 
     if (shouldTriggerOAuth) {
-        // Authorization code flow - open popup
+        const usingTemplateClient = Boolean(templateInfo && (templateInfo.templateId || templateInfo.clientId));
+        let stateExtras: Record<string, any> | undefined;
+
+        // If user provided client_secret (any grant), stage it in backend cache and carry UID in state
+        let cachePromise: Promise<any> | null = null;
+        if (!usingTemplateClient && (oauthFields as any).client_secret && oauthFields.client_id && apiKey) {
+            const client_secret_uid = generateNonce();
+            stateExtras = { client_secret_uid };
+            const endpoint = (typeof window !== 'undefined' && (window as any).__SUPERGLUE_ENDPOINT__)
+                ? (window as any).__SUPERGLUE_ENDPOINT__
+                : (typeof window !== 'undefined' ? `${window.location.origin}/api` : (process.env.GRAPHQL_ENDPOINT as string));
+            // Minimal log to verify cache staging call
+            try { console.debug('oauth cache: staging', { endpoint, clientSecretUid: client_secret_uid, clientId: String(oauthFields.client_id) }); } catch { }
+            const client = new ExtendedSuperglueClient({ endpoint, apiKey });
+            // Store the promise so we can await it if needed
+            cachePromise = client.cacheOauthClientSecrets({
+                clientSecretUid: client_secret_uid,
+                clientId: String(oauthFields.client_id),
+                clientSecret: String((oauthFields as any).client_secret)
+            });
+        }
+
+        if (grantType === 'client_credentials') {
+            const origin = window.location.origin;
+            const statePayload = btoa(JSON.stringify({
+                integrationId,
+                timestamp: Date.now(),
+                apiKey,
+                redirectUri: `${origin}/api/auth/callback`,
+                ...(templateInfo || {}),
+                token_url: (oauthFields as any).token_url,
+                ...(stateExtras || {}),
+            }));
+
+            // If we're caching secrets, wait for that to complete before making the callback
+            const makeCallbackRequest = () => {
+                try { console.debug('oauth cc: calling callback'); } catch { }
+                return fetch(`${origin}/api/auth/callback?grant_type=client_credentials&state=${encodeURIComponent(statePayload)}`)
+                    .then(async (response) => {
+                        if (response.ok) {
+                            const data = await response.json();
+                            if (onSuccess && data.tokens) {
+                                onSuccess(data.tokens);
+                            }
+                        } else {
+                            // Try to parse error response
+                            try {
+                                const errorData = await response.json();
+                                if (errorData.message && onError) {
+                                    onError(errorData.message);
+                                }
+                            } catch {
+                                if (onError) onError('OAuth authentication failed');
+                            }
+                        }
+                    })
+                    .catch((error) => {
+                        try { console.error('Client credentials OAuth error:', error); } catch { }
+                        if (onError) onError('Failed to complete client credentials OAuth flow');
+                    });
+            };
+
+            if (cachePromise) {
+                cachePromise
+                    .then(() => makeCallbackRequest())
+                    .catch((error) => {
+                        try { console.error('oauth cache: staging failed', error); } catch { }
+                        if (onError) onError('Could not stage OAuth client secret. Please retry.');
+                    });
+            } else {
+                // No caching needed (using template credentials), proceed directly
+                makeCallbackRequest();
+            }
+
+            return null;
+        }
+
+        // Authorization code flow - open provider consent screen
         const authUrl = buildOAuthUrlForIntegration(
             integrationId,
             oauthFields,
             selectedIntegration,
-            apiKey
+            apiKey,
+            templateInfo,
+            stateExtras
         );
-        
+
         if (authUrl) {
             const popup = openOAuthPopup(authUrl);
-            
-            if (popup && onError) {
-                // Monitor popup for user cancellation
+            if (popup) {
+                const handleMessage = (event: MessageEvent) => {
+                    if (event.origin !== window.location.origin) return;
+                    if (event.data?.type === 'oauth-success' && event.data?.integrationId === integrationId) {
+                        window.removeEventListener('message', handleMessage);
+                        if (onSuccess && event.data.tokens) {
+                            onSuccess(event.data.tokens);
+                        }
+                    } else if (event.data?.type === 'oauth-error' && event.data?.integrationId === integrationId) {
+                        window.removeEventListener('message', handleMessage);
+                        if (onError) {
+                            onError(event.data.message || 'OAuth authentication failed');
+                        }
+                    }
+                };
+
+                window.addEventListener('message', handleMessage);
+
                 return monitorOAuthPopup(popup, () => {
-                    onError('OAuth flow was cancelled or failed. Please check your OAuth configuration and try again.');
+                    window.removeEventListener('message', handleMessage);
+                    if (onError) {
+                        onError('OAuth flow was cancelled or the popup was closed.');
+                    }
                 });
             }
         } else if (onError) {
             onError('Failed to build OAuth URL. Please check your OAuth configuration (client_id, auth_url, etc.).');
         }
     }
-    
+
     return null;
 };
 
-/**
- * Create a comprehensive OAuth error handler that shows user-friendly toast messages
- */
 export const createOAuthErrorHandler = (
     integrationId: string,
     toast: (props: { title: string; description: string; variant?: 'default' | 'destructive' }) => any
@@ -240,12 +376,11 @@ export const createOAuthErrorHandler = (
     return (error: string) => {
         console.error('oauth error', integrationId, error);
         const errorInfo = parseOAuthError(error, integrationId);
-        
-        // Combine error message and action into a single toast
-        const fullDescription = errorInfo.action 
+
+        const fullDescription = errorInfo.action
             ? `${errorInfo.description}\n\nWhat to do next: ${errorInfo.action}`
             : errorInfo.description;
-        
+
         toast({
             title: errorInfo.title,
             description: fullDescription,
@@ -254,12 +389,10 @@ export const createOAuthErrorHandler = (
     };
 };
 
-/**
- * Parse OAuth error and return user-friendly message with actionable advice
- */
+
 export const parseOAuthError = (error: string, integrationId: string): { title: string; description: string; action?: string } => {
     const errorLower = error.toLowerCase();
-    
+
     // Common OAuth error patterns
     if (errorLower.includes('invalid_client') || errorLower.includes('unauthorized_client')) {
         return {
@@ -268,7 +401,7 @@ export const parseOAuthError = (error: string, integrationId: string): { title: 
             action: 'Check your OAuth app settings and ensure the client ID and secret are correct.'
         };
     }
-    
+
     if (errorLower.includes('invalid_request') || errorLower.includes('malformed')) {
         return {
             title: 'Invalid OAuth Request',
@@ -276,7 +409,7 @@ export const parseOAuthError = (error: string, integrationId: string): { title: 
             action: 'Please check your OAuth configuration and try again.'
         };
     }
-    
+
     if (errorLower.includes('access_denied') || errorLower.includes('user_denied')) {
         return {
             title: 'OAuth Authorization Denied',
@@ -284,7 +417,7 @@ export const parseOAuthError = (error: string, integrationId: string): { title: 
             action: 'Please try again and grant the necessary permissions when prompted.'
         };
     }
-    
+
     if (errorLower.includes('invalid_scope')) {
         return {
             title: 'Invalid OAuth Scope',
@@ -292,7 +425,7 @@ export const parseOAuthError = (error: string, integrationId: string): { title: 
             action: 'Please check the OAuth scopes configured for this integration.'
         };
     }
-    
+
     if (errorLower.includes('server_error') || errorLower.includes('temporarily_unavailable')) {
         return {
             title: 'OAuth Provider Error',
@@ -300,7 +433,7 @@ export const parseOAuthError = (error: string, integrationId: string): { title: 
             action: 'Please wait a few minutes and try again.'
         };
     }
-    
+
     if (errorLower.includes('redirect_uri_mismatch')) {
         return {
             title: 'Redirect URI Mismatch',
@@ -308,7 +441,7 @@ export const parseOAuthError = (error: string, integrationId: string): { title: 
             action: `Add this URL to your OAuth app's allowed redirect URIs: ${getOAuthCallbackUrl()}`
         };
     }
-    
+
     if (errorLower.includes('client_id') || errorLower.includes('client secret')) {
         return {
             title: 'OAuth Credentials Issue',
@@ -316,7 +449,7 @@ export const parseOAuthError = (error: string, integrationId: string): { title: 
             action: 'Please verify your OAuth app\'s client ID and secret are correct.'
         };
     }
-    
+
     if (errorLower.includes('not found') || errorLower.includes('404')) {
         return {
             title: 'OAuth Configuration Error',
@@ -324,7 +457,7 @@ export const parseOAuthError = (error: string, integrationId: string): { title: 
             action: 'Please check your OAuth app settings and ensure the authorization URL is correct.'
         };
     }
-    
+
     if (errorLower.includes('cancelled') || errorLower.includes('closed')) {
         return {
             title: 'OAuth Flow Cancelled',
@@ -332,13 +465,23 @@ export const parseOAuthError = (error: string, integrationId: string): { title: 
             action: 'Please try again and complete the OAuth authorization process.'
         };
     }
-    
-    // Generic error fallback
+
     return {
         title: 'OAuth Connection Failed',
         description: `Failed to complete OAuth connection for ${integrationId}. ${error}`,
         action: 'Please check your OAuth configuration and try again.'
     };
 };
+
+const generateNonce = (): string => {
+    const bytes = new Uint8Array(16);
+    if (typeof window !== 'undefined' && window.crypto && window.crypto.getRandomValues) {
+        window.crypto.getRandomValues(bytes);
+    } else {
+        for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+    }
+    return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+};
+
 
 

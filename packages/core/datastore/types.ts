@@ -43,7 +43,7 @@ export interface DataStore {
   upsertIntegration(params: { id: string; integration: Integration; orgId?: string }): Promise<Integration>;
   deleteIntegration(params: { id: string; orgId?: string }): Promise<boolean>;
   getManyIntegrations(params: { ids: string[]; includeDocs?: boolean; orgId?: string }): Promise<Integration[]>;
-  getTemplateOAuthCredentials(templateId: string): Promise<{ client_id: string; client_secret: string } | null>;
+  getTemplateOAuthCredentials(params: { templateId?: string; clientId?: string }): Promise<{ client_id: string; client_secret: string } | null>;
 
   // Workflow Schedule
   listWorkflowSchedules(params: { workflowId: string, orgId: string }): Promise<WorkflowScheduleInternal[]>;

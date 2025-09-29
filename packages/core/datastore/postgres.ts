@@ -30,9 +30,6 @@ export class PostgresService implements DataStore {
 
         this.initializeTables();
     }
-    getSuperglueCreds(templateId: string): Promise<{ client_id: string; client_secret: string; } | null> {
-        throw new Error("Method not implemented.");
-    }
     async getManyWorkflows(params: { ids: string[]; orgId?: string }): Promise<Workflow[]> {
         const { ids, orgId } = params;
         const client = await this.pool.connect();
@@ -926,13 +923,32 @@ export class PostgresService implements DataStore {
         }
     }
 
-    async getTemplateOAuthCredentials(templateId: string): Promise<{ client_id: string; client_secret: string } | null> {
+    async getTemplateOAuthCredentials(params: { templateId?: string; clientId?: string }): Promise<{ client_id: string; client_secret: string } | null> {
+        const { templateId, clientId } = params;
+        if (!templateId && !clientId) {
+            return null;
+        }
+
         const client = await this.pool.connect();
         try {
-            const result = await client.query(
-                'SELECT sg_client_id, sg_client_secret FROM integration_templates WHERE id = $1',
-                [templateId]
-            );
+            let query: string;
+            let queryParams: string[];
+
+            if (templateId && clientId) {
+                // If both provided, use OR condition to find by either
+                query = 'SELECT sg_client_id, sg_client_secret FROM integration_templates WHERE id = $1 AND sg_client_id = $2';
+                queryParams = [templateId, clientId];
+            } else if (templateId) {
+                // Only templateId provided
+                query = 'SELECT sg_client_id, sg_client_secret FROM integration_templates WHERE id = $1';
+                queryParams = [templateId];
+            } else {
+                // Only clientId provided
+                query = 'SELECT sg_client_id, sg_client_secret FROM integration_templates WHERE sg_client_id = $1';
+                queryParams = [clientId];
+            }
+
+            const result = await client.query(query, queryParams);
 
             if (!result.rows[0]) return null;
             const decrypted = credentialEncryption.decrypt({
@@ -944,7 +960,8 @@ export class PostgresService implements DataStore {
                 client_secret: decrypted?.secret || ''
             };
         } catch (error) {
-            logMessage('debug', `No Superglue credentials found for template: ${templateId}`, { error });
+            const searchKey = templateId ? `template: ${templateId}` : `client_id: ${clientId}`;
+            logMessage('debug', `No Superglue credentials found for ${searchKey}`, { error });
             return null;
         } finally {
             client.release();
