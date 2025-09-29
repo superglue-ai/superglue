@@ -5,6 +5,7 @@ import { ToolDefinition } from "../tools/tools.js";
 import { parseJSON } from "../utils/json-parser.js";
 import { addNullableToOptional } from "../utils/tools.js";
 import { LLM, LLMObjectResponse, LLMResponse } from "./llm.js";
+import { logMessage } from "../utils/logs.js";
 
 type ReasoningEffort = "minimal" | "low" | "medium" | "high";
 type VerbosityLevel = "low" | "medium" | "high";
@@ -89,7 +90,7 @@ export class OpenAIModel implements LLM {
         messages: updatedMessages
       } as LLMResponse;
     } catch (error) {
-      console.error('Error in generateText with Responses API:', error);
+      logMessage('error', 'Error in generateText with Responses API:', error);
       // Fall back to chat completions API
       const result = await this.client.chat.completions.create({
         messages: [dateMessage as ChatCompletionMessageParam, ...messages],
@@ -303,11 +304,11 @@ export class OpenAIModel implements LLM {
     } catch (error) {
       const updatedMessages = [...messages, {
         role: "assistant",
-        content: "Error: " + error.message
+        content: "Error: OpenAI API Error: " + error.message
       }];
 
       return {
-        response: "Error: " + error.message,
+        response: "Error: OpenAI API Error: " + error.message,
         messages: updatedMessages
       } as LLMObjectResponse;
     }
