@@ -23,7 +23,6 @@ const WorkflowSchedulesList = ({ workflowId }: { workflowId: string }) => {
   const config = useConfig();
   const [workflowSchedules, setWorkflowSchedules] = React.useState<WorkflowSchedule[]>([]);
   const [loadingSchedules, setLoadingSchedules] = React.useState(false);
-  const [loadingTimeout, setTimeoutLoading] = React.useState<NodeJS.Timeout | null>(null);
   const [modalOpen, setModalOpen] = React.useState(false);
   const [modalSchedule, setModalSchedule] = React.useState<WorkflowSchedule | null>(null);
 
@@ -31,8 +30,10 @@ const WorkflowSchedulesList = ({ workflowId }: { workflowId: string }) => {
     loadSchedules();
   }, [workflowId]);
 
-  const loadSchedules = async () => {
-    setLoadingSchedules(true);
+  const loadSchedules = async (showLoading = true) => {
+    if (showLoading) {
+      setLoadingSchedules(true);
+    }
 
     const superglueClient = new SuperglueClient({
       endpoint: config.superglueEndpoint,
@@ -59,6 +60,9 @@ const WorkflowSchedulesList = ({ workflowId }: { workflowId: string }) => {
     });
 
     await superglueClient.deleteWorkflowSchedule(scheduleId);
+
+    // make sure server and client state are in sync
+    loadSchedules(false);
   };
 
   const handleScheduleStateToggle = async (newState: boolean, scheduleId: string) => {
@@ -80,6 +84,9 @@ const WorkflowSchedulesList = ({ workflowId }: { workflowId: string }) => {
       id: scheduleId,
       enabled: newState
     });
+
+    // make sure server and client state are in sync (e.g. for nextRunAt)
+    loadSchedules(false);
   };
 
   const handleModalOpen = (schedule?: WorkflowSchedule) => {
@@ -147,7 +154,9 @@ const WorkflowSchedulesList = ({ workflowId }: { workflowId: string }) => {
                 <TableCell className="w-[200px]">{schedule.cronExpression}</TableCell>
                 <TableCell className="w-[200px]">{schedule.timezone}</TableCell>
                 <TableCell className="w-[300px]">{schedule.lastRunAt ? new Date(schedule.lastRunAt).toLocaleString() : 'Never'}</TableCell>
-                <TableCell className="w-[300px]">{schedule.nextRunAt ? new Date(schedule.nextRunAt).toLocaleString() : 'Never'}</TableCell>
+                <TableCell className="w-[300px]">
+                  {!schedule.enabled ? 'Disabled' : (new Date(schedule.nextRunAt).toLocaleString())}
+                </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1">
                     <Button variant="ghost" size="icon" onClick={() => handleModalOpen(schedule)}>

@@ -59,7 +59,7 @@ export class WorkflowScheduler {
         let nextRunAt = existingScheduleOrNull?.nextRunAt;
         const cronExpressionChanged = params.cronExpression !== undefined && params.cronExpression !== existingScheduleOrNull?.cronExpression;
         const timezoneChanged = params.timezone !== undefined && params.timezone !== existingScheduleOrNull?.timezone;
-        if(cronExpressionChanged || timezoneChanged) {
+        if(cronExpressionChanged || timezoneChanged || params.enabled == true) {
             const currentDate = new Date(Date.now());
             nextRunAt = calculateNextRun(cronExpression, timezone, currentDate);
         }
