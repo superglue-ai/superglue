@@ -90,7 +90,7 @@ export class OpenAIModel implements LLM {
         messages: updatedMessages
       } as LLMResponse;
     } catch (error) {
-      logMessage('error', 'Error in generateText with Responses API:', error);
+      logMessage('error', 'Error in OpenAI generateText with Responses API:', error);
       // Fall back to chat completions API
       const result = await this.client.chat.completions.create({
         messages: [dateMessage as ChatCompletionMessageParam, ...messages],
@@ -302,6 +302,7 @@ export class OpenAIModel implements LLM {
       } as LLMObjectResponse;
 
     } catch (error) {
+      logMessage('error', 'Error in OpenAI generateObject with Responses API:', error);
       const updatedMessages = [...messages, {
         role: "assistant",
         content: "Error: OpenAI API Error: " + error.message
