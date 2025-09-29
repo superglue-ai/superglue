@@ -234,17 +234,20 @@ export const triggerOAuthFlow = (
     onError?: (error: string) => void,
     forceOAuth?: boolean,
     templateInfo?: { templateId?: string; clientId?: string },
-    onSuccess?: (tokens: any) => void
+    onSuccess?: (tokens: any) => void,
+    endpoint?: string
 ): (() => void) | null => {
     const grantType = oauthFields.grant_type || 'authorization_code';
 
     // For authorization code flow, check if we should trigger OAuth
     const shouldTriggerOAuth = authType === 'oauth' && (
-        // Trigger if OAuth is not configured yet
-        (!oauthFields.access_token || !oauthFields.refresh_token) ||
-        // OR if OAuth is forced (e.g., when fields changed)
-        forceOAuth
+        // For client_credentials, always trigger if forced (user clicked connect button)
+        (grantType === 'client_credentials' && forceOAuth) ||
+        // For authorization_code, trigger if no tokens or forced
+        (grantType === 'authorization_code' && ((!oauthFields.access_token || !oauthFields.refresh_token) || forceOAuth))
     );
+
+    try { console.debug('shouldTriggerOAuth', shouldTriggerOAuth); } catch { }
 
     if (shouldTriggerOAuth) {
         const usingTemplateClient = Boolean(templateInfo && (templateInfo.templateId || templateInfo.clientId));
@@ -252,16 +255,27 @@ export const triggerOAuthFlow = (
 
         // If user provided client_secret (any grant), stage it in backend cache and carry UID in state
         let cachePromise: Promise<any> | null = null;
+        const hasClientSecret = !!(oauthFields as any).client_secret;
+        const hasClientId = !!oauthFields.client_id;
+        const hasApiKey = !!apiKey;
+
+        try { console.debug('oauth cache check', { usingTemplateClient, hasClientSecret, hasClientId, hasApiKey, grantType }); } catch { }
+
         if (!usingTemplateClient && (oauthFields as any).client_secret && oauthFields.client_id && apiKey) {
             const client_secret_uid = generateNonce();
             stateExtras = { client_secret_uid };
-            const endpoint = (typeof window !== 'undefined' && (window as any).__SUPERGLUE_ENDPOINT__)
-                ? (window as any).__SUPERGLUE_ENDPOINT__
-                : (typeof window !== 'undefined' ? `${window.location.origin}/api` : (process.env.GRAPHQL_ENDPOINT as string));
-            // Minimal log to verify cache staging call
-            try { console.debug('oauth cache: staging', { endpoint, clientSecretUid: client_secret_uid, clientId: String(oauthFields.client_id) }); } catch { }
-            const client = new ExtendedSuperglueClient({ endpoint, apiKey });
-            // Store the promise so we can await it if needed
+
+            // Use the passed endpoint, or fallback to window.location.origin/api
+            const clientEndpoint = endpoint || (typeof window !== 'undefined' ? `${window.location.origin}/api` : '');
+
+            if (!clientEndpoint) {
+                if (onError) onError('Could not determine API endpoint');
+                return null;
+            }
+
+            try { console.debug('oauth cache: staging', { endpoint: clientEndpoint, clientSecretUid: client_secret_uid, clientId: String(oauthFields.client_id) }); } catch { }
+            const client = new ExtendedSuperglueClient({ endpoint: clientEndpoint, apiKey });
+
             cachePromise = client.cacheOauthClientSecrets({
                 clientSecretUid: client_secret_uid,
                 clientId: String(oauthFields.client_id),

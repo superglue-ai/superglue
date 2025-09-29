@@ -244,7 +244,8 @@ export default function IntegrationsPage() {
             handleOAuthError,
             true,
             undefined,
-            handleOAuthSuccess
+            handleOAuthSuccess,
+            config.superglueEndpoint
         );
     };
 

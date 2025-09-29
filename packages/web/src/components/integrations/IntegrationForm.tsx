@@ -464,7 +464,8 @@ export function IntegrationForm({
                 handleOAuthError,
                 true,
                 templateInfo,
-                handleOAuthSuccess
+                handleOAuthSuccess,
+                config.superglueEndpoint
             );
 
         } catch (error) {
