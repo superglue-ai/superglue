@@ -5,7 +5,7 @@ import { deleteApiResolver, deleteExtractResolver, deleteTransformResolver } fro
 import { extractResolver } from "./resolvers/extract.js";
 import { generateInstructionsResolver, generateSchemaResolver } from "./resolvers/generate.js";
 import { getApiResolver, getExtractResolver, getRunResolver, getTransformResolver } from "./resolvers/get.js";
-import { cacheOauthClientSecretsResolver, deleteIntegrationResolver, findRelevantIntegrationsResolver, getIntegrationResolver, getOAuthClientSecretsResolver, listIntegrationsResolver, upsertIntegrationResolver } from "./resolvers/integrations.js";
+import { cacheOauthClientCredentialsResolver, deleteIntegrationResolver, findRelevantIntegrationsResolver, getIntegrationResolver, getOAuthClientCredentialsResolver, listIntegrationsResolver, upsertIntegrationResolver } from "./resolvers/integrations.js";
 import { listApisResolver, listExtractsResolver, listRunsResolver, listTransformsResolver } from "./resolvers/list.js";
 import { logsResolver } from "./resolvers/logs.js";
 import { JSONResolver, JSONSchemaResolver, JSONataResolver } from "./resolvers/scalars.js";
@@ -60,8 +60,8 @@ export const resolvers = {
     upsertTransformation: upsertTransformResolver,
     deleteTransformation: deleteTransformResolver,
     upsertIntegration: upsertIntegrationResolver,
-    cacheOauthClientSecrets: cacheOauthClientSecretsResolver,
-    getOAuthClientSecrets: getOAuthClientSecretsResolver,
+    cacheOauthClientCredentials: cacheOauthClientCredentialsResolver,
+    getOAuthClientCredentials: getOAuthClientCredentialsResolver,
     deleteIntegration: deleteIntegrationResolver,
     upsertWorkflowSchedule: upsertWorkflowScheduleResolver,
     deleteWorkflowSchedule: deleteWorkflowScheduleResolver,

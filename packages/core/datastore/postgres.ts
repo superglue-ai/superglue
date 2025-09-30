@@ -1020,7 +1020,7 @@ export class PostgresService implements DataStore {
 
             return {
                 clientId: row.client_id,
-                clientSecret: decrypted?.secret || row.client_secret
+                clientSecret: decrypted?.secret || ''
             };
         } finally {
             client.release();

@@ -18,25 +18,25 @@ export class ExtendedSuperglueClient extends SuperglueClient {
         return json.data as T;
     }
 
-    async cacheOauthClientSecrets(args: { clientSecretUid: string; clientId: string; clientSecret: string }): Promise<boolean> {
-        const data = await this.graphQL<{ cacheOauthClientSecrets: boolean }>(`
-            mutation CacheOauthClientSecrets($clientSecretUid: String!, $clientId: String!, $clientSecret: String!) {
-                cacheOauthClientSecrets(clientSecretUid: $clientSecretUid, clientId: $clientId, clientSecret: $clientSecret)
+    async cacheOauthClientCredentials(args: { clientCredentialsUid: string; clientId: string; clientSecret: string }): Promise<boolean> {
+        const data = await this.graphQL<{ cacheOauthClientCredentials: boolean }>(`
+            mutation CacheOauthClientCredentials($clientCredentialsUid: String!, $clientId: String!, $clientSecret: String!) {
+                cacheOauthClientCredentials(clientCredentialsUid: $clientCredentialsUid, clientId: $clientId, clientSecret: $clientSecret)
             }
         `, args);
-        return Boolean(data?.cacheOauthClientSecrets);
+        return Boolean(data?.cacheOauthClientCredentials);
     }
 
-    async getOAuthClientSecrets(args: { clientId?: string; templateId?: string; clientSecretUid?: string }): Promise<{ client_id: string; client_secret: string }> {
-        const data = await this.graphQL<{ getOAuthClientSecrets: { client_id: string; client_secret: string } }>(`
-            mutation GetOAuthClientSecrets($clientId: String, $templateId: ID, $clientSecretUid: String) {
-                getOAuthClientSecrets(clientId: $clientId, templateId: $templateId, clientSecretUid: $clientSecretUid) {
+    async getOAuthClientCredentials(args: { clientId?: string; templateId?: string; clientCredentialsUid?: string }): Promise<{ client_id: string; client_secret: string }> {
+        const data = await this.graphQL<{ getOAuthClientCredentials: { client_id: string; client_secret: string } }>(`
+            mutation GetOAuthClientCredentials($clientId: String, $templateId: ID, $clientCredentialsUid: String) {
+                getOAuthClientCredentials(clientId: $clientId, templateId: $templateId, clientCredentialsUid: $clientCredentialsUid) {
                     client_id
                     client_secret
                 }
             }
         `, args);
-        return data.getOAuthClientSecrets;
+        return data.getOAuthClientCredentials;
     }
 }
 
@@ -59,7 +59,7 @@ type OAuthState = {
     token_url: string;
     templateId?: string;
     clientId?: string;
-    client_secret_uid?: string;
+    client_credentials_uid?: string;
 };
 
 type OAuthCallbacks = {
@@ -67,8 +67,9 @@ type OAuthCallbacks = {
     onError?: (error: string) => void;
 };
 
-const getOAuthCallbackUrl = (): string => {
-    return `${window.location.origin}/api/auth/callback`;
+export const getOAuthCallbackUrl = (): string => {
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+    return `${baseUrl}/api/auth/callback`;
 };
 
 
@@ -78,7 +79,7 @@ const buildOAuthState = (params: {
     tokenUrl: string;
     templateId?: string;
     clientId?: string;
-    clientSecretUid?: string;
+    clientCredentialsUid?: string;
 }): OAuthState => {
     return {
         integrationId: params.integrationId,
@@ -88,7 +89,7 @@ const buildOAuthState = (params: {
         token_url: params.tokenUrl,
         ...(params.templateId && { templateId: params.templateId }),
         ...(params.clientId && { clientId: params.clientId }),
-        ...(params.clientSecretUid && { client_secret_uid: params.clientSecretUid }),
+        ...(params.clientCredentialsUid && { client_credentials_uid: params.clientCredentialsUid }),
     };
 };
 
@@ -274,13 +275,13 @@ export const triggerOAuthFlow = (
     const callbacks: OAuthCallbacks = { onSuccess, onError };
     const usingTemplate = Boolean(templateInfo?.templateId || templateInfo?.clientId);
     let cachePromise: Promise<any> | null = null;
-    let clientSecretUid: string | undefined;
+    let clientCredentialsUid: string | undefined;
 
     if (!usingTemplate && oauthFields.client_secret && oauthFields.client_id && apiKey && endpoint) {
-        clientSecretUid = crypto.randomUUID();
+        clientCredentialsUid = crypto.randomUUID();
         const client = new ExtendedSuperglueClient({ endpoint, apiKey });
-        cachePromise = client.cacheOauthClientSecrets({
-            clientSecretUid,
+        cachePromise = client.cacheOauthClientCredentials({
+            clientCredentialsUid,
             clientId: oauthFields.client_id,
             clientSecret: oauthFields.client_secret
         });
@@ -292,7 +293,7 @@ export const triggerOAuthFlow = (
         tokenUrl: oauthFields.token_url!,
         templateId: templateInfo?.templateId,
         clientId: templateInfo?.clientId || oauthFields.client_id,
-        clientSecretUid,
+        clientCredentialsUid,
     });
 
     if (grantType === 'client_credentials') {
@@ -373,7 +374,7 @@ export const parseOAuthError = (error: string, integrationId: string): { title: 
         return {
             title: 'Redirect URI Mismatch',
             description: 'The redirect URI in your OAuth app doesn\'t match the expected callback URL.',
-            action: `Add this URL to your OAuth app's allowed redirect URIs: ${window.location.origin}/api/auth/callback`
+            action: `Add this URL to your OAuth app's allowed redirect URIs: ${getOAuthCallbackUrl()}`
         };
     }
 

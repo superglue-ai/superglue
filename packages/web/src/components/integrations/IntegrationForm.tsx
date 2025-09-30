@@ -17,7 +17,7 @@ import { useToast } from '@/src/hooks/use-toast';
 import { cn, composeUrl, inputErrorStyles } from '@/src/lib/utils';
 import type { Integration } from '@superglue/client';
 
-import { createOAuthErrorHandler, triggerOAuthFlow } from '@/src/lib/oauth-utils';
+import { createOAuthErrorHandler, getOAuthCallbackUrl, triggerOAuthFlow } from '@/src/lib/oauth-utils';
 import { integrations } from '@superglue/shared';
 import { Check, ChevronRight, ChevronsUpDown, Copy, Globe } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -721,6 +721,14 @@ export function IntegrationForm({
 
                     {authType === 'oauth' && (
                         <>
+                            {!isOAuthConfigured && !useSuperglueOAuth && (
+                                <div className="inline-flex items-center gap-1 text-amber-800 dark:text-amber-300 text-xs bg-amber-500/10 px-2 py-1.5 rounded border border-amber-500/20">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                    </svg>
+                                    <span>OAuth not configured. Add OAuth credentials and connect in OAuth setup below.</span>
+                                </div>
+                            )}
                             {(useSuperglueOAuth || isOAuthConfigured) && (
                                 <div className="pt-1">
                                     <Button
@@ -898,14 +906,14 @@ export function IntegrationForm({
                                                     </Label>
                                                     <div className="flex items-center gap-2 mt-1 mb-2">
                                                         <code className="text-xs bg-background px-2 py-1 rounded flex-1 overflow-x-auto">
-                                                            {window.location.origin}/api/auth/callback
+                                                            {getOAuthCallbackUrl()}
                                                         </code>
                                                         <Button
                                                             type="button"
                                                             variant="ghost"
                                                             size="icon"
                                                             className="h-8 w-8"
-                                                            onClick={() => copyToClipboard(`${window.location.origin}/api/auth/callback`)}
+                                                            onClick={() => copyToClipboard(getOAuthCallbackUrl())}
                                                         >
                                                             <Copy className="h-4 w-4" />
                                                         </Button>

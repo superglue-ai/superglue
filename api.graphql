@@ -475,8 +475,8 @@ type Mutation {
   ): Integration!
   deleteIntegration(id: ID!): Boolean!
 
-  cacheOauthClientSecrets(clientSecretUid: String!, clientId: String!, clientSecret: String!): Boolean!
-  getOAuthClientSecrets(clientId: String, templateId: ID, clientSecretUid: String): OAuthClientCredentials!
+  cacheOauthClientCredentials(clientCredentialsUid: String!, clientId: String!, clientSecret: String!): Boolean!
+  getOAuthClientCredentials(clientId: String, templateId: ID, clientCredentialsUid: String): OAuthClientCredentials!
 }
 
 type Subscription {

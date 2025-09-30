@@ -146,18 +146,18 @@ export const findRelevantIntegrationsResolver = async (
   }
 };
 
-export const cacheOauthClientSecretsResolver = async (
+export const cacheOauthClientCredentialsResolver = async (
   _: any,
-  { clientSecretUid, clientId, clientSecret }: { clientSecretUid: string; clientId: string; clientSecret: string },
+  { clientCredentialsUid, clientId, clientSecret }: { clientCredentialsUid: string; clientId: string; clientSecret: string },
   context: Context,
 ) => {
-  if (!clientSecretUid || !clientId || !clientSecret) {
+  if (!clientCredentialsUid || !clientId || !clientSecret) {
     throw new Error('Missing required parameters');
   }
   const OAUTH_SECRET_TTL_MS = server_defaults.POSTGRES.OAUTH_SECRET_TTL_MS;
 
   await context.datastore.cacheOAuthSecret({
-    uid: clientSecretUid,
+    uid: clientCredentialsUid,
     clientId,
     clientSecret,
     ttlMs: OAUTH_SECRET_TTL_MS
@@ -166,21 +166,21 @@ export const cacheOauthClientSecretsResolver = async (
   return true;
 };
 
-export const getOAuthClientSecretsResolver = async (
+export const getOAuthClientCredentialsResolver = async (
   _: any,
-  { clientId, templateId, clientSecretUid }: { clientId?: string; templateId?: string; clientSecretUid?: string },
+  { clientId, templateId, clientCredentialsUid }: { clientId?: string; templateId?: string; clientCredentialsUid?: string },
   context: Context,
   info: GraphQLResolveInfo
 ) => {
-  if (clientSecretUid) {
-    const entry = await context.datastore.getOAuthSecret({ uid: clientSecretUid });
+  if (clientCredentialsUid) {
+    const entry = await context.datastore.getOAuthSecret({ uid: clientCredentialsUid });
 
     if (!entry) {
-      logMessage('debug', 'getOAuthClientSecrets: cache miss/expired', {
+      logMessage('debug', 'getOAuthClientCredentials: cache miss/expired', {
         orgId: context.orgId,
-        clientSecretUid,
+        clientCredentialsUid,
       });
-      throw new Error('Cached OAuth client secret not found or expired');
+      throw new Error('Cached OAuth client credentials not found or expired');
     }
 
     return { client_id: entry.clientId, client_secret: entry.clientSecret };

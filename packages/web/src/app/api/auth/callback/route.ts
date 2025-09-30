@@ -10,7 +10,7 @@ interface OAuthState {
     redirectUri?: string;
     templateId?: string;
     clientId?: string;
-    client_secret_uid?: string;
+    client_credentials_uid?: string;
 }
 
 interface OAuthTokenResponse {
@@ -230,7 +230,7 @@ export async function GET(request: NextRequest) {
 
     try {
         const stateData = JSON.parse(atob(state)) as OAuthState & { token_url?: string };
-        const { integrationId, apiKey, timestamp, client_secret_uid, templateId, clientId, token_url } = stateData;
+        const { integrationId, apiKey, timestamp, client_credentials_uid, templateId, clientId, token_url } = stateData;
 
         if (Date.now() - timestamp >= OAUTH_STATE_EXPIRY_MS) {
             throw new Error('OAuth state expired. Please try again.');
@@ -238,7 +238,7 @@ export async function GET(request: NextRequest) {
 
         const endpoint = process.env.GRAPHQL_ENDPOINT;
         const client = new ExtendedSuperglueClient({ endpoint, apiKey });
-        const resolved = await client.getOAuthClientSecrets({ clientId, templateId, clientSecretUid: client_secret_uid });
+        const resolved = await client.getOAuthClientCredentials({ clientId, templateId, clientCredentialsUid: client_credentials_uid });
         if (!resolved?.client_secret || !resolved?.client_id) {
             throw new Error('OAuth client credentials could not be resolved');
         }
