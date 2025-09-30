@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import OpenAI, { AzureOpenAI } from "openai";
 import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
 import { server_defaults } from "../default.js";
 import { ToolDefinition } from "../tools/tools.js";
@@ -9,17 +9,34 @@ import { LLM, LLMObjectResponse, LLMResponse } from "./llm.js";
 
 export class OpenAILegacyModel implements LLM {
     public contextLength: number = 128000;
-    private client: OpenAI;
+    private client: OpenAI | AzureOpenAI;
     readonly model: string;
+    private isAzure: boolean;
 
     constructor(model: string = null) {
         this.model = model || process.env.OPENAI_MODEL || "gpt-4.1";
-        this.client = new OpenAI({
-            apiKey: process.env.OPENAI_API_KEY || "",
-            baseURL: process.env.OPENAI_BASE_URL,
-            timeout: server_defaults.LLM.REQUEST_TIMEOUT_MS,
-            maxRetries: server_defaults.LLM.MAX_INTERNAL_RETRIES,
-        });
+        const baseURL = process.env.OPENAI_BASE_URL;
+        const apiVersion = process.env.OPENAI_API_VERSION;
+
+        this.isAzure = !!(baseURL && apiVersion);
+
+        if (this.isAzure) {
+            this.client = new AzureOpenAI({
+                apiKey: process.env.OPENAI_API_KEY || "",
+                endpoint: baseURL,
+                apiVersion: apiVersion,
+                deployment: this.model,
+                timeout: server_defaults.LLM.REQUEST_TIMEOUT_MS,
+                maxRetries: server_defaults.LLM.MAX_INTERNAL_RETRIES,
+            });
+        } else {
+            this.client = new OpenAI({
+                apiKey: process.env.OPENAI_API_KEY || "",
+                baseURL: baseURL,
+                timeout: server_defaults.LLM.REQUEST_TIMEOUT_MS,
+                maxRetries: server_defaults.LLM.MAX_INTERNAL_RETRIES,
+            });
+        }
     }
 
     async generateText(messages: ChatCompletionMessageParam[], temperature: number = 0): Promise<LLMResponse> {
@@ -28,11 +45,16 @@ export class OpenAILegacyModel implements LLM {
             content: "The current date and time is " + new Date().toISOString()
         };
 
-        const result = await this.client.chat.completions.create({
+        const requestParams: any = {
             messages: [dateMessage as ChatCompletionMessageParam, ...messages],
-            model: this.model,
             temperature,
-        });
+        };
+
+        if (!this.isAzure) {
+            requestParams.model = this.model;
+        }
+
+        const result = await this.client.chat.completions.create(requestParams);
 
         const responseText = result.choices[0].message.content;
 
@@ -172,12 +194,15 @@ export class OpenAILegacyModel implements LLM {
 
             while (finalResult === null) {
                 const requestParams: any = {
-                    model: this.model,
                     messages: conversationMessages,
                     tools: tools.map(t => ({ type: t.type, function: t.function })),
-                    tool_choice: "required",
+                    tool_choice: "auto",
                     temperature
                 };
+
+                if (!this.isAzure) {
+                    requestParams.model = this.model;
+                }
 
                 const response = await this.client.chat.completions.create(requestParams);
 
