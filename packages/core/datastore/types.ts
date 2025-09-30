@@ -45,6 +45,11 @@ export interface DataStore {
   getManyIntegrations(params: { ids: string[]; includeDocs?: boolean; orgId?: string }): Promise<Integration[]>;
   getTemplateOAuthCredentials(params: { templateId?: string; clientId?: string }): Promise<{ client_id: string; client_secret: string } | null>;
 
+  // OAuth Ephemeral Secrets (for OAuth flows)
+  cacheOAuthSecret(params: { uid: string; clientId: string; clientSecret: string; ttlMs: number }): Promise<void>;
+  getOAuthSecret(params: { uid: string }): Promise<{ clientId: string; clientSecret: string } | null>;
+  deleteOAuthSecret(params: { uid: string }): Promise<void>;
+
   // Workflow Schedule
   listWorkflowSchedules(params: { workflowId: string, orgId: string }): Promise<WorkflowScheduleInternal[]>;
   getWorkflowSchedule(params: { id: string; orgId?: string }): Promise<WorkflowScheduleInternal | null>;

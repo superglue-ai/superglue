@@ -423,4 +423,35 @@ export class MemoryStore implements DataStore {
     // This is only available in PostgresStore with database configuration
     return null;
   }
+
+  private oauthSecrets: Map<string, { clientId: string; clientSecret: string; expiresAt: number }> = new Map();
+
+  async cacheOAuthSecret(params: { uid: string; clientId: string; clientSecret: string; ttlMs: number }): Promise<void> {
+    this.oauthSecrets.set(params.uid, {
+      clientId: params.clientId,
+      clientSecret: params.clientSecret,
+      expiresAt: Date.now() + params.ttlMs
+    });
+  }
+
+  async getOAuthSecret(params: { uid: string }): Promise<{ clientId: string; clientSecret: string } | null> {
+    const entry = this.oauthSecrets.get(params.uid);
+
+    if (!entry || entry.expiresAt <= Date.now()) {
+      this.oauthSecrets.delete(params.uid);
+      return null;
+    }
+
+    // Delete after retrieval (one-time use)
+    this.oauthSecrets.delete(params.uid);
+
+    return {
+      clientId: entry.clientId,
+      clientSecret: entry.clientSecret
+    };
+  }
+
+  async deleteOAuthSecret(params: { uid: string }): Promise<void> {
+    this.oauthSecrets.delete(params.uid);
+  }
 } 

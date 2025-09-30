@@ -934,16 +934,10 @@ export class PostgresService implements DataStore {
             let query: string;
             let queryParams: string[];
 
-            if (templateId && clientId) {
-                // If both provided, use OR condition to find by either
-                query = 'SELECT sg_client_id, sg_client_secret FROM integration_templates WHERE id = $1 AND sg_client_id = $2';
-                queryParams = [templateId, clientId];
-            } else if (templateId) {
-                // Only templateId provided
+            if (templateId) {
                 query = 'SELECT sg_client_id, sg_client_secret FROM integration_templates WHERE id = $1';
                 queryParams = [templateId];
             } else {
-                // Only clientId provided
                 query = 'SELECT sg_client_id, sg_client_secret FROM integration_templates WHERE sg_client_id = $1';
                 queryParams = [clientId];
             }
@@ -963,6 +957,69 @@ export class PostgresService implements DataStore {
             const searchKey = templateId ? `template: ${templateId}` : `client_id: ${clientId}`;
             logMessage('debug', `No Superglue credentials found for ${searchKey}`, { error });
             return null;
+        } finally {
+            client.release();
+        }
+    }
+
+    async cacheOAuthSecret(params: { uid: string; clientId: string; clientSecret: string; ttlMs: number }): Promise<void> {
+        const client = await this.pool.connect();
+        try {
+            const expiresAt = new Date(Date.now() + params.ttlMs);
+            const encrypted = credentialEncryption.encrypt({ secret: params.clientSecret });
+            const encryptedSecret = encrypted?.secret || params.clientSecret;
+
+            await client.query(
+                `INSERT INTO oauth_ephemeral_secrets (uid, client_id, client_secret, expires_at)
+                 VALUES ($1, $2, $3, $4)
+                 ON CONFLICT (uid) DO UPDATE SET
+                    client_id = EXCLUDED.client_id,
+                    client_secret = EXCLUDED.client_secret,
+                    expires_at = EXCLUDED.expires_at`,
+                [params.uid, params.clientId, encryptedSecret, expiresAt]
+            );
+        } finally {
+            client.release();
+        }
+    }
+
+    async getOAuthSecret(params: { uid: string }): Promise<{ clientId: string; clientSecret: string } | null> {
+        const client = await this.pool.connect();
+        try {
+            const result = await client.query(
+                `SELECT client_id, client_secret, expires_at
+                 FROM oauth_ephemeral_secrets
+                 WHERE uid = $1`,
+                [params.uid]
+            );
+
+            if (result.rows.length === 0) {
+                return null;
+            }
+
+            const row = result.rows[0];
+
+            if (new Date(row.expires_at) <= new Date()) {
+                await client.query('DELETE FROM oauth_ephemeral_secrets WHERE uid = $1', [params.uid]);
+                return null;
+            }
+
+            await client.query('DELETE FROM oauth_ephemeral_secrets WHERE uid = $1', [params.uid]);
+            const decrypted = credentialEncryption.decrypt({ secret: row.client_secret });
+
+            return {
+                clientId: row.client_id,
+                clientSecret: decrypted?.secret || row.client_secret
+            };
+        } finally {
+            client.release();
+        }
+    }
+
+    async deleteOAuthSecret(params: { uid: string }): Promise<void> {
+        const client = await this.pool.connect();
+        try {
+            await client.query('DELETE FROM oauth_ephemeral_secrets WHERE uid = $1', [params.uid]);
         } finally {
             client.release();
         }

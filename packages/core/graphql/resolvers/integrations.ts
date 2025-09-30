@@ -2,6 +2,7 @@ import { Integration } from '@superglue/client';
 import { Context, findMatchingIntegration, integrations, Metadata } from "@superglue/shared";
 import { generateUniqueId } from '@superglue/shared/utils';
 import { GraphQLResolveInfo } from "graphql";
+import { server_defaults } from '../../default.js';
 import { IntegrationSelector } from '../../integrations/integration-selector.js';
 import { Documentation } from '../../utils/documentation.js';
 import { logMessage } from '../../utils/logs.js';
@@ -148,8 +149,7 @@ export const findRelevantIntegrationsResolver = async (
 export const templateClientCredentialsResolver = async (
   _: any,
   { clientId, templateId }: { clientId?: string, templateId?: string },
-  context: Context,
-  info: GraphQLResolveInfo
+  context: Context
 ) => {
   if (!clientId && !templateId) {
     throw new Error('clientId or templateId is required');
@@ -166,38 +166,24 @@ export const templateClientCredentialsResolver = async (
   }
 };
 
-type CachedSecret = { clientId: string; clientSecret: string; expires: number };
-const OAUTH_SECRET_TTL_MS = 5 * 60 * 1000;
-const oauthSecretCache: Map<string, CachedSecret> = new Map();
-
-// Periodic cleanup
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, value] of oauthSecretCache.entries()) {
-    if (value.expires <= now) oauthSecretCache.delete(key);
-  }
-}, 60 * 1000).unref?.();
 
 export const cacheOauthClientSecretsResolver = async (
   _: any,
   { clientSecretUid, clientId, clientSecret }: { clientSecretUid: string; clientId: string; clientSecret: string },
   context: Context,
-  info: GraphQLResolveInfo
 ) => {
   if (!clientSecretUid || !clientId || !clientSecret) {
     throw new Error('Missing required parameters');
   }
-  logMessage('debug', 'cacheOauthClientSecrets: write', {
-    orgId: context.orgId,
-    clientSecretUid,
-    clientId,
-    ttlMs: OAUTH_SECRET_TTL_MS,
-  });
-  oauthSecretCache.set(clientSecretUid, {
+  const OAUTH_SECRET_TTL_MS = server_defaults.POSTGRES.OAUTH_SECRET_TTL_MS;
+
+  await context.datastore.cacheOAuthSecret({
+    uid: clientSecretUid,
     clientId,
     clientSecret,
-    expires: Date.now() + OAUTH_SECRET_TTL_MS,
+    ttlMs: OAUTH_SECRET_TTL_MS
   });
+
   return true;
 };
 
@@ -208,27 +194,23 @@ export const getOAuthClientSecretsResolver = async (
   info: GraphQLResolveInfo
 ) => {
   if (clientSecretUid) {
-    const entry = oauthSecretCache.get(clientSecretUid);
-    if (!entry || entry.expires <= Date.now()) {
-      oauthSecretCache.delete(clientSecretUid);
+    const entry = await context.datastore.getOAuthSecret({ uid: clientSecretUid });
+
+    if (!entry) {
       logMessage('debug', 'getOAuthClientSecrets: cache miss/expired', {
         orgId: context.orgId,
         clientSecretUid,
       });
       throw new Error('Cached OAuth client secret not found or expired');
     }
-    oauthSecretCache.delete(clientSecretUid);
-    logMessage('debug', 'getOAuthClientSecrets: cache hit', {
-      orgId: context.orgId,
-      clientSecretUid,
-      clientId: entry.clientId,
-    });
+
     return { client_id: entry.clientId, client_secret: entry.clientSecret };
   }
 
   if (!clientId && !templateId) {
     throw new Error('No valid credentials source provided');
   }
+
   const creds = await context.datastore.getTemplateOAuthCredentials({ templateId, clientId });
   if (!creds) {
     throw new Error('Template client credentials not found');

@@ -239,7 +239,7 @@ export const triggerOAuthFlow = (
 ): (() => void) | null => {
     const grantType = oauthFields.grant_type || 'authorization_code';
 
-    // For authorization code flow, check if we should trigger OAuth
+    // Check if we should trigger OAuth
     const shouldTriggerOAuth = authType === 'oauth' && (
         // For client_credentials, always trigger if forced (user clicked connect button)
         (grantType === 'client_credentials' && forceOAuth) ||
@@ -247,19 +247,12 @@ export const triggerOAuthFlow = (
         (grantType === 'authorization_code' && ((!oauthFields.access_token || !oauthFields.refresh_token) || forceOAuth))
     );
 
-    try { console.debug('shouldTriggerOAuth', shouldTriggerOAuth); } catch { }
-
     if (shouldTriggerOAuth) {
         const usingTemplateClient = Boolean(templateInfo && (templateInfo.templateId || templateInfo.clientId));
         let stateExtras: Record<string, any> | undefined;
 
         // If user provided client_secret (any grant), stage it in backend cache and carry UID in state
         let cachePromise: Promise<any> | null = null;
-        const hasClientSecret = !!(oauthFields as any).client_secret;
-        const hasClientId = !!oauthFields.client_id;
-        const hasApiKey = !!apiKey;
-
-        try { console.debug('oauth cache check', { usingTemplateClient, hasClientSecret, hasClientId, hasApiKey, grantType }); } catch { }
 
         if (!usingTemplateClient && (oauthFields as any).client_secret && oauthFields.client_id && apiKey) {
             const client_secret_uid = generateNonce();
@@ -273,7 +266,6 @@ export const triggerOAuthFlow = (
                 return null;
             }
 
-            try { console.debug('oauth cache: staging', { endpoint: clientEndpoint, clientSecretUid: client_secret_uid, clientId: String(oauthFields.client_id) }); } catch { }
             const client = new ExtendedSuperglueClient({ endpoint: clientEndpoint, apiKey });
 
             cachePromise = client.cacheOauthClientSecrets({
@@ -297,7 +289,6 @@ export const triggerOAuthFlow = (
 
             // If we're caching secrets, wait for that to complete before making the callback
             const makeCallbackRequest = () => {
-                try { console.debug('oauth cc: calling callback'); } catch { }
                 return fetch(`${origin}/api/auth/callback?grant_type=client_credentials&state=${encodeURIComponent(statePayload)}`)
                     .then(async (response) => {
                         if (response.ok) {
@@ -318,7 +309,6 @@ export const triggerOAuthFlow = (
                         }
                     })
                     .catch((error) => {
-                        try { console.error('Client credentials OAuth error:', error); } catch { }
                         if (onError) onError('Failed to complete client credentials OAuth flow');
                     });
             };
@@ -327,7 +317,6 @@ export const triggerOAuthFlow = (
                 cachePromise
                     .then(() => makeCallbackRequest())
                     .catch((error) => {
-                        try { console.error('oauth cache: staging failed', error); } catch { }
                         if (onError) onError('Could not stage OAuth client secret. Please retry.');
                     });
             } else {
