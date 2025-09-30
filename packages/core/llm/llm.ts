@@ -3,6 +3,7 @@ import { ToolCall, ToolCallResult, ToolDefinition } from "../tools/tools.js";
 import { logMessage } from "../utils/logs.js";
 import { AnthropicModel } from "./anthropic-model.js";
 import { GeminiModel } from "./gemini-model.js";
+import { OpenAILegacyModel } from "./openai-legacy-model.js";
 import { OpenAIModel } from "./openai-model.js";
 
 export interface LLM {
@@ -26,7 +27,7 @@ export interface LLMAgentResponse {
         result: ToolCallResult;
     }>;
     messages: OpenAI.Chat.ChatCompletionMessageParam[];
-    responseId?: string;  
+    responseId?: string;
     success: boolean;
     lastSuccessfulToolCall?: {
         toolCall: ToolCall;
@@ -76,6 +77,9 @@ function selectLanguageModel(): LLM {
         case "OPENAI":
             logMessage("info", "Using OpenAI model: " + process.env.OPENAI_MODEL);
             return new OpenAIModel();
+        case "OPENAI_LEGACY":
+            logMessage("info", "Using OpenAI model with legacy API: " + process.env.OPENAI_MODEL);
+            return new OpenAILegacyModel();
         case "GEMINI":
             logMessage("info", "Using Gemini model: " + process.env.GEMINI_MODEL);
             return new GeminiModel();
