@@ -17,7 +17,7 @@ import { useToast } from '@/src/hooks/use-toast';
 import { cn, composeUrl, inputErrorStyles } from '@/src/lib/utils';
 import type { Integration } from '@superglue/client';
 
-import { buildOAuthUrlForIntegration, createOAuthErrorHandler, getOAuthCallbackUrl, triggerOAuthFlow } from '@/src/lib/oauth-utils';
+import { createOAuthErrorHandler, triggerOAuthFlow } from '@/src/lib/oauth-utils';
 import { integrations } from '@superglue/shared';
 import { Check, ChevronRight, ChevronsUpDown, Copy, Globe } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -44,31 +44,24 @@ function sanitizeIntegrationId(id: string) {
                 host = host.substring(0, 20);
             }
 
-            // Create ID with DB: prefix
             let cleanId = `DB-${host}-${database}`;
 
-            // Clean up and return
             return cleanId
                 .toLowerCase()
                 .replace(/[^a-z0-9-]/g, '-')  // Replace non-alphanumeric with hyphens
                 .replace(/-+/g, '-')          // Replace multiple hyphens with single
                 .replace(/^-|-$/g, '');       // Remove leading/trailing hyphens
         } catch {
-            // Fall back to regular processing if URL parsing fails
         }
     }
 
-    // Regular URL processing for non-PostgreSQL
-    // Remove protocol if present
     let cleanId = id.replace(/^.*:\/\//, '');
 
-    // Take everything before the first slash
     const slashIndex = cleanId.indexOf('/');
     if (slashIndex !== -1) {
         cleanId = cleanId.substring(0, slashIndex);
     }
 
-    // Clean up and return
     return cleanId
         .toLowerCase()
         .replace(/[^a-z0-9-]/g, '-')  // Replace non-alphanumeric with hyphens
@@ -567,15 +560,6 @@ export function IntegrationForm({
         }
     };
 
-    // Legacy function that uses the form's current ID (for backward compatibility)
-    const buildOAuthUrl = () => {
-        const integrationId = isEditing ? integration!.id : id.trim();
-        const templateInfo = useSuperglueOAuth ? {
-            templateId: selectedIntegration,
-            clientId: oauthFields.client_id
-        } : undefined;
-        return buildOAuthUrlForIntegration(integrationId, oauthFields, selectedIntegration, config.superglueApiKey, templateInfo);
-    };
 
     return (
         <Card className={cn(
@@ -924,14 +908,14 @@ export function IntegrationForm({
                                                     </Label>
                                                     <div className="flex items-center gap-2 mt-1 mb-2">
                                                         <code className="text-xs bg-background px-2 py-1 rounded flex-1 overflow-x-auto">
-                                                            {getOAuthCallbackUrl()}
+                                                            {window.location.origin}/api/auth/callback
                                                         </code>
                                                         <Button
                                                             type="button"
                                                             variant="ghost"
                                                             size="icon"
                                                             className="h-8 w-8"
-                                                            onClick={() => copyToClipboard(getOAuthCallbackUrl())}
+                                                            onClick={() => copyToClipboard(`${window.location.origin}/api/auth/callback`)}
                                                         >
                                                             <Copy className="h-4 w-4" />
                                                         </Button>

@@ -229,16 +229,13 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-        // Extract integration ID and client_secret_uid from state
         const stateData = JSON.parse(atob(state)) as OAuthState & { token_url?: string };
         const { integrationId, apiKey, timestamp, client_secret_uid, templateId, clientId, token_url } = stateData;
 
-        // Validate state timestamp
         if (Date.now() - timestamp >= OAUTH_STATE_EXPIRY_MS) {
             throw new Error('OAuth state expired. Please try again.');
         }
 
-        // Resolve secrets via GraphQL (cache or template)
         const endpoint = process.env.GRAPHQL_ENDPOINT;
         const client = new ExtendedSuperglueClient({ endpoint, apiKey });
         const resolved = await client.getOAuthClientSecrets({ clientId, templateId, clientSecretUid: client_secret_uid });

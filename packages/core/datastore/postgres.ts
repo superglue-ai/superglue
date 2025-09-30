@@ -202,6 +202,16 @@ export class PostgresService implements DataStore {
              )
             `);
 
+            await client.query(`
+                CREATE TABLE IF NOT EXISTS integration_oauth (
+                    uid TEXT PRIMARY KEY,
+                    client_id TEXT NOT NULL,
+                    client_secret TEXT NOT NULL,
+                    expires_at TIMESTAMP NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            `);
+
             await client.query(`CREATE INDEX IF NOT EXISTS idx_configurations_type_org ON configurations(type, org_id)`);
             await client.query(`CREATE INDEX IF NOT EXISTS idx_configurations_version ON configurations(version)`);
             await client.query(`CREATE INDEX IF NOT EXISTS idx_configurations_integration_ids ON configurations USING GIN(integration_ids)`);
@@ -211,6 +221,7 @@ export class PostgresService implements DataStore {
             await client.query(`CREATE INDEX IF NOT EXISTS idx_integrations_url_host ON integrations(url_host)`);
             await client.query(`CREATE INDEX IF NOT EXISTS idx_integration_details_integration_id ON integration_details(integration_id, org_id)`);
             await client.query(`CREATE INDEX IF NOT EXISTS idx_workflow_schedules_due ON workflow_schedules(next_run_at, enabled) WHERE enabled = true`);
+            await client.query(`CREATE INDEX IF NOT EXISTS idx_integration_oauth_expires ON integration_oauth(expires_at)`);
 
         } finally {
             client.release();
@@ -970,7 +981,7 @@ export class PostgresService implements DataStore {
             const encryptedSecret = encrypted?.secret || params.clientSecret;
 
             await client.query(
-                `INSERT INTO oauth_ephemeral_secrets (uid, client_id, client_secret, expires_at)
+                `INSERT INTO integration_oauth (uid, client_id, client_secret, expires_at)
                  VALUES ($1, $2, $3, $4)
                  ON CONFLICT (uid) DO UPDATE SET
                     client_id = EXCLUDED.client_id,
@@ -988,7 +999,7 @@ export class PostgresService implements DataStore {
         try {
             const result = await client.query(
                 `SELECT client_id, client_secret, expires_at
-                 FROM oauth_ephemeral_secrets
+                 FROM integration_oauth
                  WHERE uid = $1`,
                 [params.uid]
             );
@@ -1000,11 +1011,11 @@ export class PostgresService implements DataStore {
             const row = result.rows[0];
 
             if (new Date(row.expires_at) <= new Date()) {
-                await client.query('DELETE FROM oauth_ephemeral_secrets WHERE uid = $1', [params.uid]);
+                await client.query('DELETE FROM integration_oauth WHERE uid = $1', [params.uid]);
                 return null;
             }
 
-            await client.query('DELETE FROM oauth_ephemeral_secrets WHERE uid = $1', [params.uid]);
+            await client.query('DELETE FROM integration_oauth WHERE uid = $1', [params.uid]);
             const decrypted = credentialEncryption.decrypt({ secret: row.client_secret });
 
             return {
@@ -1019,7 +1030,7 @@ export class PostgresService implements DataStore {
     async deleteOAuthSecret(params: { uid: string }): Promise<void> {
         const client = await this.pool.connect();
         try {
-            await client.query('DELETE FROM oauth_ephemeral_secrets WHERE uid = $1', [params.uid]);
+            await client.query('DELETE FROM integration_oauth WHERE uid = $1', [params.uid]);
         } finally {
             client.release();
         }
