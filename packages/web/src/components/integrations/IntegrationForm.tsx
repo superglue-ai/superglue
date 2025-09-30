@@ -485,18 +485,10 @@ export function IntegrationForm({
                 }).filter(([_, value]) => value !== '')
             ) as Record<string, any>;
 
-            // Parse and merge additional credentials if provided
             let additionalCreds: Record<string, any> = {};
             try {
                 additionalCreds = JSON.parse(apiKeyCredentials);
             } catch {
-            }
-
-            // Remove sensitive fields for authorization_code from being persisted
-            const shouldStripSecret = (oauthCredsRaw.grant_type || 'authorization_code') === 'authorization_code';
-            if (shouldStripSecret) {
-                if ('client_secret' in oauthCredsRaw) delete oauthCredsRaw.client_secret;
-                if ('client_secret' in additionalCreds) delete additionalCreds.client_secret;
             }
 
             creds = { ...oauthCredsRaw, ...additionalCreds };
