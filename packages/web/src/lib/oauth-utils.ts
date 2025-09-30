@@ -27,10 +27,10 @@ export class ExtendedSuperglueClient extends SuperglueClient {
         return Boolean(data?.cacheOauthClientCredentials);
     }
 
-    async getOAuthClientCredentials(args: { clientId?: string; templateId?: string; clientCredentialsUid?: string }): Promise<{ client_id: string; client_secret: string }> {
+    async getOAuthClientCredentials(args: { templateId?: string; clientCredentialsUid?: string }): Promise<{ client_id: string; client_secret: string }> {
         const data = await this.graphQL<{ getOAuthClientCredentials: { client_id: string; client_secret: string } }>(`
-            mutation GetOAuthClientCredentials($clientId: String, $templateId: ID, $clientCredentialsUid: String) {
-                getOAuthClientCredentials(clientId: $clientId, templateId: $templateId, clientCredentialsUid: $clientCredentialsUid) {
+            mutation GetOAuthClientCredentials($templateId: ID, $clientCredentialsUid: String) {
+                getOAuthClientCredentials(templateId: $templateId, clientCredentialsUid: $clientCredentialsUid) {
                     client_id
                     client_secret
                 }

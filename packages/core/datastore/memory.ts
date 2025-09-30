@@ -418,9 +418,7 @@ export class MemoryStore implements DataStore {
     return false;
   }
 
-  async getTemplateOAuthCredentials(params: { templateId?: string; clientId?: string }): Promise<{ client_id: string; client_secret: string } | null> {
-    // MemoryStore doesn't support template OAuth credentials
-    // This is only available in PostgresStore with database configuration
+  async getTemplateOAuthCredentials(params: { templateId: string }): Promise<{ client_id: string; client_secret: string } | null> {
     return null;
   }
 

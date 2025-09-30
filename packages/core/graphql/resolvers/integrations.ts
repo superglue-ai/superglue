@@ -168,7 +168,7 @@ export const cacheOauthClientCredentialsResolver = async (
 
 export const getOAuthClientCredentialsResolver = async (
   _: any,
-  { clientId, templateId, clientCredentialsUid }: { clientId?: string; templateId?: string; clientCredentialsUid?: string },
+  { templateId, clientCredentialsUid }: { templateId?: string; clientCredentialsUid?: string },
   context: Context,
   info: GraphQLResolveInfo
 ) => {
@@ -186,11 +186,11 @@ export const getOAuthClientCredentialsResolver = async (
     return { client_id: entry.clientId, client_secret: entry.clientSecret };
   }
 
-  if (!clientId && !templateId) {
+  if (!templateId) {
     throw new Error('No valid credentials source provided');
   }
 
-  const creds = await context.datastore.getTemplateOAuthCredentials({ templateId, clientId });
+  const creds = await context.datastore.getTemplateOAuthCredentials({ templateId });
   if (!creds) {
     throw new Error('Template client credentials not found');
   }

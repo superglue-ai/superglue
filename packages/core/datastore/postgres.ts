@@ -934,28 +934,16 @@ export class PostgresService implements DataStore {
         }
     }
 
-    async getTemplateOAuthCredentials(params: { templateId?: string; clientId?: string }): Promise<{ client_id: string; client_secret: string } | null> {
-        const { templateId, clientId } = params;
-        if (!templateId && !clientId) {
-            return null;
-        }
-
+    async getTemplateOAuthCredentials(params: { templateId: string }): Promise<{ client_id: string; client_secret: string } | null> {
         const client = await this.pool.connect();
         try {
-            let query: string;
-            let queryParams: string[];
-
-            if (templateId) {
-                query = 'SELECT sg_client_id, sg_client_secret FROM integration_templates WHERE id = $1';
-                queryParams = [templateId];
-            } else {
-                query = 'SELECT sg_client_id, sg_client_secret FROM integration_templates WHERE sg_client_id = $1';
-                queryParams = [clientId];
-            }
-
-            const result = await client.query(query, queryParams);
+            const result = await client.query(
+                'SELECT sg_client_id, sg_client_secret FROM integration_templates WHERE id = $1',
+                [params.templateId]
+            );
 
             if (!result.rows[0]) return null;
+
             const decrypted = credentialEncryption.decrypt({
                 secret: result.rows[0].sg_client_secret
             });
@@ -965,8 +953,7 @@ export class PostgresService implements DataStore {
                 client_secret: decrypted?.secret || ''
             };
         } catch (error) {
-            const searchKey = templateId ? `template: ${templateId}` : `client_id: ${clientId}`;
-            logMessage('debug', `No Superglue credentials found for ${searchKey}`, { error });
+            logMessage('debug', `No template OAuth credentials found for ${params.templateId}`, { error });
             return null;
         } finally {
             client.release();

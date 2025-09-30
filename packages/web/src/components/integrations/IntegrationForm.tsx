@@ -792,7 +792,7 @@ export function IntegrationForm({
                                         return hasTemplateClient ? (
                                             <div className="flex items-center justify-between border rounded-md p-3">
                                                 <div className="text-sm">
-                                                    <div className="font-medium">Use Superglue OAuth client</div>
+                                                    <div className="font-medium">Use superglue OAuth client</div>
                                                     <div className="text-xs text-muted-foreground">Preconfigured client for {integrationOptions.find(o => o.value === selectedIntegration)?.label}</div>
                                                 </div>
                                                 <Switch
