@@ -43,6 +43,7 @@ export interface DataStore {
   upsertIntegration(params: { id: string; integration: Integration; orgId?: string }): Promise<Integration>;
   deleteIntegration(params: { id: string; orgId?: string }): Promise<boolean>;
   getManyIntegrations(params: { ids: string[]; includeDocs?: boolean; orgId?: string }): Promise<Integration[]>;
+  copyTemplateDocumentationToUserIntegration(params: { templateId: string; userIntegrationId: string; orgId?: string }): Promise<boolean>;
 
   // Workflow Schedule
   listWorkflowSchedules(params: { workflowId: string, orgId: string }): Promise<WorkflowScheduleInternal[]>;

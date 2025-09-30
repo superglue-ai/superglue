@@ -1,4 +1,5 @@
 export interface IntegrationConfig {
+    name: string;
     apiUrl: string;
     regex: string;
     icon: string;
@@ -15,6 +16,7 @@ export interface IntegrationConfig {
   
   export const integrations: Record<string, IntegrationConfig> = {  
     postgres: {
+      name: "postgres",
       apiUrl: "postgres://<<username>>:<<password>>@<<host>>:<<port>>/<<database>>",
       regex: "^.*(postgres|postgresql).*$",
       icon: "postgresql",
@@ -23,6 +25,7 @@ export interface IntegrationConfig {
       keywords: ["database", "sql", "postgres", "postgresql", "api key", "tables"]
     },
     stripe: {
+      name: "stripe",
       apiUrl: "https://api.stripe.com",
       regex: "^.*stripe.*$",
       icon: "stripe",
@@ -54,6 +57,7 @@ export interface IntegrationConfig {
         ]
     },
     shopify: {
+      name: "shopify",
       apiUrl: "https://admin.shopify.com",
       regex: "^.*(shopify|myshopify).*$",
       icon: "shopify",
@@ -84,6 +88,7 @@ export interface IntegrationConfig {
   
     },
     hubspot: {
+      name: "hubspot",
       apiUrl: "https://api.hubapi.com/crm/v3",
       regex: "^.*(hubapi|hubspot).*$",
       icon: "hubspot",
@@ -109,6 +114,7 @@ export interface IntegrationConfig {
   
     },
     attio: {
+      name: "attio",
       apiUrl: "https://api.attio.com/v2/",
       regex: "^.*attio.*$",
       icon: "attio",
@@ -136,6 +142,7 @@ export interface IntegrationConfig {
   
     },
     twilio: {
+      name: "twilio",
       apiUrl: "https://api.twilio.com",
       regex: "^.*twilio.*$",
       icon: "twilio",
@@ -163,6 +170,7 @@ export interface IntegrationConfig {
   
     },
     sendgrid: {
+      name: "sendgrid",
       apiUrl: "https://api.sendgrid.com",
       regex: "^.*sendgrid.*$",
       icon: "sendgrid",
@@ -188,6 +196,7 @@ export interface IntegrationConfig {
   
     },
     github: {
+      name: "github",
       apiUrl: "https://api.github.com",
       regex: "^.*github.*$",
       icon: "github",
@@ -219,6 +228,7 @@ export interface IntegrationConfig {
   
     },
     gitlab: {
+      name: "gitlab",
       apiUrl: "https://api.gitlab.com",
       regex: "^.*gitlab.*$",
       icon: "gitlab",
@@ -251,6 +261,7 @@ export interface IntegrationConfig {
   
     },
     bitbucket: {
+      name: "bitbucket",
       apiUrl: "https://api.bitbucket.org",
       regex: "^.*bitbucket.*$",
       icon: "bitbucket",
@@ -282,6 +293,7 @@ export interface IntegrationConfig {
   
     },
     slack: {
+      name: "slack",
       apiUrl: "https://api.slack.com",
       regex: "^.*slack.*$",
       icon: "slack",
@@ -313,6 +325,7 @@ export interface IntegrationConfig {
   
     },
     airtable: {
+      name: "airtable",
       apiUrl: "https://api.airtable.com",
       regex: "^.*airtable.*$",
       icon: "airtable",
@@ -321,11 +334,12 @@ export interface IntegrationConfig {
       oauth: {
         authUrl: "https://airtable.com/oauth2/v1/authorize",
         tokenUrl: "https://airtable.com/oauth2/v1/token",
-        scopes: "data.records:read data.records:write data.recordComments:read data.recordComments:write schema.bases:read schema.bases:write webhook:manage user.email:read"
+        scopes: "data.records: read data. records: write data.recordComments: read data.recordComments: write schema.bases: read schema.bases: write webhook:manage user.email:read"
       },
       keywords: ["bases", "tables", "records", "fields", "views", "formulas", "attachments", "comments", "collaborators", "metadata", "schemas", "api key", "key"]
     },
     gmail: {
+      name: "gmail",
       apiUrl: "https://gmail.googleapis.com/gmail/v1",
       regex: "^.*(gmail\\.googleapis|developers\\.google\\.com/gmail|mail\\.google).*$",
       icon: "gmail",
@@ -340,6 +354,7 @@ export interface IntegrationConfig {
       keywords: ["messages", "threads", "labels", "drafts", "send", "attachments", "history", "filters", "settings", "forwarding", "inbox", "profile", "oauth"]
     },
     googleDrive: {
+      name: "googleDrive",
       apiUrl: "https://www.googleapis.com/drive/v3",
       regex: "^.*(googleapis\\.com/drive|developers\\.google\\.com/drive|drive\\.google).*$",
       icon: "googledrive",
@@ -354,6 +369,7 @@ export interface IntegrationConfig {
       keywords: ["files", "folders", "permissions", "sharing", "comments", "revisions", "changes", "uploads", "downloads", "metadata", "teamdrives", "export", "copy", "move", "oauth"]
     },
     googleCalendar: {
+      name: "googleCalendar",
       apiUrl: "https://www.googleapis.com/calendar/v3",
       regex: "^.*(googleapis\\.com/calendar|developers\\.google\\.com/calendar|calendar\\.google).*$",
       icon: "googlecalendar",
@@ -368,6 +384,7 @@ export interface IntegrationConfig {
       keywords: ["events", "calendars", "attendees", "reminders", "recurring", "availability", "free busy", "settings", "acl", "colors", "notifications", "timezone", "quick add", "oauth"]
     },
     googleSheets: {
+      name: "googleSheets",
       apiUrl: "https://sheets.googleapis.com/v4",
       regex: "^.*(sheets\\.googleapis|developers\\.google\\.com/sheets|sheets\\.google).*$",
       icon: "googlesheets",
@@ -382,6 +399,7 @@ export interface IntegrationConfig {
       keywords: ["spreadsheets", "sheets", "cells", "ranges", "values", "formulas", "formatting", "charts", "pivot tables", "named ranges", "protected ranges", "batch update", "append", "oauth"]
     },
     googleAnalytics: {
+      name: "googleAnalytics",
       apiUrl: "https://analytics.google.com",
       regex: "^.*(analytics|analyticsdata).*$",
       icon: "googleAnalytics",
@@ -396,6 +414,7 @@ export interface IntegrationConfig {
       keywords: ["properties", "dimensions", "metrics", "reports", "audiences", "conversions", "events", "goals", "segments", "real time", "user activity", "attribution", "funnels", "cohorts", "oauth"]
     },
     youtube: {
+      name: "youtube",
       apiUrl: "https://youtube.googleapis.com",
       regex: "^.*youtube.*$",
       icon: "youtube",
@@ -410,6 +429,7 @@ export interface IntegrationConfig {
       keywords: ["videos", "channels", "playlists", "comments", "captions", "live streams", "analytics", "thumbnails", "subscriptions", "activities", "ratings", "uploads", "members", "oauth"]
     },
     AWS: {
+      name: "AWS",
       apiUrl: "https://amazonaws.com",
       regex: "^.*(aws|amazonaws).*$",
       icon: "amazonAWS",
@@ -418,6 +438,7 @@ export interface IntegrationConfig {
       keywords: ["ec2", "s3", "lambda", "rds", "dynamodb", "sqs", "sns", "cloudformation", "iam", "cloudwatch", "vpc", "instances", "buckets", "functions", "api key"]
     },
     googleCloud: {
+      name: "googleCloud",
       apiUrl: "https://cloud.google.com",
       regex: "^.*(cloud\\.google|gcp|googlecloud).*$",
       icon: "googleCloud",
@@ -431,6 +452,7 @@ export interface IntegrationConfig {
       keywords: ["compute", "storage", "bigquery", "pubsub", "cloud run", "kubernetes", "iam", "vpc", "cloud sql", "bigtable", "dataflow", "logging", "monitoring", "oauth"]
     },
     firebase: {
+      name: "firebase",
       apiUrl: "https://firestore.googleapis.com",
       regex: "^.*(firebase|firestore).*$",
       icon: "firebase",
@@ -445,6 +467,7 @@ export interface IntegrationConfig {
       keywords: ["firestore", "realtime database", "authentication", "cloud functions", "storage", "hosting", "documents", "collections", "users", "projects", "apps", "query", "oauth"]
     },
     salesforce: {
+      name: "salesforce",
       apiUrl: "https://api.salesforce.com",
       regex: "^.*salesforce.*$",
       icon: "salesforce",
@@ -458,6 +481,7 @@ export interface IntegrationConfig {
       keywords: ["accounts", "contacts", "leads", "opportunities", "cases", "campaigns", "products", "price books", "quotes", "contracts", "orders", "custom objects", "soql", "query", "search", "sobjects", "oauth"]
     },
     facebook: {
+      name: "facebook",
       apiUrl: "https://graph.facebook.com",
       regex: "^.*facebook.*$",
       icon: "facebook",
@@ -471,6 +495,7 @@ export interface IntegrationConfig {
       keywords: ["pages", "posts", "comments", "insights", "ads", "campaigns", "audiences", "business", "catalog", "events", "groups", "photos", "videos", "live videos", "oauth"]
     },
     instagram: {
+      name: "instagram",
       apiUrl: "https://graph.facebook.com/v23.0/",
       regex: "^.*instagram.*$",
       icon: "instagram",
@@ -484,6 +509,7 @@ export interface IntegrationConfig {
       keywords: ["media", "posts", "stories", "comments", "insights", "hashtags", "mentions", "business discovery", "content publishing", "user media", "account info", "oauth"]
     },
     twitter: {
+      name: "twitter",
       apiUrl: "https://api.twitter.com",
       regex: "^.*(twitter|x\\.com).*$",
       icon: "x",
@@ -498,6 +524,7 @@ export interface IntegrationConfig {
       keywords: ["tweets", "users", "followers", "timeline", "mentions", "retweets", "likes", "lists", "spaces", "direct messages", "trends", "media", "polls", "oauth"]
     },
     linkedin: {
+      name: "linkedin",
       apiUrl: "https://api.linkedin.com",
       regex: "^.*linkedin.*$",
       icon: "linkedin",
@@ -511,6 +538,7 @@ export interface IntegrationConfig {
       keywords: ["profiles", "connections", "companies", "shares", "posts", "articles", "jobs", "skills", "endorsements", "recommendations", "groups", "events", "messaging", "oauth"]
     },
     paypal: {
+      name: "paypal",
       apiUrl: "https://api.paypal.com",
       regex: "^.*paypal.*$",
       icon: "paypal",
@@ -519,6 +547,7 @@ export interface IntegrationConfig {
       keywords: ["payments", "orders", "captures", "refunds", "payouts", "invoices", "subscriptions", "plans", "products", "transactions", "balances", "webhooks", "checkout", "billing", "query", "search"]
     },
     square: {
+      name: "square",
       apiUrl: "https://connect.squareup.com",
       regex: "^.*(square|squareup).*$",
       icon: "square",
@@ -533,6 +562,7 @@ export interface IntegrationConfig {
       keywords: ["payments", "customers", "orders", "catalog", "inventory", "locations", "transactions", "refunds", "cards", "checkout", "invoices", "subscriptions", "terminals", "employees", "shifts", "query", "search", "oauth"]
     },
     adyen: {
+      name: "adyen",
       apiUrl: "https://checkout-test.adyen.com",
       regex: "^.*adyen.*$",
       icon: "adyen",
@@ -559,6 +589,7 @@ export interface IntegrationConfig {
   
     },
     razorpay: {
+      name: "razorpay",
       apiUrl: "https://api.razorpay.com",
       regex: "^.*razorpay.*$",
       icon: "razorpay",
@@ -583,6 +614,7 @@ export interface IntegrationConfig {
       ]
     },
     plaid: {
+      name: "plaid",
       apiUrl: "https://production.plaid.com",
       regex: "^.*plaid.*$",
       icon: "plaid",
@@ -609,6 +641,7 @@ export interface IntegrationConfig {
   
     },
     zendesk: {
+      name: "zendesk",
       apiUrl: "https://api.zendesk.com",
       regex: "^.*zendesk.*$",
       icon: "zendesk",
@@ -623,6 +656,7 @@ export interface IntegrationConfig {
       keywords: ["tickets", "users", "organizations", "groups", "agents", "views", "macros", "triggers", "automations", "sla", "custom fields", "tags", "satisfaction", "help center", "api key"]
     },
     freshdesk: {
+      name: "freshdesk",
       apiUrl: "https://{domain}.freshdesk.com/api/v2",
       regex: "^.*freshdesk.*$",
       icon: "freshdesk",
@@ -631,6 +665,7 @@ export interface IntegrationConfig {
       keywords: ["tickets", "contacts", "agents", "companies", "groups", "forums", "solutions", "categories", "folders", "articles", "time entries", "surveys", "satisfaction", "sla", "escalations", "api key"]
     },
     freshworks: {
+      name: "freshworks",
       apiUrl: "https://{domain}.freshservice.com/api/v2",
       regex: "^.*(freshworks|freshservice).*$",
       icon: "freshworks",
@@ -639,6 +674,7 @@ export interface IntegrationConfig {
       keywords: ["tickets", "requesters", "agents", "assets", "changes", "problems", "releases", "service catalog", "service items", "departments", "locations", "products", "vendors", "contracts", "api key"]
     },
     servicenow: {
+      name: "servicenow",
       apiUrl: "https://{instance}.service-now.com/api",
       regex: "^.*(servicenow|service-now).*$",
       icon: "servicenow",
@@ -647,6 +683,7 @@ export interface IntegrationConfig {
       keywords: ["incidents", "problems", "changes", "requests", "users", "groups", "cmdb", "configuration items", "service catalog", "knowledge", "tasks", "approvals", "sla", "workflows", "tables", "api key"]
     },
     helpscout: {
+      name: "helpscout",
       apiUrl: "https://api.helpscout.net",
       regex: "^.*helpscout.*$",
       icon: "helpscout",
@@ -655,6 +692,7 @@ export interface IntegrationConfig {
       keywords: ["conversations", "customers", "mailboxes", "threads", "tags", "teams", "users", "reports", "satisfaction", "ratings", "workflows", "saved replies", "docs", "beacon", "api key"]
     },
     dropbox: {
+      name: "dropbox",
       apiUrl: "https://api.dropboxapi.com",
       regex: "^.*dropbox.*$",
       icon: "dropbox",
@@ -668,6 +706,7 @@ export interface IntegrationConfig {
       keywords: ["files", "folders", "upload", "download", "sharing", "links", "metadata", "search", "sync", "paper", "users", "teams", "move", "copy", "delete", "oauth"]
     },
     mailchimp: {
+      name: "mailchimp",
       apiUrl: "https://api.mailchimp.com",
       regex: "^.*mailchimp.*$",
       icon: "mailchimp",
@@ -682,6 +721,7 @@ export interface IntegrationConfig {
       keywords: ["lists", "campaigns", "templates", "audiences", "members", "segments", "tags", "automations", "reports", "folders", "merge fields", "activities", "ecommerce", "batch", "query", "api key"]
     },
     jira: {
+      name: "jira",
       apiUrl: "https://{your-domain}.atlassian.net/rest/api",
       regex: "^.*(jira|atlassian).*$",
       icon: "jira",
@@ -696,6 +736,7 @@ export interface IntegrationConfig {
       keywords: ["issues", "projects", "boards", "sprints", "epics", "users", "workflows", "fields", "components", "versions", "priorities", "statuses", "comments", "attachments", "jql", "query", "search", "oauth"]
     },
     confluence: {
+      name: "confluence",
       apiUrl: "https://{your-domain}.atlassian.net/wiki/rest/api",
       regex: "^.*(confluence|atlassian).*$",
       icon: "confluence",
@@ -710,6 +751,7 @@ export interface IntegrationConfig {
       keywords: ["spaces", "pages", "content", "attachments", "comments", "labels", "templates", "blueprints", "macros", "restrictions", "versions", "ancestors", "descendants", "children", "oauth"]
     },
     quickbooks: {
+      name: "quickbooks",
       apiUrl: "https://quickbooks.api.intuit.com",
       regex: "^.*(quickbooks|intuit).*$",
       icon: "quickbooks",
@@ -723,6 +765,7 @@ export interface IntegrationConfig {
       keywords: ["accounts", "invoices", "customers", "vendors", "bills", "payments", "estimates", "purchase orders", "sales receipts", "credit memos", "journal entries", "items", "tax rates", "employees", "reports", "oauth"]
     },
     xero: {
+      name: "xero",
       apiUrl: "https://api.xero.com",
       regex: "^.*xero.*$",
       icon: "xero",
@@ -737,6 +780,7 @@ export interface IntegrationConfig {
       keywords: ["accounts", "invoices", "contacts", "bills", "credit notes", "bank transactions", "payments", "receipts", "journals", "purchase orders", "quotes", "reports", "tax rates", "tracking categories", "payroll", "oauth"]
     },
     docusign: {
+      name: "docusign",
       apiUrl: "https://api.docusign.com",
       regex: "^.*docusign.*$",
       icon: "docusign",
@@ -751,6 +795,7 @@ export interface IntegrationConfig {
       keywords: ["envelopes", "documents", "recipients", "templates", "signatures", "tabs", "brands", "accounts", "users", "groups", "powerforms", "bulk send", "connect", "custom fields", "oauth"]
     },
     intercom: {
+      name: "intercom",
       apiUrl: "https://api.intercom.io",
       regex: "^.*intercom.*$",
       icon: "intercom",
@@ -765,6 +810,7 @@ export interface IntegrationConfig {
       keywords: ["contacts", "conversations", "messages", "users", "companies", "events", "tags", "segments", "articles", "help center", "teams", "admins", "inbox", "notes", "custom attributes", "query", "api key"]
     },
     asana: {
+      name: "asana",
       apiUrl: "https://app.asana.com/api",
       regex: "^.*asana.*$",
       icon: "asana",
@@ -779,6 +825,7 @@ export interface IntegrationConfig {
       keywords: ["tasks", "projects", "workspaces", "teams", "portfolios", "goals", "sections", "tags", "custom fields", "stories", "attachments", "followers", "assignee", "due dates", "query", "search", "api key"]
     },
     trello: {
+      name: "trello",
       apiUrl: "https://api.trello.com",
       regex: "^.*trello.*$",
       icon: "trello",
@@ -788,6 +835,7 @@ export interface IntegrationConfig {
       keywords: ["boards", "lists", "cards", "members", "labels", "checklists", "attachments", "comments", "actions", "organizations", "teams", "power-ups", "custom fields", "stickers", "api key"]
     },
     notion: {
+      name: "notion",
       apiUrl: "https://api.notion.com",
       regex: "^.*notion.*$",
       icon: "notion",
@@ -802,6 +850,7 @@ export interface IntegrationConfig {
       keywords: ["pages", "databases", "blocks", "users", "workspaces", "properties", "rich text", "search", "comments", "parent", "children", "query", "filter", "sort", "api key"]
     },
     digitalocean: {
+      name: "digitalocean",
       apiUrl: "https://api.digitalocean.com",
       regex: "^.*digitalocean.*$",
       icon: "digitalocean",
@@ -834,6 +883,7 @@ export interface IntegrationConfig {
   
     },
     heroku: {
+      name: "heroku",
       apiUrl: "https://api.heroku.com",
       regex: "^.*heroku.*$",
       icon: "heroku",
@@ -864,6 +914,7 @@ export interface IntegrationConfig {
       ]
     },
     huggingface: {
+      name: "huggingface",
       apiUrl: "https://huggingface.co",
       regex: "^.*huggingface.*$",
       icon: "huggingface",
@@ -872,6 +923,7 @@ export interface IntegrationConfig {
       keywords: ["models", "datasets", "spaces", "parameters", "inference", "fine-tuning", "files", "spaces", "accounts", "groups", "api key"]
     },
     circleci: {
+      name: "circleci",
       apiUrl: "https://circleci.com/api",
       regex: "^.*circleci.*$",
       icon: "circleci",
@@ -895,6 +947,7 @@ export interface IntegrationConfig {
       ]
     },
     travisci: {
+      name: "travisci",
       apiUrl: "https://api.travis-ci.com",
       regex: "^.*(travis|travis-ci).*$",
       icon: "travisCI",
@@ -916,6 +969,7 @@ export interface IntegrationConfig {
       ]
     },
     wordpress: {
+      name: "wordpress",
       apiUrl: "https://{your-site.com}/wp-json/wp/v2",
       regex: "^.*wordpress.*$",
       icon: "wordpress",
@@ -940,6 +994,7 @@ export interface IntegrationConfig {
       ]
     },
     cloudflare: {
+      name: "cloudflare",
       apiUrl: "https://api.cloudflare.com",
       regex: "^.*cloudflare.*$",
       icon: "cloudflare",
@@ -963,6 +1018,7 @@ export interface IntegrationConfig {
       ]
     },
     bigcommerce: {
+      name: "bigcommerce",
       apiUrl: "https://api.bigcommerce.com",
       regex: "^.*bigcommerce.*$",
       icon: "bigcommerce",
@@ -986,6 +1042,7 @@ export interface IntegrationConfig {
       ]
     },
     woocommerce: {
+      name: "woocommerce",
       apiUrl: "https://{yourstore.com}/wp-json/wc/v3",
       regex: "^.*woocommerce.*$",
       icon: "woocommerce",
@@ -1009,6 +1066,7 @@ export interface IntegrationConfig {
       ]
     },
     prestashop: {
+      name: "prestashop",
       apiUrl: "https://{yourstore.com}/api",
       regex: "^.*prestashop.*$",
       icon: "prestashop",
@@ -1032,6 +1090,7 @@ export interface IntegrationConfig {
       ]
     },
     squarespace: {
+      name: "squarespace",
       apiUrl: "https://api.squarespace.com",
       regex: "^.*squarespace.*$",
       icon: "squarespace",
@@ -1058,6 +1117,7 @@ export interface IntegrationConfig {
       ]
     },
     monday: {
+      name: "monday",
       apiUrl: "https://api.monday.com/v2",
       regex: "^.*monday.*$",
       icon: "monday",
@@ -1071,6 +1131,7 @@ export interface IntegrationConfig {
       keywords: ["boards", "items", "groups", "columns", "updates", "users", "workspaces", "tags", "files", "activities", "teams", "subitems", "graphql", "mutations", "query", "api key"]
     },
     clickup: {
+      name: "clickup",
       apiUrl: "https://api.clickup.com/api/v2",
       regex: "^.*clickup.*$",
       icon: "clickup",
@@ -1085,6 +1146,7 @@ export interface IntegrationConfig {
       keywords: ["tasks", "lists", "folders", "spaces", "teams", "goals", "views", "statuses", "priorities", "tags", "custom fields", "time tracking", "comments", "checklists", "dependencies", "api key"]
     },
     typeform: {
+      name: "typeform",
       apiUrl: "https://api.typeform.com",
       regex: "^.*typeform.*$",
       icon: "typeform",
@@ -1098,6 +1160,7 @@ export interface IntegrationConfig {
       keywords: ["forms", "responses", "questions", "fields", "themes", "images", "workspaces", "logic jumps", "hidden fields", "variables", "calculations", "insights", "reports", "oauth"]
     },
     figma: {
+      name: "figma",
       apiUrl: "https://api.figma.com",
       regex: "^(.*\\.)?figma\\.com(/.*)?$",
       icon: "figma",
@@ -1112,6 +1175,7 @@ export interface IntegrationConfig {
       keywords: ["files", "projects", "teams", "components", "styles", "nodes", "frames", "pages", "images", "comments", "versions", "branches", "libraries", "plugins", "oauth"]
     },
     contentful: {
+      name: "contentful",
       apiUrl: "https://api.contentful.com",
       regex: "^(.*\\.)?contentful\\.com(/.*)?$",
       icon: "contentful",
@@ -1120,6 +1184,7 @@ export interface IntegrationConfig {
       keywords: ["spaces", "environments", "content types", "entries", "assets", "locales", "tags", "webhooks", "roles", "api keys", "content model", "publishing", "preview", "api key"]
     },
     sanity: {
+      name: "sanity",
       apiUrl: "https://api.sanity.io",
       regex: "^(.*\\.)?sanity\\.io(/.*)?$",
       icon: "sanity",
@@ -1128,6 +1193,7 @@ export interface IntegrationConfig {
       keywords: ["documents", "datasets", "projects", "schemas", "assets", "images", "mutations", "transactions", "groq", "listening", "history", "api key"]
     },
     prismic: {
+      name: "prismic",
       apiUrl: "https://api.prismic.io",
       regex: "^(.*\\.)?prismic\\.io(/.*)?$",
       icon: "prismic",
@@ -1136,6 +1202,7 @@ export interface IntegrationConfig {
       keywords: ["documents", "repositories", "custom types", "slices", "releases", "previews", "tags", "languages", "master ref", "api key"]
     },
     netlify: {
+      name: "netlify",
       apiUrl: "https://api.netlify.com",
       regex: "^(.*\\.)?netlify\\.com(/.*)?$",
       icon: "netlify",
@@ -1150,6 +1217,7 @@ export interface IntegrationConfig {
       keywords: ["sites", "deploys", "builds", "functions", "forms", "identity", "large media", "split tests", "analytics", "bandwidth", "dns zones", "ssl certificates", "api key"]
     },
     vercel: {
+      name: "vercel",
       apiUrl: "https://api.vercel.com",
       regex: "^(.*\\.)?vercel\\.com(/.*)?$",
       icon: "vercel",
@@ -1159,6 +1227,7 @@ export interface IntegrationConfig {
       keywords: ["deployments", "projects", "domains", "aliases", "secrets", "environment variables", "teams", "logs", "certificates", "dns", "edge config", "functions", "builds", "api key"]
     },
     amplitude: {
+      name: "amplitude",
       apiUrl: "https://api.amplitude.com",
       regex: "^(.*\\.)?amplitude\\.com(/.*)?$",
       icon: "amplitude",
@@ -1167,6 +1236,7 @@ export interface IntegrationConfig {
       keywords: ["events", "users", "cohorts", "charts", "dashboards", "behavioral", "properties", "segments", "funnels", "retention", "revenue", "annotations", "export", "api key"]
     },
     segment: {
+      name: "segment",
       apiUrl: "https://api.segment.com",
       regex: "^(.*\\.)?segment\\.com(/.*)?$",
       icon: "segment",
@@ -1175,6 +1245,7 @@ export interface IntegrationConfig {
       keywords: ["sources", "destinations", "tracking", "identify", "events", "traits", "warehouses", "functions", "transformations", "audiences", "personas", "protocols", "catalog", "api key"]
     },
     mixpanel: {
+      name: "mixpanel",
       apiUrl: "https://api.mixpanel.com",
       regex: "^(.*\\.)?mixpanel\\.com(/.*)?$",
       icon: "mixpanel",
@@ -1184,6 +1255,7 @@ export interface IntegrationConfig {
       keywords: ["events", "users", "profiles", "cohorts", "funnels", "retention", "insights", "properties", "engage", "import", "export", "jql", "query", "segmentation", "track", "api key"]
     },
     algolia: {
+      name: "algolia",
       apiUrl: "https://api.algolia.com",
       regex: "^(.*\\.)?algolia\\.com(/.*)?$",
       icon: "algolia",
@@ -1193,6 +1265,7 @@ export interface IntegrationConfig {
       keywords: ["indices", "search", "records", "objects", "facets", "filters", "ranking", "synonyms", "rules", "api keys", "analytics", "insights", "browse", "query", "api key"]
     },
     snowflake: {
+      name: "snowflake",
       apiUrl: "https://account.snowflakecomputing.com",
       regex: "^(.*\\.)?(snowflake\\.com|snowflakecomputing\\.com)(/.*)?$",
       icon: "snowflake",
@@ -1201,6 +1274,7 @@ export interface IntegrationConfig {
       keywords: ["warehouses", "databases", "schemas", "tables", "views", "stages", "pipes", "tasks", "streams", "procedures", "functions", "roles", "users", "sql", "api key"]
     },
     databricks: {
+      name: "databricks",
       apiUrl: "https://{your-workspace}.cloud.databricks.com/api",
       regex: "^(.*\\.)?(databricks\\.com|cloud\\.databricks\\.com)(/.*)?$",
       icon: "databricks",
@@ -1210,6 +1284,7 @@ export interface IntegrationConfig {
       keywords: ["clusters", "jobs", "notebooks", "dbfs", "libraries", "secrets", "tokens", "workspace", "mlflow", "delta", "sql endpoints", "permissions", "groups", "api key"]
     },
     looker: {
+      name: "looker",
       apiUrl: "https://{your-domain}.looker.com/api",
       regex: "^(.*\\.)?looker\\.com(/.*)?$",
       icon: "looker",
@@ -1219,6 +1294,7 @@ export interface IntegrationConfig {
       keywords: ["looks", "dashboards", "explores", "models", "views", "fields", "dimensions", "measures", "folders", "spaces", "schedules", "users", "groups", "roles", "api key"]
     },
     mongodb: {
+      name: "mongodb",
       apiUrl: "https://cloud.mongodb.com/api",
       regex: "^(.*\\.)?mongodb\\.com(/.*)?$",
       icon: "mongodb",
@@ -1227,6 +1303,7 @@ export interface IntegrationConfig {
       keywords: ["clusters", "databases", "collections", "documents", "indexes", "atlas", "realm", "charts", "data lake", "search", "triggers", "backups", "alerts", "api key"]
     },
     supabase: {
+      name: "supabase",
       apiUrl: "https://api.supabase.co",
       regex: "^(.*\\.)?(supabase\\.co|supabase\\.io)(/.*)?$",
       icon: "supabase",
@@ -1236,6 +1313,7 @@ export interface IntegrationConfig {
       keywords: ["tables", "rows", "auth", "storage", "functions", "realtime", "rpc", "buckets", "policies", "users", "postgrest", "select", "insert", "update", "delete", "filter", "api key"]
     },
     planetscale: {
+      name: "planetscale",
       apiUrl: "https://api.planetscale.com",
       regex: "^(.*\\.)?planetscale\\.com(/.*)?$",
       icon: "planetscale",
@@ -1245,6 +1323,7 @@ export interface IntegrationConfig {
       keywords: ["databases", "branches", "deploy requests", "schemas", "backups", "passwords", "certificates", "regions", "organizations", "audit logs", "insights", "api key"]
     },
     openai: {
+      name: "openai",
       apiUrl: "https://api.openai.com",
       regex: "^.*openai.*$",
       icon: "openai",
@@ -1254,6 +1333,7 @@ export interface IntegrationConfig {
       keywords: ["completions", "chat", "models", "embeddings", "images", "audio", "files", "fine-tuning", "assistants", "threads", "messages", "runs", "moderation", "usage", "api key"]
     },
     anthropic: {
+      name: "anthropic",
       apiUrl: "https://api.anthropic.com",
       regex: "^.*anthropic.*$",
       icon: "anthropic",
@@ -1262,6 +1342,7 @@ export interface IntegrationConfig {
       keywords: ["messages", "completions", "claude", "models", "prompts", "conversations", "tokens", "streaming", "api key"]
     },
     pinecone: {
+      name: "pinecone",
       apiUrl: "https://api.pinecone.io",
       regex: "^(.*\\.)?pinecone\\.io(/.*)?$",
       icon: "pinecone",
@@ -1271,6 +1352,7 @@ export interface IntegrationConfig {
       keywords: ["indexes", "vectors", "upsert", "collections", "namespaces", "metadata", "embeddings", "dimensions", "pods", "replicas", "shards", "api key"]
     },
     zoom: {
+      name: "zoom",
       apiUrl: "https://api.zoom.us",
       regex: "^(.*\\.)?zoom\\.us(/.*)?$",
       icon: "zoom",
@@ -1284,6 +1366,7 @@ export interface IntegrationConfig {
       keywords: ["meetings", "webinars", "users", "recordings", "chat", "channels", "messages", "participants", "registrants", "reports", "dashboards", "rooms", "schedule", "join", "oauth"]
     },
     microsoft: {
+      name: "microsoft",
       apiUrl: "https://graph.microsoft.com",
       regex: "^.*(microsoft|graph\\.microsoft|office|outlook|live\\.com).*$",
       icon: "microsoft",
@@ -1297,6 +1380,7 @@ export interface IntegrationConfig {
       keywords: ["users", "groups", "mail", "calendar", "contacts", "onedrive", "sharepoint", "teams", "planner", "tasks", "drives", "sites", "lists", "permissions", "graph", "oauth"]
     },
     redis: {
+      name: "redis",
       apiUrl: "https://app.redislabs.com/api/v1",
       regex: "^(.*\\.)?(redis\\.com|redislabs\\.com|redis\\.io)(/.*)?$",
       icon: "redis",
@@ -1306,6 +1390,7 @@ export interface IntegrationConfig {
       keywords: ["databases", "subscriptions", "cloud accounts", "regions", "modules", "persistence", "replication", "clustering", "acl", "alerts", "backup", "api key"]
     },
     elasticsearch: {
+      name: "elasticsearch",
       apiUrl: "https://api.elastic.co",
       regex: "^(.*\\.)?elastic\\.co(/.*)?$",
       icon: "elasticsearch",
@@ -1315,6 +1400,7 @@ export interface IntegrationConfig {
       keywords: ["indices", "documents", "search", "mappings", "settings", "aliases", "templates", "clusters", "nodes", "shards", "aggregations", "analyzers", "pipelines", "snapshots", "api key"]
     },
     postmark: {
+      name: "postmark",
       apiUrl: "https://api.postmarkapp.com",
       regex: "^(.*\\.)?postmarkapp\\.com(/.*)?$",
       icon: "postmark",
@@ -1323,6 +1409,7 @@ export interface IntegrationConfig {
       keywords: ["emails", "templates", "servers", "domains", "senders", "bounces", "message streams", "inbound", "stats", "suppressions", "dkim", "spf", "tracking", "api key"]
     },
     sentry: {
+      name: "sentry",
       apiUrl: "https://sentry.io/api",
       regex: "^(.*\\.)?sentry\\.io(/.*)?$",
       icon: "sentry",
@@ -1332,6 +1419,7 @@ export interface IntegrationConfig {
       keywords: ["projects", "issues", "events", "releases", "organizations", "teams", "alerts", "discover", "performance", "dashboards", "integrations", "debug files", "source maps", "api key"]
     },
     pagerduty: {
+      name: "pagerduty",
       apiUrl: "https://api.pagerduty.com",
       regex: "^(.*\\.)?pagerduty\\.com(/.*)?$",
       icon: "pagerduty",
@@ -1340,6 +1428,7 @@ export interface IntegrationConfig {
       keywords: ["incidents", "services", "escalation policies", "schedules", "users", "teams", "oncalls", "alerts", "event rules", "response plays", "analytics", "maintenance windows", "priorities", "api key"]
     },
     datadog: {
+      name: "datadog",
       apiUrl: "https://api.datadoghq.com",
       regex: "^(.*\\.)?datadoghq\\.com(/.*)?$",
       icon: "datadog",
@@ -1348,6 +1437,7 @@ export interface IntegrationConfig {
       keywords: ["metrics", "monitors", "dashboards", "logs", "traces", "synthetics", "events", "hosts", "tags", "downtimes", "slos", "incidents", "notebooks", "api key"]
     },
     newrelic: {
+      name: "newrelic",
       apiUrl: "https://api.newrelic.com",
       regex: "^(.*\\.)?newrelic\\.com(/.*)?$",
       icon: "newrelic",
@@ -1356,6 +1446,7 @@ export interface IntegrationConfig {
       keywords: ["applications", "apm", "browser", "synthetics", "alerts", "dashboards", "nrql", "insights", "infrastructure", "logs", "errors", "transactions", "deployments", "api key"]
     },
     auth0: {
+      name: "auth0",
       apiUrl: "https://{your-domain}.auth0.com/api/v2",
       regex: "^.*auth0.*$",
       icon: "auth0",
@@ -1370,6 +1461,7 @@ export interface IntegrationConfig {
       keywords: ["users", "roles", "permissions", "connections", "applications", "rules", "hooks", "actions", "organizations", "branding", "emails", "mfa", "logs", "tenants", "oauth"]
     },
     okta: {
+      name: "okta",
       apiUrl: "https://{your-domain}.okta.com/api/v1",
       regex: "^(.*\\.)?okta\\.com(/.*)?$",
       icon: "okta",
@@ -1379,6 +1471,7 @@ export interface IntegrationConfig {
       keywords: ["users", "groups", "applications", "factors", "policies", "rules", "identity providers", "sessions", "tokens", "events", "system logs", "schemas", "brands", "domains", "api key"]
     },
     discord: {
+      name: "discord",
       apiUrl: "https://discord.com/api",
       regex: "^.*discord.*$",
       icon: "discord",
@@ -1393,6 +1486,7 @@ export interface IntegrationConfig {
       keywords: ["guilds", "channels", "messages", "bots", "users", "members", "roles", "permissions", "emojis", "reactions", "voice", "invites", "bans", "audit logs", "slash commands", "interactions", "api key"]
     },
     telegram: {
+      name: "telegram",
       apiUrl: "https://api.telegram.org",
       regex: "^(.*\\.)?telegram\\.org(/.*)?$",
       icon: "telegram",
@@ -1401,6 +1495,7 @@ export interface IntegrationConfig {
       keywords: ["messages", "chats", "updates", "inline", "keyboards", "media", "stickers", "polls", "dice", "commands", "callbacks", "bot api", "api key"]
     },
     whatsapp: {
+      name: "whatsapp",
       apiUrl: "https://graph.facebook.com",
       regex: "^(.*\\.)?whatsapp\\.com(/.*)?$",
       icon: "whatsapp",
@@ -1409,6 +1504,7 @@ export interface IntegrationConfig {
       keywords: ["messages", "media", "contacts", "groups", "business", "templates", "interactive", "webhooks", "phone numbers", "profiles", "settings", "api key"]
     },
     linear: {
+      name: "linear",
       apiUrl: "https://api.linear.app/graphql",
       regex: "^(.*\\.)?linear\\.app(/.*)?$",
       icon: "linear",
@@ -1417,6 +1513,7 @@ export interface IntegrationConfig {
       keywords: ["issues", "projects", "cycles", "teams", "users", "comments", "labels", "milestones", "roadmaps", "workflows", "states", "graphql", "mutations", "queries", "api key"]
     },
     resend: {
+      name: "resend",
       apiUrl: "https://api.resend.com",
       regex: "^(.*\\.)?resend\\.com(/.*)?$",
       icon: "resend",
@@ -1426,6 +1523,7 @@ export interface IntegrationConfig {
       keywords: ["emails", "domains", "api keys", "contacts", "audiences", "broadcasts", "batch", "send", "templates", "react email", "transactional", "api key"]
     },
     googleAds: {
+      name: "googleAds",
       apiUrl: "https://googleads.googleapis.com/v20",
       regex: "^.*(googleads\\.googleapis|developers\\.google\\.com/google-ads|adwords\\.google).*$",
       icon: "googleads",
@@ -1439,6 +1537,7 @@ export interface IntegrationConfig {
       keywords: ["campaigns", "ad groups", "ads", "keywords", "GAQL", "budgets", "bidding", "conversions", "audiences", "extensions", "reports", "accounts", "billing", "targeting", "oauth"]
     },
     google: {
+      name: "google",
       apiUrl: "https://googleapis.com",
       regex: "^.*(googleapis\\.com(?!/(?:gmail|drive|calendar|sheets|googleads))|developers\\.google\\.com(?!/(?:gmail|drive|calendar|sheets|google-ads))).*$",
       icon: "google",
@@ -1452,6 +1551,7 @@ export interface IntegrationConfig {
       keywords: ["apis", "services", "resources", "GAQL", "methods", "scopes", "projects", "quotas", "usage", "oauth"]
     },
     posthog: {
+      name: "posthog",
       apiUrl: "https://us.posthog.com/api",
       regex: "^.*posthog.*$",
       icon: "posthog",
@@ -1460,6 +1560,7 @@ export interface IntegrationConfig {
       keywords: ["events", "users", "products", "dashboard", "properties", "cohorts", "funnels", "retention", "insights", "engage", "import", "export", "jql", "query", "segmentation", "track", "api key"]
     },
     firecrawl: {
+      name: "firecrawl",
       apiUrl: "https://api.firecrawl.dev/v1",
       regex: "^.*firecrawl.*$",
       icon: "firecrawl",
@@ -1468,6 +1569,7 @@ export interface IntegrationConfig {
       keywords: ["crawl", "scrape", "extract", "search", "pdf", "web", "html", "markdown", "api key"]
     },
     crawlbase: {
+      name: "crawlbase",
       apiUrl: "https://api.crawlbase.com",
       regex: "^.*crawlbase.*$",
       icon: "crawlbase",
@@ -1476,11 +1578,12 @@ export interface IntegrationConfig {
       keywords: ["crawl", "scrape", "extract", "search", "pdf", "web", "html", "markdown", "api key"]
     },
     gemini: {
+      name: "gemini",
       apiUrl: "https://generativelanguage.googleapis.com/v1beta/models/{model_string}:generateContent?key={your-api-key}",
       regex: "^.*(gemini|generativelanguage)\\.googleapis\\.com.*$",
       icon: "gemini",
       docsUrl: "https://ai.google.dev/api",
-      preferredAuthType: "apikey",
+      preferredAuthType: "apikey"
     }
   }
 
