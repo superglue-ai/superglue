@@ -15,16 +15,16 @@ describe('OpenAILegacyModel', () => {
     });
 
     it('should use environment variable for model when not specified', () => {
-        const originalEnv = process.env.OPENAI_MODEL_LEGACY;
-        process.env.OPENAI_MODEL_LEGACY = 'gpt-4-turbo';
+        const originalEnv = process.env.OPENAI_MODEL;
+        process.env.OPENAI_MODEL = 'gpt-5';
 
         const model = new OpenAILegacyModel();
-        expect(model.model).toBe('gpt-4-turbo');
+        expect(model.model).toBe('gpt-5');
 
         if (originalEnv) {
-            process.env.OPENAI_MODEL_LEGACY = originalEnv;
+            process.env.OPENAI_MODEL = originalEnv;
         } else {
-            delete process.env.OPENAI_MODEL_LEGACY;
+            delete process.env.OPENAI_MODEL;
         }
     });
 });

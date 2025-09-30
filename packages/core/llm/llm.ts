@@ -78,7 +78,7 @@ function selectLanguageModel(): LLM {
             logMessage("info", "Using OpenAI model: " + process.env.OPENAI_MODEL);
             return new OpenAIModel();
         case "OPENAI_LEGACY":
-            logMessage("info", "Using OpenAI model with legacy API: " + process.env.OPENAI_MODEL);
+            logMessage("info", "Using OpenAI model with legacy chat completions API: " + process.env.OPENAI_MODEL);
             return new OpenAILegacyModel();
         case "GEMINI":
             logMessage("info", "Using Gemini model: " + process.env.GEMINI_MODEL);
