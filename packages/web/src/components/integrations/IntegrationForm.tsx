@@ -738,33 +738,31 @@ export function IntegrationForm({
                                         className="w-full h-11 justify-center text-base"
                                     >
                                         <span className="inline-flex items-center gap-2">
+                                            {(() => {
+                                                const icon = getSimpleIcon(
+                                                    integrationOptions.find(opt => opt.value === selectedIntegration)?.icon || ''
+                                                );
+                                                return icon ? (
+                                                    <svg
+                                                        width="16"
+                                                        height="16"
+                                                        viewBox="0 0 24 24"
+                                                        fill={`#${icon.hex}`}
+                                                        className="flex-shrink-0"
+                                                    >
+                                                        <path d={icon.path} />
+                                                    </svg>
+                                                ) : (
+                                                    <Globe className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                                                );
+                                            })()}
                                             {isOAuthConfigured ? (
                                                 <>
                                                     <Check className="h-4 w-4 text-green-600" />
                                                     <span>Connected — Reauthenticate</span>
                                                 </>
                                             ) : (
-                                                <>
-                                                    Connect to {integrationOptions.find(option => option.value === selectedIntegration)?.label}
-                                                    {(() => {
-                                                        const icon = getSimpleIcon(
-                                                            integrationOptions.find(opt => opt.value === selectedIntegration)?.icon || ''
-                                                        );
-                                                        return icon ? (
-                                                            <svg
-                                                                width="16"
-                                                                height="16"
-                                                                viewBox="0 0 24 24"
-                                                                fill={`#${icon.hex}`}
-                                                                className="flex-shrink-0"
-                                                            >
-                                                                <path d={icon.path} />
-                                                            </svg>
-                                                        ) : (
-                                                            <Globe className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                                                        );
-                                                    })()}
-                                                </>
+                                                <span>Connect to {integrationOptions.find(option => option.value === selectedIntegration)?.label}</span>
                                             )}
                                         </span>
                                     </Button>
