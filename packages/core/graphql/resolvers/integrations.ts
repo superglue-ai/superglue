@@ -146,27 +146,6 @@ export const findRelevantIntegrationsResolver = async (
   }
 };
 
-export const templateClientCredentialsResolver = async (
-  _: any,
-  { clientId, templateId }: { clientId?: string, templateId?: string },
-  context: Context
-) => {
-  if (!clientId && !templateId) {
-    throw new Error('clientId or templateId is required');
-  }
-  try {
-    const creds = await context.datastore.getTemplateOAuthCredentials({ templateId, clientId });
-    if (!creds) {
-      throw new Error('Template client credentials not found');
-    }
-    return creds;
-  } catch (error) {
-    logMessage('error', `Error resolving template client credentials: ${String(error)}`, { orgId: context.orgId });
-    throw error;
-  }
-};
-
-
 export const cacheOauthClientSecretsResolver = async (
   _: any,
   { clientSecretUid, clientId, clientSecret }: { clientSecretUid: string; clientId: string; clientSecret: string },

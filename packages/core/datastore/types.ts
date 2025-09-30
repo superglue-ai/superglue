@@ -45,7 +45,7 @@ export interface DataStore {
   getManyIntegrations(params: { ids: string[]; includeDocs?: boolean; orgId?: string }): Promise<Integration[]>;
   getTemplateOAuthCredentials(params: { templateId?: string; clientId?: string }): Promise<{ client_id: string; client_secret: string } | null>;
 
-  // OAuth Ephemeral Secrets (for OAuth flows)
+  // OAuth cache methods
   cacheOAuthSecret(params: { uid: string; clientId: string; clientSecret: string; ttlMs: number }): Promise<void>;
   getOAuthSecret(params: { uid: string }): Promise<{ clientId: string; clientSecret: string } | null>;
   deleteOAuthSecret(params: { uid: string }): Promise<void>;
