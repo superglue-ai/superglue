@@ -1,11 +1,11 @@
 import OpenAI, { AzureOpenAI } from "openai";
-import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
+import type { ChatCompletionMessageParam } from "openai/resources/index.mjs";
 import { server_defaults } from "../default.js";
-import { ToolDefinition } from "../tools/tools.js";
+import type { ToolDefinition } from "../tools/tools.js";
 import { parseJSON } from "../utils/json-parser.js";
 import { logMessage } from "../utils/logs.js";
 import { addNullableToOptional } from "../utils/tools.js";
-import { LLM, LLMObjectResponse, LLMResponse } from "./llm.js";
+import type { LLM, LLMObjectResponse, LLMResponse } from "./llm.js";
 
 export class OpenAILegacyModel implements LLM {
     public contextLength: number = 128000;
@@ -13,82 +13,92 @@ export class OpenAILegacyModel implements LLM {
     readonly model: string;
     private isAzure: boolean;
 
-    constructor(model: string = null) {
+    constructor(model: string | null = null) {
         this.model = model || process.env.OPENAI_MODEL || "gpt-4.1";
         const baseURL = process.env.OPENAI_BASE_URL;
-        const apiVersion = process.env.OPENAI_API_VERSION;
-
-        this.isAzure = !!(baseURL && apiVersion);
+        const apiKey = process.env.OPENAI_API_KEY || "";
+        this.isAzure = !!(baseURL && baseURL.includes(".azure.com"));
+        const apiVersion = process.env.OPENAI_API_VERSION || (this.isAzure ? "2025-01-01-preview" : undefined);
 
         if (this.isAzure) {
-            this.client = new AzureOpenAI({
-                apiKey: process.env.OPENAI_API_KEY || "",
-                endpoint: baseURL,
-                apiVersion: apiVersion,
-                deployment: this.model,
-                timeout: server_defaults.LLM.REQUEST_TIMEOUT_MS,
-                maxRetries: server_defaults.LLM.MAX_INTERNAL_RETRIES,
-            });
+
+            try {
+
+                const savedBaseUrl = process.env.OPENAI_BASE_URL;
+                process.env.AZURE_OPENAI_ENDPOINT = baseURL!;
+                delete process.env.OPENAI_BASE_URL;
+
+                this.client = new AzureOpenAI({
+                    apiKey,
+                    apiVersion: apiVersion!,
+                    deployment: this.model
+                });
+
+                if (savedBaseUrl) process.env.OPENAI_BASE_URL = savedBaseUrl; else delete process.env.OPENAI_BASE_URL;
+            } catch (error: any) {
+                logMessage("error", `✗ Failed to create Azure client: ${error.message}`);
+                throw error;
+            }
         } else {
             this.client = new OpenAI({
-                apiKey: process.env.OPENAI_API_KEY || "",
-                baseURL: baseURL,
+                apiKey,
+                baseURL: baseURL || undefined,
                 timeout: server_defaults.LLM.REQUEST_TIMEOUT_MS,
-                maxRetries: server_defaults.LLM.MAX_INTERNAL_RETRIES,
+                maxRetries: server_defaults.LLM.MAX_INTERNAL_RETRIES
             });
         }
+
     }
 
     async generateText(messages: ChatCompletionMessageParam[], temperature: number = 0): Promise<LLMResponse> {
-        const dateMessage = {
+        const dateMessage: ChatCompletionMessageParam = {
             role: "system",
             content: "The current date and time is " + new Date().toISOString()
         };
 
         const requestParams: any = {
-            messages: [dateMessage as ChatCompletionMessageParam, ...messages],
-            temperature,
+            messages: [dateMessage, ...messages],
+            temperature
         };
 
         if (!this.isAzure) {
             requestParams.model = this.model;
         }
 
-        const result = await this.client.chat.completions.create(requestParams);
+        try {
+            const result = await this.client.chat.completions.create(requestParams);
+            return this.processTextResponse(result, messages);
+        } catch (error: any) {
+            logMessage("error", `✗ chat.completions.create failed: ${error.message}`);
+            logMessage("error", `Error details: ${JSON.stringify({ status: error.status, code: error.code })}`);
+            throw error;
+        }
+    }
 
+    private processTextResponse(result: any, messages: ChatCompletionMessageParam[]): LLMResponse {
         const responseText = result.choices[0].message.content;
-
-        const updatedMessages = [...messages, {
-            role: "assistant",
-            content: responseText
-        }];
-
-        return {
-            response: responseText,
-            messages: updatedMessages
-        } as LLMResponse;
+        const updatedMessages = [...messages, { role: "assistant", content: responseText } as ChatCompletionMessageParam];
+        return { response: responseText, messages: updatedMessages } as LLMResponse;
     }
 
     private enforceStrictSchema(schema: any, isRoot: boolean) {
-        if (!schema || typeof schema !== 'object') return schema;
+        if (!schema || typeof schema !== "object") return schema;
 
-        if (isRoot && schema.type !== 'object') {
+        if (isRoot && schema.type !== "object") {
             schema = {
-                type: 'object',
-                properties: {
-                    ___results: { ...schema }
-                },
-                required: ['___results']
+                type: "object",
+                properties: { ___results: { ...schema } },
+                required: ["___results"]
             };
         }
 
-        if (schema.type === 'object' || schema.type === 'array') {
+        if (schema.type === "object" || schema.type === "array") {
             schema.additionalProperties = false;
             schema.strict = true;
             if (schema.properties) {
                 schema.required = Object.keys(schema.properties);
                 delete schema.patternProperties;
-                Object.values(schema.properties).forEach(prop => this.enforceStrictSchema(prop, false));
+                Object.values(schema.properties).forEach((prop: any) => this.enforceStrictSchema(prop, false));
             }
             if (schema.items) {
                 schema.items = this.enforceStrictSchema(schema.items, false);
@@ -96,7 +106,6 @@ export class OpenAILegacyModel implements LLM {
                 delete schema.maxItems;
             }
         }
-
         return schema;
     }
 
@@ -112,53 +121,45 @@ export class OpenAILegacyModel implements LLM {
 
         if (name === "submit") {
             let finalResult = typeof args === "string" ? parseJSON(args) : args;
-            if (finalResult.___results) {
-                finalResult = finalResult.___results;
-            }
-            conversationMessages.push({
-                role: "tool",
-                tool_call_id: callId,
-                content: "Done"
-            });
+            if (finalResult.___results) finalResult = finalResult.___results;
+            conversationMessages.push({ role: "tool", tool_call_id: callId, content: "Done" } as any);
             return { finalResult, shouldBreak: true };
         } else if (name === "abort") {
-            let error = typeof args === "string" ? parseJSON(args) : args;
-            return { finalResult: { "error": error?.reason || "Unknown error" }, shouldBreak: true };
+            const error = typeof args === "string" ? parseJSON(args) : args;
+            return { finalResult: { error: error?.reason || "Unknown error" }, shouldBreak: true };
         } else {
             const tool = tools.find(t => t.name === name);
             if (tool && tool.execute) {
                 const toolResult = await tool.execute(typeof args === "string" ? parseJSON(args) : args, context);
-                conversationMessages.push({
-                    role: "tool",
-                    tool_call_id: callId,
-                    content: JSON.stringify(toolResult || {})
-                });
+                conversationMessages.push({ role: "tool", tool_call_id: callId, content: JSON.stringify(toolResult || {}) } as any);
             }
             return { finalResult: null, shouldBreak: false };
         }
     }
 
-    async generateObject(messages: ChatCompletionMessageParam[], schema: any, temperature: number = 0, customTools?: ToolDefinition[], context?: any): Promise<LLMObjectResponse> {
+    async generateObject(
+        messages: ChatCompletionMessageParam[],
+        schema: any,
+        temperature: number = 0,
+        customTools?: ToolDefinition[],
+        context?: any
+    ): Promise<LLMObjectResponse> {
         schema = addNullableToOptional(schema);
-        const hasCustomTools = customTools && customTools.length > 0;
+        const hasCustomTools = !!(customTools && customTools.length > 0);
         if (!hasCustomTools) {
             schema = this.enforceStrictSchema(schema, true);
+        } else {
         }
 
-        const dateMessage = {
+        const dateMessage: ChatCompletionMessageParam = {
             role: "system",
             content: "The current date and time is " + new Date().toISOString()
-        } as ChatCompletionMessageParam;
+        };
 
         const tools = [
             {
                 type: "function" as const,
-                function: {
-                    name: "submit",
-                    description: "Submit the final result in the required format. Submit the result even if it's an error and keep submitting until we stop. Keep non-function messages short and concise because they are only for debugging.",
-                    parameters: schema,
-                    strict: !hasCustomTools
-                }
+                function: { name: "submit", description: "Submit the final result in the required format. Submit the result even if it's an error and keep submitting until we stop. Keep non-function messages short and concise because they are only for debugging.", parameters: schema, strict: !hasCustomTools }
             },
             {
                 type: "function" as const,
@@ -167,9 +168,7 @@ export class OpenAILegacyModel implements LLM {
                     description: "ONLY call this if the request is technically impossible due API limitations or missing information that is critical to the request.",
                     parameters: {
                         type: "object",
-                        properties: {
-                            reason: { type: "string", description: "The critical technical error" }
-                        },
+                        properties: { reason: { type: "string", description: "The critical technical error" } },
                         required: ["reason"],
                         additionalProperties: false,
                         strict: !hasCustomTools
@@ -178,89 +177,73 @@ export class OpenAILegacyModel implements LLM {
             },
             ...(customTools?.map(t => ({
                 type: "function" as const,
-                function: {
-                    name: t.name,
-                    description: t.description,
-                    parameters: t.arguments
-                },
+                function: { name: t.name, description: t.description, parameters: t.arguments },
                 execute: t.execute
             })) || [])
         ];
 
         try {
-            let finalResult = null;
-            let conversationMessages: ChatCompletionMessageParam[] = String(messages[0]?.content)?.startsWith("The current date and time is") ?
-                messages : [dateMessage, ...messages];
+            let finalResult: any = null;
+            let conversationMessages: ChatCompletionMessageParam[] = String(messages[0]?.content)?.startsWith("The current date and time is")
+                ? messages
+                : [dateMessage, ...messages];
+            let forceSubmit: boolean = false;
 
             while (finalResult === null) {
                 const requestParams: any = {
                     messages: conversationMessages,
                     tools: tools.map(t => ({ type: t.type, function: t.function })),
-                    tool_choice: "auto",
                     temperature
                 };
 
+                // Decide tool choice strategy
+                let toolChoice: any = (customTools && customTools.length > 0) ? "auto" : "required";
+                if (forceSubmit) toolChoice = { type: "function", function: { name: "submit" } };
+                requestParams.tool_choice = toolChoice;
+
+                // Azure SDK with deployment doesn't need model param, OpenAI does
                 if (!this.isAzure) {
                     requestParams.model = this.model;
                 }
 
-                const response = await this.client.chat.completions.create(requestParams);
+                try {
+                    const response = await this.client.chat.completions.create(requestParams);
+                    const choice = response.choices[0];
+                    const message = choice.message;
 
-                const choice = response.choices[0];
-                const message = choice.message;
+                    const assistantMessage: ChatCompletionMessageParam = { role: "assistant", content: message.content || "" };
+                    if (message.tool_calls && message.tool_calls.length > 0) {
+                        (assistantMessage as any).tool_calls = message.tool_calls;
+                    }
+                    conversationMessages.push(assistantMessage);
 
-                const assistantMessage: ChatCompletionMessageParam = {
-                    role: "assistant",
-                    content: message.content
-                };
-
-                if (message.tool_calls && message.tool_calls.length > 0) {
-                    assistantMessage.tool_calls = message.tool_calls;
-                }
-
-                conversationMessages.push(assistantMessage);
-
-                if (message.tool_calls) {
-                    for (const toolCall of message.tool_calls) {
-                        const { finalResult: result, shouldBreak } = await this.processToolCall(
-                            toolCall,
-                            tools,
-                            conversationMessages,
-                            context
-                        );
-                        if (shouldBreak) {
-                            finalResult = result;
-                            break;
+                    if (message.tool_calls) {
+                        for (const toolCall of message.tool_calls) {
+                            const { finalResult: result, shouldBreak } = await this.processToolCall(toolCall, tools as any[], conversationMessages as any[], context);
+                            if (shouldBreak) {
+                                finalResult = result;
+                                break;
+                            }
                         }
                     }
-                }
 
-                if (!finalResult && !message.tool_calls) {
-                    throw new Error("No tool calls received from the model");
+                    if (!finalResult && !message.tool_calls) {
+                        if (!(customTools && customTools.length > 0)) { forceSubmit = true; continue; }
+                        throw new Error("No tool calls received from the model");
+                    }
+                } catch (error: any) {
+                    logMessage("error", `✗ generateObject request failed: ${error.message}`);
+                    throw error;
                 }
             }
 
-            const updatedMessages = [...conversationMessages, {
-                role: "assistant",
-                content: JSON.stringify(finalResult)
-            }];
+            const updatedMessages = [...conversationMessages, { role: "assistant", content: JSON.stringify(finalResult) } as ChatCompletionMessageParam];
 
-            return {
-                response: finalResult,
-                messages: updatedMessages
-            } as LLMObjectResponse;
-
-        } catch (error) {
-            logMessage('error', 'Error in OpenAI Legacy generateObject:', error);
-            const updatedMessages = [...messages, {
-                role: "assistant",
-                content: "Error: OpenAI API Error: " + error.message
-            }];
-
-            return {
-                response: "Error: OpenAI API Error: " + error.message,
-                messages: updatedMessages
-            } as LLMObjectResponse;
+            return { response: finalResult, messages: updatedMessages } as LLMObjectResponse;
+        } catch (error: any) {
+            logMessage("error", "Error in OpenAI Legacy generateObject:", error);
+            const updatedMessages = [...messages, { role: "assistant", content: "Error: OpenAI API Error: " + error.message } as ChatCompletionMessageParam];
+            return { response: "Error: OpenAI API Error: " + error.message, messages: updatedMessages } as LLMObjectResponse;
         }
     }
 }
