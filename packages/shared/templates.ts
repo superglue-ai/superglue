@@ -232,7 +232,7 @@ export interface IntegrationConfig {
       apiUrl: "https://api.gitlab.com",
       regex: "^.*gitlab.*$",
       icon: "gitlab",
-      docsUrl: "https://docs.gitlab.com/ee/api/",
+      docsUrl: "https://docs.gitlab.com/api/rest/",
       openApiUrl: "https://gitlab.com/gitlab-org/gitlab/-/raw/master/doc/api/openapi/openapi.yaml",
       preferredAuthType: "apikey",
       oauth: {
@@ -297,7 +297,7 @@ export interface IntegrationConfig {
       apiUrl: "https://api.slack.com",
       regex: "^.*slack.*$",
       icon: "slack",
-      docsUrl: "https://api.slack.com/docs",
+      docsUrl: "https://docs.slack.dev/reference/methods",
       openApiUrl: "https://raw.githubusercontent.com/slackapi/slack-api-specs/master/web-api/slack_web_openapi_v2.json",
       preferredAuthType: "oauth",
       oauth: {
@@ -471,6 +471,7 @@ export interface IntegrationConfig {
       apiUrl: "https://api.salesforce.com",
       regex: "^.*salesforce.*$",
       icon: "salesforce",
+      // documentation not crawlable due to weird htm site. PDF available at https://resources.docs.salesforce.com/258/latest/en-us/sfdc/pdf/api_rest.pdf - convert to text and insert in db.
       docsUrl: "https://developer.salesforce.com/docs/atlas.en-us.api_rest.meta/api_rest/intro_rest.htm",
       preferredAuthType: "oauth",
       oauth: {
@@ -513,8 +514,8 @@ export interface IntegrationConfig {
       apiUrl: "https://api.twitter.com",
       regex: "^.*(twitter|x\\.com).*$",
       icon: "x",
-      docsUrl: "https://developer.twitter.com/en/docs/twitter-api",
-      openApiUrl: "https://api.twitter.com/2/openapi.json",
+      docsUrl: "https://docs.x.com/x-api/introduction",
+      openApiUrl: "https://api.x.com/2/openapi.json",
       preferredAuthType: "oauth",
       oauth: {
         authUrl: "https://twitter.com/i/oauth2/authorize",
@@ -528,7 +529,7 @@ export interface IntegrationConfig {
       apiUrl: "https://api.linkedin.com",
       regex: "^.*linkedin.*$",
       icon: "linkedin",
-      docsUrl: "https://developer.linkedin.com/docs",
+      docsUrl: "https://learn.microsoft.com/en-us/linkedin/shared/authentication/getting-access",
       preferredAuthType: "oauth",
       oauth: {
         authUrl: "https://www.linkedin.com/oauth/v2/authorization",
@@ -543,6 +544,7 @@ export interface IntegrationConfig {
       regex: "^.*paypal.*$",
       icon: "paypal",
       docsUrl: "https://developer.paypal.com/api/rest",
+      // openapi specs are split across different files - all here: https://github.com/paypal/paypal-rest-api-specifications/tree/main/openapi
       preferredAuthType: "apikey",
       keywords: ["payments", "orders", "captures", "refunds", "payouts", "invoices", "subscriptions", "plans", "products", "transactions", "balances", "webhooks", "checkout", "billing", "query", "search"]
     },
@@ -660,6 +662,7 @@ export interface IntegrationConfig {
       apiUrl: "https://{domain}.freshdesk.com/api/v2",
       regex: "^.*freshdesk.*$",
       icon: "freshdesk",
+      // doc cannot be crawled from our setup
       docsUrl: "https://developers.freshdesk.com/api",
       preferredAuthType: "apikey",
       keywords: ["tickets", "contacts", "agents", "companies", "groups", "forums", "solutions", "categories", "folders", "articles", "time entries", "surveys", "satisfaction", "sla", "escalations", "api key"]
@@ -669,6 +672,7 @@ export interface IntegrationConfig {
       apiUrl: "https://{domain}.freshservice.com/api/v2",
       regex: "^.*(freshworks|freshservice).*$",
       icon: "freshworks",
+      // doc cannot be crawled from our setup
       docsUrl: "https://api.freshservice.com",
       preferredAuthType: "apikey",
       keywords: ["tickets", "requesters", "agents", "assets", "changes", "problems", "releases", "service catalog", "service items", "departments", "locations", "products", "vendors", "contracts", "api key"]
@@ -678,6 +682,7 @@ export interface IntegrationConfig {
       apiUrl: "https://{instance}.service-now.com/api",
       regex: "^.*(servicenow|service-now).*$",
       icon: "servicenow",
+      // service now page does not allow playwright to crawl their page
       docsUrl: "https://developer.servicenow.com/dev.do#!/reference/api/latest/rest",
       preferredAuthType: "apikey",
       keywords: ["incidents", "problems", "changes", "requests", "users", "groups", "cmdb", "configuration items", "service catalog", "knowledge", "tasks", "approvals", "sla", "workflows", "tables", "api key"]
