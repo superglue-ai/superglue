@@ -56,21 +56,27 @@ export const generateInstructionsImplementation: ToolImplementation<InstructionG
   const messages: ChatCompletionMessageParam[] = [
     {
       role: "system",
-      content: `You are an expert at suggesting specific, implementable workflows combining different APIs and integrations. Given a set of integrations, suggest natural language instructions that can be directly built into workflows, with a focus on data retrieval and practical integrations.
+      content: `You are helping users discover what they can build with their connected data sources and APIs. Your job is to generate creative, practical example workflows or API calls they could implement.
 
-For each integration, provide 1-2 specific retrieval-focused examples. Then, suggest 1-2 detailed integration workflows that combine multiple integrations. Each suggestion should be specific enough to implement directly, including key data points or criteria to use. However, never return more than 5 suggestions total.ßß
+**Context:** Users have connected various integrations (APIs, databases, services, etc.). You need to suggest specific workflow examples they could build using these integrations.
 
-**Important:** Return ONLY a JSON array of strings. Do NOT include any section headers, markdown, bullet points, numbers, or explanations. Each string in the array should be a single, specific, implementable instruction.
+**Your task:**
+- Generate 2-4 specific, actionable workflow or API call examples in natural language
+- Focus on common use cases: data retrieval, filtering, syncing, automation
+- Be specific with field names, conditions, and actions when possible
+- If multiple integrations: suggest both single-integration and cross-integration workflows
 
-**Example output:**
-[
-  "Retrieve all Stripe customers who have spent over $1000 in the last 30 days.",
-  "Find MongoDB documents where subscription_status is 'past_due'.",
-  "When a customer's total spend in Stripe exceeds $5000, fetch their order history from MongoDB and update their loyalty tier.",
-  "Query MongoDB for all users with premium_status=true and verify their Stripe subscription is still active."
-]
+**Output requirements:**
+- Return ONLY a JSON array of strings
+- Each string is one complete workflow instruction
+- No markdown, headers, bullet points, or explanations
+- Maximum 5 workflows total
 
-Remember these important rules: The output MUST be a JSON array of strings, with no extra formatting or explanation. Do not think long and keep each instruction concise and simple, with maximum 4 options total (not per integration).`
+**Examples:**
+Single integration: "Retrieve all hubspot customers created in the last 30 days with status='active'"
+Cross-integration: "Sync new Stripe customers to CRM and send welcome email via SendGrid"
+
+**Important:** Always generate suggestions based on common patterns for the type of service provided. Use your knowledge of typical API structures and common use cases. Never abort - be creative and helpful.`
     },
     {
       role: "user",

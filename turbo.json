@@ -2,12 +2,25 @@
   "$schema": "https://turbo.build/schema.json",
   "tasks": {
     "build": {
-      "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".next/**"],
-      "inputs": ["src/**/*.tsx", "src/**/*.ts", "*.ts", "*.tsx", "package.json"]
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        "dist/**",
+        ".next/**"
+      ],
+      "inputs": [
+        "src/**/*.tsx",
+        "src/**/*.ts",
+        "*.ts",
+        "*.tsx",
+        "package.json"
+      ]
     },
     "dev": {
-      "dependsOn": ["build"],
+      "dependsOn": [
+        "build"
+      ],
       "cache": false,
       "persistent": true
     },
@@ -16,12 +29,18 @@
       "persistent": true
     },
     "test": {
-        "dependsOn": ["@superglue/core#build"],
+      "dependsOn": [
+        "@superglue/core#build"
+      ],
       "outputs": []
     },
     "test:coverage": {
-        "dependsOn": ["@superglue/core#build"],
-      "outputs": ["coverage/**"]
+      "dependsOn": [
+        "@superglue/core#build"
+      ],
+      "outputs": [
+        "coverage/**"
+      ]
     }
   },
   "globalEnv": [
@@ -37,6 +56,8 @@
     "AUTH_TOKEN",
     "OPENAI_API_KEY",
     "OPENAI_MODEL",
+    "OPENAI_BASE_URL",
+    "OPENAI_API_VERSION",
     "NEXT_PUBLIC_SUPERGLUE_ENDPOINT",
     "NEXT_PUBLIC_SUPERGLUE_API_KEY",
     "POSTGRES_HOST",
@@ -48,7 +69,6 @@
     "LLM_PROVIDER",
     "GEMINI_API_KEY",
     "GEMINI_MODEL",
-    "OPENAI_BASE_URL",
     "NEXT_PUBLIC_DISABLE_WELCOME_SCREEN",
     "API_PORT",
     "API_ENDPOINT",

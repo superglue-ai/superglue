@@ -7,7 +7,7 @@ import { needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
 import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { cn, composeUrl, getIntegrationIcon as getIntegrationIconName, getSimpleIcon, inputErrorStyles } from '@/src/lib/utils';
 import { Integration, IntegrationInput, SuperglueClient, UpsertMode, Workflow } from '@superglue/client';
-import { integrationOptions as integrationTemplates } from "@superglue/shared";
+import { integrationOptions } from "@superglue/shared";
 import { waitForIntegrationProcessing } from '@superglue/shared/utils';
 import { ArrowRight, Check, Clock, Globe, Key, Loader2, Pencil, Plus, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -34,6 +34,7 @@ interface WorkflowCreateStepperProps {
 
 class ExtendedSuperglueClient extends SuperglueClient {
   async generateInstructions(integrations: IntegrationInput[]): Promise<string[]> {
+    let instructions: string[] = [];
     const response = await fetch(`${this['endpoint']}/graphql`, {
       method: 'POST',
       headers: {
@@ -50,7 +51,12 @@ class ExtendedSuperglueClient extends SuperglueClient {
       })
     });
     const result = await response.json();
-    return result.data.generateInstructions;
+    
+    instructions = result.data.generateInstructions;
+    if (instructions.length === 1 && instructions[0].startsWith('Error:')) {
+      throw new Error(instructions[0].replace('Error: ', ''));
+    }
+    return instructions;
   }
 }
 
@@ -128,16 +134,6 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       setValidationErrors({});
     }
   }, [step]);
-
-
-  const integrationOptions = [
-    { value: "manual", label: "Custom API", icon: "default" },
-    ...Object.entries(integrationTemplates).map(([key, integration]) => ({
-      value: key,
-      label: key.charAt(0).toUpperCase() + key.slice(1),
-      icon: integration.icon || "default"
-    }))
-  ];
 
   const highlightJson = (code: string) => {
     return Prism.highlight(code, Prism.languages.json, 'json');
@@ -349,9 +345,19 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
         .map(id => integrations.find(i => i.id === id))
         .filter(Boolean)
         .map(toIntegrationInput);
-      const suggestionsText = await client.generateInstructions(selectedIntegrationInputs);
-      const suggestionsArray = suggestionsText.filter(s => s.trim());
-      setSuggestions(suggestionsArray);
+      try {
+        const suggestionsText = await client.generateInstructions(selectedIntegrationInputs);
+        const suggestionsArray = suggestionsText.filter(s => s.trim());
+        setSuggestions(suggestionsArray);
+      } catch (error: any) {
+        toast({
+          title: 'Error Connecting to LLM',
+          description: "Please check your LLM configuration. \nError Details: \n" + error.message,
+          variant: 'destructive',
+        });
+        setSuggestions([]);
+      }
+      
     } catch (error: any) {
       toast({
         title: 'Error Generating Suggestions',
