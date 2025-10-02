@@ -517,6 +517,10 @@ export const toolDefinitions: Record<string, any> = {
       const { client, instruction } = args;
       try {
         const result = await client.findRelevantIntegrations(instruction);
+        // remove credentials so that they are not exposed to the user
+        result.forEach(integration => {
+          delete integration.credentials;
+        });
 
         if (!result || result.length === 0) {
           if (!instruction || instruction.trim() === '') {
