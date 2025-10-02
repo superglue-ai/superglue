@@ -31,39 +31,17 @@ import * as simpleIcons from 'simple-icons';
 export const detectAuthType = (credentials: any): 'oauth' | 'apikey' | 'none' => {
     if (!credentials || Object.keys(credentials).length === 0) return 'none';
 
-    const oauthSpecificFields = ['client_id', 'client_secret', 'auth_url', 'token_url', 'access_token', 'refresh_token', 'scopes', 'expires_at', 'token_type', 'grant_type'];
+    const oauthSpecificFields = ['client_id', 'client_secret', 'auth_url', 'token_url', 'access_token', 'refresh_token', 'scopes', 'expires_at', 'token_type'];
 
     const allKeys = Object.keys(credentials);
 
     const hasOAuthFields = allKeys.some(key => oauthSpecificFields.includes(key));
 
-    if (hasOAuthFields) {
-        const grantType = credentials.grant_type || 'authorization_code';
+    if (hasOAuthFields) return 'oauth';
 
-        if (grantType === 'client_credentials') {
-            if (credentials.access_token) {
-                return 'oauth';
-            } else if (credentials.client_id || credentials.client_secret) {
-                return 'oauth';
-            } else {
-                return 'none';
-            }
-        } else {
-            if (credentials.access_token && credentials.refresh_token) {
-                return 'oauth';
-            } else if (credentials.client_id || credentials.client_secret) {
-                return 'oauth';
-            } else {
-                return 'none';
-            }
-        }
-    }
-
-    // No OAuth fields present, so it's API key
     return 'apikey';
 };
 
-// Helper to determine auth badge status
 export const getAuthBadge = (integration: Integration): {
     type: 'oauth-configured' | 'oauth-incomplete' | 'apikey' | 'none',
     label: string,
@@ -78,23 +56,16 @@ export const getAuthBadge = (integration: Integration): {
     }
 
     if (authType === 'oauth') {
-        const grantType = creds.grant_type || 'authorization_code';
+        const hasAccess = !!creds.access_token;
+        const hasClientConfig = !!creds.client_id || !!creds.client_secret;
 
-        let isConfigured = false;
-        if (grantType === 'client_credentials') {
-            // For client credentials, only access_token is needed
-            isConfigured = !!creds.access_token;
-        } else {
-            // For authorization code, both access_token AND refresh_token are needed
-            isConfigured = !!(creds.access_token && creds.refresh_token);
-        }
-
-        return isConfigured
+        return hasAccess
             ? { type: 'oauth-configured', label: 'OAuth configured', color: 'blue', icon: 'key' }
-            : { type: 'oauth-incomplete', label: 'OAuth incomplete', color: 'amber', icon: 'clock' };
+            : hasClientConfig
+                ? { type: 'oauth-incomplete', label: 'OAuth incomplete', color: 'amber', icon: 'clock' }
+                : { type: 'none', label: 'No auth', color: 'amber', icon: 'key' };
     }
 
-    // Must be API key
     return { type: 'apikey', label: 'API Key', color: 'green', icon: 'key' };
 };
 
@@ -171,9 +142,7 @@ export default function IntegrationsPage() {
 
     const handleDelete = async (id: string) => {
         try {
-            // Optimistically remove from UI
             await client.deleteIntegration(id);
-            // Refresh to ensure consistency
             await refreshIntegrations();
         } catch (error) {
             console.error('Error deleting integration:', error);
@@ -195,8 +164,8 @@ export default function IntegrationsPage() {
     };
 
     const handleCompleteOAuth = (integration: Integration) => {
-        const grantType = integration.credentials?.grant_type || 'authorization_code';
-
+        const hasRefreshToken = !!integration.credentials?.refresh_token;
+        const derivedGrantType = hasRefreshToken ? 'authorization_code' : 'client_credentials';
         const oauthFields = {
             access_token: integration.credentials?.access_token,
             refresh_token: integration.credentials?.refresh_token,
@@ -205,7 +174,7 @@ export default function IntegrationsPage() {
             scopes: integration.credentials?.scopes,
             auth_url: integration.credentials?.auth_url,
             token_url: integration.credentials?.token_url,
-            grant_type: grantType,
+            grant_type: derivedGrantType,
         };
 
         // Determine auth type dynamically

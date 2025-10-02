@@ -112,7 +112,7 @@ export function IntegrationForm({
             scopes: creds.scopes || '',
             expires_at: creds.expires_at || '',
             token_type: creds.token_type || 'Bearer',
-            grant_type: creds.grant_type || 'authorization_code'
+            grant_type: 'authorization_code'
         };
     });
 
@@ -125,7 +125,7 @@ export function IntegrationForm({
             auth_url: creds.auth_url || '',
             token_url: creds.token_url || '',
             scopes: creds.scopes || '',
-            grant_type: creds.grant_type || 'authorization_code'
+            grant_type: 'authorization_code'
         };
     });
 
@@ -133,7 +133,7 @@ export function IntegrationForm({
     const [initialApiCredentials, setInitialApiCredentials] = useState(() => {
         const creds = integration?.credentials || {};
         if (initialAuthType === 'oauth' && integration) {
-            const { client_id, client_secret, auth_url, token_url, access_token, refresh_token, scopes, expires_at, ...additionalCreds } = creds;
+            const { client_id, client_secret, auth_url, token_url, access_token, refresh_token, scopes, expires_at, token_type, grant_type, ...additionalCreds } = creds;
             return Object.keys(additionalCreds).length > 0 ? JSON.stringify(additionalCreds, null, 2) : '{}';
         }
         return Object.keys(creds).length > 0 ? JSON.stringify(creds, null, 2) : '{}';
@@ -144,7 +144,7 @@ export function IntegrationForm({
         const creds = integration?.credentials || {};
         // For OAuth integrations, only include non-OAuth fields in the additional credentials
         if (initialAuthType === 'oauth' && integration) {
-            const { client_id, client_secret, auth_url, token_url, access_token, refresh_token, scopes, expires_at, ...additionalCreds } = creds;
+            const { client_id, client_secret, auth_url, token_url, access_token, refresh_token, scopes, expires_at, token_type, grant_type, ...additionalCreds } = creds;
             return Object.keys(additionalCreds).length > 0 ? JSON.stringify(additionalCreds, null, 2) : '{}';
         }
         return Object.keys(creds).length > 0 ? JSON.stringify(creds, null, 2) : '{}';
@@ -361,7 +361,7 @@ export function IntegrationForm({
         return oauthFields;
     };
 
-    const effectiveGrantType = (integration?.credentials as any)?.grant_type || oauthFields.grant_type || 'authorization_code';
+    const effectiveGrantType = oauthFields.grant_type || 'authorization_code';
     const effectiveAccessToken = (integration?.credentials as any)?.access_token || oauthFields.access_token;
     const effectiveRefreshToken = (integration?.credentials as any)?.refresh_token || oauthFields.refresh_token;
     const isOAuthConfigured: boolean = effectiveGrantType === 'client_credentials'
@@ -478,10 +478,11 @@ export function IntegrationForm({
         // Build credentials based on auth type
         if (authType === 'oauth') {
             const ef = buildEffectiveOAuthFields();
+            const { grant_type: _omitGrantType, ...efWithoutGrant } = ef as any;
             const oauthCredsRaw = Object.fromEntries(
                 Object.entries({
-                    ...ef,
-                    scopes: ef.scopes || integrations[selectedIntegration]?.oauth?.scopes || ''
+                    ...efWithoutGrant,
+                    scopes: efWithoutGrant.scopes || integrations[selectedIntegration]?.oauth?.scopes || ''
                 }).filter(([_, value]) => value !== '')
             ) as Record<string, any>;
 
@@ -1037,20 +1038,22 @@ export function IntegrationForm({
                             </div>
                         )}
 
-                        <div className="space-y-2">
-                            <Label htmlFor="additionalCredentials" className="flex items-center gap-2 text-xs">
-                                Additional API Credentials
-                                <HelpTooltip text="Some APIs require additional credentials alongside OAuth. Common examples: developer_token (Google Ads), account_id, workspace_id. Add any extra key-value pairs needed." />
-                            </Label>
-                            <div className="w-full">
-                                <CredentialsManager
-                                    value={apiKeyCredentials}
-                                    onChange={setApiKeyCredentials}
-                                    className={cn('min-h-20', validationErrors.credentials && inputErrorStyles)}
-                                />
+                        {authType === 'oauth' && (
+                            <div className="space-y-2">
+                                <Label htmlFor="additionalCredentials" className="flex items-center gap-2 text-xs">
+                                    Additional API Credentials
+                                    <HelpTooltip text="Some APIs require additional credentials alongside OAuth. Common examples: developer_token (Google Ads), account_id, workspace_id. Add any extra key-value pairs needed." />
+                                </Label>
+                                <div className="w-full">
+                                    <CredentialsManager
+                                        value={apiKeyCredentials}
+                                        onChange={setApiKeyCredentials}
+                                        className={cn('min-h-20', validationErrors.credentials && inputErrorStyles)}
+                                    />
+                                </div>
+                                {validationErrors.credentials && <p className="text-sm text-destructive">Credentials must be valid JSON.</p>}
                             </div>
-                            {validationErrors.credentials && <p className="text-sm text-destructive">Credentials must be valid JSON.</p>}
-                        </div>
+                        )}
 
                         <div>
                             <Label htmlFor="specificInstructions">Specific Instructions</Label>
