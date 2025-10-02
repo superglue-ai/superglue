@@ -1347,7 +1347,7 @@ export interface IntegrationConfig {
       icon: "anthropic",
       docsUrl: "https://docs.anthropic.com/claude/reference",
       preferredAuthType: "apikey",
-      keywords: ["messages", "completions", "claude", "models", "prompts", "conversations", "tokens", "streaming", "api key","haiku", "sonnet", "opus"]
+      keywords: ["messages", "completions", "claude", "models", "prompts", "conversations", "tokens", "streaming", "api key"]
     },
     claude: {
       name: "claude",
@@ -1356,7 +1356,7 @@ export interface IntegrationConfig {
       icon: "anthropic",
       docsUrl: "https://docs.anthropic.com/claude/reference",
       preferredAuthType: "apikey",
-      keywords: ["messages", "completions", "claude", "models", "prompts", "conversations", "tokens", "streaming", "api key", "haiku", "sonnet", "opus"]
+      keywords: ["messages", "completions", "claude", "models", "prompts", "conversations", "tokens", "streaming", "api key"]
     },
     pinecone: {
       name: "pinecone",
