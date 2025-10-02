@@ -92,11 +92,11 @@ POSTGRES_DB=superglue
 # Generate a strong key: openssl rand -hex 32
 MASTER_ENCRYPTION_KEY=your-32-byte-encryption-key
 
-# AI Provider - OPENAI or GEMINI
+# AI Provider - OPENAI, OPENAI_LEGACY, GEMINI, or ANTHROPIC
 # best performance / price ratio right now is OpenAI with gpt-4.1
 LLM_PROVIDER=GEMINI
 
-# If OPENAI: Your OpenAI API key
+# If OPENAI: Your OpenAI API key (uses Responses API)
 # You can get one here : https://platform.openai.com/api-keys
 OPENAI_API_KEY=sk-proj-XXXXXXXX
 # OpenAI model to use. Use gpt-4.1 for best results.
@@ -105,11 +105,23 @@ OPENAI_MODEL=gpt-4.1
 # for fireworks, use https://api.fireworks.ai/inference/v1
 OPENAI_BASE_URL=https://api.openai.com/v1
 
+# If OPENAI_LEGACY: superglue will use the chat completions API (for e.g. for Azure OpenAI or older endpoints)
+# LLM_PROVIDER=OPENAI_LEGACY
+# For Azure OpenAI - auto-detected when URL contains '.azure.com':
+# OPENAI_BASE_URL=https://your-resource.openai.azure.com
+# OPENAI_MODEL=your-deployment-name
+# OPENAI_API_KEY=your-azure-api-key
+# OPENAI_API_VERSION=2025-01-01-preview  # Optional - defaults to 2025-01-01-preview for Azure
+
 # If GEMINI: Your Google API key
 # You can get one here : https://aistudio.google.com/app/apikey
 GEMINI_API_KEY=XXXXXXX
 # Gemini model to use. We recommend gemini-2.5-flash
 GEMINI_MODEL=gemini-2.5-flash
+
+# If ANTHROPIC: Your Anthropic API key
+# ANTHROPIC_API_KEY=sk-ant-XXXXXXXX
+# ANTHROPIC_MODEL=claude-sonnet-4-20250514
 
 # Disable the welcome/onboarding screen for development
 NEXT_PUBLIC_DISABLE_WELCOME_SCREEN=false
