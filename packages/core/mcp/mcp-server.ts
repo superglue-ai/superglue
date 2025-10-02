@@ -517,10 +517,14 @@ export const toolDefinitions: Record<string, any> = {
       const { client, instruction } = args;
       try {
         const result = await client.findRelevantIntegrations(instruction);
-        // remove credentials so that they are not exposed to the user
+        // mask credentials so that they are not exposed to the user
         result.forEach(suggestion => {
-          if (suggestion.integration) {
-            delete suggestion.integration.credentials;
+          if (suggestion.integration && suggestion.integration.credentials) {
+            const maskedCredentials: Record<string, string> = {};
+            Object.keys(suggestion.integration.credentials).forEach(key => {
+              maskedCredentials[key] = `masked_${key}`;
+            });
+            suggestion.integration.credentials = maskedCredentials;
           }
         });
 
