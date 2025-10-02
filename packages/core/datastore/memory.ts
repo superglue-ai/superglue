@@ -362,6 +362,11 @@ export class MemoryStore implements DataStore {
     return this.storage.integrations.delete(key);
   }
 
+  async copyTemplateDocumentationToUserIntegration(params: { templateId: string; userIntegrationId: string; orgId?: string }): Promise<boolean> {
+    // Not supported for memory store
+    return false;
+  }
+
   // Workflow Schedule Methods
   async listWorkflowSchedules(params: { workflowId: string, orgId: string }): Promise<WorkflowScheduleInternal[]> {
     const { workflowId, orgId } = params;

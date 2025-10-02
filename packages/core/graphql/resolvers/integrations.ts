@@ -7,6 +7,7 @@ import { Documentation } from '../../utils/documentation.js';
 import { logMessage } from '../../utils/logs.js';
 import { handleClientCredentialsFlow } from '../../utils/oauth.js';
 import { composeUrl } from '../../utils/tools.js';
+import { PostgresService } from '../../datastore/postgres.js';
 
 export const listIntegrationsResolver = async (
   _: any,
@@ -76,7 +77,7 @@ export const upsertIntegrationResolver = async (
       }
     }
 
-    const shouldFetchDoc = shouldTriggerDocFetch(input, existingIntegrationOrNull);
+    var shouldFetchDoc = shouldTriggerDocFetch(input, context, existingIntegrationOrNull);
     const shouldTriggerOAuth: boolean = shouldTriggerClientCredentialsOAuthFlow(input, existingIntegrationOrNull);
 
     const integrationToSave = {
@@ -99,6 +100,20 @@ export const upsertIntegrationResolver = async (
     };
 
     const savedIntegration = await context.datastore.upsertIntegration({ id: input.id, integration: integrationToSave, orgId: context.orgId });
+
+    if (mode === 'CREATE') {
+      // If we are creating the integration, and we are on postgres datastore, and there is a template documentation, we copy it to the users integration
+      const [doesTemplateDocumentationExists, templateName] = templateDocumentationExists(input, context);
+      if(doesTemplateDocumentationExists) {
+        logMessage('debug', `Copying template documentation to user integration ${input.id} for template ${templateName} for org ${context.orgId}`, { orgId: context.orgId });
+        const success = await context.datastore.copyTemplateDocumentationToUserIntegration({ templateId: templateName, userIntegrationId: input.id, orgId: context.orgId });
+        if(!success) {
+          logMessage('error', `Failed to copy template documentation to user integration ${input.id}`, { orgId: context.orgId });
+          // set shouldFetchDoc to true to trigger a fetch
+          shouldFetchDoc = true;
+        }
+      }
+    }
 
     if (shouldFetchDoc) {
       triggerAsyncDocumentationFetch(input, context); // Fire-and-forget, will fetch docs in background and update integration documentation, documentationPending and metadata fields once its done
@@ -151,6 +166,22 @@ export const findRelevantIntegrationsResolver = async (
   }
 };
 
+function templateDocumentationExists(input: Integration, context: Context): [boolean, string] {
+  if (!(context.datastore instanceof PostgresService)) {
+    return [false, ''];
+  }
+  const matchingTemplate = integrations[String(input.name || input.id).toLowerCase()] ||
+    findMatchingIntegration(composeUrl(input.urlHost, input.urlPath))?.integration;
+
+  if (!matchingTemplate) {
+    return [false, ''];
+  }
+  // check if all keywords are present in the matchingTemplate.keywords
+  const allKeywordsPresent = matchingTemplate.keywords?.every(keyword => input.documentationKeywords?.includes(keyword));
+  const documentationUrlMatches = input.documentationUrl.trim() === matchingTemplate.docsUrl.trim();
+  return [allKeywordsPresent && documentationUrlMatches, matchingTemplate.name];
+}
+
 function enrichWithTemplate(input: Integration): Integration {
   const matchingTemplate = integrations[String(input.name || input.id).toLowerCase()] ||
     findMatchingIntegration(composeUrl(input.urlHost, input.urlPath))?.integration;
@@ -179,7 +210,7 @@ function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined
   return defaultValue;
 }
 
-function shouldTriggerDocFetch(input: Integration, existingIntegration?: Integration | null): boolean {
+function shouldTriggerDocFetch(input: Integration, context: Context, existingIntegration?: Integration | null): boolean {
   // Early exit conditions
   const isManualRefresh = input.documentationPending === true;
   if (isManualRefresh) return true;
@@ -189,6 +220,10 @@ function shouldTriggerDocFetch(input: Integration, existingIntegration?: Integra
 
   const isFileUrl = input.documentationUrl?.startsWith('file://');
   if (isFileUrl) return false;
+
+  // If we are on postgres datastore and there is a template documentation, we don't need to fetch
+  const [doesTemplateDocumentationExists, _] = templateDocumentationExists(input, context);
+  if (doesTemplateDocumentationExists) return false;
 
   // Check if we have something to fetch
   const hasDocumentationUrl = input.documentationUrl && input.documentationUrl.trim().length > 0;
@@ -206,7 +241,7 @@ function shouldTriggerDocFetch(input: Integration, existingIntegration?: Integra
   if (isNewIntegration) return true;
 
   const docUrlChanged = input.documentationUrl !== existingIntegration.documentationUrl;
-  const hostChanged = input.urlHost !== existingIntegration.urlHost;
+  const hostChanged = input.urlHost!== existingIntegration.urlHost;
   const pathChanged = input.urlPath !== existingIntegration.urlPath;
   const hasRelevantChanges = docUrlChanged || hostChanged || pathChanged;
 
@@ -215,7 +250,7 @@ function shouldTriggerDocFetch(input: Integration, existingIntegration?: Integra
 
 async function triggerAsyncDocumentationFetch(
   input: Integration,
-  context: Context
+  context: Context // for orgId and datastore
 ): Promise<void> {
   try {
     // Re-enrich with template to ensure we have all the fields
