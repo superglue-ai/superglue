@@ -49,6 +49,7 @@ export interface DataStore {
   cacheOAuthSecret(params: { uid: string; clientId: string; clientSecret: string; ttlMs: number }): Promise<void>;
   getOAuthSecret(params: { uid: string }): Promise<{ clientId: string; clientSecret: string } | null>;
   deleteOAuthSecret(params: { uid: string }): Promise<void>;
+  copyTemplateDocumentationToUserIntegration(params: { templateId: string; userIntegrationId: string; orgId?: string }): Promise<boolean>;
 
   // Workflow Schedule
   listWorkflowSchedules(params: { workflowId: string, orgId: string }): Promise<WorkflowScheduleInternal[]>;

@@ -1,4 +1,5 @@
 export interface IntegrationConfig {
+  name: string;
   apiUrl: string;
   regex: string;
   icon: string;
@@ -16,7 +17,9 @@ export interface IntegrationConfig {
 }
 
 export const integrations: Record<string, IntegrationConfig> = {
+  // Important: keys and names are the same and do not change without updating the integration and integration_details table with the template entries
   postgres: {
+    name: "postgres",
     apiUrl: "postgres://<<username>>:<<password>>@<<host>>:<<port>>/<<database>>",
     regex: "^.*(postgres|postgresql).*$",
     icon: "postgresql",
@@ -25,6 +28,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["database", "sql", "postgres", "postgresql", "api key", "tables"]
   },
   stripe: {
+    name: "stripe",
     apiUrl: "https://api.stripe.com",
     regex: "^.*stripe.*$",
     icon: "stripe",
@@ -56,6 +60,7 @@ export const integrations: Record<string, IntegrationConfig> = {
       ]
   },
   shopify: {
+    name: "shopify",
     apiUrl: "https://admin.shopify.com",
     regex: "^.*(shopify|myshopify).*$",
     icon: "shopify",
@@ -86,6 +91,7 @@ export const integrations: Record<string, IntegrationConfig> = {
 
   },
   hubspot: {
+    name: "hubspot",
     apiUrl: "https://api.hubapi.com/crm/v3",
     regex: "^.*(hubapi|hubspot).*$",
     icon: "hubspot",
@@ -111,6 +117,7 @@ export const integrations: Record<string, IntegrationConfig> = {
 
   },
   attio: {
+    name: "attio",
     apiUrl: "https://api.attio.com/v2/",
     regex: "^.*attio.*$",
     icon: "attio",
@@ -138,6 +145,7 @@ export const integrations: Record<string, IntegrationConfig> = {
 
   },
   twilio: {
+    name: "twilio",
     apiUrl: "https://api.twilio.com",
     regex: "^.*twilio.*$",
     icon: "twilio",
@@ -165,6 +173,7 @@ export const integrations: Record<string, IntegrationConfig> = {
 
   },
   sendgrid: {
+    name: "sendgrid",
     apiUrl: "https://api.sendgrid.com",
     regex: "^.*sendgrid.*$",
     icon: "sendgrid",
@@ -190,6 +199,7 @@ export const integrations: Record<string, IntegrationConfig> = {
 
   },
   github: {
+    name: "github",
     apiUrl: "https://api.github.com",
     regex: "^.*github.*$",
     icon: "github",
@@ -221,10 +231,11 @@ export const integrations: Record<string, IntegrationConfig> = {
 
   },
   gitlab: {
+    name: "gitlab",
     apiUrl: "https://api.gitlab.com",
     regex: "^.*gitlab.*$",
     icon: "gitlab",
-    docsUrl: "https://docs.gitlab.com/ee/api/",
+    docsUrl: "https://docs.gitlab.com/api/rest/",
     openApiUrl: "https://gitlab.com/gitlab-org/gitlab/-/raw/master/doc/api/openapi/openapi.yaml",
     preferredAuthType: "apikey",
     oauth: {
@@ -253,6 +264,7 @@ export const integrations: Record<string, IntegrationConfig> = {
 
   },
   bitbucket: {
+    name: "bitbucket",
     apiUrl: "https://api.bitbucket.org",
     regex: "^.*bitbucket.*$",
     icon: "bitbucket",
@@ -284,10 +296,11 @@ export const integrations: Record<string, IntegrationConfig> = {
 
   },
   slack: {
+    name: "slack",
     apiUrl: "https://api.slack.com",
     regex: "^.*slack.*$",
     icon: "slack",
-    docsUrl: "https://api.slack.com/docs",
+    docsUrl: "https://docs.slack.dev/reference/methods",
     openApiUrl: "https://raw.githubusercontent.com/slackapi/slack-api-specs/master/web-api/slack_web_openapi_v2.json",
     preferredAuthType: "oauth",
     oauth: {
@@ -315,6 +328,7 @@ export const integrations: Record<string, IntegrationConfig> = {
 
   },
   airtable: {
+    name: "airtable",
     apiUrl: "https://api.airtable.com",
     regex: "^.*airtable.*$",
     icon: "airtable",
@@ -328,6 +342,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["bases", "tables", "records", "fields", "views", "formulas", "attachments", "comments", "collaborators", "metadata", "schemas", "api key", "key"]
   },
   gmail: {
+    name: "gmail",
     apiUrl: "https://gmail.googleapis.com/gmail/v1",
     regex: "^.*(gmail\\.googleapis|developers\\.google\\.com/gmail|mail\\.google).*$",
     icon: "gmail",
@@ -342,6 +357,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["messages", "threads", "labels", "drafts", "send", "attachments", "history", "filters", "settings", "forwarding", "inbox", "profile", "oauth"]
   },
   googleDrive: {
+    name: "googleDrive",
     apiUrl: "https://www.googleapis.com/drive/v3",
     regex: "^.*(googleapis\\.com/drive|developers\\.google\\.com/drive|drive\\.google).*$",
     icon: "googledrive",
@@ -356,6 +372,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["files", "folders", "permissions", "sharing", "comments", "revisions", "changes", "uploads", "downloads", "metadata", "teamdrives", "export", "copy", "move", "oauth"]
   },
   googleCalendar: {
+    name: "googleCalendar",
     apiUrl: "https://www.googleapis.com/calendar/v3",
     regex: "^.*(googleapis\\.com/calendar|developers\\.google\\.com/calendar|calendar\\.google).*$",
     icon: "googlecalendar",
@@ -370,6 +387,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["events", "calendars", "attendees", "reminders", "recurring", "availability", "free busy", "settings", "acl", "colors", "notifications", "timezone", "quick add", "oauth"]
   },
   googleSheets: {
+    name: "googleSheets",
     apiUrl: "https://sheets.googleapis.com/v4",
     regex: "^.*(sheets\\.googleapis|developers\\.google\\.com/sheets|sheets\\.google).*$",
     icon: "googlesheets",
@@ -384,6 +402,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["spreadsheets", "sheets", "cells", "ranges", "values", "formulas", "formatting", "charts", "pivot tables", "named ranges", "protected ranges", "batch update", "append", "oauth"]
   },
   googleAnalytics: {
+    name: "googleAnalytics",
     apiUrl: "https://analytics.google.com",
     regex: "^.*(analytics|analyticsdata).*$",
     icon: "googleAnalytics",
@@ -398,6 +417,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["properties", "dimensions", "metrics", "reports", "audiences", "conversions", "events", "goals", "segments", "real time", "user activity", "attribution", "funnels", "cohorts", "oauth"]
   },
   youtube: {
+    name: "youtube",
     apiUrl: "https://youtube.googleapis.com",
     regex: "^.*youtube.*$",
     icon: "youtube",
@@ -412,6 +432,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["videos", "channels", "playlists", "comments", "captions", "live streams", "analytics", "thumbnails", "subscriptions", "activities", "ratings", "uploads", "members", "oauth"]
   },
   AWS: {
+    name: "AWS",
     apiUrl: "https://amazonaws.com",
     regex: "^.*(aws|amazonaws).*$",
     icon: "amazonAWS",
@@ -420,6 +441,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["ec2", "s3", "lambda", "rds", "dynamodb", "sqs", "sns", "cloudformation", "iam", "cloudwatch", "vpc", "instances", "buckets", "functions", "api key"]
   },
   googleCloud: {
+    name: "googleCloud",
     apiUrl: "https://cloud.google.com",
     regex: "^.*(cloud\\.google|gcp|googlecloud).*$",
     icon: "googleCloud",
@@ -433,6 +455,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["compute", "storage", "bigquery", "pubsub", "cloud run", "kubernetes", "iam", "vpc", "cloud sql", "bigtable", "dataflow", "logging", "monitoring", "oauth"]
   },
   firebase: {
+    name: "firebase",
     apiUrl: "https://firestore.googleapis.com",
     regex: "^.*(firebase|firestore).*$",
     icon: "firebase",
@@ -447,9 +470,11 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["firestore", "realtime database", "authentication", "cloud functions", "storage", "hosting", "documents", "collections", "users", "projects", "apps", "query", "oauth"]
   },
   salesforce: {
+    name: "salesforce",
     apiUrl: "https://api.salesforce.com",
     regex: "^.*salesforce.*$",
     icon: "salesforce",
+    // documentation not crawlable due to weird htm site. PDF available at https://resources.docs.salesforce.com/258/latest/en-us/sfdc/pdf/api_rest.pdf - convert to text and insert in db.
     docsUrl: "https://developer.salesforce.com/docs/atlas.en-us.api_rest.meta/api_rest/intro_rest.htm",
     preferredAuthType: "oauth",
     oauth: {
@@ -462,6 +487,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["accounts", "contacts", "leads", "opportunities", "cases", "campaigns", "products", "price books", "quotes", "contracts", "orders", "custom objects", "soql", "query", "search", "sobjects", "oauth"]
   },
   facebook: {
+    name: "facebook",
     apiUrl: "https://graph.facebook.com",
     regex: "^.*facebook.*$",
     icon: "facebook",
@@ -475,6 +501,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["pages", "posts", "comments", "insights", "ads", "campaigns", "audiences", "business", "catalog", "events", "groups", "photos", "videos", "live videos", "oauth"]
   },
   instagram: {
+    name: "instagram",
     apiUrl: "https://graph.facebook.com/v23.0/",
     regex: "^.*instagram.*$",
     icon: "instagram",
@@ -488,11 +515,12 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["media", "posts", "stories", "comments", "insights", "hashtags", "mentions", "business discovery", "content publishing", "user media", "account info", "oauth"]
   },
   twitter: {
+    name: "twitter",
     apiUrl: "https://api.twitter.com",
     regex: "^.*(twitter|x\\.com).*$",
     icon: "x",
-    docsUrl: "https://developer.twitter.com/en/docs/twitter-api",
-    openApiUrl: "https://api.twitter.com/2/openapi.json",
+    docsUrl: "https://docs.x.com/x-api/introduction",
+    openApiUrl: "https://api.x.com/2/openapi.json",
     preferredAuthType: "oauth",
     oauth: {
       authUrl: "https://twitter.com/i/oauth2/authorize",
@@ -502,10 +530,11 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["tweets", "users", "followers", "timeline", "mentions", "retweets", "likes", "lists", "spaces", "direct messages", "trends", "media", "polls", "oauth"]
   },
   linkedin: {
+    name: "linkedin",
     apiUrl: "https://api.linkedin.com",
     regex: "^.*linkedin.*$",
     icon: "linkedin",
-    docsUrl: "https://developer.linkedin.com/docs",
+    docsUrl: "https://learn.microsoft.com/en-us/linkedin/shared/authentication/getting-access",
     preferredAuthType: "oauth",
     oauth: {
       authUrl: "https://www.linkedin.com/oauth/v2/authorization",
@@ -515,14 +544,17 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["profiles", "connections", "companies", "shares", "posts", "articles", "jobs", "skills", "endorsements", "recommendations", "groups", "events", "messaging", "oauth"]
   },
   paypal: {
+    name: "paypal",
     apiUrl: "https://api.paypal.com",
     regex: "^.*paypal.*$",
     icon: "paypal",
     docsUrl: "https://developer.paypal.com/api/rest",
+    // openapi specs are split across different files - all here: https://github.com/paypal/paypal-rest-api-specifications/tree/main/openapi
     preferredAuthType: "apikey",
     keywords: ["payments", "orders", "captures", "refunds", "payouts", "invoices", "subscriptions", "plans", "products", "transactions", "balances", "webhooks", "checkout", "billing", "query", "search"]
   },
   square: {
+    name: "square",
     apiUrl: "https://connect.squareup.com",
     regex: "^.*(square|squareup).*$",
     icon: "square",
@@ -537,6 +569,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["payments", "customers", "orders", "catalog", "inventory", "locations", "transactions", "refunds", "cards", "checkout", "invoices", "subscriptions", "terminals", "employees", "shifts", "query", "search", "oauth"]
   },
   adyen: {
+    name: "adyen",
     apiUrl: "https://checkout-test.adyen.com",
     regex: "^.*adyen.*$",
     icon: "adyen",
@@ -563,6 +596,7 @@ export const integrations: Record<string, IntegrationConfig> = {
 
   },
   razorpay: {
+    name: "razorpay",
     apiUrl: "https://api.razorpay.com",
     regex: "^.*razorpay.*$",
     icon: "razorpay",
@@ -587,6 +621,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     ]
   },
   plaid: {
+    name: "plaid",
     apiUrl: "https://production.plaid.com",
     regex: "^.*plaid.*$",
     icon: "plaid",
@@ -613,6 +648,7 @@ export const integrations: Record<string, IntegrationConfig> = {
 
   },
   zendesk: {
+    name: "zendesk",
     apiUrl: "https://api.zendesk.com",
     regex: "^.*zendesk.*$",
     icon: "zendesk",
@@ -627,30 +663,37 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["tickets", "users", "organizations", "groups", "agents", "views", "macros", "triggers", "automations", "sla", "custom fields", "tags", "satisfaction", "help center", "api key"]
   },
   freshdesk: {
+    name: "freshdesk",
     apiUrl: "https://{domain}.freshdesk.com/api/v2",
     regex: "^.*freshdesk.*$",
     icon: "freshdesk",
+    // doc cannot be crawled from our setup
     docsUrl: "https://developers.freshdesk.com/api",
     preferredAuthType: "apikey",
     keywords: ["tickets", "contacts", "agents", "companies", "groups", "forums", "solutions", "categories", "folders", "articles", "time entries", "surveys", "satisfaction", "sla", "escalations", "api key"]
   },
   freshworks: {
+    name: "freshworks",
     apiUrl: "https://{domain}.freshservice.com/api/v2",
     regex: "^.*(freshworks|freshservice).*$",
     icon: "freshworks",
+    // doc cannot be crawled from our setup
     docsUrl: "https://api.freshservice.com",
     preferredAuthType: "apikey",
     keywords: ["tickets", "requesters", "agents", "assets", "changes", "problems", "releases", "service catalog", "service items", "departments", "locations", "products", "vendors", "contracts", "api key"]
   },
   servicenow: {
+    name: "servicenow",
     apiUrl: "https://{instance}.service-now.com/api",
     regex: "^.*(servicenow|service-now).*$",
     icon: "servicenow",
+    // service now page does not allow playwright to crawl their page
     docsUrl: "https://developer.servicenow.com/dev.do#!/reference/api/latest/rest",
     preferredAuthType: "apikey",
     keywords: ["incidents", "problems", "changes", "requests", "users", "groups", "cmdb", "configuration items", "service catalog", "knowledge", "tasks", "approvals", "sla", "workflows", "tables", "api key"]
   },
   helpscout: {
+    name: "helpscout",
     apiUrl: "https://api.helpscout.net",
     regex: "^.*helpscout.*$",
     icon: "helpscout",
@@ -659,6 +702,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["conversations", "customers", "mailboxes", "threads", "tags", "teams", "users", "reports", "satisfaction", "ratings", "workflows", "saved replies", "docs", "beacon", "api key"]
   },
   dropbox: {
+    name: "dropbox",
     apiUrl: "https://api.dropboxapi.com",
     regex: "^.*dropbox.*$",
     icon: "dropbox",
@@ -672,6 +716,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["files", "folders", "upload", "download", "sharing", "links", "metadata", "search", "sync", "paper", "users", "teams", "move", "copy", "delete", "oauth"]
   },
   mailchimp: {
+    name: "mailchimp",
     apiUrl: "https://api.mailchimp.com",
     regex: "^.*mailchimp.*$",
     icon: "mailchimp",
@@ -686,6 +731,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["lists", "campaigns", "templates", "audiences", "members", "segments", "tags", "automations", "reports", "folders", "merge fields", "activities", "ecommerce", "batch", "query", "api key"]
   },
   jira: {
+    name: "jira",
     apiUrl: "https://{your-domain}.atlassian.net/rest/api",
     regex: "^.*(jira|atlassian).*$",
     icon: "jira",
@@ -700,11 +746,12 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["issues", "projects", "boards", "sprints", "epics", "users", "workflows", "fields", "components", "versions", "priorities", "statuses", "comments", "attachments", "jql", "query", "search", "oauth"]
   },
   confluence: {
+    name: "confluence",
     apiUrl: "https://{your-domain}.atlassian.net/wiki/rest/api",
     regex: "^.*(confluence|atlassian).*$",
     icon: "confluence",
     docsUrl: "https://developer.atlassian.com/cloud/confluence/rest",
-    openApiUrl: "https://developer.atlassian.com/cloud/confluence/openapi.json",
+    openApiUrl: "https://developer.atlassian.com/cloud/confluence/swagger.json",
     preferredAuthType: "oauth",
     oauth: {
       authUrl: "https://auth.atlassian.com/authorize",
@@ -714,6 +761,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["spaces", "pages", "content", "attachments", "comments", "labels", "templates", "blueprints", "macros", "restrictions", "versions", "ancestors", "descendants", "children", "oauth"]
   },
   quickbooks: {
+    name: "quickbooks",
     apiUrl: "https://quickbooks.api.intuit.com",
     regex: "^.*(quickbooks|intuit).*$",
     icon: "quickbooks",
@@ -727,6 +775,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["accounts", "invoices", "customers", "vendors", "bills", "payments", "estimates", "purchase orders", "sales receipts", "credit memos", "journal entries", "items", "tax rates", "employees", "reports", "oauth"]
   },
   xero: {
+    name: "xero",
     apiUrl: "https://api.xero.com",
     regex: "^.*xero.*$",
     icon: "xero",
@@ -741,6 +790,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["accounts", "invoices", "contacts", "bills", "credit notes", "bank transactions", "payments", "receipts", "journals", "purchase orders", "quotes", "reports", "tax rates", "tracking categories", "payroll", "oauth"]
   },
   docusign: {
+    name: "docusign",
     apiUrl: "https://api.docusign.com",
     regex: "^.*docusign.*$",
     icon: "docusign",
@@ -755,6 +805,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["envelopes", "documents", "recipients", "templates", "signatures", "tabs", "brands", "accounts", "users", "groups", "powerforms", "bulk send", "connect", "custom fields", "oauth"]
   },
   intercom: {
+    name: "intercom",
     apiUrl: "https://api.intercom.io",
     regex: "^.*intercom.*$",
     icon: "intercom",
@@ -769,6 +820,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["contacts", "conversations", "messages", "users", "companies", "events", "tags", "segments", "articles", "help center", "teams", "admins", "inbox", "notes", "custom attributes", "query", "api key"]
   },
   asana: {
+    name: "asana",
     apiUrl: "https://app.asana.com/api",
     regex: "^.*asana.*$",
     icon: "asana",
@@ -778,11 +830,14 @@ export const integrations: Record<string, IntegrationConfig> = {
     oauth: {
       authUrl: "https://app.asana.com/-/oauth_authorize",
       tokenUrl: "https://app.asana.com/-/oauth_token",
-      scopes: "default openid email profile"
+      scopes: "default openid email profile",
+      grant_type: "authorization_code",
+      client_id: "1211466490919249"
     },
     keywords: ["tasks", "projects", "workspaces", "teams", "portfolios", "goals", "sections", "tags", "custom fields", "stories", "attachments", "followers", "assignee", "due dates", "query", "search", "api key"]
   },
   trello: {
+    name: "trello",
     apiUrl: "https://api.trello.com",
     regex: "^.*trello.*$",
     icon: "trello",
@@ -792,10 +847,12 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["boards", "lists", "cards", "members", "labels", "checklists", "attachments", "comments", "actions", "organizations", "teams", "power-ups", "custom fields", "stickers", "api key"]
   },
   notion: {
+    name: "notion",
     apiUrl: "https://api.notion.com",
     regex: "^.*notion.*$",
     icon: "notion",
     docsUrl: "https://developers.notion.com",
+    // this openapi spec was last updated in 2024 - might be outdated
     openApiUrl: "https://raw.githubusercontent.com/cameronking4/notion-openapi-chatgpt-action/refs/heads/main/public/notion-openapi.json",
     preferredAuthType: "apikey",
     oauth: {
@@ -806,6 +863,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["pages", "databases", "blocks", "users", "workspaces", "properties", "rich text", "search", "comments", "parent", "children", "query", "filter", "sort", "api key"]
   },
   digitalocean: {
+    name: "digitalocean",
     apiUrl: "https://api.digitalocean.com",
     regex: "^.*digitalocean.*$",
     icon: "digitalocean",
@@ -838,6 +896,7 @@ export const integrations: Record<string, IntegrationConfig> = {
 
   },
   heroku: {
+    name: "heroku",
     apiUrl: "https://api.heroku.com",
     regex: "^.*heroku.*$",
     icon: "heroku",
@@ -868,6 +927,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     ]
   },
   huggingface: {
+    name: "huggingface",
     apiUrl: "https://huggingface.co",
     regex: "^.*huggingface.*$",
     icon: "huggingface",
@@ -876,6 +936,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["models", "datasets", "spaces", "parameters", "inference", "fine-tuning", "files", "spaces", "accounts", "groups", "api key"]
   },
   circleci: {
+    name: "circleci",
     apiUrl: "https://circleci.com/api",
     regex: "^.*circleci.*$",
     icon: "circleci",
@@ -899,6 +960,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     ]
   },
   travisci: {
+    name: "travisci",
     apiUrl: "https://api.travis-ci.com",
     regex: "^.*(travis|travis-ci).*$",
     icon: "travisCI",
@@ -920,6 +982,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     ]
   },
   wordpress: {
+    name: "wordpress",
     apiUrl: "https://{your-site.com}/wp-json/wp/v2",
     regex: "^.*wordpress.*$",
     icon: "wordpress",
@@ -944,6 +1007,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     ]
   },
   cloudflare: {
+    name: "cloudflare",
     apiUrl: "https://api.cloudflare.com",
     regex: "^.*cloudflare.*$",
     icon: "cloudflare",
@@ -967,6 +1031,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     ]
   },
   bigcommerce: {
+    name: "bigcommerce",
     apiUrl: "https://api.bigcommerce.com",
     regex: "^.*bigcommerce.*$",
     icon: "bigcommerce",
@@ -990,6 +1055,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     ]
   },
   woocommerce: {
+    name: "woocommerce",
     apiUrl: "https://{yourstore.com}/wp-json/wc/v3",
     regex: "^.*woocommerce.*$",
     icon: "woocommerce",
@@ -1013,6 +1079,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     ]
   },
   prestashop: {
+    name: "prestashop",
     apiUrl: "https://{yourstore.com}/api",
     regex: "^.*prestashop.*$",
     icon: "prestashop",
@@ -1036,6 +1103,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     ]
   },
   squarespace: {
+    name: "squarespace",
     apiUrl: "https://api.squarespace.com",
     regex: "^.*squarespace.*$",
     icon: "squarespace",
@@ -1062,6 +1130,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     ]
   },
   monday: {
+    name: "monday",
     apiUrl: "https://api.monday.com/v2",
     regex: "^.*monday.*$",
     icon: "monday",
@@ -1075,11 +1144,12 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["boards", "items", "groups", "columns", "updates", "users", "workspaces", "tags", "files", "activities", "teams", "subitems", "graphql", "mutations", "query", "api key"]
   },
   clickup: {
+    name: "clickup",
     apiUrl: "https://api.clickup.com/api/v2",
     regex: "^.*clickup.*$",
     icon: "clickup",
     docsUrl: "https://clickup.com/api",
-    openApiUrl: "https://developer.clickup.com/openapi/673cf4cfdca96a0019533cad",
+    openApiUrl: "https://developer.clickup.com/openapi/clickup-api-v2-reference.json",
     preferredAuthType: "apikey",
     oauth: {
       authUrl: "https://app.clickup.com/api",
@@ -1089,6 +1159,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["tasks", "lists", "folders", "spaces", "teams", "goals", "views", "statuses", "priorities", "tags", "custom fields", "time tracking", "comments", "checklists", "dependencies", "api key"]
   },
   typeform: {
+    name: "typeform",
     apiUrl: "https://api.typeform.com",
     regex: "^.*typeform.*$",
     icon: "typeform",
@@ -1102,6 +1173,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["forms", "responses", "questions", "fields", "themes", "images", "workspaces", "logic jumps", "hidden fields", "variables", "calculations", "insights", "reports", "oauth"]
   },
   figma: {
+    name: "figma",
     apiUrl: "https://api.figma.com",
     regex: "^(.*\\.)?figma\\.com(/.*)?$",
     icon: "figma",
@@ -1116,6 +1188,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["files", "projects", "teams", "components", "styles", "nodes", "frames", "pages", "images", "comments", "versions", "branches", "libraries", "plugins", "oauth"]
   },
   contentful: {
+    name: "contentful",
     apiUrl: "https://api.contentful.com",
     regex: "^(.*\\.)?contentful\\.com(/.*)?$",
     icon: "contentful",
@@ -1124,6 +1197,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["spaces", "environments", "content types", "entries", "assets", "locales", "tags", "webhooks", "roles", "api keys", "content model", "publishing", "preview", "api key"]
   },
   sanity: {
+    name: "sanity",
     apiUrl: "https://api.sanity.io",
     regex: "^(.*\\.)?sanity\\.io(/.*)?$",
     icon: "sanity",
@@ -1132,6 +1206,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["documents", "datasets", "projects", "schemas", "assets", "images", "mutations", "transactions", "groq", "listening", "history", "api key"]
   },
   prismic: {
+    name: "prismic",
     apiUrl: "https://api.prismic.io",
     regex: "^(.*\\.)?prismic\\.io(/.*)?$",
     icon: "prismic",
@@ -1140,6 +1215,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["documents", "repositories", "custom types", "slices", "releases", "previews", "tags", "languages", "master ref", "api key"]
   },
   netlify: {
+    name: "netlify",
     apiUrl: "https://api.netlify.com",
     regex: "^(.*\\.)?netlify\\.com(/.*)?$",
     icon: "netlify",
@@ -1154,6 +1230,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["sites", "deploys", "builds", "functions", "forms", "identity", "large media", "split tests", "analytics", "bandwidth", "dns zones", "ssl certificates", "api key"]
   },
   vercel: {
+    name: "vercel",
     apiUrl: "https://api.vercel.com",
     regex: "^(.*\\.)?vercel\\.com(/.*)?$",
     icon: "vercel",
@@ -1163,6 +1240,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["deployments", "projects", "domains", "aliases", "secrets", "environment variables", "teams", "logs", "certificates", "dns", "edge config", "functions", "builds", "api key"]
   },
   amplitude: {
+    name: "amplitude",
     apiUrl: "https://api.amplitude.com",
     regex: "^(.*\\.)?amplitude\\.com(/.*)?$",
     icon: "amplitude",
@@ -1171,6 +1249,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["events", "users", "cohorts", "charts", "dashboards", "behavioral", "properties", "segments", "funnels", "retention", "revenue", "annotations", "export", "api key"]
   },
   segment: {
+    name: "segment",
     apiUrl: "https://api.segment.com",
     regex: "^(.*\\.)?segment\\.com(/.*)?$",
     icon: "segment",
@@ -1179,6 +1258,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["sources", "destinations", "tracking", "identify", "events", "traits", "warehouses", "functions", "transformations", "audiences", "personas", "protocols", "catalog", "api key"]
   },
   mixpanel: {
+    name: "mixpanel",
     apiUrl: "https://api.mixpanel.com",
     regex: "^(.*\\.)?mixpanel\\.com(/.*)?$",
     icon: "mixpanel",
@@ -1188,6 +1268,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["events", "users", "profiles", "cohorts", "funnels", "retention", "insights", "properties", "engage", "import", "export", "jql", "query", "segmentation", "track", "api key"]
   },
   algolia: {
+    name: "algolia",
     apiUrl: "https://api.algolia.com",
     regex: "^(.*\\.)?algolia\\.com(/.*)?$",
     icon: "algolia",
@@ -1197,23 +1278,27 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["indices", "search", "records", "objects", "facets", "filters", "ranking", "synonyms", "rules", "api keys", "analytics", "insights", "browse", "query", "api key"]
   },
   snowflake: {
+    name: "snowflake",
     apiUrl: "https://account.snowflakecomputing.com",
     regex: "^(.*\\.)?(snowflake\\.com|snowflakecomputing\\.com)(/.*)?$",
     icon: "snowflake",
     docsUrl: "https://docs.snowflake.com/en/developer-guide/sql-api/index",
+    // snowflake stores multiple openapi specs in different files - all here: https://github.com/snowflakedb/snowflake-rest-api-specs
     preferredAuthType: "apikey",
     keywords: ["warehouses", "databases", "schemas", "tables", "views", "stages", "pipes", "tasks", "streams", "procedures", "functions", "roles", "users", "sql", "api key"]
   },
   databricks: {
+    name: "databricks",
     apiUrl: "https://{your-workspace}.cloud.databricks.com/api",
     regex: "^(.*\\.)?(databricks\\.com|cloud\\.databricks\\.com)(/.*)?$",
     icon: "databricks",
-    docsUrl: "https://docs.databricks.com/dev-tools/api/latest/index.html",
-    openApiUrl: "https://docs.databricks.com/dev-tools/api/latest/index.html",
+    // databricks is tricky since the documentation and the oauth changes if you use databricks on aws, gcp or azure
+    docsUrl: "https://docs.databricks.com/api/workspace/introduction",
     preferredAuthType: "apikey",
     keywords: ["clusters", "jobs", "notebooks", "dbfs", "libraries", "secrets", "tokens", "workspace", "mlflow", "delta", "sql endpoints", "permissions", "groups", "api key"]
   },
   looker: {
+    name: "looker",
     apiUrl: "https://{your-domain}.looker.com/api",
     regex: "^(.*\\.)?looker\\.com(/.*)?$",
     icon: "looker",
@@ -1223,6 +1308,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["looks", "dashboards", "explores", "models", "views", "fields", "dimensions", "measures", "folders", "spaces", "schedules", "users", "groups", "roles", "api key"]
   },
   mongodb: {
+    name: "mongodb",
     apiUrl: "https://cloud.mongodb.com/api",
     regex: "^(.*\\.)?mongodb\\.com(/.*)?$",
     icon: "mongodb",
@@ -1231,6 +1317,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["clusters", "databases", "collections", "documents", "indexes", "atlas", "realm", "charts", "data lake", "search", "triggers", "backups", "alerts", "api key"]
   },
   supabase: {
+    name: "supabase",
     apiUrl: "https://api.supabase.co",
     regex: "^(.*\\.)?(supabase\\.co|supabase\\.io)(/.*)?$",
     icon: "supabase",
@@ -1240,6 +1327,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["tables", "rows", "auth", "storage", "functions", "realtime", "rpc", "buckets", "policies", "users", "postgrest", "select", "insert", "update", "delete", "filter", "api key"]
   },
   planetscale: {
+    name: "planetscale",
     apiUrl: "https://api.planetscale.com",
     regex: "^(.*\\.)?planetscale\\.com(/.*)?$",
     icon: "planetscale",
@@ -1249,15 +1337,27 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["databases", "branches", "deploy requests", "schemas", "backups", "passwords", "certificates", "regions", "organizations", "audit logs", "insights", "api key"]
   },
   openai: {
+    name: "openai",
     apiUrl: "https://api.openai.com",
     regex: "^.*openai.*$",
     icon: "openai",
-    docsUrl: "https://platform.openai.com/docs/api-reference",
+    // openai prevents playwright from crawling their page - we manually copied the text to the template doc
+    docsUrl: "https://platform.openai.com/docs/api-reference/introduction",
     openApiUrl: "https://app.stainless.com/api/spec/documented/openai/openapi.documented.yml",
     preferredAuthType: "apikey",
     keywords: ["completions", "chat", "models", "embeddings", "images", "audio", "files", "fine-tuning", "assistants", "threads", "messages", "runs", "moderation", "usage", "api key"]
   },
   anthropic: {
+    name: "anthropic",
+    apiUrl: "https://api.anthropic.com",
+    regex: "^.*anthropic.*$",
+    icon: "anthropic",
+    docsUrl: "https://docs.anthropic.com/claude/reference",
+    preferredAuthType: "apikey",
+    keywords: ["messages", "completions", "claude", "models", "prompts", "conversations", "tokens", "streaming", "api key"]
+  },
+  claude: {
+    name: "claude",
     apiUrl: "https://api.anthropic.com",
     regex: "^.*anthropic.*$",
     icon: "anthropic",
@@ -1266,6 +1366,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["messages", "completions", "claude", "models", "prompts", "conversations", "tokens", "streaming", "api key"]
   },
   pinecone: {
+    name: "pinecone",
     apiUrl: "https://api.pinecone.io",
     regex: "^(.*\\.)?pinecone\\.io(/.*)?$",
     icon: "pinecone",
@@ -1275,6 +1376,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["indexes", "vectors", "upsert", "collections", "namespaces", "metadata", "embeddings", "dimensions", "pods", "replicas", "shards", "api key"]
   },
   zoom: {
+    name: "zoom",
     apiUrl: "https://api.zoom.us",
     regex: "^(.*\\.)?zoom\\.us(/.*)?$",
     icon: "zoom",
@@ -1288,6 +1390,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["meetings", "webinars", "users", "recordings", "chat", "channels", "messages", "participants", "registrants", "reports", "dashboards", "rooms", "schedule", "join", "oauth"]
   },
   microsoft: {
+    name: "microsoft",
     apiUrl: "https://graph.microsoft.com",
     regex: "^.*(microsoft|graph\\.microsoft|office|outlook|live\\.com).*$",
     icon: "microsoft",
@@ -1301,6 +1404,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["users", "groups", "mail", "calendar", "contacts", "onedrive", "sharepoint", "teams", "planner", "tasks", "drives", "sites", "lists", "permissions", "graph", "oauth"]
   },
   redis: {
+    name: "redis",
     apiUrl: "https://app.redislabs.com/api/v1",
     regex: "^(.*\\.)?(redis\\.com|redislabs\\.com|redis\\.io)(/.*)?$",
     icon: "redis",
@@ -1310,6 +1414,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["databases", "subscriptions", "cloud accounts", "regions", "modules", "persistence", "replication", "clustering", "acl", "alerts", "backup", "api key"]
   },
   elasticsearch: {
+    name: "elasticsearch",
     apiUrl: "https://api.elastic.co",
     regex: "^(.*\\.)?elastic\\.co(/.*)?$",
     icon: "elasticsearch",
@@ -1319,6 +1424,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["indices", "documents", "search", "mappings", "settings", "aliases", "templates", "clusters", "nodes", "shards", "aggregations", "analyzers", "pipelines", "snapshots", "api key"]
   },
   postmark: {
+    name: "postmark",
     apiUrl: "https://api.postmarkapp.com",
     regex: "^(.*\\.)?postmarkapp\\.com(/.*)?$",
     icon: "postmark",
@@ -1327,6 +1433,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["emails", "templates", "servers", "domains", "senders", "bounces", "message streams", "inbound", "stats", "suppressions", "dkim", "spf", "tracking", "api key"]
   },
   sentry: {
+    name: "sentry",
     apiUrl: "https://sentry.io/api",
     regex: "^(.*\\.)?sentry\\.io(/.*)?$",
     icon: "sentry",
@@ -1336,6 +1443,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["projects", "issues", "events", "releases", "organizations", "teams", "alerts", "discover", "performance", "dashboards", "integrations", "debug files", "source maps", "api key"]
   },
   pagerduty: {
+    name: "pagerduty",
     apiUrl: "https://api.pagerduty.com",
     regex: "^(.*\\.)?pagerduty\\.com(/.*)?$",
     icon: "pagerduty",
@@ -1344,6 +1452,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["incidents", "services", "escalation policies", "schedules", "users", "teams", "oncalls", "alerts", "event rules", "response plays", "analytics", "maintenance windows", "priorities", "api key"]
   },
   datadog: {
+    name: "datadog",
     apiUrl: "https://api.datadoghq.com",
     regex: "^(.*\\.)?datadoghq\\.com(/.*)?$",
     icon: "datadog",
@@ -1352,6 +1461,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["metrics", "monitors", "dashboards", "logs", "traces", "synthetics", "events", "hosts", "tags", "downtimes", "slos", "incidents", "notebooks", "api key"]
   },
   newrelic: {
+    name: "newrelic",
     apiUrl: "https://api.newrelic.com",
     regex: "^(.*\\.)?newrelic\\.com(/.*)?$",
     icon: "newrelic",
@@ -1360,6 +1470,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["applications", "apm", "browser", "synthetics", "alerts", "dashboards", "nrql", "insights", "infrastructure", "logs", "errors", "transactions", "deployments", "api key"]
   },
   auth0: {
+    name: "auth0",
     apiUrl: "https://{your-domain}.auth0.com/api/v2",
     regex: "^.*auth0.*$",
     icon: "auth0",
@@ -1374,6 +1485,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["users", "roles", "permissions", "connections", "applications", "rules", "hooks", "actions", "organizations", "branding", "emails", "mfa", "logs", "tenants", "oauth"]
   },
   okta: {
+    name: "okta",
     apiUrl: "https://{your-domain}.okta.com/api/v1",
     regex: "^(.*\\.)?okta\\.com(/.*)?$",
     icon: "okta",
@@ -1383,10 +1495,12 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["users", "groups", "applications", "factors", "policies", "rules", "identity providers", "sessions", "tokens", "events", "system logs", "schemas", "brands", "domains", "api key"]
   },
   discord: {
+    name: "discord",
     apiUrl: "https://discord.com/api",
     regex: "^.*discord.*$",
     icon: "discord",
     docsUrl: "https://discord.com/developers/docs/intro",
+    // failed to fetch for some reason...
     openApiUrl: "https://raw.githubusercontent.com/discord/discord-api-spec/refs/heads/main/specs/openapi.json",
     preferredAuthType: "apikey",
     oauth: {
@@ -1397,6 +1511,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["guilds", "channels", "messages", "bots", "users", "members", "roles", "permissions", "emojis", "reactions", "voice", "invites", "bans", "audit logs", "slash commands", "interactions", "api key"]
   },
   telegram: {
+    name: "telegram",
     apiUrl: "https://api.telegram.org",
     regex: "^(.*\\.)?telegram\\.org(/.*)?$",
     icon: "telegram",
@@ -1405,6 +1520,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["messages", "chats", "updates", "inline", "keyboards", "media", "stickers", "polls", "dice", "commands", "callbacks", "bot api", "api key"]
   },
   whatsapp: {
+    name: "whatsapp",
     apiUrl: "https://graph.facebook.com",
     regex: "^(.*\\.)?whatsapp\\.com(/.*)?$",
     icon: "whatsapp",
@@ -1413,6 +1529,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["messages", "media", "contacts", "groups", "business", "templates", "interactive", "webhooks", "phone numbers", "profiles", "settings", "api key"]
   },
   linear: {
+    name: "linear",
     apiUrl: "https://api.linear.app/graphql",
     regex: "^(.*\\.)?linear\\.app(/.*)?$",
     icon: "linear",
@@ -1421,15 +1538,18 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["issues", "projects", "cycles", "teams", "users", "comments", "labels", "milestones", "roadmaps", "workflows", "states", "graphql", "mutations", "queries", "api key"]
   },
   resend: {
+    name: "resend",
     apiUrl: "https://api.resend.com",
     regex: "^(.*\\.)?resend\\.com(/.*)?$",
     icon: "resend",
     docsUrl: "https://resend.com/docs/api-reference",
+    // problem fetching the yml and converting it to json
     openApiUrl: "https://raw.githubusercontent.com/resend/resend-openapi/main/resend.yaml",
     preferredAuthType: "apikey",
     keywords: ["emails", "domains", "api keys", "contacts", "audiences", "broadcasts", "batch", "send", "templates", "react email", "transactional", "api key"]
   },
   googleAds: {
+    name: "googleAds",
     apiUrl: "https://googleads.googleapis.com/v20",
     regex: "^.*(googleads\\.googleapis|developers\\.google\\.com/google-ads|adwords\\.google).*$",
     icon: "googleads",
@@ -1443,6 +1563,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["campaigns", "ad groups", "ads", "keywords", "GAQL", "budgets", "bidding", "conversions", "audiences", "extensions", "reports", "accounts", "billing", "targeting", "oauth"]
   },
   google: {
+    name: "google",
     apiUrl: "https://googleapis.com",
     regex: "^.*(googleapis\\.com(?!/(?:gmail|drive|calendar|sheets|googleads))|developers\\.google\\.com(?!/(?:gmail|drive|calendar|sheets|google-ads))).*$",
     icon: "google",
@@ -1456,14 +1577,17 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["apis", "services", "resources", "GAQL", "methods", "scopes", "projects", "quotas", "usage", "oauth"]
   },
   posthog: {
+    name: "posthog",
     apiUrl: "https://us.posthog.com/api",
     regex: "^.*posthog.*$",
     icon: "posthog",
     docsUrl: "https://posthog.com/docs/api",
+    openApiUrl: "https://app.posthog.com/api/schema/",
     preferredAuthType: "apikey",
     keywords: ["events", "users", "products", "dashboard", "properties", "cohorts", "funnels", "retention", "insights", "engage", "import", "export", "jql", "query", "segmentation", "track", "api key"]
   },
   firecrawl: {
+    name: "firecrawl",
     apiUrl: "https://api.firecrawl.dev/v1",
     regex: "^.*firecrawl.*$",
     icon: "firecrawl",
@@ -1472,6 +1596,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["crawl", "scrape", "extract", "search", "pdf", "web", "html", "markdown", "api key"]
   },
   crawlbase: {
+    name: "crawlbase",
     apiUrl: "https://api.crawlbase.com",
     regex: "^.*crawlbase.*$",
     icon: "crawlbase",
@@ -1480,11 +1605,13 @@ export const integrations: Record<string, IntegrationConfig> = {
     keywords: ["crawl", "scrape", "extract", "search", "pdf", "web", "html", "markdown", "api key"]
   },
   gemini: {
+    name: "gemini",
     apiUrl: "https://generativelanguage.googleapis.com/v1beta/models/{model_string}:generateContent?key={your-api-key}",
     regex: "^.*(gemini|generativelanguage)\\.googleapis\\.com.*$",
     icon: "gemini",
     docsUrl: "https://ai.google.dev/api",
-    preferredAuthType: "apikey",
+    // there is a openapi spec here: https://generativelanguage.googleapis.com/$discovery/OPENAPI3_0?version=v1beta&key=$GOOGLE_API_KEY - but you need your own google api key to access it
+    preferredAuthType: "apikey"
   }
 }
 
@@ -1564,7 +1691,7 @@ export function getOAuthTokenUrl(integration: { id: string; urlHost: string; cre
 
   // Fallback: Default OAuth token endpoint
   return `${integration.urlHost}/oauth/token`;
-}
+} 
 
 
 export interface SdkCodegenOptions {
@@ -1587,61 +1714,61 @@ export function getSDKCode(opts: SdkCodegenOptions): SdkCode {
   const { endpoint, workflowId, payload } = opts;
 
   return {
-    typescript:
-      `// if not installed, run: npm install @superglue/client
+      typescript:
+          `// if not installed, run: npm install @superglue/client
 // ALWAYS USE THE SDK, do not use the graphql endpoint directly
 import { SuperglueClient } from '@superglue/client';
 
 const client = new SuperglueClient({
-    apiKey: "<YOUR_SUPERGLUE_API_KEY>",
-    endpoint: "${endpoint}" // or default to https://graphql.superglue.ai NOT https://api.superglue.ai
+  apiKey: "<YOUR_SUPERGLUE_API_KEY>",
+  endpoint: "${endpoint}" // or default to https://graphql.superglue.ai NOT https://api.superglue.ai
 });
 
 async function main() {
-    const result = await client.executeWorkflow({
-        id: "${workflowId}",
-        payload: ${JSON.stringify(payload, null, 2)}
-    });
-    console.log(result);
+  const result = await client.executeWorkflow({
+      id: "${workflowId}",
+      payload: ${JSON.stringify(payload, null, 2)}
+  });
+  console.log(result);
 }
 
 main();`,
-    python: `import requests
+      python: `import requests
 
 response = requests.post("${endpoint}",  # or default to https://graphql.superglue.ai
-    headers={"Authorization": "Bearer <YOUR_SUPERGLUE_API_KEY>"},
-    json={
-        "query": "mutation ExecuteWorkflow($input: WorkflowInputRequest!, $payload: JSON) { \\n      executeWorkflow(input: $input, payload: $payload) { \\n        data error success\\n      }\\n    }",
-        "variables": {
-            "input": {"id": "${workflowId}"},
-            "payload": ${JSON.stringify(payload, null, 2)}
-        }
-    })
+  headers={"Authorization": "Bearer <YOUR_SUPERGLUE_API_KEY>"},
+  json={
+      "query": "mutation ExecuteWorkflow($input: WorkflowInputRequest!, $payload: JSON) { \\n      executeWorkflow(input: $input, payload: $payload) { \\n        data error success\\n      }\\n    }",
+      "variables": {
+          "input": {"id": "${workflowId}"},
+          "payload": ${JSON.stringify(payload, null, 2)}
+      }
+  })
 `,
-    go: `package main
+      go: `package main
 import (
-    "bytes"
-    "encoding/json"
-    "net/http"
+  "bytes"
+  "encoding/json"
+  "net/http"
 )
 
 func main() {
-    payload := ${JSON.stringify(payload, null, 2)}
-    
-    reqBody, _ := json.Marshal(map[string]interface{}{
-        "query": \`mutation ExecuteWorkflow($input: WorkflowInputRequest!, $payload: JSON) {\\n      executeWorkflow(input: $input, payload: $payload) {\\n        data error success\\n      }\\n    }\`,
-        "variables": map[string]interface{}{
-            "input":       map[string]string{"id": "${workflowId}"},
-            "payload":     payload,
-        },
-    })
-    
-    req, _ := http.NewRequest("POST", "${endpoint}", bytes.NewBuffer(reqBody)) // or default to https://graphql.superglue.ai
-    req.Header.Set("Authorization", "Bearer <YOUR_SUPERGLUE_API_KEY>")
-    req.Header.Set("Content-Type", "application/json")
-    
-    resp, _ := http.DefaultClient.Do(req)
-    defer resp.Body.Close()
+  payload := ${JSON.stringify(payload, null, 2)}
+  
+  reqBody, _ := json.Marshal(map[string]interface{}{
+      "query": \`mutation ExecuteWorkflow($input: WorkflowInputRequest!, $payload: JSON) {\\n      executeWorkflow(input: $input, payload: $payload) {\\n        data error success\\n      }\\n    }\`,
+      "variables": map[string]interface{}{
+          "input":       map[string]string{"id": "${workflowId}"},
+          "payload":     payload,
+      },
+  })
+  
+  req, _ := http.NewRequest("POST", "${endpoint}", bytes.NewBuffer(reqBody)) // or default to https://graphql.superglue.ai
+  req.Header.Set("Authorization", "Bearer <YOUR_SUPERGLUE_API_KEY>")
+  req.Header.Set("Content-Type", "application/json")
+  
+  resp, _ := http.DefaultClient.Do(req)
+  defer resp.Body.Close()
 }`
   }
 }

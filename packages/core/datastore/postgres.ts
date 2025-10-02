@@ -862,6 +862,24 @@ export class PostgresService implements DataStore {
         }
     }
 
+    async copyTemplateDocumentationToUserIntegration(params: { templateId: string; userIntegrationId: string; orgId?: string }): Promise<boolean> {
+        const { templateId, userIntegrationId, orgId } = params;
+        if (!templateId || !userIntegrationId) return false;
+        const client = await this.pool.connect();
+        try {
+            // Copy the template documentation (identified by the org_id == 'template') to the user integration
+            logMessage('debug', `userIntegrationId => ${userIntegrationId}`, { orgId: orgId });
+            logMessage('debug', `orgId => ${orgId}`, { orgId: orgId });
+            logMessage('debug', `templateId => ${templateId}`, { orgId: orgId });
+            const result = await client.query('INSERT INTO integration_details (integration_id, org_id, documentation, open_api_schema) SELECT $1::text, $2::text, documentation, open_api_schema FROM integration_details WHERE integration_id = $3 AND org_id = $4', [userIntegrationId, orgId || '', templateId, 'template']);
+            logMessage('debug', `result => ${result}`, { orgId: orgId });
+            // return true, if we inserted at least one row
+            return result.rowCount > 0;
+        } finally {
+            client.release();
+        }
+    }
+
     // Tenant Information Methods
     async getTenantInfo(): Promise<{ email: string | null; emailEntrySkipped: boolean }> {
         const client = await this.pool.connect();

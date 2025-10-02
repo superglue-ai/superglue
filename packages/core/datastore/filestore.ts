@@ -692,6 +692,11 @@ export class FileStore implements DataStore {
     return deleted;
   }
 
+  async copyTemplateDocumentationToUserIntegration(params: { templateId: string; userIntegrationId: string; orgId?: string }): Promise<boolean> {
+    // Not supported for file store
+    return false;
+  }
+
   // Workflow Schedule Methods
   async listWorkflowSchedules(params: { workflowId: string, orgId: string }): Promise<WorkflowScheduleInternal[]> {
     await this.ensureInitialized();
