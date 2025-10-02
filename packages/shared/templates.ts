@@ -14,7 +14,8 @@ export interface IntegrationConfig {
     keywords?: string[];
   }
   
-  export const integrations: Record<string, IntegrationConfig> = {  
+  export const integrations: Record<string, IntegrationConfig> = {
+    // Important: keys and names are the same and do not change without updating the integration and integration_details table with the template entries
     postgres: {
       name: "postgres",
       apiUrl: "postgres://<<username>>:<<password>>@<<host>>:<<port>>/<<database>>",
