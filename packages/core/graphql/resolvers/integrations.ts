@@ -178,7 +178,8 @@ function templateDocumentationExists(input: Integration, context: Context): [boo
   }
   // check if all keywords are present in the matchingTemplate.keywords
   const allKeywordsPresent = matchingTemplate.keywords?.every(keyword => input.documentationKeywords?.includes(keyword));
-  return [allKeywordsPresent, matchingTemplate.name];
+  const documentationUrlMatches = input.documentationUrl.trim() === matchingTemplate.docsUrl.trim();
+  return [allKeywordsPresent && documentationUrlMatches, matchingTemplate.name];
 }
 
 function enrichWithTemplate(input: Integration): Integration {

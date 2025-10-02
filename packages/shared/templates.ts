@@ -746,7 +746,7 @@ export interface IntegrationConfig {
       regex: "^.*(confluence|atlassian).*$",
       icon: "confluence",
       docsUrl: "https://developer.atlassian.com/cloud/confluence/rest",
-      openApiUrl: "https://developer.atlassian.com/cloud/confluence/openapi.json",
+      openApiUrl: "https://developer.atlassian.com/cloud/confluence/swagger.json",
       preferredAuthType: "oauth",
       oauth: {
         authUrl: "https://auth.atlassian.com/authorize",
@@ -845,6 +845,7 @@ export interface IntegrationConfig {
       regex: "^.*notion.*$",
       icon: "notion",
       docsUrl: "https://developers.notion.com",
+      // this openapi spec was last updated in 2024 - might be outdated
       openApiUrl: "https://raw.githubusercontent.com/cameronking4/notion-openapi-chatgpt-action/refs/heads/main/public/notion-openapi.json",
       preferredAuthType: "apikey",
       oauth: {
@@ -1141,7 +1142,7 @@ export interface IntegrationConfig {
       regex: "^.*clickup.*$",
       icon: "clickup",
       docsUrl: "https://clickup.com/api",
-      openApiUrl: "https://developer.clickup.com/openapi/673cf4cfdca96a0019533cad",
+      openApiUrl: "https://developer.clickup.com/openapi/clickup-api-v2-reference.json",
       preferredAuthType: "apikey",
       oauth: {
         authUrl: "https://app.clickup.com/api",
@@ -1275,6 +1276,7 @@ export interface IntegrationConfig {
       regex: "^(.*\\.)?(snowflake\\.com|snowflakecomputing\\.com)(/.*)?$",
       icon: "snowflake",
       docsUrl: "https://docs.snowflake.com/en/developer-guide/sql-api/index",
+      // snowflake stores multiple openapi specs in different files - all here: https://github.com/snowflakedb/snowflake-rest-api-specs
       preferredAuthType: "apikey",
       keywords: ["warehouses", "databases", "schemas", "tables", "views", "stages", "pipes", "tasks", "streams", "procedures", "functions", "roles", "users", "sql", "api key"]
     },
@@ -1283,8 +1285,8 @@ export interface IntegrationConfig {
       apiUrl: "https://{your-workspace}.cloud.databricks.com/api",
       regex: "^(.*\\.)?(databricks\\.com|cloud\\.databricks\\.com)(/.*)?$",
       icon: "databricks",
-      docsUrl: "https://docs.databricks.com/dev-tools/api/latest/index.html",
-      openApiUrl: "https://docs.databricks.com/dev-tools/api/latest/index.html",
+      // databricks is tricky since the documentation and the oauth changes if you use databricks on aws, gcp or azure
+      docsUrl: "https://docs.databricks.com/api/workspace/introduction",
       preferredAuthType: "apikey",
       keywords: ["clusters", "jobs", "notebooks", "dbfs", "libraries", "secrets", "tokens", "workspace", "mlflow", "delta", "sql endpoints", "permissions", "groups", "api key"]
     },
@@ -1332,7 +1334,8 @@ export interface IntegrationConfig {
       apiUrl: "https://api.openai.com",
       regex: "^.*openai.*$",
       icon: "openai",
-      docsUrl: "https://platform.openai.com/docs/api-reference",
+      // openai prevents playwright from crawling their page - we manually copied the text to the template doc
+      docsUrl: "https://platform.openai.com/docs/api-reference/introduction",
       openApiUrl: "https://app.stainless.com/api/spec/documented/openai/openapi.documented.yml",
       preferredAuthType: "apikey",
       keywords: ["completions", "chat", "models", "embeddings", "images", "audio", "files", "fine-tuning", "assistants", "threads", "messages", "runs", "moderation", "usage", "api key"]
@@ -1344,7 +1347,16 @@ export interface IntegrationConfig {
       icon: "anthropic",
       docsUrl: "https://docs.anthropic.com/claude/reference",
       preferredAuthType: "apikey",
-      keywords: ["messages", "completions", "claude", "models", "prompts", "conversations", "tokens", "streaming", "api key"]
+      keywords: ["messages", "completions", "claude", "models", "prompts", "conversations", "tokens", "streaming", "api key","haiku", "sonnet", "opus"]
+    },
+    claude: {
+      name: "claude",
+      apiUrl: "https://api.anthropic.com",
+      regex: "^.*anthropic.*$",
+      icon: "anthropic",
+      docsUrl: "https://docs.anthropic.com/claude/reference",
+      preferredAuthType: "apikey",
+      keywords: ["messages", "completions", "claude", "models", "prompts", "conversations", "tokens", "streaming", "api key", "haiku", "sonnet", "opus"]
     },
     pinecone: {
       name: "pinecone",
@@ -1481,6 +1493,7 @@ export interface IntegrationConfig {
       regex: "^.*discord.*$",
       icon: "discord",
       docsUrl: "https://discord.com/developers/docs/intro",
+      // failed to fetch for some reason...
       openApiUrl: "https://raw.githubusercontent.com/discord/discord-api-spec/refs/heads/main/specs/openapi.json",
       preferredAuthType: "apikey",
       oauth: {
@@ -1523,6 +1536,7 @@ export interface IntegrationConfig {
       regex: "^(.*\\.)?resend\\.com(/.*)?$",
       icon: "resend",
       docsUrl: "https://resend.com/docs/api-reference",
+      // problem fetching the yml and converting it to json
       openApiUrl: "https://raw.githubusercontent.com/resend/resend-openapi/main/resend.yaml",
       preferredAuthType: "apikey",
       keywords: ["emails", "domains", "api keys", "contacts", "audiences", "broadcasts", "batch", "send", "templates", "react email", "transactional", "api key"]
@@ -1561,6 +1575,7 @@ export interface IntegrationConfig {
       regex: "^.*posthog.*$",
       icon: "posthog",
       docsUrl: "https://posthog.com/docs/api",
+      openApiUrl: "https://app.posthog.com/api/schema/",
       preferredAuthType: "apikey",
       keywords: ["events", "users", "products", "dashboard", "properties", "cohorts", "funnels", "retention", "insights", "engage", "import", "export", "jql", "query", "segmentation", "track", "api key"]
     },
@@ -1588,6 +1603,7 @@ export interface IntegrationConfig {
       regex: "^.*(gemini|generativelanguage)\\.googleapis\\.com.*$",
       icon: "gemini",
       docsUrl: "https://ai.google.dev/api",
+      // there is a openapi spec here: https://generativelanguage.googleapis.com/$discovery/OPENAPI3_0?version=v1beta&key=$GOOGLE_API_KEY - but you need your own google api key to access it
       preferredAuthType: "apikey"
     }
   }

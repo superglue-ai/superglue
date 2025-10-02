@@ -407,7 +407,10 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
     'privacy', 'terms', 'legal', 'policy', 'status', 'help', 'blog',
     'careers', 'about', 'press', 'news', 'events', 'partners',
     'changelog', 'release-notes', 'updates', 'upgrade', 'register', 'cli',
-    'signin', 'sign-in', 'sign-up', 'trial', 'demo', 'sales', 'widget', 'webhooks'
+    'signin', 'sign-in', 'sign-up', 'trial', 'demo', 'sales', 'widget', 'webhooks',
+    // dont include the same page in different languages
+    '/de/', '/it/', '/fr/', '/nl/', '/es/', '/pt/', '/pl/', '/ru/', '/ja/', '/zh/',
+    '/ko/', '/zh-CN/', '/zh-TW/', '/id/'
   ];
 
 
