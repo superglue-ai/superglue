@@ -147,16 +147,18 @@ describe('CredentialEncryption', () => {
             expect(() => encryption.decrypt(invalidCredentials)).toThrow('Failed to decrypt credentials');
         });
 
-        it('should fail to decrypt with different master key', () => {
+        it('should fail to decrypt with different master key', async () => {
             // Encrypt with one key
             process.env.MASTER_ENCRYPTION_KEY = 'key-1';
-            const encryption1 = new CredentialEncryption();
+            const { CredentialEncryption: EncryptionClass1 } = await import('./encryption.js');
+            const encryption1 = new EncryptionClass1();
             const credentials = { apiKey: 'sk_test_123' };
             const encrypted = encryption1.encrypt(credentials);
             
             // Try to decrypt with different key
             process.env.MASTER_ENCRYPTION_KEY = 'key-2';
-            const encryption2 = new CredentialEncryption();
+            const { CredentialEncryption: EncryptionClass2 } = await import('./encryption.js');
+            const encryption2 = new EncryptionClass2();
             
             expect(() => encryption2.decrypt(encrypted)).toThrow('Failed to decrypt credentials');
         });
