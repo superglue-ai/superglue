@@ -153,7 +153,7 @@ export class MemoryStore implements DataStore {
     if (!run) return null;
     const key = this.getKey('run', run.id, orgId);
     this.storage.runs.set(key, run);
-    
+
     // Update index for efficient listing
     const configId = run.config?.id;
     if (configId) {
@@ -166,34 +166,34 @@ export class MemoryStore implements DataStore {
       });
       this.storage.runsIndex.set(indexKey, existing);
     }
-    
+
     return { ...run, id: run.id };
   }
 
   async listRuns(params?: { limit?: number; offset?: number; configId?: string; orgId?: string }): Promise<{ items: RunResult[], total: number }> {
     const { limit = 10, offset = 0, configId, orgId } = params || {};
     const allRuns = this.getOrgItems(this.storage.runs, 'run', orgId);
-    
+
     // Store total count of ALL runs (including corrupted ones)
     const totalAllRuns = allRuns.length;
-    
+
     // Filter out runs with corrupted data (missing critical fields)
-    const validRuns = allRuns.filter((run): run is RunResult => 
-      run !== null && 
-      run.config && 
-      run.config.id && 
+    const validRuns = allRuns.filter((run): run is RunResult =>
+      run !== null &&
+      run.config &&
+      run.config.id &&
       run.startedAt instanceof Date
     );
-    
+
     // Sort by startedAt date (most recent first)
     validRuns.sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime());
-    
+
     // Filter by configId if provided
     const filteredRuns = configId ? validRuns.filter(run => run.config?.id === configId) : validRuns;
-    
+
     // Apply pagination
     const items = filteredRuns.slice(offset, offset + limit);
-    
+
     // Return total as count of ALL runs (including corrupted ones)
     return { items, total: totalAllRuns };
   }
@@ -203,7 +203,7 @@ export class MemoryStore implements DataStore {
     if (!id) return false;
     const key = this.getKey('run', id, orgId);
     const run = this.storage.runs.get(key);
-    
+
     if (run) {
       // Remove from index
       const configId = run.config?.id;
@@ -218,7 +218,7 @@ export class MemoryStore implements DataStore {
         }
       }
     }
-    
+
     return this.storage.runs.delete(key);
   }
 
@@ -226,13 +226,13 @@ export class MemoryStore implements DataStore {
     const { orgId } = params || {};
     const prefix = orgId ? `${orgId}:run:` : 'run:';
     const keysToDelete: string[] = [];
-    
+
     for (const key of this.storage.runs.keys()) {
       if (key.startsWith(prefix)) {
         keysToDelete.push(key);
       }
     }
-    
+
     // Also clear index entries
     const indexPrefix = orgId ? `${orgId}:index:` : 'index:';
     for (const key of this.storage.runsIndex.keys()) {
@@ -240,9 +240,9 @@ export class MemoryStore implements DataStore {
         this.storage.runsIndex.delete(key);
       }
     }
-    
+
     keysToDelete.forEach(key => this.storage.runs.delete(key));
-    
+
     return true;
   }
 
@@ -407,7 +407,7 @@ export class MemoryStore implements DataStore {
   async updateScheduleNextRun(params: { id: string; nextRunAt: Date; lastRunAt: Date; }): Promise<boolean> {
     const { id, nextRunAt, lastRunAt } = params;
     if (!id) return false;
-    
+
     for (const [key, schedule] of this.storage.workflowSchedules.entries()) {
       if (schedule.id === id) {
         const updatedSchedule = {
@@ -421,5 +421,40 @@ export class MemoryStore implements DataStore {
       }
     }
     return false;
+  }
+
+  async getTemplateOAuthCredentials(params: { templateId: string }): Promise<{ client_id: string; client_secret: string } | null> {
+    return null;
+  }
+
+  private oauthSecrets: Map<string, { clientId: string; clientSecret: string; expiresAt: number }> = new Map();
+
+  async cacheOAuthSecret(params: { uid: string; clientId: string; clientSecret: string; ttlMs: number }): Promise<void> {
+    this.oauthSecrets.set(params.uid, {
+      clientId: params.clientId,
+      clientSecret: params.clientSecret,
+      expiresAt: Date.now() + params.ttlMs
+    });
+  }
+
+  async getOAuthSecret(params: { uid: string }): Promise<{ clientId: string; clientSecret: string } | null> {
+    const entry = this.oauthSecrets.get(params.uid);
+
+    if (!entry || entry.expiresAt <= Date.now()) {
+      this.oauthSecrets.delete(params.uid);
+      return null;
+    }
+
+    // Delete after retrieval (one-time use)
+    this.oauthSecrets.delete(params.uid);
+
+    return {
+      clientId: entry.clientId,
+      clientSecret: entry.clientSecret
+    };
+  }
+
+  async deleteOAuthSecret(params: { uid: string }): Promise<void> {
+    this.oauthSecrets.delete(params.uid);
   }
 } 

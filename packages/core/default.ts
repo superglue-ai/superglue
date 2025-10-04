@@ -42,6 +42,7 @@ export const server_defaults = {
         DEFAULT_TIMEOUT: 30000, // 30 seconds
         DEFAULT_RETRIES: 0,
         DEFAULT_RETRY_DELAY: 1000, // 1 second
+        OAUTH_SECRET_TTL_MS: 5 * 60 * 1000, // 5 minutes
     },
     FTP: {
         DEFAULT_TIMEOUT: 30000, // 30 seconds
