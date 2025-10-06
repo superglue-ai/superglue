@@ -1,7 +1,15 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { logMessage } from '../../../utils/logs.js';
-import { DocumentationEvaluationConfig, DocumentationSite } from './documentation-evaluator.js';
+import { DocumentationSite } from './documentation-fetcher.js';
+
+export interface DocumentationEvaluationConfig {
+  sites: DocumentationSite[];
+  crawlTimeoutMs: number;
+  maxDocumentationSizeMB: number;
+  enablePlaywright: boolean;
+  enableOpenApiFetching: boolean;
+}
 
 export class DocumentationEvaluationConfigLoader {
   private metadata = { orgId: 'doc-eval-config-loader', userId: 'system' };
@@ -106,14 +114,12 @@ export class DocumentationEvaluationConfigLoader {
    * Validate that all required settings are present
    */
   validateSettings(config: DocumentationEvaluationConfig): boolean {
-    const settings = config.settings;
-    
-    if (settings.crawlTimeout <= 0) {
+    if (config.crawlTimeoutMs <= 0) {
       logMessage('warn', 'Crawl timeout is set to 0 or negative value', this.metadata);
       return false;
     }
     
-    if (settings.maxDocumentationSize <= 0) {
+    if (config.maxDocumentationSizeMB <= 0) {
       logMessage('warn', 'Max documentation size is set to 0 or negative value', this.metadata);
       return false;
     }

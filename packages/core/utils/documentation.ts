@@ -1,3 +1,30 @@
+/**
+ * Documentation Retrieval and Processing System
+ * 
+ * This module handles automated retrieval and processing of API documentation from various sources.
+ * It uses a strategy pattern with two main phases: fetching and processing.
+ * 
+ * FETCHING STRATEGIES (tried in order):
+ * 1. GraphQLStrategy - Attempts GraphQL introspection queries for schema discovery
+ * 2. PlaywrightFetchingStrategy - Uses headless browser to crawl documentation sites
+ *    - First tries sitemap-based discovery for comprehensive coverage
+ *    - Falls back to iterative link crawling if sitemap fails
+ *    - Filters out non-documentation pages (login, pricing, etc.)
+ * 3. AxiosFetchingStrategy - Simple HTTP GET requests for direct documentation URLs
+ * 
+ * PROCESSING STRATEGIES (tried in order):
+ * 1. OpenApiStrategy - Extracts and processes OpenAPI/Swagger specifications
+ *    - Handles both JSON and YAML formats
+ *    - Can discover OpenAPI URLs from HTML pages
+ *    - Fetches multiple related specs if found
+ * 2. PostgreSqlStrategy - Generates database schema documentation for PostgreSQL connections
+ * 3. HtmlMarkdownStrategy - Converts HTML content to Markdown using a shared pool
+ * 4. RawPageContentStrategy - Returns raw content as final fallback
+ * 
+ * The system caches results and provides content extraction with relevance scoring
+ * based on search terms and keyword matching.
+ */
+
 import playwright from '@playwright/test';
 import { ApiConfig } from "@superglue/client";
 import { Metadata } from "@superglue/shared";

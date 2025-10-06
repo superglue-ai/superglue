@@ -1,5 +1,6 @@
 import { config } from 'dotenv';
 import path from 'path';
+import { DocumentationFetcher } from './utils/documentation-fetcher.js';
 import { DocumentationEvaluator } from './utils/documentation-evaluator.js';
 import { DocumentationEvaluationConfigLoader } from './utils/config-loader.js';
 import { createDataStore } from '../../datastore/datastore.js';
@@ -12,7 +13,7 @@ const envPath = process.cwd().endsWith('packages/core')
 config({ path: envPath });
 
 /**
- * Main entry point for running documentation crawl and fetch evaluation
+ * Main entry point for documentation evaluation pipeline
  */
 async function main() {
   const configLoader = new DocumentationEvaluationConfigLoader();
@@ -20,22 +21,36 @@ async function main() {
   const metadata = { orgId: ORG_ID, userId: 'system' };
   
   try {
-    logMessage('info', '🚀 Starting Documentation Crawl and Fetch Evaluation...', metadata);
+    logMessage('info', '🚀 Starting Documentation Evaluation Pipeline', metadata);
     
+    // Load configuration
     const config = await configLoader.loadConfig();
     
-    // Initialize PostgreSQL datastore
+    // Initialize datastore
     const datastore = createDataStore({ type: 'postgres' });
     
+    // Phase 1: Fetch Documentation
+    logMessage('info', '📥 Phase 1: Documentation Fetching', metadata);
+    const fetcher = new DocumentationFetcher(datastore, ORG_ID);
+    const fetchSummary = await fetcher.fetchAllDocumentation(config.sites);
+    
+    // Phase 2: Evaluate Documentation
+    logMessage('info', '📝 Phase 2: Documentation Evaluation', metadata);
     const evaluator = new DocumentationEvaluator(datastore, ORG_ID);
-    const suite = await evaluator.runEvaluation(config);
+    const evaluationSummary = await evaluator.evaluateAllSites(config.sites);
     
-    await evaluator.cleanup();
+    // Final Summary
+    logMessage('info', '📊 Final Summary', metadata);
+    logMessage('info', `✅ Documentation: ${fetchSummary.successfulFetches}/${fetchSummary.totalSites} sites fetched`, metadata);
+    logMessage('info', `✅ Evaluation: ${evaluationSummary.questionsAnswered}/${evaluationSummary.totalQuestions} questions answered`, metadata);
     
-    logMessage('info', 'Evaluation completed', metadata);
+    // Cleanup
+    await fetcher.cleanup();
+    
+    logMessage('info', '🎉 Pipeline completed successfully', metadata);
     
   } catch (error) {
-    logMessage('error', `❌ Evaluation failed: ${error}`, metadata);
+    logMessage('error', `❌ Pipeline failed: ${error}`, metadata);
     process.exit(1);
   }
   

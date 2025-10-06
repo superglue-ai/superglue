@@ -15,10 +15,7 @@
       "keywords": ["payment", "charge", "customer", "subscription", "webhook", "authentication"],
       "testQuestions": [
         "How do I create a new customer in Stripe?",
-        "What are the required fields for creating a payment intent?",
-        "How do I handle webhook events in Stripe?",
-        "What authentication methods does Stripe support?",
-        "How do I list all charges for a customer?"
+        "What are the required fields for creating a payment intent?"
       ]
     }
   ],
