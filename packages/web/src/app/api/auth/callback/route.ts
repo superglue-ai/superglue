@@ -1,5 +1,4 @@
-import { SuperglueClient, UpsertMode } from '@superglue/client';
-import { getOAuthTokenUrl } from '@superglue/shared';
+import { ExtendedSuperglueClient } from '@/src/lib/oauth-utils';
 import { NextRequest, NextResponse } from 'next/server';
 
 const OAUTH_STATE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
@@ -9,6 +8,9 @@ interface OAuthState {
     timestamp: number;
     integrationId: string;
     redirectUri?: string;
+    templateId?: string;
+    clientId?: string;
+    client_credentials_uid?: string;
 }
 
 interface OAuthTokenResponse {
@@ -50,17 +52,15 @@ function validateOAuthState(state: string | null, expectedIntegrationId: string)
 
 async function exchangeCodeForToken(
     code: string,
-    integration: any,
+    tokenUrl: string,
+    clientId: string,
+    clientSecret: string,
     redirectUri: string,
     state?: string
 ): Promise<OAuthTokenResponse> {
-    const { client_id, client_secret } = integration.credentials || {};
-
-    if (!client_id || !client_secret) {
+    if (!clientId || !clientSecret) {
         throw new Error('OAuth client credentials not configured');
     }
-
-    const tokenUrl = getOAuthTokenUrl(integration);
     const response = await fetch(tokenUrl, {
         method: 'POST',
         headers: {
@@ -70,10 +70,39 @@ async function exchangeCodeForToken(
         body: new URLSearchParams({
             grant_type: 'authorization_code',
             code,
-            client_id,
-            client_secret,
+            client_id: clientId,
+            client_secret: clientSecret,
             redirect_uri: redirectUri,
             ...(state ? { state } : {}),
+        }),
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Token exchange failed: ${errorText}`);
+    }
+
+    return response.json();
+}
+
+async function exchangeClientCredentialsForToken(
+    tokenUrl: string,
+    clientId: string,
+    clientSecret: string
+): Promise<OAuthTokenResponse> {
+    if (!clientId || !clientSecret) {
+        throw new Error('OAuth client credentials not configured');
+    }
+    const response = await fetch(tokenUrl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': 'application/json',
+        },
+        body: new URLSearchParams({
+            grant_type: 'client_credentials',
+            client_id: clientId,
+            client_secret: clientSecret,
         }),
     });
 
@@ -98,16 +127,17 @@ function createOAuthCallbackHTML(
     type: 'success' | 'error',
     message: string,
     integrationId: string,
-    origin: string
+    origin: string,
+    tokens?: any
 ): string {
     const isError = type === 'error';
     const title = isError ? 'OAuth Connection Failed' : 'OAuth Connection Successful!';
     const color = isError ? '#dc2626' : '#16a34a';
     const actionText = isError ? 'You can close this window and try again.' : 'You can close this window now.';
-    
+
     // Properly escape message for JavaScript
     const escapedMessage = message.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
-    
+
     return `
         <!DOCTYPE html>
         <html>
@@ -126,7 +156,8 @@ function createOAuthCallbackHTML(
                         window.opener.postMessage({ 
                             type: 'oauth-${type}', 
                             integrationId: '${integrationId}',
-                            message: '${escapedMessage}'
+                            message: '${escapedMessage}',
+                            tokens: ${tokens ? JSON.stringify(tokens) : 'undefined'}
                         }, '${origin}');
                     } catch (e) {
                         console.error('Failed to notify parent window:', e);
@@ -161,7 +192,7 @@ export async function GET(request: NextRequest) {
     } else {
         origin = request.nextUrl.origin;
     }
-    
+
     // Force HTTPS for production domains
     if (origin.startsWith('http://') && origin.includes('superglue.cloud')) {
         origin = origin.replace('http://', 'https://');
@@ -169,6 +200,7 @@ export async function GET(request: NextRequest) {
 
     // Extract OAuth parameters
     const code = searchParams.get('code');
+    const grantTypeParam = searchParams.get('grant_type');
     const state = searchParams.get('state');
     const error = searchParams.get('error');
     const errorDescription = searchParams.get('error_description');
@@ -176,24 +208,19 @@ export async function GET(request: NextRequest) {
     // Handle OAuth provider errors
     if (error) {
         const errorMsg = errorDescription || error;
-        // Try to extract integration ID from state if available
         let integrationId = 'unknown';
         try {
             if (state) {
-                const stateData = JSON.parse(atob(state));
+                const stateData = JSON.parse(atob(state)) as OAuthState;
                 integrationId = stateData.integrationId || 'unknown';
             }
-        } catch {
-            // Ignore state parsing errors, use default
-        }
-        
+        } catch { }
+
         const html = createOAuthCallbackHTML('error', errorMsg, integrationId, origin);
-        return new Response(html, {
-            headers: { 'Content-Type': 'text/html' },
-        });
+        return new NextResponse(html, { headers: { 'Content-Type': 'text/html' } });
     }
 
-    if (!code || !state) {
+    if ((!code && grantTypeParam !== 'client_credentials') || !state) {
         return NextResponse.redirect(
             buildRedirectUrl(origin, '/integrations', {
                 error: !code ? 'no_code' : 'no_state'
@@ -202,88 +229,83 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-        // Extract integration ID from state
-        const stateData = JSON.parse(atob(state)) as OAuthState;
-        const { integrationId, apiKey, timestamp } = stateData;
+        const stateData = JSON.parse(atob(state)) as OAuthState & { token_url?: string };
+        const { integrationId, apiKey, timestamp, client_credentials_uid, templateId, clientId, token_url } = stateData;
 
-        // Validate state timestamp
         if (Date.now() - timestamp >= OAUTH_STATE_EXPIRY_MS) {
             throw new Error('OAuth state expired. Please try again.');
         }
 
-        // Initialize client
-        const client = new SuperglueClient({
-            endpoint: process.env.GRAPHQL_ENDPOINT || `http://localhost:${process.env.GRAPHQL_PORT}`,
-            apiKey,
-        });
-
-        // Fetch integration
-        const integration = await client.getIntegration(integrationId);
-
-        if (!integration) {
-            throw new Error('Integration not found');
+        const endpoint = process.env.GRAPHQL_ENDPOINT;
+        const client = new ExtendedSuperglueClient({ endpoint, apiKey });
+        const resolved = await client.getOAuthClientCredentials({ templateId, clientCredentialsUid: client_credentials_uid });
+        if (!resolved?.client_secret || !resolved?.client_id) {
+            throw new Error('OAuth client credentials could not be resolved');
         }
 
-        // Exchange code for tokens
-        const redirectUri = stateData.redirectUri || `${origin}/api/auth/callback`;
-        const tokenData = await exchangeCodeForToken(code, integration, redirectUri, state);
+        let tokenData: OAuthTokenResponse;
+        if (grantTypeParam === 'client_credentials') {
+            tokenData = await exchangeClientCredentialsForToken(String(token_url), resolved.client_id, resolved.client_secret);
+        } else {
+            const redirectUri = stateData.redirectUri || `${origin}/api/auth/callback`;
+            tokenData = await exchangeCodeForToken(code as string, String(token_url), resolved.client_id, resolved.client_secret, redirectUri, state);
+        }
 
         if (!tokenData || typeof tokenData !== 'object') {
             throw new Error('Invalid token response from OAuth provider');
         }
 
-        let { access_token, refresh_token, ...additionalFields } = tokenData;
+        const { access_token, refresh_token, ...additionalFields } = tokenData;
 
         if (!access_token) {
             throw new Error('No access token received from OAuth provider. Please try again.');
         }
 
-        if (!refresh_token) {
-            refresh_token = access_token;
-            // If refresh token is not provided, use access token as refresh token.
-        }
-        // Update integration with new tokens
-        const updatedCredentials = {
-            ...integration.credentials,
-            access_token: access_token,
-            refresh_token: refresh_token,
+        // Package the tokens for the frontend to handle
+        const tokens = {
+            access_token,
+            refresh_token: refresh_token || access_token,
             token_type: additionalFields.token_type || 'Bearer',
             expires_at: additionalFields.expires_at || (additionalFields.expires_in ? new Date(Date.now() + additionalFields.expires_in * 1000).toISOString() : undefined),
         };
 
-        await client.upsertIntegration(
-            integrationId,
-            {
-                credentials: updatedCredentials,
-            },
-            UpsertMode.UPDATE
-        );
-
-        // Check if this is a popup window (opened by window.open)
-        // If so, close it. Otherwise redirect normally.
-        const html = createOAuthCallbackHTML('success', 'OAuth connection completed successfully!', integrationId, origin);
-
-        return new Response(html, {
-            headers: { 'Content-Type': 'text/html' },
-        });
+        if (grantTypeParam === 'client_credentials') {
+            return NextResponse.json({
+                type: 'oauth-success',
+                integrationId,
+                message: 'OAuth connection completed successfully!',
+                tokens
+            });
+        } else {
+            const html = createOAuthCallbackHTML('success', 'OAuth connection completed successfully!', integrationId, origin, tokens);
+            return new NextResponse(html, { headers: { 'Content-Type': 'text/html' } });
+        }
     } catch (error) {
         console.error('OAuth callback error:', error);
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        
+
         // Try to extract integration ID from state if available
         let integrationId = 'unknown';
+        let isClientCredentials = false;
         try {
             if (state) {
-                const stateData = JSON.parse(atob(state));
+                const stateData = JSON.parse(atob(state)) as OAuthState;
                 integrationId = stateData.integrationId || 'unknown';
             }
+            isClientCredentials = grantTypeParam === 'client_credentials';
         } catch {
             // Ignore state parsing errors, use default
         }
 
-        const html = createOAuthCallbackHTML('error', errorMessage, integrationId, origin);
-        return new Response(html, {
-            headers: { 'Content-Type': 'text/html' },
-        });
+        if (isClientCredentials) {
+            return NextResponse.json({
+                type: 'oauth-error',
+                integrationId,
+                message: errorMessage
+            }, { status: 400 });
+        } else {
+            const html = createOAuthCallbackHTML('error', errorMessage, integrationId, origin);
+            return new NextResponse(html, { headers: { 'Content-Type': 'text/html' } });
+        }
     }
 }

@@ -159,6 +159,16 @@ export class PostgresService implements DataStore {
       FOREIGN KEY (integration_id, org_id) REFERENCES integrations(id, org_id) ON DELETE CASCADE
     )
   `);
+            // Integration templates table for Superglue OAuth credentials (and potentially further fields in the future)
+            await client.query(`
+    CREATE TABLE IF NOT EXISTS integration_templates (
+        id VARCHAR(255) PRIMARY KEY,
+        sg_client_id VARCHAR(500),
+        sg_client_secret TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+`);
 
             // Tenant info table
             await client.query(`
@@ -192,6 +202,16 @@ export class PostgresService implements DataStore {
              )
             `);
 
+            await client.query(`
+                CREATE TABLE IF NOT EXISTS integration_oauth (
+                    uid TEXT PRIMARY KEY,
+                    client_id TEXT NOT NULL,
+                    client_secret TEXT NOT NULL,
+                    expires_at TIMESTAMP NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            `);
+
             await client.query(`CREATE INDEX IF NOT EXISTS idx_configurations_type_org ON configurations(type, org_id)`);
             await client.query(`CREATE INDEX IF NOT EXISTS idx_configurations_version ON configurations(version)`);
             await client.query(`CREATE INDEX IF NOT EXISTS idx_configurations_integration_ids ON configurations USING GIN(integration_ids)`);
@@ -201,6 +221,8 @@ export class PostgresService implements DataStore {
             await client.query(`CREATE INDEX IF NOT EXISTS idx_integrations_url_host ON integrations(url_host)`);
             await client.query(`CREATE INDEX IF NOT EXISTS idx_integration_details_integration_id ON integration_details(integration_id, org_id)`);
             await client.query(`CREATE INDEX IF NOT EXISTS idx_workflow_schedules_due ON workflow_schedules(next_run_at, enabled) WHERE enabled = true`);
+            await client.query(`CREATE INDEX IF NOT EXISTS idx_integration_oauth_expires ON integration_oauth(expires_at)`);
+
         } finally {
             client.release();
         }
@@ -520,7 +542,7 @@ export class PostgresService implements DataStore {
         const client = await this.pool.connect();
         try {
             const query = 'SELECT id, org_id, workflow_id, cron_expression, timezone, enabled, payload, options, last_run_at, next_run_at, created_at, updated_at FROM workflow_schedules WHERE id = $1 AND org_id = $2';
-            
+
             const queryResult = await client.query(query, [id, orgId || '']);
             if (!queryResult.rows[0]) {
                 return null;
@@ -549,7 +571,7 @@ export class PostgresService implements DataStore {
                     next_run_at = $11,
                     updated_at = CURRENT_TIMESTAMP
             `;
-            
+
             await client.query(
                 query,
                 [
@@ -571,7 +593,7 @@ export class PostgresService implements DataStore {
         }
     }
 
-    async deleteWorkflowSchedule({id, orgId}: { id: string, orgId: string }): Promise<boolean> {
+    async deleteWorkflowSchedule({ id, orgId }: { id: string, orgId: string }): Promise<boolean> {
         const client = await this.pool.connect();
         try {
             const result = await client.query('DELETE FROM workflow_schedules WHERE id = $1 AND org_id = $2', [id, orgId]);
@@ -583,7 +605,7 @@ export class PostgresService implements DataStore {
 
     async listDueWorkflowSchedules(): Promise<WorkflowScheduleInternal[]> {
         const client = await this.pool.connect();
-        
+
         // We check for schedules that are enabled and have a next run time that is in the past (all timestamps in the database are in UTC)
         try {
             const query = `SELECT id, org_id, workflow_id, cron_expression, timezone, enabled, payload, options, last_run_at, next_run_at, created_at, updated_at FROM workflow_schedules WHERE enabled = true AND next_run_at <= CURRENT_TIMESTAMP at time zone 'utc'`;
@@ -927,6 +949,95 @@ export class PostgresService implements DataStore {
             return true;
         } catch (error) {
             return false;
+        }
+    }
+
+    async getTemplateOAuthCredentials(params: { templateId: string }): Promise<{ client_id: string; client_secret: string } | null> {
+        const client = await this.pool.connect();
+        try {
+            const result = await client.query(
+                'SELECT sg_client_id, sg_client_secret FROM integration_templates WHERE id = $1',
+                [params.templateId]
+            );
+
+            if (!result.rows[0]) return null;
+
+            const decrypted = credentialEncryption.decrypt({
+                secret: result.rows[0].sg_client_secret
+            });
+
+            return {
+                client_id: result.rows[0].sg_client_id,
+                client_secret: decrypted?.secret || ''
+            };
+        } catch (error) {
+            logMessage('debug', `No template OAuth credentials found for ${params.templateId}`, { error });
+            return null;
+        } finally {
+            client.release();
+        }
+    }
+
+    async cacheOAuthSecret(params: { uid: string; clientId: string; clientSecret: string; ttlMs: number }): Promise<void> {
+        const client = await this.pool.connect();
+        try {
+            const expiresAt = new Date(Date.now() + params.ttlMs);
+            const encrypted = credentialEncryption.encrypt({ secret: params.clientSecret });
+            const encryptedSecret = encrypted?.secret || params.clientSecret;
+
+            await client.query(
+                `INSERT INTO integration_oauth (uid, client_id, client_secret, expires_at)
+                 VALUES ($1, $2, $3, $4)
+                 ON CONFLICT (uid) DO UPDATE SET
+                    client_id = EXCLUDED.client_id,
+                    client_secret = EXCLUDED.client_secret,
+                    expires_at = EXCLUDED.expires_at`,
+                [params.uid, params.clientId, encryptedSecret, expiresAt]
+            );
+        } finally {
+            client.release();
+        }
+    }
+
+    async getOAuthSecret(params: { uid: string }): Promise<{ clientId: string; clientSecret: string } | null> {
+        const client = await this.pool.connect();
+        try {
+            const result = await client.query(
+                `SELECT client_id, client_secret, expires_at
+                 FROM integration_oauth
+                 WHERE uid = $1`,
+                [params.uid]
+            );
+
+            if (result.rows.length === 0) {
+                return null;
+            }
+
+            const row = result.rows[0];
+
+            if (new Date(row.expires_at) <= new Date()) {
+                await client.query('DELETE FROM integration_oauth WHERE uid = $1', [params.uid]);
+                return null;
+            }
+
+            await client.query('DELETE FROM integration_oauth WHERE uid = $1', [params.uid]);
+            const decrypted = credentialEncryption.decrypt({ secret: row.client_secret });
+
+            return {
+                clientId: row.client_id,
+                clientSecret: decrypted?.secret || ''
+            };
+        } finally {
+            client.release();
+        }
+    }
+
+    async deleteOAuthSecret(params: { uid: string }): Promise<void> {
+        const client = await this.pool.connect();
+        try {
+            await client.query('DELETE FROM integration_oauth WHERE uid = $1', [params.uid]);
+        } finally {
+            client.release();
         }
     }
 }

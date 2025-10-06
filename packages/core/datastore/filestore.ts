@@ -621,13 +621,13 @@ export class FileStore implements DataStore {
     const key = this.getKey('integration', id, orgId);
     const integration = this.storage.integrations.get(key);
     if (!integration) return null;
-    
+
     // Decrypt credentials if encryption is enabled
     const decryptedIntegration = { ...integration, id };
     if (decryptedIntegration.credentials) {
       decryptedIntegration.credentials = credentialEncryption.decrypt(decryptedIntegration.credentials);
     }
-    
+
     return decryptedIntegration;
   }
 
@@ -670,13 +670,13 @@ export class FileStore implements DataStore {
     const { id, integration, orgId } = params;
     if (!id || !integration) return null;
     const key = this.getKey('integration', id, orgId);
-    
+
     // Encrypt credentials if encryption is enabled and credentials exist
     const toStore = { ...integration };
     if (toStore.credentials) {
       toStore.credentials = credentialEncryption.encrypt(toStore.credentials);
     }
-    
+
     this.storage.integrations.set(key, toStore);
     await this.persist();
     return { ...integration, id };
@@ -746,7 +746,7 @@ export class FileStore implements DataStore {
     await this.ensureInitialized();
     const { id, nextRunAt, lastRunAt } = params;
     if (!id) return false;
-    
+
     // Find the schedule by searching all orgs since we don't have orgId in params
     for (const [key, schedule] of this.storage.workflowSchedules.entries()) {
       if (schedule.id === id) {
@@ -762,5 +762,40 @@ export class FileStore implements DataStore {
       }
     }
     return false;
+  }
+
+  async getTemplateOAuthCredentials(params: { templateId: string }): Promise<{ client_id: string; client_secret: string } | null> {
+    return null;
+  }
+
+  private oauthSecrets: Map<string, { clientId: string; clientSecret: string; expiresAt: number }> = new Map();
+
+  async cacheOAuthSecret(params: { uid: string; clientId: string; clientSecret: string; ttlMs: number }): Promise<void> {
+    this.oauthSecrets.set(params.uid, {
+      clientId: params.clientId,
+      clientSecret: params.clientSecret,
+      expiresAt: Date.now() + params.ttlMs
+    });
+  }
+
+  async getOAuthSecret(params: { uid: string }): Promise<{ clientId: string; clientSecret: string } | null> {
+    const entry = this.oauthSecrets.get(params.uid);
+
+    if (!entry || entry.expiresAt <= Date.now()) {
+      this.oauthSecrets.delete(params.uid);
+      return null;
+    }
+
+    // Delete after retrieval (one-time use)
+    this.oauthSecrets.delete(params.uid);
+
+    return {
+      clientId: entry.clientId,
+      clientSecret: entry.clientSecret
+    };
+  }
+
+  async deleteOAuthSecret(params: { uid: string }): Promise<void> {
+    this.oauthSecrets.delete(params.uid);
   }
 } 

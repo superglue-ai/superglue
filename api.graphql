@@ -474,6 +474,9 @@ type Mutation {
     mode: UpsertMode = UPSERT
   ): Integration!
   deleteIntegration(id: ID!): Boolean!
+
+  cacheOauthClientCredentials(clientCredentialsUid: String!, clientId: String!, clientSecret: String!): Boolean!
+  getOAuthClientCredentials(templateId: ID, clientCredentialsUid: String): OAuthClientCredentials!
 }
 
 type Subscription {
@@ -498,4 +501,9 @@ type Integration {
   version: String
   createdAt: DateTime
   updatedAt: DateTime
+}
+
+type OAuthClientCredentials {
+  client_id: String!
+  client_secret: String!
 }
