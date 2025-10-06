@@ -1,0 +1,31 @@
+{
+  "evaluationSuite": {
+    "name": "Documentation Crawl and Fetch Evaluation",
+    "description": "Evaluate documentation crawling and retrieval quality across multiple APIs",
+    "version": "1.0.0"
+  },
+  "sites": [
+    {
+      "id": "stripe-api",
+      "name": "Stripe API",
+      "description": "Payment processing API",
+      "documentationUrl": "https://stripe.com/docs/api",
+      "openApiUrl": "https://raw.githubusercontent.com/stripe/openapi/master/openapi/spec3.json",
+      "urlHost": "https://api.stripe.com",
+      "keywords": ["payment", "charge", "customer", "subscription", "webhook", "authentication"],
+      "testQuestions": [
+        "How do I create a new customer in Stripe?",
+        "What are the required fields for creating a payment intent?",
+        "How do I handle webhook events in Stripe?",
+        "What authentication methods does Stripe support?",
+        "How do I list all charges for a customer?"
+      ]
+    }
+  ],
+  "settings": {
+    "crawlTimeout": 300000,
+    "maxDocumentationSize": 500000,
+    "enablePlaywrightCrawling": true,
+    "enableOpenApiFetching": true
+  }
+}
