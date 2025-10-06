@@ -189,7 +189,7 @@ export class DocumentationFetcher {
    */
   async cleanup(): Promise<void> {
     if (this.createdIntegrationIds.length > 0) {
-      logMessage('info', `🗑️ Cleaning up ${this.createdIntegrationIds.length} integrations`, this.metadata);
+      logMessage('info', `Cleaned up ${this.createdIntegrationIds.length} integrations`, this.metadata);
       
       for (const integrationId of this.createdIntegrationIds) {
         try {

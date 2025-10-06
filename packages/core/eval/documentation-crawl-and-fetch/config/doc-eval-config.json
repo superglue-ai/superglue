@@ -15,7 +15,66 @@
       "keywords": ["payment", "charge", "customer", "subscription", "webhook", "authentication"],
       "testQuestions": [
         "How do I create a new customer in Stripe?",
-        "What are the required fields for creating a payment intent?"
+        "What are the required fields for creating a payment intent?",
+        "What parameters are required to refund a payment?"
+      ]
+    },
+    {
+      "id": "slack-api",
+      "name": "Slack API",
+      "description": "Messaging and collaboration API",
+      "documentationUrl": "https://docs.slack.dev/reference/methods",
+      "urlHost": "https://api.slack.com",
+      "openApiUrl": "https://raw.githubusercontent.com/slackapi/slack-api-specs/master/web-api/slack_web_openapi_v2.json",
+      "keywords": [
+        "channel",
+        "conversation",
+        "user",
+        "file",
+        "event",
+        "message",
+        "workflow_step",
+        "workflow_published",
+        "workflow_step_execute",
+        "usergroup",
+        "im",
+        "mpim",
+        "group",
+        "check_run",
+        "apps_permissions_resource"
+      ],
+      "testQuestions": [
+        "How can I authenticate a bot using OAuth2?",
+        "How do I send a message to a channel?",
+        "How do I add a reaction to a message?"
+      ]
+    },
+    {
+      "id": "gmail-api",
+      "name": "Gmail API",
+      "description": "Email API",
+      "documentationUrl": "https://developers.google.com/gmail/api/reference/rest",
+      "urlHost": "https://gmail.googleapis.com",
+      "openApiUrl": "https://www.googleapis.com/discovery/v1/apis/gmail/v1/rest",
+      "keywords": ["messages", "threads", "labels", "drafts", "send", "attachments", "history", "filters", "settings", "forwarding", "inbox", "profile", "oauth"],
+      "testQuestions": [
+        "How do I list all messages in a user's mailbox?",
+        "How do I list all labels in a mailbox?",
+        "How do I refresh an expired access token?"
+      ]
+    },
+    {
+      "id": "openai-api",
+      "name": "OpenAI API",
+      "description": "AI API",
+      "urlHost": "https://api.openai.com",
+      "documentationUrl": "https://platform.openai.com/docs/api-reference/introduction",
+      "openApiUrl": "https://app.stainless.com/api/spec/documented/openai/openapi.documented.yml",
+      "keywords": ["completions", "chat", "models", "embeddings", "images", "audio", "files", "fine-tuning", "assistants", "threads", "messages", "runs", "moderation", "usage", "api key"],
+      "testQuestions": [
+        "What parameter do I use to get structured output?",
+        "How can I retrieve files from my vector database?",
+        "How do I include both text and images in the same input?"
       ]
     }
   ],

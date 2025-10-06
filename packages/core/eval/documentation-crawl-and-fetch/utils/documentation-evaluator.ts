@@ -21,10 +21,10 @@ export interface QuestionResult {
   retrievedContent?: string;
   retrievedContentSize?: number;
   searchQuery?: string;
-  ragScore?: number;
-  relevanceScore?: number;
+  retrievalScore?: number;
+  endpointScore?: number;
   completenessScore?: number;
-  accuracyScore?: number;
+  reasoning?: string;
   error?: string;
 }
 
@@ -34,10 +34,9 @@ export interface EvaluationSummary {
   questionsAnswered: number;
   totalTime: number;
   averageScore: number;
-  averageRagScore: number;
-  averageRelevanceScore: number;
+  averageRetrievalScore: number;
+  averageEndpointScore: number;
   averageCompletenessScore: number;
-  averageAccuracyScore: number;
 }
 
 /**
@@ -71,10 +70,10 @@ export class DocumentationEvaluator {
       'searchResultsSizeKB',
       'searchResultsPreview',
       'success',
-      'ragScore',
-      'relevanceScore',
+      'retrievalScore',
+      'endpointScore',
       'completenessScore',
-      'accuracyScore',
+      'reasoning',
       'error'
     ].join(',');
     
@@ -101,10 +100,10 @@ export class DocumentationEvaluator {
       searchResultsSizeKB,
       `"${searchResultsPreview}"`,
       result.success ? 'true' : 'false',
-      result.ragScore || 0,
-      result.relevanceScore || 0,
+      result.retrievalScore || 0,
+      result.endpointScore || 0,
       result.completenessScore || 0,
-      result.accuracyScore || 0,
+      `"${result.reasoning?.replace(/"/g, '""') || ''}"`,
       `"${result.error?.replace(/"/g, '""') || ''}"`
     ].join(',');
     
@@ -126,13 +125,13 @@ export class DocumentationEvaluator {
       
       const score = (result.questionsAnswered / result.totalQuestions * 100).toFixed(1);
       
-      // Calculate average RAG score for this site
-      const siteRagResults = result.details.filter(d => d.success && d.ragScore !== undefined);
-      const avgRagScore = siteRagResults.length > 0 
-        ? (siteRagResults.reduce((sum, r) => sum + (r.ragScore || 0), 0) / siteRagResults.length).toFixed(1)
+      // Calculate average retrieval score for this site
+      const siteResults = result.details.filter(d => d.success && d.retrievalScore !== undefined);
+      const avgRetrievalScore = siteResults.length > 0 
+        ? (siteResults.reduce((sum, r) => sum + (r.retrievalScore || 0), 0) / siteResults.length).toFixed(1)
         : '0.0';
       
-      logMessage('info', `📝 ${site.name}: ${result.questionsAnswered}/${result.totalQuestions} questions (${score}%) - Avg RAG: ${avgRagScore}%`, this.metadata);
+      logMessage('info', `📝 ${site.name}: ${result.questionsAnswered}/${result.totalQuestions} questions (${score}%) - Avg Retrieval: ${avgRetrievalScore}%`, this.metadata);
     }
 
     const summary = this.generateSummary(results, Date.now() - startTime);
@@ -258,28 +257,30 @@ Return only the search query, no additional text.`;
         };
       }
 
-      // Step 3: Evaluate the search results using RAG metrics
-      const evaluationPrompt = `You are an expert at evaluating RAG (Retrieval-Augmented Generation) systems for API documentation.
+      // Step 3: Evaluate the search results using focused API documentation metrics
+      const evaluationPrompt = `You are an expert at evaluating API documentation retrieval systems. Focus specifically on what developers need to successfully make API calls.
 
 USER QUESTION: "${question}"
 SEARCH QUERY USED: "${searchQuery}"
 RETRIEVED DOCUMENTATION:
 ${searchResults}
 
-Evaluate how well the retrieved documentation can answer the user's question using these RAG metrics (score 0-100):
+Evaluate how well the retrieved documentation helps answer the user's question using these focused metrics (score 0-100):
 
-1. RELEVANCE: How relevant is the retrieved content to the user's question?
-2. COMPLETENESS: Does the retrieved content contain sufficient information to fully answer the question?
-3. ACCURACY: Is the information in the retrieved content accurate and reliable?
-4. OVERALL RAG SCORE: Combined assessment of retrieval quality
+1. RETRIEVAL SCORE: Overall quality of the retrieved content for answering the question. Higher if the right content is found, even with some extra information. Lower if completely wrong or missing key content.
+
+2. ENDPOINT SCORE: Does the documentation clearly identify which API endpoint to use? Higher if the correct endpoint is mentioned (e.g., POST /v1/customers). Lower if endpoint is unclear or wrong.
+
+3. COMPLETENESS SCORE: Does the documentation provide sufficient detail to make the API call? Higher if it includes required/optional parameters, examples, or clear usage instructions. Lower if it's just high-level descriptions.
+
+Note: It's OK if there's additional information about other endpoints - focus on whether the RIGHT information is present and useful.
 
 Provide your evaluation in this exact JSON format:
 {
-  "relevanceScore": <0-100>,
-  "completenessScore": <0-100>, 
-  "accuracyScore": <0-100>,
-  "ragScore": <0-100>,
-  "reasoning": "Brief explanation of scores"
+  "retrievalScore": <0-100>,
+  "endpointScore": <0-100>, 
+  "completenessScore": <0-100>,
+  "reasoning": "Brief explanation focusing on endpoint identification and parameter details"
 }`;
 
       const evaluationResponseObj = await LanguageModel.generateText([{ role: 'user', content: evaluationPrompt }], 1.0);
@@ -298,10 +299,10 @@ Provide your evaluation in this exact JSON format:
           searchQuery,
           retrievedContent: searchResults,
           retrievedContentSize,
-          ragScore: 50,
-          relevanceScore: 50,
+          retrievalScore: 50,
+          endpointScore: 50,
           completenessScore: 50,
-          accuracyScore: 50
+          reasoning: 'Failed to parse LLM response - using fallback scores'
         };
       }
 
@@ -311,10 +312,10 @@ Provide your evaluation in this exact JSON format:
         searchQuery,
         retrievedContent: searchResults,
         retrievedContentSize,
-        ragScore: evaluationScores.ragScore || 0,
-        relevanceScore: evaluationScores.relevanceScore || 0,
+        retrievalScore: evaluationScores.retrievalScore || 0,
+        endpointScore: evaluationScores.endpointScore || 0,
         completenessScore: evaluationScores.completenessScore || 0,
-        accuracyScore: evaluationScores.accuracyScore || 0
+        reasoning: evaluationScores.reasoning || ''
       };
 
     } catch (error) {
@@ -334,23 +335,19 @@ Provide your evaluation in this exact JSON format:
     const questionsAnswered = results.reduce((sum, r) => sum + r.questionsAnswered, 0);
     const averageScore = totalQuestions > 0 ? (questionsAnswered / totalQuestions) * 100 : 0;
 
-    // Calculate RAG metrics from all successful evaluations
-    const allQuestionResults = results.flatMap(r => r.details.filter(d => d.success && d.ragScore !== undefined));
+    // Calculate focused API documentation metrics from all successful evaluations
+    const allQuestionResults = results.flatMap(r => r.details.filter(d => d.success && d.retrievalScore !== undefined));
     
-    const averageRagScore = allQuestionResults.length > 0 
-      ? allQuestionResults.reduce((sum, r) => sum + (r.ragScore || 0), 0) / allQuestionResults.length 
+    const averageRetrievalScore = allQuestionResults.length > 0 
+      ? allQuestionResults.reduce((sum, r) => sum + (r.retrievalScore || 0), 0) / allQuestionResults.length 
       : 0;
     
-    const averageRelevanceScore = allQuestionResults.length > 0 
-      ? allQuestionResults.reduce((sum, r) => sum + (r.relevanceScore || 0), 0) / allQuestionResults.length 
+    const averageEndpointScore = allQuestionResults.length > 0 
+      ? allQuestionResults.reduce((sum, r) => sum + (r.endpointScore || 0), 0) / allQuestionResults.length 
       : 0;
     
     const averageCompletenessScore = allQuestionResults.length > 0 
       ? allQuestionResults.reduce((sum, r) => sum + (r.completenessScore || 0), 0) / allQuestionResults.length 
-      : 0;
-    
-    const averageAccuracyScore = allQuestionResults.length > 0 
-      ? allQuestionResults.reduce((sum, r) => sum + (r.accuracyScore || 0), 0) / allQuestionResults.length 
       : 0;
 
     return {
@@ -359,26 +356,24 @@ Provide your evaluation in this exact JSON format:
       questionsAnswered,
       totalTime,
       averageScore,
-      averageRagScore,
-      averageRelevanceScore,
-      averageCompletenessScore,
-      averageAccuracyScore
+      averageRetrievalScore,
+      averageEndpointScore,
+      averageCompletenessScore
     };
   }
 
   /**
-   * Log evaluation summary with RAG metrics
+   * Log evaluation summary with focused API documentation metrics
    */
   private logSummary(summary: EvaluationSummary): void {
     const score = summary.averageScore.toFixed(1);
-    const ragScore = summary.averageRagScore.toFixed(1);
-    const relevanceScore = summary.averageRelevanceScore.toFixed(1);
+    const retrievalScore = summary.averageRetrievalScore.toFixed(1);
+    const endpointScore = summary.averageEndpointScore.toFixed(1);
     const completenessScore = summary.averageCompletenessScore.toFixed(1);
-    const accuracyScore = summary.averageAccuracyScore.toFixed(1);
     const totalTimeSec = (summary.totalTime / 1000).toFixed(1);
 
     logMessage('info', `📊 Evaluation Summary: ${summary.questionsAnswered}/${summary.totalQuestions} questions answered (${score}%)`, this.metadata);
-    logMessage('info', `🎯 RAG Scores - Overall: ${ragScore}%, Relevance: ${relevanceScore}%, Completeness: ${completenessScore}%, Accuracy: ${accuracyScore}%`, this.metadata);
+    logMessage('info', `🎯 API Doc Scores - Retrieval: ${retrievalScore}%, Endpoint: ${endpointScore}%, Completeness: ${completenessScore}%`, this.metadata);
     logMessage('info', `⏱️  Total time: ${totalTimeSec}s`, this.metadata);
   }
 }
