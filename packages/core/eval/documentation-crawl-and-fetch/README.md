@@ -13,7 +13,7 @@ Evaluates the quality of documentation crawling across multiple API documentatio
 
 ```bash
 # Run documentation evaluations
-npx ts-node packages/core/eval/documentation-crawl-and-fetch/run-documentation-evaluations.ts
+cd packages/core && npm run build && node dist/eval/documentation-crawl-and-fetch/run-documentation-evaluations.js 
 ```
 
 ## Configuration
