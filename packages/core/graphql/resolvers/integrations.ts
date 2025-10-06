@@ -223,7 +223,7 @@ function templateDocumentationExists(input: Integration, context: Context): [boo
   }
   // check if all keywords are present in the matchingTemplate.keywords
   const allKeywordsPresent = matchingTemplate.keywords?.every(keyword => input.documentationKeywords?.includes(keyword));
-  const documentationUrlMatches = input.documentationUrl.trim() === matchingTemplate.docsUrl.trim();
+  const documentationUrlMatches = input.documentationUrl?.trim() === matchingTemplate.docsUrl.trim();
   return [allKeywordsPresent && documentationUrlMatches, matchingTemplate.name];
 }
 
@@ -266,10 +266,6 @@ function shouldTriggerDocFetch(input: Integration, context: Context, existingInt
   const isFileUrl = input.documentationUrl?.startsWith('file://');
   if (isFileUrl) return false;
 
-  // If we are on postgres datastore and there is a template documentation, we don't need to fetch
-  const [doesTemplateDocumentationExists, _] = templateDocumentationExists(input, context);
-  if (doesTemplateDocumentationExists) return false;
-
   // Check if we have something to fetch
   const hasDocumentationUrl = input.documentationUrl && input.documentationUrl.trim().length > 0;
   const hasApiUrl = input.urlHost && input.urlHost.trim().length > 0;
@@ -283,7 +279,12 @@ function shouldTriggerDocFetch(input: Integration, context: Context, existingInt
 
   // Check if we need to trigger a fetch
   const isNewIntegration = !existingIntegration;
-  if (isNewIntegration) return true;
+  if (isNewIntegration) {
+    // If we are on postgres datastore and there is a template documentation, we don't need to fetch
+    const [doesTemplateDocumentationExists, _] = templateDocumentationExists(input, context);
+    if (doesTemplateDocumentationExists) return false;
+    return true;
+  }
 
   const docUrlChanged = input.documentationUrl !== existingIntegration.documentationUrl;
   const hostChanged = input.urlHost!== existingIntegration.urlHost;
