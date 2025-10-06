@@ -104,7 +104,7 @@ export const upsertIntegrationResolver = async (
       // If we are creating the integration, and we are on postgres datastore, and there is a template documentation, we copy it to the users integration
       const [doesTemplateDocumentationExists, templateName] = templateDocumentationExists(input, context);
       if(doesTemplateDocumentationExists) {
-        logMessage('debug', `Copying template documentation to user integration ${input.id} for template ${templateName} for org ${context.orgId}`, { orgId: context.orgId });
+        logMessage('debug', `Copying template documentation for template '${templateName}' to user integration '${input.id}'`, { orgId: context.orgId });
         const success = await context.datastore.copyTemplateDocumentationToUserIntegration({ templateId: templateName, userIntegrationId: input.id, orgId: context.orgId });
         if(!success) {
           logMessage('error', `Failed to copy template documentation to user integration ${input.id}`, { orgId: context.orgId });
