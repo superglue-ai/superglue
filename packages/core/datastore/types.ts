@@ -43,6 +43,12 @@ export interface DataStore {
   upsertIntegration(params: { id: string; integration: Integration; orgId?: string }): Promise<Integration>;
   deleteIntegration(params: { id: string; orgId?: string }): Promise<boolean>;
   getManyIntegrations(params: { ids: string[]; includeDocs?: boolean; orgId?: string }): Promise<Integration[]>;
+  getTemplateOAuthCredentials(params: { templateId: string }): Promise<{ client_id: string; client_secret: string } | null>;
+
+  // OAuth cache methods
+  cacheOAuthSecret(params: { uid: string; clientId: string; clientSecret: string; ttlMs: number }): Promise<void>;
+  getOAuthSecret(params: { uid: string }): Promise<{ clientId: string; clientSecret: string } | null>;
+  deleteOAuthSecret(params: { uid: string }): Promise<void>;
   copyTemplateDocumentationToUserIntegration(params: { templateId: string; userIntegrationId: string; orgId?: string }): Promise<boolean>;
 
   // Workflow Schedule

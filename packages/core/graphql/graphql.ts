@@ -5,7 +5,7 @@ import { deleteApiResolver, deleteExtractResolver, deleteTransformResolver } fro
 import { extractResolver } from "./resolvers/extract.js";
 import { generateInstructionsResolver, generateSchemaResolver } from "./resolvers/generate.js";
 import { getApiResolver, getExtractResolver, getRunResolver, getTransformResolver } from "./resolvers/get.js";
-import { deleteIntegrationResolver, findRelevantIntegrationsResolver, getIntegrationResolver, listIntegrationsResolver, upsertIntegrationResolver } from "./resolvers/integrations.js";
+import { cacheOauthClientCredentialsResolver, deleteIntegrationResolver, findRelevantIntegrationsResolver, getIntegrationResolver, getOAuthClientCredentialsResolver, listIntegrationsResolver, upsertIntegrationResolver } from "./resolvers/integrations.js";
 import { listApisResolver, listExtractsResolver, listRunsResolver, listTransformsResolver } from "./resolvers/list.js";
 import { logsResolver } from "./resolvers/logs.js";
 import { JSONResolver, JSONSchemaResolver, JSONataResolver } from "./resolvers/scalars.js";
@@ -13,6 +13,7 @@ import { getTenantInfoResolver, setTenantInfoResolver } from "./resolvers/tenant
 import { transformResolver } from "./resolvers/transform.js";
 import { updateApiConfigIdResolver } from "./resolvers/update-id.js";
 import { upsertApiResolver, upsertExtractResolver, upsertTransformResolver } from "./resolvers/upsert.js";
+import { deleteWorkflowScheduleResolver, listWorkflowSchedulesResolver, upsertWorkflowScheduleResolver } from "./resolvers/workflow-scheduler.js";
 import {
   buildWorkflowResolver,
   deleteWorkflowResolver,
@@ -21,7 +22,6 @@ import {
   listWorkflowsResolver,
   upsertWorkflowResolver
 } from "./resolvers/workflow.js";
-import { listWorkflowSchedulesResolver, upsertWorkflowScheduleResolver, deleteWorkflowScheduleResolver } from "./resolvers/workflow-scheduler.js";
 
 export const resolvers = {
   Query: {
@@ -60,6 +60,8 @@ export const resolvers = {
     upsertTransformation: upsertTransformResolver,
     deleteTransformation: deleteTransformResolver,
     upsertIntegration: upsertIntegrationResolver,
+    cacheOauthClientCredentials: cacheOauthClientCredentialsResolver,
+    getOAuthClientCredentials: getOAuthClientCredentialsResolver,
     deleteIntegration: deleteIntegrationResolver,
     upsertWorkflowSchedule: upsertWorkflowScheduleResolver,
     deleteWorkflowSchedule: deleteWorkflowScheduleResolver,
