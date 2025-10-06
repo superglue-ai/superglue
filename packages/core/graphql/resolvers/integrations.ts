@@ -108,7 +108,7 @@ export const upsertIntegrationResolver = async (
         logMessage('debug', `Copying template documentation to user integration ${input.id} for template ${templateName} for org ${context.orgId}`, { orgId: context.orgId });
         const success = await context.datastore.copyTemplateDocumentationToUserIntegration({ templateId: templateName, userIntegrationId: input.id, orgId: context.orgId });
         if(!success) {
-          logMessage('error', `Failed to copy template documentation to user integration ${input.id}`, { orgId: context.orgId });
+          logMessage('warn', `No Template Documentation found for template ${templateName} to copy to user integration ${input.id}`, { orgId: context.orgId });
           // set shouldFetchDoc to true to trigger a fetch
           shouldFetchDoc = true;
         }
