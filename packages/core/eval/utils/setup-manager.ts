@@ -202,8 +202,8 @@ export class SetupManager {
             try {
                 logMessage('info', `📚 Starting documentation fetch for ${integration.id}`, this.metadata);
 
-                const { Documentation } = await import('../../utils/documentation.js');
-                const docFetcher = new Documentation(
+                const { DocumentationFetcher } = await import('../../documentation/index.js');
+                const docFetcher = new DocumentationFetcher(
                     {
                         urlHost: config.urlHost,
                         urlPath: config.urlPath,

@@ -1,5 +1,5 @@
 import { DataStore } from '../../../datastore/types.js';
-import { Documentation } from '../../../utils/documentation.js';
+import { DocumentationFetcher as DocumentationFetcherCore } from '../../../documentation/documentation-fetching.js';
 import { logMessage } from '../../../utils/logs.js';
 
 export interface DocumentationSite {
@@ -77,7 +77,7 @@ export class DocumentationFetcher {
     const fetchStartTime = Date.now();
     
     try {
-      const docFetcher = new Documentation(
+      const docFetcher = new DocumentationFetcherCore(
         {
           urlHost: site.urlHost,
           urlPath: site.urlPath || '',

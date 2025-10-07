@@ -25,6 +25,7 @@ async function main() {
     
     // Load configuration
     const config = await configLoader.loadConfig();
+    const sitesToUse = configLoader.getEnabledSites(config);
     
     // Initialize datastore
     const datastore = createDataStore({ type: 'postgres' });
@@ -32,12 +33,12 @@ async function main() {
     // Phase 1: Fetch Documentation
     logMessage('info', '📥 Phase 1: Documentation Fetching', metadata);
     const fetcher = new DocumentationFetcher(datastore, ORG_ID);
-    const fetchSummary = await fetcher.fetchAllDocumentation(config.sites);
+    const fetchSummary = await fetcher.fetchAllDocumentation(sitesToUse);
     
     // Phase 2: Evaluate Documentation
     logMessage('info', '📝 Phase 2: Documentation Evaluation', metadata);
     const evaluator = new DocumentationEvaluator(datastore, ORG_ID);
-    const evaluationSummary = await evaluator.evaluateAllSites(config.sites);
+    const evaluationSummary = await evaluator.evaluateAllSites(sitesToUse);
     
     // Final Summary
     logMessage('info', '📊 Final Summary', metadata);

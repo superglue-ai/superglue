@@ -9,6 +9,7 @@ export interface DocumentationEvaluationConfig {
   maxDocumentationSizeMB: number;
   enablePlaywright: boolean;
   enableOpenApiFetching: boolean;
+  enabledSites: string[];
 }
 
 export class DocumentationEvaluationConfigLoader {
@@ -21,7 +22,7 @@ export class DocumentationEvaluationConfigLoader {
     const defaultPath = path.join(process.cwd(), 'packages/core/eval/documentation-crawl-and-fetch/config/doc-eval-config.json');
     const finalPath = configPath || defaultPath;
 
-    const config = await this.loadJsonConfig<DocumentationEvaluationConfig>(
+    const rawConfig = await this.loadJsonConfig<any>(
       finalPath,
       'doc-eval-config.json',
       [
@@ -30,7 +31,18 @@ export class DocumentationEvaluationConfigLoader {
       ]
     );
 
-    this.validateConfig(config);
+    this.validateRawConfig(rawConfig);
+    
+    // Transform to match DocumentationEvaluationConfig interface
+    const config: DocumentationEvaluationConfig = {
+      sites: rawConfig.sites,
+      crawlTimeoutMs: rawConfig.settings.crawlTimeout,
+      maxDocumentationSizeMB: rawConfig.settings.maxDocumentationSize,
+      enablePlaywright: rawConfig.settings.enablePlaywrightCrawling,
+      enableOpenApiFetching: rawConfig.settings.enableOpenApiFetching,
+      enabledSites: rawConfig.settings.enabledSites || []
+    };
+    
     return config;
   }
 
@@ -70,9 +82,9 @@ export class DocumentationEvaluationConfigLoader {
   }
 
   /**
-   * Validate configuration structure
+   * Validate raw configuration structure from JSON
    */
-  private validateConfig(config: any): asserts config is DocumentationEvaluationConfig {
+  private validateRawConfig(config: any): void {
     if (!config.evaluationSuite?.name) {
       throw new Error('Invalid config: missing evaluationSuite.name');
     }
@@ -107,7 +119,7 @@ export class DocumentationEvaluationConfigLoader {
    * Get enabled sites from config
    */
   getEnabledSites(config: DocumentationEvaluationConfig): DocumentationSite[] {
-    return config.sites;
+    return config.sites.filter((site) => config.enabledSites.includes(site.id));
   }
 
   /**

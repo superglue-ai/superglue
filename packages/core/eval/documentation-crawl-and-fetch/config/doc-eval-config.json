@@ -97,12 +97,26 @@
         "How can I retrieve files from my vector database?",
         "How do I include both text and images in the same input?"
       ]
+    },
+    {
+      "id": "zignsec-api",
+      "name": "Zignsec API",
+      "description": "Identify and onboard your customers globally",
+      "documentationUrl": "https://gateway.zignsec.com/",
+      "urlHost": "https://gateway.zignsec.com/",
+      "openApiUrl": "https://gateway.zignsec.com/",
+      "keywords": ["proof-of-address", "identity verification", "e-id", "background check"],
+      "testQuestions": [
+        "How can I Create a proof-of-address session?",
+        "How can I start an identity verification session?"
+      ]
     }
   ],
   "settings": {
     "crawlTimeout": 300000,
     "maxDocumentationSize": 500000,
     "enablePlaywrightCrawling": true,
-    "enableOpenApiFetching": true
+    "enableOpenApiFetching": true,
+    "enabledSites": ["openai-api"]
   }
 }

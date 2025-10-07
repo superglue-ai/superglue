@@ -2,7 +2,7 @@ import type { Integration } from "@superglue/client";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { LanguageModel } from "../llm/llm.js";
 import { BaseToolContext, ToolDefinition, ToolImplementation } from "../tools/tools.js";
-import { Documentation } from "./documentation.js";
+import { DocumentationRetrieval } from "../documentation/documentation-retrieval.js";
 import { parseJSON } from "./json-parser.js";
 
 // Extend context to include integrations
@@ -32,10 +32,11 @@ export const generateInstructionsImplementation: ToolImplementation<InstructionG
 
   // Prepare integration summaries with smart documentation truncation
   const integrationSummaries = integrations.map(integration => {
-    // Use Documentation.extractRelevantSections to intelligently truncate documentation
+    // Use DocumentationRetrieval to intelligently truncate documentation
     // Focus on getting started, authentication, and basic operations
+    const retrieval = new DocumentationRetrieval();
     const truncatedDocs = integration.documentation
-      ? Documentation.extractRelevantSections(
+      ? retrieval.extractRelevantSections(
         integration.documentation,
         "getting started overview endpoints reference",
         10,  // max_chunks

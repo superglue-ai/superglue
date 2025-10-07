@@ -4,7 +4,7 @@ import { generateUniqueId } from '@superglue/shared/utils';
 import { GraphQLResolveInfo } from "graphql";
 import { server_defaults } from '../../default.js';
 import { IntegrationSelector } from '../../integrations/integration-selector.js';
-import { Documentation } from '../../utils/documentation.js';
+import { DocumentationFetcher } from '../../documentation/documentation-fetching.js';
 import { logMessage } from '../../utils/logs.js';
 import { composeUrl } from '../../utils/tools.js';
 import { PostgresService } from '../../datastore/postgres.js';
@@ -308,7 +308,7 @@ async function triggerAsyncDocumentationFetch(
 
     logMessage('info', `Starting async documentation fetch for integration ${input.id}`, { orgId: context.orgId });
 
-    const docFetcher = new Documentation(
+    const docFetcher = new DocumentationFetcher(
       {
         urlHost: enrichedInput.urlHost,
         urlPath: enrichedInput.urlPath,

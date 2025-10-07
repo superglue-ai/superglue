@@ -4,7 +4,7 @@ import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { LanguageModel } from "../llm/llm.js";
 import { ToolDefinition, ToolImplementation, WorkflowBuildContext, WorkflowExecutionContext } from "../tools/tools.js";
-import { Documentation } from "../utils/documentation.js";
+import { DocumentationRetrieval } from "../documentation/documentation-retrieval.js";
 import { logMessage } from "../utils/logs.js";
 
 export const searchDocumentationToolImplementation: ToolImplementation<WorkflowExecutionContext> = async (args, context) => {
@@ -30,8 +30,9 @@ export const searchDocumentationToolImplementation: ToolImplementation<WorkflowE
             };
         }
 
-        // Use Documentation.extractRelevantSections for targeted search
-        const searchResults = Documentation.extractRelevantSections(
+        // Use DocumentationRetrieval for targeted search
+        const retrieval = new DocumentationRetrieval();
+        const searchResults = retrieval.extractRelevantSections(
             integration.documentation,
             query,
             5,
