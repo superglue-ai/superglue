@@ -62,7 +62,7 @@ export const extractResolver = async (
           }
           const documentation = new DocumentationFetcher(input.endpoint, credentials, metadata);
           const rawDoc = await documentation.fetchAndProcess();
-          const documentationSearch = new DocumentationSearch();
+          const documentationSearch = new DocumentationSearch({ orgId: context.orgId });
           const documentationString = documentationSearch.extractRelevantSections(rawDoc, input.endpoint.instruction || "");
           preparedExtract = await generateExtractConfig(input.endpoint, documentationString, payload, credentials, lastError);
         }

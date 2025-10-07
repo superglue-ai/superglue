@@ -52,7 +52,7 @@ export class WorkflowBuilder {
   }
 
   private generateIntegrationDescriptions(maxChars: number = 100000): string {
-    const documentationSearch = new DocumentationSearch();
+    const documentationSearch = new DocumentationSearch(this.metadata);
     const descriptions = Object.values(this.integrations).map(int => {
       if (!int.documentation) {
         return `<${int.id}>
@@ -66,20 +66,23 @@ export class WorkflowBuilder {
         int.documentation,
         "authentication authorization api key token bearer basic oauth credentials access private app secret",
         3,  // fewer sections needed for auth
-        2000 // should be detailed though
+        2000, // should be detailed though
+        int.openApiSchema
       );
 
       const paginationSection = documentationSearch.extractRelevantSections(
         int.documentation,
         "pagination page offset cursor limit per_page pageSize after next previous paging paginated results list",
         3,  // max 3 sections
-        2000 // same logic applies here
+        2000, // same logic applies here
+        int.openApiSchema
       );
       const generalSection = documentationSearch.extractRelevantSections(
         int.documentation,
         this.instruction + "reference object endpoints methods properties values fields enums search query filter list create update delete get put post patch",
         20,  // max 20 sections
-        1000 // should cover examples, endpoints etc.
+        1000, // should cover examples, endpoints etc.
+        int.openApiSchema
       );
 
       return `<${int.id}>

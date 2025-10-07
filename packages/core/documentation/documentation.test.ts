@@ -276,7 +276,7 @@ describe('Documentation Class', () => {
     });
 
     describe('extractRelevantSections', () => {
-        const documentationSearch = new DocumentationSearch();
+        const documentationSearch = new DocumentationSearch({ orgId: 'test' });
         
         it('should return empty string for empty documentation', () => {
             const result = documentationSearch.extractRelevantSections("", "some instruction");

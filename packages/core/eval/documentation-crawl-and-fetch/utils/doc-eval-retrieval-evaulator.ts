@@ -159,7 +159,7 @@ export class DocumentationEvaluator {
         orgId: this.orgId 
       });
 
-      if (!integration || !integration.documentation) {
+      if (!integration || (!integration.documentation && !integration.openApiSchema)) {
         // No documentation found - mark all questions as failed
         for (const question of site.testQuestions) {
           const result = {
@@ -175,7 +175,7 @@ export class DocumentationEvaluator {
       } else {
         // Evaluate each question
         for (const question of site.testQuestions) {
-          const result = await this.evaluateQuestion(question, integration.documentation);
+          const result = await this.evaluateQuestion(question, integration.documentation, integration.openApiSchema);
           details.push(result);
           
           // Log to CSV for debugging
@@ -218,7 +218,7 @@ export class DocumentationEvaluator {
   /**
    * Evaluate a single question against documentation using RAG evaluation
    */
-  private async evaluateQuestion(question: string, documentation: string): Promise<QuestionResult> {
+  private async evaluateQuestion(question: string, documentation: string, openApiSchema: string): Promise<QuestionResult> {
     try {
       // Use LanguageModel as a static object
 
@@ -237,12 +237,13 @@ Return only the search query, no additional text.`;
       const searchQuery = searchQueryResponse.response;
       
       // Step 2: Use DocumentationSearch for targeted search
-      const documentationSearch = new DocumentationSearch();
+      const documentationSearch = new DocumentationSearch({ orgId: this.orgId });
       const searchResults = documentationSearch.extractRelevantSections(
         documentation,
         searchQuery,
         5,
-        2000
+        2000,
+        openApiSchema
       );
 
       const retrievedContentSize = Buffer.byteLength(searchResults, 'utf8');

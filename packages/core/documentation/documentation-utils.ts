@@ -55,7 +55,7 @@ export async function fetchMultipleOpenApiSpecs(urls: string[], metadata: Metada
 
   filteredUrls = removeOldVersionFromUrls(filteredUrls);
   
-  var specs: any[] = [];
+  let specs: any[] = [];
   const MAX_CONCURRENT_FETCHES = server_defaults.DOCUMENTATION.MAX_CONCURRENT_OPENAPI_FETCHES;
   const MAX_SPECS_TO_FETCH = server_defaults.DOCUMENTATION.MAX_OPENAPI_SPECS_TO_FETCH;
 

@@ -34,13 +34,14 @@ export const generateInstructionsImplementation: ToolImplementation<InstructionG
   const integrationSummaries = integrations.map(integration => {
     // Use DocumentationSearch to intelligently truncate documentation
     // Focus on getting started, authentication, and basic operations
-    const documentationSearch = new DocumentationSearch();
+    const documentationSearch = new DocumentationSearch({orgId: context.orgId});
     const truncatedDocs = integration.documentation
       ? documentationSearch.extractRelevantSections(
         integration.documentation,
         "getting started overview endpoints reference",
         10,  // max_chunks
-        1000 // chunk_size - smaller chunks for summaries
+        1000, // chunk_size - smaller chunks for summaries
+        integration.openApiSchema
       )
       : "";
 

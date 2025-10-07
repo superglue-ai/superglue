@@ -77,7 +77,7 @@ export const upsertIntegrationResolver = async (
       }
     }
 
-    var shouldFetchDoc = shouldTriggerDocFetch(input, context, existingIntegrationOrNull);
+    let shouldFetchDoc = shouldTriggerDocFetch(input, context, existingIntegrationOrNull);
 
     const integrationToSave = {
       id: input.id,

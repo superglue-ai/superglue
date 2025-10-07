@@ -31,12 +31,13 @@ export const searchDocumentationToolImplementation: ToolImplementation<WorkflowE
         }
 
         // Use DocumentationSearch for targeted search
-        const documentationSearch = new DocumentationSearch();
+        const documentationSearch = new DocumentationSearch({orgId: context.orgId});
         const searchResults = documentationSearch.extractRelevantSections(
             integration.documentation,
             query,
             5,
-            2000
+            2000,
+            integration.openApiSchema
         );
 
         // Return the full search results
