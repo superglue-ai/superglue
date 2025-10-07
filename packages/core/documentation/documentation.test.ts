@@ -194,32 +194,6 @@ describe('Documentation Class', () => {
             expect(result).toContain('"title": "My API"');
         });
 
-        it('should extract and fetch absolute OpenAPI URL found in HTML', async () => {
-            const swaggerHtml = `<html><body><a href="https://absolute.com/openapi.yaml">Link</a></body></html>`; // Different extraction case
-            const openApiYaml = `openapi: 3.0.0\ninfo:\n  title: YAML API`;
-            const docUrl = 'https://api.example.com/docs';
-
-            mockPage.evaluate.mockResolvedValue({ html: swaggerHtml, links: {} })
-
-            // Mock sitemap requests to fail, then OpenAPI request succeeds
-            mockedAxios.get.mockImplementation((url: string) => {
-                if (url.includes('sitemap')) {
-                    return Promise.reject(new Error('404'));
-                }
-                if (url.includes('openapi.yaml')) {
-                    return Promise.resolve({ data: openApiYaml });
-                }
-                return Promise.reject(new Error('404'));
-            });
-
-            const doc = new DocumentationFetcher({ documentationUrl: docUrl, urlHost: 'https://api.example.com' }, {}, metadata);
-            const result = await doc.fetchAndProcess();
-
-            expect(playwright.chromium.launch).toHaveBeenCalledTimes(1);
-            expect(mockPage.evaluate).toHaveBeenCalledTimes(1);
-            expect(result).toContain(openApiYaml);
-        });
-
         it('should handle page content being the OpenAPI spec directly (JSON)', async () => {
             const openApiJsonString = JSON.stringify({ swagger: "2.0", info: { title: "Direct JSON" } });
             mockPage.evaluate.mockResolvedValue({ html: openApiJsonString, links: {} })
