@@ -1,6 +1,6 @@
 import { CacheMode, DecompressionMethod, ExtractConfig, ExtractInputRequest, FileType, RequestOptions } from "@superglue/client";
 import { GraphQLResolveInfo } from "graphql";
-import { DocumentationRetrieval } from "../../documentation/documentation-retrieval.js";
+import { DocumentationSearch } from "../../documentation/documentation-search.js";
 import { DocumentationFetcher } from "../../documentation/documentation-fetching.js";
 import { callExtract, generateExtractConfig, processFile } from "../../utils/extract.js";
 import { logMessage } from "../../utils/logs.js";
@@ -62,8 +62,8 @@ export const extractResolver = async (
           }
           const documentation = new DocumentationFetcher(input.endpoint, credentials, metadata);
           const rawDoc = await documentation.fetchAndProcess();
-          const retrieval = new DocumentationRetrieval();
-          const documentationString = retrieval.extractRelevantSections(rawDoc, input.endpoint.instruction || "");
+          const documentationSearch = new DocumentationSearch();
+          const documentationString = documentationSearch.extractRelevantSections(rawDoc, input.endpoint.instruction || "");
           preparedExtract = await generateExtractConfig(input.endpoint, documentationString, payload, credentials, lastError);
         }
 

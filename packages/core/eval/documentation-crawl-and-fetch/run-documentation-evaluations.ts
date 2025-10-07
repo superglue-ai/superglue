@@ -1,8 +1,8 @@
 import { config } from 'dotenv';
 import path from 'path';
-import { DocumentationFetcher } from './utils/documentation-fetcher.js';
-import { DocumentationEvaluator } from './utils/documentation-evaluator.js';
-import { DocumentationEvaluationConfigLoader } from './utils/config-loader.js';
+import { DocumentationEvalFetcher } from './utils/doc-eval-fetcher.js';
+import { DocumentationEvaluator } from './utils/doc-eval-retrieval-evaulator.js';
+import { DocumentationEvaluationConfigLoader } from './utils/doc-eval-config-loader.js';
 import { createDataStore } from '../../datastore/datastore.js';
 import { logMessage } from '../../utils/logs.js';
 
@@ -32,7 +32,7 @@ async function main() {
     
     // Phase 1: Fetch Documentation
     logMessage('info', '📥 Phase 1: Documentation Fetching', metadata);
-    const fetcher = new DocumentationFetcher(datastore, ORG_ID);
+    const fetcher = new DocumentationEvalFetcher(datastore, ORG_ID);
     const fetchSummary = await fetcher.fetchAllDocumentation(sitesToUse);
     
     // Phase 2: Evaluate Documentation

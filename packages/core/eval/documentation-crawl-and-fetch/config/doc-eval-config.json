@@ -195,6 +195,6 @@
     "maxDocumentationSize": 500000,
     "enablePlaywrightCrawling": true,
     "enableOpenApiFetching": true,
-    "enabledSites": ["crossref-api"]
+    "enabledSites": ["gmail-api"]
   }
 }

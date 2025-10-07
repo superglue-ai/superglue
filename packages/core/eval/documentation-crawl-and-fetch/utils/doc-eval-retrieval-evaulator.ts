@@ -1,8 +1,8 @@
 import { DataStore } from '../../../datastore/types.js';
 import { logMessage } from '../../../utils/logs.js';
-import { DocumentationRetrieval } from '../../../documentation/documentation-retrieval.js';
+import { DocumentationSearch } from '../../../documentation/documentation-search.js';
 import { LanguageModel } from '../../../llm/llm.js';
-import { DocumentationSite } from './documentation-fetcher.js';
+import { DocumentationSite } from './doc-eval-fetcher.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -236,9 +236,9 @@ Return only the search query, no additional text.`;
       const searchQueryResponse = await LanguageModel.generateText([{ role: 'user', content: searchQueryPrompt }], 1.0);
       const searchQuery = searchQueryResponse.response;
       
-      // Step 2: Use DocumentationRetrieval for targeted search
-      const retrieval = new DocumentationRetrieval();
-      const searchResults = retrieval.extractRelevantSections(
+      // Step 2: Use DocumentationSearch for targeted search
+      const documentationSearch = new DocumentationSearch();
+      const searchResults = documentationSearch.extractRelevantSections(
         documentation,
         searchQuery,
         5,

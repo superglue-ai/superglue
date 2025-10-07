@@ -57,9 +57,8 @@ export class DocumentationFetcher {
   private readonly credentials?: Record<string, any>;
   private readonly metadata: Metadata;
 
-  private lastResult: string | null = null;
-
-  private lastRawResult: string | null = null;
+  private lastFetchAndProcessResult: string | null = null;
+  private lastFetchAndProcessRawResult: string | null = null;
 
   constructor(config: DocumentationConfig, credentials: Record<string, any>, metadata: Metadata) {
     this.config = config;
@@ -68,8 +67,8 @@ export class DocumentationFetcher {
   }
 
   public async fetchAndProcess(): Promise<string> {
-    if (this.lastResult) {
-      return this.lastResult;
+    if (this.lastFetchAndProcessResult) {
+      return this.lastFetchAndProcessResult;
     }
 
     const fetchingStrategies: DocumentationFetchingStrategy[] = [
@@ -99,15 +98,15 @@ export class DocumentationFetcher {
       rawResult = "";
     }
 
-    this.lastRawResult = rawResult;
+    this.lastFetchAndProcessRawResult = rawResult;
 
     for (const strategy of processingStrategies) {
       const result = await strategy.tryProcess(rawResult, this.config, this.metadata, this.credentials);
       if (result == null || result.length === 0) {
         continue;
       }
-      this.lastResult = result;
-      return this.lastResult;
+      this.lastFetchAndProcessResult = result;
+      return this.lastFetchAndProcessResult;
     }
 
     logMessage('warn', "No processing strategy could handle the fetched documentation.", this.metadata);
@@ -126,7 +125,7 @@ export class DocumentationFetcher {
       const strategies: OpenApiFetchingStrategy[] = [
         new DirectOpenApiStrategy(),
         new SwaggerUIStrategy(),
-        new HtmlLinkExtractorStrategy(this.lastRawResult),
+        new HtmlLinkExtractorStrategy(this.lastFetchAndProcessRawResult),
         new OpenApiLinkExtractorStrategy()
       ];
 

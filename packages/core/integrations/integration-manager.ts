@@ -1,6 +1,6 @@
 import { Integration } from "@superglue/client";
 import { DataStore } from "../datastore/types.js";
-import { DocumentationRetrieval } from "../documentation/documentation-retrieval.js";
+import { DocumentationSearch } from "../documentation/documentation-search.js";
 import { logMessage } from "../utils/logs.js";
 import { isTokenExpired, refreshOAuthToken } from "../utils/oauth.js";
 
@@ -107,8 +107,8 @@ export class IntegrationManager {
         if(!documentation.openApiSchema && !documentation.content) {
             return "no documentation provided";
         }
-        const retrieval = new DocumentationRetrieval();
-        const result = retrieval.extractRelevantSections(documentation.content, instruction, 5, 4000);
+        const documentationSearch = new DocumentationSearch();
+        const result = documentationSearch.extractRelevantSections(documentation.content, instruction, 5, 4000);
         this.searchCache.set(instruction, result);
         return result;
     }

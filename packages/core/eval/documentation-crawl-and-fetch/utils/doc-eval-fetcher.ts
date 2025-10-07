@@ -32,9 +32,9 @@ export interface FetchSummary {
 }
 
 /**
- * Handles fetching and storing documentation from various sources
+ * Handles fetching and storing documentation from various sources for evaluation purposes
  */
-export class DocumentationFetcher {
+export class DocumentationEvalFetcher {
   private metadata = { orgId: 'documentation-eval', userId: 'system' };
   private createdIntegrationIds: string[] = [];
 

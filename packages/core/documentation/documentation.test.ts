@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, Mocked, vi } from 'vitest'
 import { server_defaults } from '../default.js';
 import { DocumentationFetcher } from './documentation-fetching.js';
 import { PlaywrightFetchingStrategy } from './strategies/index.js';
-import { DocumentationRetrieval } from './documentation-retrieval.js';
+import { DocumentationSearch } from './documentation-search.js';
 
 // Mock playwright and axios
 vi.mock('@playwright/test', async (importOriginal) => {
@@ -302,34 +302,34 @@ describe('Documentation Class', () => {
     });
 
     describe('extractRelevantSections', () => {
-        const retrieval = new DocumentationRetrieval();
+        const documentationSearch = new DocumentationSearch();
         
         it('should return empty string for empty documentation', () => {
-            const result = retrieval.extractRelevantSections("", "some instruction");
+            const result = documentationSearch.extractRelevantSections("", "some instruction");
             expect(result).toBe("");
         });
 
         it('should return whole doc if no valid search terms but doc is small', () => {
             const doc = "Some documentation content here";
-            const result = retrieval.extractRelevantSections(doc, "a b c"); // All terms too short
+            const result = documentationSearch.extractRelevantSections(doc, "a b c"); // All terms too short
             expect(result).toBe(doc); // Returns whole doc since it's smaller than section size
         });
 
         it('should return whole doc if smaller than section size', () => {
             const doc = "Short documentation";
-            const result = retrieval.extractRelevantSections(doc, "documentation", 5, 500);
+            const result = documentationSearch.extractRelevantSections(doc, "documentation", 5, 500);
             expect(result).toBe(doc);
         });
 
         it('should return empty string if no sections match search terms', () => {
             const doc = "A".repeat(1000);
-            const result = retrieval.extractRelevantSections(doc, "nonexistent term", 5, 200);
+            const result = documentationSearch.extractRelevantSections(doc, "nonexistent term", 5, 200);
             expect(result).toBe("");
         });
 
         it('should extract sections matching search terms', () => {
             const doc = "prefix ".repeat(50) + "important api endpoint here " + "suffix ".repeat(50);
-            const result = retrieval.extractRelevantSections(doc, "api endpoint", 3, 200);
+            const result = documentationSearch.extractRelevantSections(doc, "api endpoint", 3, 200);
 
             expect(result).toContain("api");
             expect(result).toContain("endpoint");
@@ -342,7 +342,7 @@ describe('Documentation Class', () => {
             const section3 = "third section with keyword api " + "z".repeat(170);
             const doc = section1 + section2 + section3;
 
-            const result = retrieval.extractRelevantSections(doc, "api", 2, 200);
+            const result = documentationSearch.extractRelevantSections(doc, "api", 2, 200);
 
             const sections = result.split('\n\n');
             expect(sections.length).toBeLessThanOrEqual(2);
@@ -351,7 +351,7 @@ describe('Documentation Class', () => {
 
         it('should respect sectionSize parameter', () => {
             const doc = "test api ".repeat(100); // ~900 chars
-            const result = retrieval.extractRelevantSections(doc, "api test", 3, 250);
+            const result = documentationSearch.extractRelevantSections(doc, "api test", 3, 250);
 
             // Should create sections of 250 chars each
             expect(result.length).toBeLessThanOrEqual(3 * 250);
@@ -365,7 +365,7 @@ describe('Documentation Class', () => {
             const section3 = "authentication mentioned once " + "z".repeat(170);
             const doc = section1 + section2 + section3;
 
-            const result = retrieval.extractRelevantSections(doc, "authentication authorization", 2, 200);
+            const result = documentationSearch.extractRelevantSections(doc, "authentication authorization", 2, 200);
 
             // Section 1 should score highest (has both terms)
             // Section 3 should score second (has one term)
@@ -381,7 +381,7 @@ describe('Documentation Class', () => {
             const section3 = "third match for keyword " + "c".repeat(176);
             const doc = section1 + section2 + section3;
 
-            const result = retrieval.extractRelevantSections(doc, "keyword", 2, 200);
+            const result = documentationSearch.extractRelevantSections(doc, "keyword", 2, 200);
 
             // Both matching sections should be included in their original order
             const firstIndex = result.indexOf("first");
@@ -393,15 +393,15 @@ describe('Documentation Class', () => {
             const doc = "test content ".repeat(100);
 
             // Test with invalid maxSections (too high)
-            const result1 = retrieval.extractRelevantSections(doc, "test", 150, 200);
+            const result1 = documentationSearch.extractRelevantSections(doc, "test", 150, 200);
             expect(result1).toContain("test");
 
             // Test with invalid sectionSize (too small)
-            const result2 = retrieval.extractRelevantSections(doc, "test", 5, 50);
+            const result2 = documentationSearch.extractRelevantSections(doc, "test", 5, 50);
             expect(result2).toContain("test");
 
             // Test with 0 or negative values
-            const result3 = retrieval.extractRelevantSections(doc, "test", 0, -100);
+            const result3 = documentationSearch.extractRelevantSections(doc, "test", 0, -100);
             expect(result3).toContain("test");
         });
 
@@ -409,11 +409,11 @@ describe('Documentation Class', () => {
             const doc = "authentication system for api access";
 
             // "for" should be filtered out (too short)
-            const result = retrieval.extractRelevantSections(doc, "for api", 1, 200);
+            const result = documentationSearch.extractRelevantSections(doc, "for api", 1, 200);
             expect(result).toContain("api");
 
             // Returns whole doc if all terms are too short and doc is small
-            const result2 = retrieval.extractRelevantSections(doc, "a or by", 1, 200);
+            const result2 = documentationSearch.extractRelevantSections(doc, "a or by", 1, 200);
             expect(result2).toBe(doc); // Whole doc since it's smaller than section size
         });
     });

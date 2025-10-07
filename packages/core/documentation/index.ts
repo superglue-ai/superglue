@@ -6,7 +6,7 @@
 
 export { DocumentationFetcher } from './documentation-fetching.js';
 export { AxiosFetchingStrategy, PlaywrightFetchingStrategy } from './strategies/index.js';
-export { DocumentationRetrieval } from './documentation-retrieval.js';
+export { DocumentationSearch } from './documentation-search.js';
 export { 
   removeOldVersionFromUrls, 
   extractOpenApiUrlsFromObject, 

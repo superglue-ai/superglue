@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { logMessage } from '../../../utils/logs.js';
-import { DocumentationSite } from './documentation-fetcher.js';
+import { DocumentationSite } from './doc-eval-fetcher.js';
 
 export interface DocumentationEvaluationConfig {
   sites: DocumentationSite[];

@@ -1,14 +1,14 @@
 /**
- * Documentation Retrieval and Relevance Scoring
+ * Documentation Search and Relevance Scoring
  * 
- * This module handles extracting relevant sections from documentation based on search queries.
+ * This module handles searching and extracting relevant sections from documentation based on search queries.
  * It uses keyword matching and scoring algorithms to identify the most relevant content.
  */
 
 import { server_defaults } from '../default.js';
 import { LanguageModel } from '../llm/llm.js';
 
-export class DocumentationRetrieval {
+export class DocumentationSearch {
   /**
    * Extracts the most relevant sections from documentation based on a search query.
    * 

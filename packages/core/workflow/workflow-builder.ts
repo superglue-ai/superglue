@@ -4,7 +4,7 @@ import { type OpenAI } from "openai";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { BUILD_WORKFLOW_SYSTEM_PROMPT } from "../llm/prompts.js";
 import { executeTool } from "../tools/tools.js";
-import { DocumentationRetrieval } from "../documentation/documentation-retrieval.js";
+import { DocumentationSearch } from "../documentation/documentation-search.js";
 import { parseJSON } from "../utils/json-parser.js";
 import { logMessage } from "../utils/logs.js";
 import { composeUrl, sample } from "../utils/tools.js";
@@ -52,7 +52,7 @@ export class WorkflowBuilder {
   }
 
   private generateIntegrationDescriptions(maxChars: number = 100000): string {
-    const retrieval = new DocumentationRetrieval();
+    const documentationSearch = new DocumentationSearch();
     const descriptions = Object.values(this.integrations).map(int => {
       if (!int.documentation) {
         return `<${int.id}>
@@ -62,20 +62,20 @@ export class WorkflowBuilder {
   </specific_instructions>
 </${int.id}>`;
       }
-      const authSection = retrieval.extractRelevantSections(
+      const authSection = documentationSearch.extractRelevantSections(
         int.documentation,
         "authentication authorization api key token bearer basic oauth credentials access private app secret",
         3,  // fewer sections needed for auth
         2000 // should be detailed though
       );
 
-      const paginationSection = retrieval.extractRelevantSections(
+      const paginationSection = documentationSearch.extractRelevantSections(
         int.documentation,
         "pagination page offset cursor limit per_page pageSize after next previous paging paginated results list",
         3,  // max 3 sections
         2000 // same logic applies here
       );
-      const generalSection = retrieval.extractRelevantSections(
+      const generalSection = documentationSearch.extractRelevantSections(
         int.documentation,
         this.instruction + "reference object endpoints methods properties values fields enums search query filter list create update delete get put post patch",
         20,  // max 20 sections
