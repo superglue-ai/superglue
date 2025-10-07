@@ -114,7 +114,7 @@ export async function fetchMultipleOpenApiSpecs(urls: string[], metadata: Metada
 
   filteredUrls = removeOldVersionFromUrls(filteredUrls);
   
-  const specs: any[] = [];
+  var specs: any[] = [];
   const MAX_CONCURRENT_FETCHES = server_defaults.DOCUMENTATION.MAX_CONCURRENT_OPENAPI_FETCHES;
   const MAX_SPECS_TO_FETCH = server_defaults.DOCUMENTATION.MAX_OPENAPI_SPECS_TO_FETCH;
 
@@ -160,6 +160,9 @@ export async function fetchMultipleOpenApiSpecs(urls: string[], metadata: Metada
     const batchResults = await Promise.all(batchPromises);
     specs.push(...batchResults.filter(result => result !== null));
   }
+
+  // filter out empty strings
+  specs = specs.filter(spec => spec !== null && spec !== undefined && spec !== "");
 
   if (specs.length === 0) {
     return null;

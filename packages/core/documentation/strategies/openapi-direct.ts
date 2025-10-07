@@ -18,7 +18,7 @@ export class DirectOpenApiStrategy implements OpenApiFetchingStrategy {
 
         try {
           parsedData = parseJSON(trimmedData);
-          // if parsedData is empty, throw an error
+          // if parsedData is empty, throw an error to try yaml instead
           if (
             !parsedData ||
             parsedData === null ||

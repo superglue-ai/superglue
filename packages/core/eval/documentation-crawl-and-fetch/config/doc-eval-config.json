@@ -110,6 +110,84 @@
         "How can I Create a proof-of-address session?",
         "How can I start an identity verification session?"
       ]
+    },
+    {
+      "id": "sitecore-components-api",
+      "name": "Sitecore Cloud Components API",
+      "description": "Sitecore cloud components and services API",
+      "documentationUrl": "https://components.sitecorecloud.io/api/docs/static/index.html",
+      "urlHost": "https://components.sitecorecloud.io",
+      "openApiUrl": "https://components.sitecorecloud.io/api/docs/static/index.html",
+      "keywords": ["components", "services", "content", "delivery", "rendering"],
+      "testQuestions": [
+        "How do I retrieve component data?",
+        "What endpoints are available for content delivery?"
+      ]
+    },
+    {
+      "id": "openstorage-api",
+      "name": "OpenStorage API",
+      "description": "Storage orchestration and management API",
+      "documentationUrl": "https://libopenstorage.github.io/w/swagger-ui/",
+      "urlHost": "https://libopenstorage.github.io",
+      "openApiUrl": "https://libopenstorage.github.io/w/swagger-ui/",
+      "keywords": ["storage", "volume", "cluster", "snapshots", "backup", "nodes"],
+      "testQuestions": [
+        "How do I create a new volume?",
+        "What are the parameters for creating a snapshot?"
+      ]
+    },
+    {
+      "id": "caspio-api",
+      "name": "Caspio REST API",
+      "description": "Low-code database and application platform API",
+      "documentationUrl": "https://demo.caspio.com/integrations/rest/swagger/index.html",
+      "urlHost": "https://demo.caspio.com",
+      "openApiUrl": "https://demo.caspio.com/integrations/rest/swagger/index.html",
+      "keywords": ["tables", "records", "views", "applications", "authentication", "database"],
+      "testQuestions": [
+        "How do I retrieve records from a table?",
+        "What authentication methods are supported?"
+      ]
+    },
+    {
+      "id": "epaypolicy-api",
+      "name": "ePayPolicy API",
+      "description": "Insurance payment processing API",
+      "documentationUrl": "https://api-sandbox.epaypolicy.com/content/swagger-ui/",
+      "urlHost": "https://api-sandbox.epaypolicy.com",
+      "openApiUrl": "https://api-sandbox.epaypolicy.com/content/swagger-ui/",
+      "keywords": ["payments", "policies", "transactions", "invoices", "customers", "billing"],
+      "testQuestions": [
+        "How do I process a payment for an insurance policy?",
+        "What are the required fields for creating a transaction?"
+      ]
+    },
+    {
+      "id": "thingsboard-api",
+      "name": "ThingsBoard API",
+      "description": "IoT platform API for device management and data collection",
+      "documentationUrl": "https://demo.thingsboard.io/swagger-ui/index.html",
+      "urlHost": "https://demo.thingsboard.io",
+      "openApiUrl": "https://demo.thingsboard.io/swagger-ui/index.html",
+      "keywords": ["devices", "telemetry", "attributes", "entities", "dashboards", "rules", "alarms"],
+      "testQuestions": [
+        "How do I send telemetry data from a device?",
+        "What endpoints are available for managing device attributes?"
+      ]
+    },
+    {
+      "id": "crossref-api",
+      "name": "Crossref API",
+      "description": "Scholarly metadata and DOI registration API",
+      "documentationUrl": "https://api.crossref.org/swagger-ui/index.html",
+      "urlHost": "https://api.crossref.org",
+      "openApiUrl": "https://api.crossref.org/swagger-ui/index.html",
+      "keywords": ["doi", "works", "publications", "journals", "members", "metadata", "citations"],
+      "testQuestions": [
+        "How do I search for works by DOI?",
+        "What parameters can I use to filter journal metadata?"
+      ]
     }
   ],
   "settings": {
@@ -117,6 +195,6 @@
     "maxDocumentationSize": 500000,
     "enablePlaywrightCrawling": true,
     "enableOpenApiFetching": true,
-    "enabledSites": ["zignsec-api"]
+    "enabledSites": ["zignsec-api", "sitecore-components-api", "openstorage-api", "caspio-api", "epaypolicy-api", "thingsboard-api", "crossref-api"]
   }
 }

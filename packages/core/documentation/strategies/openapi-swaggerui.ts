@@ -1,6 +1,5 @@
 import axios from "axios";
-import { JSDOM } from "jsdom";
-import * as puppeteer from "puppeteer";
+import { chromium } from "playwright";
 import { Metadata } from "@superglue/shared";
 import { logMessage } from "../../utils/logs.js";
 import { OpenApiFetchingStrategy } from "../types.js";
@@ -15,7 +14,7 @@ import { fetchMultipleOpenApiSpecs } from '../documentation-utils.js';
  *    - Parses JavaScript configuration files (swagger-initializer.js)
  *    - Checks swagger-config endpoints
  *    - Checks config.json files
- *    - Uses Puppeteer to find links in the rendered page
+ *    - Uses Playwright to find links in the rendered page
  * 3. Returns the discovered OpenAPI spec URLs
  */
 export class SwaggerUIStrategy implements OpenApiFetchingStrategy {
@@ -39,11 +38,11 @@ export class SwaggerUIStrategy implements OpenApiFetchingStrategy {
         }
       }
 
-      // Fall back to Puppeteer (slower but more thorough)
-      const puppeteerUrls = await this.findByPuppeteer(sourceUrl);
-      if (puppeteerUrls.length > 0) {
-        logMessage('info', `Found ${puppeteerUrls.length} OpenAPI spec URL(s) via Puppeteer`, metadata);
-        const specs = await fetchMultipleOpenApiSpecs(puppeteerUrls, metadata);
+      // Fall back to Playwright (slower but more thorough)
+      const playwrightUrls = await this.findByPlaywright(sourceUrl);
+      if (playwrightUrls.length > 0) {
+        logMessage('info', `Found ${playwrightUrls.length} OpenAPI spec URL(s) via Playwright`, metadata);
+        const specs = await fetchMultipleOpenApiSpecs(playwrightUrls, metadata);
         if (specs) {
           return specs;
         }
@@ -173,40 +172,28 @@ export class SwaggerUIStrategy implements OpenApiFetchingStrategy {
     const urls = await this.extractSpecUrls(pageUrl, html);
     urls.forEach(u => found.add(u));
 
-    const dom = new JSDOM(html, { url: pageUrl });
-
-    // Look for SwaggerUI spec links in the rendered HTML
-    const specLinks = dom.window.document.querySelectorAll('a[href*="/api-docs"], a[href*="/swagger/docs"], a[href*="/docs"], a[href*="/openapi.json"], a[href*="/swagger.json"]');
-    for (const link of specLinks) {
-      const href = (link as Element).getAttribute("href");
-      if (href) {
-        try {
-          const resolved = new URL(href, pageUrl).href;
-          found.add(resolved);
-        } catch {
-          // ignore invalid URLs
-        }
-      }
-    }
-
-    const scripts = Array.from(dom.window.document.querySelectorAll("script"));
-    for (const s of scripts) {
-      const src = (s as Element).getAttribute("src");
-      if (src) {
-        const scriptUrl = new URL(src, pageUrl).href;
-        try {
-          const { data: js } = await axios.get(scriptUrl, { timeout: 10000 });
-          const urls = await this.extractSpecUrls(scriptUrl, js);
-          urls.forEach(u => found.add(u));
-        } catch {
-          // ignore failed script fetches
-        }
-      } else {
-        const inline = (s as Element).textContent || "";
-        const urls = await this.extractSpecUrls(pageUrl, inline);
+    // Extract script src attributes using regex
+    const scriptSrcPattern = /<script[^>]*\ssrc=["']([^"']+)["']/gi;
+    let scriptMatch;
+    while ((scriptMatch = scriptSrcPattern.exec(html)) !== null) {
+      try {
+        const scriptUrl = new URL(scriptMatch[1], pageUrl).href;
+        const { data: js } = await axios.get(scriptUrl, { timeout: 10000 });
+        const urls = await this.extractSpecUrls(scriptUrl, js);
         urls.forEach(u => found.add(u));
+      } catch {
+        // ignore failed script fetches
       }
     }
+
+    // Extract inline scripts using regex
+    const inlineScriptPattern = /<script[^>]*>([^<]*(?:(?!<\/script>)<[^<]*)*)<\/script>/gi;
+    let inlineMatch;
+    while ((inlineMatch = inlineScriptPattern.exec(html)) !== null) {
+      const urls = await this.extractSpecUrls(pageUrl, inlineMatch[1]);
+      urls.forEach(u => found.add(u));
+    }
+
     return Array.from(found);
   }
 
@@ -221,8 +208,8 @@ export class SwaggerUIStrategy implements OpenApiFetchingStrategy {
     }
   }
 
-  private async findByPuppeteer(pageUrl: string): Promise<string[]> {
-    const browser = await puppeteer.launch({ headless: true });
+  private async findByPlaywright(pageUrl: string): Promise<string[]> {
+    const browser = await chromium.launch({ headless: true });
     const page = await browser.newPage();
     const found = new Set<string>();
 
@@ -234,8 +221,8 @@ export class SwaggerUIStrategy implements OpenApiFetchingStrategy {
           const text = await res.text();
           if (this.looksLikeOpenApi(text)) found.add(url);
         } else {
-          const ct = (res.headers() as any)["content-type"] || "";
-          if (ct.includes("application/json")) {
+          const contentType = res.headers()["content-type"] || "";
+          if (contentType.includes("application/json")) {
             const text = await res.text();
             if (this.looksLikeOpenApi(text)) found.add(url);
           }
@@ -245,10 +232,10 @@ export class SwaggerUIStrategy implements OpenApiFetchingStrategy {
       }
     });
 
-    await page.goto(pageUrl, { waitUntil: "networkidle2", timeout: 30000 });
+    await page.goto(pageUrl, { waitUntil: "networkidle", timeout: 30000 });
 
     // Wait a bit more for dynamic content to load
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await page.waitForTimeout(2000);
 
     // Look for SwaggerUI spec links in the rendered page
     try {
@@ -296,7 +283,7 @@ export class SwaggerUIStrategy implements OpenApiFetchingStrategy {
       // ignore evaluation errors
     }
 
-    await new Promise(resolve => setTimeout(resolve, 800));
+    await page.waitForTimeout(800);
     await browser.close();
     return Array.from(found);
   }
