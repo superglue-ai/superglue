@@ -8,29 +8,35 @@
  * 1. DocumentationFetcher.fetchAndProcess()
  *    - Main entry point for retrieving documentation
  *    - Automatically tries multiple fetching strategies (GraphQL, web crawling, HTTP)
- *    - Processes raw content through multiple processors (OpenAPI, PostgreSQL, HTML-to-Markdown)
+ *    - Processes raw content through multiple processors (PostgreSQL, HTML-to-Markdown, raw content)
  *    - Returns formatted documentation string ready for use
  *    - Caches results to avoid redundant fetches
  * 
  * 2. DocumentationFetcher.fetchOpenApiDocumentation()
  *    - Specialized fetcher for OpenAPI specifications
  *    - Handles JSON and YAML formats
- *    - Can discover and fetch multiple related OpenAPI specs
+ *    - Can discover and fetch multiple related OpenAPI specs from various sources
  *    - Returns consolidated OpenAPI documentation
  * 
  * FETCHING STRATEGIES (tried in order):
- * - GraphQLStrategy: Attempts GraphQL introspection for schema discovery
+ * - GraphQLStrategy: Attempts GraphQL introspection queries for schema discovery
  * - PlaywrightFetchingStrategy: Uses headless browser to crawl documentation sites
  *   * Tries sitemap-based discovery first for comprehensive coverage
- *   * Falls back to iterative link crawling if sitemap fails
- *   * Filters out non-documentation pages (login, pricing, etc.)
+ *   * Ranks URLs by keywords to prioritize relevant documentation
+ *   * Falls back to iterative link crawling if sitemap fails or times out
+ *   * Filters out non-documentation pages (login, pricing, localized versions, etc.)
  * - AxiosFetchingStrategy: Simple HTTP GET requests for direct documentation URLs
  * 
  * PROCESSING STRATEGIES (tried in order):
- * - OpenApiStrategy: Extracts and processes OpenAPI/Swagger specifications
- * - PostgreSqlStrategy: Generates database schema documentation for PostgreSQL
- * - HtmlMarkdownStrategy: Converts HTML content to Markdown
- * - RawPageContentStrategy: Returns raw content as final fallback
+ * - PostgreSqlStrategy: Queries information_schema to generate database schema documentation
+ * - HtmlMarkdownStrategy: Converts HTML content to Markdown using a shared conversion pool
+ * - RawPageContentStrategy: Returns raw content as final fallback (always succeeds)
+ * 
+ * OPENAPI FETCHING STRATEGIES (tried in order):
+ * - DirectOpenApiStrategy: Directly parses JSON/YAML to validate and extract OpenAPI specs
+ * - SwaggerUIStrategy: Detects SwaggerUI pages and extracts actual spec URLs via static analysis or Playwright
+ * - HtmlLinkExtractorStrategy: Searches raw HTML from previous fetches for OpenAPI spec URLs
+ * - OpenApiLinkExtractorStrategy: Extracts OpenAPI URLs from JSON/YAML objects containing spec links
  */
 
 import { Metadata } from "@superglue/shared";
