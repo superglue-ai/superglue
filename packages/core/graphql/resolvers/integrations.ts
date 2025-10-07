@@ -313,7 +313,7 @@ async function triggerAsyncDocumentationFetch(
         urlHost: enrichedInput.urlHost,
         urlPath: enrichedInput.urlPath,
         documentationUrl: enrichedInput.documentationUrl,
-        openApiUrl: enrichedInput.openApiUrl,
+        openApiUrl: enrichedInput.openApiUrl?.trim() ? enrichedInput.openApiUrl : enrichedInput.documentationUrl,
         keywords: uniqueKeywords(enrichedInput.documentationKeywords),
       },
       credentials,

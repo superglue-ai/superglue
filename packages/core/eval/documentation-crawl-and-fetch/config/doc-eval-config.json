@@ -12,7 +12,28 @@
       "documentationUrl": "https://stripe.com/docs/api",
       "openApiUrl": "https://raw.githubusercontent.com/stripe/openapi/master/openapi/spec3.json",
       "urlHost": "https://api.stripe.com",
-      "keywords": ["payment", "charge", "customer", "subscription", "webhook", "authentication"],
+      "keywords": [
+        "customers",
+        "charges",
+        "payment_intents",
+        "products",
+        "prices",
+        "subscriptions",
+        "invoices",
+        "balance_transactions",
+        "refunds",
+        "checkout_sessions",
+        "line_items",
+        "payment_methods",
+        "issuers",
+        "plans",
+        "setup_intents",
+        "payouts",
+        "transfers",
+        "balance",
+        "users",
+        "emails"
+      ],
       "testQuestions": [
         "How do I create a new customer in Stripe?",
         "What are the required fields for creating a payment intent?",
@@ -60,7 +81,7 @@
       "testQuestions": [
         "How do I list all messages in a user's mailbox?",
         "How do I list all labels in a mailbox?",
-        "How do I refresh an expired access token?"
+        "What's the rate limit per user for Gmail API requests?"
       ]
     },
     {

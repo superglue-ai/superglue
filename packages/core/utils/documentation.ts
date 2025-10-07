@@ -126,6 +126,8 @@ export class Documentation {
       const response = await axios.get(this.config.openApiUrl, { timeout: server_defaults.DOCUMENTATION.TIMEOUTS.AXIOS });
       let data = response.data;
 
+
+
       if (typeof data === 'object' && data !== null) {
         const openApiUrls = this.extractOpenApiUrls(data);
         if (openApiUrls.length > 0) {
@@ -178,6 +180,31 @@ export class Documentation {
     }
   }
 
+  private removeOldVersionFromUrls(urls: string[]): string[] {
+    const versionRegex = /v(\d+)/;
+  
+    // group urls by base (without version part)
+    const groups = new Map<string, { url: string; version: number }[]>();
+  
+    for (const url of urls) {
+      const match = url.match(versionRegex);
+      const version = match ? parseInt(match[1]) : 0;
+      const base = url.replace(versionRegex, ""); // remove version for grouping
+  
+      if (!groups.has(base)) groups.set(base, []);
+      groups.get(base)!.push({ url, version });
+    }
+  
+    // pick only the highest version per base
+    const result: string[] = [];
+    for (const [, entries] of groups) {
+      entries.sort((a, b) => b.version - a.version);
+      result.push(entries[0].url);
+    }
+  
+    return result;
+  }
+
   private extractOpenApiUrls(data: any): string[] {
     const urls: string[] = [];
 
@@ -204,15 +231,20 @@ export class Documentation {
     };
 
     findOpenApiUrls(data);
-    return [...new Set(urls)]; // Remove duplicates
+    return [...new Set(urls)];
   }
 
   private async fetchMultipleOpenApiSpecs(urls: string[]): Promise<string> {
+    // filter urls
+    var filteredUrls = urls.filter(url => !url.includes('.png') && !url.includes('.jpg') && !url.includes('.jpeg') && !url.includes('.gif') && !url.includes('.svg') && !url.includes('.webp') && !url.includes('.ico') && !url.includes('.woff') && !url.includes('.woff2') && !url.includes('.ttf') && !url.includes('.eot') && !url.includes('.otf') && !url.includes('.ico') && !url.includes('.webp') && !url.includes('.svg') && !url.includes('.png') && !url.includes('.jpg') && !url.includes('.jpeg') && !url.includes('.gif') && !url.includes('.pdf') && !url.includes('.ico'));
+    // if there are two urls which are exactly the same, only that one of them says v1 and the other v2 - remove the one that says v1 (same for v2 and v3)
+    filteredUrls = this.removeOldVersionFromUrls(filteredUrls);
+    
     const specs: any[] = [];
     const MAX_CONCURRENT_FETCHES = server_defaults.DOCUMENTATION.MAX_CONCURRENT_OPENAPI_FETCHES;
     const MAX_SPECS_TO_FETCH = server_defaults.DOCUMENTATION.MAX_OPENAPI_SPECS_TO_FETCH;
 
-    const urlsToFetch = urls.slice(0, MAX_SPECS_TO_FETCH);
+    const urlsToFetch = filteredUrls.slice(0, MAX_SPECS_TO_FETCH);
     if (urls.length > MAX_SPECS_TO_FETCH) {
       logMessage('warn', `Found ${urls.length} OpenAPI specs but limiting to ${MAX_SPECS_TO_FETCH}`, this.metadata);
     }
@@ -703,8 +735,34 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
 
     return { urls, sitemaps };
   }
+
+  private removeOldVersionFromUrls(urls: string[]): string[] {
+    const versionRegex = /v(\d+)/;
+  
+    // group urls by base (without version part)
+    const groups = new Map<string, { url: string; version: number }[]>();
+  
+    for (const url of urls) {
+      const match = url.match(versionRegex);
+      const version = match ? parseInt(match[1]) : 0;
+      const base = url.replace(versionRegex, ""); // remove version for grouping
+  
+      if (!groups.has(base)) groups.set(base, []);
+      groups.get(base)!.push({ url, version });
+    }
+  
+    // pick only the highest version per base
+    const result: string[] = [];
+    for (const [, entries] of groups) {
+      entries.sort((a, b) => b.version - a.version);
+      result.push(entries[0].url);
+    }
+  
+    return result;
+  }
+
   private filterUrls(urls: string[]): string[] {
-    const filteredUrls = urls.filter(url => {
+    var filteredUrls = urls.filter(url => {
       try {
         const urlLower = new URL(url).pathname.toLowerCase();
         for (const excludedKeyword of PlaywrightFetchingStrategy.EXCLUDED_LINK_KEYWORDS) {
@@ -717,11 +775,15 @@ export class PlaywrightFetchingStrategy implements FetchingStrategy {
         return false;
       }
     });
+
+    filteredUrls = this.removeOldVersionFromUrls(filteredUrls);
+
     if (filteredUrls.length > 0) {
       return filteredUrls;
     }
     return urls;
   }
+  
   private async collectSitemapUrls(config: DocumentationConfig, metadata: Metadata): Promise<string[]> {
     if (!config.documentationUrl) return [];
 
