@@ -4,7 +4,7 @@ import * as yaml from 'js-yaml';
 import { OpenApiFetchingStrategy } from '../types.js';
 import { logMessage } from "../../utils/logs.js";
 import { parseJSON } from "../../utils/json-parser.js";
-import { extractOpenApiUrls, fetchMultipleOpenApiSpecs } from '../documentation-utils.js';
+import { extractOpenApiUrlsFromObject, fetchMultipleOpenApiSpecs } from '../documentation-utils.js';
 
 export class OpenApiLinkExtractorStrategy implements OpenApiFetchingStrategy {
   async tryFetch(responseData: any, openApiUrl: string, metadata: Metadata): Promise<string | null> {
@@ -29,7 +29,7 @@ export class OpenApiLinkExtractorStrategy implements OpenApiFetchingStrategy {
       }
 
       if (typeof parsedData === 'object' && parsedData !== null) {
-        const openApiUrls = extractOpenApiUrls(parsedData);
+        const openApiUrls = extractOpenApiUrlsFromObject(parsedData);
         if (openApiUrls.length > 0) {
           logMessage('debug', `Found ${openApiUrls.length} OpenAPI specification links in ${openApiUrl}`, metadata);
           const allSpecs = await fetchMultipleOpenApiSpecs(openApiUrls, metadata);

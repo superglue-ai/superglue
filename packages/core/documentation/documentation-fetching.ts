@@ -43,12 +43,12 @@ import {
   AxiosFetchingStrategy,
   PlaywrightFetchingStrategy,
   PostgreSqlStrategy,
-  OpenApiStrategy,
   HtmlMarkdownStrategy,
   RawPageContentStrategy,
   OpenApiLinkExtractorStrategy,
   DirectOpenApiStrategy,
-  SwaggerUIStrategy
+  SwaggerUIStrategy,
+  HtmlLinkExtractorStrategy
 } from './strategies/index.js';
 import { DocumentationConfig, DocumentationFetchingStrategy, DocumentationProcessingStrategy, OpenApiFetchingStrategy } from './types.js';
 
@@ -58,6 +58,8 @@ export class DocumentationFetcher {
   private readonly metadata: Metadata;
 
   private lastResult: string | null = null;
+
+  private lastRawResult: string | null = null;
 
   constructor(config: DocumentationConfig, credentials: Record<string, any>, metadata: Metadata) {
     this.config = config;
@@ -77,7 +79,6 @@ export class DocumentationFetcher {
     ];
 
     const processingStrategies: DocumentationProcessingStrategy[] = [
-      new OpenApiStrategy(),
       new PostgreSqlStrategy(),
       new HtmlMarkdownStrategy(),
       new RawPageContentStrategy()
@@ -97,6 +98,8 @@ export class DocumentationFetcher {
     if (!rawResult) {
       rawResult = "";
     }
+
+    this.lastRawResult = rawResult;
 
     for (const strategy of processingStrategies) {
       const result = await strategy.tryProcess(rawResult, this.config, this.metadata, this.credentials);
@@ -123,6 +126,7 @@ export class DocumentationFetcher {
       const strategies: OpenApiFetchingStrategy[] = [
         new DirectOpenApiStrategy(),
         new SwaggerUIStrategy(),
+        new HtmlLinkExtractorStrategy(this.lastRawResult),
         new OpenApiLinkExtractorStrategy()
       ];
 

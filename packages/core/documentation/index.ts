@@ -9,7 +9,7 @@ export { AxiosFetchingStrategy, PlaywrightFetchingStrategy } from './strategies/
 export { DocumentationRetrieval } from './documentation-retrieval.js';
 export { 
   removeOldVersionFromUrls, 
-  extractOpenApiUrls, 
+  extractOpenApiUrlsFromObject, 
   fetchMultipleOpenApiSpecs, 
   filterDocumentationUrls, 
   extractOpenApiUrlFromHtml 

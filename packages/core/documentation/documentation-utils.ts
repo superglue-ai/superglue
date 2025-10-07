@@ -10,33 +10,6 @@ import { logMessage } from '../utils/logs.js';
 import { Metadata } from "@superglue/shared";
 
 /**
- * Removes older API versions from a list of URLs, keeping only the highest version for each base URL.
- * For example, given ["/api/v1/users", "/api/v2/users"], only "/api/v2/users" is kept.
- */
-export function removeOldVersionFromUrls(urls: string[]): string[] {
-  const versionRegex = /v(\d+)/;
-
-  const groups = new Map<string, { url: string; version: number }[]>();
-
-  for (const url of urls) {
-    const match = url.match(versionRegex);
-    const version = match ? parseInt(match[1]) : 0;
-    const base = url.replace(versionRegex, "");
-
-    if (!groups.has(base)) groups.set(base, []);
-    groups.get(base)!.push({ url, version });
-  }
-
-  const result: string[] = [];
-  for (const [, entries] of groups) {
-    entries.sort((a, b) => b.version - a.version);
-    result.push(entries[0].url);
-  }
-
-  return result;
-}
-
-/**
  * Validates if an object is a valid OpenAPI 3.x, Swagger 2.0, or Google API Discovery Document specification.
  */
 export function isValidOpenApiSpec(obj: any): boolean {
@@ -68,40 +41,8 @@ export function isValidOpenApiSpec(obj: any): boolean {
 }
 
 /**
- * Recursively extracts OpenAPI specification URLs from an object.
- * Looks for keys containing 'openapi' or 'spec' with HTTP URL values.
- */
-export function extractOpenApiUrls(data: any): string[] {
-  const urls: string[] = [];
-
-  const findOpenApiUrls = (obj: any) => {
-    if (!obj || typeof obj !== 'object') return;
-
-    for (const key in obj) {
-      if (!obj.hasOwnProperty(key)) continue;
-      const value = obj[key];
-
-      if ((key.toLowerCase().includes('openapi') || key.toLowerCase().includes('spec')) &&
-        typeof value === 'string' &&
-        value.startsWith('http')) {
-        urls.push(value);
-      }
-
-      if (Array.isArray(value)) {
-        value.forEach(item => findOpenApiUrls(item));
-      } else if (typeof value === 'object') {
-        findOpenApiUrls(value);
-      }
-    }
-  };
-
-  findOpenApiUrls(data);
-  return [...new Set(urls)];
-}
-
-/**
  * Fetches multiple OpenAPI specifications concurrently with limits.
- * Returns  either an empty string if no valid specs are fetched, or a json string of a single spec, or a json string of all specs with metadata.
+ * Returns either null if no valid specs are fetched, or a json string of a single spec, or a json string of all specs with metadata.
  */
 export async function fetchMultipleOpenApiSpecs(urls: string[], metadata: Metadata): Promise<string> {
   let filteredUrls = urls.filter(url => 
@@ -203,6 +144,65 @@ export function filterDocumentationUrls(urls: string[], excludedKeywords: string
     return filteredUrls;
   }
   return urls;
+}
+
+/**
+ * Removes older API versions from a list of URLs, keeping only the highest version for each base URL.
+ * For example, given ["/api/v1/users", "/api/v2/users"], only "/api/v2/users" is kept.
+ */
+export function removeOldVersionFromUrls(urls: string[]): string[] {
+  const versionRegex = /v(\d+)/;
+
+  const groups = new Map<string, { url: string; version: number }[]>();
+
+  for (const url of urls) {
+    const match = url.match(versionRegex);
+    const version = match ? parseInt(match[1]) : 0;
+    const base = url.replace(versionRegex, "");
+
+    if (!groups.has(base)) groups.set(base, []);
+    groups.get(base)!.push({ url, version });
+  }
+
+  const result: string[] = [];
+  for (const [, entries] of groups) {
+    entries.sort((a, b) => b.version - a.version);
+    result.push(entries[0].url);
+  }
+
+  return result;
+}
+
+/**
+ * Recursively extracts OpenAPI specification URLs from an object.
+ * Looks for keys containing 'openapi' or 'spec' with HTTP URL values.
+ */
+export function extractOpenApiUrlsFromObject(data: any): string[] {
+  const urls: string[] = [];
+
+  const findOpenApiUrls = (obj: any) => {
+    if (!obj || typeof obj !== 'object') return;
+
+    for (const key in obj) {
+      if (!obj.hasOwnProperty(key)) continue;
+      const value = obj[key];
+
+      if ((key.toLowerCase().includes('openapi') || key.toLowerCase().includes('spec')) &&
+        typeof value === 'string' &&
+        value.startsWith('http')) {
+        urls.push(value);
+      }
+
+      if (Array.isArray(value)) {
+        value.forEach(item => findOpenApiUrls(item));
+      } else if (typeof value === 'object') {
+        findOpenApiUrls(value);
+      }
+    }
+  };
+
+  findOpenApiUrls(data);
+  return [...new Set(urls)];
 }
 
 /**
