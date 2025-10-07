@@ -33,7 +33,7 @@ export class DirectOpenApiStrategy implements OpenApiFetchingStrategy {
           try {
             parsedData = yaml.load(trimmedData) as any;
           } catch (yamlError) {
-            logMessage('warn', `DirectOpenApiStrategy: Failed to parse content as JSON or YAML from ${openApiUrl}: ${yamlError?.message}`, metadata);
+            logMessage('warn', `DirectOpenApiStrategy: Failed to parse content as JSON or YAML from ${openApiUrl}`, metadata);
             return null;
           }
         }

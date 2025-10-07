@@ -18,4 +18,5 @@ export { RawPageContentStrategy } from './processing-raw-content.js';
 // OpenAPI Fetching Strategies
 export { OpenApiLinkExtractorStrategy } from './openapi-link-extractor.js';
 export { DirectOpenApiStrategy } from './openapi-direct.js';
+export { SwaggerUIStrategy } from './openapi-swaggerui.js';
 

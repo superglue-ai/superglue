@@ -117,6 +117,6 @@
     "maxDocumentationSize": 500000,
     "enablePlaywrightCrawling": true,
     "enableOpenApiFetching": true,
-    "enabledSites": ["openai-api"]
+    "enabledSites": ["zignsec-api"]
   }
 }

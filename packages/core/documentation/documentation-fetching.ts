@@ -47,7 +47,8 @@ import {
   HtmlMarkdownStrategy,
   RawPageContentStrategy,
   OpenApiLinkExtractorStrategy,
-  DirectOpenApiStrategy
+  DirectOpenApiStrategy,
+  SwaggerUIStrategy
 } from './strategies/index.js';
 import { DocumentationConfig, DocumentationFetchingStrategy, DocumentationProcessingStrategy, OpenApiFetchingStrategy } from './types.js';
 
@@ -121,6 +122,7 @@ export class DocumentationFetcher {
 
       const strategies: OpenApiFetchingStrategy[] = [
         new DirectOpenApiStrategy(),
+        new SwaggerUIStrategy(),
         new OpenApiLinkExtractorStrategy()
       ];
 
