@@ -15,6 +15,26 @@ import { logMessage } from "../../utils/logs.js";
 import { filterDocumentationUrls } from '../documentation-utils.js';
 import { DocumentationConfig, DocumentationFetchingStrategy } from '../types.js';
 
+// Similarity functions for deduplication
+function diceCoefficient(str1: string, str2: string): number {
+  const words1 = new Set(str1.toLowerCase().split(/\s+/));
+  const words2 = new Set(str2.toLowerCase().split(/\s+/));
+  
+  const intersection = new Set([...words1].filter(x => words2.has(x)));
+  
+  return (2 * intersection.size) / (words1.size + words2.size);
+}
+
+function jaccardSimilarity(str1: string, str2: string): number {
+  const words1 = new Set(str1.toLowerCase().split(/\s+/));
+  const words2 = new Set(str2.toLowerCase().split(/\s+/));
+  
+  const intersection = new Set([...words1].filter(x => words2.has(x)));
+  const union = new Set([...words1, ...words2]);
+  
+  return intersection.size / union.size;
+}
+
 export class PlaywrightFetchingStrategy implements DocumentationFetchingStrategy {
   private static readonly MAX_FETCHED_LINKS = server_defaults.DOCUMENTATION.MAX_FETCHED_LINKS;
   private static readonly PARALLEL_FETCH_LIMIT = server_defaults.DOCUMENTATION.MAX_PAGES_TO_FETCH_IN_PARALLEL;
@@ -92,7 +112,7 @@ export class PlaywrightFetchingStrategy implements DocumentationFetchingStrategy
     }
   }
 
-  private async fetchPageContentWithPlaywright(urlString: string, config: DocumentationConfig, metadata: Metadata): Promise<{ content: string; links: Record<string, string>; } | null> {
+  private async fetchPageContentWithPlaywright(urlString: string, config: DocumentationConfig, metadata: Metadata): Promise<{ content: string; textContent: string; links: Record<string, string>; } | null> {
     if (!urlString?.startsWith("http")) {
       return null;
     }
@@ -157,7 +177,9 @@ export class PlaywrightFetchingStrategy implements DocumentationFetchingStrategy
           ? `<html><body>${mainContent.outerHTML}</body></html>`
           : `<html><body>${document.body?.innerHTML || ''}</body></html>`;
 
-        return { html, links };
+        const textContent = document.body?.innerText || '';
+
+        return { html, textContent, links };
       });
 
       if (!result || !result.html) {
@@ -165,7 +187,7 @@ export class PlaywrightFetchingStrategy implements DocumentationFetchingStrategy
         return null;
       }
 
-      let { html, links } = result;
+      let { html, textContent, links } = result;
 
       if (html.length > server_defaults.DOCUMENTATION.MAX_PAGE_SIZE_BYTES) {
         logMessage('warn', `Page ${urlString} exceeds size limit after cleanup (${Math.round(html.length / 1024 / 1024)}MB > ${Math.round(server_defaults.DOCUMENTATION.MAX_PAGE_SIZE_BYTES / 1024 / 1024)}MB), truncating`, metadata);
@@ -175,6 +197,7 @@ export class PlaywrightFetchingStrategy implements DocumentationFetchingStrategy
       logMessage('debug', `Successfully fetched content for ${urlString}`, metadata);
       return {
         content: html,
+        textContent,
         links
       };
     } catch (error) {
@@ -475,12 +498,12 @@ export class PlaywrightFetchingStrategy implements DocumentationFetchingStrategy
     config: DocumentationConfig,
     metadata: Metadata
   ): Promise<string> {
-    let combinedContent = "";
     const BATCH_SIZE = PlaywrightFetchingStrategy.PARALLEL_FETCH_LIMIT;
     const MAX_TOTAL_SIZE = server_defaults.DOCUMENTATION.MAX_TOTAL_CONTENT_SIZE;
-    let totalSize = 0;
+    const pageResults: Array<{ url: string; html: string; textContent: string }> = [];
     let fetchedCount = 0;
 
+    // Fetch all pages in batches
     for (let i = 0; i < urls.length && fetchedCount < PlaywrightFetchingStrategy.MAX_FETCHED_LINKS; i += BATCH_SIZE) {
       const remainingSlots = PlaywrightFetchingStrategy.MAX_FETCHED_LINKS - fetchedCount;
       const batch = urls.slice(i, Math.min(i + BATCH_SIZE, i + remainingSlots));
@@ -488,36 +511,68 @@ export class PlaywrightFetchingStrategy implements DocumentationFetchingStrategy
       const batchPromises = batch.map(async (url) => {
         const result = await this.fetchPageContentWithPlaywright(url, config, metadata);
         if (!result?.content) return null;
-        return { url, content: result.content };
+        return { url, html: result.content, textContent: result.textContent };
       });
 
       const results = await Promise.all(batchPromises);
 
       for (const result of results) {
-        if (!result || !result.content) continue;
-
-        const contentSize = Buffer.byteLength(result.content, 'utf8');
-
-        if (totalSize + contentSize > MAX_TOTAL_SIZE) {
-          logMessage('debug', `Reached size budget (${Math.round(totalSize / 1024 / 1024)}MB), skipping remaining pages`, metadata);
-          return combinedContent;
-        }
-
-        if (combinedContent.includes(result.content)) {
-          continue;
-        }
-
-        combinedContent += combinedContent ? `\n\n${result.content}` : result.content;
-        totalSize += contentSize;
+        if (!result || !result.html) continue;
+        pageResults.push(result);
         fetchedCount++;
-      }
-
-      if (totalSize >= MAX_TOTAL_SIZE * 0.9) {
-        logMessage('debug', `Approaching size budget (${Math.round(totalSize / 1024 / 1024)}MB), stopping fetch`, metadata);
-        break;
       }
     }
 
+    // Deduplicate based on similarity
+    const deduplicatedPages: Array<{ url: string; html: string; textContent: string }> = [];
+    
+    if (pageResults.length > 0) {
+      deduplicatedPages.push(pageResults[0]);
+    }
+
+    for (let i = 1; i < pageResults.length; i++) {
+      const currentPage = pageResults[i];
+      
+      // Always include pages with short text content
+      if (currentPage.textContent.length <= 500) {
+        deduplicatedPages.push(currentPage);
+        continue;
+      }
+
+      // Check similarity against all pages already in the deduplicated list
+      let isSimilar = false;
+      for (const existingPage of deduplicatedPages) {
+        const dice = diceCoefficient(currentPage.textContent, existingPage.textContent);
+        const jaccard = jaccardSimilarity(currentPage.textContent, existingPage.textContent);
+        const avgSimilarity = (dice + jaccard) / 2;
+
+        if (avgSimilarity > 0.80) {
+          isSimilar = true;
+          logMessage('debug', `Skipping similar page '${currentPage.url}' because it is ${(avgSimilarity * 100).toFixed(1)}% similar to '${existingPage.url}'`, metadata);
+          break;
+        }
+      }
+
+      if (!isSimilar) {
+        deduplicatedPages.push(currentPage);
+      }
+    }
+
+    // Build final combined content from deduplicated pages
+    let combinedContent = "";
+    let totalSize = 0;
+
+    for (const page of deduplicatedPages) {
+      const contentSize = Buffer.byteLength(page.html, 'utf8');
+
+      if (totalSize + contentSize > MAX_TOTAL_SIZE) {
+        logMessage('debug', `Reached size budget (${Math.round(totalSize / 1024 / 1024)}MB), skipping remaining pages`, metadata);
+        break;
+      }
+
+      combinedContent += combinedContent ? `\n\n${page.html}` : page.html;
+      totalSize += contentSize;
+    }
     return combinedContent;
   }
 
