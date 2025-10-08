@@ -28,6 +28,7 @@ const createPlaywrightMocks = () => {
         goto: vi.fn().mockResolvedValue(undefined),
         waitForLoadState: vi.fn().mockResolvedValue(undefined),
         waitForTimeout: vi.fn().mockResolvedValue(undefined),
+        addInitScript: vi.fn().mockResolvedValue(undefined),
         content: vi.fn().mockResolvedValue(''),
         evaluate: vi.fn().mockResolvedValue(undefined),
         close: vi.fn().mockResolvedValue(undefined),
@@ -35,7 +36,6 @@ const createPlaywrightMocks = () => {
 
     const mockContext = {
         newPage: vi.fn().mockResolvedValue(mockPage),
-        setExtraHTTPHeaders: vi.fn().mockResolvedValue(undefined),
         close: vi.fn().mockResolvedValue(undefined),
     };
 
