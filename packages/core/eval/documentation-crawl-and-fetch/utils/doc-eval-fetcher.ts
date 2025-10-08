@@ -1,6 +1,8 @@
 import { DataStore } from '../../../datastore/types.js';
 import { DocumentationFetcher as DocumentationFetcherCore } from '../../../documentation/documentation-fetching.js';
 import { logMessage } from '../../../utils/logs.js';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export interface DocumentationSite {
   id: string;
@@ -19,7 +21,9 @@ export interface FetchResult {
   success: boolean;
   documentationSize: number;
   openApiSize: number;
-  fetchTime: number;
+  docFetchTime: number;
+  openApiFetchTime: number;
+  pageCount: number;
   error?: string;
 }
 
@@ -29,6 +33,7 @@ export interface FetchSummary {
   totalDocumentationSize: number;
   totalOpenApiSize: number;
   totalTime: number;
+  results: FetchResult[];
 }
 
 /**
@@ -49,7 +54,7 @@ export class DocumentationEvalFetcher {
     const startTime = Date.now();
     const results: FetchResult[] = [];
 
-    logMessage('info', `🚀 Starting documentation fetch for ${sites.length} sites`, this.metadata);
+    logMessage('info', `\n🚀 Starting documentation fetch for ${sites.length} sites...`, this.metadata);
 
     for (const site of sites) {
       const result = await this.fetchSiteDocumentation(site);
@@ -57,8 +62,8 @@ export class DocumentationEvalFetcher {
       
       if (result.success) {
         const docMB = (result.documentationSize / 1024 / 1024).toFixed(2);
-        const openApiKB = result.openApiSize > 0 ? `, OpenAPI: ${Math.round(result.openApiSize / 1024)}KB` : '';
-        logMessage('info', `✅ ${site.name}: ${docMB}MB${openApiKB}`, this.metadata);
+        const apiIndicator = result.openApiSize > 0 ? ' + OpenAPI' : '';
+        logMessage('info', `✅ ${site.name}: ${docMB}MB${apiIndicator}`, this.metadata);
       } else {
         logMessage('warn', `❌ ${site.name}: ${result.error}`, this.metadata);
       }
@@ -74,8 +79,6 @@ export class DocumentationEvalFetcher {
    * Fetch documentation for a single site
    */
   private async fetchSiteDocumentation(site: DocumentationSite): Promise<FetchResult> {
-    const fetchStartTime = Date.now();
-    
     try {
       const docFetcher = new DocumentationFetcherCore(
         {
@@ -89,15 +92,21 @@ export class DocumentationEvalFetcher {
         this.metadata
       );
 
-      // Fetch both documentation and OpenAPI schema
+      const docStartTime = Date.now();
       const documentation = await docFetcher.fetchAndProcess();
+      const docFetchTime = Date.now() - docStartTime;
+      
+      const openApiStartTime = Date.now();
       const openApiSchema = await docFetcher.fetchOpenApiDocumentation();
+      const openApiFetchTime = Date.now() - openApiStartTime;
       
       const documentationSize = Buffer.byteLength(documentation, 'utf8');
       const openApiSize = (openApiSchema && openApiSchema.trim().length > 0) 
         ? Buffer.byteLength(openApiSchema, 'utf8') : 0;
 
-      // Store in database if we have content
+      const AVG_PAGE_SIZE_KB = 75;
+      const pageCount = Math.max(1, Math.round(documentationSize / 1024 / AVG_PAGE_SIZE_KB));
+
       if (documentationSize > 0) {
         await this.storeDocumentation(site, documentation, openApiSchema || '');
       }
@@ -108,7 +117,9 @@ export class DocumentationEvalFetcher {
         success: documentationSize > 0,
         documentationSize,
         openApiSize,
-        fetchTime: Date.now() - fetchStartTime
+        docFetchTime,
+        openApiFetchTime,
+        pageCount,
       };
 
     } catch (error) {
@@ -118,7 +129,9 @@ export class DocumentationEvalFetcher {
         success: false,
         documentationSize: 0,
         openApiSize: 0,
-        fetchTime: Date.now() - fetchStartTime,
+        docFetchTime: 0,
+        openApiFetchTime: 0,
+        pageCount: 0,
         error: error instanceof Error ? error.message : String(error)
       };
     }
@@ -164,24 +177,83 @@ export class DocumentationEvalFetcher {
       successfulFetches: successfulFetches.length,
       totalDocumentationSize: successfulFetches.reduce((sum, r) => sum + r.documentationSize, 0),
       totalOpenApiSize: successfulFetches.reduce((sum, r) => sum + r.openApiSize, 0),
-      totalTime
+      totalTime,
+      results
     };
   }
 
   /**
-   * Log fetch summary
+   * Log fetch summary with table and save to CSV
    */
   private logSummary(summary: FetchSummary): void {
-    const successRate = ((summary.successfulFetches / summary.totalSites) * 100).toFixed(1);
-    const avgDocMB = (summary.totalDocumentationSize / summary.successfulFetches / 1024 / 1024).toFixed(2);
-    const totalDocMB = (summary.totalDocumentationSize / 1024 / 1024).toFixed(1);
-    const totalOpenApiMB = (summary.totalOpenApiSize / 1024 / 1024).toFixed(1);
-    const totalTimeSec = (summary.totalTime / 1000).toFixed(1);
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const csvPath = path.join(process.cwd(), `fetch-results-${timestamp}.csv`);
 
-    logMessage('info', `📊 Fetch Summary: ${summary.successfulFetches}/${summary.totalSites} sites (${successRate}%)`, this.metadata);
-    logMessage('info', `📚 Documentation: ${totalDocMB}MB total, ${avgDocMB}MB avg per site`, this.metadata);
-    logMessage('info', `🔌 OpenAPI: ${totalOpenApiMB}MB total`, this.metadata);
-    logMessage('info', `⏱️  Total time: ${totalTimeSec}s`, this.metadata);
+    logMessage('info', '\n📊 Fetch Results Table:', this.metadata);
+    logMessage('info', '═══════════════════════════════════════════════════════════════════════════════════', this.metadata);
+    logMessage('info', `${'Site'.padEnd(25)} ${'Pages*'.padStart(6)} ${'Doc Size'.padStart(10)} ${'OpenAPI'.padStart(8)} ${'API Size'.padStart(9)} ${'Doc s/pg'.padStart(9)} ${'API Fetch'.padStart(10)}`, this.metadata);
+    logMessage('info', '───────────────────────────────────────────────────────────────────────────────────', this.metadata);
+
+    const csvLines: string[] = [
+      'Site,Pages (estimated),Doc Size (MB),Has OpenAPI,OpenAPI Size (KB),Doc Fetch (s/page),OpenAPI Fetch (s)'
+    ];
+
+    for (const result of summary.results) {
+      if (result.success) {
+        const siteName = result.siteName.length > 24 ? result.siteName.substring(0, 21) + '...' : result.siteName;
+        const pages = result.pageCount.toString();
+        const docSize = `${(result.documentationSize / 1024 / 1024).toFixed(2)} MB`;
+        const hasOpenApi = result.openApiSize > 0 ? 'Yes' : 'No';
+        const apiSize = result.openApiSize > 0 ? `${Math.round(result.openApiSize / 1024)} KB` : '-';
+        const docSecPerPage = result.pageCount > 0 ? (result.docFetchTime / 1000 / result.pageCount).toFixed(2) : '0.00';
+        const apiSec = (result.openApiFetchTime / 1000).toFixed(2);
+
+        logMessage('info', 
+          `${siteName.padEnd(25)} ${pages.padStart(6)} ${docSize.padStart(10)} ${hasOpenApi.padStart(8)} ${apiSize.padStart(9)} ${docSecPerPage.padStart(9)} ${apiSec.padStart(10)}s`, 
+          this.metadata
+        );
+
+        csvLines.push(
+          `"${result.siteName}",${result.pageCount},${(result.documentationSize / 1024 / 1024).toFixed(2)},${hasOpenApi},${result.openApiSize > 0 ? Math.round(result.openApiSize / 1024) : 0},${docSecPerPage},${apiSec}`
+        );
+      }
+    }
+
+    const successfulResults = summary.results.filter(r => r.success);
+    const totalPages = successfulResults.reduce((sum, r) => sum + r.pageCount, 0);
+    const avgDocSize = successfulResults.length > 0 
+      ? (summary.totalDocumentationSize / successfulResults.length / 1024 / 1024).toFixed(2) 
+      : '0.00';
+    const sitesWithOpenApi = successfulResults.filter(r => r.openApiSize > 0).length;
+    const avgOpenApiSize = sitesWithOpenApi > 0
+      ? Math.round(summary.totalOpenApiSize / sitesWithOpenApi / 1024)
+      : 0;
+    const avgDocSecPerPage = totalPages > 0
+      ? (successfulResults.reduce((sum, r) => sum + r.docFetchTime, 0) / 1000 / totalPages).toFixed(2)
+      : '0.00';
+    const avgOpenApiSec = sitesWithOpenApi > 0
+      ? (successfulResults.filter(r => r.openApiSize > 0).reduce((sum, r) => sum + r.openApiFetchTime, 0) / 1000 / sitesWithOpenApi).toFixed(2)
+      : '0.00';
+
+    logMessage('info', '───────────────────────────────────────────────────────────────────────────────────', this.metadata);
+    logMessage('info', 
+      `${'AVERAGE'.padEnd(25)} ${(totalPages / successfulResults.length).toFixed(0).padStart(6)} ${(avgDocSize + ' MB').padStart(10)} ${`${sitesWithOpenApi}/${successfulResults.length}`.padStart(8)} ${(avgOpenApiSize + ' KB').padStart(9)} ${avgDocSecPerPage.padStart(9)} ${avgOpenApiSec.padStart(10)}s`, 
+      this.metadata
+    );
+    logMessage('info', '═══════════════════════════════════════════════════════════════════════════════════', this.metadata);
+    logMessage('info', '* Page count estimated based on documentation size (~75KB/page average)', this.metadata);
+
+    csvLines.push(
+      `"AVERAGE",${(totalPages / successfulResults.length).toFixed(0)},${avgDocSize},${sitesWithOpenApi}/${successfulResults.length},${avgOpenApiSize},${avgDocSecPerPage},${avgOpenApiSec}`
+    );
+
+    fs.writeFileSync(csvPath, csvLines.join('\n'));
+    logMessage('info', `\n💾 Results saved to: ${csvPath}`, this.metadata);
+
+    const successRate = ((summary.successfulFetches / summary.totalSites) * 100).toFixed(1);
+    const totalTimeSec = (summary.totalTime / 1000).toFixed(1);
+    logMessage('info', `✅ Success rate: ${summary.successfulFetches}/${summary.totalSites} sites (${successRate}%)`, this.metadata);
+    logMessage('info', `⏱️  Total time: ${totalTimeSec}s\n`, this.metadata);
   }
 
   /**

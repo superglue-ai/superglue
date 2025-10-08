@@ -546,7 +546,7 @@ export class PlaywrightFetchingStrategy implements DocumentationFetchingStrategy
         const jaccard = jaccardSimilarity(currentPage.textContent, existingPage.textContent);
         const avgSimilarity = (dice + jaccard) / 2;
 
-        if (avgSimilarity > 0.80) {
+        if (avgSimilarity > server_defaults.DOCUMENTATION.SIMILARITY_THRESHOLD_PERCENTAGE / 100.0) {
           isSimilar = true;
           logMessage('debug', `Skipping similar page '${currentPage.url}' because it is ${(avgSimilarity * 100).toFixed(1)}% similar to '${existingPage.url}'`, metadata);
           break;

@@ -23,6 +23,7 @@ export const server_defaults = {
         MAX_OPENAPI_SPECS_TO_FETCH: 100,
         MAX_PAGE_SIZE_BYTES: 3 * 1024 * 1024, // 3MB hard cap per individual page after pruning
         MAX_TOTAL_CONTENT_SIZE: 10 * 1024 * 1024, // 10MB total budget for all pages combined
+        SIMILARITY_THRESHOLD_PERCENTAGE: 90, // 90% similarity threshold for deduplication
         TIMEOUTS: {
             AXIOS: 120000,
             PLAYWRIGHT: 120000,

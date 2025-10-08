@@ -23,39 +23,28 @@ async function main() {
   try {
     logMessage('info', '🚀 Starting Documentation Evaluation Pipeline', metadata);
     
-    // Load configuration
     const config = await configLoader.loadConfig();
     const sitesToUse = configLoader.getEnabledSites(config);
     
-    // Initialize datastore
     const datastore = createDataStore({ type: 'postgres' });
     
-    // Phase 1: Fetch Documentation
-    logMessage('info', '📥 Phase 1: Documentation Fetching', metadata);
+    logMessage('info', '\n📥 Phase 1: Documentation Fetching', metadata);
     const fetcher = new DocumentationEvalFetcher(datastore, ORG_ID);
-    const fetchSummary = await fetcher.fetchAllDocumentation(sitesToUse);
+    await fetcher.fetchAllDocumentation(sitesToUse);
     
-    // Phase 2: Evaluate Documentation
-    logMessage('info', '📝 Phase 2: Documentation Evaluation', metadata);
+    logMessage('info', '\n📝 Phase 2: Documentation Evaluation', metadata);
     const evaluator = new DocumentationEvaluator(datastore, ORG_ID);
-    const evaluationSummary = await evaluator.evaluateAllSites(sitesToUse);
+    await evaluator.evaluateAllSites(sitesToUse);
     
-    // Final Summary
-    logMessage('info', '📊 Final Summary', metadata);
-    logMessage('info', `✅ Documentation: ${fetchSummary.successfulFetches}/${fetchSummary.totalSites} sites fetched`, metadata);
-    logMessage('info', `✅ Evaluation: ${evaluationSummary.questionsAnswered}/${evaluationSummary.totalQuestions} questions answered`, metadata);
-    
-    // Cleanup
     await fetcher.cleanup();
     
-    logMessage('info', '🎉 Pipeline completed successfully', metadata);
+    logMessage('info', '\n🎉 Pipeline completed successfully', metadata);
     
   } catch (error) {
     logMessage('error', `❌ Pipeline failed: ${error}`, metadata);
     process.exit(1);
   }
   
-  // Ensure process exits cleanly
   process.exit(0);
 }
 

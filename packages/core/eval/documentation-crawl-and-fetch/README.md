@@ -4,15 +4,13 @@ Evaluates the quality of documentation crawling and retrieval across multiple AP
 
 ## What It Does
 
-1. **Phase 1 - Documentation Fetching**: Uses the `Documentation` class to crawl and store docs from API sites
+1. **Phase 1 - Documentation Fetching**: Crawls and stores docs from API sites, tracks timing and sizes
 2. **Phase 2 - RAG Evaluation**: Tests retrieval quality using AI-generated search queries and comprehensive scoring
-3. **Advanced Metrics**: Measures relevance, completeness, accuracy, and overall RAG performance
-4. **Debug Logging**: Generates detailed CSV files with all evaluation data for analysis
+3. **Metrics & CSV Export**: Detailed fetch metrics and evaluation results exported to CSV files
 
 ## How to Run
 
 ```bash
-# Run documentation evaluations
 cd packages/core && npm run build && node dist/eval/documentation-crawl-and-fetch/run-documentation-evaluations.js 
 ```
 
@@ -32,54 +30,56 @@ Edit `config/doc-eval-config.json` to add/remove sites and test questions:
       "keywords": ["payment", "charge", "customer"],
       "testQuestions": [
         "How do I create a new customer in Stripe?",
-        "What are the required fields for creating a payment intent?",
-        "How do I handle webhook events in Stripe?",
-        "What authentication methods does Stripe API support?",
-        "How do I list all charges for a customer?"
+        "What are the required fields for creating a payment intent?"
       ]
     }
-  ],
-  "settings": {
-    "crawlTimeout": 30000,
-    "maxDocumentationSize": 9000000,
-    "enablePlaywright": true,
-    "enableOpenApi": true
-  }
+  ]
 }
 ```
 
 ## Output
 
-The evaluation runs in two phases with detailed logging and CSV debug files:
+### Phase 1: Fetch Results Table
+
+After fetching, a detailed table shows per-site metrics:
 
 ```
-🚀 Starting Documentation Evaluation Pipeline
-📥 Phase 1: Documentation Fetching
-✅ Stripe API: 1.39MB, OpenAPI: 6966KB
-📊 Fetch Summary: 1/1 sites (100.0%)
-📚 Documentation: 1.4MB total, 1.39MB avg per site
+📊 Fetch Results Table:
+═══════════════════════════════════════════════════════════════════════════════════
+Site                      Pages*  Doc Size   OpenAPI  API Size  Doc s/pg  API Fetch
+───────────────────────────────────────────────────────────────────────────────────
+Stripe API                    19   1.39 MB       Yes    6796 KB      1.23      0.45s
+GitHub API                    12   0.92 MB       Yes    3421 KB      1.87      0.32s
+───────────────────────────────────────────────────────────────────────────────────
+AVERAGE                       16   1.16 MB       2/2    5109 KB      1.55      0.39s
+═══════════════════════════════════════════════════════════════════════════════════
+* Page count estimated based on documentation size (~75KB/page average)
 
+💾 Results saved to: fetch-results-2025-10-08T12-34-56-789Z.csv
+```
+
+**Fetch CSV Columns:**
+- `Site`: Site name
+- `Pages (estimated)`: Estimated page count based on size
+- `Doc Size (MB)`: Total documentation size
+- `Has OpenAPI`: Yes/No if OpenAPI spec exists
+- `OpenAPI Size (KB)`: Size of OpenAPI spec
+- `Doc Fetch (s/page)`: Average seconds per page for doc fetching
+- `OpenAPI Fetch (s)`: Time to fetch OpenAPI spec
+
+### Phase 2: Evaluation Results
+
+```
 📝 Phase 2: Documentation Evaluation
-📄 Debug CSV log initialized: evaluation-debug-2025-10-06T14-00-18-638Z.csv
-📝 Stripe API: 5/5 questions (100.0%) - Avg RAG: 61.6%
+📝 Stripe API: 5/5 questions (100.0%) - Avg Retrieval: 76.0%
 📊 Evaluation Summary: 5/5 questions answered (100.0%)
-🎯 RAG Scores - Overall: 61.6%, Relevance: 76.0%, Completeness: 48.0%, Accuracy: 82.0%
-📄 Detailed evaluation results saved to: evaluation-debug-2025-10-06T14-00-18-638Z.csv
+🎯 API Doc Scores - Retrieval: 76.0%, Endpoint: 82.0%, Completeness: 68.0%
+📄 Detailed evaluation results saved to: evaluation-debug-2025-10-08T12-34-56-789Z.csv
 ```
 
-## Debug CSV Output
-
-Each evaluation generates a timestamped CSV file with detailed results:
-
-| Column | Description |
-|--------|-------------|
-| `timestamp` | When the evaluation occurred |
-| `siteId` | Site identifier |
-| `question` | Original test question |
-| `searchQuery` | AI-generated search query |
-| `searchResultsSizeKB` | Size of retrieved content |
-| `searchResultsPreview` | First 2000 chars of retrieved content |
-| `ragScore` | Overall RAG score (0-100) |
-| `relevanceScore` | Relevance score (0-100) |
-| `completenessScore` | Completeness score (0-100) |
-| `accuracyScore` | Accuracy score (0-100) |
+**Evaluation CSV Columns:**
+- `timestamp`, `siteId`, `siteName`: Metadata
+- `question`, `searchQuery`: Question and generated search
+- `searchResultsSizeKB`: Retrieved content size
+- `retrievalScore`, `endpointScore`, `completenessScore`: Quality metrics (0-100)
+- `reasoning`: AI explanation of scores

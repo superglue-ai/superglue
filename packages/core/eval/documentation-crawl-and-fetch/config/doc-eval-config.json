@@ -120,8 +120,8 @@
       "openApiUrl": "https://components.sitecorecloud.io/api/docs/static/index.html",
       "keywords": ["components", "services", "content", "delivery", "rendering"],
       "testQuestions": [
-        "How do I retrieve component data?",
-        "What endpoints are available for content delivery?"
+        "How do I interact with a file source like azure blob storage?",
+        "I want to upload a new stylesheet"
       ]
     },
     {
@@ -133,8 +133,8 @@
       "openApiUrl": "https://libopenstorage.github.io/w/swagger-ui/",
       "keywords": ["storage", "volume", "cluster", "snapshots", "backup", "nodes"],
       "testQuestions": [
-        "How do I create a new volume?",
-        "What are the parameters for creating a snapshot?"
+        "Create a new role",
+        "Activate a cluster domain"
       ]
     },
     {
@@ -144,10 +144,10 @@
       "documentationUrl": "https://demo.caspio.com/integrations/rest/swagger/index.html",
       "urlHost": "https://demo.caspio.com",
       "openApiUrl": "https://demo.caspio.com/integrations/rest/swagger/index.html",
-      "keywords": ["tables", "records", "views", "applications", "authentication", "database"],
+      "keywords": ["tables", "views","records", "DataPage", "applications", "authentication", "webhook"],
       "testQuestions": [
-        "How do I retrieve records from a table?",
-        "What authentication methods are supported?"
+        "how do I deploy a DataPage?",
+        "Create a new ongoing webhook"
       ]
     },
     {
@@ -159,34 +159,86 @@
       "openApiUrl": "https://api-sandbox.epaypolicy.com/content/swagger-ui/",
       "keywords": ["payments", "policies", "transactions", "invoices", "customers", "billing"],
       "testQuestions": [
-        "How do I process a payment for an insurance policy?",
-        "What are the required fields for creating a transaction?"
+        "Please cancel a ongoing payment schedule",
+        "Can you calculate transaction fees for me"
       ]
     },
     {
-      "id": "thingsboard-api",
-      "name": "ThingsBoard API",
-      "description": "IoT platform API for device management and data collection",
-      "documentationUrl": "https://demo.thingsboard.io/swagger-ui/index.html",
-      "urlHost": "https://demo.thingsboard.io",
-      "openApiUrl": "https://demo.thingsboard.io/swagger-ui/index.html",
-      "keywords": ["devices", "telemetry", "attributes", "entities", "dashboards", "rules", "alarms"],
+      "id": "twitter-api",
+      "name": "Twitter API",
+      "description": "Twitter API",
+      "documentationUrl": "https://docs.x.com/x-api/introduction",
+      "urlHost": "https://api.twitter.com",
+      "openApiUrl": "https://api.x.com/2/openapi.json",
+      "keywords": ["tweets", "users", "followers", "timeline", "mentions", "retweets", "likes", "lists", "spaces", "direct messages", "trends", "media", "polls", "oauth"],
       "testQuestions": [
-        "How do I send telemetry data from a device?",
-        "What endpoints are available for managing device attributes?"
+        "How is pagination handled in the Twitter API?",
+        "How do I get posts from a user's timeline?"
       ]
     },
     {
-      "id": "crossref-api",
-      "name": "Crossref API",
-      "description": "Scholarly metadata and DOI registration API",
-      "documentationUrl": "https://api.crossref.org/swagger-ui/index.html",
-      "urlHost": "https://api.crossref.org",
-      "openApiUrl": "https://api.crossref.org/swagger-ui/index.html",
-      "keywords": ["doi", "works", "publications", "journals", "members", "metadata", "citations"],
+      "id": "trello-api",
+      "name": "Trello API",
+      "description": "Trello API",
+      "documentationUrl": "https://developer.atlassian.com/cloud/trello/rest",
+      "urlHost": "https://api.trello.com",
+      "openApiUrl": "https://developer.atlassian.com/cloud/trello/swagger.v3.json",
+      "keywords": ["boards", "cards", "lists", "members", "labels", "attachments", "checklists", "comments", "actions", "organizations", "teams", "power-ups", "custom fields", "stickers", "api key"],
       "testQuestions": [
-        "How do I search for works by DOI?",
-        "What parameters can I use to filter journal metadata?"
+        "How do I create a new board?",
+        "How do I get a list of all cards in a board?"
+      ]
+    },
+    {
+      "id": "gemini-api",
+      "name": "Gemini API",
+      "description": "Gemini API",
+      "documentationUrl": "https://ai.google.dev/api",
+      "urlHost": "https://generativelanguage.googleapis.com/v1beta/models/{model_string}:generateContent?key={your-api-key}",
+      "openApiUrl": "https://ai.google.dev/api",
+      "keywords": ["gemini", "generativelanguage", "models", "generateContent", "api key"],
+      "testQuestions": [
+        "How do I generate content using the Gemini API?",
+        "How do I count tokens I used?"
+      ]
+    },
+    {
+      "id": "linear-api",
+      "name": "Linear API",
+      "description": "Linear API",
+      "documentationUrl": "https://developers.linear.app/docs/graphql/working-with-the-graphql-api",
+      "urlHost": "https://api.linear.app/graphql",
+      "openApiUrl": "https://developers.linear.app/docs/graphql/working-with-the-graphql-api",
+      "keywords": ["issues", "projects", "cycles", "teams", "users", "comments", "labels", "milestones", "roadmaps", "workflows", "states", "graphql", "mutations", "queries", "api key"],
+      "testQuestions": [
+        "How do I create a new triage issue?",
+        "How do I get a list of all issues?"
+      ]
+    },
+    {
+      "id": "claude-api",
+      "name": "Claude API",
+      "description": "Claude API",
+      "documentationUrl": "https://docs.anthropic.com/claude/reference",
+      "urlHost": "https://api.anthropic.com",
+      "openApiUrl": "https://docs.anthropic.com/claude/reference",
+      "keywords": ["messages", "completions", "claude", "models", "prompts", "conversations", "tokens", "streaming", "api key"],
+      "testQuestions": [
+        "How does Claude handle Rate Limiting?",
+        "How do I create a new message in a conversation?"
+      ]
+    },
+    {
+      "id": "pokeapi-api",
+      "name": "PokeAPI API",
+      "description": "PokeAPI API",
+      "documentationUrl": "https://pokeapi.co/docs/v2",
+      "urlHost": "https://pokeapi.co/api/v2/",
+      "openApiUrl": "https://pokeapi.co/docs/v2",
+      "keywords": ["pokemon", "pokedex", "types", "abilities", "moves", "stats", "api key"],
+      "testQuestions": [
+        "How do I get a list of gen2 pokemons?",
+        "How do find information about a specific berry?"
       ]
     }
   ],
@@ -195,6 +247,6 @@
     "maxDocumentationSize": 500000,
     "enablePlaywrightCrawling": true,
     "enableOpenApiFetching": true,
-    "enabledSites": ["stripe-api"]
+    "enabledSites": ["stripe-api", "slack-api", "gmail-api", "openai-api", "zignsec-api", "sitecore-components-api", "openstorage-api", "caspio-api", "epaypolicy-api", "twitter-api", "trello-api", "gemini-api", "linear-api", "claude-api", "pokeapi-api"]
   }
 }
