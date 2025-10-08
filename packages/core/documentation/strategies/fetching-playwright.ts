@@ -33,7 +33,17 @@ export class PlaywrightFetchingStrategy implements DocumentationFetchingStrategy
 
   private static async getBrowser(): Promise<playwright.Browser> {
     if (!PlaywrightFetchingStrategy.browserInstance) {
-      PlaywrightFetchingStrategy.browserInstance = await playwright.chromium.launch();
+      PlaywrightFetchingStrategy.browserInstance = await playwright.chromium.launch({
+        headless: true,
+        args: [
+          '--disable-blink-features=AutomationControlled',
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-web-security',
+          '--disable-features=IsolateOrigins,site-per-process',
+        ]
+      });
     }
     return PlaywrightFetchingStrategy.browserInstance;
   }
@@ -61,11 +71,13 @@ export class PlaywrightFetchingStrategy implements DocumentationFetchingStrategy
   private async getOrCreateContext(config: DocumentationConfig): Promise<playwright.BrowserContext> {
     if (!this.browserContext) {
       const browser = await PlaywrightFetchingStrategy.getBrowser();
-      this.browserContext = await browser.newContext();
-
-      if (config.headers) {
-        await this.browserContext.setExtraHTTPHeaders(config.headers);
-      }
+      this.browserContext = await browser.newContext({
+        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        viewport: { width: 1920, height: 1080 },
+        locale: 'en-US',
+        timezoneId: 'America/New_York',
+        extraHTTPHeaders: config.headers || {}
+      });
     }
     return this.browserContext;
   }
@@ -98,6 +110,15 @@ export class PlaywrightFetchingStrategy implements DocumentationFetchingStrategy
       }
 
       page = await browserContext.newPage();
+      
+      await page.addInitScript(() => {
+        Object.defineProperty(navigator, 'webdriver', { get: () => false });
+        Object.defineProperty(navigator, 'platform', { get: () => 'MacIntel' });
+        Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 8 });
+        Object.defineProperty(navigator, 'deviceMemory', { get: () => 8 });
+        Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
+      });
+      
       await page.goto(url.toString(), { timeout: server_defaults.DOCUMENTATION.TIMEOUTS.PLAYWRIGHT });
       await page.waitForLoadState('domcontentloaded', { timeout: server_defaults.DOCUMENTATION.TIMEOUTS.PLAYWRIGHT });
       await page.waitForTimeout(1000);
