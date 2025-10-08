@@ -78,7 +78,7 @@ describe('Documentation Class', () => {
             const htmlDoc = `
         <html><body><h1>API Docs</h1><p>Details here.</p></body></html>
       `;
-            mockPage.evaluate.mockResolvedValue({ html: htmlDoc, links: {} });
+            mockPage.evaluate.mockResolvedValue({ html: htmlDoc, textContent: 'API Docs Details here.', links: {} });
 
             // Mock sitemap requests to fail (404)
             mockedAxios.get.mockRejectedValue(new Error('404'));
@@ -103,7 +103,7 @@ describe('Documentation Class', () => {
 
         it('should return raw page content if not HTML, GraphQL, or OpenAPI', async () => {
             const plainDoc = 'Plain text documentation content.';
-            mockPage.evaluate.mockResolvedValue({ html: plainDoc, links: {} })
+            mockPage.evaluate.mockResolvedValue({ html: plainDoc, textContent: plainDoc, links: {} })
 
             // Mock sitemap requests to fail
             mockedAxios.get.mockRejectedValue(new Error('404'));
@@ -145,7 +145,7 @@ describe('Documentation Class', () => {
         it('should fall back to Playwright fetch if GraphQL introspection fails', async () => {
             const htmlDoc = `<html><body>GraphQL Maybe?</body></html>`;
             mockedAxios.post.mockRejectedValueOnce(new Error('GraphQL Network Error')); // Simulate network failure
-            mockPage.evaluate.mockResolvedValue({ html: htmlDoc, links: {} })
+            mockPage.evaluate.mockResolvedValue({ html: htmlDoc, textContent: 'GraphQL Maybe?', links: {} })
 
             const docUrl = 'https://api.example.com/graphql'; // Looks like GraphQL
             const doc = new DocumentationFetcher({ documentationUrl: docUrl, urlHost: 'https://api.example.com' }, {}, metadata);
@@ -163,7 +163,7 @@ describe('Documentation Class', () => {
         it('should fall back to Playwright fetch if GraphQL returns errors', async () => {
             const htmlDoc = `<html><body>GraphQL Maybe?</body></html>`;
             mockedAxios.post.mockResolvedValueOnce({ data: { errors: [{ message: 'Bad Query' }] } }); // Simulate GQL error response
-            mockPage.evaluate.mockResolvedValue({ html: htmlDoc, links: {} })
+            mockPage.evaluate.mockResolvedValue({ html: htmlDoc, textContent: 'GraphQL Maybe?', links: {} })
 
             const docUrl = 'https://api.example.com/graphql'; // Looks like GraphQL
             const doc = new DocumentationFetcher({ documentationUrl: docUrl, urlHost: 'https://api.example.com' }, {}, metadata);
@@ -196,7 +196,7 @@ describe('Documentation Class', () => {
 
         it('should handle page content being the OpenAPI spec directly (JSON)', async () => {
             const openApiJsonString = JSON.stringify({ swagger: "2.0", info: { title: "Direct JSON" } });
-            mockPage.evaluate.mockResolvedValue({ html: openApiJsonString, links: {} })
+            mockPage.evaluate.mockResolvedValue({ html: openApiJsonString, textContent: openApiJsonString, links: {} })
 
             // Mock sitemap requests to fail
             mockedAxios.get.mockRejectedValue(new Error('404'));
@@ -212,7 +212,7 @@ describe('Documentation Class', () => {
 
         it('should handle page content being the OpenAPI spec directly (YAML)', async () => {
             const openApiYaml = `openapi: 3.1.0\ninfo:\n  title: Direct YAML`;
-            mockPage.evaluate.mockResolvedValue({ html: openApiYaml, links: {} })
+            mockPage.evaluate.mockResolvedValue({ html: openApiYaml, textContent: openApiYaml, links: {} })
 
             // Mock sitemap requests to fail
             mockedAxios.get.mockRejectedValue(new Error('404'));
@@ -228,7 +228,7 @@ describe('Documentation Class', () => {
 
         it('should fall back to HTML->Markdown if OpenAPI extraction/fetch fails', async () => {
             const swaggerHtml = `<html><script id="swagger-settings">{ "url": "/missing.json" }</script><body>Content</body></html>`;
-            mockPage.evaluate.mockResolvedValue({ html: swaggerHtml, links: {} })
+            mockPage.evaluate.mockResolvedValue({ html: swaggerHtml, textContent: 'Content', links: {} })
 
             // All requests fail
             mockedAxios.get.mockRejectedValue(new Error('404 Not Found'));
@@ -497,6 +497,7 @@ describe('Documentation Class', () => {
                 // Mock page fetches
                 mockPage.evaluate.mockResolvedValue({
                     html: '<html><body>Content</body></html>',
+                    textContent: 'Content',
                     links: {}
                 });
 
@@ -543,6 +544,7 @@ describe('Documentation Class', () => {
 
                 mockPage.evaluate.mockResolvedValue({
                     html: '<html><body>Docs</body></html>',
+                    textContent: 'Docs',
                     links: {}
                 });
 
@@ -568,6 +570,7 @@ describe('Documentation Class', () => {
                 // Mock initial page with links
                 mockPage.evaluate.mockResolvedValueOnce({
                     html: '<html><body>Main Page</body></html>',
+                    textContent: 'Main Page',
                     links: {
                         'api reference https docs api': 'https://api.com/docs/api',
                         'getting started https docs start': 'https://api.com/docs/start'
@@ -606,6 +609,7 @@ describe('Documentation Class', () => {
 
                 mockPage.evaluate.mockResolvedValue({
                     html: '<html><body>Page</body></html>',
+                    textContent: 'Page',
                     links: {}
                 });
 
@@ -639,6 +643,7 @@ describe('Documentation Class', () => {
 
                 mockPage.evaluate.mockResolvedValue({
                     html: '<html><body>Content</body></html>',
+                    textContent: 'Content',
                     links: {}
                 });
 
