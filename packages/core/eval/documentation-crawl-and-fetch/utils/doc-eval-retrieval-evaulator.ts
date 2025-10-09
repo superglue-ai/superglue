@@ -245,7 +245,7 @@ Generate a concise search query that would help find relevant API documentation 
 
 Return only the search query, no additional text.`;
 
-      const searchQueryResponse = await LanguageModel.generateText([{ role: 'user', content: searchQueryPrompt }], 1.0);
+      const searchQueryResponse = await LanguageModel.generateText([{ role: 'user', content: searchQueryPrompt }], 0);
       const searchQuery = searchQueryResponse.response;
       
       // Step 2: Use DocumentationSearch for targeted search
@@ -282,10 +282,16 @@ ${searchResults}
 Evaluate how well the retrieved documentation helps answer the user's question using these focused metrics (score 0-100):
 
 1. RETRIEVAL SCORE: Overall quality of the retrieved content for answering the question. Higher if the right content is found, even with some extra information. Lower if completely wrong or missing key content.
+   - Example low score (<20): Completely wrong content retrieved (e.g., user asks about payment refunds, but only subscription management docs are returned)
+   - Example high score (>80): Correct endpoint and relevant information is present, possibly with some extra context
 
 2. ENDPOINT SCORE: Does the documentation clearly identify which API endpoint to use? Higher if the correct endpoint is mentioned (e.g., POST /v1/customers). Lower if endpoint is unclear or wrong.
+   - Example low score (<20): No endpoint mentioned, or only tangentially related endpoints shown
+   - Example high score (>80): Correct endpoint clearly shown (e.g., "POST /v1/customers" for customer creation)
 
 3. COMPLETENESS SCORE: Does the documentation provide sufficient detail to make the API call? Higher if it includes required/optional parameters, examples, or clear usage instructions. Lower if it's just high-level descriptions.
+   - Example low score (<20): Only mentions endpoint exists but no parameters or usage details
+   - Example high score (>80): Shows required/optional parameters, types, and ideally includes an example
 
 Note: It's OK if there's additional information about other endpoints - focus on whether the RIGHT information is present and useful.
 
@@ -297,7 +303,7 @@ Provide your evaluation in this exact JSON format:
   "reasoning": "Brief explanation focusing on endpoint identification and parameter details"
 }`;
 
-      const evaluationResponseObj = await LanguageModel.generateText([{ role: 'user', content: evaluationPrompt }], 1.0);
+      const evaluationResponseObj = await LanguageModel.generateText([{ role: 'user', content: evaluationPrompt }], 0);
       const evaluationResponse = evaluationResponseObj.response;
       
       // Parse the structured response
