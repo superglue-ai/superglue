@@ -390,6 +390,378 @@ describe('Documentation Class', () => {
             const result2 = documentationSearch.extractRelevantSections(doc, "a or by", 1, 200);
             expect(result2).toBe(doc); // Whole doc since it's smaller than section size
         });
+
+        describe('OpenAPI schema integration', () => {
+            it('should extract security information when security keywords are present', () => {
+                const openApiSpec = JSON.stringify({
+                    openapi: "3.0.0",
+                    info: { title: "Test API", version: "1.0.0" },
+                    components: {
+                        securitySchemes: {
+                            bearerAuth: {
+                                type: "http",
+                                scheme: "bearer",
+                                bearerFormat: "JWT"
+                            },
+                            apiKey: {
+                                type: "apiKey",
+                                in: "header",
+                                name: "X-API-Key"
+                            }
+                        }
+                    },
+                    security: [
+                        { bearerAuth: [] }
+                    ],
+                    paths: {
+                        "/users": {
+                            get: {
+                                summary: "Get users",
+                                operationId: "getUsers",
+                                responses: { "200": { description: "Success" } }
+                            }
+                        }
+                    }
+                });
+
+                const doc = "General documentation content about the API usage.";
+                const result = documentationSearch.extractRelevantSections(doc, "authentication bearer token", 5, 2000, openApiSpec);
+
+                expect(result).toContain("=== SECURITY ===");
+                expect(result).toContain("bearerAuth");
+                expect(result).toContain("bearer");
+                expect(result).toContain("JWT");
+                expect(result).toContain("apiKey");
+                expect(result).toContain("X-API-Key");
+            });
+
+            it('should not extract security info when no security keywords in query', () => {
+                const openApiSpec = JSON.stringify({
+                    openapi: "3.0.0",
+                    info: { title: "Test API", version: "1.0.0" },
+                    components: {
+                        securitySchemes: {
+                            bearerAuth: { type: "http", scheme: "bearer" }
+                        }
+                    },
+                    paths: {
+                        "/users": {
+                            get: {
+                                summary: "Get users",
+                                operationId: "getUsers",
+                                tags: ["users"],
+                                responses: { "200": { description: "Success" } }
+                            }
+                        }
+                    }
+                });
+
+                const doc = "General documentation content.";
+                const result = documentationSearch.extractRelevantSections(doc, "users list", 5, 2000, openApiSpec);
+
+                expect(result).not.toContain("=== SECURITY ===");
+                expect(result).not.toContain("bearerAuth");
+            });
+
+            it('should extract and rank relevant OpenAPI operations based on search terms', () => {
+                const openApiSpec = JSON.stringify({
+                    openapi: "3.0.0",
+                    info: { title: "Test API", version: "1.0.0" },
+                    paths: {
+                        "/users": {
+                            get: {
+                                summary: "List all users",
+                                operationId: "listUsers",
+                                tags: ["users"],
+                                description: "Get a list of all users in the system",
+                                responses: { "200": { description: "Success" } }
+                            },
+                            post: {
+                                summary: "Create a user",
+                                operationId: "createUser",
+                                tags: ["users"],
+                                description: "Create a new user account",
+                                responses: { "201": { description: "Created" } }
+                            }
+                        },
+                        "/products": {
+                            get: {
+                                summary: "List products",
+                                operationId: "listProducts",
+                                tags: ["products"],
+                                description: "Get all products from catalog",
+                                responses: { "200": { description: "Success" } }
+                            }
+                        },
+                        "/users/{id}": {
+                            get: {
+                                summary: "Get user by ID",
+                                operationId: "getUserById",
+                                tags: ["users"],
+                                description: "Fetch a single user by their unique identifier",
+                                parameters: [
+                                    { name: "id", in: "path", required: true, schema: { type: "string" } }
+                                ],
+                                responses: { "200": { description: "Success" } }
+                            }
+                        }
+                    }
+                });
+
+                const doc = "Some general documentation text.";
+                const result = documentationSearch.extractRelevantSections(doc, "users account identifier", 5, 2000, openApiSpec);
+
+                expect(result).toContain("=== OPENAPI OPERATIONS ===");
+                expect(result).toContain("[GET /users]");
+                expect(result).toContain("listUsers");
+                
+                // Should not include products endpoint since search terms only match user-related operations
+                expect(result).not.toContain("products");
+                expect(result).not.toContain("listProducts");
+            });
+
+            it('should match operations by path, method, operationId, and description', () => {
+                const openApiSpec = JSON.stringify({
+                    openapi: "3.0.0",
+                    info: { title: "Test API", version: "1.0.0" },
+                    paths: {
+                        "/auth/login": {
+                            post: {
+                                summary: "User login",
+                                operationId: "loginUser",
+                                tags: ["authentication"],
+                                description: "Authenticate user with credentials and return token",
+                                responses: { "200": { description: "Success" } }
+                            }
+                        },
+                        "/auth/logout": {
+                            post: {
+                                summary: "User logout",
+                                operationId: "logoutUser",
+                                tags: ["authentication"],
+                                description: "Invalidate user session token",
+                                responses: { "200": { description: "Success" } }
+                            }
+                        },
+                        "/users/profile": {
+                            get: {
+                                summary: "Get profile",
+                                operationId: "getProfile",
+                                tags: ["users"],
+                                description: "Get current user profile",
+                                responses: { "200": { description: "Success" } }
+                            }
+                        }
+                    }
+                });
+
+                // Search by path component
+                const result1 = documentationSearch.extractRelevantSections("", "auth login", 5, 2000, openApiSpec);
+                expect(result1).toContain("[POST /auth/login]");
+                expect(result1).toContain("loginUser");
+                expect(result1).toContain("Authenticate user with credentials");
+
+                // Search by operationId
+                const result2 = documentationSearch.extractRelevantSections("", "logoutUser", 5, 2000, openApiSpec);
+                expect(result2).toContain("[POST /auth/logout]");
+                expect(result2).toContain("logoutUser");
+
+                // Search by tag
+                const result3 = documentationSearch.extractRelevantSections("", "authentication", 5, 2000, openApiSpec);
+                expect(result3).toContain("authentication");
+                expect(result3).toContain("login");
+            });
+
+            it('should limit number of returned operations based on maxSections', () => {
+                const openApiSpec = JSON.stringify({
+                    openapi: "3.0.0",
+                    info: { title: "Test API", version: "1.0.0" },
+                    paths: {
+                        "/users": {
+                            get: {
+                                summary: "List users",
+                                operationId: "listUsers",
+                                description: "Get all users in the system",
+                                responses: { "200": { description: "Success" } }
+                            },
+                            post: {
+                                summary: "Create user",
+                                operationId: "createUser",
+                                description: "Create a new user account",
+                                responses: { "201": { description: "Created" } }
+                            }
+                        },
+                        "/users/{id}": {
+                            get: {
+                                summary: "Get user",
+                                operationId: "getUser",
+                                description: "Retrieve user by ID",
+                                responses: { "200": { description: "Success" } }
+                            },
+                            put: {
+                                summary: "Update user",
+                                operationId: "updateUser",
+                                description: "Update user information",
+                                responses: { "200": { description: "Success" } }
+                            },
+                            delete: {
+                                summary: "Delete user",
+                                operationId: "deleteUser",
+                                description: "Remove user from system",
+                                responses: { "204": { description: "Deleted" } }
+                            }
+                        }
+                    }
+                });
+
+                // With maxSections=2, should only get top 2 matching operations
+                const result = documentationSearch.extractRelevantSections("", "users", 2, 2000, openApiSpec);
+                
+                expect(result).toContain("=== OPENAPI OPERATIONS ===");
+                
+                // Count operation delimiters to verify we got limited results
+                const operationCount = (result.match(/\[(?:GET|POST|PUT|DELETE) /g) || []).length;
+                expect(operationCount).toBeLessThanOrEqual(2);
+            });
+
+            it('should handle OpenAPI spec with parameters in operations', () => {
+                const openApiSpec = JSON.stringify({
+                    openapi: "3.0.0",
+                    info: { title: "Test API", version: "1.0.0" },
+                    paths: {
+                        "/search": {
+                            get: {
+                                summary: "Search items",
+                                operationId: "searchItems",
+                                description: "Search for items using query parameters",
+                                parameters: [
+                                    { name: "query", in: "query", required: true, schema: { type: "string" } },
+                                    { name: "limit", in: "query", schema: { type: "integer" } },
+                                    { name: "offset", in: "query", schema: { type: "integer" } }
+                                ],
+                                responses: { "200": { description: "Success" } }
+                            }
+                        }
+                    }
+                });
+
+                // Search should match parameter names
+                const result = documentationSearch.extractRelevantSections("", "query limit search", 5, 2000, openApiSpec);
+                
+                expect(result).toContain("[GET /search]");
+                expect(result).toContain("searchItems");
+                expect(result).toContain("query");
+                expect(result).toContain("limit");
+            });
+
+            it('should combine documentation sections with OpenAPI operations', () => {
+                const openApiSpec = JSON.stringify({
+                    openapi: "3.0.0",
+                    info: { title: "Test API", version: "1.0.0" },
+                    paths: {
+                        "/users": {
+                            get: {
+                                summary: "Get users",
+                                operationId: "getUsers",
+                                description: "List all users",
+                                responses: { "200": { description: "Success" } }
+                            }
+                        }
+                    }
+                });
+
+                const doc = "This documentation explains how to use the users endpoint. " + 
+                           "The users API allows you to manage user accounts. " +
+                           "You can list, create, update, and delete users.";
+                
+                const result = documentationSearch.extractRelevantSections(doc, "users", 5, 2000, openApiSpec);
+
+                // Should contain both documentation sections and OpenAPI operations
+                // Note: === DOCUMENTATION === header is only added when security info is present
+                expect(result).toContain("users endpoint");
+                expect(result).toContain("manage user accounts");
+                expect(result).toContain("=== OPENAPI OPERATIONS ===");
+                expect(result).toContain("[GET /users]");
+                expect(result).toContain("getUsers");
+            });
+
+            it('should add DOCUMENTATION header when security info is also present', () => {
+                const openApiSpec = JSON.stringify({
+                    openapi: "3.0.0",
+                    info: { title: "Test API", version: "1.0.0" },
+                    components: {
+                        securitySchemes: {
+                            bearerAuth: {
+                                type: "http",
+                                scheme: "bearer"
+                            }
+                        }
+                    },
+                    security: [{ bearerAuth: [] }],
+                    paths: {
+                        "/users": {
+                            get: {
+                                summary: "Get users",
+                                operationId: "getUsers",
+                                description: "List all users",
+                                responses: { "200": { description: "Success" } }
+                            }
+                        }
+                    }
+                });
+
+                const doc = "This documentation explains the API. Users endpoint allows managing accounts.";
+                
+                const result = documentationSearch.extractRelevantSections(doc, "users authentication", 5, 2000, openApiSpec);
+
+                // With security keywords, should have all three sections with headers
+                expect(result).toContain("=== SECURITY ===");
+                expect(result).toContain("bearerAuth");
+                expect(result).toContain("=== DOCUMENTATION ===");
+                expect(result).toContain("Users endpoint");
+                expect(result).toContain("=== OPENAPI OPERATIONS ===");
+                expect(result).toContain("[GET /users]");
+            });
+
+            it('should handle Google Discovery schema format', () => {
+                const googleDiscoverySpec = JSON.stringify({
+                    kind: "discovery#restDescription",
+                    name: "testapi",
+                    version: "v1",
+                    resources: {
+                        users: {
+                            methods: {
+                                list: {
+                                    id: "testapi.users.list",
+                                    path: "users",
+                                    httpMethod: "GET",
+                                    description: "Lists all users in the system",
+                                    parameters: {
+                                        maxResults: {
+                                            type: "integer",
+                                            location: "query"
+                                        }
+                                    }
+                                },
+                                insert: {
+                                    id: "testapi.users.insert",
+                                    path: "users",
+                                    httpMethod: "POST",
+                                    description: "Creates a new user"
+                                }
+                            }
+                        }
+                    }
+                });
+
+                const result = documentationSearch.extractRelevantSections("", "users list", 5, 2000, googleDiscoverySpec);
+
+                expect(result).toContain("=== OPENAPI OPERATIONS ===");
+                expect(result).toContain("testapi.users.list");
+                expect(result).toContain("Lists all users");
+                expect(result).toContain("GET");
+            });
+        });
     });
 
     describe('Sitemap and URL Ranking', () => {
@@ -661,6 +1033,77 @@ describe('Documentation Class', () => {
                 // Verify that URL filtering worked by checking the fetched URLs
                 // The implementation filters at collection time, so we should only see relevant URLs
                 expect(calledUrls.some(url => url.includes('intro') || url.includes('auth'))).toBe(true);
+            });
+
+            it('should deduplicate similar page content based on similarity threshold', async () => {
+                const sitemapXml = `<?xml version="1.0" encoding="UTF-8"?>
+          <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+            <url><loc>https://api.com/docs/page1</loc></url>
+            <url><loc>https://api.com/docs/page2</loc></url>
+            <url><loc>https://api.com/docs/page3</loc></url>
+            <url><loc>https://api.com/docs/page4</loc></url>
+          </urlset>`;
+
+                mockedAxios.get.mockImplementation((url: string) => {
+                    if (url.includes('sitemap.xml')) {
+                        return Promise.resolve({ data: sitemapXml });
+                    }
+                    return Promise.reject(new Error('404'));
+                });
+
+                // Mock page content with duplicates
+                const uniqueContent1 = 'Authentication API documentation with bearer token support and OAuth flows for secure access ' + 'x'.repeat(500);
+                const duplicateContent = 'Authentication API documentation with bearer token support and OAuth flows for secure access ' + 'x'.repeat(500);
+                const uniqueContent2 = 'Completely different content about webhooks and event subscriptions for real-time updates ' + 'y'.repeat(500);
+
+                let callCount = 0;
+                mockPage.evaluate.mockImplementation(() => {
+                    callCount++;
+                    if (callCount === 1) {
+                        return Promise.resolve({
+                            html: `<html><body>${uniqueContent1}</body></html>`,
+                            textContent: uniqueContent1,
+                            links: {}
+                        });
+                    } else if (callCount === 2) {
+                        return Promise.resolve({
+                            html: `<html><body>${duplicateContent}</body></html>`,
+                            textContent: duplicateContent,
+                            links: {}
+                        });
+                    } else if (callCount === 3) {
+                        return Promise.resolve({
+                            html: `<html><body>${uniqueContent2}</body></html>`,
+                            textContent: uniqueContent2,
+                            links: {}
+                        });
+                    } else {
+                        return Promise.resolve({
+                            html: `<html><body>${duplicateContent}</body></html>`,
+                            textContent: duplicateContent,
+                            links: {}
+                        });
+                    }
+                });
+
+                const doc = new DocumentationFetcher({
+                    documentationUrl: 'https://api.com/docs',
+                    keywords: ['api']
+                }, {}, metadata);
+
+                const result = await doc.fetchAndProcess();
+
+                // Should have fetched multiple pages
+                expect(mockPage.goto).toHaveBeenCalled();
+                expect(callCount).toBeGreaterThan(1);
+
+                // Result should contain unique content
+                expect(result).toContain('Authentication API documentation');
+                expect(result).toContain('webhooks and event subscriptions');
+
+                // Count occurrences of the duplicate content - should only appear once
+                const occurrences = (result.match(/Authentication API documentation with bearer token support/g) || []).length;
+                expect(occurrences).toBe(1);
             });
         });
     });
