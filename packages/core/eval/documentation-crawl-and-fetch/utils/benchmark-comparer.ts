@@ -39,10 +39,18 @@ export class BenchmarkComparer {
 
     // Only compare sites that exist in both
     const commonSites = Object.keys(current).filter(site => benchmark[site]);
+    const newSites = Object.keys(current).filter(site => !benchmark[site]);
     
     if (commonSites.length === 0) {
       logMessage('info', '⚠️  No common sites between current run and benchmark - skipping comparison', this.metadata);
+      if (newSites.length > 0) {
+        logMessage('info', `ℹ️  New sites not in benchmark: ${newSites.join(', ')}`, this.metadata);
+      }
       return;
+    }
+
+    if (newSites.length > 0) {
+      logMessage('info', `ℹ️  New sites not in benchmark (skipping): ${newSites.join(', ')}`, this.metadata);
     }
 
     logMessage('info', 'Fetch Performance vs Benchmark:', this.metadata);
@@ -87,10 +95,18 @@ export class BenchmarkComparer {
 
     // Only compare sites that exist in both
     const commonSites = Object.keys(current).filter(site => benchmark[site]);
+    const newSites = Object.keys(current).filter(site => !benchmark[site]);
     
     if (commonSites.length === 0) {
       logMessage('info', '⚠️  No common sites between current run and benchmark - skipping comparison', this.metadata);
+      if (newSites.length > 0) {
+        logMessage('info', `ℹ️  New sites not in benchmark: ${newSites.join(', ')}`, this.metadata);
+      }
       return;
+    }
+
+    if (newSites.length > 0) {
+      logMessage('info', `ℹ️  New sites not in benchmark (skipping): ${newSites.join(', ')}`, this.metadata);
     }
 
     logMessage('info', 'Eval Quality vs Benchmark:', this.metadata);

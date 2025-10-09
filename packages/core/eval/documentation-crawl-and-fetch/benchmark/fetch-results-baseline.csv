@@ -1,17 +1,23 @@
 Site,Pages (estimated),Doc Size (MB),Has OpenAPI,OpenAPI Size (KB),Doc Fetch (s/page),OpenAPI Fetch (s)
-"Stripe API",13,0.98,Yes,6966,3.55,0.29
-"Slack API",2,0.16,Yes,846,8.24,0.04
-"Gmail API",1,0.03,Yes,199,5.93,0.10
-"OpenAI API",9,0.62,Yes,2400,1.66,0.71
-"Zignsec API",23,1.70,Yes,4029,0.13,6.60
-"Sitecore Cloud Components API",1,0.00,Yes,214,1.77,4.33
-"OpenStorage API",6,0.41,Yes,375,0.46,0.09
-"Caspio REST API",1,0.00,Yes,201,3.35,7.24
-"ePayPolicy API",1,0.00,Yes,119,2.78,1.36
-"Twitter API",2,0.13,Yes,618,16.50,0.20
-"Trello API",6,0.41,Yes,457,3.20,0.40
-"Gemini API",6,0.45,No,0,13.74,0.94
-"Linear API",22,1.64,No,0,0.03,1.29
-"Claude API",2,0.14,No,0,6.80,0.51
-"PokeAPI API",3,0.22,No,0,2.38,0.07
-"AVERAGE",7,0.46,11/15,1493,2.58,1.94
+"Stripe API",13,0.98,Yes,6966,3.19,0.73
+"Slack API",2,0.16,Yes,846,8.70,0.17
+"Gmail API",1,0.03,Yes,199,5.67,0.10
+"OpenAI API",9,0.62,Yes,2400,1.51,1.32
+"Zignsec API",23,1.70,Yes,4029,0.17,7.12
+"Sitecore Cloud Components API",1,0.00,Yes,214,2.12,4.69
+"OpenStorage API",6,0.41,Yes,375,0.56,0.28
+"Caspio REST API",1,0.00,Yes,201,3.34,7.15
+"ePayPolicy API",1,0.00,Yes,119,3.20,0.78
+"Twitter API",2,0.13,Yes,618,16.57,0.20
+"Trello API",6,0.41,Yes,457,2.71,0.30
+"Gemini API",6,0.45,No,0,11.91,0.40
+"Linear API",22,1.64,No,0,0.05,1.06
+"Claude API",2,0.14,No,0,6.58,5.52
+"PokeAPI API",3,0.22,No,0,1.95,0.08
+"JIRA API",11,0.84,Yes,3410,2.05,0.56
+"Attio API",1,0.10,Yes,2076,37.93,0.33
+"PostHog API",3,0.26,No,0,12.81,8.07
+"GitHub API",10,0.71,Yes,11346,3.83,1.07
+"Snowflake API",1,0.04,No,0,14.09,0.69
+"Finwise API",1,0.09,No,0,2.43,0.29
+"AVERAGE",6,0.43,14/21,2375,3.11,1.77

@@ -239,6 +239,117 @@
         "How do I get a list of gen2 pokemons?",
         "How do find information about a specific berry?"
       ]
+    },
+    {
+      "id": "jira-api",
+      "name": "JIRA API",
+      "description": "JIRA API",
+      "documentationUrl": "https://developer.atlassian.com/cloud/jira/platform/rest/v3",
+      "urlHost": "https://{your-domain}.atlassian.net/rest/api",
+      "openApiUrl": "https://developer.atlassian.com/cloud/jira/platform/swagger-v3.json",
+      "keywords": ["issues", "projects", "boards", "sprints", "epics", "users", "workflows", "fields", "components", "versions", "priorities", "statuses", "comments", "attachments", "jql", "query", "search", "api key"],
+      "testQuestions": [
+        "Get all issues from the current active sprint, categorize them by status",
+        "Get all issues marked as Blocked or High Priority that are still in progress?"
+      ]
+    },
+    {
+      "id": "attio-api",
+      "name": "Attio API",
+      "description": "Attio API",
+      "documentationUrl": "https://docs.attio.com/rest-api/overview",
+      "urlHost": "https://api.attio.com/v2",
+      "openApiUrl": "https://api.attio.com/openapi/api",
+      "keywords": [
+        "people",
+        "objects",
+        "records",
+        "lists",
+        "entries",
+        "workspace_members",
+        "notes",
+        "tasks",
+        "threads",
+        "comments",
+        "sorts",
+        "api_slug",
+        "attribute_type",
+        "record_id",
+        "workspace_id",
+        "object_id"
+      ],
+      "testQuestions": [
+        "Get all people with a non-empty email address",
+        "Get all members of a workspace"
+      ]
+    },
+    {
+      "id": "posthog-api",
+      "name": "PostHog API",
+      "description": "PostHog API",
+      "documentationUrl": "https://posthog.com/docs/api",
+      "urlHost": "https://us.posthog.com/api",
+      "openApiUrl": "https://app.posthog.com/api/schema/",
+      "keywords": ["events", "users", "products", "dashboard", "properties", "cohorts", "funnels", "retention", "insights", "engage", "import", "export", "jql", "query", "segmentation", "track", "api key"],
+      "testQuestions": [
+        "Get the project IDs of all projects in my posthog account.",
+        "Get all events in the last 30 days for a project"
+      ]
+    },
+    {
+      "id": "github-api",
+      "name": "GitHub API",
+      "description": "GitHub API",
+      "documentationUrl": "https://docs.github.com/en/rest",
+      "urlHost": "https://api.github.com",
+      "openApiUrl": "https://raw.githubusercontent.com/github/rest-api-description/main/descriptions/api.github.com/api.github.com.json",
+      "keywords": [
+        "repositories",
+        "issues",
+        "pull_requests",
+        "commits",
+        "branches",
+        "tags",
+        "releases",
+        "deployments",
+        "check_runs",
+        "actions_artifacts",
+        "organizations",
+        "packages",
+        "collaborators",
+        "gists",
+        "milestones"
+      ],
+      "testQuestions": [
+        "List all repositories in my GitHub account.",
+        "Get all issues for a specific repository"
+      ]
+    },
+    {
+      "id": "snowflake-api",
+      "name": "Snowflake API",
+      "description": "Snowflake API",
+      "documentationUrl": "https://docs.snowflake.com/en/developer-guide/sql-api/index",
+      "urlHost": "https://account.snowflakecomputing.com",
+      "openApiUrl": "https://github.com/snowflakedb/snowflake-rest-api-specs",
+      "keywords": ["warehouses", "databases", "schemas", "tables", "views", "stages", "pipes", "tasks", "streams", "procedures", "functions", "roles", "users", "sql", "api key"],
+      "testQuestions": [
+        "List all warehouses in my Snowflake account.",
+        "Get all tables in the TESTING_SCHEMA in the snowflake SUPERGLUE_DATA database."
+      ]
+    },
+    {
+      "id": "finwise-api",
+      "name": "Finwise API",
+      "description": "Finwise API",
+      "documentationUrl": "https://finwiseapp.io/docs/api#introduction",
+      "urlHost": "https://api.finwiseapp.io",
+      "openApiUrl": "https://finwiseapp.io/docs/api#introduction",
+      "keywords": ["account", "transaction", "budgets", "goals", "balance"],
+      "testQuestions": [
+        "Can you create a new account for me?",
+        "What is my aggregated account balance?"
+      ]
     }
   ],
   "settings": {
@@ -246,6 +357,28 @@
     "maxDocumentationSize": 500000,
     "enablePlaywrightCrawling": true,
     "enableOpenApiFetching": true,
-    "enabledSites": ["stripe-api", "slack-api", "gmail-api", "openai-api", "zignsec-api", "sitecore-components-api", "openstorage-api", "caspio-api", "epaypolicy-api", "twitter-api", "trello-api", "gemini-api", "linear-api", "claude-api", "pokeapi-api"]
+    "enabledSites": [
+      "stripe-api",
+      "slack-api",
+      "gmail-api",
+      "openai-api",
+      "zignsec-api",
+      "sitecore-components-api",
+      "openstorage-api",
+      "caspio-api",
+      "epaypolicy-api",
+      "twitter-api",
+      "trello-api",
+      "gemini-api",
+      "linear-api",
+      "claude-api",
+      "pokeapi-api",
+      "jira-api",
+      "attio-api",
+      "posthog-api",
+      "github-api",
+      "snowflake-api",
+      "finwise-api"
+    ]
   }
 }
