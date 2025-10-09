@@ -617,28 +617,85 @@ export class PlaywrightFetchingStrategy implements DocumentationFetchingStrategy
     }
   }
 
-  public getDefaultKeywords(): string[] {
+  public getDefaultKeywords(): Array<{ keyword: string; weight: number }> {
     return [
-      "authentication", "authorization", "bearer", "token", "pagination", "api",
-      "getting started", "quickstart", "guides", "tutorial", "api-reference", "open api", "swagger",
-      "objects", "data-objects", "properties", "values", "fields", "attributes", "parameters", "slugs", "schema", "lists", "query", "rest", "endpoints", "reference", "methods",
-      "pagination", "response", "filtering", "sorting", "searching", "filter", "sort", "search",
-      "get", "post", "put", "delete", "patch",
+      // High priority: Getting started & overview content (weight: 5)
+      { keyword: "getting started", weight: 5 },
+      { keyword: "quickstart", weight: 5 },
+      { keyword: "overview", weight: 5 },
+      { keyword: "introduction", weight: 5 },
+      { keyword: "api", weight: 5 },
+      
+      // Core concepts: Authentication & API fundamentals (weight: 4)
+      { keyword: "authentication", weight: 4 },
+      { keyword: "authorization", weight: 4 },
+      { keyword: "rest", weight: 4 },
+      { keyword: "endpoints", weight: 4 },
+      
+      // Important concepts (weight: 3)
+      { keyword: "guides", weight: 3 },
+      { keyword: "tutorial", weight: 3 },
+      { keyword: "reference", weight: 3 },
+      { keyword: "api-reference", weight: 3 },
+      { keyword: "open api", weight: 3 },
+      { keyword: "swagger", weight: 3 },
+      { keyword: "bearer", weight: 3 },
+      { keyword: "token", weight: 3 },
+      { keyword: "pagination", weight: 3 },
+      { keyword: "schema", weight: 3 },
+      
+      // Moderate importance: Data concepts (weight: 2)
+      { keyword: "objects", weight: 2 },
+      { keyword: "data-objects", weight: 2 },
+      { keyword: "properties", weight: 2 },
+      { keyword: "values", weight: 2 },
+      { keyword: "fields", weight: 2 },
+      { keyword: "attributes", weight: 2 },
+      { keyword: "parameters", weight: 2 },
+      { keyword: "slugs", weight: 2 },
+      { keyword: "lists", weight: 2 },
+      { keyword: "query", weight: 2 },
+      { keyword: "methods", weight: 2 },
+      { keyword: "response", weight: 2 },
+      { keyword: "filtering", weight: 2 },
+      { keyword: "sorting", weight: 2 },
+      { keyword: "searching", weight: 2 },
+      { keyword: "filter", weight: 2 },
+      { keyword: "sort", weight: 2 },
+      { keyword: "search", weight: 2 },
+      
+      // Lower priority: Specific HTTP methods (weight: 1)
+      { keyword: "get", weight: 1 },
+      { keyword: "post", weight: 1 },
+      { keyword: "put", weight: 1 },
+      { keyword: "delete", weight: 1 },
+      { keyword: "patch", weight: 1 },
     ];
   }
 
-  public getMergedKeywords(inputKeywords?: string[] | null): string[] {
+  public getMergedKeywords(inputKeywords?: string[] | null): Array<{ keyword: string; weight: number }> {
     const defaultKeywords = this.getDefaultKeywords();
 
     if (!inputKeywords || inputKeywords.length === 0) {
       return defaultKeywords;
     }
 
-    const mergedSet = new Set([...inputKeywords, ...defaultKeywords]);
-    return Array.from(mergedSet);
+    // User-provided keywords get high weight (4)
+    const userKeywords = inputKeywords.map(keyword => ({ keyword, weight: 4 }));
+    
+    // Merge, preferring user-provided weights for duplicates
+    const keywordMap = new Map<string, number>();
+    for (const { keyword, weight } of [...userKeywords, ...defaultKeywords]) {
+      const key = keyword.toLowerCase();
+      if (!keywordMap.has(key)) {
+        keywordMap.set(key, weight);
+      }
+    }
+    
+    return Array.from(keywordMap.entries()).map(([keyword, weight]) => ({ keyword, weight }));
   }
 
-  public rankItems(items: string[] | { linkText: string, href: string }[], keywords: string[], fetchedLinks?: Set<string>): any[] {
+  public rankItems(items: string[] | { linkText: string, href: string }[], keywords: string[] | Array<{ keyword: string; weight: number }>, fetchedLinks?: Set<string>): any[] {
     const normalizedItems = items.map((item, index) => {
       const isString = typeof item === 'string';
       const url = isString ? new URL(item).pathname : new URL(item.href).pathname;
@@ -680,23 +737,34 @@ export class PlaywrightFetchingStrategy implements DocumentationFetchingStrategy
       return itemsToRank.map(item => item.original);
     }
 
+    // Normalize keywords to weighted format
+    const weightedKeywords: Array<{ keyword: string; weight: number }> = 
+      typeof keywords[0] === 'string'
+        ? (keywords as string[]).map(k => ({ keyword: k, weight: 1 }))
+        : keywords as Array<{ keyword: string; weight: number }>;
+
     const scored = itemsToRank.map(item => {
       let matchScore = 0;
       const content = item.searchableContent;
 
-      for (const keyword of keywords) {
+      for (const { keyword, weight } of weightedKeywords) {
         const keywordLower = keyword.toLowerCase();
         const wordBoundaryRegex = new RegExp(`\\b${keywordLower}\\b`, 'g');
         const exactMatches = (content.match(wordBoundaryRegex) || []).length;
-        matchScore += exactMatches * 3;
+        
+        // Weighted scoring: exact matches get 3x base, partial matches get 1x base
+        matchScore += exactMatches * 3 * weight;
 
         if (exactMatches === 0 && content.includes(keywordLower)) {
-          matchScore += 1;
+          matchScore += 1 * weight;
         }
       }
 
-      const urlLength = Math.max(item.url.length, 1);
-      const score = matchScore / urlLength;
+      // Smarter length penalty: use log scale with a cap to prevent over-penalizing long URLs
+      const MIN_LENGTH = 10;
+      const urlLength = Math.max(item.url.length, MIN_LENGTH);
+      const lengthPenalty = Math.log10(urlLength);
+      const score = matchScore / lengthPenalty;
 
       return {
         item: item.original,

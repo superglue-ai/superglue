@@ -3,6 +3,7 @@ import path from 'path';
 import { DocumentationEvalFetcher } from './utils/doc-eval-fetcher.js';
 import { DocumentationEvaluator } from './utils/doc-eval-retrieval-evaulator.js';
 import { DocumentationEvaluationConfigLoader } from './utils/doc-eval-config-loader.js';
+import { BenchmarkComparer } from './utils/benchmark-comparer.js';
 import { createDataStore } from '../../datastore/datastore.js';
 import { logMessage } from '../../utils/logs.js';
 
@@ -23,14 +24,21 @@ async function main() {
   try {
     logMessage('info', '🚀 Starting Documentation Evaluation Pipeline', metadata);
     
-    const config = await configLoader.loadConfig();
-    const sitesToUse = configLoader.getEnabledSites(config);
+    const evalConfig = await configLoader.loadConfig();
+    const sitesToUse = configLoader.getEnabledSites(evalConfig);
     
     const datastore = createDataStore({ type: 'postgres' });
     
+    const isCompiledDist = import.meta.url.includes('/dist/');
+    const scriptDir = path.dirname(new URL(import.meta.url).pathname);
+    const benchmarkDir = isCompiledDist 
+      ? path.join(scriptDir, '../../../eval/documentation-crawl-and-fetch/benchmark')
+      : path.join(scriptDir, 'benchmark');
+    const comparer = new BenchmarkComparer(benchmarkDir);
+    
     logMessage('info', '\n📥 Phase 1: Documentation Fetching', metadata);
     const fetcher = new DocumentationEvalFetcher(datastore, ORG_ID);
-    await fetcher.fetchAllDocumentation(sitesToUse);
+    const { csvPath: fetchCsvPath } = await fetcher.fetchAllDocumentation(sitesToUse);
     
     logMessage('info', '\n📝 Phase 2: Documentation Evaluation', metadata);
     const evaluator = new DocumentationEvaluator(datastore, ORG_ID);
@@ -39,6 +47,10 @@ async function main() {
     await fetcher.cleanup();
     
     logMessage('info', '\n🎉 Pipeline completed successfully', metadata);
+    
+    // Compare against benchmark
+    comparer.compareFetchResults(fetchCsvPath);
+    comparer.compareEvalResults(evaluator.getCsvPath());
     
   } catch (error) {
     logMessage('error', `❌ Pipeline failed: ${error}`, metadata);

@@ -46,12 +46,24 @@ export class DocumentationEvaluator {
   private metadata = { orgId: 'documentation-eval', userId: 'system' };
   private csvLogPath: string;
 
+  getCsvPath(): string {
+    return this.csvLogPath;
+  }
+
   constructor(private datastore: DataStore, private orgId: string) {
     this.metadata = { orgId, userId: 'system' };
     
-    // Create CSV log file with timestamp
+    // Create CSV log file with timestamp in results folder
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    this.csvLogPath = path.join(process.cwd(), `evaluation-debug-${timestamp}.csv`);
+    const isCompiledDist = import.meta.url.includes('/dist/');
+    const scriptDir = path.dirname(new URL(import.meta.url).pathname);
+    const resultsDir = isCompiledDist 
+      ? path.join(scriptDir, '../../../../eval/documentation-crawl-and-fetch/results')
+      : path.join(scriptDir, '../results');
+    if (!fs.existsSync(resultsDir)) {
+      fs.mkdirSync(resultsDir, { recursive: true });
+    }
+    this.csvLogPath = path.join(resultsDir, `evaluation-debug-${timestamp}.csv`);
     
     // Initialize CSV with headers
     this.initializeCsvLog();

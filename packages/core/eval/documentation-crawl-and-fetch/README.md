@@ -39,6 +39,8 @@ Edit `config/doc-eval-config.json` to add/remove sites and test questions:
 
 ## Output
 
+Results are saved to the `results/` folder (gitignored) and compared against benchmarks in the `benchmark/` folder.
+
 ### Phase 1: Fetch Results Table
 
 After fetching, a detailed table shows per-site metrics:
@@ -55,7 +57,7 @@ AVERAGE                       16   1.16 MB       2/2    5109 KB      1.55      0
 ═══════════════════════════════════════════════════════════════════════════════════
 * Page count estimated based on documentation size (~75KB/page average)
 
-💾 Results saved to: fetch-results-2025-10-08T12-34-56-789Z.csv
+💾 Results saved to: results/fetch-results-2025-10-08T12-34-56-789Z.csv
 ```
 
 **Fetch CSV Columns:**
@@ -74,7 +76,7 @@ AVERAGE                       16   1.16 MB       2/2    5109 KB      1.55      0
 📝 Stripe API: 5/5 questions (100.0%) - Avg Retrieval: 76.0%
 📊 Evaluation Summary: 5/5 questions answered (100.0%)
 🎯 API Doc Scores - Retrieval: 76.0%, Endpoint: 82.0%, Completeness: 68.0%
-📄 Detailed evaluation results saved to: evaluation-debug-2025-10-08T12-34-56-789Z.csv
+📄 Detailed evaluation results saved to: results/evaluation-debug-2025-10-08T12-34-56-789Z.csv
 ```
 
 **Evaluation CSV Columns:**
@@ -83,3 +85,35 @@ AVERAGE                       16   1.16 MB       2/2    5109 KB      1.55      0
 - `searchResultsSizeKB`: Retrieved content size
 - `retrievalScore`, `endpointScore`, `completenessScore`: Quality metrics (0-100)
 - `reasoning`: AI explanation of scores
+
+### Phase 3: Benchmark Comparison
+
+After completing evaluation, results are automatically compared against baseline benchmarks:
+
+```
+Fetch Performance vs Benchmark:
+═════════════════════════════════════════════════════════════════
+⚡ Stripe API: Speed -15.3%
+📈 OpenAI API: Doc size +12.4%
+═════════════════════════════════════════════════════════════════
+
+Eval Quality vs Benchmark:
+═════════════════════════════════════════════════════════════════
+📈 Stripe API: Retrieval +18, Endpoint +12
+📉 Claude API: Completeness -15
+═════════════════════════════════════════════════════════════════
+```
+
+Only significant changes (>10% or >10 points) are reported. If no changes are significant, you'll see "✅ No significant changes from benchmark".
+
+## Benchmark Management
+
+Baseline files are stored in `benchmark/`:
+- `fetch-results-baseline.csv` - Fetch performance baseline
+- `evaluation-debug-baseline.csv` - Eval quality baseline
+
+To update benchmarks after improvements:
+```bash
+cp results/fetch-results-<timestamp>.csv benchmark/fetch-results-baseline.csv
+cp results/evaluation-debug-<timestamp>.csv benchmark/evaluation-debug-baseline.csv
+```

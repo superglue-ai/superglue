@@ -50,7 +50,7 @@ export class DocumentationEvalFetcher {
   /**
    * Fetch documentation for all sites and store in database
    */
-  async fetchAllDocumentation(sites: DocumentationSite[]): Promise<FetchSummary> {
+  async fetchAllDocumentation(sites: DocumentationSite[]): Promise<{ summary: FetchSummary; csvPath: string }> {
     const startTime = Date.now();
     const results: FetchResult[] = [];
 
@@ -70,9 +70,9 @@ export class DocumentationEvalFetcher {
     }
 
     const summary = this.generateSummary(results, Date.now() - startTime);
-    this.logSummary(summary);
+    const csvPath = this.logSummary(summary);
 
-    return summary;
+    return { summary, csvPath };
   }
 
   /**
@@ -185,9 +185,17 @@ export class DocumentationEvalFetcher {
   /**
    * Log fetch summary with table and save to CSV
    */
-  private logSummary(summary: FetchSummary): void {
+  private logSummary(summary: FetchSummary): string {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const csvPath = path.join(process.cwd(), `fetch-results-${timestamp}.csv`);
+    const isCompiledDist = import.meta.url.includes('/dist/');
+    const scriptDir = path.dirname(new URL(import.meta.url).pathname);
+    const resultsDir = isCompiledDist 
+      ? path.join(scriptDir, '../../../../eval/documentation-crawl-and-fetch/results')
+      : path.join(scriptDir, '../results');
+    if (!fs.existsSync(resultsDir)) {
+      fs.mkdirSync(resultsDir, { recursive: true });
+    }
+    const csvPath = path.join(resultsDir, `fetch-results-${timestamp}.csv`);
 
     logMessage('info', '\n📊 Fetch Results Table:', this.metadata);
     logMessage('info', '═══════════════════════════════════════════════════════════════════════════════════', this.metadata);
@@ -254,6 +262,8 @@ export class DocumentationEvalFetcher {
     const totalTimeSec = (summary.totalTime / 1000).toFixed(1);
     logMessage('info', `✅ Success rate: ${summary.successfulFetches}/${summary.totalSites} sites (${successRate}%)`, this.metadata);
     logMessage('info', `⏱️  Total time: ${totalTimeSec}s\n`, this.metadata);
+    
+    return csvPath;
   }
 
   /**

@@ -17,7 +17,6 @@
         "charges",
         "payment_intents",
         "products",
-        "prices",
         "subscriptions",
         "invoices",
         "balance_transactions",
