@@ -29,12 +29,8 @@ export class AbortError extends Error {
     this.name = 'AbortError';
   }
 }
+type StatusHandlerResult = { shouldFail: boolean; message?: string };
 
-/**
- * Checks if response data appears to be an HTML error page
- * @param data - Response data (Buffer, string, or other)
- * @returns Object with isHTML flag and a preview string if HTML was detected
- */
 function detectHtmlErrorResponse(data: any): { isHtml: boolean; preview?: string } {
   const MAX_HTML_CHECK_BYTES = 1024; // Only check first 1KB for efficiency
   let dataPrefix = '';
@@ -51,11 +47,137 @@ function detectHtmlErrorResponse(data: any): { isHtml: boolean; preview?: string
 
   const trimmedLower = dataPrefix.slice(0, 100).trim().toLowerCase();
   const isHtml = trimmedLower.startsWith('<!doctype html') || trimmedLower.startsWith('<html');
-  
+
   return {
     isHtml,
     preview: dataPrefix
   };
+}
+
+function normalizeToJson(input: any): any {
+  if (!input) return input;
+  if (input instanceof Buffer) {
+    const s = input.toString('utf-8');
+    try { return JSON.parse(s); } catch { return s; }
+  }
+  if (typeof input === 'string') {
+    try { return JSON.parse(input); } catch { return input; }
+  }
+  return input;
+}
+
+export function checkResponseForErrors(
+  rawData: any,
+  status: number,
+  ctx: { axiosConfig: AxiosRequestConfig; method: string; url: string; credentials: Record<string, any>; payload: Record<string, any>; }
+): void {
+  const ERROR_KEYWORDS = ['error', 'errors', 'error_message', 'errormessage', 'errorDescription', 'error_description', 'failure'];
+  const NEGATIVE_STATUS_VALUES = ['error', 'failed', 'fail', 'denied', 'forbidden'];
+  const data = normalizeToJson(rawData);
+  let reasons: string[] = [];
+
+  const addReason = (r: string) => { if (r && !reasons.includes(r)) reasons.push(r); };
+
+  if (data && typeof data === 'object' && !Array.isArray(data)) {
+    const keys = Object.keys(data).map(k => k.toLowerCase());
+    for (const k of keys) {
+      for (const kw of ERROR_KEYWORDS) {
+        if (k.includes(kw)) {
+          const v: any = (data as any)[k as keyof typeof data];
+          if (v !== undefined && v !== null && String(v).length > 0) addReason(`key '${k}' present with value '${String(v).slice(0, 120)}'`);
+        }
+      }
+    }
+    if (data.success === false) addReason("success=false");
+    if (typeof (data as any).status === 'string' && NEGATIVE_STATUS_VALUES.includes(String((data as any).status).toLowerCase())) addReason(`status='${String((data as any).status)}'`);
+    if (typeof (data as any).code === 'number' && (data as any).code >= 400 && (data as any).code <= 599) addReason(`code=${(data as any).code}`);
+    if (Array.isArray((data as any).errors) && (data as any).errors.length > 0) addReason(`errors array length=${(data as any).errors.length}`);
+    if (typeof (data as any).message === 'string') {
+      const m = String((data as any).message).toLowerCase();
+      if (ERROR_KEYWORDS.some(kw => m.includes(kw))) addReason(`message='${String((data as any).message).slice(0, 120)}'`);
+    }
+    if (typeof (data as any).detail === 'string') {
+      const d = String((data as any).detail).toLowerCase();
+      if (ERROR_KEYWORDS.some(kw => d.includes(kw))) addReason(`detail='${String((data as any).detail).slice(0, 120)}'`);
+    }
+  } else if (Array.isArray(data) && data.length > 0) {
+    const first = data[0];
+    if (first && typeof first === 'object') {
+      const keys = Object.keys(first).map(k => k.toLowerCase());
+      if (keys.some(k => ERROR_KEYWORDS.some(kw => k.includes(kw)))) addReason('array elements contain error-like keys');
+    } else if (typeof first === 'string') {
+      const s = String(first).toLowerCase();
+      if (ERROR_KEYWORDS.some(kw => s.includes(kw))) addReason('array elements contain error-like strings');
+    }
+  } else if (typeof data === 'string') {
+    const s = data.toLowerCase();
+    if (ERROR_KEYWORDS.some(kw => s.includes(kw))) addReason('response string contains error-like phrases');
+  }
+
+  if (reasons.length > 0) {
+    const maskedConfig = maskCredentials(JSON.stringify(ctx.axiosConfig));
+    const previewSource = typeof data === 'string' ? data : JSON.stringify(data);
+    const preview = String(previewSource).slice(0, 1000);
+    const message = `${ctx.method} ${ctx.url} returned ${status} but appears to be an error. Indicators: ${reasons.join('; ')}\nResponse preview: ${preview}\nconfig: ${maskedConfig}`;
+    throw new ApiCallError(message, status);
+  }
+}
+
+function handle2xxStatus(
+  response: AxiosResponse,
+  axiosConfig: AxiosRequestConfig,
+  method: string,
+  url: string,
+  credentials: Record<string, any>,
+  payload: Record<string, any>
+): StatusHandlerResult {
+  try {
+    checkResponseForErrors(response?.data, response?.status, { axiosConfig, method, url, credentials, payload });
+  } catch (e) {
+    const message = e?.message || String(e);
+    return { shouldFail: true, message };
+  }
+
+  const htmlCheck = detectHtmlErrorResponse(response?.data);
+  if (htmlCheck.isHtml) {
+    const maskedUrl = maskCredentials(url, { ...credentials, ...payload });
+    const msg = `Received HTML response instead of expected JSON data from ${maskedUrl}. \n        This usually indicates an error page or invalid endpoint.\nResponse: ${htmlCheck.preview}`;
+    return { shouldFail: true, message: msg };
+  }
+  return { shouldFail: false };
+}
+
+function handle429Status(
+  response: AxiosResponse,
+  axiosConfig: AxiosRequestConfig,
+  method: string,
+  url: string
+): StatusHandlerResult {
+  const errorData = response?.data instanceof Buffer ? response.data.toString('utf-8') : response?.data;
+  const error = JSON.stringify((errorData as any)?.error || (errorData as any)?.errors || errorData || response?.statusText || "undefined");
+  const maskedConfig = maskCredentials(JSON.stringify(axiosConfig));
+  let message = `${method} ${url} failed with status ${response.status}.\nResponse: ${String(error).slice(0, 1000)}\nconfig: ${maskedConfig}`;
+
+  const retryAfter = response.headers['retry-after']
+    ? `Retry-After: ${response.headers['retry-after']}`
+    : 'No Retry-After header provided';
+  message = `Rate limit exceeded. ${retryAfter}. Maximum wait time of 60s exceeded. \n        \n        ${message}`;
+  const full = `API call failed with status ${response.status}. Response: ${message}`;
+  return { shouldFail: true, message: full };
+}
+
+function handleOtherStatus(
+  response: AxiosResponse,
+  axiosConfig: AxiosRequestConfig,
+  method: string,
+  url: string
+): StatusHandlerResult {
+  const errorData = response?.data instanceof Buffer ? response.data.toString('utf-8') : response?.data;
+  const error = JSON.stringify((errorData as any)?.error || (errorData as any)?.errors || errorData || response?.statusText || "undefined");
+  const maskedConfig = maskCredentials(JSON.stringify(axiosConfig));
+  let message = `${method} ${url} failed with status ${response.status}.\nResponse: ${String(error).slice(0, 1000)}\nconfig: ${maskedConfig}`;
+  const full = `API call failed with status ${response.status}. Response: ${message}`;
+  return { shouldFail: true, message: full };
 }
 
 export function convertBasicAuthToBase64(headerValue: string) {
@@ -101,7 +223,6 @@ export async function callEndpoint({ endpoint, payload, credentials, options }: 
 
     const requestVars = { ...paginationVars, ...allVariables };
 
-    // check if the pagination type is configured correctly
     if (endpoint.pagination?.type === PaginationType.PAGE_BASED) {
       const request = JSON.stringify(endpoint);
       if (!request.includes('page')) {
@@ -176,7 +297,6 @@ export async function callEndpoint({ endpoint, payload, credentials, options }: 
 
     const processedUrl = composeUrl(processedUrlHost, processedUrlPath);
 
-
     const axiosConfig: AxiosRequestConfig = {
       method: endpoint.method,
       url: processedUrl,
@@ -188,37 +308,17 @@ export async function callEndpoint({ endpoint, payload, credentials, options }: 
 
     lastResponse = await callAxios(axiosConfig, options);
 
-    if (![200, 201, 202, 203, 204, 205].includes(lastResponse?.status) ||
-      lastResponse.data?.error ||
-      (Array.isArray(lastResponse?.data?.errors) && lastResponse?.data?.errors.length > 0)
-    ) {
-      // Handle Buffer data in error responses
-      const errorData = lastResponse?.data instanceof Buffer ? 
-        lastResponse.data.toString('utf-8') : lastResponse?.data;
-      const error = JSON.stringify(errorData?.error || errorData?.errors || errorData || lastResponse?.statusText || "undefined");
-      const maskedConfig = maskCredentials(JSON.stringify(axiosConfig));
-      let message = `${endpoint.method} ${processedUrl} failed with status ${lastResponse.status}.
-Response: ${String(error).slice(0, 1000)}
-config: ${maskedConfig}`;
 
-      if (lastResponse.status === 429) {
-        const retryAfter = lastResponse.headers['retry-after']
-          ? `Retry-After: ${lastResponse.headers['retry-after']}`
-          : 'No Retry-After header provided';
-        message = `Rate limit exceeded. ${retryAfter}. Maximum wait time of 60s exceeded. 
-        
-        ${message}`;
-      }
-
-      throw new ApiCallError(`API call failed with status ${lastResponse.status}. Response: ${message}`, lastResponse.status);
-    }
-
-    // Check for HTML error pages
-    const htmlCheck = detectHtmlErrorResponse(lastResponse.data);
-    if (htmlCheck.isHtml) {
-      const maskedUrl = maskCredentials(processedUrl, { ...credentials, ...payload });
-      throw new ApiCallError(`Received HTML response instead of expected JSON data from ${maskedUrl}. 
-        This usually indicates an error page or invalid endpoint.\nResponse: ${htmlCheck.preview}`, lastResponse.status);
+    const status = lastResponse?.status;
+    if ([200, 201, 202, 203, 204, 205].includes(status)) {
+      const res = handle2xxStatus(lastResponse, axiosConfig, endpoint.method, processedUrl, credentials, payload);
+      if (res.shouldFail) throw new ApiCallError(res.message, status);
+    } else if (status === 429) {
+      const res = handle429Status(lastResponse, axiosConfig, endpoint.method, processedUrl);
+      if (res.shouldFail) throw new ApiCallError(res.message, status);
+    } else {
+      const res = handleOtherStatus(lastResponse, axiosConfig, endpoint.method, processedUrl);
+      if (res.shouldFail) throw new ApiCallError(res.message, status);
     }
 
     let dataPathSuccess = true;
