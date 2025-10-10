@@ -285,18 +285,17 @@ export async function callEndpoint({ endpoint, payload, credentials, options }: 
 
     lastResponse = await callAxios(axiosConfig, options);
 
-
     const status = lastResponse?.status;
+    let statusHandlerResult = null;
+    
     if ([200, 201, 202, 203, 204, 205].includes(status)) {
-      const res = handle2xxStatus(lastResponse, axiosConfig, endpoint.method, processedUrl, credentials, payload);
-      if (res.shouldFail) throw new ApiCallError(res.message, status);
+      statusHandlerResult = handle2xxStatus(lastResponse, axiosConfig, endpoint.method, processedUrl, credentials, payload);
     } else if (status === 429) {
-      const res = handle429Status(lastResponse, axiosConfig, endpoint.method, processedUrl);
-      if (res.shouldFail) throw new ApiCallError(res.message, status);
+      statusHandlerResult = handle429Status(lastResponse, axiosConfig, endpoint.method, processedUrl);
     } else {
-      const res = handleOtherStatus(lastResponse, axiosConfig, endpoint.method, processedUrl);
-      if (res.shouldFail) throw new ApiCallError(res.message, status);
+      statusHandlerResult = handleOtherStatus(lastResponse, axiosConfig, endpoint.method, processedUrl);
     }
+    if (statusHandlerResult.shouldFail) throw new ApiCallError(statusHandlerResult.message, status);
 
     let dataPathSuccess = true;
 
