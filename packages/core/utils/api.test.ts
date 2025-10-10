@@ -368,11 +368,11 @@ describe('API Utilities', () => {
         .rejects.toThrow(/appears to be an error/i);
     });
 
-    it('should flag 2xx responses with top-level failed key', async () => {
+    it('should flag 2xx responses with top-level failure key', async () => {
       const mockResponse = {
         status: 200,
         data: {
-          failed: true,
+          failure: true,
           result: null
         },
         statusText: 'OK',
@@ -385,7 +385,24 @@ describe('API Utilities', () => {
         .rejects.toThrow(/appears to be an error/i);
     });
 
-    it('should flag 2xx responses if any nested errors key exists (even empty)', async () => {
+    it('should flag 2xx responses if any nested errors key exists (non-empty)', async () => {
+      const mockResponse = {
+        status: 200,
+        data: {
+          data: { id: 1 },
+          meta: { errors: [{ message: 'boom' }] }
+        },
+        statusText: 'OK',
+        headers: {},
+        config: {} as any
+      };
+      mockedTools.callAxios.mockResolvedValueOnce(mockResponse);
+
+      await expect(callEndpoint({ endpoint: testEndpoint, payload: {}, credentials: {}, options: {} }))
+        .rejects.toThrow(/appears to be an error/i);
+    });
+
+    it('should NOT flag 2xx responses when nested errors key is an empty array', async () => {
       const mockResponse = {
         status: 200,
         data: {
@@ -398,8 +415,9 @@ describe('API Utilities', () => {
       };
       mockedTools.callAxios.mockResolvedValueOnce(mockResponse);
 
-      await expect(callEndpoint({ endpoint: testEndpoint, payload: {}, credentials: {}, options: {} }))
-        .rejects.toThrow(/appears to be an error/i);
+      const result = await callEndpoint({ endpoint: testEndpoint, payload: {}, credentials: {}, options: {} });
+      expect(result.statusCode).toBe(200);
+      expect(result.data).toEqual(mockResponse.data);
     });
   });
 
