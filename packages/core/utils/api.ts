@@ -71,55 +71,38 @@ export function checkResponseForErrors(
   status: number,
   ctx: { axiosConfig: AxiosRequestConfig; method: string; url: string; credentials: Record<string, any>; payload: Record<string, any>; }
 ): void {
-  const ERROR_KEYWORDS = ['error', 'errors', 'error_message', 'errormessage', 'errorDescription', 'error_description', 'failure'];
-  const NEGATIVE_STATUS_VALUES = ['error', 'failed', 'fail', 'denied', 'forbidden'];
   const data = normalizeToJson(rawData);
-  let reasons: string[] = [];
-
-  const addReason = (r: string) => { if (r && !reasons.includes(r)) reasons.push(r); };
 
   if (data && typeof data === 'object' && !Array.isArray(data)) {
-    const keys = Object.keys(data).map(k => k.toLowerCase());
-    for (const k of keys) {
-      for (const kw of ERROR_KEYWORDS) {
-        if (k.includes(kw)) {
-          const v: any = (data as any)[k as keyof typeof data];
-          if (v !== undefined && v !== null && String(v).length > 0) addReason(`key '${k}' present with value '${String(v).slice(0, 120)}'`);
-        }
+    const d: any = data;
+    const throwDetected = (reason: string) => {
+      const maskedConfig = maskCredentials(JSON.stringify(ctx.axiosConfig));
+      const previewSource = JSON.stringify(data);
+      const preview = String(previewSource).slice(0, 1000);
+      const message = `${ctx.method} ${ctx.url} returned ${status} but appears to be an error. Reason: ${reason}\nResponse preview: ${preview}\nconfig: ${maskedConfig}`;
+      throw new ApiCallError(message, status);
+    };
+
+    if (typeof d.code === 'number' && d.code >= 400 && d.code <= 599) {
+      throwDetected(`code=${d.code}`);
+    }
+    if (typeof d.status === 'number' && d.status >= 400 && d.status <= 599) {
+      throwDetected(`status=${d.status}`);
+    }
+
+    const keyPattern = /(?:^|[^a-zA-Z0-9])(errormessage|error_message|error|errors|failure_reason|failure|failed)(?:[^a-zA-Z0-9]|$)/i;
+    for (const key of Object.keys(d)) {
+      if (!keyPattern.test(key)) continue;
+      const v = d[key];
+      const isTruthyValue = v === true ||
+        (typeof v === 'string' && v.trim() !== '') ||
+        (typeof v === 'number' && v !== 0) ||
+        (Array.isArray(v) && v.length > 0) ||
+        (v && typeof v === 'object' && Object.keys(v).length > 0);
+      if (isTruthyValue) {
+        throwDetected(`${key}='${String(v).slice(0, 120)}'`);
       }
     }
-    if (data.success === false) addReason("success=false");
-    if (typeof (data as any).status === 'string' && NEGATIVE_STATUS_VALUES.includes(String((data as any).status).toLowerCase())) addReason(`status='${String((data as any).status)}'`);
-    if (typeof (data as any).code === 'number' && (data as any).code >= 400 && (data as any).code <= 599) addReason(`code=${(data as any).code}`);
-    if (Array.isArray((data as any).errors) && (data as any).errors.length > 0) addReason(`errors array length=${(data as any).errors.length}`);
-    if (typeof (data as any).message === 'string') {
-      const m = String((data as any).message).toLowerCase();
-      if (ERROR_KEYWORDS.some(kw => m.includes(kw))) addReason(`message='${String((data as any).message).slice(0, 120)}'`);
-    }
-    if (typeof (data as any).detail === 'string') {
-      const d = String((data as any).detail).toLowerCase();
-      if (ERROR_KEYWORDS.some(kw => d.includes(kw))) addReason(`detail='${String((data as any).detail).slice(0, 120)}'`);
-    }
-  } else if (Array.isArray(data) && data.length > 0) {
-    const first = data[0];
-    if (first && typeof first === 'object') {
-      const keys = Object.keys(first).map(k => k.toLowerCase());
-      if (keys.some(k => ERROR_KEYWORDS.some(kw => k.includes(kw)))) addReason('array elements contain error-like keys');
-    } else if (typeof first === 'string') {
-      const s = String(first).toLowerCase();
-      if (ERROR_KEYWORDS.some(kw => s.includes(kw))) addReason('array elements contain error-like strings');
-    }
-  } else if (typeof data === 'string') {
-    const s = data.toLowerCase();
-    if (ERROR_KEYWORDS.some(kw => s.includes(kw))) addReason('response string contains error-like phrases');
-  }
-
-  if (reasons.length > 0) {
-    const maskedConfig = maskCredentials(JSON.stringify(ctx.axiosConfig));
-    const previewSource = typeof data === 'string' ? data : JSON.stringify(data);
-    const preview = String(previewSource).slice(0, 1000);
-    const message = `${ctx.method} ${ctx.url} returned ${status} but appears to be an error. Indicators: ${reasons.join('; ')}\nResponse preview: ${preview}\nconfig: ${maskedConfig}`;
-    throw new ApiCallError(message, status);
   }
 }
 
