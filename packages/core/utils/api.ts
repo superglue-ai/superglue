@@ -287,7 +287,7 @@ export async function callEndpoint({ endpoint, payload, credentials, options }: 
 
     const status = lastResponse?.status;
     let statusHandlerResult = null;
-    
+
     if ([200, 201, 202, 203, 204, 205].includes(status)) {
       statusHandlerResult = handle2xxStatus(lastResponse, axiosConfig, endpoint.method, processedUrl, credentials, payload);
     } else if (status === 429) {
@@ -295,10 +295,12 @@ export async function callEndpoint({ endpoint, payload, credentials, options }: 
     } else {
       statusHandlerResult = handleOtherStatus(lastResponse, axiosConfig, endpoint.method, processedUrl);
     }
-    if (statusHandlerResult.shouldFail) throw new ApiCallError(statusHandlerResult.message, status);
+    
+    if (statusHandlerResult.shouldFail) {
+      throw new ApiCallError(statusHandlerResult.message, status);
+    }
 
     let dataPathSuccess = true;
-
     // TODO: we need to remove the data path and just join the data with the next page of data, otherwise we will have to do a lot of gymnastics to get the data path right
     let responseData = lastResponse.data;
 
