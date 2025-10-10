@@ -91,7 +91,7 @@ export function checkResponseForErrors(
     }
 
     const errorKeys = new Set(['error', 'errors', 'error_message', 'errormessage', 'failure_reason', 'failure']);
-    const maxDepth = 2; 
+    const maxDepth = 2;
 
     const traverse = (obj: any, depth: number) => {
       if (!obj || typeof obj !== 'object') return;
@@ -103,9 +103,9 @@ export function checkResponseForErrors(
             ? v.length > 0
             : (typeof v === 'string')
               ? v.trim() !== ''
-              : (typeof v === 'number')
-                ? v !== 0
-                : v === true || (v && typeof v === 'object' && Object.keys(v).length > 0);
+              : (typeof v === 'boolean')
+                ? v === true
+                : (v && typeof v === 'object' && Object.keys(v).length > 0);
           if (isNonEmpty) {
             throwDetected(`${key} key detected at depth ${depth}`);
           }
