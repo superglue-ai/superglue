@@ -90,13 +90,34 @@ export function checkResponseForErrors(
       throwDetected(`status=${d.status}`);
     }
 
-    // Matches error-like key names anywhere in the JSON hierarchy (case-insensitive), e.g. "error":, "error_message":, "errormessage":, "failure_reason":, "failed":, "errors":
-    const keyPattern = /"(errormessage|error_message|error|errors|failure_reason|failure|failed)"\s*:/i;
-    const jsonSource = typeof data === 'string' ? data : JSON.stringify(data);
-    const match = jsonSource.match(keyPattern);
-    if (match) {
-      throwDetected(`${match[1]} key detected`);
-    }
+    const errorKeys = new Set(['error', 'errors', 'error_message', 'errormessage', 'failure_reason', 'failure']);
+    const maxDepth = 2; 
+
+    const traverse = (obj: any, depth: number) => {
+      if (!obj || typeof obj !== 'object') return;
+      for (const key of Object.keys(obj)) {
+        const lower = key.toLowerCase();
+        if (errorKeys.has(lower)) {
+          const v = obj[key];
+          const isNonEmpty = Array.isArray(v)
+            ? v.length > 0
+            : (typeof v === 'string')
+              ? v.trim() !== ''
+              : (typeof v === 'number')
+                ? v !== 0
+                : v === true || (v && typeof v === 'object' && Object.keys(v).length > 0);
+          if (isNonEmpty) {
+            throwDetected(`${key} key detected`);
+          }
+        }
+        const val = obj[key];
+        if (depth < maxDepth && val && typeof val === 'object') {
+          traverse(val, depth + 1);
+        }
+      }
+    };
+
+    traverse(d, 0);
   }
 }
 
@@ -295,7 +316,7 @@ export async function callEndpoint({ endpoint, payload, credentials, options }: 
     } else {
       statusHandlerResult = handleOtherStatus(lastResponse, axiosConfig, endpoint.method, processedUrl);
     }
-    
+
     if (statusHandlerResult.shouldFail) {
       throw new ApiCallError(statusHandlerResult.message, status);
     }
