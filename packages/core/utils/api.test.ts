@@ -50,7 +50,7 @@ describe('API Utilities', () => {
       };
       mockedTools.callAxios.mockResolvedValueOnce(mockResponse);
 
-      const result = await callEndpoint({endpoint: testEndpoint, payload: testPayload, credentials: testCredentials, options: testOptions});
+      const result = await callEndpoint({ endpoint: testEndpoint, payload: testPayload, credentials: testCredentials, options: testOptions });
 
       expect(result).toEqual({ data: { result: 'success' }, statusCode: 200, headers: {} });
     });
@@ -73,7 +73,7 @@ describe('API Utilities', () => {
         .mockResolvedValueOnce(mockResponses[0])
         .mockResolvedValueOnce(mockResponses[1]);
 
-      const result = await callEndpoint({endpoint: config, payload: {}, credentials: {}, options: {}});
+      const result = await callEndpoint({ endpoint: config, payload: {}, credentials: {}, options: {} });
 
       expect(result.data).toHaveLength(3);
       expect(result.data).toEqual([{ id: 1 }, { id: 2 }, { id: 3 }]);
@@ -102,7 +102,7 @@ describe('API Utilities', () => {
         .mockResolvedValueOnce(mockResponses[0])
         .mockResolvedValueOnce(mockResponses[1]);
 
-      const result = await callEndpoint({endpoint: config, payload: {}, credentials: {}, options: {}});
+      const result = await callEndpoint({ endpoint: config, payload: {}, credentials: {}, options: {} });
 
       expect(result.data).toHaveLength(3);
       expect(mockedTools.callAxios).toHaveBeenNthCalledWith(
@@ -159,7 +159,7 @@ describe('API Utilities', () => {
         .mockResolvedValueOnce(mockResponses[0])
         .mockResolvedValueOnce(mockResponses[1]);
 
-      const result = await callEndpoint({endpoint: config, payload: {}, credentials: {}, options: {}});
+      const result = await callEndpoint({ endpoint: config, payload: {}, credentials: {}, options: {} });
 
       expect(result.data.results).toHaveLength(3);
       expect(result.data.next_cursor).toBeNull();
@@ -186,7 +186,7 @@ describe('API Utilities', () => {
         .mockResolvedValueOnce(sameResponse)
         .mockResolvedValueOnce(sameResponse); // Same data returned
 
-      const result = await callEndpoint({endpoint: config, payload: {}, credentials: {}, options: {}});
+      const result = await callEndpoint({ endpoint: config, payload: {}, credentials: {}, options: {} });
 
       expect(result.data).toHaveLength(2); // Should only include unique data
       expect(mockedTools.callAxios).toHaveBeenCalledTimes(2);
@@ -214,7 +214,7 @@ describe('API Utilities', () => {
       for (let i = 0; i < 505; i++) {
         mockedTools.callAxios.mockResolvedValueOnce({ ...mockResponse, data: [{ id: i }] });
       }
-      const result = await callEndpoint({endpoint: config, payload: {}, credentials: {}, options: {}});
+      const result = await callEndpoint({ endpoint: config, payload: {}, credentials: {}, options: {} });
       // Should stop at 500 iterations (as defined in the code)
       expect(mockedTools.callAxios).toHaveBeenCalledTimes(500);
     });
@@ -242,7 +242,7 @@ describe('API Utilities', () => {
 
       mockedTools.callAxios.mockResolvedValue(mockResponse);
 
-      const result = await callEndpoint({endpoint: config, payload: {}, credentials: {}, options: {}});
+      const result = await callEndpoint({ endpoint: config, payload: {}, credentials: {}, options: {} });
 
       // Should stop at 500 iterations (as defined in the code)
       expect(mockedTools.callAxios).toHaveBeenCalledTimes(2);
@@ -259,7 +259,7 @@ describe('API Utilities', () => {
       };
       mockedTools.callAxios.mockResolvedValueOnce(errorResponse);
 
-      await expect(callEndpoint({endpoint: testEndpoint, payload: {}, credentials: {}, options: {}}))
+      await expect(callEndpoint({ endpoint: testEndpoint, payload: {}, credentials: {}, options: {} }))
         .rejects.toThrow(/API call failed/);
     });
 
@@ -273,7 +273,7 @@ describe('API Utilities', () => {
       };
       mockedTools.callAxios.mockResolvedValueOnce(htmlResponse);
 
-      await expect(callEndpoint({endpoint: testEndpoint, payload: {}, credentials: {}, options: {}}))
+      await expect(callEndpoint({ endpoint: testEndpoint, payload: {}, credentials: {}, options: {} }))
         .rejects.toThrow(/Received HTML response/);
     });
 
@@ -296,7 +296,7 @@ describe('API Utilities', () => {
       };
       mockedTools.callAxios.mockResolvedValueOnce(mockResponse);
 
-      const result = await callEndpoint({endpoint: config, payload: {}, credentials: {}, options: {}});
+      const result = await callEndpoint({ endpoint: config, payload: {}, credentials: {}, options: {} });
 
       expect(result.data).toEqual([{ id: 1 }, { id: 2 }]);
     });
@@ -326,8 +326,80 @@ describe('API Utilities', () => {
       };
       mockedTools.callAxios.mockResolvedValueOnce(graphqlErrorResponse);
 
-      await expect(callEndpoint({endpoint: config, payload: {}, credentials: {}, options: {}}))
-        .rejects.toThrow(/API call failed*/);
+      await expect(callEndpoint({ endpoint: config, payload: {}, credentials: {}, options: {} }))
+        .rejects.toThrow(/appears to be an error/i);
+    });
+
+    it('should not flag benign 2xx responses with similar-sounding keys', async () => {
+      const mockResponse = {
+        status: 200,
+        data: {
+          profile: 'ok',
+          errorCount: 0,
+          stats: { failureProbability: 0 },
+          items: [],
+          failedItems: []
+        },
+        statusText: 'OK',
+        headers: {},
+        config: {} as any
+      };
+      mockedTools.callAxios.mockResolvedValueOnce(mockResponse);
+
+      const result = await callEndpoint({ endpoint: testEndpoint, payload: {}, credentials: {}, options: {} });
+      expect(result.statusCode).toBe(200);
+      expect(result.data).toEqual(mockResponse.data);
+    });
+
+    it('should flag 2xx responses with nested error_message keys', async () => {
+      const mockResponse = {
+        status: 200,
+        data: {
+          data: { id: 1 },
+          details: { error_message: 'boom' }
+        },
+        statusText: 'OK',
+        headers: {},
+        config: {} as any
+      };
+      mockedTools.callAxios.mockResolvedValueOnce(mockResponse);
+
+      await expect(callEndpoint({ endpoint: testEndpoint, payload: {}, credentials: {}, options: {} }))
+        .rejects.toThrow(/appears to be an error/i);
+    });
+
+    it('should flag 2xx responses with top-level failed key', async () => {
+      const mockResponse = {
+        status: 200,
+        data: {
+          failed: true,
+          result: null
+        },
+        statusText: 'OK',
+        headers: {},
+        config: {} as any
+      };
+      mockedTools.callAxios.mockResolvedValueOnce(mockResponse);
+
+      await expect(callEndpoint({ endpoint: testEndpoint, payload: {}, credentials: {}, options: {} }))
+        .rejects.toThrow(/appears to be an error/i);
+    });
+
+    it('should flag 2xx responses if any nested errors key exists (even empty)', async () => {
+      const mockResponse = {
+        status: 200,
+        data: {
+          data: { id: 1 },
+          meta: { errors: [] }
+        },
+        statusText: 'OK',
+        headers: {},
+        config: {} as any
+      };
+      mockedTools.callAxios.mockResolvedValueOnce(mockResponse);
+
+      await expect(callEndpoint({ endpoint: testEndpoint, payload: {}, credentials: {}, options: {} }))
+        .rejects.toThrow(/appears to be an error/i);
     });
   });
 
@@ -339,11 +411,11 @@ describe('API Utilities', () => {
       // Test API self-healing enabled scenarios
       expect(isSelfHealingEnabled({ selfHealing: SelfHealingMode.ENABLED }, 'api')).toBe(true);
       expect(isSelfHealingEnabled({ selfHealing: SelfHealingMode.REQUEST_ONLY }, 'api')).toBe(true);
-      
+
       // Test API self-healing disabled scenarios  
       expect(isSelfHealingEnabled({ selfHealing: SelfHealingMode.DISABLED }, 'api')).toBe(false);
       expect(isSelfHealingEnabled({ selfHealing: SelfHealingMode.TRANSFORM_ONLY }, 'api')).toBe(false);
-      
+
       // Test defaults
       expect(isSelfHealingEnabled({}, 'api')).toBe(true);
       expect(isSelfHealingEnabled(undefined, 'api')).toBe(true);
