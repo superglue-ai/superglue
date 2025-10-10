@@ -90,18 +90,12 @@ export function checkResponseForErrors(
       throwDetected(`status=${d.status}`);
     }
 
-    const keyPattern = /(?:^|[^a-zA-Z0-9])(errormessage|error_message|error|errors|failure_reason|failure|failed)(?:[^a-zA-Z0-9]|$)/i;
-    for (const key of Object.keys(d)) {
-      if (!keyPattern.test(key)) continue;
-      const v = d[key];
-      const isTruthyValue = v === true ||
-        (typeof v === 'string' && v.trim() !== '') ||
-        (typeof v === 'number' && v !== 0) ||
-        (Array.isArray(v) && v.length > 0) ||
-        (v && typeof v === 'object' && Object.keys(v).length > 0);
-      if (isTruthyValue) {
-        throwDetected(`${key}='${String(v).slice(0, 120)}'`);
-      }
+    // Matches error-like key names anywhere in the JSON hierarchy (case-insensitive), e.g. "error":, "error_message":, "errormessage":, "failure_reason":, "failed":, "errors":
+    const keyPattern = /"(errormessage|error_message|error|errors|failure_reason|failure|failed)"\s*:/i;
+    const jsonSource = typeof data === 'string' ? data : JSON.stringify(data);
+    const match = jsonSource.match(keyPattern);
+    if (match) {
+      throwDetected(`${match[1]} key detected`);
     }
   }
 }
