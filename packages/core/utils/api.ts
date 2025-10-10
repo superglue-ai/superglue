@@ -107,7 +107,7 @@ export function checkResponseForErrors(
                 ? v !== 0
                 : v === true || (v && typeof v === 'object' && Object.keys(v).length > 0);
           if (isNonEmpty) {
-            throwDetected(`${key} key detected`);
+            throwDetected(`${key} key detected at depth ${depth}`);
           }
         }
         const val = obj[key];
