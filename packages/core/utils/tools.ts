@@ -210,14 +210,12 @@ export async function executeAndValidateMappingCode(input: any, mappingCode: str
 
 export async function callAxios(config: AxiosRequestConfig, options: RequestOptions) {
   let retryCount = 0;
-  const maxRetries = options?.retries || 0;
+  const maxRetries = options?.retries ?? 1;
   const delay = options?.retryDelay || 1000;
   const maxRateLimitWaitMs = 60 * 60 * 1000 * 24; // 24 hours is the max wait time for rate limit retries, hardcoded
   let rateLimitRetryCount = 0;
   let totalRateLimitWaitTime = 0;
   const QUICK_RETRY_THRESHOLD_MS = 10000;
-  let quickRetryPending = false;
-  let allowOneQuickRetry = true;
 
   config.headers = {
     "Accept": "*/*",
@@ -239,7 +237,6 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
   }
 
   do {
-    quickRetryPending = false;
     let response: AxiosResponse | null = null;
     try {
       const startTs = Date.now();
@@ -288,13 +285,12 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
       if (response.data instanceof ArrayBuffer) {
         response.data = Buffer.from(response.data);
       }
-
-      if (!(response.status >= 200 && response.status < 300)) {
-        if (allowOneQuickRetry && durationMs < QUICK_RETRY_THRESHOLD_MS && response.status !== 429) {
-          allowOneQuickRetry = false;
-          quickRetryPending = true;
+      if (response.status < 200 || response.status >= 300) {
+        if (response.status !== 429 && retryCount < maxRetries && durationMs < QUICK_RETRY_THRESHOLD_MS) {
+          retryCount++;
           continue;
         }
+        return response;
       }
       return response;
     } catch (error) {
@@ -302,7 +298,7 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
       retryCount++;
       await new Promise(resolve => setTimeout(resolve, delay * retryCount));
     }
-  } while (retryCount < maxRetries || rateLimitRetryCount > 0 || quickRetryPending);  // separate max retries, rate limit retries, and quick retry
+  } while (retryCount < maxRetries || rateLimitRetryCount > 0);  // separate max retries and rate limit retries
 }
 
 export function applyAuthFormat(format: string, credentials: Record<string, string>): string {
