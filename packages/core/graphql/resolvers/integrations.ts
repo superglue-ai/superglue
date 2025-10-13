@@ -4,7 +4,7 @@ import { generateUniqueId } from '@superglue/shared/utils';
 import { GraphQLResolveInfo } from "graphql";
 import { server_defaults } from '../../default.js';
 import { IntegrationSelector } from '../../integrations/integration-selector.js';
-import { Documentation } from '../../utils/documentation.js';
+import { DocumentationFetcher } from '../../documentation/documentation-fetching.js';
 import { logMessage } from '../../utils/logs.js';
 import { composeUrl } from '../../utils/tools.js';
 import { PostgresService } from '../../datastore/postgres.js';
@@ -77,7 +77,7 @@ export const upsertIntegrationResolver = async (
       }
     }
 
-    var shouldFetchDoc = shouldTriggerDocFetch(input, context, existingIntegrationOrNull);
+    let shouldFetchDoc = shouldTriggerDocFetch(input, context, existingIntegrationOrNull);
 
     const integrationToSave = {
       id: input.id,
@@ -107,7 +107,7 @@ export const upsertIntegrationResolver = async (
         logMessage('debug', `Copying template documentation for template '${templateName}' to user integration '${input.id}'`, { orgId: context.orgId });
         const success = await context.datastore.copyTemplateDocumentationToUserIntegration({ templateId: templateName, userIntegrationId: input.id, orgId: context.orgId });
         if(!success) {
-          logMessage('error', `Failed to copy template documentation to user integration ${input.id}`, { orgId: context.orgId });
+          logMessage('warn', `No Template Documentation found for template ${templateName} to copy to user integration ${input.id}`, { orgId: context.orgId });
           // set shouldFetchDoc to true to trigger a fetch
           shouldFetchDoc = true;
         }
@@ -309,12 +309,12 @@ async function triggerAsyncDocumentationFetch(
 
     logMessage('info', `Starting async documentation fetch for integration ${input.id}`, { orgId: context.orgId });
 
-    const docFetcher = new Documentation(
+    const docFetcher = new DocumentationFetcher(
       {
         urlHost: enrichedInput.urlHost,
         urlPath: enrichedInput.urlPath,
         documentationUrl: enrichedInput.documentationUrl,
-        openApiUrl: enrichedInput.openApiUrl,
+        openApiUrl: enrichedInput.openApiUrl?.trim() ? enrichedInput.openApiUrl : enrichedInput.documentationUrl,
         keywords: uniqueKeywords(enrichedInput.documentationKeywords),
       },
       credentials,

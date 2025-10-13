@@ -18,11 +18,12 @@ export const server_defaults = {
         MAX_PAGES_TO_FETCH_IN_PARALLEL: 4,
         MAX_SITEMAP_DEPTH: 3,
         MAX_SITEMAPS_PER_DEPTH: 10, // Limit per depth level to prevent explosion at any single level
-        MAX_TOTAL_SITEMAPS: 20, // Global limit across all depths to bound total processing
+        MAX_TOTAL_SITEMAPS: 25, // Global limit across all depths to bound total processing
         MAX_CONCURRENT_OPENAPI_FETCHES: 25,
         MAX_OPENAPI_SPECS_TO_FETCH: 100,
         MAX_PAGE_SIZE_BYTES: 3 * 1024 * 1024, // 3MB hard cap per individual page after pruning
         MAX_TOTAL_CONTENT_SIZE: 10 * 1024 * 1024, // 10MB total budget for all pages combined
+        SIMILARITY_THRESHOLD_PERCENTAGE: 90, // 90% similarity threshold for deduplication
         TIMEOUTS: {
             AXIOS: 120000,
             PLAYWRIGHT: 120000,

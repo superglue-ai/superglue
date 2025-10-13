@@ -1,0 +1,384 @@
+{
+  "evaluationSuite": {
+    "name": "Documentation Crawl and Fetch Evaluation",
+    "description": "Evaluate documentation crawling and retrieval quality across multiple APIs",
+    "version": "1.0.0"
+  },
+  "sites": [
+    {
+      "id": "stripe-api",
+      "name": "Stripe API",
+      "description": "Payment processing API",
+      "documentationUrl": "https://stripe.com/docs/api",
+      "openApiUrl": "https://raw.githubusercontent.com/stripe/openapi/master/openapi/spec3.json",
+      "urlHost": "https://api.stripe.com",
+      "keywords": [
+        "customers",
+        "charges",
+        "payment_intents",
+        "products",
+        "subscriptions",
+        "invoices",
+        "balance_transactions",
+        "refunds",
+        "checkout_sessions",
+        "line_items",
+        "payment_methods",
+        "issuers",
+        "plans",
+        "setup_intents",
+        "payouts",
+        "transfers",
+        "balance",
+        "users",
+        "emails"
+      ],
+      "testQuestions": [
+        "How do I create a new customer in Stripe?",
+        "What are the required fields for creating a payment intent?",
+        "What parameters are required to refund a payment?"
+      ]
+    },
+    {
+      "id": "slack-api",
+      "name": "Slack API",
+      "description": "Messaging and collaboration API",
+      "documentationUrl": "https://docs.slack.dev/reference/methods",
+      "urlHost": "https://api.slack.com",
+      "openApiUrl": "https://raw.githubusercontent.com/slackapi/slack-api-specs/master/web-api/slack_web_openapi_v2.json",
+      "keywords": [
+        "channel",
+        "conversation",
+        "user",
+        "file",
+        "event",
+        "message",
+        "workflow_step",
+        "workflow_published",
+        "workflow_step_execute",
+        "usergroup",
+        "im",
+        "mpim",
+        "group",
+        "check_run",
+        "apps_permissions_resource"
+      ],
+      "testQuestions": [
+        "How can I authenticate a bot using OAuth2?",
+        "How do I send a message to a channel?",
+        "How do I add a reaction to a message?"
+      ]
+    },
+    {
+      "id": "gmail-api",
+      "name": "Gmail API",
+      "description": "Email API",
+      "documentationUrl": "https://developers.google.com/gmail/api/reference/rest",
+      "urlHost": "https://gmail.googleapis.com",
+      "openApiUrl": "https://www.googleapis.com/discovery/v1/apis/gmail/v1/rest",
+      "keywords": ["messages", "threads", "labels", "drafts", "send", "attachments", "history", "filters", "settings", "forwarding", "inbox", "profile", "oauth"],
+      "testQuestions": [
+        "How do I list all messages in a user's mailbox?",
+        "How do I list all labels in a mailbox?",
+        "What's the rate limit per user for Gmail API requests?"
+      ]
+    },
+    {
+      "id": "openai-api",
+      "name": "OpenAI API",
+      "description": "AI API",
+      "urlHost": "https://api.openai.com",
+      "documentationUrl": "https://platform.openai.com/docs/api-reference/introduction",
+      "openApiUrl": "https://app.stainless.com/api/spec/documented/openai/openapi.documented.yml",
+      "keywords": ["completions", "chat", "models", "embeddings", "images", "audio", "files", "fine-tuning", "assistants", "threads", "messages", "runs", "moderation", "usage", "api key"],
+      "testQuestions": [
+        "What parameter do I use to get structured output?",
+        "How can I retrieve files from my vector database?",
+        "How do I include both text and images in the same input?"
+      ]
+    },
+    {
+      "id": "zignsec-api",
+      "name": "Zignsec API",
+      "description": "Identify and onboard your customers globally",
+      "documentationUrl": "https://gateway.zignsec.com/",
+      "urlHost": "https://gateway.zignsec.com/",
+      "openApiUrl": "https://gateway.zignsec.com/",
+      "keywords": ["proof-of-address", "identity verification", "e-id", "background check"],
+      "testQuestions": [
+        "How can I Create a proof-of-address session?",
+        "How can I start an identity verification session?"
+      ]
+    },
+    {
+      "id": "sitecore-components-api",
+      "name": "Sitecore Cloud Components API",
+      "description": "Sitecore cloud components and services API",
+      "documentationUrl": "https://components.sitecorecloud.io/api/docs/static/index.html",
+      "urlHost": "https://components.sitecorecloud.io",
+      "openApiUrl": "https://components.sitecorecloud.io/api/docs/static/index.html",
+      "keywords": ["components", "services", "content", "delivery", "rendering"],
+      "testQuestions": [
+        "How do I interact with a file source like azure blob storage?",
+        "I want to upload a new stylesheet"
+      ]
+    },
+    {
+      "id": "openstorage-api",
+      "name": "OpenStorage API",
+      "description": "Storage orchestration and management API",
+      "documentationUrl": "https://libopenstorage.github.io/w/swagger-ui/",
+      "urlHost": "https://libopenstorage.github.io",
+      "openApiUrl": "https://libopenstorage.github.io/w/swagger-ui/",
+      "keywords": ["storage", "volume", "cluster", "snapshots", "backup", "nodes"],
+      "testQuestions": [
+        "Create a new role",
+        "Activate a cluster domain"
+      ]
+    },
+    {
+      "id": "caspio-api",
+      "name": "Caspio REST API",
+      "description": "Low-code database and application platform API",
+      "documentationUrl": "https://demo.caspio.com/integrations/rest/swagger/index.html",
+      "urlHost": "https://demo.caspio.com",
+      "openApiUrl": "https://demo.caspio.com/integrations/rest/swagger/index.html",
+      "keywords": ["tables", "views","records", "DataPage", "applications", "authentication", "webhook"],
+      "testQuestions": [
+        "how do I deploy a DataPage?",
+        "Create a new ongoing webhook"
+      ]
+    },
+    {
+      "id": "epaypolicy-api",
+      "name": "ePayPolicy API",
+      "description": "Insurance payment processing API",
+      "documentationUrl": "https://api-sandbox.epaypolicy.com/content/swagger-ui/",
+      "urlHost": "https://api-sandbox.epaypolicy.com",
+      "openApiUrl": "https://api-sandbox.epaypolicy.com/content/swagger-ui/",
+      "keywords": ["payments", "policies", "transactions", "invoices", "customers", "billing"],
+      "testQuestions": [
+        "Please cancel a ongoing payment schedule",
+        "Can you calculate transaction fees for me"
+      ]
+    },
+    {
+      "id": "twitter-api",
+      "name": "Twitter API",
+      "description": "Twitter API",
+      "documentationUrl": "https://docs.x.com/x-api/introduction",
+      "urlHost": "https://api.twitter.com",
+      "openApiUrl": "https://api.x.com/2/openapi.json",
+      "keywords": ["tweets", "users", "followers", "timeline", "mentions", "retweets", "likes", "lists", "spaces", "direct messages", "trends", "media", "polls", "oauth"],
+      "testQuestions": [
+        "How is pagination handled in the Twitter API?",
+        "How do I get posts from a user's timeline?"
+      ]
+    },
+    {
+      "id": "trello-api",
+      "name": "Trello API",
+      "description": "Trello API",
+      "documentationUrl": "https://developer.atlassian.com/cloud/trello/rest",
+      "urlHost": "https://api.trello.com",
+      "openApiUrl": "https://developer.atlassian.com/cloud/trello/swagger.v3.json",
+      "keywords": ["boards", "cards", "lists", "members", "labels", "attachments", "checklists", "comments", "actions", "organizations", "teams", "power-ups", "custom fields", "stickers", "api key"],
+      "testQuestions": [
+        "How do I create a new board?",
+        "How do I get a list of all cards in a board?"
+      ]
+    },
+    {
+      "id": "gemini-api",
+      "name": "Gemini API",
+      "description": "Gemini API",
+      "documentationUrl": "https://ai.google.dev/api",
+      "urlHost": "https://generativelanguage.googleapis.com/v1beta/models/{model_string}:generateContent?key={your-api-key}",
+      "openApiUrl": "https://ai.google.dev/api",
+      "keywords": ["gemini", "generativelanguage", "models", "generateContent", "api key"],
+      "testQuestions": [
+        "How do I generate content using the Gemini API?",
+        "How do I count tokens I used?"
+      ]
+    },
+    {
+      "id": "linear-api",
+      "name": "Linear API",
+      "description": "Linear API",
+      "documentationUrl": "https://developers.linear.app/docs/graphql/working-with-the-graphql-api",
+      "urlHost": "https://api.linear.app/graphql",
+      "openApiUrl": "https://developers.linear.app/docs/graphql/working-with-the-graphql-api",
+      "keywords": ["issues", "projects", "cycles", "teams", "users", "comments", "labels", "milestones", "roadmaps", "workflows", "states", "graphql", "mutations", "queries", "api key"],
+      "testQuestions": [
+        "How do I create a new triage issue?",
+        "How do I get a list of all issues?"
+      ]
+    },
+    {
+      "id": "claude-api",
+      "name": "Claude API",
+      "description": "Claude API",
+      "documentationUrl": "https://docs.anthropic.com/claude/reference",
+      "urlHost": "https://api.anthropic.com",
+      "openApiUrl": "https://docs.anthropic.com/claude/reference",
+      "keywords": ["messages", "completions", "claude", "models", "prompts", "conversations", "tokens", "streaming", "api key"],
+      "testQuestions": [
+        "How does Claude handle Rate Limiting?",
+        "How do I create a new message in a conversation?"
+      ]
+    },
+    {
+      "id": "pokeapi-api",
+      "name": "PokeAPI API",
+      "description": "PokeAPI API",
+      "documentationUrl": "https://pokeapi.co/docs/v2",
+      "urlHost": "https://pokeapi.co/api/v2/",
+      "openApiUrl": "https://pokeapi.co/docs/v2",
+      "keywords": ["pokemon", "pokedex", "types", "abilities", "moves", "stats", "api key"],
+      "testQuestions": [
+        "How do I get a list of gen2 pokemons?",
+        "How do find information about a specific berry?"
+      ]
+    },
+    {
+      "id": "jira-api",
+      "name": "JIRA API",
+      "description": "JIRA API",
+      "documentationUrl": "https://developer.atlassian.com/cloud/jira/platform/rest/v3",
+      "urlHost": "https://{your-domain}.atlassian.net/rest/api",
+      "openApiUrl": "https://developer.atlassian.com/cloud/jira/platform/swagger-v3.json",
+      "keywords": ["issues", "projects", "boards", "sprints", "epics", "users", "workflows", "fields", "components", "versions", "priorities", "statuses", "comments", "attachments", "jql", "query", "search", "api key"],
+      "testQuestions": [
+        "Get all issues from the current active sprint, categorize them by status",
+        "Get all issues marked as Blocked or High Priority that are still in progress?"
+      ]
+    },
+    {
+      "id": "attio-api",
+      "name": "Attio API",
+      "description": "Attio API",
+      "documentationUrl": "https://docs.attio.com/rest-api/overview",
+      "urlHost": "https://api.attio.com/v2",
+      "openApiUrl": "https://api.attio.com/openapi/api",
+      "keywords": [
+        "people",
+        "objects",
+        "records",
+        "lists",
+        "entries",
+        "workspace_members",
+        "notes",
+        "tasks",
+        "threads",
+        "comments",
+        "sorts",
+        "api_slug",
+        "attribute_type",
+        "record_id",
+        "workspace_id",
+        "object_id"
+      ],
+      "testQuestions": [
+        "Get all people with a non-empty email address",
+        "Get all members of a workspace"
+      ]
+    },
+    {
+      "id": "posthog-api",
+      "name": "PostHog API",
+      "description": "PostHog API",
+      "documentationUrl": "https://posthog.com/docs/api",
+      "urlHost": "https://us.posthog.com/api",
+      "openApiUrl": "https://app.posthog.com/api/schema/",
+      "keywords": ["events", "users", "products", "dashboard", "properties", "cohorts", "funnels", "retention", "insights", "engage", "import", "export", "jql", "query", "segmentation", "track", "api key"],
+      "testQuestions": [
+        "Get the project IDs of all projects in my posthog account.",
+        "Get all events in the last 30 days for a project"
+      ]
+    },
+    {
+      "id": "github-api",
+      "name": "GitHub API",
+      "description": "GitHub API",
+      "documentationUrl": "https://docs.github.com/en/rest",
+      "urlHost": "https://api.github.com",
+      "openApiUrl": "https://raw.githubusercontent.com/github/rest-api-description/main/descriptions/api.github.com/api.github.com.json",
+      "keywords": [
+        "repositories",
+        "issues",
+        "pull_requests",
+        "commits",
+        "branches",
+        "tags",
+        "releases",
+        "deployments",
+        "check_runs",
+        "actions_artifacts",
+        "organizations",
+        "packages",
+        "collaborators",
+        "gists",
+        "milestones"
+      ],
+      "testQuestions": [
+        "List all repositories in my GitHub account.",
+        "Get all issues for a specific repository"
+      ]
+    },
+    {
+      "id": "snowflake-api",
+      "name": "Snowflake API",
+      "description": "Snowflake API",
+      "documentationUrl": "https://docs.snowflake.com/en/developer-guide/sql-api/index",
+      "urlHost": "https://account.snowflakecomputing.com",
+      "openApiUrl": "https://github.com/snowflakedb/snowflake-rest-api-specs",
+      "keywords": ["warehouses", "databases", "schemas", "tables", "views", "stages", "pipes", "tasks", "streams", "procedures", "functions", "roles", "users", "sql", "api key"],
+      "testQuestions": [
+        "List all warehouses in my Snowflake account.",
+        "Get all tables in the TESTING_SCHEMA in the snowflake SUPERGLUE_DATA database."
+      ]
+    },
+    {
+      "id": "finwise-api",
+      "name": "Finwise API",
+      "description": "Finwise API",
+      "documentationUrl": "https://finwiseapp.io/docs/api#introduction",
+      "urlHost": "https://api.finwiseapp.io",
+      "openApiUrl": "https://finwiseapp.io/docs/api#introduction",
+      "keywords": ["account", "transaction", "budgets", "goals", "balance"],
+      "testQuestions": [
+        "Can you create a new account for me?",
+        "What is my aggregated account balance?"
+      ]
+    }
+  ],
+  "settings": {
+    "crawlTimeout": 300000,
+    "maxDocumentationSize": 500000,
+    "enablePlaywrightCrawling": true,
+    "enableOpenApiFetching": true,
+    "enabledSites": [
+      "stripe-api",
+      "slack-api",
+      "gmail-api",
+      "openai-api",
+      "zignsec-api",
+      "sitecore-components-api",
+      "openstorage-api",
+      "caspio-api",
+      "epaypolicy-api",
+      "twitter-api",
+      "trello-api",
+      "gemini-api",
+      "linear-api",
+      "claude-api",
+      "pokeapi-api",
+      "jira-api",
+      "attio-api",
+      "posthog-api",
+      "github-api",
+      "snowflake-api",
+      "finwise-api"
+    ]
+  }
+}
