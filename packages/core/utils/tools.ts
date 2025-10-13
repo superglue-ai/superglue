@@ -2,6 +2,7 @@ import { HttpMethod, RequestOptions, SelfHealingMode } from "@superglue/client";
 import { inferJsonSchema } from '@superglue/shared';
 import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
 import { GraphQLResolveInfo } from "graphql";
+import https from 'https';
 import ivm from 'isolated-vm';
 import jsonata from "jsonata";
 import { Validator } from "jsonschema";
@@ -247,6 +248,9 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
         maxContentLength: Infinity, // No limit on response size
         maxBodyLength: Infinity, // No limit on response body size
         decompress: true, // Ensure gzip/deflate responses are decompressed
+        httpsAgent: new https.Agent({
+          rejectUnauthorized: false
+        })  
       });
       const durationMs = Date.now() - startTs;
 
