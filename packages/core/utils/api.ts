@@ -67,58 +67,59 @@ function normalizeToJson(input: any): any {
 }
 
 export function checkResponseForErrors(
-  rawData: any,
+  data: any,
   status: number,
   ctx: { axiosConfig: AxiosRequestConfig; method: string; url: string; credentials: Record<string, any>; payload: Record<string, any>; }
 ): void {
-  const data = normalizeToJson(rawData);
+  if (!data || typeof data !== 'object') return;
 
-  if (data && typeof data === 'object' && !Array.isArray(data)) {
-    const d: any = data;
-    const throwDetected = (reason: string) => {
-      const maskedConfig = maskCredentials(JSON.stringify(ctx.axiosConfig));
-      const previewSource = JSON.stringify(data);
-      const preview = String(previewSource).slice(0, 1000);
-      const message = `${ctx.method} ${ctx.url} returned ${status} but appears to be an error. Reason: ${reason}\nResponse preview: ${preview}\nconfig: ${maskedConfig}`;
-      throw new ApiCallError(message, status);
-    };
+  const d: any = Array.isArray(data) && data.length > 0 ? data[0] : data;
+  if (!d || typeof d !== 'object') return;
 
-    if (typeof d.code === 'number' && d.code >= 400 && d.code <= 599) {
-      throwDetected(`code=${d.code}`);
-    }
-    if (typeof d.status === 'number' && d.status >= 400 && d.status <= 599) {
-      throwDetected(`status=${d.status}`);
-    }
+  const throwDetected = (reason: string, value?: any) => {
+    const maskedConfig = maskCredentials(JSON.stringify(ctx.axiosConfig));
+    const previewSource = JSON.stringify(data);
+    const preview = String(previewSource).slice(0, 1000);
+    const valueStr = value !== undefined ? `='${String(value).slice(0, 120)}'` : '';
+    const message = `${ctx.method} ${ctx.url} returned ${status} but appears to be an error. Reason: ${reason}${valueStr}\nResponse preview: ${preview}\nconfig: ${maskedConfig}`;
+    throw new ApiCallError(message, status);
+  };
 
-    const errorKeys = new Set(['error', 'errors', 'error_message', 'errormessage', 'failure_reason', 'failure']);
-    const maxDepth = 2;
+  if (typeof d.code === 'number' && d.code >= 400 && d.code <= 599) {
+    throwDetected(`code`, d.code);
+  }
+  if (typeof d.status === 'number' && d.status >= 400 && d.status <= 599) {
+    throwDetected(`status`, d.status);
+  }
 
-    const traverse = (obj: any, depth: number) => {
-      if (!obj || typeof obj !== 'object') return;
-      for (const key of Object.keys(obj)) {
-        const lower = key.toLowerCase();
-        if (errorKeys.has(lower)) {
-          const v = obj[key];
-          const isNonEmpty = Array.isArray(v)
-            ? v.length > 0
-            : (typeof v === 'string')
-              ? v.trim() !== ''
-              : (typeof v === 'boolean')
-                ? v === true
-                : (v && typeof v === 'object' && Object.keys(v).length > 0);
-          if (isNonEmpty) {
-            throwDetected(`${key} key detected at depth ${depth}`);
-          }
-        }
-        const val = obj[key];
-        if (depth < maxDepth && val && typeof val === 'object') {
-          traverse(val, depth + 1);
+  const errorKeys = new Set(['error', 'errors', 'error_message', 'errormessage', 'failure_reason', 'failure', 'failed']);
+  const maxDepth = 2;
+
+  const traverse = (obj: any, depth: number) => {
+    if (!obj || typeof obj !== 'object') return;
+    for (const key of Object.keys(obj)) {
+      const lower = key.toLowerCase();
+      if (errorKeys.has(lower)) {
+        const v = obj[key];
+        const isNonEmpty = Array.isArray(v)
+          ? v.length > 0
+          : (typeof v === 'string')
+            ? v.trim() !== ''
+            : (typeof v === 'boolean')
+              ? v === true
+              : (v && typeof v === 'object' && Object.keys(v).length > 0);
+        if (isNonEmpty) {
+          throwDetected(`${key} key detected at depth ${depth}`, typeof v === 'string' ? v : undefined);
         }
       }
-    };
+      const val = obj[key];
+      if (depth < maxDepth && val && typeof val === 'object') {
+        traverse(val, depth + 1);
+      }
+    }
+  };
 
-    traverse(d, 0);
-  }
+  traverse(d, 0);
 }
 
 function handle2xxStatus(
@@ -129,13 +130,6 @@ function handle2xxStatus(
   credentials: Record<string, any>,
   payload: Record<string, any>
 ): StatusHandlerResult {
-  try {
-    checkResponseForErrors(response?.data, response?.status, { axiosConfig, method, url, credentials, payload });
-  } catch (e) {
-    const message = e?.message || String(e);
-    return { shouldFail: true, message };
-  }
-
   const htmlCheck = detectHtmlErrorResponse(response?.data);
   if (htmlCheck.isHtml) {
     const maskedUrl = maskCredentials(url, { ...credentials, ...payload });
@@ -345,6 +339,14 @@ export async function callEndpoint({ endpoint, payload, credentials, options }: 
       responseData = await parseFile(Buffer.from(responseData), FileType.AUTO);
     }
     const parsedResponseData = responseData;
+
+    if (status >= 200 && status <= 205) {
+      try {
+        checkResponseForErrors(responseData, status, { axiosConfig, method: endpoint.method, url: processedUrl, credentials, payload });
+      } catch (e) {
+        throw new ApiCallError(e?.message || String(e), status);
+      }
+    }
     if (endpoint.dataPath) {
       const pathParts = endpoint.dataPath.split('.');
       for (const part of pathParts) {
