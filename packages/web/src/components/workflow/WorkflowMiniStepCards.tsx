@@ -753,10 +753,10 @@ export const MiniStepCard = ({ step, index, isActive, onClick, stepId, isPayload
             <Card className={cn(isActive ? "p-4 w-[228px] h-[130px]" : "p-4 w-[228px] h-[120px]", "flex-shrink-0", isActive && "ring-2 ring-primary shadow-lg")}>
                 <div className="h-full flex flex-col justify-between">
                     <div className="flex items-center justify-between mb-2">
-                        <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-sm font-semibold">{index}</div>
+                        <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-start text-sm font-semibold">{index}</div>
                         <div className="flex items-center gap-1.5">
                             {step?.executionMode === 'LOOP' && (
-                                <RotateCw className={cn("h-3.5 w-3.5", methodTextColor)} aria-label="Loop step" />
+                                <RotateCw className="h-3.5 w-3.5 text-muted-foreground" aria-label="Loop step" />
                             )}
                             <span className={cn("text-xs px-2 py-1 rounded font-medium", method === 'GET' && "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400", method === 'POST' && "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400", method === 'PUT' && "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400", method === 'DELETE' && "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400", !['GET', 'POST', 'PUT', 'DELETE'].includes(method) && "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400")}>{method}</span>
                         </div>

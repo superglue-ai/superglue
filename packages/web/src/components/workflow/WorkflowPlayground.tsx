@@ -5,7 +5,7 @@ import { executeFinalTransform, executeSingleStep, executeWorkflowStepByStep, ty
 import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { computeStepOutput } from "@/src/lib/utils";
 import { ExecutionStep, Integration, SuperglueClient, Workflow, WorkflowResult } from "@superglue/client";
-import { X } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { useToast } from "../../hooks/use-toast";
@@ -336,11 +336,6 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
 
       setInputSchema(workflow.inputSchema ? JSON.stringify(workflow.inputSchema, null, 2) : null);
       // Don't modify payload when loading a workflow - keep existing or use empty object
-
-      toast({
-        title: "Workflow loaded",
-        description: `Loaded "${workflow.id}" successfully`,
-      });
     } catch (error: any) {
       console.error("Error loading workflow:", error);
       toast({
@@ -890,46 +885,54 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
         <div className="w-full">
           <div className="space-y-4">
             <div className={embedded ? "" : "mb-4"}>
-              <WorkflowStepGallery
-                steps={steps}
-                stepResults={stepResultsMap}
-                finalTransform={finalTransform}
-                finalResult={result?.data}
-                transformResult={finalPreviewResult}
-                responseSchema={responseSchema}
-                workflowId={workflowId}
-                instruction={instructions}
-                onStepsChange={handleStepsChange}
-                onStepEdit={handleStepEdit}
-                onExecuteStep={handleExecuteStep}
-                onExecuteTransform={handleExecuteTransform}
-                onFinalTransformChange={setFinalTransform}
-                onResponseSchemaChange={setResponseSchema}
-                onPayloadChange={setPayload}
-                onWorkflowIdChange={setWorkflowId}
-                onInstructionEdit={embedded ? onInstructionEdit : undefined}
-                integrations={integrations}
-                isExecuting={loading}
-                isExecutingStep={isExecutingStep}
-                isExecutingTransform={isExecutingTransform as any}
-                currentExecutingStepIndex={currentExecutingStepIndex}
-                completedSteps={completedSteps}
-                failedSteps={failedSteps}
-                readOnly={readOnly}
-                inputSchema={inputSchema}
-                onInputSchemaChange={(v) => setInputSchema(v)}
-                payloadText={payload}
-                headerActions={headerActions || (!embedded ? defaultHeaderActions : undefined)}
-                navigateToFinalSignal={navigateToFinalSignal}
-                showStepOutputSignal={showStepOutputSignal}
-                focusStepId={focusStepId}
-                uploadedFiles={uploadedFiles}
-                onFilesUpload={handleFilesUpload}
-                onFileRemove={handleFileRemove}
-                isProcessingFiles={isProcessingFiles}
-                totalFileSize={totalFileSize}
-                filePayloads={filePayloads}
-              />
+              {loading && steps.length === 0 && !instructions ? (
+                <div className="flex items-center justify-center py-20">
+                  <div className="flex flex-col items-center gap-3">
+                    <Loader2 className="h-8 w-8 animate-spin text-foreground" />
+                  </div>
+                </div>
+              ) : (
+                <WorkflowStepGallery
+                  steps={steps}
+                  stepResults={stepResultsMap}
+                  finalTransform={finalTransform}
+                  finalResult={result?.data}
+                  transformResult={finalPreviewResult}
+                  responseSchema={responseSchema}
+                  workflowId={workflowId}
+                  instruction={instructions}
+                  onStepsChange={handleStepsChange}
+                  onStepEdit={handleStepEdit}
+                  onExecuteStep={handleExecuteStep}
+                  onExecuteTransform={handleExecuteTransform}
+                  onFinalTransformChange={setFinalTransform}
+                  onResponseSchemaChange={setResponseSchema}
+                  onPayloadChange={setPayload}
+                  onWorkflowIdChange={setWorkflowId}
+                  onInstructionEdit={embedded ? onInstructionEdit : undefined}
+                  integrations={integrations}
+                  isExecuting={loading}
+                  isExecutingStep={isExecutingStep}
+                  isExecutingTransform={isExecutingTransform as any}
+                  currentExecutingStepIndex={currentExecutingStepIndex}
+                  completedSteps={completedSteps}
+                  failedSteps={failedSteps}
+                  readOnly={readOnly}
+                  inputSchema={inputSchema}
+                  onInputSchemaChange={(v) => setInputSchema(v)}
+                  payloadText={payload}
+                  headerActions={headerActions || (!embedded ? defaultHeaderActions : undefined)}
+                  navigateToFinalSignal={navigateToFinalSignal}
+                  showStepOutputSignal={showStepOutputSignal}
+                  focusStepId={focusStepId}
+                  uploadedFiles={uploadedFiles}
+                  onFilesUpload={handleFilesUpload}
+                  onFileRemove={handleFileRemove}
+                  isProcessingFiles={isProcessingFiles}
+                  totalFileSize={totalFileSize}
+                  filePayloads={filePayloads}
+                />
+              )}
             </div>
           </div>
         </div>
