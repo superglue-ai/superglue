@@ -33,6 +33,7 @@
         "cmdk": "^1.1.1",
         "combined-stream": "^1.0.8",
         "cronstrue": "^3.3.0",
+        "crypto": "^1.0.1",
         "es-set-tostringtag": "^2.0.1",
         "framer-motion": "^12.4.7",
         "graphql": "^16.10.0",
