@@ -3,7 +3,6 @@ import * as yaml from 'js-yaml';
 
 import { OpenApiFetchingStrategy } from '../types.js';
 import { logMessage } from "../../utils/logs.js";
-import { parseJSON } from "../../utils/json-parser.js";
 import { extractOpenApiUrlsFromObject, fetchMultipleOpenApiSpecs } from '../documentation-utils.js';
 
 export class OpenApiLinkExtractorStrategy implements OpenApiFetchingStrategy {
@@ -16,7 +15,7 @@ export class OpenApiLinkExtractorStrategy implements OpenApiFetchingStrategy {
       } else if (typeof responseData === 'string') {
         const trimmedData = responseData.trim();
         try {
-          parsedData = parseJSON(trimmedData);
+          parsedData = JSON.parse(trimmedData);
         } catch {
           try {
             parsedData = yaml.load(trimmedData) as any;

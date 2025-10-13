@@ -3,7 +3,6 @@ import * as yaml from 'js-yaml';
 
 import { OpenApiFetchingStrategy } from '../types.js';
 import { logMessage } from "../../utils/logs.js";
-import { parseJSON } from "../../utils/json-parser.js";
 import { isValidOpenApiSpec } from '../documentation-utils.js';
 
 export class DirectOpenApiStrategy implements OpenApiFetchingStrategy {
@@ -17,7 +16,7 @@ export class DirectOpenApiStrategy implements OpenApiFetchingStrategy {
         const trimmedData = responseData.trim();
 
         try {
-          parsedData = parseJSON(trimmedData);
+          parsedData = JSON.parse(trimmedData);
           // if parsedData is empty, throw an error to try yaml instead
           if (
             !parsedData ||
