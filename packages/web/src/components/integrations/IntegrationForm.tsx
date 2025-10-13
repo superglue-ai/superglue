@@ -79,10 +79,10 @@ export function IntegrationForm({
 }: IntegrationFormProps) {
     const initialSelected = integration
         ? integrationOptions.find(opt =>
-            opt.value !== 'manual' &&
+            opt.value !== '' &&
             (integration.id === opt.value || (integration.urlHost && integration.urlHost.includes(opt.value)))
-        )?.value || 'manual'
-        : 'manual';
+        )?.value || ''
+        : '';
     const [selectedIntegration, setSelectedIntegration] = useState<string>(initialSelected);
     const [integrationDropdownOpen, setIntegrationDropdownOpen] = useState(false);
     const [id, setId] = useState(integration?.id || initialSelected);
@@ -205,7 +205,7 @@ export function IntegrationForm({
 
     // Pre-fill OAuth fields when auth type/template changes; enable SG toggle if template has client_id
     useEffect(() => {
-        if (authType !== 'oauth' || !selectedIntegration || selectedIntegration === 'manual') return;
+        if (authType !== 'oauth' || !selectedIntegration) return;
         const integrationTemplate = integrations[selectedIntegration];
         const templateOAuth: any = integrationTemplate?.oauth;
         setUseSuperglueOAuth(prev => (isEditing ? prev : !!(templateOAuth?.client_id && String(templateOAuth.client_id).trim().length > 0)));
@@ -220,7 +220,7 @@ export function IntegrationForm({
     }, [authType, selectedIntegration]);
 
     useEffect(() => {
-        if (!isEditing || authType !== 'oauth' || !selectedIntegration || selectedIntegration === 'manual') return;
+        if (!isEditing || authType !== 'oauth' || !selectedIntegration) return;
         const templateClientId = integrations[selectedIntegration]?.oauth?.client_id;
         const savedClientId = (integration?.credentials || {}).client_id || oauthFields.client_id;
         if (templateClientId && savedClientId && savedClientId === templateClientId) {
@@ -243,7 +243,7 @@ export function IntegrationForm({
     const handleIntegrationSelect = (value: string) => {
         setSelectedIntegration(value);
 
-        if (value === 'manual') {
+        if (!value) {
             setUrlHost('');
             setUrlPath('');
             setDocumentationUrl('');
@@ -342,7 +342,7 @@ export function IntegrationForm({
     };
 
     const getTemplateOAuth = () => {
-        if (!selectedIntegration || selectedIntegration === 'manual') return null as any;
+        if (!selectedIntegration) return null as any;
         return (integrations[selectedIntegration]?.oauth as any) || null;
     };
 
@@ -670,6 +670,23 @@ export function IntegrationForm({
                         </PopoverContent>
                     </Popover>
                 </div>
+                {!isEditing && (
+                            <div>
+                                <Label htmlFor="integrationId">Integration ID*</Label>
+                                <HelpTooltip text="A unique identifier for this integration within the workflow. You cannot change this after saving." />
+                                <Input
+                                    id="integrationId"
+                                    value={id || ''}
+                                    onChange={e => {
+                                        setId(e.target.value);
+                                        setIsIdManuallyEdited(true);
+                                    }}
+                                    placeholder="e.g., crm-api"
+                                    className={cn(validationErrors.id && inputErrorStyles)}
+                                />
+                                {validationErrors.id && <p className="text-sm text-destructive mt-1">Integration ID is required and must be unique.</p>}
+                            </div>
+                )}
                 <div>
                     <Label htmlFor="integrationFullUrl">API Endpoint*</Label>
                     <HelpTooltip text="The base URL of the API (e.g., https://api.example.com/v1)." />
@@ -1020,24 +1037,6 @@ export function IntegrationForm({
                 </div>
                 {showAdvanced && (
                     <>
-                        {!isEditing && (
-                            <div>
-                                <Label htmlFor="integrationId">Custom Integration ID*</Label>
-                                <HelpTooltip text="A unique identifier for this integration within the workflow (e.g., 'crm', 'productApi')." />
-                                <Input
-                                    id="integrationId"
-                                    value={id || ''}
-                                    onChange={e => {
-                                        setId(e.target.value);
-                                        setIsIdManuallyEdited(true);
-                                    }}
-                                    placeholder="e.g., crm-api"
-                                    className={cn(validationErrors.id && inputErrorStyles)}
-                                />
-                                {validationErrors.id && <p className="text-sm text-destructive mt-1">Integration ID is required and must be unique.</p>}
-                            </div>
-                        )}
-
                         {authType === 'oauth' && (
                             <div className="space-y-2">
                                 <Label htmlFor="additionalCredentials" className="flex items-center gap-2 text-xs">
