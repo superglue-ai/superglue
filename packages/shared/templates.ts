@@ -121,7 +121,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     apiUrl: "https://api.attio.com/v2/",
     regex: "^.*attio.*$",
     icon: "attio",
-    docsUrl: "https://api.attio.com/openapi/api",
+    docsUrl: "https://docs.attio.com/rest-api/overview",
     openApiUrl: "https://api.attio.com/openapi/api",
     preferredAuthType: "apikey",
     keywords: [

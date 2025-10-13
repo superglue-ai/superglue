@@ -1,6 +1,7 @@
 import { CacheMode, DecompressionMethod, ExtractConfig, ExtractInputRequest, FileType, RequestOptions } from "@superglue/client";
 import { GraphQLResolveInfo } from "graphql";
-import { Documentation } from "../../utils/documentation.js";
+import { DocumentationSearch } from "../../documentation/documentation-search.js";
+import { DocumentationFetcher } from "../../documentation/documentation-fetching.js";
 import { callExtract, generateExtractConfig, processFile } from "../../utils/extract.js";
 import { logMessage } from "../../utils/logs.js";
 import { telemetryClient } from "../../utils/telemetry.js";
@@ -59,9 +60,10 @@ export const extractResolver = async (
           if (!input.endpoint.instruction) {
             throw new Error("Id could not be found and no endpoint provided.");
           }
-          const documentation = new Documentation(input.endpoint, credentials, metadata);
+          const documentation = new DocumentationFetcher(input.endpoint, credentials, metadata);
           const rawDoc = await documentation.fetchAndProcess();
-          const documentationString = Documentation.extractRelevantSections(rawDoc, input.endpoint.instruction || "");
+          const documentationSearch = new DocumentationSearch({ orgId: context.orgId });
+          const documentationString = documentationSearch.extractRelevantSections(rawDoc, input.endpoint.instruction || "");
           preparedExtract = await generateExtractConfig(input.endpoint, documentationString, payload, credentials, lastError);
         }
 

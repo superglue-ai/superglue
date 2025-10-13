@@ -11,7 +11,7 @@ async function cleanupResources(): Promise<void> {
     const cleanupTasks = [];
 
     try {
-        const { PlaywrightFetchingStrategy } = await import('../../utils/documentation.js');
+        const { PlaywrightFetchingStrategy } = await import('../../documentation/index.js');
         cleanupTasks.push(PlaywrightFetchingStrategy.closeBrowser());
     } catch (e) {
         console.error('Error during browser cleanup:', e);

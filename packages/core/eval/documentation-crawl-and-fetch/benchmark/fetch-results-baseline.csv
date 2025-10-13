@@ -1,0 +1,23 @@
+Site,Pages (estimated),Doc Size (MB),Has OpenAPI,OpenAPI Size (KB),Doc Fetch (s/page),OpenAPI Fetch (s)
+"Stripe API",13,0.98,Yes,6966,3.11,0.75
+"Slack API",2,0.16,Yes,846,8.93,0.19
+"Gmail API",1,0.03,Yes,199,7.11,0.09
+"OpenAI API",9,0.62,Yes,2400,1.49,0.67
+"Zignsec API",23,1.70,Yes,4029,0.13,6.75
+"Sitecore Cloud Components API",1,0.00,Yes,214,1.78,4.41
+"OpenStorage API",6,0.41,Yes,375,0.46,0.08
+"Caspio REST API",1,0.00,Yes,201,3.38,6.46
+"ePayPolicy API",1,0.00,Yes,119,2.90,1.15
+"Twitter API",2,0.13,Yes,618,16.43,0.26
+"Trello API",6,0.41,Yes,457,2.53,0.79
+"Gemini API",6,0.45,No,0,12.42,0.63
+"Linear API",22,1.64,No,0,0.03,1.40
+"Claude API",2,0.14,No,0,7.31,0.59
+"PokeAPI API",3,0.22,No,0,2.39,0.10
+"JIRA API",11,0.84,Yes,3410,2.01,0.90
+"Attio API",1,0.10,Yes,2076,32.99,0.25
+"PostHog API",4,0.27,No,0,9.33,10.60
+"GitHub API",10,0.71,Yes,11346,2.87,0.87
+"Snowflake API",1,0.04,No,0,13.98,0.87
+"Finwise API",1,0.09,No,0,2.42,0.29
+"AVERAGE",6,0.43,14/21,2375,2.98,1.69
