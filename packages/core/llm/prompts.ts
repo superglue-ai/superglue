@@ -30,29 +30,9 @@ Requirements:
 - Function signature: (sourceData) => { ... } or (sourceData, currentItem) => { ... } for loops
 - Return statement is REQUIRED - the function must return the transformed data
 - Pure function - no side effects or external dependencies
-- Handle missing/null data gracefully with optional chaining (?.) and defaults
+- Handle missing/null data gracefully with optional chaining (?.) and defaults - BUT - throw when expected and required data is missing so superglue can self heal
 - Validate arrays with Array.isArray() before using array methods
 - Return appropriate defaults when data is missing
-
-DEFENSIVE PROGRAMMING PATTERNS:
-\`\`\`javascript
-const items = Array.isArray(sourceData.items) ? sourceData.items : [];
-
-const config = sourceData.config || {};
-const name = config.name || 'default';
-
-const userId = sourceData.user?.profile?.id;
-
-const activeItems = (sourceData.items || []).filter(item => 
-  item && item.status === 'active'
-);
-
-if (sourceData.type === 'batch') {
-  return sourceData.items.map(transformItem);
-} else {
-  return [transformItem(sourceData)];
-}
-\`\`\`
 
 COMMON WORKFLOW TRANSFORMATIONS:
 
@@ -60,7 +40,7 @@ COMMON WORKFLOW TRANSFORMATIONS:
 \`\`\`javascript
 (sourceData) => {
   const items = sourceData.fetchItems;
-  if (!Array.isArray(items)) return [];
+  if (!Array.isArray(items)) throw new Error("Expected array of items to iterate over");
   
   const excludeIds = sourceData.excludeIds || [];
   return items.filter(item => !excludeIds.includes(item.id));
@@ -82,11 +62,7 @@ COMMON WORKFLOW TRANSFORMATIONS:
 3. Final transform (shape output):
 \`\`\`javascript
 (sourceData) => {
-  const results = [];
-  
-  if (sourceData.step1) results.push(...sourceData.step1);
-  if (sourceData.step2) results.push(...sourceData.step2);
-  
+  const results = sourceData.getId.map(item => sourceData.getProductForId.find(product => product.id === item.id));
   return {
     success: true,
     count: results.length,
@@ -94,12 +70,6 @@ COMMON WORKFLOW TRANSFORMATIONS:
   };
 }
 \`\`\`
-
-ERROR HANDLING:
-- Always check data types before operations
-- Provide sensible defaults for missing data
-- Never assume nested properties exist
-- Handle both single items and arrays when the shape is ambiguous
 
 Return your answer in the following JSON format:
 {
@@ -284,6 +254,80 @@ Common authentication patterns are:
 
 IMPORTANT: Modern APIs (HubSpot, Stripe, etc.) mostly expect authentication in headers, NOT query parameters. Only use query parameter authentication if explicitly required by the documentation.
 </AUTHENTICATION_PATTERNS>
+
+<FINAL_TRANSFORMATION>
+CRITICAL CONTEXT FOR WORKFLOW TRANSFORMATIONS:
+1. In workflow contexts, sourceData contains:
+   - Initial payload fields at the root level (e.g., sourceData.date, sourceData.companies)
+   - Previous step results accessed by stepId (e.g., sourceData.getAllContacts, sourceData.fetchUsers)
+   - DO NOT use sourceData.payload - initial payload is merged at root level
+
+2. Common workflow patterns:
+   - Filtering arrays: contacts.filter(c => !excludeList.includes(c.company))
+   - Mapping data: items.map(item => ({ id: item.id, name: item.name }))
+   - Extracting nested data: response.data?.items || []
+   - Combining multiple sources: { ...sourceData.step1, ...sourceData.step2 }
+
+3. For LOOP execution contexts:
+   - currentItem is available directly in the payload
+   - For simple access: use <<currentItem>> to access the entire item
+   - For transformations or complex operations: use <<(sourceData) => sourceData.currentItem...>>
+   - Example: if currentItem = { id: 123, name: "test" }:
+     * Simple access: <<currentItem>> returns the whole object
+     * With transformations: <<(sourceData) => sourceData.currentItem.id * 2>> or <<(sourceData) => sourceData.currentItem.name.toUpperCase()>>
+
+Requirements:
+- Function signature: (sourceData) => { ... } or (sourceData, currentItem) => { ... } for loops
+- Return statement is REQUIRED - the function must return the transformed data
+- Pure function - no side effects or external dependencies
+- Handle missing/null data gracefully with optional chaining (?.) and defaults - BUT - throw when expected and required data is missing so superglue can self heal
+- Validate arrays with Array.isArray() before using array methods
+- Return appropriate defaults when data is missing
+
+COMMON WORKFLOW TRANSFORMATIONS:
+
+1. Loop selector (extract array to iterate):
+\`\`\`javascript
+(sourceData) => {
+  const items = sourceData.fetchItems;
+  if (!Array.isArray(items)) throw new Error("Expected array of items to iterate over");
+  
+  const excludeIds = sourceData.excludeIds || [];
+  return items.filter(item => !excludeIds.includes(item.id));
+}
+\`\`\`
+
+2. Input mapping (prepare data for API call):
+\`\`\`javascript
+(sourceData) => {
+  return {
+    userId: sourceData.currentItem?.id || sourceData.userId,
+    action: 'update',
+    timestamp: new Date().toISOString(),
+    metadata: sourceData.globalMetadata || {}
+  };
+}
+\`\`\`
+
+3. Final transform (shape output):
+\`\`\`javascript
+(sourceData) => {
+  const results = sourceData.getId.map(item => sourceData.getProductForId.find(product => product.id === item.id));
+  return {
+    success: true,
+    count: results.length,
+    data: results
+  };
+}
+\`\`\`
+
+Return your answer in the following JSON format:
+{
+  "mappingCode": "(sourceData) => { return { id: sourceData.id }; }"
+}
+
+THE FUNCTION MUST BE VALID JAVASCRIPT that can be executed with eval().
+</FINAL_TRANSFORMATION>
 
 <DOCUMENTATION_FIRST_APPROACH>
 Before configuring any API step:
