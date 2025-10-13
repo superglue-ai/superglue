@@ -9,8 +9,9 @@ import { type UploadedFileInfo } from '@/src/lib/file-utils';
 import { buildEvolvingPayload, cn, isEmptyData, MAX_DISPLAY_LINES, MAX_DISPLAY_SIZE, truncateForDisplay, truncateLines } from '@/src/lib/utils';
 import { Integration } from "@superglue/client";
 import { inferJsonSchema } from '@superglue/shared';
-import { ChevronLeft, ChevronRight, Database, Download, FileJson, Package, Play, Settings, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Database, Download, FileJson, Package, Play, Plus, Settings, Trash2 } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
+import { AddStepDialog } from './AddStepDialog';
 import { CopyButton, FinalResultsCard, FinalTransformMiniStepCard, InstructionDisplay, JsonCodeEditor, MiniStepCard, PayloadMiniStepCard } from './WorkflowMiniStepCards';
 import { WorkflowStepConfigurator } from './WorkflowStepConfigurator';
 
@@ -119,25 +120,26 @@ const SpotlightStepCard = ({
                     <div className="flex items-center gap-2">
                         {!readOnly && onExecuteStep && (
                             <>
-                                <Button
-                                    size="sm"
-                                    onClick={onExecuteStep}
-                                    disabled={!canExecute || isExecuting}
-                                    title={!canExecute ? "Execute previous steps first" : "Test this step (no self-healing)"}
-                                >
-                                    {isExecuting ? (
-                                        <>
-                                            <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
-                                            Running...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Play className="h-3 w-3 mr-1" />
-                                            Run Step
-                                        </>
-                                    )}
-                                </Button>
-                                <HelpTooltip text="Executes this step configuration directly without instruction validation or self-healing. Useful for quick testing." />
+                                <span title={!canExecute ? "To enable this button, execute previous steps first" : isExecuting ? "Step is currently executing" : "Test this step (no self-healing)"}>
+                                    <Button
+                                        size="sm"
+                                        onClick={onExecuteStep}
+                                        disabled={!canExecute || isExecuting}
+                                    >
+                                        {isExecuting ? (
+                                            <>
+                                                <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
+                                                Running...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Play className="h-3 w-3 mr-1" />
+                                                Run Step
+                                            </>
+                                        )}
+                                    </Button>
+                                </span>
+                                <HelpTooltip text="Executes this step configuration directly without instruction validation or self-healing. Only works if all previous steps have completed successfully." />
                             </>
                         )}
                         {!readOnly && onRemove && (
@@ -407,6 +409,10 @@ export function WorkflowStepGallery({
     const [isHydrated, setIsHydrated] = useState(false);
     const listRef = useRef<HTMLDivElement | null>(null);
     const [isConfiguratorEditing, setIsConfiguratorEditing] = useState<boolean>(false);
+    
+    const [isAddStepDialogOpen, setIsAddStepDialogOpen] = useState(false);
+    const [defaultStepId, setDefaultStepId] = useState('');
+    const [pendingInsertIndex, setPendingInsertIndex] = useState<number | null>(null);
 
     const isNavigatingRef = useRef<boolean>(false);
     const navigationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -599,6 +605,62 @@ export function WorkflowStepGallery({
         }
     };
 
+    const handleInsertStep = (afterIndex: number) => {
+        if (!onStepsChange || readOnly) return;
+        
+        const defaultId = `step_${Date.now()}`;
+        setDefaultStepId(defaultId);
+        setPendingInsertIndex(afterIndex);
+        setIsAddStepDialogOpen(true);
+    };
+
+    const handleConfirmInsertStep = (stepId: string) => {
+        if (pendingInsertIndex === null || !onStepsChange) return;
+        
+        const newStep = {
+            id: stepId,
+            name: '',
+            apiConfig: {
+                id: stepId,
+                instruction: '',
+                urlHost: '',
+                urlPath: '',
+                method: 'GET',
+                headers: {},
+                queryParams: {},
+                body: '',
+                authentication: 'NONE'
+            },
+            executionMode: 'DIRECT'
+        };
+        
+        const newSteps = [...steps];
+        newSteps.splice(pendingInsertIndex, 0, newStep);
+        onStepsChange(newSteps);
+        
+        const insertedIndex = pendingInsertIndex;
+        setIsAddStepDialogOpen(false);
+        setPendingInsertIndex(null);
+        
+        // Navigate to the newly inserted step (+1 for payload card, +1 because we insert after)
+        setTimeout(() => navigateToIndex(insertedIndex + 1), 100);
+    };
+
+    const handleConfirmInsertWorkflow = (workflowSteps: any[]) => {
+        if (pendingInsertIndex === null || !onStepsChange) return;
+        
+        const newSteps = [...steps];
+        newSteps.splice(pendingInsertIndex, 0, ...workflowSteps);
+        onStepsChange(newSteps);
+        
+        const insertedIndex = pendingInsertIndex;
+        setIsAddStepDialogOpen(false);
+        setPendingInsertIndex(null);
+        
+        // Navigate to the first newly inserted step
+        setTimeout(() => navigateToIndex(insertedIndex + 1), 100);
+    };
+
     const onStepEdit = (stepId: string, updatedStep: any, isUserInitiated: boolean = false) => {
         // Suppress user-initiated edits during navigation to prevent spurious resets
         if (isNavigatingRef.current && isUserInitiated) {
@@ -788,7 +850,22 @@ export function WorkflowStepGallery({
                                                         </div>
                                                         {showArrow && (
                                                             <div style={{ flex: `0 0 ${sepWidth}px`, width: `${sepWidth}px` }} className="flex items-center justify-center">
-                                                                <ChevronRight className="h-5 w-5 text-muted-foreground/50" />
+                                                                {!readOnly && onStepsChange && (
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            handleInsertStep(globalIdx);
+                                                                        }}
+                                                                        className="group relative flex items-center justify-center h-8 w-8 rounded-full hover:bg-primary/10 transition-colors"
+                                                                        title="Add step here"
+                                                                    >
+                                                                        <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:opacity-0 transition-opacity" />
+                                                                        <Plus className="h-4 w-4 text-primary absolute opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                                    </button>
+                                                                )}
+                                                                {(readOnly || !onStepsChange) && (
+                                                                    <ChevronRight className="h-5 w-5 text-muted-foreground/50" />
+                                                                )}
                                                             </div>
                                                         )}
                                                     </React.Fragment>
@@ -890,6 +967,15 @@ export function WorkflowStepGallery({
                     )}
                 </div>
             </div>
+
+            <AddStepDialog
+                open={isAddStepDialogOpen}
+                onOpenChange={setIsAddStepDialogOpen}
+                onConfirm={handleConfirmInsertStep}
+                onConfirmWorkflow={handleConfirmInsertWorkflow}
+                existingStepIds={steps.map((s: any) => s.id)}
+                defaultId={defaultStepId}
+            />
         </div>
     );
 }
