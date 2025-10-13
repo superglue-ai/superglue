@@ -31,7 +31,8 @@ export class OpenAILegacyModel implements LLM {
                 this.client = new AzureOpenAI({
                     apiKey,
                     apiVersion: apiVersion!,
-                    deployment: this.model
+                    deployment: this.model,
+                    //httpAgent: new SocksProxyAgent("socks://localhost:1080")
                 });
 
                 if (savedBaseUrl) process.env.OPENAI_BASE_URL = savedBaseUrl; else delete process.env.OPENAI_BASE_URL;
@@ -128,10 +129,14 @@ export class OpenAILegacyModel implements LLM {
             const error = typeof args === "string" ? parseJSON(args) : args;
             return { finalResult: { error: error?.reason || "Unknown error" }, shouldBreak: true };
         } else {
-            const tool = tools.find(t => t.name === name);
+            const tool = tools.find(t => t.function?.name === name);
             if (tool && tool.execute) {
                 const toolResult = await tool.execute(typeof args === "string" ? parseJSON(args) : args, context);
                 conversationMessages.push({ role: "tool", tool_call_id: callId, content: JSON.stringify(toolResult || {}) } as any);
+            }
+            else {
+                console.log(`Tool ${name} not found`);
+                conversationMessages.push({ role: "tool", tool_call_id: callId, content: JSON.stringify({ error: `Tool ${name} not found - continue without it` }) } as any);
             }
             return { finalResult: null, shouldBreak: false };
         }
@@ -222,7 +227,6 @@ export class OpenAILegacyModel implements LLM {
                             const { finalResult: result, shouldBreak } = await this.processToolCall(toolCall, tools as any[], conversationMessages as any[], context);
                             if (shouldBreak) {
                                 finalResult = result;
-                                break;
                             }
                         }
                     }

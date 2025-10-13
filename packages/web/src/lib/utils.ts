@@ -269,3 +269,22 @@ export function getGroupedTimezones(): Record<string, Array<{value: string, labe
     return acc;
   }, {} as Record<string, Array<{value: string, label: string}>>);
 }
+
+export function isValidSourceDataArrowFunction(code: string | undefined | null): boolean {
+  if (!code) return false;
+  const text = String(code);
+  const patterns = [
+    /^\s*\(?\s*\(\s*sourceData\s*\)\s*=>\s*\{[\s\S]*\}\s*\)?\s*;?\s*$/, // block body
+    /^\s*\(?\s*\(\s*sourceData\s*\)\s*=>\s*\([\s\S]*\)\s*\)?\s*;?\s*$/, // parenthesized expr
+    /^\s*\(?\s*\(\s*sourceData\s*\)\s*=>[\s\S]*\)?\s*;?\s*$/              // tolerant bare expr
+  ];
+  return patterns.some((re) => re.test(text));
+}
+
+export function ensureSourceDataArrowFunction(code: string | undefined | null): string {
+  const fallback = `(sourceData) => {\n  return sourceData;\n}`;
+  const text = (code ?? '').trim();
+  if (!text) return fallback;
+  if (isValidSourceDataArrowFunction(text)) return text;
+  return `(sourceData) => {\n${text}\n}`;
+}
