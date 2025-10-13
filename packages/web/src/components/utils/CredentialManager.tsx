@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
-import { Button } from '@/src/components/ui/button'
-import { Input } from '@/src/components/ui/input'
-import { Plus, Trash2, Sparkles } from 'lucide-react'
-import { parseCredentialsHelper } from '@/src/lib/client-utils'
-import { cn } from '@/src/lib/utils'
+import { Button } from '@/src/components/ui/button';
+import { Input } from '@/src/components/ui/input';
+import { parseCredentialsHelper } from '@/src/lib/client-utils';
+import { cn } from '@/src/lib/utils';
+import { Plus, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 
 type Credential = {
   key: string
@@ -118,6 +118,7 @@ export function CredentialsManager({ value, onChange, className }: CredentialsMa
                       )}
                     />
                     <Input
+                      type="password"
                       value={cred.value}
                       onChange={(e) => updateCredential(index, 'value', e.target.value)}
                       placeholder="Enter your API key"
