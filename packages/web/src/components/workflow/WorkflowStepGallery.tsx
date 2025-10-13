@@ -243,7 +243,7 @@ const SpotlightStepCard = ({
                                     const stepFailed = failedSteps?.includes(step.id);
                                     const errorResult = stepFailed && (!stepResult || typeof stepResult === 'string');
 
-                                    // Check if result is pending
+                                    // Check if result is pending (no output yet)
                                     const isPending = !stepFailed && stepResult === undefined;
 
                                     let outputString = '';
@@ -282,13 +282,20 @@ const SpotlightStepCard = ({
                                                 </div>
                                             )}
                                             {isPending ? (
-                                                <div className="flex flex-col items-center justify-center py-8 text-muted-foreground border rounded-md bg-muted/5">
-                                                    <div className="flex items-center gap-2 mb-1">
-                                                        <div className="h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
-                                                        <span className="text-xs">Currently running...</span>
+                                                isExecuting ? (
+                                                    <div className="flex flex-col items-center justify-center py-8 text-muted-foreground border rounded-md bg-muted/5">
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <div className="h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+                                                            <span className="text-xs">Currently running...</span>
+                                                        </div>
+                                                        <p className="text-[10px]">Step outputs will be shown shortly</p>
                                                     </div>
-                                                    <p className="text-[10px]">Step outputs will be shown shortly</p>
-                                                </div>
+                                                ) : (
+                                                    <div className="flex flex-col items-center justify-center py-8 text-muted-foreground border rounded-md bg-muted/5">
+                                                        <div className="text-xs mb-1">No output yet</div>
+                                                        <p className="text-[10px]">Run this step to see outputs</p>
+                                                    </div>
+                                                )
                                             ) : (
                                                 <>
                                                     <JsonCodeEditor
@@ -399,14 +406,18 @@ export function WorkflowStepGallery({
     // Local workflowId editor state to reduce re-renders
     const [localWorkflowId, setLocalWorkflowId] = useState<string>(workflowId ?? '');
     const [isEditingWorkflowId, setIsEditingWorkflowId] = useState<boolean>(false);
+    const workflowIdInputRef = useRef<HTMLInputElement | null>(null);
+    const liveWorkflowIdRef = useRef<string>(workflowId ?? '');
     useEffect(() => {
         if (!isEditingWorkflowId) {
             setLocalWorkflowId(workflowId ?? '');
         }
     }, [workflowId, isEditingWorkflowId]);
     const commitWorkflowIdIfChanged = () => {
-        if (onWorkflowIdChange && localWorkflowId !== (workflowId ?? '')) {
-            onWorkflowIdChange(localWorkflowId);
+        const nextVal = liveWorkflowIdRef.current ?? localWorkflowId;
+        if (onWorkflowIdChange && nextVal !== (workflowId ?? '')) {
+            onWorkflowIdChange(nextVal);
+            setLocalWorkflowId(nextVal);
         }
         setIsEditingWorkflowId(false);
     };
@@ -629,17 +640,21 @@ export function WorkflowStepGallery({
                                 <div className="flex items-center gap-3 px-3 py-1.5 bg-muted/50 rounded-md border h-[36px]">
                                     <span className="text-sm text-muted-foreground">Workflow ID:</span>
                                     <Input
-                                        value={localWorkflowId}
-                                        onChange={(e) => {
-                                            setLocalWorkflowId(e.target.value);
-                                            setIsEditingWorkflowId(true);
-                                        }}
+                                        key={isEditingWorkflowId ? 'editing' : localWorkflowId}
+                                        ref={workflowIdInputRef}
+                                        defaultValue={localWorkflowId}
+                                        onFocus={() => { setIsEditingWorkflowId(true); liveWorkflowIdRef.current = workflowIdInputRef.current?.value ?? localWorkflowId; }}
+                                        onChange={(e) => { liveWorkflowIdRef.current = e.target.value; }}
                                         onBlur={commitWorkflowIdIfChanged}
                                         onKeyDown={(e) => {
                                             if (e.key === 'Enter') {
                                                 e.preventDefault();
                                                 commitWorkflowIdIfChanged();
                                             } else if (e.key === 'Escape') {
+                                                if (workflowIdInputRef.current) {
+                                                    workflowIdInputRef.current.value = workflowId ?? '';
+                                                }
+                                                liveWorkflowIdRef.current = workflowId ?? '';
                                                 setLocalWorkflowId(workflowId ?? '');
                                                 setIsEditingWorkflowId(false);
                                             }

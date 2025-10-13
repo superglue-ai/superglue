@@ -29,7 +29,6 @@ interface WorkflowStepConfiguratorProps {
 }
 
 export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integrations: propIntegrations, onCreateIntegration, onEditingChange, disabled = false }: WorkflowStepConfiguratorProps) {
-    const [editedStep, setEditedStep] = useState({ ...step });
     const [didFormatLoopSelector, setDidFormatLoopSelector] = useState(false);
     const [showJson, setShowJson] = useState(false);
     const [localIntegrations, setLocalIntegrations] = useState<Integration[]>([]);
@@ -62,7 +61,6 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
         }
     };
 
-    // Load integrations on mount if not provided
     useEffect(() => {
         if (!propIntegrations) {
             loadIntegrations();
@@ -78,122 +76,102 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
 
     // Sync from parent when switching steps (step.id changes)
     useEffect(() => {
-        if (step.id !== editedStep.id) {
-            const next = { ...step };
-            setEditedStep(next);
-            // Keep JSON text in sync as single source
-            try {
-                setRawJsonText(JSON.stringify(next, null, 2));
-            } catch {
-                // ignore
-            }
-            // Reset headers and query params text
-            try {
-                const headers = step.apiConfig?.headers;
-                const headersJson = headers !== undefined && headers !== null ? JSON.stringify(headers, null, 2) : '{}';
-                setHeadersText(headersJson);
-                setHeadersError(false);
-            } catch (error) {
-                console.warn('Failed to stringify headers:', error);
-                setHeadersText('{}');
-                setHeadersError(false);
-            }
-            try {
-                const queryParams = step.apiConfig?.queryParams;
-                const queryParamsJson = queryParams !== undefined && queryParams !== null ? JSON.stringify(queryParams, null, 2) : '{}';
-                setQueryParamsText(queryParamsJson);
-                setQueryParamsError(false);
-            } catch (error) {
-                console.warn('Failed to stringify queryParams:', error);
-                setQueryParamsText('{}');
-                setQueryParamsError(false);
-            }
+        try {
+            setRawJsonText(JSON.stringify(step, null, 2));
+        } catch {}
+        try {
+            const headers = step.apiConfig?.headers;
+            const headersJson = headers !== undefined && headers !== null ? JSON.stringify(headers, null, 2) : '{}';
+            setHeadersText(headersJson);
+            setHeadersError(false);
+        } catch {
+            setHeadersText('{}');
+            setHeadersError(false);
+        }
+        try {
+            const queryParams = step.apiConfig?.queryParams;
+            const queryParamsJson = queryParams !== undefined && queryParams !== null ? JSON.stringify(queryParams, null, 2) : '{}';
+            setQueryParamsText(queryParamsJson);
+            setQueryParamsError(false);
+        } catch {
+            setQueryParamsText('{}');
+            setQueryParamsError(false);
         }
     }, [step.id]);
 
+    // Also reflect parent updates to headers/queryParams even if id doesn't change (e.g., self-heal)
+    useEffect(() => {
+        try {
+            const headers = step.apiConfig?.headers;
+            const headersJson = headers !== undefined && headers !== null ? JSON.stringify(headers, null, 2) : '{}';
+            if (headersJson !== headersText) {
+                setHeadersText(headersJson);
+                setHeadersError(false);
+            }
+        } catch { }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [step.apiConfig?.headers]);
+
+    useEffect(() => {
+        try {
+            const queryParams = step.apiConfig?.queryParams;
+            const queryParamsJson = queryParams !== undefined && queryParams !== null ? JSON.stringify(queryParams, null, 2) : '{}';
+            if (queryParamsJson !== queryParamsText) {
+                setQueryParamsText(queryParamsJson);
+                setQueryParamsError(false);
+            }
+        } catch { }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [step.apiConfig?.queryParams]);
+
     // Format loop selector on first load
     useEffect(() => {
-        if (!didFormatLoopSelector && editedStep.loopSelector) {
-            formatJavaScriptCode(editedStep.loopSelector).then(formatted => {
-                if (formatted !== editedStep.loopSelector) {
-                    handleFieldChange({ loopSelector: formatted });
+        if (!didFormatLoopSelector && step.loopSelector) {
+            formatJavaScriptCode(step.loopSelector).then(formatted => {
+                if (formatted !== step.loopSelector) {
+                    const updated = { ...step, loopSelector: formatted } as any;
+                    onEdit(step.id, updated, true);
                 }
                 setDidFormatLoopSelector(true);
             });
         }
-    }, [editedStep.loopSelector]);
+    }, [step.loopSelector]);
 
-    const handleFieldChange = (updates: Partial<typeof editedStep>) => {
+    const handleImmediateEdit = (updater: (s: any) => any) => {
         if (disabled) return;
-        const newStep = { ...editedStep, ...updates };
-        setEditedStep(newStep);
-        // Update canonical JSON string
-        try {
-            setRawJsonText(JSON.stringify(newStep, null, 2));
-        } catch {
-            // ignore
-        }
-
-        if (onEditingChange) {
-            onEditingChange(true);
-        }
-
-        // Immediately propagate changes to parent
-        const updatedStep = {
-            ...step,
-            ...newStep,
-            executionMode: newStep.executionMode,
-            loopSelector: newStep.loopSelector,
-            loopMaxIters: newStep.loopMaxIters,
-            apiConfig: { ...step.apiConfig, ...newStep.apiConfig }
-        };
-        onEdit(step.id, updatedStep, true);
-
-        if (onEditingChange) {
-            setTimeout(() => onEditingChange(false), 100);
-        }
+        const updated = updater(step);
+        try { setRawJsonText(JSON.stringify(updated, null, 2)); } catch {}
+        if (onEditingChange) onEditingChange(true);
+        onEdit(step.id, updated, true);
+        if (onEditingChange) setTimeout(() => onEditingChange(false), 100);
     };
 
     const [rawJsonText, setRawJsonText] = useState<string>(() => {
-        try { return JSON.stringify(editedStep, null, 2); } catch { return '{}'; }
+        try { return JSON.stringify(step, null, 2); } catch { return '{}'; }
     });
 
-    // Track if rawJsonText changes came from code editor (user), not programmatic sync
     const isCodeEditingRef = useRef<boolean>(false);
-
-    // Debounce-parse canonical JSON text into object and emit onEdit when valid
+    
     useEffect(() => {
         const timer = setTimeout(() => {
             try {
                 if (!isCodeEditingRef.current) return; // only react to actual code editor edits
                 const parsed = JSON.parse(rawJsonText);
-                // Only update/emit if content actually changed
-                const changed = JSON.stringify(parsed) !== JSON.stringify(editedStep);
-                if (changed) {
-                    setEditedStep(parsed);
-                    // Keep ancillary text fields in sync for headers/query params
-                    try {
-                        const headers = parsed.apiConfig?.headers;
-                        setHeadersText(headers !== undefined && headers !== null ? JSON.stringify(headers, null, 2) : '{}');
-                        setHeadersError(false);
-                    } catch {
-                        // keep previous
-                    }
-                    try {
-                        const queryParams = parsed.apiConfig?.queryParams;
-                        setQueryParamsText(queryParams !== undefined && queryParams !== null ? JSON.stringify(queryParams, null, 2) : '{}');
-                        setQueryParamsError(false);
-                    } catch {
-                        // keep previous
-                    }
-                    if (onEditingChange) onEditingChange(true);
-                    onEdit(step.id, parsed, true);
-                    if (onEditingChange) setTimeout(() => onEditingChange(false), 100);
-                }
-            } catch {
-                // invalid JSON - do nothing until valid
-            }
-            // reset flag after debounce window
+                if (onEditingChange) onEditingChange(true);
+                onEdit(step.id, parsed, true);
+                
+                try {
+                    const headers = parsed.apiConfig?.headers;
+                    setHeadersText(headers !== undefined && headers !== null ? JSON.stringify(headers, null, 2) : '{}');
+                    setHeadersError(false);
+                } catch {}
+                try {
+                    const queryParams = parsed.apiConfig?.queryParams;
+                    setQueryParamsText(queryParams !== undefined && queryParams !== null ? JSON.stringify(queryParams, null, 2) : '{}');
+                    setQueryParamsError(false);
+                } catch {}
+                if (onEditingChange) setTimeout(() => onEditingChange(false), 100);
+            } catch {}
             isCodeEditingRef.current = false;
         }, 300);
         return () => clearTimeout(timer);
@@ -202,22 +180,9 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
     const handleRemove = () => { onRemove(step.id); };
 
     const linkedIntegration = integrations?.find(integration => {
-        if ((editedStep.integrationId && integration.id === editedStep.integrationId) || (step.integrationId && integration.id === step.integrationId)) return true;
+        if (step.integrationId && integration.id === step.integrationId) return true;
         return step.apiConfig?.urlHost && integration.urlHost && step.apiConfig.urlHost.includes(integration.urlHost.replace(/^(https?|postgres(ql)?|ftp(s)?|sftp|file):\/\//, ''));
     });
-
-    useEffect(() => {
-        if (linkedIntegration && !editedStep.integrationId && !step.integrationId) {
-            // Only update local state, don't trigger onEdit
-            // This is automatic linking, not user-initiated change
-            setEditedStep(prev => {
-                if (prev.integrationId === linkedIntegration.id) {
-                    return prev; // No change needed
-                }
-                return { ...prev, integrationId: linkedIntegration.id };
-            });
-        }
-    }, [linkedIntegration?.id, step.id]);
 
     return (
         <div className="flex flex-col items-center">
@@ -226,7 +191,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                     <div className="flex items-center justify-between min-w-0">
                         <div className="flex items-center gap-2 min-w-0 flex-1">
                             <CardTitle className="text-sm font-medium flex items-center gap-2 min-w-0">
-                                {editedStep.executionMode === 'LOOP' && (<RotateCw className="h-4 w-4 text-muted-foreground flex-shrink-0" />)}
+                                {step.executionMode === 'LOOP' && (<RotateCw className="h-4 w-4 text-muted-foreground flex-shrink-0" />)}
                                 <span className="font-mono truncate">{step.id}</span>
                                 {linkedIntegration && (
                                     <Badge variant="outline" className="text-xs flex-shrink-0">
@@ -279,7 +244,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                             <HelpTooltip text="AI-generated instruction for this step. This describes what the step does and how it should behave." />
                                         </Label>
                                         <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded mt-1">
-                                            {editedStep.apiConfig.instruction || <span className="italic">No instruction provided</span>}
+                                            {step.apiConfig.instruction || <span className="italic">No instruction provided</span>}
                                         </div>
                                     </div>
                                     <div className="flex gap-2">
@@ -288,7 +253,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                                 Integration
                                                 <HelpTooltip text="Select an integration to link this step to. This will pre-fill the API configuration with the integration's base URL and credentials." />
                                             </Label>
-                                            <Select value={editedStep.integrationId || step.integrationId} onValueChange={(value) => { if (disabled) return; if (value === "CREATE_NEW") { onCreateIntegration?.(); } else { const selectedIntegration = integrations?.find(integration => integration.id === value); handleFieldChange({ integrationId: value, apiConfig: { ...editedStep.apiConfig, urlHost: selectedIntegration?.urlHost || editedStep.apiConfig.urlHost, urlPath: selectedIntegration?.urlPath || editedStep.apiConfig.urlPath, headers: selectedIntegration?.credentials ? Object.entries(selectedIntegration.credentials).reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {}) : editedStep.apiConfig.headers } }); } }}>
+                                            <Select value={step.integrationId || ''} onValueChange={(value) => { if (disabled) return; if (value === "CREATE_NEW") { onCreateIntegration?.(); } else { const selectedIntegration = integrations?.find(integration => integration.id === value); handleImmediateEdit((s) => ({ ...s, integrationId: value, apiConfig: { ...s.apiConfig, urlHost: selectedIntegration?.urlHost || s.apiConfig.urlHost, urlPath: selectedIntegration?.urlPath || s.apiConfig.urlPath, headers: selectedIntegration?.credentials ? Object.entries(selectedIntegration.credentials).reduce((acc, [key, val]) => ({ ...acc, [key]: val }), {}) : s.apiConfig.headers } })); } }}>
                                                 <SelectTrigger className="h-9 mt-1" disabled={disabled}>
                                                     <SelectValue placeholder="Select integration" />
                                                 </SelectTrigger>
@@ -317,7 +282,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                                 <Label className="text-xs">Mode</Label>
                                                 <HelpTooltip text="DIRECT: Execute once with input data. LOOP: Execute multiple times iterating over an array from previous steps." />
                                             </div>
-                                            <Select value={editedStep.executionMode} onValueChange={(value) => { if (disabled) return; handleFieldChange({ executionMode: value }); }}>
+                                            <Select value={step.executionMode} onValueChange={(value) => { if (disabled) return; handleImmediateEdit((s) => ({ ...s, executionMode: value })); }}>
                                                 <SelectTrigger className="h-9 w-28 mt-1" disabled={disabled}>
                                                     <SelectValue placeholder="Mode" />
                                                 </SelectTrigger>
@@ -335,7 +300,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                         </Label>
                                         <div className="space-y-2 mt-1">
                                             <div className="flex gap-2">
-                                                <Select value={editedStep.apiConfig.method} onValueChange={(value) => { if (disabled) return; handleFieldChange({ apiConfig: { ...editedStep.apiConfig, method: value } }); }}>
+                                                <Select value={step.apiConfig.method} onValueChange={(value) => { if (disabled) return; handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, method: value } })); }}>
                                                     <SelectTrigger className="h-9 flex-1" disabled={disabled}>
                                                         <SelectValue placeholder="Method" />
                                                     </SelectTrigger>
@@ -343,8 +308,8 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                                         {['GET', 'POST', 'PUT', 'DELETE', 'PATCH'].map(method => (<SelectItem key={method} value={method}>{method}</SelectItem>))}
                                                     </SelectContent>
                                                 </Select>
-                                                <Input value={editedStep.apiConfig.urlHost} onChange={(e) => handleFieldChange({ apiConfig: { ...editedStep.apiConfig, urlHost: e.target.value } })} className="text-xs flex-1 focus:ring-0 focus:ring-offset-0" placeholder="Host" disabled={disabled} />
-                                                <Input value={editedStep.apiConfig.urlPath} onChange={(e) => handleFieldChange({ apiConfig: { ...editedStep.apiConfig, urlPath: e.target.value } })} className="text-xs flex-1 focus:ring-0 focus:ring-offset-0" placeholder="Path" disabled={disabled} />
+                                                <Input value={step.apiConfig.urlHost} onChange={(e) => handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, urlHost: e.target.value } }))} className="text-xs flex-1 focus:ring-0 focus:ring-offset-0" placeholder="Host" disabled={disabled} />
+                                                <Input value={step.apiConfig.urlPath} onChange={(e) => handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, urlPath: e.target.value } }))} className="text-xs flex-1 focus:ring-0 focus:ring-offset-0" placeholder="Path" disabled={disabled} />
                                             </div>
                                         </div>
                                     </div>
@@ -353,7 +318,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                             Headers (JSON)
                                             <HelpTooltip text="HTTP headers to include with the request. Use JSON format. Common headers include Content-Type, Authorization, etc." />
                                         </Label>
-                                        <Textarea value={headersText} onChange={(e) => { if (disabled) return; const newValue = e.target.value; setHeadersText(newValue); if (!newValue.trim()) { handleFieldChange({ apiConfig: { ...editedStep.apiConfig, headers: {} } }); setHeadersError(false); return; } try { const headers = JSON.parse(newValue); handleFieldChange({ apiConfig: { ...editedStep.apiConfig, headers } }); setHeadersError(false); } catch { setHeadersError(true); } }} className="font-mono text-xs h-20 mt-1 focus:ring-0 focus:ring-offset-0" placeholder="{}" disabled={disabled} />
+                                        <Textarea value={headersText} onChange={(e) => { if (disabled) return; const newValue = e.target.value; setHeadersText(newValue); try { const headers = JSON.parse(newValue); handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, headers } })); setHeadersError(false); } catch { setHeadersError(true); } }} className="font-mono text-xs h-20 mt-1 focus:ring-0 focus:ring-offset-0" placeholder="{}" disabled={disabled} />
                                         {headersError && (<div className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5 bg-red-500/10 dark:bg-red-500/20 py-1.5 px-2.5 rounded-md mt-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg><span>Invalid JSON format</span></div>)}
                                     </div>
                                     <div>
@@ -361,7 +326,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                             Query Parameters (JSON)
                                             <HelpTooltip text='URL query parameters to append to the request. Use JSON format like {"param1": "value1", "param2": "value2"}' />
                                         </Label>
-                                        <Textarea value={queryParamsText} onChange={(e) => { if (disabled) return; const newValue = e.target.value; setQueryParamsText(newValue); if (!newValue.trim()) { handleFieldChange({ apiConfig: { ...editedStep.apiConfig, queryParams: {} } }); setQueryParamsError(false); return; } try { const queryParams = JSON.parse(newValue); handleFieldChange({ apiConfig: { ...editedStep.apiConfig, queryParams } }); setQueryParamsError(false); } catch { setQueryParamsError(true); } }} className="font-mono text-xs h-20 mt-1 focus:ring-0 focus:ring-offset-0" placeholder="{}" disabled={disabled} />
+                                        <Textarea value={queryParamsText} onChange={(e) => { if (disabled) return; const newValue = e.target.value; setQueryParamsText(newValue); try { const queryParams = JSON.parse(newValue); handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, queryParams } })); setQueryParamsError(false); } catch { setQueryParamsError(true); } }} className="font-mono text-xs h-20 mt-1 focus:ring-0 focus:ring-offset-0" placeholder="{}" disabled={disabled} />
                                         {queryParamsError && (<div className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5 bg-red-500/10 dark:bg-red-500/20 py-1.5 px-2.5 rounded-md mt-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg><span>Invalid JSON format</span></div>)}
                                     </div>
                                     <div>
@@ -369,7 +334,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                             Body
                                             <HelpTooltip text="Request body content. Can be JSON, form data, or plain text. Use JavaScript expressions to transform data from previous steps." />
                                         </Label>
-                                        <Textarea value={editedStep.apiConfig.body || ''} onChange={(e) => handleFieldChange({ apiConfig: { ...editedStep.apiConfig, body: e.target.value } })} className="font-mono text-xs h-20 mt-1 focus:ring-0 focus:ring-offset-0" disabled={disabled} />
+                                        <Textarea value={step.apiConfig.body || ''} onChange={(e) => handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, body: e.target.value } }))} className="font-mono text-xs h-20 mt-1 focus:ring-0 focus:ring-offset-0" disabled={disabled} />
                                     </div>
                                     <div>
                                         <Label className="text-xs flex items-center gap-1">
@@ -377,7 +342,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                             <HelpTooltip text="Configure pagination if the API returns data in pages. Only set this if you're using pagination variables like {'<<offset>>'}, {'<<page>>'}, or {'<<cursor>>'} in your request." />
                                         </Label>
                                         <div className="space-y-2 mt-1">
-                                            <Select value={editedStep.apiConfig.pagination?.type || 'none'} onValueChange={(value) => { if (disabled) return; if (value === 'none') { handleFieldChange({ apiConfig: { ...editedStep.apiConfig, pagination: undefined } }); } else { handleFieldChange({ apiConfig: { ...editedStep.apiConfig, pagination: { ...(editedStep.apiConfig.pagination || {}), type: value, pageSize: editedStep.apiConfig.pagination?.pageSize || '50', cursorPath: editedStep.apiConfig.pagination?.cursorPath || '', stopCondition: editedStep.apiConfig.pagination?.stopCondition || '(response, pageInfo) => !response.data || response.data.length === 0' } } }); } }}>
+                                            <Select value={step.apiConfig.pagination?.type || 'none'} onValueChange={(value) => { if (disabled) return; if (value === 'none') { handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, pagination: undefined } })); } else { handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, pagination: { ...(s.apiConfig.pagination || {}), type: value, pageSize: s.apiConfig.pagination?.pageSize || '50', cursorPath: s.apiConfig.pagination?.cursorPath || '', stopCondition: s.apiConfig.pagination?.stopCondition || '(response, pageInfo) => !response.data || response.data.length === 0' } } })); } }}>
                                                 <SelectTrigger className="h-9" disabled={disabled}>
                                                     <SelectValue placeholder="No pagination" />
                                                 </SelectTrigger>
@@ -388,16 +353,16 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                                     <SelectItem value="CURSOR_BASED">Cursor-based (uses {'<<cursor>>'})</SelectItem>
                                                 </SelectContent>
                                             </Select>
-                                            {editedStep.apiConfig.pagination && (
+                                            {step.apiConfig.pagination && (
                                                 <>
                                                     <div>
                                                         <Label className="text-xs">Page Size</Label>
-                                                        <Input value={editedStep.apiConfig.pagination.pageSize || '50'} onChange={(e) => handleFieldChange({ apiConfig: { ...editedStep.apiConfig, pagination: { ...(editedStep.apiConfig.pagination || {}), pageSize: e.target.value } } })} className="text-xs mt-1 focus:ring-0 focus:ring-offset-0" placeholder="50" disabled={disabled} />
+                                                        <Input value={step.apiConfig.pagination.pageSize || '50'} onChange={(e) => handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, pagination: { ...(s.apiConfig.pagination || {}), pageSize: e.target.value } } }))} className="text-xs mt-1 focus:ring-0 focus:ring-offset-0" placeholder="50" disabled={disabled} />
                                                     </div>
-                                                    {editedStep.apiConfig.pagination.type === 'CURSOR_BASED' && (
+                                                    {step.apiConfig.pagination.type === 'CURSOR_BASED' && (
                                                         <div>
                                                             <Label className="text-xs">Cursor Path</Label>
-                                                            <Input value={editedStep.apiConfig.pagination.cursorPath || ''} onChange={(e) => handleFieldChange({ apiConfig: { ...editedStep.apiConfig, pagination: { ...(editedStep.apiConfig.pagination || {}), cursorPath: e.target.value } } })} className="text-xs mt-1 focus:ring-0 focus:ring-offset-0" placeholder="e.g., response.nextCursor" disabled={disabled} />
+                                                            <Input value={step.apiConfig.pagination.cursorPath || ''} onChange={(e) => handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, pagination: { ...(s.apiConfig.pagination || {}), cursorPath: e.target.value } } }))} className="text-xs mt-1 focus:ring-0 focus:ring-offset-0" placeholder="e.g., response.nextCursor" disabled={disabled} />
                                                         </div>
                                                     )}
                                                     <div>
@@ -405,13 +370,13 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                                             Stop Condition (JavaScript)
                                                             <HelpTooltip text="JavaScript function that returns true when pagination should stop. Receives (response, pageInfo) where pageInfo has: page, offset, cursor, total fetched." />
                                                         </Label>
-                                                        <Textarea value={editedStep.apiConfig.pagination.stopCondition || '(response, pageInfo) => !response.data || response.data.length === 0'} onChange={(e) => handleFieldChange({ apiConfig: { ...editedStep.apiConfig, pagination: { ...(editedStep.apiConfig.pagination || {}), stopCondition: e.target.value } } })} className="font-mono text-xs h-16 mt-1" placeholder="(response, pageInfo) => !response.data || response.data.length === 0" disabled={disabled} />
+                                                        <Textarea value={step.apiConfig.pagination.stopCondition || '(response, pageInfo) => !response.data || response.data.length === 0'} onChange={(e) => handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, pagination: { ...(s.apiConfig.pagination || {}), stopCondition: e.target.value } } }))} className="font-mono text-xs h-16 mt-1" placeholder="(response, pageInfo) => !response.data || response.data.length === 0" disabled={disabled} />
                                                     </div>
                                                 </>
                                             )}
                                         </div>
                                     </div>
-                                    {editedStep.executionMode === 'LOOP' && (
+                                    {step.executionMode === 'LOOP' && (
                                         <>
                                             <div>
                                                 <Label className="text-xs flex items-center gap-1">
@@ -420,8 +385,8 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                                 </Label>
                                                 <div className="mt-1">
                                                     <JavaScriptCodeEditor
-                                                        value={editedStep.loopSelector || ''}
-                                                        onChange={(val) => handleFieldChange({ loopSelector: val })}
+                                                        value={step.loopSelector || ''}
+                                                        onChange={(val) => handleImmediateEdit((s) => ({ ...s, loopSelector: val }))}
                                                         readOnly={disabled}
                                                         minHeight="120px"
                                                         maxHeight="260px"
@@ -435,7 +400,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                                     Max Iterations
                                                     <HelpTooltip text="Maximum number of loop iterations to prevent infinite loops. Default is 1000." />
                                                 </Label>
-                                                <Input type="number" value={editedStep.loopMaxIters || ''} onChange={(e) => handleFieldChange({ loopMaxIters: parseInt(e.target.value) || undefined })} className="text-xs mt-1 w-32" placeholder="1000" disabled={disabled} />
+                                                <Input type="number" value={step.loopMaxIters || ''} onChange={(e) => handleImmediateEdit((s) => ({ ...s, loopMaxIters: parseInt(e.target.value) || undefined }))} className="text-xs mt-1 w-32" placeholder="1000" disabled={disabled} />
                                             </div>
                                         </>
                                     )}
@@ -449,5 +414,4 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
         </div>
     );
 }
-
 

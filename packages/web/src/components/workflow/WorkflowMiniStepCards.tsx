@@ -5,7 +5,7 @@ import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import JsonSchemaEditor from '@/src/components/utils/JsonSchemaEditor';
 import { downloadJson } from '@/src/lib/download-utils';
 import { formatBytes, isAllowedFileType, MAX_TOTAL_FILE_SIZE, type UploadedFileInfo } from '@/src/lib/file-utils';
-import { cn, formatJavaScriptCode, isEmptyData, truncateForDisplay, truncateLines } from '@/src/lib/utils';
+import { cn, formatJavaScriptCode, isEmptyData, truncateForDisplay, truncateLines, isValidSourceDataArrowFunction, ensureSourceDataArrowFunction } from '@/src/lib/utils';
 import { inferJsonSchema } from '@superglue/shared';
 import { Check, Code2, Copy, Download, Eye, FileJson, Package, Play, Upload, X } from 'lucide-react';
 import Prism from 'prismjs';
@@ -183,10 +183,7 @@ export const JavaScriptCodeEditor = React.memo(({ value, onChange, readOnly = fa
     const highlightTimer = useRef<number | null>(null);
     const [allowHighlight, setAllowHighlight] = useState<boolean>(true);
     const [hasFormatted, setHasFormatted] = useState(false);
-    const hasValidPattern = (code: string): boolean => {
-        const arrowFunctionPattern = /^\s*\(\s*sourceData\s*\)\s*=>\s*\{[\s\S]*\}\s*;?\s*$/;
-        return arrowFunctionPattern.test(code);
-    };
+    const hasValidPattern = (code: string): boolean => isValidSourceDataArrowFunction(code);
     const displayValue = value || '';
 
     useEffect(() => {
@@ -594,12 +591,7 @@ export const FinalTransformMiniStepCard = ({ transform, responseSchema, onTransf
             if (onResponseSchemaChange) onResponseSchemaChange(value);
         }
     };
-    const ensureValidTransform = (code: string): string => {
-        if (!code || !code.trim()) return `(sourceData) => {\n  return sourceData;\n}`;
-        const arrowFunctionPattern = /^\s*\(\s*sourceData\s*\)\s*=>\s*\{[\s\S]*\}\s*;?\s*$/;
-        if (arrowFunctionPattern.test(code)) return code;
-        return `(sourceData) => {\n${code}\n}`;
-    };
+    const ensureValidTransform = (code: string): string => ensureSourceDataArrowFunction(code);
     const handleExecuteTransform = () => {
         const validTransform = ensureValidTransform(localTransform);
         if (onTransformChange) onTransformChange(localTransform);
@@ -770,5 +762,4 @@ export const MiniStepCard = ({ step, index, isActive, onClick, stepId, isPayload
 };
 
 export { truncateForDisplay, truncateLines };
-
 
