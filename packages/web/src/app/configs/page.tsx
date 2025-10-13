@@ -20,6 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/src/components/ui/dropdown-menu";
+import { Input } from "@/src/components/ui/input";
 import {
   Table,
   TableBody,
@@ -31,14 +32,15 @@ import {
 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/src/components/ui/tooltip";
 import EmptyStateActions from '@/src/components/utils/EmptyStateActions';
-import { ApiConfig, ExecutionStep, ExtractConfig, SuperglueClient, TransformConfig, Workflow } from '@superglue/client';
-import { Calendar, Check, Copy, GitBranch, History, Loader2, Play, Plus, RotateCw, Settings, Trash2, Zap } from "lucide-react";
+import WorkflowSchedulesList from '@/src/components/workflow/WorkflowSchedulesList';
+import { ApiConfig, ExtractConfig, SuperglueClient, TransformConfig, Workflow } from '@superglue/client';
+import { Calendar, Check, Copy, GitBranch, History, Loader2, Play, Plus, RotateCw, Search, Settings, Trash2, Zap } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import React from 'react';
-import WorkflowSchedulesList from '@/src/components/workflow/WorkflowSchedulesList';
 
 const ConfigTable = () => {
   const router = useRouter();
+  const [allConfigs, setAllConfigs] = React.useState<(ApiConfig | ExtractConfig | Workflow | TransformConfig)[]>([]);
   const [configs, setConfigs] = React.useState<(ApiConfig | ExtractConfig | Workflow | TransformConfig)[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [total, setTotal] = React.useState(0);
@@ -52,6 +54,7 @@ const ConfigTable = () => {
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
   const [showHiddenOptions, setShowHiddenOptions] = React.useState(false);
   const [expandedWorkflowId, setExpandedWorkflowId] = React.useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = React.useState("");
 
   // Add effect to track Command/Shift key presses
   React.useEffect(() => {
@@ -100,28 +103,47 @@ const ConfigTable = () => {
         ...transformConfigs.items.map(item => ({ ...item, type: 'transform' as const })),
         ...workflowConfigs.items.map((item: any) => ({ ...item, type: 'workflow' as const }))
       ].sort((a, b) => {
-        // Use updatedAt first, fallback to createdAt
         const dateA = new Date(a.updatedAt || a.createdAt).getTime();
         const dateB = new Date(b.updatedAt || b.createdAt).getTime();
-        return dateB - dateA; // Sort descending (newest first)
+        return dateB - dateA;
       });
 
-      const start = page * pageSize;
-      const end = start + pageSize;
-      setConfigs(combinedConfigs.slice(start, end));
+      setAllConfigs(combinedConfigs);
       setTotal(combinedConfigs.length);
+      setPage(0);
     } catch (error) {
       console.error('Error fetching configs:', error);
-      // Consider setting an error state to show in the UI
     } finally {
       setLoading(false);
       setIsRefreshing(false);
     }
-  }, [page, pageSize]);
+  }, [config.superglueEndpoint, config.superglueApiKey]);
 
   React.useEffect(() => {
     refreshConfigs();
   }, [refreshConfigs]);
+
+  React.useEffect(() => {
+    const filtered = allConfigs.filter(config => {
+      if (!searchTerm) return true;
+      if(!config) return false;
+      const searchLower = searchTerm.toLowerCase();
+      const configString = JSON.stringify(config).toLowerCase();
+      return configString.includes(searchLower);
+    });
+    
+    setTotal(filtered.length);
+    
+    const start = page * pageSize;
+    const end = start + pageSize;
+    setConfigs(filtered.slice(start, end));
+  }, [page, allConfigs, searchTerm, pageSize]);
+
+  React.useEffect(() => {
+    if (searchTerm) {
+      setPage(0);
+    }
+  }, [searchTerm]);
 
   const handleWorkflow = () => {
     router.push('/workflows');
@@ -253,7 +275,7 @@ const ConfigTable = () => {
   if (loading) {
     return (
       <div className="p-8 max-w-none w-full min-h-full flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-white" />
+        <Loader2 className="h-8 w-8 animate-spin text-foreground" />
       </div>
     );
   }
@@ -268,7 +290,7 @@ const ConfigTable = () => {
       </div>
     )
   }
-  else if (configs.length === 0) {
+  else if (allConfigs.length === 0) {
     return (
       <div className="p-8 max-w-none w-full min-h-full">
         <div className="flex justify-between items-center mb-6">
@@ -333,6 +355,16 @@ const ConfigTable = () => {
         </div>
       </div>
 
+      <div className="relative mb-4">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search by ID, type, or details..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-10"
+        />
+      </div>
+
       <div className="border rounded-lg">
         <Table>
           <TableHeader>
@@ -364,7 +396,14 @@ const ConfigTable = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {configs.map((config) => {
+            {configs.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                  No results found
+                </TableCell>
+              </TableRow>
+            ) : (
+              configs.map((config) => {
               const configType = (config as any).type;
               const isApi = configType === 'api';
               const isExtract = configType === 'extract';
@@ -442,10 +481,7 @@ const ConfigTable = () => {
                       </Badge>
                     </TableCell>
                     <TableCell className="max-w-[300px] truncate">
-                      {configType === 'api' || configType === 'extract' || configType === 'transform' ?
-                        (config as ApiConfig | ExtractConfig | TransformConfig).instruction :
-                        (config as Workflow).steps.map((step: ExecutionStep) => step.id).join(' => ')
-                      }
+                      {config.instruction}
                     </TableCell>
                     <TableCell className="w-[150px]">
                       {config.updatedAt ? new Date(config.updatedAt).toLocaleDateString() : (config.createdAt ? new Date(config.createdAt).toLocaleDateString() : '')}
@@ -522,7 +558,8 @@ const ConfigTable = () => {
                   )}
                 </React.Fragment>
               );
-            })}
+            })
+            )}
           </TableBody>
         </Table>
       </div>
