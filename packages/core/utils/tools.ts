@@ -210,11 +210,12 @@ export async function executeAndValidateMappingCode(input: any, mappingCode: str
 
 export async function callAxios(config: AxiosRequestConfig, options: RequestOptions) {
   let retryCount = 0;
-  const maxRetries = options?.retries || 0;
+  const maxRetries = options?.retries ?? 1;
   const delay = options?.retryDelay || 1000;
   const maxRateLimitWaitMs = 60 * 60 * 1000 * 24; // 24 hours is the max wait time for rate limit retries, hardcoded
   let rateLimitRetryCount = 0;
   let totalRateLimitWaitTime = 0;
+  const QUICK_RETRY_THRESHOLD_MS = 10000;
 
   config.headers = {
     "Accept": "*/*",
@@ -238,6 +239,7 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
   do {
     let response: AxiosResponse | null = null;
     try {
+      const startTs = Date.now();
       response = await axios({
         ...config,
         responseType: 'arraybuffer', // ALWAYS use arraybuffer to preserve data integrity
@@ -246,6 +248,7 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
         maxBodyLength: Infinity, // No limit on response body size
         decompress: true, // Ensure gzip/deflate responses are decompressed
       });
+      const durationMs = Date.now() - startTs;
 
       if (response.status === 429) {
 
@@ -279,10 +282,15 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
         rateLimitRetryCount++;
         continue; // Skip the regular retry logic and try again immediately
       }
-
-      // Convert ArrayBuffer to Buffer for consistent handling
       if (response.data instanceof ArrayBuffer) {
         response.data = Buffer.from(response.data);
+      }
+      if (response.status < 200 || response.status >= 300) {
+        if (response.status !== 429 && retryCount < maxRetries && durationMs < QUICK_RETRY_THRESHOLD_MS) {
+          retryCount++;
+          continue;
+        }
+        return response;
       }
       return response;
     } catch (error) {
