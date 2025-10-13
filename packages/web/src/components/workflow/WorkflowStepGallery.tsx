@@ -413,6 +413,10 @@ export function WorkflowStepGallery({
     const [isAddStepDialogOpen, setIsAddStepDialogOpen] = useState(false);
     const [defaultStepId, setDefaultStepId] = useState('');
     const [pendingInsertIndex, setPendingInsertIndex] = useState<number | null>(null);
+  const isConfiguratorEditingRef = useRef<boolean>(false);
+  useEffect(() => {
+      isConfiguratorEditingRef.current = isConfiguratorEditing;
+  }, [isConfiguratorEditing]);
 
     const isNavigatingRef = useRef<boolean>(false);
     const navigationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -667,8 +671,11 @@ export function WorkflowStepGallery({
             if (originalOnStepEdit) {
                 originalOnStepEdit(stepId, updatedStep, false);
             }
-        } else if (originalOnStepEdit) {
-            originalOnStepEdit(stepId, updatedStep, isUserInitiated);
+            return;
+        }
+        if (originalOnStepEdit) {
+            const effectiveUserInitiated = !!(isUserInitiated && isConfiguratorEditingRef.current);
+            originalOnStepEdit(stepId, updatedStep, effectiveUserInitiated);
         }
     };
 
