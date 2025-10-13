@@ -250,7 +250,7 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
         decompress: true, // Ensure gzip/deflate responses are decompressed
         httpsAgent: new https.Agent({
           rejectUnauthorized: false
-        })  
+        })
       });
       const durationMs = Date.now() - startTs;
 
@@ -302,7 +302,7 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
       retryCount++;
       await new Promise(resolve => setTimeout(resolve, delay * retryCount));
     }
-  } while (retryCount < maxRetries || rateLimitRetryCount > 0);  // separate max retries and rate limit retries
+  } while (retryCount <= maxRetries || rateLimitRetryCount > 0);  // separate max retries and rate limit retries
 }
 
 export function applyAuthFormat(format: string, credentials: Record<string, string>): string {
