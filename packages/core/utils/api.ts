@@ -309,12 +309,20 @@ export async function callEndpoint({ endpoint, payload, credentials, options }: 
     const status = lastResponse?.status;
     let statusHandlerResult = null;
 
+    const retriesAttempted = (lastResponse as any)._retriesAttempted || 0;
+    const lastFailureStatus = (lastResponse as any)._lastFailureStatus;
     if ([200, 201, 202, 203, 204, 205].includes(status)) {
       statusHandlerResult = handle2xxStatus(lastResponse, axiosConfig, endpoint.method, processedUrl, credentials, payload);
     } else if (status === 429) {
       statusHandlerResult = handle429Status(lastResponse, axiosConfig, endpoint.method, processedUrl);
     } else {
-      statusHandlerResult = handleOtherStatus(lastResponse, axiosConfig, endpoint.method, processedUrl);
+      const base = handleOtherStatus(lastResponse, axiosConfig, endpoint.method, processedUrl);
+      if (base.shouldFail && base.message) {
+        const suffix = `\nRetries attempted: ${retriesAttempted}${lastFailureStatus ? `; last failure status: ${lastFailureStatus}` : ''}`;
+        statusHandlerResult = { shouldFail: true, message: `${base.message}${suffix}` };
+      } else {
+        statusHandlerResult = base;
+      }
     }
 
     if (statusHandlerResult.shouldFail) {

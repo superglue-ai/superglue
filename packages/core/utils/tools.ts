@@ -9,6 +9,7 @@ import { Validator } from "jsonschema";
 import { HttpMethodEnum } from "../mcp/mcp-server.js";
 import { ApiCallError } from "./api.js";
 import { parseJSON } from "./json-parser.js";
+import { logMessage } from "./logs.js";
 import { injectVMHelpersIndividually } from "./vm-helpers.js";
 
 export function isRequested(field: string, info: GraphQLResolveInfo) {
@@ -211,12 +212,13 @@ export async function executeAndValidateMappingCode(input: any, mappingCode: str
 
 export async function callAxios(config: AxiosRequestConfig, options: RequestOptions) {
   let retryCount = 0;
-  const maxRetries = options?.retries ?? 1;
+  const maxRetries = options?.retries ?? 2;
   const delay = options?.retryDelay || 1000;
   const maxRateLimitWaitMs = 60 * 60 * 1000 * 24; // 24 hours is the max wait time for rate limit retries, hardcoded
   let rateLimitRetryCount = 0;
   let totalRateLimitWaitTime = 0;
   const QUICK_RETRY_THRESHOLD_MS = 10000;
+  let lastFailureStatus: number | undefined;
 
   config.headers = {
     "Accept": "*/*",
@@ -291,14 +293,29 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
       }
       if (response.status < 200 || response.status >= 300) {
         if (response.status !== 429 && retryCount < maxRetries && durationMs < QUICK_RETRY_THRESHOLD_MS) {
+          lastFailureStatus = response.status;
           retryCount++;
           continue;
         }
+        (response as any)._retriesAttempted = retryCount;
+        (response as any)._lastFailureStatus = lastFailureStatus ?? response.status;
         return response;
       }
+      if (retryCount > 0) {
+        const method = (config.method || "GET").toString().toUpperCase();
+        const url = (config as any).url || "";
+        logMessage("debug", `Automatic retry succeeded for ${method} ${url} after ${retryCount} retr${retryCount === 1 ? "y" : "ies"}${lastFailureStatus ? `; last failure status: ${lastFailureStatus}` : ""}`);
+      }
+      (response as any)._retriesAttempted = retryCount;
+      (response as any)._lastFailureStatus = lastFailureStatus;
       return response;
     } catch (error) {
-      if (retryCount >= maxRetries) throw new ApiCallError(error.message, response?.status);
+      if (retryCount >= maxRetries) {
+        const baseMessage = (error as any).message || "Network error";
+        const withRetryInfo = `${baseMessage} (retries attempted: ${retryCount}${lastFailureStatus ? `, last failure status: ${lastFailureStatus}` : ""})`;
+        throw new ApiCallError(withRetryInfo, response?.status);
+      }
+      lastFailureStatus = response?.status;
       retryCount++;
       await new Promise(resolve => setTimeout(resolve, delay * retryCount));
     }
