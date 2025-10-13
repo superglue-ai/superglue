@@ -5,9 +5,9 @@ import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import JsonSchemaEditor from '@/src/components/utils/JsonSchemaEditor';
 import { downloadJson } from '@/src/lib/download-utils';
 import { formatBytes, isAllowedFileType, MAX_TOTAL_FILE_SIZE, type UploadedFileInfo } from '@/src/lib/file-utils';
-import { cn, formatJavaScriptCode, isEmptyData, truncateForDisplay, truncateLines, isValidSourceDataArrowFunction, ensureSourceDataArrowFunction } from '@/src/lib/utils';
+import { cn, ensureSourceDataArrowFunction, formatJavaScriptCode, isEmptyData, isValidSourceDataArrowFunction, truncateForDisplay, truncateLines } from '@/src/lib/utils';
 import { inferJsonSchema } from '@superglue/shared';
-import { Check, Code2, Copy, Download, Eye, FileJson, Package, Play, Upload, X } from 'lucide-react';
+import { Check, Code2, Copy, Download, Eye, FileJson, Package, Play, RotateCw, Upload, X } from 'lucide-react';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-javascript';
 import 'prismjs/components/prism-json';
@@ -724,6 +724,15 @@ export const MiniStepCard = ({ step, index, isActive, onClick, stepId, isPayload
         );
     }
     const method = step.apiConfig?.method || 'GET';
+    const methodTextColor = method === 'GET'
+        ? "text-blue-700 dark:text-blue-400"
+        : method === 'POST'
+            ? "text-green-700 dark:text-green-400"
+            : method === 'PUT'
+                ? "text-yellow-700 dark:text-yellow-400"
+                : method === 'DELETE'
+                    ? "text-red-700 dark:text-red-400"
+                    : "text-gray-700 dark:text-gray-400";
     const url = `${step.apiConfig?.urlHost || ''}${step.apiConfig?.urlPath || ''}`.trim() || 'No URL';
     const isCompleted = stepId ? completedSteps.includes(stepId) : false;
     const isFailed = stepId ? failedSteps.includes(stepId) : false;
@@ -745,7 +754,12 @@ export const MiniStepCard = ({ step, index, isActive, onClick, stepId, isPayload
                 <div className="h-full flex flex-col justify-between">
                     <div className="flex items-center justify-between mb-2">
                         <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-sm font-semibold">{index}</div>
-                        <span className={cn("text-xs px-2 py-1 rounded font-medium", method === 'GET' && "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400", method === 'POST' && "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400", method === 'PUT' && "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400", method === 'DELETE' && "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400", !['GET', 'POST', 'PUT', 'DELETE'].includes(method) && "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400")}>{method}</span>
+                        <div className="flex items-center gap-1.5">
+                            {step?.executionMode === 'LOOP' && (
+                                <RotateCw className={cn("h-3.5 w-3.5", methodTextColor)} aria-label="Loop step" />
+                            )}
+                            <span className={cn("text-xs px-2 py-1 rounded font-medium", method === 'GET' && "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400", method === 'POST' && "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400", method === 'PUT' && "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400", method === 'DELETE' && "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400", !['GET', 'POST', 'PUT', 'DELETE'].includes(method) && "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400")}>{method}</span>
+                        </div>
                     </div>
                     <div className="flex-1 min-h-0">
                         <p className="text-sm font-semibold truncate">{step.id || `Step ${index}`}</p>

@@ -67,6 +67,7 @@ const SpotlightStepCard = ({
     canExecute,
     isExecuting,
     isGlobalExecuting,
+    currentExecutingStepIndex,
     integrations,
     readOnly,
     failedSteps = [],
@@ -83,6 +84,7 @@ const SpotlightStepCard = ({
     canExecute?: boolean;
     isExecuting?: boolean;
     isGlobalExecuting?: boolean;
+    currentExecutingStepIndex?: number;
     integrations?: Integration[];
     readOnly?: boolean;
     failedSteps?: string[];
@@ -246,6 +248,9 @@ const SpotlightStepCard = ({
                                     // Check if result is pending (no output yet)
                                     const isPending = !stepFailed && stepResult === undefined;
 
+                                    // Running if either single-step run or global run is currently on this step
+                                    const isActivelyRunning = !!(isExecuting || (isGlobalExecuting && currentExecutingStepIndex === stepIndex));
+
                                     let outputString = '';
                                     let isTruncated = false;
                                     if (!isPending) {
@@ -282,7 +287,7 @@ const SpotlightStepCard = ({
                                                 </div>
                                             )}
                                             {isPending ? (
-                                                isExecuting ? (
+                                                isActivelyRunning ? (
                                                     <div className="flex flex-col items-center justify-center py-8 text-muted-foreground border rounded-md bg-muted/5">
                                                         <div className="flex items-center gap-2 mb-1">
                                                             <div className="h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
@@ -403,6 +408,28 @@ export function WorkflowStepGallery({
     const listRef = useRef<HTMLDivElement | null>(null);
     const [isConfiguratorEditing, setIsConfiguratorEditing] = useState<boolean>(false);
 
+    const isNavigatingRef = useRef<boolean>(false);
+    const navigationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const NAV_SUPPRESS_MS = 300;
+    const NAV_DELAY_MS = 50;
+
+    const navigateToIndex = (nextIndex: number) => {
+        isNavigatingRef.current = true;
+        if (navigationTimeoutRef.current) clearTimeout(navigationTimeoutRef.current);
+        navigationTimeoutRef.current = setTimeout(() => {
+            isNavigatingRef.current = false;
+        }, NAV_SUPPRESS_MS);
+
+        setTimeout(() => {
+            setActiveIndex(nextIndex);
+            const container = listRef.current;
+            const card = container?.children?.[nextIndex] as HTMLElement | undefined;
+            if (container && card) {
+                card.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+            }
+        }, NAV_DELAY_MS);
+    };
+
     // Local workflowId editor state to reduce re-renders
     const [localWorkflowId, setLocalWorkflowId] = useState<string>(workflowId ?? '');
     const [isEditingWorkflowId, setIsEditingWorkflowId] = useState<boolean>(false);
@@ -518,16 +545,13 @@ export function WorkflowStepGallery({
         }, {})
         : stepResults;
 
-    // Build the complete workflow items including payload card
     const workflowItems = [
-        // Initial payload card
         {
             type: 'payload',
             data: { payloadText: rawPayloadText, inputSchema },
             stepResult: undefined,
             evolvingPayload: workingPayload || {}
         },
-        // Regular steps
         ...steps.map((step, index) => ({
             type: 'step',
             data: step,
@@ -548,7 +572,6 @@ export function WorkflowStepGallery({
         }
     ];
 
-    // Compute current item
     const currentItem = workflowItems[activeIndex];
     const indicatorIndices = workflowItems.map((_, idx) => idx);
 
@@ -557,30 +580,13 @@ export function WorkflowStepGallery({
         const newIndex = direction === 'prev'
             ? Math.max(0, activeIndex - 1)
             : Math.min(workflowItems.length - 1, activeIndex + 1);
-
-        // Add a small delay to make the transition feel smoother
-        setTimeout(() => {
-            setActiveIndex(newIndex);
-            // Snap the new active card into view
-            const container = listRef.current;
-            const card = container?.children?.[newIndex] as HTMLElement | undefined;
-            if (container && card) {
-                card.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-            }
-        }, 50);
+        if (newIndex === activeIndex) return;
+        navigateToIndex(newIndex);
     };
 
     const handleCardClick = (globalIndex: number) => {
         if (isConfiguratorEditing) return;
-
-        setTimeout(() => {
-            setActiveIndex(globalIndex);
-            const container = listRef.current;
-            const card = container?.children?.[globalIndex] as HTMLElement | undefined;
-            if (container && card) {
-                card.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-            }
-        }, 50);
+        navigateToIndex(globalIndex);
     };
 
     const handleRemoveStep = (stepId: string) => {
@@ -593,9 +599,13 @@ export function WorkflowStepGallery({
         }
     };
 
-    // Wrap onStepEdit and forward user-initiated flag for proper cascading
     const onStepEdit = (stepId: string, updatedStep: any, isUserInitiated: boolean = false) => {
-        if (originalOnStepEdit) {
+        // Suppress user-initiated edits during navigation to prevent spurious resets
+        if (isNavigatingRef.current && isUserInitiated) {
+            if (originalOnStepEdit) {
+                originalOnStepEdit(stepId, updatedStep, false);
+            }
+        } else if (originalOnStepEdit) {
             originalOnStepEdit(stepId, updatedStep, isUserInitiated);
         }
     };
@@ -606,12 +616,7 @@ export function WorkflowStepGallery({
 
     useEffect(() => {
         if (navigateToFinalSignal) {
-            setActiveIndex(workflowItems.length - 1);
-            const container = listRef.current;
-            const card = container?.children?.[workflowItems.length - 1] as HTMLElement | undefined;
-            if (container && card) {
-                card.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-            }
+            navigateToIndex(workflowItems.length - 1);
         }
     }, [navigateToFinalSignal]);
 
@@ -619,13 +624,7 @@ export function WorkflowStepGallery({
         if (!showStepOutputSignal || !focusStepId) return;
         const idx = steps.findIndex((s: any) => s.id === focusStepId);
         if (idx >= 0) {
-            const globalIdx = idx + 1; // +1 to account for payload card at index 0
-            setActiveIndex(globalIdx);
-            const container = listRef.current;
-            const card = container?.children?.[globalIdx] as HTMLElement | undefined;
-            if (container && card) {
-                card.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-            }
+            navigateToIndex(idx + 1);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [showStepOutputSignal, focusStepId]);
@@ -824,7 +823,7 @@ export function WorkflowStepGallery({
                         {indicatorIndices.map((globalIdx) => (
                             <button
                                 key={`dot-${globalIdx}`}
-                                onClick={() => { if (isConfiguratorEditing) return; setActiveIndex(globalIdx); }}
+                                onClick={() => { if (isConfiguratorEditing) return; navigateToIndex(globalIdx); }}
                                 className={cn(
                                     "w-1.5 h-1.5 rounded-full transition-colors",
                                     globalIdx === activeIndex ? "bg-primary" : "bg-muted"
@@ -880,6 +879,7 @@ export function WorkflowStepGallery({
                                 canExecute={canExecuteStep(activeIndex - 1, completedSteps, { steps } as any, stepResultsMap)}
                                 isExecuting={isExecutingStep === activeIndex - 1}
                                 isGlobalExecuting={!!(isExecuting || isExecutingTransform)}
+                                currentExecutingStepIndex={currentExecutingStepIndex}
                                 integrations={integrations}
                                 readOnly={readOnly}
                                 failedSteps={failedSteps}

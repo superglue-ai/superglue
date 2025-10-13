@@ -694,32 +694,25 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
     const currentHashes = steps.map(hashStepConfig);
     const prevHashes = prevStepHashesRef.current;
 
-    // Find first changed index
-    let changedIndex = -1;
-    for (let i = 0; i < Math.max(prevHashes.length, currentHashes.length); i++) {
-      if (prevHashes[i] !== currentHashes[i]) { changedIndex = i; break; }
-    }
-
-    // Only cascade when change was user-initiated (set in handleStepEdit)
-    if (changedIndex !== -1 && lastUserEditedStepIdRef.current) {
+    // Only cascade when the edited step itself changed
+    if (lastUserEditedStepIdRef.current) {
       const editedId = lastUserEditedStepIdRef.current;
-      // Ensure the changed index corresponds to or precedes the edited step
       const idxOfEdited = steps.findIndex(s => s.id === editedId);
-      const cascadeFrom = idxOfEdited !== -1 ? Math.min(changedIndex, idxOfEdited) : changedIndex;
-      const stepsToReset = steps.slice(cascadeFrom).map(s => s.id);
+      if (idxOfEdited !== -1 && prevHashes[idxOfEdited] !== currentHashes[idxOfEdited]) {
+        const stepsToReset = steps.slice(idxOfEdited).map(s => s.id);
 
-      setCompletedSteps(prev => prev.filter(id => !stepsToReset.includes(id) && id !== '__final_transform__'));
-      setFailedSteps(prev => prev.filter(id => !stepsToReset.includes(id) && id !== '__final_transform__'));
-      setStepResultsMap(prev => {
-        const next = { ...prev } as Record<string, any>;
-        stepsToReset.forEach(id => delete next[id]);
-        delete next['__final_transform__'];
-        return next;
-      });
-      setFinalPreviewResult(null);
-      setResult(null);
-
-      // Clear marker after cascading
+        setCompletedSteps(prev => prev.filter(id => !stepsToReset.includes(id) && id !== '__final_transform__'));
+        setFailedSteps(prev => prev.filter(id => !stepsToReset.includes(id) && id !== '__final_transform__'));
+        setStepResultsMap(prev => {
+          const next = { ...prev } as Record<string, any>;
+          stepsToReset.forEach(id => delete next[id]);
+          delete next['__final_transform__'];
+          return next;
+        });
+        setFinalPreviewResult(null);
+        setResult(null);
+      }
+      // Clear marker regardless to avoid stale cascades
       lastUserEditedStepIdRef.current = null;
     }
 

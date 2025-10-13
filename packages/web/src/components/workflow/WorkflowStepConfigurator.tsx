@@ -78,7 +78,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
     useEffect(() => {
         try {
             setRawJsonText(JSON.stringify(step, null, 2));
-        } catch {}
+        } catch { }
         try {
             const headers = step.apiConfig?.headers;
             const headersJson = headers !== undefined && headers !== null ? JSON.stringify(headers, null, 2) : '{}';
@@ -130,7 +130,8 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
             formatJavaScriptCode(step.loopSelector).then(formatted => {
                 if (formatted !== step.loopSelector) {
                     const updated = { ...step, loopSelector: formatted } as any;
-                    onEdit(step.id, updated, true);
+                    // Programmatic normalization; do NOT mark as user-initiated
+                    onEdit(step.id, updated, false);
                 }
                 setDidFormatLoopSelector(true);
             });
@@ -140,7 +141,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
     const handleImmediateEdit = (updater: (s: any) => any) => {
         if (disabled) return;
         const updated = updater(step);
-        try { setRawJsonText(JSON.stringify(updated, null, 2)); } catch {}
+        try { setRawJsonText(JSON.stringify(updated, null, 2)); } catch { }
         if (onEditingChange) onEditingChange(true);
         onEdit(step.id, updated, true);
         if (onEditingChange) setTimeout(() => onEditingChange(false), 100);
@@ -151,7 +152,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
     });
 
     const isCodeEditingRef = useRef<boolean>(false);
-    
+
     useEffect(() => {
         const timer = setTimeout(() => {
             try {
@@ -159,19 +160,19 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                 const parsed = JSON.parse(rawJsonText);
                 if (onEditingChange) onEditingChange(true);
                 onEdit(step.id, parsed, true);
-                
+
                 try {
                     const headers = parsed.apiConfig?.headers;
                     setHeadersText(headers !== undefined && headers !== null ? JSON.stringify(headers, null, 2) : '{}');
                     setHeadersError(false);
-                } catch {}
+                } catch { }
                 try {
                     const queryParams = parsed.apiConfig?.queryParams;
                     setQueryParamsText(queryParams !== undefined && queryParams !== null ? JSON.stringify(queryParams, null, 2) : '{}');
                     setQueryParamsError(false);
-                } catch {}
+                } catch { }
                 if (onEditingChange) setTimeout(() => onEditingChange(false), 100);
-            } catch {}
+            } catch { }
             isCodeEditingRef.current = false;
         }, 300);
         return () => clearTimeout(timer);
