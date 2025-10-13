@@ -168,9 +168,9 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                     const queryParams = parsed.apiConfig?.queryParams;
                     setQueryParamsText(queryParams !== undefined && queryParams !== null ? JSON.stringify(queryParams, null, 2) : '{}');
                     setQueryParamsError(false);
-                } catch {}
+                } catch { }
                 if (onEditingChange) setTimeout(() => onEditingChange(false), 100);
-            } catch {}
+            } catch { }
             isCodeEditingRef.current = false;
         }, 300);
         return () => clearTimeout(timer);
