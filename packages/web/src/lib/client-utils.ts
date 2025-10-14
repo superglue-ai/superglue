@@ -411,3 +411,41 @@ export const deepMergePreferRight = (left: any, right: any): any => {
   }
   return result;
 };
+
+/**
+ * Generate a UUID v4 with fallback for browsers that don't support crypto.randomUUID
+ * Works in both secure and non-secure contexts
+ */
+export function generateUUID(): string {
+  // Use native crypto.randomUUID if available (secure contexts only)
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    try {
+      return crypto.randomUUID();
+    } catch (e) {
+      // Fall through to manual implementation
+    }
+  }
+
+  // Fallback implementation using crypto.getRandomValues (available in more contexts)
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const array = new Uint8Array(16);
+    crypto.getRandomValues(array);
+    
+    // Set the version to 4 (random)
+    array[6] = (array[6] & 0x0f) | 0x40;
+    // Set the variant to 1 (RFC4122)
+    array[8] = (array[8] & 0x3f) | 0x80;
+
+    return [...array].map((b, i) => {
+      const hex = b.toString(16).padStart(2, '0');
+      return (i === 4 || i === 6 || i === 8 || i === 10) ? `-${hex}` : hex;
+    }).join('');
+  }
+
+  // Final fallback for environments without crypto (should be rare)
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
