@@ -10,8 +10,7 @@ This guide walks you through deploying and managing your own instance of supergl
 Before you begin, ensure you have:
 
 - Docker (version 20.10.0 or higher)
-- Redis (version 6.0 or higher) for persistent storage
-- OpenAI or Gemini API key
+- OpenAI, Anthropic or Gemini API key
 - At least 2GB of RAM and 1 CPU core
 - Git (optional, for building from source)
 
@@ -24,14 +23,13 @@ Before you begin, ensure you have:
 Create a `docker-compose.yml` file:
 
 ```yaml
-version: '3.8'
-
 services:
   superglue:
     image: superglueai/superglue:latest
     ports:
       - "3000:3000"  # GraphQL API
       - "3001:3001"  # Web Dashboard
+      - "3002:3002"  # REST API
     environment:
       - NODE_ENV=production
     env_file:
@@ -58,79 +56,102 @@ volumes:
 
 2. **Configure Environment Variables**
 
-Copy `.env.example` to `.env` and fill in your values. Here are all available variables:
+Copy `.env.example` to `.env` and fill in your values. Here are all available variables - already configured for docker-compose selft hosted:
 
 ```env
-# Port for the superglue server
+# ==============================================================================
+# ENDPOINTS AND AUTHENTICATION
+# ==============================================================================
+
+# Port for the superglue graphql server
 GRAPHQL_PORT=3000
+# Port to the superglue rest api (must be different than the graphql port)
+API_PORT=3002
 
 # Endpoint for the graphql api (used so the web dashboard knows where to find the server)
 GRAPHQL_ENDPOINT=http://localhost:3000
+# Endpoint for the rest api (not used at the moment)
+API_ENDPOINT=http://localhost:3002
 
 # Port for the web dashboard 
 WEB_PORT=3001
-# Authentication token for API access
+
+# Authentication token for API access - needed for server to start
 AUTH_TOKEN=your-secret-token
 
-# Datastore type (redis, memory, file, or postgres)
-DATASTORE_TYPE=file
+# Controls whether the workflow scheduler should run alongside Superglue.
+# ⚠️ Important: Only enable this on a single instance. 
+# Running multiple schedulers (e.g. in production or when using the same DB) 
+# can cause conflicts.
+START_SCHEDULER_SERVER=false
 
-# if file, the path to the datastore directory
-# if not given or existing, the datastore will be created in the current directory
-STORAGE_DIR=/data
 
-# If POSTGRES: Database connection settings
-POSTGRES_HOST=localhost
+# ==============================================================================
+# DATASTORE
+# ==============================================================================
+
+# Datastore type (redis or memory, file or postgres)
+DATASTORE_TYPE=postgres
+
+# If postgres: Database connection settings
+POSTGRES_HOST=postgres
 POSTGRES_PORT=5432
 POSTGRES_USERNAME=superglue
 POSTGRES_PASSWORD=your-secure-password
 POSTGRES_DB=superglue
+# when using a unsecured postgres db that does not support ssl, uncomment this:
+POSTGRES_SSL=false
+
+
+
+# ==============================================================================
+# LLM PROVIDERS
+# ==============================================================================
+
+# AI Provider - OPENAI, OPENAI_LEGACY, GEMINI or ANTHROPIC
+# best performance / price ratio right now is OpenAI with gpt-4.1
+LLM_PROVIDER=OPENAI
+
+# If GEMINI: Your Google API key
+# You can get one here: https://aistudio.google.com/app/apikey
+GEMINI_API_KEY=XXXXXXX
+# Gemini model to use. We recommend gemini-2.5-flash
+GEMINI_MODEL=gemini-2.5-flash
+
+# If OPENAI: Your OpenAI API key
+# You can get one here: https://platform.openai.com/api-keys
+OPENAI_API_KEY=sk-proj-XXXXXXXX
+# OpenAI model to use. Use gpt-4.1 for best results.
+OPENAI_MODEL=gpt-4.1
+# Optional: Set a custom OpenAI API URL (for self-hosted models or providers like fireworks.ai)
+# For fireworks, use https://api.fireworks.ai/inference/v1
+OPENAI_BASE_URL=https://api.openai.com/v1
+
+# If ANTHROPIC: Your API KEY
+# You can get one here: https://docs.anthropic.com/en/api/admin-api/apikeys/get-api-key
+ANTHROPIC_API_KEY=sk-ant-XXXXXXX
+# Anthropic model to use
+ANTHROPIC_MODEL=claude-sonnet-4-20250514
+
+# ==============================================================================
+# MISC
+# ==============================================================================
+
+# Disable the welcome/onboarding screen for development
+NEXT_PUBLIC_DISABLE_WELCOME_SCREEN=false
 
 # Encryption settings
 # Optional: Master key for encrypting stored credentials
 # If not set, credentials will be stored in plaintext
 # Generate a strong key: openssl rand -hex 32
-MASTER_ENCRYPTION_KEY=your-32-byte-encryption-key
+# MASTER_ENCRYPTION_KEY=your-32-byte-encryption-key
 
-# AI Provider - OPENAI, OPENAI_LEGACY, GEMINI, or ANTHROPIC
-# best performance / price ratio right now is OpenAI with gpt-4.1
-LLM_PROVIDER=GEMINI
-
-# If OPENAI: Your OpenAI API key (uses Responses API)
-# You can get one here : https://platform.openai.com/api-keys
-OPENAI_API_KEY=sk-proj-XXXXXXXX
-# OpenAI model to use. Use gpt-4.1 for best results.
-OPENAI_MODEL=gpt-4.1
-# Optional: Set a custom OpenAI API URL (for self-hosted models or providers like fireworks.ai)
-# for fireworks, use https://api.fireworks.ai/inference/v1
-OPENAI_BASE_URL=https://api.openai.com/v1
-
-# If OPENAI_LEGACY: superglue will use the chat completions API (for e.g. for Azure OpenAI or older endpoints)
-# LLM_PROVIDER=OPENAI_LEGACY
-# For Azure OpenAI - auto-detected when URL contains '.azure.com':
-# OPENAI_BASE_URL=https://your-resource.openai.azure.com
-# OPENAI_MODEL=your-deployment-name
-# OPENAI_API_KEY=your-azure-api-key
-# OPENAI_API_VERSION=2025-01-01-preview  # Optional - defaults to 2025-01-01-preview for Azure
-
-# If GEMINI: Your Google API key
-# You can get one here : https://aistudio.google.com/app/apikey
-GEMINI_API_KEY=XXXXXXX
-# Gemini model to use. We recommend gemini-2.5-flash
-GEMINI_MODEL=gemini-2.5-flash
-
-# If ANTHROPIC: Your Anthropic API key
-# ANTHROPIC_API_KEY=sk-ant-XXXXXXXX
-# ANTHROPIC_MODEL=claude-sonnet-4-20250514
-
-# Disable the welcome/onboarding screen for development
-NEXT_PUBLIC_DISABLE_WELCOME_SCREEN=false
 ```
 
 3. **Start the Services**
 
 ```bash
-docker-compose up -d
+docker-compose up --build
 ```
 
 ### Option 2: Manual Docker Setup
@@ -175,6 +196,7 @@ docker run -d \
   --env-file .env \
   -p 3000:3000 \
   -p 3001:3001 \
+  -p 3002:3002 \
   superglueai/superglue
 ```
 
