@@ -38,6 +38,7 @@ export function getPostgresConfig() {
     port: parseInt(process.env.POSTGRES_PORT || '5432'),
     user: process.env.POSTGRES_USERNAME!,
     password: process.env.POSTGRES_PASSWORD!,
-    database: process.env.POSTGRES_DB!
+    database: process.env.POSTGRES_DB!,
+    ssl: process.env.POSTGRES_SSL === 'false' ? false : true,
   };
 }
