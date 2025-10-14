@@ -295,6 +295,7 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
         if (response.status !== 429 && retryCount < maxRetries && durationMs < QUICK_RETRY_THRESHOLD_MS) {
           lastFailureStatus = response.status;
           retryCount++;
+          await new Promise(resolve => setTimeout(resolve, delay));
           continue;
         }
         (response as any)._retriesAttempted = retryCount;
