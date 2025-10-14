@@ -191,11 +191,6 @@ export default function TransformPlayground({ id }: { id?: string }) {
                     });
                 }
             }
-
-            toast({
-                title: "Transform loaded",
-                description: `Loaded "${transformConfig.id}" successfully`,
-            });
         } catch (error: any) {
             console.error("Error loading transform:", error);
             toast({

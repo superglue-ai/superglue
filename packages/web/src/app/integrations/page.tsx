@@ -13,6 +13,7 @@ import {
     AlertDialogTitle,
 } from "@/src/components/ui/alert-dialog";
 import { Button } from '@/src/components/ui/button';
+import { Input } from '@/src/components/ui/input';
 import { DocStatus } from '@/src/components/utils/DocStatusSpinner';
 import { useToast } from '@/src/hooks/use-toast';
 import { needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
@@ -129,11 +130,23 @@ export default function IntegrationsPage() {
     };
 
     const [addFormOpen, setAddFormOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
 
     const [page, setPage] = useState(0);
     const PAGE_SIZE = 10;
-    const paginatedIntegrations = integrations?.sort((a, b) => a.id.localeCompare(b.id)).slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE) || [];
-    const totalPages = Math.ceil(integrations.length / PAGE_SIZE);
+    
+    const filteredIntegrations = integrations?.filter(integration => {
+        if (!searchQuery) return true;
+        const query = searchQuery.toLowerCase();
+        return (
+            integration.id.toLowerCase().includes(query) ||
+            integration.urlHost?.toLowerCase().includes(query) ||
+            integration.urlPath?.toLowerCase().includes(query)
+        );
+    }).sort((a, b) => a.id.localeCompare(b.id)) || [];
+    
+    const paginatedIntegrations = filteredIntegrations.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+    const totalPages = Math.ceil(filteredIntegrations.length / PAGE_SIZE);
 
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [integrationToDelete, setIntegrationToDelete] = useState<Integration | null>(null);
@@ -410,7 +423,16 @@ export default function IntegrationsPage() {
                         </div>
                     ) : (
                         <div className="flex flex-col gap-4 w-full">
-                            <div className="flex justify-end mb-2">
+                            <div className="flex items-center gap-3 mb-2">
+                                <Input
+                                    placeholder="Search integrations..."
+                                    value={searchQuery}
+                                    onChange={(e) => {
+                                        setSearchQuery(e.target.value);
+                                        setPage(0);
+                                    }}
+                                    className="flex-1 h-8"
+                                />
                                 <Button variant="outline" size="sm" onClick={handleAdd}>
                                     <Plus className="mr-2 h-4 w-4" /> Add Integration
                                 </Button>
