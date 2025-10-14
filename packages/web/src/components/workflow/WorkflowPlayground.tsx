@@ -1,7 +1,7 @@
 "use client";
 import { useConfig } from "@/src/app/config-context";
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
-import { executeFinalTransform, executeSingleStep, executeWorkflowStepByStep, type StepExecutionResult } from "@/src/lib/client-utils";
+import { executeFinalTransform, executeSingleStep, executeWorkflowStepByStep, generateUUID, type StepExecutionResult } from "@/src/lib/client-utils";
 import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { computeStepOutput } from "@/src/lib/utils";
 import { ExecutionStep, Integration, SuperglueClient, Workflow, WorkflowResult } from "@superglue/client";
@@ -566,8 +566,9 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
 
       const finalData = state.stepResults['__final_transform__']?.data;
       setFinalPreviewResult(finalData);
+      
       const wr: WorkflowResult = {
-        id: crypto.randomUUID(),
+        id: generateUUID(),
         success: state.failedSteps.length === 0,
         data: finalData,
         error: state.stepResults['__final_transform__']?.error,
