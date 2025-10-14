@@ -1,5 +1,4 @@
-
-export const DEFAULT_MAX_DOWNLOAD_BYTES = 100 * 1024 * 1024; // 100 MB
+export const DEFAULT_MAX_DOWNLOAD_BYTES = 1000 * 1024 * 1024; // 1000 MB
 
 function safeStringify(value: any): string {
     const seen = new WeakSet<object>();
