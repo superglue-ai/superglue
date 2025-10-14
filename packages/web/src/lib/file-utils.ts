@@ -1,4 +1,4 @@
-export const MAX_TOTAL_FILE_SIZE = 100 * 1024 * 1024; // 100MB total
+export const MAX_TOTAL_FILE_SIZE = 1000 * 1024 * 1024; // 1000MB total
 export const ALLOWED_EXTENSIONS = ['.json', '.csv', '.txt', '.xml', '.xlsx', '.xls'];
 
 export function isAllowedFileType(filename: string): boolean {
