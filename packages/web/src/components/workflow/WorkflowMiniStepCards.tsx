@@ -14,7 +14,7 @@ import 'prismjs/components/prism-json';
 import React, { useEffect, useRef, useState } from 'react';
 import Editor from 'react-simple-code-editor';
 
-const MAX_HIGHLIGHT_CHARS = 100000;
+const MAX_HIGHLIGHT_CHARS = 150000;
 const highlightCode = (code: string, language: string) => {
     if (!code || code.length > MAX_HIGHLIGHT_CHARS) return code;
     try {
