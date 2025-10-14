@@ -62,8 +62,8 @@ export function AddStepDialog({
     const loadWorkflows = async () => {
         setLoadingWorkflows(true);
         try {
-            const result = await client.listWorkflows(100, 0);
-            setWorkflows(result.items || []);
+            const result = await client.listWorkflows(1000, 0);
+            setWorkflows(result.items?.filter(workflow => workflow.steps?.length > 0) || []);
         } catch (error) {
             console.error('Error loading workflows:', error);
             setError('Failed to load workflows');
@@ -131,7 +131,7 @@ export function AddStepDialog({
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogContent className="max-w-2xl">
                 <DialogHeader>
-                    <DialogTitle>Add Steps</DialogTitle>
+                    <DialogTitle>Add</DialogTitle>
                     <DialogDescription>
                         Create a new step from scratch or import steps from an existing workflow
                     </DialogDescription>
@@ -139,8 +139,8 @@ export function AddStepDialog({
                 
                 <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'scratch' | 'workflow')} className="overflow-hidden w-full">
                     <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="scratch">From Scratch</TabsTrigger>
-                        <TabsTrigger value="workflow">From Workflow</TabsTrigger>
+                        <TabsTrigger value="scratch">Add new step</TabsTrigger>
+                        <TabsTrigger value="workflow">Import workflow</TabsTrigger>
                     </TabsList>
                     
                     <TabsContent value="scratch" className="space-y-4 py-4 overflow-hidden">
