@@ -5,6 +5,7 @@ import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/components/ui/card";
 import { useToast } from "@/src/hooks/use-toast";
+import { generateUUID } from "@/src/lib/client-utils";
 import { composeUrl } from "@/src/lib/utils";
 import { ApiConfig, CacheMode, SuperglueClient } from "@superglue/client";
 import { AlertCircle, Clock, Copy, Play, Plus, X } from "lucide-react";
@@ -90,7 +91,7 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
           const additionalManual = manualVars
             .filter((key: string) => !existingKeys.has(key) && parsed[key] !== undefined)
             .map((key: string) => ({
-              id: crypto.randomUUID(),
+              id: generateUUID(),
               key,
               value: parsed[key],
               isManual: true
@@ -125,7 +126,7 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
 
         // Set credentials with unique IDs
         setCredentials(allVars.map(key => ({
-          id: crypto.randomUUID(),
+          id: generateUUID(),
           key,
           value: '',
           isManual: false
@@ -224,7 +225,7 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
   const handleAddVariable = () => {
     const newKey = `var${credentials.filter(c => c.isManual).length + 1}`;
     setCredentials(prev => [...prev, {
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       key: newKey,
       value: '',
       isManual: true
