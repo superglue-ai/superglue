@@ -177,7 +177,7 @@ export const FinalResultsCard = ({ result }: { result: any }) => {
     );
 };
 
-export const JavaScriptCodeEditor = React.memo(({ value, onChange, readOnly = false, minHeight = '200px', maxHeight = '350px', showCopy = true, resizable = false, isTransformEditor = false }: { value: string; onChange?: (value: string) => void; readOnly?: boolean; minHeight?: string; maxHeight?: string; showCopy?: boolean; resizable?: boolean; isTransformEditor?: boolean; }) => {
+export const JavaScriptCodeEditor = React.memo(({ value, onChange, readOnly = false, minHeight = '200px', maxHeight = '350px', showCopy = true, resizable = false, isTransformEditor = false, autoFormatOnMount = true }: { value: string; onChange?: (value: string) => void; readOnly?: boolean; minHeight?: string; maxHeight?: string; showCopy?: boolean; resizable?: boolean; isTransformEditor?: boolean; autoFormatOnMount?: boolean; }) => {
     const [currentHeight, setCurrentHeight] = useState(maxHeight);
     const effectiveHeight = resizable ? currentHeight : maxHeight;
     const highlightTimer = useRef<number | null>(null);
@@ -187,6 +187,7 @@ export const JavaScriptCodeEditor = React.memo(({ value, onChange, readOnly = fa
     const displayValue = value || '';
 
     useEffect(() => {
+        if (!autoFormatOnMount) return;
         if (!onChange || hasFormatted || !displayValue.trim()) return;
         formatJavaScriptCode(displayValue).then(formatted => {
             if (formatted !== displayValue) {

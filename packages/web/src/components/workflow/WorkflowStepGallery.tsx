@@ -6,10 +6,10 @@ import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import { canExecuteStep } from '@/src/lib/client-utils';
 import { downloadJson } from '@/src/lib/download-utils';
 import { type UploadedFileInfo } from '@/src/lib/file-utils';
-import { buildEvolvingPayload, cn, isEmptyData, MAX_DISPLAY_LINES, MAX_DISPLAY_SIZE, truncateForDisplay, truncateLines } from '@/src/lib/utils';
+import { buildEvolvingPayload, cn, ensureSourceDataArrowFunction, isEmptyData, MAX_DISPLAY_LINES, MAX_DISPLAY_SIZE, truncateForDisplay, truncateLines } from '@/src/lib/utils';
 import { Integration } from "@superglue/client";
 import { inferJsonSchema } from '@superglue/shared';
-import { ChevronLeft, ChevronRight, Database, Download, FileJson, Package, Play, Plus, Settings, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Database, Download, FileJson, Package, Play, Plus, RotateCw, Settings, Trash2 } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { AddStepDialog } from './AddStepDialog';
 import { CopyButton, FinalResultsCard, FinalTransformMiniStepCard, InstructionDisplay, JsonCodeEditor, MiniStepCard, PayloadMiniStepCard } from './WorkflowMiniStepCards';
@@ -93,9 +93,10 @@ const SpotlightStepCard = ({
     showOutputSignal?: number;
     onConfigEditingChange?: (editing: boolean) => void;
 }) => {
-    const [activePanel, setActivePanel] = useState<'input' | 'config' | 'output'>('config');
+    const [activePanel, setActivePanel] = useState<'input' | 'config' | 'output' | 'items'>('config');
     const [inputViewMode, setInputViewMode] = useState<'preview' | 'schema'>('preview');
     const [outputViewMode, setOutputViewMode] = useState<'preview' | 'schema'>('preview');
+    const [itemsViewMode, setItemsViewMode] = useState<'preview' | 'schema'>('preview');
 
     // Switch to output tab when signal changes
     useEffect(() => {
@@ -157,7 +158,7 @@ const SpotlightStepCard = ({
 
                 <div className="space-y-3" style={{ scrollbarGutter: 'stable both-edges' }}>
                     <div className="flex items-center justify-between">
-                        <Tabs value={activePanel} onValueChange={(v) => setActivePanel(v as 'input' | 'config' | 'output')}>
+                        <Tabs value={activePanel} onValueChange={(v) => setActivePanel(v as 'input' | 'config' | 'output' | 'items')}>
                             <TabsList className="h-9 p-1 rounded-md">
                                 <TabsTrigger value="input" className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm">
                                     <FileJson className="h-4 w-4" /> Step Input
@@ -168,6 +169,11 @@ const SpotlightStepCard = ({
                                 <TabsTrigger value="output" className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm">
                                     <Package className="h-4 w-4" /> Step Output
                                 </TabsTrigger>
+                                {step?.executionMode === 'LOOP' && (
+                                    <TabsTrigger value="items" className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm">
+                                        <RotateCw className="h-4 w-4" /> Loop Items
+                                    </TabsTrigger>
+                                )}
                             </TabsList>
                         </Tabs>
                     </div>
@@ -347,6 +353,88 @@ const SpotlightStepCard = ({
                                                         </div>
                                                     )}
                                                 </>
+                                            )}
+                                        </>
+                                    );
+                                })()}
+                            </div>
+                        )}
+                        {activePanel === 'items' && step?.executionMode === 'LOOP' && (
+                            <div>
+                                {(() => {
+                                    const isActivelyRunning = !!(isExecuting || (isGlobalExecuting && currentExecutingStepIndex === stepIndex));
+                                    if (isActivelyRunning) {
+                                        return (
+                                            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground border rounded-md bg-muted/5">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <div className="h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+                                                    <span className="text-xs">Currently running...</span>
+                                                </div>
+                                                <p className="text-[10px]">Loop items will be shown shortly</p>
+                                            </div>
+                                        );
+                                    }
+                                    const loopItems: any[] = (() => {
+                                        const sel = step?.loopSelector;
+                                        if (sel && typeof sel === 'string') {
+                                            try {
+                                                const code = ensureSourceDataArrowFunction(sel);
+                                                // eslint-disable-next-line no-new-func
+                                                const fn = new Function('sourceData', `return (${code})(sourceData);`);
+                                                const out = fn(evolvingPayload);
+                                                if (Array.isArray(out)) return out;
+                                            } catch { }
+                                        }
+                                        if (Array.isArray(stepResult)) {
+                                            try {
+                                                return stepResult.map((r: any) => (r && typeof r === 'object' && 'currentItem' in r) ? r.currentItem : r);
+                                            } catch { return []; }
+                                        }
+                                        return [];
+                                    })();
+                                    let itemsString = '';
+                                    let isTruncated = false;
+                                    if (itemsViewMode === 'schema') {
+                                        const schemaObj = inferJsonSchema(loopItems || []);
+                                        itemsString = truncateLines(JSON.stringify(schemaObj, null, 2), MAX_DISPLAY_LINES);
+                                    } else {
+                                        const displayData = truncateForDisplay(loopItems || []);
+                                        itemsString = displayData.value;
+                                        isTruncated = displayData.truncated;
+                                    }
+                                    return (
+                                        <>
+                                            <JsonCodeEditor
+                                                value={itemsString}
+                                                readOnly={true}
+                                                minHeight="150px"
+                                                maxHeight="300px"
+                                                resizable={true}
+                                                overlay={
+                                                    <div className="flex items-center gap-1">
+                                                        <Tabs value={itemsViewMode} onValueChange={(v) => setItemsViewMode(v as 'preview' | 'schema')} className="w-auto">
+                                                            <TabsList className="h-6 p-0.5 rounded-md">
+                                                                <TabsTrigger value="preview" className="h-full px-2 text-[11px] rounded-sm data-[state=active]:rounded-sm">Preview</TabsTrigger>
+                                                                <TabsTrigger value="schema" className="h-full px-2 text-[11px] rounded-sm data-[state=active]:rounded-sm">Schema</TabsTrigger>
+                                                            </TabsList>
+                                                        </Tabs>
+                                                        <CopyButton text={itemsString} />
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-6 w-6"
+                                                            onClick={() => downloadJson(loopItems || [], `step_${step.id}_loop_items.json`)}
+                                                            title="Download loop items as JSON"
+                                                        >
+                                                            <Download className="h-3 w-3" />
+                                                        </Button>
+                                                    </div>
+                                                }
+                                            />
+                                            {isTruncated && itemsViewMode === 'preview' && (
+                                                <div className="mt-1 text-[10px] text-amber-600 dark:text-amber-300 px-2">
+                                                    Preview truncated for display performance
+                                                </div>
                                             )}
                                         </>
                                     );
@@ -671,11 +759,8 @@ export function WorkflowStepGallery({
             if (originalOnStepEdit) {
                 originalOnStepEdit(stepId, updatedStep, false);
             }
-            return;
-        }
-        if (originalOnStepEdit) {
-            const effectiveUserInitiated = !!(isUserInitiated && isConfiguratorEditingRef.current);
-            originalOnStepEdit(stepId, updatedStep, effectiveUserInitiated);
+        } else if (originalOnStepEdit) {
+            originalOnStepEdit(stepId, updatedStep, isUserInitiated);
         }
     };
 

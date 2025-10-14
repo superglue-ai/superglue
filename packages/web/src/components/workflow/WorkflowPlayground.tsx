@@ -695,13 +695,13 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
       const editedId = lastUserEditedStepIdRef.current;
       const idxOfEdited = steps.findIndex(s => s.id === editedId);
       if (idxOfEdited !== -1 && prevHashes[idxOfEdited] !== currentHashes[idxOfEdited]) {
-        // Reset ONLY the edited step and final transform; keep prior failures/outputs for other steps
-        const editedOnly = steps[idxOfEdited]?.id;
-        setCompletedSteps(prev => prev.filter(id => id !== editedOnly && id !== '__final_transform__'));
-        setFailedSteps(prev => prev.filter(id => id !== editedOnly && id !== '__final_transform__'));
+        const stepsToReset = steps.slice(idxOfEdited).map(s => s.id);
+
+        setCompletedSteps(prev => prev.filter(id => !stepsToReset.includes(id) && id !== '__final_transform__'));
+        setFailedSteps(prev => prev.filter(id => !stepsToReset.includes(id) && id !== '__final_transform__'));
         setStepResultsMap(prev => {
           const next = { ...prev } as Record<string, any>;
-          if (editedOnly) delete next[editedOnly];
+          stepsToReset.forEach(id => delete next[id]);
           delete next['__final_transform__'];
           return next;
         });

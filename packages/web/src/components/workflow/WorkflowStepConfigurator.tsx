@@ -391,6 +391,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                                         maxHeight="260px"
                                                         resizable={true}
                                                         isTransformEditor={false}
+                                                        autoFormatOnMount={false}
                                                     />
                                                 </div>
                                             </div>
