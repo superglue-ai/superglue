@@ -31,16 +31,7 @@ export function composeUrl(host: string, path: string | undefined) {
   return `${cleanHost}/${cleanPath}`;
 }
 
-export function useDebouncedValue<T>(value: T, delayMs: number): T {
-  const [debounced, setDebounced] = useState<T>(value);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), delayMs);
-    return () => clearTimeout(timer);
-  }, [value, delayMs]);
-
-  return debounced;
-}
 
 export function usePrismHighlight(code: string, language: 'javascript' | 'json', delayMs = 80): string {
   const [html, setHtml] = useState<string>('');

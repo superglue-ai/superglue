@@ -5,7 +5,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import JsonSchemaEditor from '@/src/components/utils/JsonSchemaEditor';
 import { useToast } from '@/src/hooks/use-toast';
 import { downloadJson } from '@/src/lib/download-utils';
-import { ensureSourceDataArrowFunction, formatJavaScriptCode, getIntegrationIcon as getIntegrationIconName, getSimpleIcon, isEmptyData, MAX_DISPLAY_LINES, truncateForDisplay, truncateLines, useDebouncedValue } from '@/src/lib/utils';
+import { ensureSourceDataArrowFunction, formatJavaScriptCode, getIntegrationIcon as getIntegrationIconName, getSimpleIcon, isEmptyData, MAX_DISPLAY_LINES, truncateForDisplay, truncateLines } from '@/src/lib/utils';
 import { Integration, SuperglueClient } from "@superglue/client";
 import { inferJsonSchema } from '@superglue/shared';
 import { ArrowDown, Check, Copy, Download, Globe, RotateCw } from 'lucide-react';
@@ -185,13 +185,12 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
         return step.apiConfig?.urlHost && integration.urlHost && step.apiConfig.urlHost.includes(integration.urlHost.replace(/^(https?|postgres(ql)?|ftp(s)?|sftp|file):\/\//, ''));
     });
 
-    const LOOP_ITEMS_DEBOUNCE_MS = 450;
+    const LOOP_ITEMS_DEBOUNCE_MS = 400;
     const [loopItemsViewMode, setLoopItemsViewMode] = useState<'preview' | 'schema'>('preview');
     const [loopItems, setLoopItems] = useState<any[] | null>(null);
     const [loopItemsError, setLoopItemsError] = useState<string | null>(null);
     const [isLoopItemsEvaluating, setIsLoopItemsEvaluating] = useState<boolean>(false);
-    const debouncedLoopSelector = useDebouncedValue(step.loopSelector, LOOP_ITEMS_DEBOUNCE_MS);
-    const debouncedLoopMaxIters = useDebouncedValue(step.loopMaxIters, LOOP_ITEMS_DEBOUNCE_MS);
+    const lastEvalTimerRef = useRef<number | null>(null);
 
     useEffect(() => {
         if (step.executionMode !== 'LOOP') {
@@ -204,11 +203,15 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
             setLoopItemsError(null);
             return;
         }
-        setIsLoopItemsEvaluating(true);
+        if (lastEvalTimerRef.current) {
+            window.clearTimeout(lastEvalTimerRef.current);
+            lastEvalTimerRef.current = null;
+        }
         setLoopItemsError(null);
-        const h = window.setTimeout(() => {
+        const t = window.setTimeout(() => {
+            setIsLoopItemsEvaluating(true);
             try {
-                const sel = debouncedLoopSelector;
+                const sel = step?.loopSelector;
                 if (!sel || typeof sel !== 'string') {
                     setLoopItems(null);
                     setLoopItemsError('No loop selector configured');
@@ -233,10 +236,11 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
             } finally {
                 setIsLoopItemsEvaluating(false);
             }
-        }, 0);
-        return () => window.clearTimeout(h);
+        }, LOOP_ITEMS_DEBOUNCE_MS);
+        lastEvalTimerRef.current = t as unknown as number;
+        return () => { if (lastEvalTimerRef.current) { window.clearTimeout(lastEvalTimerRef.current); lastEvalTimerRef.current = null; } };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [step.executionMode, debouncedLoopSelector, debouncedLoopMaxIters, stepInput]);
+    }, [step.executionMode, step.loopSelector, step.loopMaxIters, stepInput]);
 
     return (
         <div className="flex flex-col items-center">
