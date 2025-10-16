@@ -1153,7 +1153,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     preferredAuthType: "apikey",
     oauth: {
       authUrl: "https://app.clickup.com/api",
-      tokenUrl: "https://app.clickup.com/api/v2/oauth/token",
+      tokenUrl: "https://api.clickup.com/api/v2/oauth/token",
       scopes: "user:read user:write task:read task:write list:read list:write folder:read folder:write space:read space:write team:read team:write webhook:read webhook:write goal:read goal:write"
     },
     keywords: ["tasks", "lists", "folders", "spaces", "teams", "goals", "views", "statuses", "priorities", "tags", "custom fields", "time tracking", "comments", "checklists", "dependencies", "api key"]
