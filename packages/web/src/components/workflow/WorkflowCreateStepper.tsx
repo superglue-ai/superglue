@@ -910,7 +910,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                         disabled={isSaving || isExecuting}
                         className="h-9 px-4"
                       >
-                        Test Workflow
+                        Run All Workflow Steps
                       </Button>
                     )}
                     <Button

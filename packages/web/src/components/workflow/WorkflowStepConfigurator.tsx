@@ -2,14 +2,13 @@ import { useConfig } from '@/src/app/config-context';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/src/components/ui/select";
 import { Switch } from "@/src/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
+import JsonSchemaEditor from '@/src/components/utils/JsonSchemaEditor';
 import { useToast } from '@/src/hooks/use-toast';
-import { ensureSourceDataArrowFunction, formatJavaScriptCode, getIntegrationIcon as getIntegrationIconName, getSimpleIcon, isEmptyData, MAX_DISPLAY_LINES, truncateForDisplay, truncateLines } from '@/src/lib/utils';
+import { downloadJson } from '@/src/lib/download-utils';
+import { ensureSourceDataArrowFunction, formatJavaScriptCode, getIntegrationIcon as getIntegrationIconName, getSimpleIcon, isEmptyData, MAX_DISPLAY_LINES, truncateForDisplay, truncateLines, useDebouncedValue } from '@/src/lib/utils';
 import { Integration, SuperglueClient } from "@superglue/client";
 import { inferJsonSchema } from '@superglue/shared';
 import { ArrowDown, Check, Copy, Download, Globe, RotateCw } from 'lucide-react';
-
-import JsonSchemaEditor from '@/src/components/utils/JsonSchemaEditor';
-import { downloadJson } from '@/src/lib/download-utils';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Badge } from "../ui/badge";
 import { Button } from '../ui/button';
@@ -78,7 +77,6 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
         return iconName ? getSimpleIcon(iconName) : null;
     };
 
-    // Sync from parent when switching steps (step.id changes)
     useEffect(() => {
         try {
             setRawJsonText(JSON.stringify(step, null, 2));
@@ -192,6 +190,8 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
     const [loopItems, setLoopItems] = useState<any[] | null>(null);
     const [loopItemsError, setLoopItemsError] = useState<string | null>(null);
     const [isLoopItemsEvaluating, setIsLoopItemsEvaluating] = useState<boolean>(false);
+    const debouncedLoopSelector = useDebouncedValue(step.loopSelector, LOOP_ITEMS_DEBOUNCE_MS);
+    const debouncedLoopMaxIters = useDebouncedValue(step.loopMaxIters, LOOP_ITEMS_DEBOUNCE_MS);
 
     useEffect(() => {
         if (step.executionMode !== 'LOOP') {
@@ -206,9 +206,9 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
         }
         setIsLoopItemsEvaluating(true);
         setLoopItemsError(null);
-        const h = setTimeout(() => {
+        const h = window.setTimeout(() => {
             try {
-                const sel = step?.loopSelector;
+                const sel = debouncedLoopSelector;
                 if (!sel || typeof sel !== 'string') {
                     setLoopItems(null);
                     setLoopItemsError('No loop selector configured');
@@ -233,10 +233,10 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
             } finally {
                 setIsLoopItemsEvaluating(false);
             }
-        }, LOOP_ITEMS_DEBOUNCE_MS);
-        return () => clearTimeout(h);
+        }, 0);
+        return () => window.clearTimeout(h);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [step.executionMode, step.loopSelector, stepInput]);
+    }, [step.executionMode, debouncedLoopSelector, debouncedLoopMaxIters, stepInput]);
 
     return (
         <div className="flex flex-col items-center">
@@ -480,7 +480,7 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                                                 resizable={true}
                                                                 placeholder="[]"
                                                                 overlay={
-                                                                    <div className="flex items-center gap-1">
+                                                                    <div className="flex items-center gap-2">
                                                                         {!loopItemsError && (
                                                                             <Tabs value={loopItemsViewMode} onValueChange={(v) => setLoopItemsViewMode(v as 'preview' | 'schema')} className="w-auto">
                                                                                 <TabsList className="h-6 p-0.5 rounded-md">
@@ -506,6 +506,11 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                                                         )}
                                                                     </div>
                                                                 }
+                                                                bottomRightOverlay={(!loopItemsError && Array.isArray(loopItems)) ? (
+                                                                    <div className="px-2 py-1 rounded-md bg-secondary text-muted-foreground text-[11px] font-medium shadow-md">
+                                                                        {loopItems.length} items
+                                                                    </div>
+                                                                ) : undefined}
                                                             />
                                                         )}
                                                     </div>

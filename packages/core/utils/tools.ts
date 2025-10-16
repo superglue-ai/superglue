@@ -11,6 +11,7 @@ import { ApiCallError } from "./api.js";
 import { parseJSON } from "./json-parser.js";
 import { logMessage } from "./logs.js";
 import { injectVMHelpersIndividually } from "./vm-helpers.js";
+import { server_defaults } from "../default.js";
 
 export function isRequested(field: string, info: GraphQLResolveInfo) {
   return info.fieldNodes.some(
@@ -217,7 +218,6 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
   const maxRateLimitWaitMs = 60 * 60 * 1000 * 24; // 24 hours is the max wait time for rate limit retries, hardcoded
   let rateLimitRetryCount = 0;
   let totalRateLimitWaitTime = 0;
-  const QUICK_RETRY_THRESHOLD_MS = 10000;
   let lastFailureStatus: number | undefined;
 
   config.headers = {
@@ -292,7 +292,7 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
         response.data = Buffer.from(response.data);
       }
       if (response.status < 200 || response.status >= 300) {
-        if (response.status !== 429 && retryCount < maxRetries && durationMs < QUICK_RETRY_THRESHOLD_MS) {
+        if (response.status !== 429 && retryCount < maxRetries && durationMs < server_defaults.AXIOS_QUICK_RETRY_THRESHOLD_MS) {
           lastFailureStatus = response.status;
           retryCount++;
           await new Promise(resolve => setTimeout(resolve, delay));

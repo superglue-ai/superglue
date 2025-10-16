@@ -3,6 +3,10 @@ import { clsx, type ClassValue } from "clsx";
 import prettierPluginBabel from 'prettier/plugins/babel';
 import prettierPluginEstree from 'prettier/plugins/estree';
 import prettier from 'prettier/standalone';
+import Prism from 'prismjs';
+import 'prismjs/components/prism-javascript';
+import 'prismjs/components/prism-json';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { SimpleIcon } from 'simple-icons';
 import * as simpleIcons from 'simple-icons';
 import { twMerge } from "tailwind-merge";
@@ -27,11 +31,64 @@ export function composeUrl(host: string, path: string | undefined) {
   return `${cleanHost}/${cleanPath}`;
 }
 
-/**
- * Get the icon name for an integration
- * @param integration - The integration object
- * @returns The icon name or null if no match found
- */
+export function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState<T>(value);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(timer);
+  }, [value, delayMs]);
+
+  return debounced;
+}
+
+export function usePrismHighlight(code: string, language: 'javascript' | 'json', delayMs = 80): string {
+  const [html, setHtml] = useState<string>('');
+  const lastHtmlRef = useRef<string>('');
+  const highlightFn = useMemo(() => {
+    return (c: string) => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const PrismAny = (Prism as any);
+        const lang = language === 'javascript' ? (PrismAny.languages.javascript || PrismAny.languages.js) : PrismAny.languages.json;
+        return Prism.highlight(c, lang, language);
+      } catch {
+        return c;
+      }
+    };
+  }, [language]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let cancel: (() => void) | null = null;
+    const schedule = (fn: () => void) => {
+      const w: any = window as any;
+      if (typeof w.requestIdleCallback === 'function') {
+        const id = w.requestIdleCallback(fn, { timeout: delayMs });
+        return () => w.cancelIdleCallback?.(id);
+      }
+      const id = window.requestAnimationFrame(fn);
+      return () => window.cancelAnimationFrame(id);
+    };
+
+    cancel = schedule(() => {
+      if (cancelled) return;
+      const next = highlightFn(code);
+      if (!cancelled) {
+        lastHtmlRef.current = next;
+        setHtml(next);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      cancel?.();
+    };
+  }, [code, highlightFn, delayMs]);
+
+  return html || lastHtmlRef.current || code;
+}
+
 export function getIntegrationIcon(integration: { id: string; urlHost?: string }): string | null {
   // First try exact ID match with known integrations
   if (integrations[integration.id]) {
@@ -186,11 +243,6 @@ export const truncateLines = (text: string, maxLines: number): string => {
   return lines.slice(0, maxLines).join('\n') + `\n... truncated ${lines.length - maxLines} more lines ...`;
 };
 
-/**
- * Get SimpleIcon object for a given icon name
- * @param name - The icon name to look up
- * @returns SimpleIcon object or null if not found
- */
 export function getSimpleIcon(name: string): SimpleIcon | null {
   if (!name || name === "default") return null;
 
@@ -205,9 +257,6 @@ export function getSimpleIcon(name: string): SimpleIcon | null {
   }
 }
 
-/**
- * Build evolving payload by merging step results
- */
 export const buildEvolvingPayload = (initialPayload: any, steps: any[], stepResults: Record<string, any>, upToIndex: number) => {
   let evolvingPayload = { ...initialPayload };
 
@@ -254,7 +303,7 @@ export async function formatJavaScriptCode(code: string): Promise<string> {
   }
 }
 
-export function getGroupedTimezones(): Record<string, Array<{value: string, label: string}>> {
+export function getGroupedTimezones(): Record<string, Array<{ value: string, label: string }>> {
   const timezones = Intl.supportedValuesOf('timeZone').map(tz => ({
     value: tz,
     label: tz.replace(/_/g, ' ')
@@ -267,7 +316,7 @@ export function getGroupedTimezones(): Record<string, Array<{value: string, labe
     }
     acc[group].push(timezone);
     return acc;
-  }, {} as Record<string, Array<{value: string, label: string}>>);
+  }, {} as Record<string, Array<{ value: string, label: string }>>);
 }
 
 export function isValidSourceDataArrowFunction(code: string | undefined | null): boolean {
