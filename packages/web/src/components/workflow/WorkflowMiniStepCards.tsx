@@ -14,7 +14,7 @@ import 'prismjs/components/prism-json';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Editor from 'react-simple-code-editor';
 
-export function usePrismHighlight(code: string, language: 'javascript' | 'json', delayMs = 80): string {
+export function usePrismHighlight(code: string, language: 'javascript' | 'json', delayMs = 40): string {
     const [html, setHtml] = useState<string>('');
     const lastHtmlRef = useRef<string>('');
     const highlightFn = useMemo(() => {
