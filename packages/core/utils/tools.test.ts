@@ -1,6 +1,9 @@
-import { SelfHealingMode } from '@superglue/client'
-import { describe, expect, it } from 'vitest'
-import { applyAuthFormat, applyJsonata, applyJsonataWithValidation, composeUrl, isSelfHealingEnabled, maskCredentials, replaceVariables, safeHttpMethod, sample } from './tools.js'
+import { SelfHealingMode } from '@superglue/client';
+import axios from 'axios';
+import { describe, expect, it, vi } from 'vitest';
+import { applyAuthFormat, applyJsonata, applyJsonataWithValidation, callAxios, composeUrl, isSelfHealingEnabled, maskCredentials, replaceVariables, safeHttpMethod, sample } from './tools.js';
+
+vi.mock('axios');
 
 describe('tools utility functions', () => {
   describe('composeUrl', () => {
@@ -397,6 +400,32 @@ describe('tools utility functions', () => {
       it('should default to true when options is undefined', () => {
         expect(isSelfHealingEnabled(undefined, 'api')).toBe(true);
       });
+    });
+  });
+
+  describe('callAxios automatic retry', () => {
+    it('retries quick failures up to maxRetries and returns metadata', async () => {
+      (axios as any).mockReset();
+      (axios as any)
+        .mockImplementationOnce(async (_cfg: any) => ({ status: 500, data: Buffer.from('X'), headers: {}, config: {} }))
+        .mockImplementationOnce(async (_cfg: any) => ({ status: 502, data: Buffer.from('X'), headers: {}, config: {} }))
+        .mockImplementationOnce(async (_cfg: any) => ({ status: 200, data: Buffer.from('OK'), headers: {}, config: {} }));
+
+      const { response, retriesAttempted, lastFailureStatus } = await callAxios({ method: 'GET', url: 'https://example.com' } as any, { retries: 2, retryDelay: 1 } as any);
+      expect(response.status).toBe(200);
+      expect(retriesAttempted).toBe(2);
+      expect(lastFailureStatus).toBe(502);
+      (axios as any).mockReset();
+    });
+
+    it('returns immediately for 429 beyond max wait budget without throwing', async () => {
+      (axios as any).mockReset();
+      (axios as any).mockImplementation(async (_cfg: any) => ({ status: 429, data: Buffer.from('rate'), headers: { 'retry-after': '1' }, config: {} }));
+
+      const { response, retriesAttempted } = await callAxios({ method: 'GET', url: 'https://example.com' } as any, { retries: 1, retryDelay: 1 } as any);
+      expect(response.status).toBe(429);
+      expect(retriesAttempted).toBe(0);
+      (axios as any).mockReset();
     });
   });
 }) 

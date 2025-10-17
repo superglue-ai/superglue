@@ -48,7 +48,7 @@ describe('API Utilities', () => {
         headers: {},
         config: {} as any
       };
-      mockedTools.callAxios.mockResolvedValueOnce(mockResponse);
+      mockedTools.callAxios.mockResolvedValueOnce({ response: mockResponse, retriesAttempted: 0, lastFailureStatus: undefined });
 
       const result = await callEndpoint({ endpoint: testEndpoint, payload: testPayload, credentials: testCredentials, options: testOptions });
 
@@ -70,8 +70,8 @@ describe('API Utilities', () => {
       ];
 
       mockedTools.callAxios
-        .mockResolvedValueOnce(mockResponses[0])
-        .mockResolvedValueOnce(mockResponses[1]);
+        .mockResolvedValueOnce({ response: mockResponses[0], retriesAttempted: 0, lastFailureStatus: undefined })
+        .mockResolvedValueOnce({ response: mockResponses[1], retriesAttempted: 0, lastFailureStatus: undefined });
 
       const result = await callEndpoint({ endpoint: config, payload: {}, credentials: {}, options: {} });
 
@@ -99,8 +99,8 @@ describe('API Utilities', () => {
       ];
 
       mockedTools.callAxios
-        .mockResolvedValueOnce(mockResponses[0])
-        .mockResolvedValueOnce(mockResponses[1]);
+        .mockResolvedValueOnce({ response: mockResponses[0], retriesAttempted: 0, lastFailureStatus: undefined })
+        .mockResolvedValueOnce({ response: mockResponses[1], retriesAttempted: 0, lastFailureStatus: undefined });
 
       const result = await callEndpoint({ endpoint: config, payload: {}, credentials: {}, options: {} });
 
@@ -156,8 +156,8 @@ describe('API Utilities', () => {
       ];
 
       mockedTools.callAxios
-        .mockResolvedValueOnce(mockResponses[0])
-        .mockResolvedValueOnce(mockResponses[1]);
+        .mockResolvedValueOnce({ response: mockResponses[0], retriesAttempted: 0, lastFailureStatus: undefined })
+        .mockResolvedValueOnce({ response: mockResponses[1], retriesAttempted: 0, lastFailureStatus: undefined });
 
       const result = await callEndpoint({ endpoint: config, payload: {}, credentials: {}, options: {} });
 
@@ -183,8 +183,8 @@ describe('API Utilities', () => {
       };
 
       mockedTools.callAxios
-        .mockResolvedValueOnce(sameResponse)
-        .mockResolvedValueOnce(sameResponse); // Same data returned
+        .mockResolvedValueOnce({ response: sameResponse, retriesAttempted: 0, lastFailureStatus: undefined })
+        .mockResolvedValueOnce({ response: sameResponse, retriesAttempted: 0, lastFailureStatus: undefined }); // Same data returned
 
       const result = await callEndpoint({ endpoint: config, payload: {}, credentials: {}, options: {} });
 
@@ -212,7 +212,7 @@ describe('API Utilities', () => {
         config: {} as any
       };
       for (let i = 0; i < 505; i++) {
-        mockedTools.callAxios.mockResolvedValueOnce({ ...mockResponse, data: [{ id: i }] });
+        mockedTools.callAxios.mockResolvedValueOnce({ response: { ...mockResponse, data: [{ id: i }] }, retriesAttempted: 0, lastFailureStatus: undefined });
       }
       const result = await callEndpoint({ endpoint: config, payload: {}, credentials: {}, options: {} });
       // Should stop at 500 iterations (as defined in the code)
@@ -240,7 +240,7 @@ describe('API Utilities', () => {
         config: {} as any
       };
 
-      mockedTools.callAxios.mockResolvedValue(mockResponse);
+      mockedTools.callAxios.mockResolvedValue({ response: mockResponse, retriesAttempted: 0, lastFailureStatus: undefined });
 
       const result = await callEndpoint({ endpoint: config, payload: {}, credentials: {}, options: {} });
 
@@ -257,7 +257,7 @@ describe('API Utilities', () => {
         headers: {},
         config: {} as any
       };
-      mockedTools.callAxios.mockResolvedValueOnce(errorResponse);
+      mockedTools.callAxios.mockResolvedValueOnce({ response: errorResponse, retriesAttempted: 0, lastFailureStatus: undefined });
 
       await expect(callEndpoint({ endpoint: testEndpoint, payload: {}, credentials: {}, options: {} }))
         .rejects.toThrow(/API call failed/);
@@ -271,7 +271,7 @@ describe('API Utilities', () => {
         headers: {},
         config: {} as any
       };
-      mockedTools.callAxios.mockResolvedValueOnce(htmlResponse);
+      mockedTools.callAxios.mockResolvedValueOnce({ response: htmlResponse, retriesAttempted: 0, lastFailureStatus: undefined } );
 
       await expect(callEndpoint({ endpoint: testEndpoint, payload: {}, credentials: {}, options: {} }))
         .rejects.toThrow(/Received HTML response/);
@@ -294,7 +294,7 @@ describe('API Utilities', () => {
         headers: {},
         config: {} as any
       };
-      mockedTools.callAxios.mockResolvedValueOnce(mockResponse);
+      mockedTools.callAxios.mockResolvedValueOnce({ response: mockResponse, retriesAttempted: 0, lastFailureStatus: undefined });
 
       const result = await callEndpoint({ endpoint: config, payload: {}, credentials: {}, options: {} });
 
@@ -324,7 +324,7 @@ describe('API Utilities', () => {
         headers: {},
         config: {} as any
       };
-      mockedTools.callAxios.mockResolvedValueOnce(graphqlErrorResponse);
+      mockedTools.callAxios.mockResolvedValueOnce({ response: graphqlErrorResponse, retriesAttempted: 0, lastFailureStatus: undefined });
 
       await expect(callEndpoint({ endpoint: config, payload: {}, credentials: {}, options: {} }))
         .rejects.toThrow(/appears to be an error/i);
@@ -344,7 +344,7 @@ describe('API Utilities', () => {
         headers: {},
         config: {} as any
       };
-      mockedTools.callAxios.mockResolvedValueOnce(mockResponse);
+      mockedTools.callAxios.mockResolvedValueOnce({ response: mockResponse, retriesAttempted: 0, lastFailureStatus: undefined });
 
       const result = await callEndpoint({ endpoint: testEndpoint, payload: {}, credentials: {}, options: {} });
       expect(result.statusCode).toBe(200);
@@ -362,7 +362,7 @@ describe('API Utilities', () => {
         headers: {},
         config: {} as any
       };
-      mockedTools.callAxios.mockResolvedValueOnce(mockResponse);
+      mockedTools.callAxios.mockResolvedValueOnce({ response: mockResponse, retriesAttempted: 0, lastFailureStatus: undefined });
 
       await expect(callEndpoint({ endpoint: testEndpoint, payload: {}, credentials: {}, options: {} }))
         .rejects.toThrow(/appears to be an error/i);
@@ -379,7 +379,7 @@ describe('API Utilities', () => {
         headers: {},
         config: {} as any
       };
-      mockedTools.callAxios.mockResolvedValueOnce(mockResponse);
+      mockedTools.callAxios.mockResolvedValueOnce({ response: mockResponse, retriesAttempted: 0, lastFailureStatus: undefined });
 
       await expect(callEndpoint({ endpoint: testEndpoint, payload: {}, credentials: {}, options: {} }))
         .rejects.toThrow(/appears to be an error/i);
@@ -396,7 +396,7 @@ describe('API Utilities', () => {
         headers: {},
         config: {} as any
       };
-      mockedTools.callAxios.mockResolvedValueOnce(mockResponse);
+      mockedTools.callAxios.mockResolvedValueOnce({ response: mockResponse, retriesAttempted: 0, lastFailureStatus: undefined });
 
       await expect(callEndpoint({ endpoint: testEndpoint, payload: {}, credentials: {}, options: {} }))
         .rejects.toThrow(/appears to be an error/i);
@@ -413,7 +413,7 @@ describe('API Utilities', () => {
         headers: {},
         config: {} as any
       };
-      mockedTools.callAxios.mockResolvedValueOnce(mockResponse);
+      mockedTools.callAxios.mockResolvedValueOnce({ response: mockResponse, retriesAttempted: 0, lastFailureStatus: undefined });
 
       const result = await callEndpoint({ endpoint: testEndpoint, payload: {}, credentials: {}, options: {} });
       expect(result.statusCode).toBe(200);

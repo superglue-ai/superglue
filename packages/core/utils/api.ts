@@ -294,13 +294,14 @@ export async function callEndpoint({ endpoint, payload, credentials, options }: 
       timeout: options?.timeout || 60000,
     };
 
-    lastResponse = await callAxios(axiosConfig, options);
+    const axiosResult = await callAxios(axiosConfig, options);
+    lastResponse = axiosResult.response;
 
     const status = lastResponse?.status;
     let statusHandlerResult = null;
 
-    const retriesAttempted = (lastResponse as any)._retriesAttempted || 0;
-    const lastFailureStatus = (lastResponse as any)._lastFailureStatus;
+    const retriesAttempted = axiosResult.retriesAttempted || 0;
+    const lastFailureStatus = axiosResult.lastFailureStatus;
     if ([200, 201, 202, 203, 204, 205].includes(status)) {
       statusHandlerResult = handle2xxStatus({ response: lastResponse, axiosConfig, credentials, payload, retriesAttempted, lastFailureStatus });
     } else if (status === 429) {

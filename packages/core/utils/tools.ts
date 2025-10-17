@@ -6,12 +6,12 @@ import https from 'https';
 import ivm from 'isolated-vm';
 import jsonata from "jsonata";
 import { Validator } from "jsonschema";
+import { server_defaults } from "../default.js";
 import { HttpMethodEnum } from "../mcp/mcp-server.js";
 import { ApiCallError } from "./api.js";
 import { parseJSON } from "./json-parser.js";
 import { logMessage } from "./logs.js";
 import { injectVMHelpersIndividually } from "./vm-helpers.js";
-import { server_defaults } from "../default.js";
 
 export function isRequested(field: string, info: GraphQLResolveInfo) {
   return info.fieldNodes.some(
@@ -211,7 +211,13 @@ export async function executeAndValidateMappingCode(input: any, mappingCode: str
   }
 }
 
-export async function callAxios(config: AxiosRequestConfig, options: RequestOptions) {
+export interface CallAxiosResult {
+  response: AxiosResponse;
+  retriesAttempted: number;
+  lastFailureStatus?: number;
+}
+
+export async function callAxios(config: AxiosRequestConfig, options: RequestOptions): Promise<CallAxiosResult> {
   let retryCount = 0;
   const maxRetries = options?.retries ?? 1;
   const delay = options?.retryDelay || 1000;
@@ -279,14 +285,14 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
           if (response.data instanceof ArrayBuffer) {
             response.data = Buffer.from(response.data);
           }
-          return response; // Return the 429 response, caller will handle the error
+          return { response, retriesAttempted: retryCount, lastFailureStatus };
         }
 
         await new Promise(resolve => setTimeout(resolve, waitTime));
 
         totalRateLimitWaitTime += waitTime;
         rateLimitRetryCount++;
-        continue; // Skip the regular retry logic and try again immediately
+        continue;
       }
       if (response.data instanceof ArrayBuffer) {
         response.data = Buffer.from(response.data);
@@ -298,18 +304,14 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
           await new Promise(resolve => setTimeout(resolve, delay));
           continue;
         }
-        (response as any)._retriesAttempted = retryCount;
-        (response as any)._lastFailureStatus = lastFailureStatus ?? response.status;
-        return response;
+        return { response, retriesAttempted: retryCount, lastFailureStatus: lastFailureStatus ?? response.status };
       }
       if (retryCount > 0) {
         const method = (config.method || "GET").toString().toUpperCase();
         const url = (config as any).url || "";
         logMessage("debug", `Automatic retry succeeded for ${method} ${url} after ${retryCount} retr${retryCount === 1 ? "y" : "ies"}${lastFailureStatus ? `; last failure status: ${lastFailureStatus}` : ""}`);
       }
-      (response as any)._retriesAttempted = retryCount;
-      (response as any)._lastFailureStatus = lastFailureStatus;
-      return response;
+      return { response, retriesAttempted: retryCount, lastFailureStatus };
     } catch (error) {
       if (retryCount >= maxRetries) {
         const baseMessage = (error as any).message || "Network error";
