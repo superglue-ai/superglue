@@ -22,3 +22,4 @@ packages/core/eval/api-ranking/upload-api-ranking.ts
 packages/core/eval/api-ranking/ranking.csv
 packages/core/eval/integration-testing/gha-integration-test-config.json
 packages/web/public/files
+packages/core/eval/agent-eval/.data
