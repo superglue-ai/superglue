@@ -128,7 +128,7 @@ superglue is GPL licensed. The superglue client SDKs are MIT licensed. See [LICE
 ## Next Steps
 
 - [Join our Discord](https://discord.gg/vUKnuhHtfW)
-- [Read our docs](https://docs.superglue.cloud/introduction)
+- [Read our docs](https://docs.superglue.cloud/)
 - [Book a sales call](https://cal.com/superglue/superglue-demo)
 
 Text us! <br>
