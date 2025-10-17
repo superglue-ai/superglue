@@ -5,31 +5,59 @@ import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import JsonSchemaEditor from '@/src/components/utils/JsonSchemaEditor';
 import { downloadJson } from '@/src/lib/download-utils';
 import { formatBytes, isAllowedFileType, MAX_TOTAL_FILE_SIZE, type UploadedFileInfo } from '@/src/lib/file-utils';
-import { cn, ensureSourceDataArrowFunction, formatJavaScriptCode, isEmptyData, isValidSourceDataArrowFunction, truncateForDisplay, truncateLines, usePrismHighlight } from '@/src/lib/utils';
+import { cn, ensureSourceDataArrowFunction, formatJavaScriptCode, isEmptyData, isValidSourceDataArrowFunction, truncateForDisplay, truncateLines } from '@/src/lib/utils';
 import { inferJsonSchema } from '@superglue/shared';
 import { Check, Code2, Copy, Download, Eye, FileJson, Package, Play, RotateCw, Upload, X } from 'lucide-react';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-javascript';
 import 'prismjs/components/prism-json';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Editor from 'react-simple-code-editor';
 
-const MAX_HIGHLIGHT_CHARS = 150000;
-const highlightCode = (code: string, language: string) => {
-    if (!code || code.length > MAX_HIGHLIGHT_CHARS) return code;
-    try {
-        if (language === 'javascript' || language === 'js') {
-            const jsLang = Prism.languages.javascript || Prism.languages.js;
-            if (jsLang) return Prism.highlight(code, jsLang, 'javascript');
-        } else if (language === 'json') {
-            const jsonLang = Prism.languages.json;
-            if (jsonLang) return Prism.highlight(code, jsonLang, 'json');
+export function usePrismHighlight(code: string, language: 'javascript' | 'json', delayMs = 100): string {
+    const [html, setHtml] = useState<string>('');
+    const lastHtmlRef = useRef<string>('');
+    const highlightFn = useMemo(() => {
+      return (c: string) => {
+        try {
+          const lang = language === 'javascript' ? Prism.languages.javascript : Prism.languages.json;
+          return Prism.highlight(c, lang, language);
+        } catch {
+          return c;
         }
-        return code;
-    } catch {
-        return code;
-    }
-};
+      };
+    }, [language]);
+  
+    useEffect(() => {
+      let cancelled = false;
+      let cancel: (() => void) | null = null;
+      const schedule = (fn: () => void) => {
+        const w: any = window as any;
+        if (typeof w.requestIdleCallback === 'function') {
+          const id = w.requestIdleCallback(fn, { timeout: delayMs });
+          return () => w.cancelIdleCallback?.(id);
+        }
+        const id = window.requestAnimationFrame(fn);
+        return () => window.cancelAnimationFrame(id);
+      };
+  
+      cancel = schedule(() => {
+        if (cancelled) return;
+        const next = highlightFn(code);
+        if (!cancelled) {
+          lastHtmlRef.current = next;
+          setHtml(next);
+        }
+      });
+  
+      return () => {
+        cancelled = true;
+        cancel?.();
+      };
+    }, [code, highlightFn, delayMs]);
+  
+    return html || lastHtmlRef.current || code;
+  }
 
 
 export const CopyButton = ({ text, getData }: { text?: string; getData?: () => any }) => {
