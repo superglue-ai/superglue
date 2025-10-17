@@ -1,6 +1,7 @@
 import { SelfHealingMode } from '@superglue/client';
 import axios from 'axios';
 import { describe, expect, it, vi } from 'vitest';
+import { server_defaults } from '../default.js';
 import { applyAuthFormat, applyJsonata, applyJsonataWithValidation, callAxios, composeUrl, isSelfHealingEnabled, maskCredentials, replaceVariables, safeHttpMethod, sample } from './tools.js';
 
 vi.mock('axios');
@@ -420,7 +421,8 @@ describe('tools utility functions', () => {
 
     it('returns immediately for 429 beyond max wait budget without throwing', async () => {
       (axios as any).mockReset();
-      (axios as any).mockImplementation(async (_cfg: any) => ({ status: 429, data: Buffer.from('rate'), headers: { 'retry-after': '1' }, config: {} }));
+      const tooLongSeconds = Math.ceil(server_defaults.AXIOS_MAX_RATE_LIMIT_WAIT_MS / 1000) + 1;
+      (axios as any).mockImplementation(async (_cfg: any) => ({ status: 429, data: Buffer.from('rate'), headers: { 'retry-after': String(tooLongSeconds) }, config: {} }));
 
       const { response, retriesAttempted } = await callAxios({ method: 'GET', url: 'https://example.com' } as any, { retries: 1, retryDelay: 1 } as any);
       expect(response.status).toBe(429);
