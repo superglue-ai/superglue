@@ -8,7 +8,7 @@ import { IntegrationSetupService } from "./integration-setup.js";
 import { WorkflowRunnerService } from "./workflow-runner.js";
 import path from "node:path";
 import { config } from "dotenv";
-import { calculateMetrics } from "./metrics-calculator.js";
+import { MetricsCalculatorService } from "./metrics-calculator.js";
 import { ConsoleReporter } from "./console-reporter.js";
 
 const envPath = process.cwd().endsWith('packages/core')
@@ -35,7 +35,9 @@ export async function main(): Promise<void> {
   const agentEvalRunner = new WorkflowRunnerService(store, metadata);
   const workflowAttempts = await agentEvalRunner.runWorkflows(enabledWorkflows, integrations);
 
-  const metrics = calculateMetrics(workflowAttempts);
+  const metricsCalculatorService = new MetricsCalculatorService();
+  const metrics = metricsCalculatorService.calculateMetrics(workflowAttempts);
+
   ConsoleReporter.report(metrics);
 
   const duration = new Date().getTime() - startedAt.getTime();
