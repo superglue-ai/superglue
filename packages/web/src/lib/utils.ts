@@ -31,55 +31,6 @@ export function composeUrl(host: string, path: string | undefined) {
   return `${cleanHost}/${cleanPath}`;
 }
 
-
-
-export function usePrismHighlight(code: string, language: 'javascript' | 'json', delayMs = 80): string {
-  const [html, setHtml] = useState<string>('');
-  const lastHtmlRef = useRef<string>('');
-  const highlightFn = useMemo(() => {
-    return (c: string) => {
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const PrismAny = (Prism as any);
-        const lang = language === 'javascript' ? (PrismAny.languages.javascript || PrismAny.languages.js) : PrismAny.languages.json;
-        return Prism.highlight(c, lang, language);
-      } catch {
-        return c;
-      }
-    };
-  }, [language]);
-
-  useEffect(() => {
-    let cancelled = false;
-    let cancel: (() => void) | null = null;
-    const schedule = (fn: () => void) => {
-      const w: any = window as any;
-      if (typeof w.requestIdleCallback === 'function') {
-        const id = w.requestIdleCallback(fn, { timeout: delayMs });
-        return () => w.cancelIdleCallback?.(id);
-      }
-      const id = window.requestAnimationFrame(fn);
-      return () => window.cancelAnimationFrame(id);
-    };
-
-    cancel = schedule(() => {
-      if (cancelled) return;
-      const next = highlightFn(code);
-      if (!cancelled) {
-        lastHtmlRef.current = next;
-        setHtml(next);
-      }
-    });
-
-    return () => {
-      cancelled = true;
-      cancel?.();
-    };
-  }, [code, highlightFn, delayMs]);
-
-  return html || lastHtmlRef.current || code;
-}
-
 export function getIntegrationIcon(integration: { id: string; urlHost?: string }): string | null {
   // First try exact ID match with known integrations
   if (integrations[integration.id]) {
