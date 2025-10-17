@@ -1,0 +1,322 @@
+{
+  "integrations": [
+    {
+      "id": "clickup",
+      "name": "ClickUp",
+      "urlHost": "https://api.clickup.com",
+      "urlPath": "/api",
+      "documentationUrl": "https://developer.clickup.com/reference/getauthorizeduser",
+      "openApiUrl": "https://developer.clickup.com/openapi/clickup-api-v2-reference.json",
+      "credentials": {
+        "api_token": ""
+      },
+      "description": "Project management Software"
+    },
+    {
+      "id": "stripe",
+      "name": "Stripe",
+      "urlHost": "https://api.stripe.com",
+      "urlPath": "/v1",
+      "documentationUrl": "https://stripe.com/docs/api",
+      "credentials": {
+        "secret_key": "",
+        "publishable_key": ""
+      },
+      "description": "Payment processing and subscription management"
+    },
+    {
+      "id": "airtable",
+      "name": "Airtable",
+      "urlHost": "https://api.airtable.com",
+      "urlPath": "/v0",
+      "documentationUrl": "https://airtable.com/developers/web/api/introduction",
+      "credentials": {
+        "api_key": ""
+      },
+      "description": "Airtable API"
+    },
+    {
+      "id": "clockify",
+      "name": "Clockify",
+      "urlHost": "https://api.clockify.me",
+      "urlPath": "/api/v1",
+      "documentationUrl": "https://docs.clockify.me/",
+      "credentials": {
+        "api_key": ""
+      },
+      "description": "Clockify API"
+    },
+    {
+      "id": "typeform",
+      "name": "Typeform",
+      "urlHost": "https://api.typeform.com/",
+      "urlPath": "",
+      "documentationUrl": "https://www.typeform.com/developers/get-started/",
+      "credentials": {
+        "personal_access_token": ""
+      },
+      "description": "Typeform API"
+    }
+  ],
+  "workflows": [
+    {
+      "id": "clickup-task-list",
+      "name": "ClickUp Task List",
+      "type": "retrieval",
+      "instruction": "Get all tasks from the ClickUp task list. I want the final output to be a JSON object with the following structure: { \"tasks\": [ { \"name\": \"Task 1\", \"description\": \"Task 1 description\" } ]",
+      "integrationIds": ["clickup"],
+      "payload": {
+        "listId": "901516361522"
+      },
+      "expectedData": {
+        "tasks": [
+          {
+            "name": "First Task",
+            "description": "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua."
+          }
+        ]
+      }
+    },
+    {
+      "id": "clickup-all-lists",
+      "name": "ClickUp All Lists",
+      "type": "retrieval",
+      "instruction": "Get all lists of all workspaces in ClickUp. Including Lists located in Folders and in Spaces. Return an object of this shape: { lists: Array<{ id: string, name: string, content: string, due_date: string | null, start_date: string | null }> }. Dates should have the format YYYY-MM-DD.",
+      "integrationIds": ["clickup"],
+      "payload": {},
+      "expectedData": {
+        "lists": [
+          {
+            "id": "901516249723",
+            "name": "Projekt 1",
+            "content": "Project one's text",
+            "due_date": "2025-11-06",
+            "start_date": "2025-10-15"
+          },
+          {
+            "id": "901516249722",
+            "name": "Projekt 2",
+            "content": "",
+            "due_date": null,
+            "start_date": null
+          },
+          {
+            "id": "901516361522",
+            "name": "Test",
+            "content": "",
+            "due_date": null,
+            "start_date": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "clickup-all-comments-and-replies",
+      "name": "ClickUp All Comments and Replies",
+      "type": "retrieval",
+      "instruction": "Get all comments and and for each comment its sub-comments for the task with the given taskId. Be aware that you need to iterate over the comments and get the sub-comments for each comment using another API call. Return an object of this shape: { comments: Array<{ id: string, authorId: string, authorName: string, text: string, parentCommentId: string | null, createdAt: string }> }. Convert the create date to YYYY-MM-DD.",
+      "integrationIds": ["clickup"],
+      "payload": {
+        "taskId": "86c5y6t56"
+      },
+      "expectedData": {
+        "comments": [
+          {
+            "id": "90150163803004",
+            "authorId": "242688065",
+            "authorName": "Max Mustermann",
+            "text": "Second comment without replies\n",
+            "parentCommentId": null,
+            "createdAt": "2025-10-14"
+          },
+          {
+            "id": "90150163802974",
+            "authorId": "242688065",
+            "authorName": "Max Mustermann",
+            "text": "One comment\n",
+            "parentCommentId": null,
+            "createdAt": "2025-10-14"
+          },
+          {
+            "id": "90150163802992",
+            "authorId": "242688065",
+            "authorName": "Max Mustermann",
+            "text": "Sub comment\n",
+            "parentCommentId": "90150163802974",
+            "createdAt": "2025-10-14"
+          }
+        ]
+      }
+    },
+    {
+      "id": "clockify-time-entries",
+      "name": "Clockify Time Entries",
+      "type": "retrieval",
+      "instruction": "Get all time entries for the authenticated user. I want the final output to be a JSON object with the following structure: { timeEntries: [{id: string,description: string, duration: number, // duration in MS }]}",
+      "integrationIds": ["clockify"],
+      "payload": {},
+      "expectedData": {
+        "timeEntries": [
+          {
+            "id": "68eaecf2a76c246ccca9f7ff",
+            "description": "Buchhaltung",
+            "duration": 3300000
+          },
+          {
+            "id": "68eaed76c0a1d045ac1d72b1",
+            "description": "Beratungsgespräch",
+            "duration": 3600000
+          },
+          {
+            "id": "68eaed55a76c246ccca9f9b7",
+            "description": "Beratungsgespräch",
+            "duration": 3600000
+          }
+        ]
+      }
+    },
+    {
+      "id": "clockify-projects",
+      "name": "Clockify Projects",
+      "type": "retrieval",
+      "instruction": "Get all projects for the authenticated user's active workspace. I want the final output to be a JSON object with the following structure: { projects: [{id: string, name: string, note: string, billable: boolean, hourlyRate?: number, hourlyRateCurrency?: string }]}. ",
+      "integrationIds": ["clockify"],
+      "payload": {},
+      "expectedData": {
+        "projects": [
+          {
+            "id": "68eaed6cf78d45743dec5b43",
+            "name": "Buchhaltung 2025",
+            "note": "Some notes",
+            "billable": false,
+            "hourlyRate": 0,
+            "hourlyRateCurrency": "USD"
+          },
+          {
+            "id": "68eaed36c0a1d045ac1d6fbc",
+            "name": "Marketing Project X",
+            "note": "",
+            "billable": true,
+            "hourlyRate": 8000,
+            "hourlyRateCurrency": "USD"
+          }
+        ]
+      }
+    },
+    {
+      "id": "clockify-projects-all-workspaces",
+      "name": "Clockify Projects All Workspaces",
+      "type": "retrieval",
+      "instruction": "Get all projects the authenticated user has access to. I want the final output to be a JSON object with the following structure: { projects: [{id: string, name: string, note: string, billable: boolean, hourlyRate?: number, hourlyRateCurrency?: string }]}. ",
+      "integrationIds": ["clockify"],
+      "payload": {},
+      "expectedData": {
+        "projects": [
+          {
+            "id": "68eaed6cf78d45743dec5b43",
+            "name": "Buchhaltung 2025",
+            "note": "Some notes",
+            "billable": false,
+            "hourlyRate": 0,
+            "hourlyRateCurrency": "USD"
+          },
+          {
+            "id": "68eaed36c0a1d045ac1d6fbc",
+            "name": "Marketing Project X",
+            "note": "",
+            "billable": true,
+            "hourlyRate": 8000,
+            "hourlyRateCurrency": "USD"
+          }
+        ]
+      }
+    },
+    {
+      "id": "typeform-get-all-forms",
+      "name": "Typeform Get All Forms",
+      "type": "retrieval",
+      "instruction": "Get all forms with responses (question and answer) for the authenticated user. I want the final output to be a JSON object with the following structure: { forms: [{id: string, name: string, responses: Array<{id: string, answers: Array<{question: string, answer: string}>, submittedAt: number // unix timestamp}>, createdAt: number // unix timestamp }], total: number}. Please make sure to include the questions and answers for each response.",
+      "integrationIds": ["typeform"],
+      "payload": {},
+      "expectedData": {
+        "forms": [
+          {
+            "id": "lyyDJUcC",
+            "name": "Coffee Shop Applications",
+            "responses": [
+              {
+                "id": "zrf8owa8sa9aq94pd6rmdzrf8ow4jewu",
+                "answers": [
+                  {
+                    "question": "What is your full name?",
+                    "answer": "Peter Mustermann"
+                  },
+                  {
+                    "question": "Which position are you applying for?",
+                    "answer": "Cashier"
+                  },
+                  {
+                    "question": "Please share a brief overview of your work experience.",
+                    "answer": "Peter's text"
+                  },
+                  {
+                    "question": "Why would you like to work at our coffee shop?",
+                    "answer": "Random text"
+                  }
+                ],
+                "submittedAt": 1760610533
+              },
+              {
+                "id": "gpau4osqcuahhim7hngpauukv3090uf6",
+                "answers": [
+                  {
+                    "question": "What is your full name?",
+                    "answer": "Max Mustermann"
+                  },
+                  {
+                    "question": "What is your email address?",
+                    "answer": "evals@superglue.ai"
+                  },
+                  {
+                    "question": "Which position are you applying for?",
+                    "answer": "Barista"
+                  },
+                  {
+                    "question": "Please share a brief overview of your work experience.",
+                    "answer": "Test Text here"
+                  },
+                  {
+                    "question": "Why would you like to work at our coffee shop?",
+                    "answer": "Some text here"
+                  }
+                ],
+                "submittedAt": 1760610498
+              }
+            ],
+            "createdAt": 1760610392
+          },
+          {
+            "id": "OB4nenxi",
+            "name": "Just empty",
+            "responses": [],
+            "createdAt": 1760229402
+          }
+        ],
+        "total": 2
+      }
+    }
+  ],
+  "enabledWorkflows": [
+    "clickup-task-list",
+    "clickup-all-lists",
+    "clickup-all-comments-and-replies",
+    "clockify-time-entries",
+    "clockify-projects",
+    "clockify-projects-all-workspaces",
+    "typeform-get-all-forms"
+  ],
+  "settings": {
+    "runOneShotMode": true,
+    "runSelfHealingMode": true
+  }
+}
