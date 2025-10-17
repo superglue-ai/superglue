@@ -2,7 +2,7 @@ import { Integration } from "@superglue/client";
 import { DataStore } from "../datastore/types.js";
 import { DocumentationSearch } from "../documentation/documentation-search.js";
 import { logMessage } from "../utils/logs.js";
-import { isTokenExpired, refreshOAuthToken } from "../utils/oauth.js";
+import { isTokenExpired, refreshOAuthToken } from "../utils/oauth-token-refresh.js";
 
 export interface DocumentationData {
     content?: string;
