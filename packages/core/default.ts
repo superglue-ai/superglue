@@ -11,6 +11,8 @@ export const server_defaults = {
     DEFAULT_LOOP_MAX_ITERS: 1000,
     MAX_PAGINATION_REQUESTS: 1000,
     AXIOS_QUICK_RETRY_THRESHOLD_MS: 10000,
+    AXIOS_DEFAULT_RETRY_DELAY_MS: 1000,
+    AXIOS_MAX_RATE_LIMIT_WAIT_MS: 60 * 60 * 1000 * 24, // 24 hours is the max wait time for rate limit retries, hardcoded
     DOCUMENTATION: {
         MIN_SEARCH_TERM_LENGTH: 4,
         MAX_LENGTH_OFFSET: 50000,

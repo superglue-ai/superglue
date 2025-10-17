@@ -220,8 +220,8 @@ export interface CallAxiosResult {
 export async function callAxios(config: AxiosRequestConfig, options: RequestOptions): Promise<CallAxiosResult> {
   let retryCount = 0;
   const maxRetries = options?.retries ?? 1;
-  const delay = options?.retryDelay || 1000;
-  const maxRateLimitWaitMs = 60 * 60 * 1000 * 24; // 24 hours is the max wait time for rate limit retries, hardcoded
+  const delay = options?.retryDelay || server_defaults.AXIOS_DEFAULT_RETRY_DELAY_MS;
+  const maxRateLimitWaitMs = server_defaults.AXIOS_MAX_RATE_LIMIT_WAIT_MS;
   let rateLimitRetryCount = 0;
   let totalRateLimitWaitTime = 0;
   let lastFailureStatus: number | undefined;
