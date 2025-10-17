@@ -428,7 +428,24 @@ export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integ
                                                             Stop Condition (JavaScript)
                                                             <HelpTooltip text="JavaScript function that returns true when pagination should stop. Receives (response, pageInfo) where pageInfo has: page, offset, cursor, total fetched." />
                                                         </Label>
-                                                        <Textarea value={step.apiConfig.pagination.stopCondition || '(response, pageInfo) => !response.data || response.data.length === 0'} onChange={(e) => handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, pagination: { ...(s.apiConfig.pagination || {}), stopCondition: e.target.value } } }))} className="font-mono text-xs h-16 mt-1" placeholder="(response, pageInfo) => !response.data || response.data.length === 0" disabled={disabled} />
+                                                        <div className="mt-1">
+                                                            <JavaScriptCodeEditor
+                                                                value={step.apiConfig.pagination.stopCondition || '(response, pageInfo) => !response.data || response.data.length === 0'}
+                                                                onChange={(val) => handleImmediateEdit((s) => ({
+                                                                    ...s,
+                                                                    apiConfig: {
+                                                                        ...s.apiConfig,
+                                                                        pagination: { ...(s.apiConfig.pagination || {}), stopCondition: val }
+                                                                    }
+                                                                }))}
+                                                                readOnly={disabled}
+                                                                minHeight="150px"
+                                                                maxHeight="250px"
+                                                                resizable={true}
+                                                                isTransformEditor={false}
+                                                                autoFormatOnMount={true}
+                                                            />
+                                                        </div>
                                                     </div>
                                                 </>
                                             )}
