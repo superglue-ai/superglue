@@ -21,35 +21,6 @@ interface OAuthTokenResponse {
     expires_in?: number;
 }
 
-function validateOAuthState(state: string | null, expectedIntegrationId: string): OAuthState {
-    if (!state) {
-        throw new Error('Missing OAuth state parameter. Please try the authorization flow again.');
-    }
-
-    try {
-        const stateData = JSON.parse(atob(state)) as OAuthState;
-
-        if (!stateData.apiKey || !stateData.timestamp || !stateData.integrationId) {
-            throw new Error('Invalid OAuth state structure');
-        }
-
-        if (Date.now() - stateData.timestamp >= OAUTH_STATE_EXPIRY_MS) {
-            throw new Error('OAuth state expired. Please try again.');
-        }
-
-        if (stateData.integrationId !== expectedIntegrationId) {
-            throw new Error('Integration ID mismatch. Possible CSRF attempt.');
-        }
-
-        return stateData;
-    } catch (error) {
-        if (error instanceof Error && error.message.includes('OAuth')) {
-            throw error;
-        }
-        throw new Error('Invalid OAuth state format. Please try the authorization flow again.');
-    }
-}
-
 async function exchangeCodeForToken(
     code: string,
     tokenUrl: string,
