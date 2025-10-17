@@ -6,9 +6,11 @@ import https from 'https';
 import ivm from 'isolated-vm';
 import jsonata from "jsonata";
 import { Validator } from "jsonschema";
+import { server_defaults } from "../default.js";
 import { HttpMethodEnum } from "../mcp/mcp-server.js";
 import { ApiCallError } from "./api.js";
 import { parseJSON } from "./json-parser.js";
+import { logMessage } from "./logs.js";
 import { injectVMHelpersIndividually } from "./vm-helpers.js";
 
 export function isRequested(field: string, info: GraphQLResolveInfo) {
@@ -209,14 +211,20 @@ export async function executeAndValidateMappingCode(input: any, mappingCode: str
   }
 }
 
-export async function callAxios(config: AxiosRequestConfig, options: RequestOptions) {
+export interface CallAxiosResult {
+  response: AxiosResponse;
+  retriesAttempted: number;
+  lastFailureStatus?: number;
+}
+
+export async function callAxios(config: AxiosRequestConfig, options: RequestOptions): Promise<CallAxiosResult> {
   let retryCount = 0;
   const maxRetries = options?.retries ?? 1;
-  const delay = options?.retryDelay || 1000;
-  const maxRateLimitWaitMs = 60 * 60 * 1000 * 24; // 24 hours is the max wait time for rate limit retries, hardcoded
+  const delay = options?.retryDelay || server_defaults.AXIOS_DEFAULT_RETRY_DELAY_MS;
+  const maxRateLimitWaitMs = server_defaults.AXIOS_MAX_RATE_LIMIT_WAIT_MS;
   let rateLimitRetryCount = 0;
   let totalRateLimitWaitTime = 0;
-  const QUICK_RETRY_THRESHOLD_MS = 10000;
+  let lastFailureStatus: number | undefined;
 
   config.headers = {
     "Accept": "*/*",
@@ -277,28 +285,40 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
           if (response.data instanceof ArrayBuffer) {
             response.data = Buffer.from(response.data);
           }
-          return response; // Return the 429 response, caller will handle the error
+          return { response, retriesAttempted: retryCount, lastFailureStatus };
         }
 
         await new Promise(resolve => setTimeout(resolve, waitTime));
 
         totalRateLimitWaitTime += waitTime;
         rateLimitRetryCount++;
-        continue; // Skip the regular retry logic and try again immediately
+        continue;
       }
       if (response.data instanceof ArrayBuffer) {
         response.data = Buffer.from(response.data);
       }
       if (response.status < 200 || response.status >= 300) {
-        if (response.status !== 429 && retryCount < maxRetries && durationMs < QUICK_RETRY_THRESHOLD_MS) {
+        if (response.status !== 429 && retryCount < maxRetries && durationMs < server_defaults.AXIOS_QUICK_RETRY_THRESHOLD_MS) {
+          lastFailureStatus = response.status;
           retryCount++;
+          await new Promise(resolve => setTimeout(resolve, delay));
           continue;
         }
-        return response;
+        return { response, retriesAttempted: retryCount, lastFailureStatus: lastFailureStatus ?? response.status };
       }
-      return response;
+      if (retryCount > 0) {
+        const method = (config.method || "GET").toString().toUpperCase();
+        const url = (config as any).url || "";
+        logMessage("debug", `Automatic retry succeeded for ${method} ${url} after ${retryCount} retr${retryCount === 1 ? "y" : "ies"}${lastFailureStatus ? `; last failure status: ${lastFailureStatus}` : ""}`);
+      }
+      return { response, retriesAttempted: retryCount, lastFailureStatus };
     } catch (error) {
-      if (retryCount >= maxRetries) throw new ApiCallError(error.message, response?.status);
+      if (retryCount >= maxRetries) {
+        const baseMessage = (error as any).message || "Network error";
+        const withRetryInfo = `${baseMessage} (retries attempted: ${retryCount}${lastFailureStatus ? `, last failure status: ${lastFailureStatus}` : ""})`;
+        throw new ApiCallError(withRetryInfo, response?.status);
+      }
+      lastFailureStatus = response?.status;
       retryCount++;
       await new Promise(resolve => setTimeout(resolve, delay * retryCount));
     }

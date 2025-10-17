@@ -54,91 +54,81 @@ function detectHtmlErrorResponse(data: any): { isHtml: boolean; preview?: string
   };
 }
 
-function normalizeToJson(input: any): any {
-  if (!input) return input;
-  if (input instanceof Buffer) {
-    const s = input.toString('utf-8');
-    try { return JSON.parse(s); } catch { return s; }
-  }
-  if (typeof input === 'string') {
-    try { return JSON.parse(input); } catch { return input; }
-  }
-  return input;
-}
-
 export function checkResponseForErrors(
-  rawData: any,
+  data: any,
   status: number,
-  ctx: { axiosConfig: AxiosRequestConfig; method: string; url: string; credentials: Record<string, any>; payload: Record<string, any>; }
+  ctx: { axiosConfig: AxiosRequestConfig; credentials: Record<string, any>; payload: Record<string, any>; }
 ): void {
-  const data = normalizeToJson(rawData);
+  if (!data || typeof data !== 'object') return;
 
-  if (data && typeof data === 'object' && !Array.isArray(data)) {
-    const d: any = data;
-    const throwDetected = (reason: string) => {
-      const maskedConfig = maskCredentials(JSON.stringify(ctx.axiosConfig));
-      const previewSource = JSON.stringify(data);
-      const preview = String(previewSource).slice(0, 1000);
-      const message = `${ctx.method} ${ctx.url} returned ${status} but appears to be an error. Reason: ${reason}\nResponse preview: ${preview}\nconfig: ${maskedConfig}`;
-      throw new ApiCallError(message, status);
-    };
+  const d: any = Array.isArray(data) && data.length > 0 ? data[0] : data;
+  if (!d || typeof d !== 'object') return;
 
-    if (typeof d.code === 'number' && d.code >= 400 && d.code <= 599) {
-      throwDetected(`code=${d.code}`);
-    }
-    if (typeof d.status === 'number' && d.status >= 400 && d.status <= 599) {
-      throwDetected(`status=${d.status}`);
-    }
+  const throwDetected = (reason: string, value?: any) => {
+    const method = (ctx.axiosConfig?.method || 'GET').toString().toUpperCase();
+    const url = String(ctx.axiosConfig?.url || '');
+    const maskedConfig = maskCredentials(JSON.stringify(ctx.axiosConfig || {}), ctx.credentials);
+    const previewSource = JSON.stringify(data);
+    const preview = String(previewSource).slice(0, 2500);
+    const valueStr = value !== undefined ? `='${String(value).slice(0, 120)}'` : '';
+    const message = `${method} ${url} returned ${status} but appears to be an error. Reason: ${reason}${valueStr}\nResponse preview: ${preview}\nconfig: ${maskedConfig}`;
+    throw new ApiCallError(message, status);
+  };
 
-    const errorKeys = new Set(['error', 'errors', 'error_message', 'errormessage', 'failure_reason', 'failure']);
-    const maxDepth = 2;
+  if (typeof d.code === 'number' && d.code >= 400 && d.code <= 599) {
+    throwDetected(`code`, d.code);
+  }
+  if (typeof d.status === 'number' && d.status >= 400 && d.status <= 599) {
+    throwDetected(`status`, d.status);
+  }
 
-    const traverse = (obj: any, depth: number) => {
-      if (!obj || typeof obj !== 'object') return;
-      for (const key of Object.keys(obj)) {
-        const lower = key.toLowerCase();
-        if (errorKeys.has(lower)) {
-          const v = obj[key];
-          const isNonEmpty = Array.isArray(v)
-            ? v.length > 0
-            : (typeof v === 'string')
-              ? v.trim() !== ''
-              : (typeof v === 'boolean')
-                ? v === true
-                : (v && typeof v === 'object' && Object.keys(v).length > 0);
-          if (isNonEmpty) {
-            throwDetected(`${key} key detected at depth ${depth}`);
-          }
-        }
-        const val = obj[key];
-        if (depth < maxDepth && val && typeof val === 'object') {
-          traverse(val, depth + 1);
+  const errorKeys = new Set(['error', 'errors', 'error_message', 'errormessage', 'failure_reason', 'failure', 'failed']);
+  const maxDepth = 2;
+
+  const traverse = (obj: any, depth: number) => {
+    if (!obj || typeof obj !== 'object') return;
+    for (const key of Object.keys(obj)) {
+      const lower = key.toLowerCase();
+      if (errorKeys.has(lower)) {
+        const v = obj[key];
+        const isNonEmpty = Array.isArray(v)
+          ? v.length > 0
+          : (typeof v === 'string')
+            ? v.trim() !== ''
+            : (typeof v === 'boolean')
+              ? v === true
+              : (v && typeof v === 'object' && Object.keys(v).length > 0);
+        if (isNonEmpty) {
+          throwDetected(`${key} key detected at depth ${depth}`, typeof v === 'string' ? v : undefined);
         }
       }
-    };
+      const val = obj[key];
+      if (depth < maxDepth && val && typeof val === 'object') {
+        traverse(val, depth + 1);
+      }
+    }
+  };
 
-    traverse(d, 0);
-  }
+  traverse(d, 0);
 }
 
-function handle2xxStatus(
-  response: AxiosResponse,
-  axiosConfig: AxiosRequestConfig,
-  method: string,
-  url: string,
-  credentials: Record<string, any>,
-  payload: Record<string, any>
-): StatusHandlerResult {
-  try {
-    checkResponseForErrors(response?.data, response?.status, { axiosConfig, method, url, credentials, payload });
-  } catch (e) {
-    const message = e?.message || String(e);
-    return { shouldFail: true, message };
-  }
+type StatusHandlerInput = {
+  response: AxiosResponse;
+  axiosConfig: AxiosRequestConfig;
+  credentials?: Record<string, any>;
+  payload?: Record<string, any>;
+  retriesAttempted?: number;
+  lastFailureStatus?: number | undefined;
+};
 
+function handle2xxStatus(
+  input: StatusHandlerInput
+): StatusHandlerResult {
+  const { response, axiosConfig, credentials = {}, payload = {} } = input;
   const htmlCheck = detectHtmlErrorResponse(response?.data);
   if (htmlCheck.isHtml) {
-    const maskedUrl = maskCredentials(url, { ...credentials, ...payload });
+    const url = String(axiosConfig?.url || '');
+    const maskedUrl = maskCredentials(url, credentials);
     const msg = `Received HTML response instead of expected JSON data from ${maskedUrl}. \n        This usually indicates an error page or invalid endpoint.\nResponse: ${htmlCheck.preview}`;
     return { shouldFail: true, message: msg };
   }
@@ -146,14 +136,14 @@ function handle2xxStatus(
 }
 
 function handle429Status(
-  response: AxiosResponse,
-  axiosConfig: AxiosRequestConfig,
-  method: string,
-  url: string
+  input: StatusHandlerInput
 ): StatusHandlerResult {
+  const { response, axiosConfig, credentials = {}, payload = {} } = input;
+  const method = (axiosConfig?.method || 'GET').toString().toUpperCase();
+  const url = String(axiosConfig?.url || '');
   const errorData = response?.data instanceof Buffer ? response.data.toString('utf-8') : response?.data;
   const error = JSON.stringify((errorData as any)?.error || (errorData as any)?.errors || errorData || response?.statusText || "undefined");
-  const maskedConfig = maskCredentials(JSON.stringify(axiosConfig));
+  const maskedConfig = maskCredentials(JSON.stringify(axiosConfig || {}), credentials);
   let message = `${method} ${url} failed with status ${response.status}.\nResponse: ${String(error).slice(0, 1000)}\nconfig: ${maskedConfig}`;
 
   const retryAfter = response.headers['retry-after']
@@ -164,16 +154,16 @@ function handle429Status(
   return { shouldFail: true, message: full };
 }
 
-function handleOtherStatus(
-  response: AxiosResponse,
-  axiosConfig: AxiosRequestConfig,
-  method: string,
-  url: string
+function handleErrorStatus(
+  input: StatusHandlerInput
 ): StatusHandlerResult {
+  const { response, axiosConfig, credentials = {}, payload = {} } = input;
+  const method = (axiosConfig?.method || 'GET').toString().toUpperCase();
+  const url = String(axiosConfig?.url || '');
   const errorData = response?.data instanceof Buffer ? response.data.toString('utf-8') : response?.data;
   const error = JSON.stringify((errorData as any)?.error || (errorData as any)?.errors || errorData || response?.statusText || "undefined");
-  const maskedConfig = maskCredentials(JSON.stringify(axiosConfig));
-  let message = `${method} ${url} failed with status ${response.status}.\nResponse: ${String(error).slice(0, 1000)}\nconfig: ${maskedConfig}`;
+  const maskedConfig = maskCredentials(JSON.stringify(axiosConfig || {}), credentials);
+  const message = `${method} ${url} failed with status ${response.status}.\nResponse: ${String(error).slice(0, 1000)}\nconfig: ${maskedConfig}`;
   const full = `API call failed with status ${response.status}. Response: ${message}`;
   return { shouldFail: true, message: full };
 }
@@ -304,17 +294,26 @@ export async function callEndpoint({ endpoint, payload, credentials, options }: 
       timeout: options?.timeout || 60000,
     };
 
-    lastResponse = await callAxios(axiosConfig, options);
+    const axiosResult = await callAxios(axiosConfig, options);
+    lastResponse = axiosResult.response;
 
     const status = lastResponse?.status;
     let statusHandlerResult = null;
 
+    const retriesAttempted = axiosResult.retriesAttempted || 0;
+    const lastFailureStatus = axiosResult.lastFailureStatus;
     if ([200, 201, 202, 203, 204, 205].includes(status)) {
-      statusHandlerResult = handle2xxStatus(lastResponse, axiosConfig, endpoint.method, processedUrl, credentials, payload);
+      statusHandlerResult = handle2xxStatus({ response: lastResponse, axiosConfig, credentials, payload, retriesAttempted, lastFailureStatus });
     } else if (status === 429) {
-      statusHandlerResult = handle429Status(lastResponse, axiosConfig, endpoint.method, processedUrl);
+      statusHandlerResult = handle429Status({ response: lastResponse, axiosConfig, credentials, payload, retriesAttempted, lastFailureStatus });
     } else {
-      statusHandlerResult = handleOtherStatus(lastResponse, axiosConfig, endpoint.method, processedUrl);
+      const base = handleErrorStatus({ response: lastResponse, axiosConfig, credentials, payload, retriesAttempted, lastFailureStatus });
+      if (base.shouldFail && base.message) {
+        const suffix = `\nRetries attempted: ${retriesAttempted}${lastFailureStatus ? `; last failure status: ${lastFailureStatus}` : ''}`;
+        statusHandlerResult = { shouldFail: true, message: `${base.message}${suffix}` };
+      } else {
+        statusHandlerResult = base;
+      }
     }
 
     if (statusHandlerResult.shouldFail) {
@@ -337,6 +336,14 @@ export async function callEndpoint({ endpoint, payload, credentials, options }: 
       responseData = await parseFile(Buffer.from(responseData), FileType.AUTO);
     }
     const parsedResponseData = responseData;
+
+    if (status >= 200 && status <= 205) {
+      try {
+        checkResponseForErrors(responseData, status, { axiosConfig, credentials, payload });
+      } catch (e) {
+        throw new ApiCallError(e?.message || String(e), status);
+      }
+    }
     if (endpoint.dataPath) {
       const pathParts = endpoint.dataPath.split('.');
       for (const part of pathParts) {
@@ -362,9 +369,9 @@ export async function callEndpoint({ endpoint, payload, credentials, options }: 
       }
 
       if (loopCounter === 1 && currentResponseHash === firstResponseHash && hasValidData && currentHasData) {
-        const maskedBody = maskCredentials(processedBody, { ...credentials, ...payload });
-        const maskedParams = maskCredentials(JSON.stringify(processedQueryParams), { ...credentials, ...payload });
-        const maskedHeaders = maskCredentials(JSON.stringify(processedHeaders), { ...credentials, ...payload });
+        const maskedBody = maskCredentials(processedBody, credentials);
+        const maskedParams = maskCredentials(JSON.stringify(processedQueryParams), credentials);
+        const maskedHeaders = maskCredentials(JSON.stringify(processedHeaders), credentials);
 
         throw new Error(
           `Pagination configuration error: The first two API requests returned identical responses with valid data. ` +

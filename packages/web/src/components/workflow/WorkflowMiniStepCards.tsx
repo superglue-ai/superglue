@@ -5,7 +5,7 @@ import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import JsonSchemaEditor from '@/src/components/utils/JsonSchemaEditor';
 import { downloadJson } from '@/src/lib/download-utils';
 import { formatBytes, isAllowedFileType, MAX_TOTAL_FILE_SIZE, type UploadedFileInfo } from '@/src/lib/file-utils';
-import { cn, ensureSourceDataArrowFunction, formatJavaScriptCode, isEmptyData, isValidSourceDataArrowFunction, truncateForDisplay, truncateLines } from '@/src/lib/utils';
+import { cn, ensureSourceDataArrowFunction, formatJavaScriptCode, isEmptyData, isValidSourceDataArrowFunction, truncateForDisplay, truncateLines, usePrismHighlight } from '@/src/lib/utils';
 import { inferJsonSchema } from '@superglue/shared';
 import { Check, Code2, Copy, Download, Eye, FileJson, Package, Play, RotateCw, Upload, X } from 'lucide-react';
 import Prism from 'prismjs';
@@ -14,7 +14,7 @@ import 'prismjs/components/prism-json';
 import React, { useEffect, useRef, useState } from 'react';
 import Editor from 'react-simple-code-editor';
 
-const MAX_HIGHLIGHT_CHARS = 100000;
+const MAX_HIGHLIGHT_CHARS = 150000;
 const highlightCode = (code: string, language: string) => {
     if (!code || code.length > MAX_HIGHLIGHT_CHARS) return code;
     try {
@@ -177,16 +177,16 @@ export const FinalResultsCard = ({ result }: { result: any }) => {
     );
 };
 
-export const JavaScriptCodeEditor = React.memo(({ value, onChange, readOnly = false, minHeight = '200px', maxHeight = '350px', showCopy = true, resizable = false, isTransformEditor = false }: { value: string; onChange?: (value: string) => void; readOnly?: boolean; minHeight?: string; maxHeight?: string; showCopy?: boolean; resizable?: boolean; isTransformEditor?: boolean; }) => {
+export const JavaScriptCodeEditor = React.memo(({ value, onChange, readOnly = false, minHeight = '200px', maxHeight = '350px', showCopy = true, resizable = false, isTransformEditor = false, autoFormatOnMount = true }: { value: string; onChange?: (value: string) => void; readOnly?: boolean; minHeight?: string; maxHeight?: string; showCopy?: boolean; resizable?: boolean; isTransformEditor?: boolean; autoFormatOnMount?: boolean; }) => {
     const [currentHeight, setCurrentHeight] = useState(maxHeight);
     const effectiveHeight = resizable ? currentHeight : maxHeight;
-    const highlightTimer = useRef<number | null>(null);
-    const [allowHighlight, setAllowHighlight] = useState<boolean>(true);
     const [hasFormatted, setHasFormatted] = useState(false);
     const hasValidPattern = (code: string): boolean => isValidSourceDataArrowFunction(code);
     const displayValue = value || '';
+    const jsHtml = usePrismHighlight(displayValue, 'javascript', 60);
 
     useEffect(() => {
+        if (!autoFormatOnMount) return;
         if (!onChange || hasFormatted || !displayValue.trim()) return;
         formatJavaScriptCode(displayValue).then(formatted => {
             if (formatted !== displayValue) {
@@ -196,12 +196,7 @@ export const JavaScriptCodeEditor = React.memo(({ value, onChange, readOnly = fa
         });
     }, []);
 
-    useEffect(() => {
-        setAllowHighlight(false);
-        if (highlightTimer.current) window.clearTimeout(highlightTimer.current);
-        highlightTimer.current = window.setTimeout(() => { setAllowHighlight(true); }, 120);
-        return () => { if (highlightTimer.current) { window.clearTimeout(highlightTimer.current); highlightTimer.current = null; } };
-    }, [displayValue]);
+    // highlighting handled by usePrismHighlight
     const handleChange = (newValue: string) => {
         if (!onChange) return;
         onChange(newValue);
@@ -243,10 +238,10 @@ export const JavaScriptCodeEditor = React.memo(({ value, onChange, readOnly = fa
                                     <span>Code will be auto-wrapped with (sourceData) =&gt; {'{'} ... {'}'} when executed</span>
                                 </div>
                             )}
-                            <Editor value={displayValue} onValueChange={handleChange} highlight={(code) => { if (!allowHighlight) return code; try { return Prism.highlight(code, Prism.languages.javascript, 'javascript'); } catch { return code; } }} padding={0} disabled={readOnly} className="font-mono text-[11px] leading-[18px]" textareaClassName="outline-none focus:outline-none" textareaId="transform-editor" placeholder="(sourceData) => { return sourceData; }" style={{ background: 'transparent', lineHeight: '18px', minHeight: '100px', whiteSpace: 'pre' }} />
+                            <Editor value={displayValue} onValueChange={handleChange} highlight={() => jsHtml} padding={0} disabled={readOnly} className="font-mono text-[11px] leading-[18px]" textareaClassName="outline-none focus:outline-none" textareaId="transform-editor" placeholder="(sourceData) => { return sourceData; }" style={{ background: 'transparent', lineHeight: '18px', minHeight: '100px', whiteSpace: 'pre' }} />
                         </>
                     ) : (
-                        <Editor value={value || ''} onValueChange={onChange || (() => { })} highlight={(code) => { if (!allowHighlight) return code; try { return Prism.highlight(code, Prism.languages.javascript, 'javascript'); } catch { return code; } }} padding={0} disabled={readOnly} className="font-mono text-[11px] leading-[18px]" textareaClassName="outline-none focus:outline-none" style={{ minHeight, background: 'transparent', lineHeight: '18px', whiteSpace: 'pre' }} />
+                        <Editor value={value || ''} onValueChange={onChange || (() => { })} highlight={() => jsHtml} padding={0} disabled={readOnly} className="font-mono text-[11px] leading-[18px]" textareaClassName="outline-none focus:outline-none" style={{ minHeight, background: 'transparent', lineHeight: '18px', whiteSpace: 'pre' }} />
                     )}
                 </div>
             </div>
@@ -263,16 +258,18 @@ export const JavaScriptCodeEditor = React.memo(({ value, onChange, readOnly = fa
     );
 });
 
-export const JsonCodeEditor = ({ value, onChange, readOnly = false, minHeight = '150px', maxHeight = '400px', placeholder = '{}', overlay, resizable = false }: { value: string; onChange?: (value: string) => void; readOnly?: boolean; minHeight?: string; maxHeight?: string; placeholder?: string; overlay?: React.ReactNode; resizable?: boolean; }) => {
+export const JsonCodeEditor = ({ value, onChange, readOnly = false, minHeight = '150px', maxHeight = '400px', placeholder = '{}', overlay, bottomRightOverlay, resizable = false }: { value: string; onChange?: (value: string) => void; readOnly?: boolean; minHeight?: string; maxHeight?: string; placeholder?: string; overlay?: React.ReactNode; bottomRightOverlay?: React.ReactNode; resizable?: boolean; }) => {
     const [currentHeight, setCurrentHeight] = useState(maxHeight);
     const displayValue = React.useMemo(() => {
         const base = value || placeholder;
         if (readOnly && (base?.length || 0) > 150000) return `${base.slice(0, 150000)}\n...truncated...`;
         return base;
     }, [value, placeholder, readOnly]);
+    const jsonHtml = usePrismHighlight(displayValue, 'json', 60);
     return (
         <div className={cn("relative rounded-lg border shadow-sm", readOnly ? "bg-muted/30 border-dashed" : "bg-background border")}>
             {overlay && (<div className="absolute top-1 right-1 z-10 flex items-center gap-1">{overlay}</div>)}
+            {bottomRightOverlay && (<div className="absolute bottom-1 right-1 z-10 flex items-center gap-1">{bottomRightOverlay}</div>)}
             {!overlay && (<div className="absolute top-1 right-1 z-10"><CopyButton text={value || placeholder} /></div>)}
             {resizable && (
                 <div className="absolute bottom-1 right-1 w-3 h-3 cursor-se-resize z-10" style={{ background: 'linear-gradient(135deg, transparent 50%, rgba(100,100,100,0.3) 50%)' }} onMouseDown={(e) => {
@@ -286,7 +283,7 @@ export const JsonCodeEditor = ({ value, onChange, readOnly = false, minHeight = 
                 }} />
             )}
             <div className={cn("p-3 pr-10 overflow-auto", readOnly ? "cursor-not-allowed" : "cursor-text")} style={{ maxHeight: resizable ? currentHeight : maxHeight, scrollbarGutter: 'stable both-edges' }}>
-                <Editor value={displayValue} onValueChange={onChange || (() => { })} highlight={(code) => highlightCode(code, 'json')} padding={0} disabled={readOnly} className="font-mono text-xs" textareaClassName="outline-none focus:outline-none" style={{ minHeight, background: 'transparent' }} />
+                <Editor value={displayValue} onValueChange={onChange || (() => { })} highlight={() => jsonHtml} padding={0} disabled={readOnly} className="font-mono text-xs" textareaClassName="outline-none focus:outline-none" style={{ minHeight, background: 'transparent' }} />
             </div>
         </div>
     );

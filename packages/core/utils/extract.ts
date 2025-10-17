@@ -35,7 +35,7 @@ export async function callExtract(extract: ExtractConfig, payload: Record<string
     timeout: options?.timeout || 300000,
   };
   logMessage('info', `${extract.method} ${url}`, metadata);
-  const response = await callAxios(axiosConfig, options);
+  const { response } = await callAxios(axiosConfig, options);
 
   if (![200, 201, 204].includes(response?.status) || response.data?.error) {
     const error = JSON.stringify(String(response?.data?.error || response?.data));

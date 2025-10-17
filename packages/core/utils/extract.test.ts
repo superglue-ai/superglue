@@ -61,7 +61,11 @@ describe('Extract Utils', () => {
         status: 200,
         data: Buffer.from(JSON.stringify({ items: [{ id: 1 }] }))
       };
-      (callAxios as any).mockResolvedValue(mockResponse);
+      (callAxios as any).mockResolvedValue({
+        response: mockResponse,
+        retriesAttempted: 0,
+        lastFailureStatus: undefined
+      });
 
       const extract = {
         id: 'test-id',
@@ -100,8 +104,9 @@ describe('Extract Utils', () => {
       const mockDecompressedData = Buffer.from(JSON.stringify({ data: [1, 2, 3] }));
 
       (callAxios as any).mockResolvedValue({
-        status: 200,
-        data: mockCompressedData
+        response: { status: 200, data: mockCompressedData },
+        retriesAttempted: 0,
+        lastFailureStatus: undefined
       });
       (decompressData as any).mockResolvedValue(mockDecompressedData);
       (parseFile as any).mockResolvedValue({ data: [1, 2, 3] });
@@ -132,8 +137,9 @@ describe('Extract Utils', () => {
 
     it('should throw error for non-200 response', async () => {
       (callAxios as any).mockResolvedValue({
-        status: 404,
-        data: { error: 'Not found' }
+        response: { status: 404, data: { error: 'Not found' } },
+        retriesAttempted: 0,
+        lastFailureStatus: undefined
       });
 
       const extract = {
@@ -159,8 +165,9 @@ describe('Extract Utils', () => {
       const mockParsedData = { sheet1: [{ name: 'John', age: 30 }] };
 
       (callAxios as any).mockResolvedValue({
-        status: 200,
-        data: mockExcelData
+        response: { status: 200, data: mockExcelData },
+        retriesAttempted: 0,
+        lastFailureStatus: undefined
       });
       (parseFile as any).mockResolvedValue(mockParsedData);
 
@@ -195,8 +202,9 @@ describe('Extract Utils', () => {
       };
 
       (callAxios as any).mockResolvedValue({
-        status: 200,
-        data: mockExcelData
+        response: { status: 200, data: mockExcelData },
+        retriesAttempted: 0,
+        lastFailureStatus: undefined
       });
       (parseFile as any).mockResolvedValue(mockParsedData);
 
@@ -228,8 +236,9 @@ describe('Extract Utils', () => {
       const mockParsedData = { sheet1: [{ name: 'John', age: 30 }] };
 
       (callAxios as any).mockResolvedValue({
-        status: 200,
-        data: mockCompressedData
+        response: { status: 200, data: mockCompressedData },
+        retriesAttempted: 0,
+        lastFailureStatus: undefined
       });
       (decompressData as any).mockResolvedValue(mockDecompressedData);
       (parseFile as any).mockResolvedValue(mockParsedData);

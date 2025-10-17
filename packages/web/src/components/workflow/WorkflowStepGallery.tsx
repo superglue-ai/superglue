@@ -97,6 +97,8 @@ const SpotlightStepCard = ({
     const [inputViewMode, setInputViewMode] = useState<'preview' | 'schema'>('preview');
     const [outputViewMode, setOutputViewMode] = useState<'preview' | 'schema'>('preview');
 
+
+
     // Switch to output tab when signal changes
     useEffect(() => {
         if (showOutputSignal) {
@@ -168,6 +170,7 @@ const SpotlightStepCard = ({
                                 <TabsTrigger value="output" className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm">
                                     <Package className="h-4 w-4" /> Step Output
                                 </TabsTrigger>
+
                             </TabsList>
                         </Tabs>
                     </div>
@@ -176,6 +179,15 @@ const SpotlightStepCard = ({
                         {activePanel === 'input' && (
                             <div>
                                 {(() => {
+                                    const noInputYet = stepIndex > 0 && isEmptyData(evolvingPayload || {});
+                                    if (noInputYet) {
+                                        return (
+                                            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground border rounded-md bg-muted/5">
+                                                <div className="text-xs mb-1">No input yet</div>
+                                                <p className="text-[10px]">Run previous step to see inputs</p>
+                                            </div>
+                                        );
+                                    }
                                     let inputString = '';
                                     let isTruncated = false;
                                     if (inputViewMode === 'schema') {
@@ -191,8 +203,8 @@ const SpotlightStepCard = ({
                                             <JsonCodeEditor
                                                 value={inputString}
                                                 readOnly={true}
-                                                minHeight="150px"
-                                                maxHeight="300px"
+                                                minHeight="300px"
+                                                maxHeight="600px"
                                                 resizable={true}
                                                 overlay={
                                                     <div className="flex items-center gap-1">
@@ -236,6 +248,7 @@ const SpotlightStepCard = ({
                                     integrations={integrations}
                                     onEditingChange={onConfigEditingChange}
                                     disabled={!!(isExecuting || isGlobalExecuting)}
+                                    stepInput={evolvingPayload}
                                 />
                             </div>
                         )}
@@ -308,8 +321,8 @@ const SpotlightStepCard = ({
                                                     <JsonCodeEditor
                                                         value={outputString}
                                                         readOnly={true}
-                                                        minHeight="150px"
-                                                        maxHeight="300px"
+                                                        minHeight="300px"
+                                                        maxHeight="600px"
                                                         resizable={true}
                                                         overlay={
                                                             <div className="flex items-center gap-1">
@@ -353,6 +366,7 @@ const SpotlightStepCard = ({
                                 })()}
                             </div>
                         )}
+
                     </div>
                 </div>
             </div>
@@ -409,10 +423,14 @@ export function WorkflowStepGallery({
     const [isHydrated, setIsHydrated] = useState(false);
     const listRef = useRef<HTMLDivElement | null>(null);
     const [isConfiguratorEditing, setIsConfiguratorEditing] = useState<boolean>(false);
-    
+
     const [isAddStepDialogOpen, setIsAddStepDialogOpen] = useState(false);
     const [defaultStepId, setDefaultStepId] = useState('');
     const [pendingInsertIndex, setPendingInsertIndex] = useState<number | null>(null);
+    const isConfiguratorEditingRef = useRef<boolean>(false);
+    useEffect(() => {
+        isConfiguratorEditingRef.current = isConfiguratorEditing;
+    }, [isConfiguratorEditing]);
 
     const isNavigatingRef = useRef<boolean>(false);
     const navigationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -607,7 +625,7 @@ export function WorkflowStepGallery({
 
     const handleInsertStep = (afterIndex: number) => {
         if (!onStepsChange || readOnly) return;
-        
+
         const defaultId = `step_${Date.now()}`;
         setDefaultStepId(defaultId);
         setPendingInsertIndex(afterIndex);
@@ -616,7 +634,7 @@ export function WorkflowStepGallery({
 
     const handleConfirmInsertStep = (stepId: string) => {
         if (pendingInsertIndex === null || !onStepsChange) return;
-        
+
         const newStep = {
             id: stepId,
             name: '',
@@ -633,30 +651,30 @@ export function WorkflowStepGallery({
             },
             executionMode: 'DIRECT'
         };
-        
+
         const newSteps = [...steps];
         newSteps.splice(pendingInsertIndex, 0, newStep);
         onStepsChange(newSteps);
-        
+
         const insertedIndex = pendingInsertIndex;
         setIsAddStepDialogOpen(false);
         setPendingInsertIndex(null);
-        
+
         // Navigate to the newly inserted step (+1 for payload card, +1 because we insert after)
         setTimeout(() => navigateToIndex(insertedIndex + 1), 100);
     };
 
     const handleConfirmInsertWorkflow = (workflowSteps: any[]) => {
         if (pendingInsertIndex === null || !onStepsChange) return;
-        
+
         const newSteps = [...steps];
         newSteps.splice(pendingInsertIndex, 0, ...workflowSteps);
         onStepsChange(newSteps);
-        
+
         const insertedIndex = pendingInsertIndex;
         setIsAddStepDialogOpen(false);
         setPendingInsertIndex(null);
-        
+
         // Navigate to the first newly inserted step
         setTimeout(() => navigateToIndex(insertedIndex + 1), 100);
     };
