@@ -128,7 +128,7 @@ function handle2xxStatus(
   const htmlCheck = detectHtmlErrorResponse(response?.data);
   if (htmlCheck.isHtml) {
     const url = String(axiosConfig?.url || '');
-    const maskedUrl = maskCredentials(url, { ...credentials, ...payload });
+    const maskedUrl = maskCredentials(url, credentials);
     const msg = `Received HTML response instead of expected JSON data from ${maskedUrl}. \n        This usually indicates an error page or invalid endpoint.\nResponse: ${htmlCheck.preview}`;
     return { shouldFail: true, message: msg };
   }
@@ -143,7 +143,7 @@ function handle429Status(
   const url = String(axiosConfig?.url || '');
   const errorData = response?.data instanceof Buffer ? response.data.toString('utf-8') : response?.data;
   const error = JSON.stringify((errorData as any)?.error || (errorData as any)?.errors || errorData || response?.statusText || "undefined");
-  const maskedConfig = maskCredentials(JSON.stringify(axiosConfig || {}), { ...credentials, ...payload });
+  const maskedConfig = maskCredentials(JSON.stringify(axiosConfig || {}), credentials);
   let message = `${method} ${url} failed with status ${response.status}.\nResponse: ${String(error).slice(0, 1000)}\nconfig: ${maskedConfig}`;
 
   const retryAfter = response.headers['retry-after']
@@ -162,7 +162,7 @@ function handleErrorStatus(
   const url = String(axiosConfig?.url || '');
   const errorData = response?.data instanceof Buffer ? response.data.toString('utf-8') : response?.data;
   const error = JSON.stringify((errorData as any)?.error || (errorData as any)?.errors || errorData || response?.statusText || "undefined");
-  const maskedConfig = maskCredentials(JSON.stringify(axiosConfig || {}), { ...credentials, ...payload });
+  const maskedConfig = maskCredentials(JSON.stringify(axiosConfig || {}), credentials);
   const message = `${method} ${url} failed with status ${response.status}.\nResponse: ${String(error).slice(0, 1000)}\nconfig: ${maskedConfig}`;
   const full = `API call failed with status ${response.status}. Response: ${message}`;
   return { shouldFail: true, message: full };
@@ -369,9 +369,9 @@ export async function callEndpoint({ endpoint, payload, credentials, options }: 
       }
 
       if (loopCounter === 1 && currentResponseHash === firstResponseHash && hasValidData && currentHasData) {
-        const maskedBody = maskCredentials(processedBody, { ...credentials, ...payload });
-        const maskedParams = maskCredentials(JSON.stringify(processedQueryParams), { ...credentials, ...payload });
-        const maskedHeaders = maskCredentials(JSON.stringify(processedHeaders), { ...credentials, ...payload });
+        const maskedBody = maskCredentials(processedBody, credentials);
+        const maskedParams = maskCredentials(JSON.stringify(processedQueryParams), credentials);
+        const maskedHeaders = maskCredentials(JSON.stringify(processedHeaders), credentials);
 
         throw new Error(
           `Pagination configuration error: The first two API requests returned identical responses with valid data. ` +
