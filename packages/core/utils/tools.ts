@@ -213,7 +213,7 @@ export async function executeAndValidateMappingCode(input: any, mappingCode: str
 
 export async function callAxios(config: AxiosRequestConfig, options: RequestOptions) {
   let retryCount = 0;
-  const maxRetries = options?.retries ?? 2;
+  const maxRetries = options?.retries ?? 1;
   const delay = options?.retryDelay || 1000;
   const maxRateLimitWaitMs = 60 * 60 * 1000 * 24; // 24 hours is the max wait time for rate limit retries, hardcoded
   let rateLimitRetryCount = 0;
