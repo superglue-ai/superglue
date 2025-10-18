@@ -97,17 +97,7 @@ const loopStrategy: ExecutionStrategy = {
         }
         logMessage("error", `Loop selector for '${step.id}' did not return an array. Regenerating loop selector.`, metadata);
 
-        const loopContextInput: LoopSelectorContextInput = {
-          step: step,
-          payload: payload,
-          instruction: step.apiConfig.instruction
-        };
-
-        const loopContextOptions: LoopSelectorContextOptions = {
-          characterBudget: LanguageModel.contextLength / 10
-        };
-
-        const loopPrompt = getLoopSelectorContext(loopContextInput, loopContextOptions);
+        const loopPrompt = getLoopSelectorContext( { step: step, payload: payload, instruction: step.apiConfig.instruction }, { characterBudget: LanguageModel.contextLength / 10 });
         const arraySchema = { type: "array", description: "Array of items to iterate over" };
         const transformResult = await generateTransformCode(arraySchema, payload, loopPrompt, metadata);
 
