@@ -5,9 +5,9 @@ import { Workflow } from "@superglue/client";
 import { generateUniqueId } from "@superglue/shared/utils";
 import { IntegrationManager } from "../../integrations/integration-manager.js";
 import { DataStore } from "../../datastore/types.js";
-import { WorkflowBuilder } from "../../workflow/workflow-builder.js";
-import { WorkflowExecutor } from "../../workflow/workflow-executor.js";
 import { isDeepEqual } from "./utils.js";
+import { WorkflowBuilder } from "../../build/workflow-builder.js";
+import { WorkflowExecutor } from "../../execute/workflow-executor.js";
 
 export class SuperglueWorkflowAttemptService {
     constructor(
