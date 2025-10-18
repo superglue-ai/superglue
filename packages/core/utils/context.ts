@@ -8,6 +8,7 @@ export type ObjectContextOptions = {
 const SMALL_JSON_THRESHOLD_DEFAULT = 10_000;
 const PREVIEW_DEPTH_LIMIT = 10;
 const PREVIEW_ARRAY_LIMIT = 10;
+const PREVIEW_OBJECT_KEY_LIMIT = 1000;
 const SAMPLES_MAX_ARRAY_PATHS = 5;
 const SAMPLES_ITEMS_PER_ARRAY = 5;
 const SAMPLE_OBJECT_MAX_DEPTH = 5;
@@ -165,7 +166,7 @@ function safeStringifyPreview(value: any, depthLimit: number, arrayLimit: number
         }
         if (v && typeof v === 'object') {
             const out: Record<string, any> = {};
-            const keys = Object.keys(v).sort();
+            const keys = Object.keys(v).sort().slice(0, PREVIEW_OBJECT_KEY_LIMIT);
             for (const k of keys) {
                 out[k] = walk(v[k], depth + 1);
             }
@@ -195,7 +196,8 @@ function collectArrayPaths(v: any, path: string, depth: number, acc: Array<{ pat
         return;
     }
     if (v && typeof v === 'object') {
-        for (const k of Object.keys(v)) collectArrayPaths(v[k], `${path}.${k}`, depth + 1, acc);
+        const keys = Object.keys(v).sort().slice(0, PREVIEW_OBJECT_KEY_LIMIT);
+        for (const k of keys) collectArrayPaths(v[k], `${path}.${k}`, depth + 1, acc);
     }
 }
 
