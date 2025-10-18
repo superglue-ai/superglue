@@ -229,20 +229,21 @@ IMPORTANT: Modern APIs (HubSpot, Stripe, etc.) mostly expect authentication in h
 <LOOP_EXECUTION>
 When executionMode is "LOOP":
 1. The loopSelector extracts an array from available data: (sourceData) => sourceData.getContacts.results
-2. IMPORTANT: The loopSelector should always return an array of flattened objects. No nested properties.
-3. Each item in the array becomes available as currentItem in the loop context.
-4. CURRENTITEM ACCESS:
+2. Each item in the array becomes available as currentItem in the loop context.
+3. CURRENTITEM ACCESS:
    - For direct access to the whole item: use <<currentItem>>
    - For transformations or specific properties with operations: use <<(sourceData) => sourceData.currentItem.propertyName>>
-5. Example flow:
+4. Example flow:
    - loopSelector: (sourceData) => sourceData.getAllContacts.filter(c => c.status === 'active')
    - URL: /contacts/<<currentItem>>/update (if currentItem is an ID string)
    - Body: {"contact": <<currentItem>>, "updatedBy": "<<userId>>"}
    - Or with transformations: {"doubledValue": <<(sourceData) => sourceData.currentItem.value * 2>>, "upperName": <<(sourceData) => sourceData.currentItem.name.toUpperCase()>>}
-6. You can use JavaScript expressions to transform loop data:
-   - Body with calculations: {"price": <<(sourceData) => sourceData.currentItem.price * 1.2>>, "currency": "<<currency>>"}
-   - Body with complex logic: <<(sourceData) => JSON.stringify({ id: sourceData.currentItem.id, tags: sourceData.globalTags.concat([sourceData.currentItem.category]) })>>
-7. Response data from all iterations is collected into an array
+5. Previous loop step results structure:
+   - sourceData.<loop_step_id> is an array of objects, one per loop iteration
+   - Each element has: { currentItem: <the loop item>, data: <API response data for that item> }
+   - Use this to access results from earlier loop steps, e.g. sourceData.myLoopStep[0].data or sourceData.myLoopStep.map(x => x.currentItem)
+6. Empty loop selector arrays:
+   - IMPORTANT: NEVER throw an error when the loop selector returns an empty array.
 </LOOP_EXECUTION>
 
 <FINAL_TRANSFORMATION>
@@ -259,12 +260,14 @@ CRITICAL CONTEXT FOR WORKFLOW TRANSFORMATIONS:
    - Combining multiple sources: { ...sourceData.step1, ...sourceData.step2 }
 
 3. For LOOP execution contexts:
-   - currentItem is available directly in the payload
+   - currentItem is available directly in the payload and refers to the currently executing step's loop item
+   - previous loop step results are available in sourceData.<loop_step_id>, where <loop_step_id> is the id of the previous loop step and refers to the array of objects returned by the loop selector
    - For simple access: use <<currentItem>> to access the entire item
    - For transformations or complex operations: use <<(sourceData) => sourceData.currentItem...>>
    - Example: if currentItem = { id: 123, name: "test" }:
      * Simple access: <<currentItem>> returns the whole object
      * With transformations: <<(sourceData) => sourceData.currentItem.id>> or <<(sourceData) => sourceData.currentItem.name.toUpperCase()>>
+     * Access previous loop step results: <<(sourceData) => sourceData.myLoopStep[0].data>> or <<(sourceData) => sourceData.myLoopStep.map(x => x.currentItem)>>
 
 Requirements:
 - Function signature: (sourceData) => { ... } or (sourceData, currentItem) => { ... } for loops
@@ -280,8 +283,6 @@ COMMON WORKFLOW TRANSFORMATIONS:
 \`\`\`javascript
 (sourceData) => {
   const items = sourceData.fetchItems;
-  if (!Array.isArray(items)) throw new Error("Expected array of items to iterate over");
-  
   const excludeIds = sourceData.excludeIds || [];
   return items.filter(item => !excludeIds.includes(item.id));
 }
