@@ -161,54 +161,31 @@ API Response Parsing:
 - NEVER add manual parsing steps for these formats in final transforms
 </FILE_HANDLING>
 
-<EXECUTION_MODES>
-Set the execution mode to either:
-- DIRECT: For steps that execute once with specific data. Important: Except if the user explicitly provides an array of items to loop over or a previous step gives you a list of items to loop, direct should be used, particularly for the FIRST STEP. If you use loop on the first step without a source array, it will fail.
-- LOOP: For steps that need to iterate over a collection of items. Use this ONLY if there is a payload to iterate over, e.g. a user / a previous step gives you a list of ids to loop.
-Important: Avoid using LOOP mode for potentially very large data objects. If you need to process many items (e.g., thousands of records), prefer batch operations or APIs that can handle multiple items in a single call. Individual loops over large datasets can result in performance issues and API rate limits.
-</EXECUTION_MODES>
-
 <DATA_DEPENDENCIES>
 - Consider data dependencies between steps (later steps can access results from earlier steps)
 - Keep in mind that transformations happen within each step, so there is no need to add specific transformation steps
 - Keep in mind that logging and the final transformation happen after the workflow, no need to make this a step
 </DATA_DEPENDENCIES>
 
-<POSTGRES>
-- You can use the following format to access a postgres database: urlHost: "postgres://<<user>>:<<password>>@<<hostname>>:<<port>>", urlPath: "<<database>>", body: {query: "<<query>>"}
-- Note that the connection string and database name may be part of the connection string, or not provided at all, or only be provided in the instruction. Look at the input variables and instructions to come up with a best guess.
-- Consider that you might need additional information from tables to process the instruction. E.g. if a user asks for a list of products, you might need to join the products table with the categories table to get the category name and filter on that.
-- In case the query is unclear (user asks for all products that are in a category but you are unsure what the exact category names are), get all category names in step 1 and then create the actual query in step 2.
-- Use parameterized queries for safer and more efficient execution, you can also use <<>> tags to access variables:
-  * body: {query: "SELECT * FROM users WHERE id = $1 AND status = $2", params: [123, "<<(sourceData) => sourceData.status>>"]}
-  * body: {query: "INSERT INTO products (name, price) VALUES ($1, $2) RETURNING *", values: ["Widget", <<(sourceData) => sourceData.price * 1.2>>]}
-  * Parameters prevent SQL injection and improve performance
-  * Use $1, $2, $3, etc. as placeholders in the query
-  * Provide values in the params or values array in the same order
-  * Always wrap js string results in quotes like so: {"name": "<<(sourceData) => sourceData.name>>"}
-</POSTGRES>
+<DOCUMENTATION_FIRST_APPROACH>
+Before configuring any API step:
+1. Search documentation for the specific endpoint you need
+2. Look for:
+   - Required and optional parameters
+   - Authentication patterns
+   - Response structure
+   - Pagination details (if applicable)
+   - Rate limits or special requirements
+3. Only proceed with configuration after understanding the API's requirements
+4. If documentation is unclear or missing, make conservative choices
+</DOCUMENTATION_FIRST_APPROACH>
 
-<FTP_SFTP>
-- You can use the following format to access FTP/SFTP servers:
-  * FTP: urlHost: "ftp://<<username>>:<<password>>@<<hostname>>:21", urlPath: "/basepath"
-  * FTPS (secure FTP): urlHost: "ftps://<<username>>:<<password>>@<<hostname>>:21", urlPath: "/basepath"
-  * SFTP (SSH FTP): urlHost: "sftp://<<username>>:<<password>>@<<hostname>>:22", urlPath: "/basepath"
-- The body must contain a JSON object with an 'operation' field specifying the action to perform
-- Supported operations are: list, get, put, delete, rename, mkdir, rmdir, exists, stat
-- Examples:
-  * List directory: body: {"operation": "list", "path": "/directory"}
-  * Get file (returns content as JSON if possible): body: {"operation": "get", "path": "/file.json"}
-  * Upload file: body: {"operation": "put", "path": "/upload.txt", "content": "<<fileContent>>"}
-  * Delete file: body: {"operation": "delete", "path": "/file.txt"}
-  * Rename/move: body: {"operation": "rename", "path": "/old.txt", "newPath": "/new.txt"}
-  * Create directory: body: {"operation": "mkdir", "path": "/newfolder"}
-  * Remove directory: body: {"operation": "rmdir", "path": "/folder"}
-  * Check existence: body: {"operation": "exists", "path": "/file.txt"}
-  * Get file stats: body: {"operation": "stat", "path": "/file.txt"}
-- All file operations return JSON responses
-- The 'get' operation automatically parses files and returns the parsed data
-- Path variables can use <<>> syntax: {"operation": "get", "path": "/<<folder>>/<<filename>>"}
-</FTP_SFTP>
+<EXECUTION_MODES>
+Set the execution mode to either:
+- DIRECT: For steps that execute once with specific data. Important: Except if the user explicitly provides an array of items to loop over or a previous step gives you a list of items to loop, direct should be used, particularly for the FIRST STEP. If you use loop on the first step without a source array, it will fail.
+- LOOP: For steps that need to iterate over a collection of items. Use this ONLY if there is a payload to iterate over, e.g. a user / a previous step gives you a list of ids to loop.
+Important: Avoid using LOOP mode for potentially very large data objects. If you need to process many items (e.g., thousands of records), prefer batch operations or APIs that can handle multiple items in a single call. Individual loops over large datasets can result in performance issues and API rate limits.
+</EXECUTION_MODES>
 
 <VARIABLES>
 - Use <<variable>> syntax to access variables directly (no JS just plain variables) OR execute JavaScript expressions formatted as <<(sourceData) => sourceData.variable>>:
@@ -228,11 +205,6 @@ Important: Avoid using LOOP mode for potentially very large data objects. If you
    e.g. urlPath: /api/<<(sourceData) => sourceData.version || 'v1'>>/users
    e.g. queryParams: { "active": "<<(sourceData) => sourceData.includeInactive ? 'all' : 'true'>>" }
    
-   In loops - use direct access when possible:
-   e.g. body: { "item": <<currentItem>> } - passes the entire current item
-   e.g. urlPath: /api/items/<<currentItem>>/update - if currentItem is a simple ID string
-   e.g. With transformations: { "doubledPrice": <<(sourceData) => sourceData.currentItem.price * 2>> }
-   
 - Note: For Basic Authentication, format as "Basic <<integrationId_username>>:<<integrationId_password>>" and the system will automatically convert it to Base64.
 - Headers provided starting with 'x-' are probably headers.
 - Credentials are prefixed with integration ID: <<integrationId_credentialName>>
@@ -241,7 +213,6 @@ Important: Avoid using LOOP mode for potentially very large data objects. If you
 - Access initial payload via sourceData (e.g., sourceData.userId)
 - Access uploaded files via sourceData (e.g., sourceData.uploadedFile.csvData)
 - Complex transformations can be done inline: <<(sourceData) => sourceData.contacts.filter(c => c.active).map(c => c.email).join(',')>>
-- For json content, always wrap js string results in quotes like so: {"name": "<<(sourceData) => sourceData.name>>"}
 </VARIABLES>
 
 <AUTHENTICATION_PATTERNS>
@@ -254,6 +225,24 @@ Common authentication patterns are:
 
 IMPORTANT: Modern APIs (HubSpot, Stripe, etc.) mostly expect authentication in headers, NOT query parameters. Only use query parameter authentication if explicitly required by the documentation.
 </AUTHENTICATION_PATTERNS>
+
+<LOOP_EXECUTION>
+When executionMode is "LOOP":
+1. The loopSelector extracts an array from available data: (sourceData) => sourceData.getContacts.results
+2. Each item in the array becomes available as currentItem in the loop context.
+3. CURRENTITEM ACCESS:
+   - For direct access to the whole item: use <<currentItem>>
+   - For transformations or specific properties with operations: use <<(sourceData) => sourceData.currentItem.propertyName>>
+4. Example flow:
+   - loopSelector: (sourceData) => sourceData.getAllContacts.filter(c => c.status === 'active')
+   - URL: /contacts/<<currentItem>>/update (if currentItem is an ID string)
+   - Body: {"contact": <<currentItem>>, "updatedBy": "<<userId>>"}
+   - Or with transformations: {"doubledValue": <<(sourceData) => sourceData.currentItem.value * 2>>, "upperName": <<(sourceData) => sourceData.currentItem.name.toUpperCase()>>}
+5. You can use JavaScript expressions to transform loop data:
+   - Body with calculations: {"price": <<(sourceData) => sourceData.currentItem.price * 1.2>>, "currency": "<<currency>>"}
+   - Body with complex logic: <<(sourceData) => JSON.stringify({ id: sourceData.currentItem.id, tags: sourceData.globalTags.concat([sourceData.currentItem.category]) })>>
+6. Response data from all iterations is collected into an array
+</LOOP_EXECUTION>
 
 <FINAL_TRANSFORMATION>
 CRITICAL CONTEXT FOR WORKFLOW TRANSFORMATIONS:
@@ -274,7 +263,7 @@ CRITICAL CONTEXT FOR WORKFLOW TRANSFORMATIONS:
    - For transformations or complex operations: use <<(sourceData) => sourceData.currentItem...>>
    - Example: if currentItem = { id: 123, name: "test" }:
      * Simple access: <<currentItem>> returns the whole object
-     * With transformations: <<(sourceData) => sourceData.currentItem.id * 2>> or <<(sourceData) => sourceData.currentItem.name.toUpperCase()>>
+     * With transformations: <<(sourceData) => sourceData.currentItem.id>> or <<(sourceData) => sourceData.currentItem.name.toUpperCase()>>
 
 Requirements:
 - Function signature: (sourceData) => { ... } or (sourceData, currentItem) => { ... } for loops
@@ -329,19 +318,6 @@ Return your answer in the following JSON format:
 THE FUNCTION MUST BE VALID JAVASCRIPT that can be executed with eval().
 </FINAL_TRANSFORMATION>
 
-<DOCUMENTATION_FIRST_APPROACH>
-Before configuring any API step:
-1. Search documentation for the specific endpoint you need
-2. Look for:
-   - Required and optional parameters
-   - Authentication patterns
-   - Response structure
-   - Pagination details (if applicable)
-   - Rate limits or special requirements
-3. Only proceed with configuration after understanding the API's requirements
-4. If documentation is unclear or missing, make conservative choices
-</DOCUMENTATION_FIRST_APPROACH>
-
 <STEP_CONFIGURATION>
 For each step in the plan, you must:
 1. Search documentation for the specific endpoint
@@ -374,7 +350,7 @@ For data access in <<>> tags:
 - Initial payload fields: <<date>>, <<companies>>
 - Previous step results: <<fetchUsers>>, <<getProducts.data>>
 - Complex expressions: <<(sourceData) => sourceData.users.filter(u => u.active).map(u => u.id)>>
-- Current item in loops: <<currentItem>> for the whole item, or use arrow functions for transformations: <<(sourceData) => sourceData.currentItem.id * 2>>
+- Current item in loops: <<currentItem>> for the whole item, or use arrow functions for transformations: <<(sourceData) => sourceData.currentItem.id>>
 
 For special transformation functions:
 - loopSelector: (sourceData) => sourceData.fetchUsers.users
@@ -397,24 +373,6 @@ CRITICAL DATA ACCESS PATTERNS:
    - RIGHT: <<getAllContacts>> ✓ (check actual response structure)
 </TRANSFORMATION_FUNCTIONS>
 
-<LOOP_EXECUTION>
-When executionMode is "LOOP":
-1. The loopSelector extracts an array from available data: (sourceData) => sourceData.getContacts.results
-2. Each item in the array becomes available as currentItem in the loop context.
-3. CURRENTITEM ACCESS:
-   - For direct access to the whole item: use <<currentItem>>
-   - For transformations or specific properties with operations: use <<(sourceData) => sourceData.currentItem.propertyName>>
-4. Example flow:
-   - loopSelector: (sourceData) => sourceData.getAllContacts.filter(c => c.status === 'active')
-   - URL: /contacts/<<currentItem>>/update (if currentItem is an ID string)
-   - Body: {"contact": <<currentItem>>, "updatedBy": "<<userId>>"}
-   - Or with transformations: {"doubledValue": <<(sourceData) => sourceData.currentItem.value * 2>>, "upperName": <<(sourceData) => sourceData.currentItem.name.toUpperCase()>>}
-5. You can use JavaScript expressions to transform loop data:
-   - Body with calculations: {"price": <<(sourceData) => sourceData.currentItem.price * 1.2>>, "currency": "<<currency>>"}
-   - Body with complex logic: <<(sourceData) => JSON.stringify({ id: sourceData.currentItem.id, tags: sourceData.globalTags.concat([sourceData.currentItem.category]) })>>
-6. Response data from all iterations is collected into an array
-</LOOP_EXECUTION>
-
 <PAGINATION_CONFIGURATION>
 Pagination is OPTIONAL. Only configure it if you have verified the exact pagination mechanism from the documentation or know it really well.
 
@@ -435,6 +393,42 @@ Common patterns (VERIFY IN DOCS FIRST):
 
 ⚠️ WARNING: Incorrect pagination configuration causes infinite loops. When in doubt, leave it unconfigured.
 </PAGINATION_CONFIGURATION>
+
+<POSTGRES>
+- You can use the following format to access a postgres database: urlHost: "postgres://<<user>>:<<password>>@<<hostname>>:<<port>>", urlPath: "<<database>>", body: {query: "<<query>>"}
+- Note that the connection string and database name may be part of the connection string, or not provided at all, or only be provided in the instruction. Look at the input variables and instructions to come up with a best guess.
+- Consider that you might need additional information from tables to process the instruction. E.g. if a user asks for a list of products, you might need to join the products table with the categories table to get the category name and filter on that.
+- In case the query is unclear (user asks for all products that are in a category but you are unsure what the exact category names are), get all category names in step 1 and then create the actual query in step 2.
+- Use parameterized queries for safer and more efficient execution, you can also use <<>> tags to access variables:
+  * body: {query: "SELECT * FROM users WHERE id = $1 AND status = $2", params: [123, "<<(sourceData) => sourceData.status>>"]}
+  * body: {query: "INSERT INTO products (name, price) VALUES ($1, $2) RETURNING *", values: ["Widget", <<(sourceData) => sourceData.price * 1.2>>]}
+  * Parameters prevent SQL injection and improve performance
+  * Use $1, $2, $3, etc. as placeholders in the query
+  * Provide values in the params or values array in the same order
+  * Always wrap js string results in quotes like so: {"name": "<<(sourceData) => sourceData.name>>"}
+</POSTGRES>
+
+<FTP_SFTP>
+- You can use the following format to access FTP/SFTP servers:
+  * FTP: urlHost: "ftp://<<username>>:<<password>>@<<hostname>>:21", urlPath: "/basepath"
+  * FTPS (secure FTP): urlHost: "ftps://<<username>>:<<password>>@<<hostname>>:21", urlPath: "/basepath"
+  * SFTP (SSH FTP): urlHost: "sftp://<<username>>:<<password>>@<<hostname>>:22", urlPath: "/basepath"
+- The body must contain a JSON object with an 'operation' field specifying the action to perform
+- Supported operations are: list, get, put, delete, rename, mkdir, rmdir, exists, stat
+- Examples:
+  * List directory: body: {"operation": "list", "path": "/directory"}
+  * Get file (returns content as JSON if possible): body: {"operation": "get", "path": "/file.json"}
+  * Upload file: body: {"operation": "put", "path": "/upload.txt", "content": "<<fileContent>>"}
+  * Delete file: body: {"operation": "delete", "path": "/file.txt"}
+  * Rename/move: body: {"operation": "rename", "path": "/old.txt", "newPath": "/new.txt"}
+  * Create directory: body: {"operation": "mkdir", "path": "/newfolder"}
+  * Remove directory: body: {"operation": "rmdir", "path": "/folder"}
+  * Check existence: body: {"operation": "exists", "path": "/file.txt"}
+  * Get file stats: body: {"operation": "stat", "path": "/file.txt"}
+- All file operations return JSON responses
+- The 'get' operation automatically parses files and returns the parsed data
+- Path variables can use <<>> syntax: {"operation": "get", "path": "/<<folder>>/<<filename>>"}
+</FTP_SFTP>
 
 <SOAP>
 For SOAP requests:
