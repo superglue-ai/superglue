@@ -533,7 +533,6 @@ Understand what each error means:
 - 429 Rate Limit: API is rejecting due to too many requests
 - 500 Server Error: May be temporary or request is malformed
 - "Response evaluation failed": Your step instruction doesn't match what the API returned
-
 </ERROR_ANALYSIS>
 
 <COMMON_ERRORS>
