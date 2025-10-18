@@ -14,23 +14,51 @@ export class WorkflowRunnerService {
 
     public async runWorkflows(workflows: WorkflowConfig[], integrations: Integration[], settings: TestSuiteSettings): Promise<WorkflowAttempt[]> {
         const workflowAttemptService = new SuperglueWorkflowAttemptService(this.metadata, this.datastore);
+        const allAttempts: WorkflowAttempt[] = [];
 
-        const attemptPromises: Promise<WorkflowAttempt>[] = workflows.flatMap(workflow => {
-            const workflowsIntegrations = integrations.filter(i => workflow.integrationIds.includes(i.id));
-            
-            const attempts: Promise<WorkflowAttempt>[] = [];
-            for (let i = 0; i < settings.attempts; i++) {
-                if (settings.runSelfHealingMode) {
-                    attempts.push(workflowAttemptService.runWorkflowAttempt(workflow, workflowsIntegrations, true));
-                }
-                if (settings.runOneShotMode) {
-                    attempts.push(workflowAttemptService.runWorkflowAttempt(workflow, workflowsIntegrations, false));
+        if (settings.runOneShotMode) {
+            const oneShotPromises: Promise<WorkflowAttempt>[] = [];
+            for (const workflow of workflows) {
+                const workflowsIntegrations = integrations.filter(i => workflow.integrationIds.includes(i.id));
+                for (let i = 0; i < settings.attemptsEachMode; i++) {
+                    oneShotPromises.push(workflowAttemptService.runWorkflowAttempt(workflow, workflowsIntegrations, false));
                 }
             }
+            const oneShotAttempts = await Promise.all(oneShotPromises);
+            allAttempts.push(...oneShotAttempts);
+        }
 
-            return attempts;
-        });
+        if (settings.runSelfHealingMode) {
+            let workflowsToRunSelfHealing: WorkflowConfig[] = [];
 
-        return await Promise.all(attemptPromises);
+            if (settings.runOneShotMode) {
+                const failedWorkflowIds = new Set<string>();
+                const oneShotAttempts = allAttempts.filter(attempt => !attempt.selfHealingEnabled);
+                
+                for (const attempt of oneShotAttempts) {
+                    if (!attempt.buildSuccess || !attempt.executionSuccess) {
+                        failedWorkflowIds.add(attempt.workflowConfig.id);
+                    }
+                }
+                
+                workflowsToRunSelfHealing = workflows.filter(workflow => failedWorkflowIds.has(workflow.id));
+            } else {
+                workflowsToRunSelfHealing = workflows; // If one-shot mode is disabled, run all workflows in self-healing mode
+            }
+
+            if (workflowsToRunSelfHealing.length > 0) {
+                const selfHealingPromises: Promise<WorkflowAttempt>[] = [];
+                for (const workflow of workflowsToRunSelfHealing) {
+                    const workflowsIntegrations = integrations.filter(i => workflow.integrationIds.includes(i.id));
+                    for (let i = 0; i < settings.attemptsEachMode; i++) {
+                        selfHealingPromises.push(workflowAttemptService.runWorkflowAttempt(workflow, workflowsIntegrations, true));
+                    }
+                }
+                const selfHealingAttempts = await Promise.all(selfHealingPromises);
+                allAttempts.push(...selfHealingAttempts);
+            }
+        }
+
+        return allAttempts;
     }
 }

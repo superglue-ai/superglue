@@ -30,10 +30,11 @@ async function main(): Promise<void> {
 
     const integrationSetupService = new IntegrationSetupService(store, config, metadata);
     const integrations = await integrationSetupService.setupIntegrations();
-    
-    const enabledWorkflows = config.workflows.filter(workflow => config.enabledWorkflows.includes(workflow.id));
+  
+    const enabledWorkflows = config.enabledWorkflows === 'all' ? config.workflows : config.workflows.filter(workflow => config.enabledWorkflows.includes(workflow.id));
 
-    logMessage("info", `Integrations setup: ${integrations.length}, Workflows: ${config.workflows.length}, Enabled workflows: ${config.enabledWorkflows.length}`, metadata);
+    const enabledWorkflowsCount = config.enabledWorkflows === 'all' ? config.workflows.length : config.enabledWorkflows.length;
+    logMessage("info", `Integrations setup: ${integrations.length}, Workflows: ${config.workflows.length}, Enabled workflows: ${enabledWorkflowsCount}`, metadata);
 
     const agentEvalRunner = new WorkflowRunnerService(store, metadata);
     const workflowAttempts = await agentEvalRunner.runWorkflows(enabledWorkflows, integrations, config.settings);
@@ -50,10 +51,11 @@ async function main(): Promise<void> {
     const metricsComparer = new MetricsComparer();
     const metricsComparison = metricsComparer.compare(metrics, previousMetrics);
     
-    ConsoleReporter.report(metrics, metricsComparison, workflowAttempts);
-
     const duration = new Date().getTime() - startedAt.getTime();
     logMessage("info", `Agent Evaluation Completed in ${duration}ms`, metadata);
+
+    await new Promise(resolve => setTimeout(resolve, 1000)); // delay as quick fix
+    ConsoleReporter.report(metrics, metricsComparison,workflowAttempts);
   } catch (error) {
     const message = error instanceof Error ? error.stack || error.message : String(error);
     console.error("Agent Eval failed:", message);
