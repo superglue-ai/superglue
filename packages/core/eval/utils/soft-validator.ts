@@ -1,7 +1,7 @@
-import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
 import { parseJSON } from "../../utils/json-parser.js";
 import { logMessage } from '../../utils/logs.js';
 import { sample } from '../../utils/tools.js';
+import { LLMMessage } from '../../llm/llm.js';
 
 export interface SoftValidationResult {
     success: boolean;
@@ -76,7 +76,7 @@ ${actualContent}
 
 Please validate if the actual result reasonably aligns with the expected criteria. Remember to be lenient and focus on whether the core objective was achieved.`;
 
-        const messages: ChatCompletionMessageParam[] = [
+        const messages: LLMMessage[] = [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt }
         ];

@@ -1,6 +1,5 @@
 import { ExecutionStep, Integration, Workflow } from "@superglue/client";
 import { inferJsonSchema, Metadata, toJsonSchema } from "@superglue/shared";
-import { type OpenAI } from "openai";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { BUILD_WORKFLOW_SYSTEM_PROMPT } from "../llm/prompts.js";
 import { executeTool } from "../tools/tools.js";
@@ -8,8 +7,7 @@ import { DocumentationSearch } from "../documentation/documentation-search.js";
 import { parseJSON } from "../utils/json-parser.js";
 import { logMessage } from "../utils/logs.js";
 import { composeUrl, sample } from "../utils/tools.js";
-
-type ChatMessage = OpenAI.Chat.ChatCompletionMessageParam;
+import { LLMMessage } from "../llm/llm.js";
 
 export class WorkflowBuilder {
   private integrations: Record<string, Integration>;
@@ -130,7 +128,7 @@ ${authSection}
     return payloadContext;
   }
 
-  private prepareBuildingContext(): ChatMessage[] {
+  private prepareBuildingContext(): LLMMessage[] {
     const integrationDescriptions = this.generateIntegrationDescriptions();
     const initialPayloadDescription = this.generatePayloadDescription();
 
@@ -272,7 +270,7 @@ ${hasIntegrations
           messages.push({
             role: "user",
             content: `The previous workflow build attempt failed with the following error:\n\n${error.message}\n\nPlease fix these issues and generate a valid workflow.`
-          } as ChatMessage);
+          } as LLMMessage);
         }
 
         retryCount++;

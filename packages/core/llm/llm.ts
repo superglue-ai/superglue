@@ -1,22 +1,20 @@
 import OpenAI from "openai";
+import type { SystemModelMessage, UserModelMessage, AssistantModelMessage, ToolModelMessage } from "ai";
 import { ToolCall, ToolCallResult, ToolDefinition } from "../tools/tools.js";
-import { logMessage } from "../utils/logs.js";
-import { AnthropicModel } from "./anthropic-model.js";
-import { GeminiModel } from "./gemini-model.js";
-import { OpenAILegacyModel } from "./openai-legacy-model.js";
-import { OpenAIModel } from "./openai-model.js";
 import { VercelAIModel } from "./vercel-ai-model.js";
+
+export type LLMMessage = SystemModelMessage | UserModelMessage | AssistantModelMessage | ToolModelMessage;
 
 export interface LLM {
     contextLength: number;
-    generateText(messages: OpenAI.Chat.ChatCompletionMessageParam[], temperature?: number): Promise<LLMResponse>;
-    generateObject(messages: OpenAI.Chat.ChatCompletionMessageParam[], schema: any, temperature?: number, customTools?: ToolDefinition[], context?: any): Promise<LLMObjectResponse>;
+    generateText(messages: LLMMessage[], temperature?: number): Promise<LLMResponse>;
+    generateObject(messages: LLMMessage[], schema: any, temperature?: number, customTools?: ToolDefinition[], context?: any): Promise<LLMObjectResponse>;
 }
 
 export interface LLMToolResponse {
     toolCall: ToolCall | null;
     textResponse?: string;
-    messages: OpenAI.Chat.ChatCompletionMessageParam[];
+    messages: LLMMessage[];
     responseId?: string;
 }
 
@@ -27,7 +25,7 @@ export interface LLMAgentResponse {
         toolCall: ToolCall;
         result: ToolCallResult;
     }>;
-    messages: OpenAI.Chat.ChatCompletionMessageParam[];
+    messages: LLMMessage[];
     responseId?: string;
     success: boolean;
     lastSuccessfulToolCall?: {
@@ -41,12 +39,12 @@ export interface LLMAgentResponse {
 
 export interface LLMResponse {
     response: string;
-    messages: OpenAI.Chat.ChatCompletionMessageParam[];
+    messages: LLMMessage[];
 }
 
 export interface LLMObjectResponse {
     response: any;
-    messages: OpenAI.Chat.ChatCompletionMessageParam[];
+    messages: LLMMessage[];
 }
 
 // Lazy initialization to ensure environment variables are loaded
@@ -57,11 +55,11 @@ export const LanguageModel = {
         return this._getInstance().contextLength;
     },
 
-    generateText(messages: OpenAI.Chat.ChatCompletionMessageParam[], temperature?: number): Promise<LLMResponse> {
+    generateText(messages: LLMMessage[], temperature?: number): Promise<LLMResponse> {
         return this._getInstance().generateText(messages, temperature);
     },
 
-    generateObject(messages: OpenAI.Chat.ChatCompletionMessageParam[], schema: any, temperature?: number, customTools?: ToolDefinition[], context?: any): Promise<LLMObjectResponse> {
+    generateObject(messages: LLMMessage[], schema: any, temperature?: number, customTools?: ToolDefinition[], context?: any): Promise<LLMObjectResponse> {
         return this._getInstance().generateObject(messages, schema, temperature, customTools, context);
     },
 

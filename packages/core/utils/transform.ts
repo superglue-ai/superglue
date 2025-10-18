@@ -1,9 +1,8 @@
 import { RequestOptions, TransformConfig, TransformInputRequest } from "@superglue/client";
 import type { DataStore, Metadata } from "@superglue/shared";
-import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import prettier from "prettier";
 import { server_defaults } from "../default.js";
-import { LanguageModel } from "../llm/llm.js";
+import { LanguageModel, LLMMessage } from "../llm/llm.js";
 import { PROMPT_JS_TRANSFORM } from "../llm/prompts.js";
 import { logMessage } from "./logs.js";
 import { getSchemaFromData, isSelfHealingEnabled, sample, transformAndValidateSchema } from "./tools.js";
@@ -93,7 +92,7 @@ export async function generateTransformCode(
   instruction: string,
   metadata: Metadata,
   retry = 0,
-  messages?: ChatCompletionMessageParam[]
+  messages?: LLMMessage[]
 ): Promise<{ mappingCode: string; data?: any } | null> {
   try {
     logMessage('info', "Generating mapping" + (retry > 0 ? ` (retry ${retry})` : ''), metadata);
@@ -211,7 +210,7 @@ ${mappingCode}
 
 Please evaluate the transformation based on the criteria in the system prompt, considering that samples may not show all data values present in the full dataset.`;
 
-    const messages: ChatCompletionMessageParam[] = [
+    const messages: LLMMessage[] = [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt }
     ];

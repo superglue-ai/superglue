@@ -1,9 +1,8 @@
 import { generateText, generateObject, jsonSchema } from "ai";
-import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
 import { initializeAIModel, getModelContextLength } from "@superglue/shared/utils";
 import { server_defaults } from "../default.js";
 import { ToolDefinition } from "../tools/tools.js";
-import { LLM, LLMObjectResponse, LLMResponse } from "./llm.js";
+import { LLM, LLMMessage, LLMObjectResponse, LLMResponse } from "./llm.js";
 import { logMessage } from "../utils/logs.js";
 
 type MessageParam = 
@@ -43,7 +42,7 @@ export class VercelAIModel implements LLM {
     }
   }
 
-  private convertMessages(messages: ChatCompletionMessageParam[]): MessageParam[] {
+  private convertMessages(messages: LLMMessage[]): MessageParam[] {
     return messages.map(msg => {
       if (msg.role === "system" || msg.role === "user" || msg.role === "assistant") {
         return {
@@ -55,7 +54,7 @@ export class VercelAIModel implements LLM {
     });
   }
 
-  async generateText(messages: ChatCompletionMessageParam[], temperature: number = 0): Promise<LLMResponse> {
+  async generateText(messages: LLMMessage[], temperature: number = 0): Promise<LLMResponse> {
     const dateMessage = {
       role: "system" as const,
       content: "The current date and time is " + new Date().toISOString()
@@ -87,7 +86,7 @@ export class VercelAIModel implements LLM {
   }
 
   async generateObject(
-    messages: ChatCompletionMessageParam[],
+    messages: LLMMessage[],
     schema: any,
     temperature: number = 0,
     customTools?: ToolDefinition[],
@@ -107,11 +106,13 @@ export class VercelAIModel implements LLM {
     }
 
     try {
-      const schemaObj = jsonSchema(schema);
+      const isArray = schema.type === 'array';
+      const schemaObj = jsonSchema(isArray ? schema.items : schema);
 
       const result = await generateObject({
         model: this.model,
         messages: convertedMessages as any,
+        ...(isArray && { output: 'array' as const }),
         schema: schemaObj,
         temperature,
         maxRetries: server_defaults.LLM.MAX_INTERNAL_RETRIES,

@@ -1,12 +1,11 @@
 import { Metadata } from "@playwright/test";
 import { Validator } from "jsonschema";
-import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
-import { LanguageModel } from "../llm/llm.js";
+import { LanguageModel, LLMMessage } from "../llm/llm.js";
 import { GENERATE_SCHEMA_PROMPT } from "../llm/prompts.js";
 import { logMessage } from "./logs.js";
 
 export async function generateSchema(instruction: string, responseData: string, metadata: Metadata): Promise<string> {
-  const messages: ChatCompletionMessageParam[] = [
+  const messages: LLMMessage[] = [
     {
       role: "system",
       content: GENERATE_SCHEMA_PROMPT
@@ -41,7 +40,7 @@ export async function generateSchema(instruction: string, responseData: string, 
 }
 
 async function attemptSchemaGeneration(
-  messages: ChatCompletionMessageParam[],
+  messages: LLMMessage[],
   retry: number
 ): Promise<string> {
   let temperature = Math.min(0.3 * retry, 1.0);

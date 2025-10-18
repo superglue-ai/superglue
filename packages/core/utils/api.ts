@@ -1,10 +1,9 @@
 import { type ApiConfig, FileType, PaginationType, type RequestOptions } from "@superglue/client";
 import type { AxiosRequestConfig, AxiosResponse } from "axios";
-import OpenAI from "openai";
 import { server_defaults } from "../default.js";
 import { Metadata } from "../graphql/types.js";
 import { IntegrationManager } from "../integrations/integration-manager.js";
-import { LanguageModel } from "../llm/llm.js";
+import { LanguageModel, LLMMessage } from "../llm/llm.js";
 import { SELF_HEALING_API_AGENT_PROMPT } from "../llm/prompts.js";
 import { searchDocumentationToolDefinition, submitToolDefinition } from "../workflow/workflow-tools.js";
 import { parseFile } from "./file.js";
@@ -491,9 +490,9 @@ export async function generateApiConfig({
   payload: Record<string, any>,
   credentials: Record<string, any>,
   retryCount?: number,
-  messages?: OpenAI.Chat.ChatCompletionMessageParam[],
+  messages?: LLMMessage[],
   integrationManager: IntegrationManager,
-}): Promise<{ config: ApiConfig; messages: OpenAI.Chat.ChatCompletionMessageParam[]; }> {
+}): Promise<{ config: ApiConfig; messages: LLMMessage[]; }> {
   if (!retryCount) retryCount = 0;
   if (!messages) messages = [];
 
@@ -651,7 +650,7 @@ ${documentationContext}
       role: "user", content: `<request>${JSON.stringify(endpoint)}</request>
 <api_response>${content}</api_response>`
     }
-  ] as OpenAI.Chat.ChatCompletionMessageParam[];
+  ] as LLMMessage[];
 
   const response = await LanguageModel.generateObject(
     request,
@@ -684,7 +683,7 @@ export async function executeApiCall({
   let response: any = null;
   let retryCount = 0;
   let lastError: string | null = null;
-  let messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
+  let messages: LLMMessage[] = [];
   let success = false;
   let isSelfHealing = isSelfHealingEnabled(options, "api");
 
