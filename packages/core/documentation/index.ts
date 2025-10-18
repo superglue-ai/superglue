@@ -14,4 +14,4 @@ export {
   filterDocumentationUrls, 
   extractOpenApiUrlFromHtml 
 } from './documentation-utils.js';
-export { DocumentationConfig, DocumentationFetchingStrategy, DocumentationProcessingStrategy } from './types.js';
+export type { DocumentationConfig, DocumentationFetchingStrategy, DocumentationProcessingStrategy } from './types.js';
