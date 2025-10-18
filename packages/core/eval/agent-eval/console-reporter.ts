@@ -5,14 +5,14 @@ export class ConsoleReporter {
     this.printHeader();
     this.printOverallMetrics(metrics, metricsComparison);
     this.printWorkflowBreakdown(metrics, metricsComparison);
-    this.printAttemptsSection(metrics, attempts ?? []);
+    this.printDeterminismSection(attempts ?? []);
     this.printPerformanceMetrics(metrics, metricsComparison);
     this.printFooter();
   }
 
   private static printHeader(): void {
     console.log('\n' + '═'.repeat(80));
-    console.log('  📊 AGENT EVALUATION RESULTS');
+    console.log('  📊 EVALUATION RESULTS');
     console.log('═'.repeat(80));
   }
 
@@ -37,7 +37,7 @@ export class ConsoleReporter {
 
     if (selfHealingRate !== null) {
       const selfHealingDiff = comparison ? this.formatDiff(comparison.workflowSelfHealingSuccessRateDifference * 100) : '';
-      console.log(`  🔄 Self-Healing Workflows:        ${selfHealingRate.toFixed(1)}%${selfHealingDiff}`);
+      console.log(`  🔄 Self-Healing:                   ${selfHealingRate.toFixed(1)}%${selfHealingDiff}`);
     }
     if (oneShotRate !== null) {
       const oneShotDiff = comparison ? this.formatDiff(comparison.workflowOneShotSuccessRateDifference * 100) : '';
@@ -45,9 +45,10 @@ export class ConsoleReporter {
     }
   }
 
-  private static printAttemptsSection(metrics: Metrics, attempts: WorkflowAttempt[]): void {
-    console.log('\n🧪 ATTEMPTS');
+  private static printDeterminismSection(attempts: WorkflowAttempt[]): void {
+    console.log('\n🧪 DETERMINISM');
     console.log('─'.repeat(80));
+    
     if (attempts.length === 0) {
       console.log('  No attempts.');
       return;
@@ -60,23 +61,32 @@ export class ConsoleReporter {
       byWorkflow.get(id)!.push(a);
     }
 
-    for (const metricsRow of metrics.workflowMetrics) {
-      const id = metricsRow.workflowId;
-      const items = byWorkflow.get(id) ?? [];
+    const nonDeterministicWorkflows: string[] = [];
+    for (const [id, items] of byWorkflow.entries()) {
       const sh = items.filter(x => x.selfHealingEnabled);
       const os = items.filter(x => !x.selfHealingEnabled);
+      
       const shSucc = sh.filter(x => x.executionSuccess).length;
       const shFail = sh.filter(x => !x.executionSuccess).length;
       const osSucc = os.filter(x => x.executionSuccess).length;
       const osFail = os.filter(x => !x.executionSuccess).length;
-      const shVar = shSucc > 0 && shFail > 0 ? ' (non-deterministic)' : '';
-      const osVar = osSucc > 0 && osFail > 0 ? ' (non-deterministic)' : '';
+      
+      const isNonDeterministic = (shSucc > 0 && shFail > 0) || (osSucc > 0 && osFail > 0);
+      if (isNonDeterministic) {
+        nonDeterministicWorkflows.push(id);
+      }
+    }
 
-      console.log(`  ${id}`);
-      if (sh.length > 0) console.log(`    SH: success ${shSucc}, fail ${shFail}${shVar}`);
-      if (os.length > 0) console.log(`    OS: success ${osSucc}, fail ${osFail}${osVar}`);
+    const totalWorkflows = byWorkflow.size;
+    const deterministicCount = totalWorkflows - nonDeterministicWorkflows.length;
+    
+    console.log(`  ${deterministicCount}/${totalWorkflows} workflows deterministic${nonDeterministicWorkflows.length > 0 ? ` (${nonDeterministicWorkflows.length} non-deterministic)` : ''}`);
+    
+    if (nonDeterministicWorkflows.length > 0) {
+      console.log(`    Non-deterministic: ${nonDeterministicWorkflows.join(', ')}`);
     }
   }
+
 
   private static printPerformanceMetrics(metrics: Metrics, comparison?: MetricsComparisonResult): void {
     const buildTime = metrics.overallAverageBuildTimeMs;
@@ -87,8 +97,8 @@ export class ConsoleReporter {
     
     console.log('\n⚡ PERFORMANCE METRICS');
     console.log('─'.repeat(80));
-    console.log(`  🏗️  Average Build Time:            ${buildTime.toFixed(0)}ms${buildDiff}`);
-    console.log(`  🚀 Average Execution Time:        ${execTime.toFixed(0)}ms${execDiff}`);
+    console.log(`  🏗️  Average Build Time:            ${(buildTime / 1000).toFixed(1)}s${buildDiff}`);
+    console.log(`  🚀 Average Execution Time:        ${(execTime / 1000).toFixed(1)}s${execDiff}`);
   }
 
   // removed failure analysis and detailed metrics for simplicity
@@ -98,21 +108,15 @@ export class ConsoleReporter {
     console.log('─'.repeat(80));
     const NAME_WIDTH = 40;
     const COL_WIDTH = 10;
-    const header = `  ${'Workflow'.padEnd(NAME_WIDTH)} ${'Any'.padEnd(COL_WIDTH)}${'1-Shot'.padEnd(COL_WIDTH)}${'Heal'.padEnd(COL_WIDTH)}`;
+    const header = `  ${'Workflow'.padEnd(NAME_WIDTH)} ${'1-Shot'.padEnd(COL_WIDTH)}${'Heal*'.padEnd(COL_WIDTH)}`;
     console.log(header);
     console.log('  ' + '─'.repeat(78));
-    
-    const sortedWorkflows = [...metrics.workflowMetrics].sort((a, b) => {
-      const rateA = a.totalAttempts > 0 ? a.totalSuccessfulAttempts / a.totalAttempts : 0;
-      const rateB = b.totalAttempts > 0 ? b.totalSuccessfulAttempts / b.totalAttempts : 0;
-      return rateB - rateA;
-    });
     
     const comparisonById = comparison 
       ? new Map(comparison.workflowMetrics.map(c => [c.workflowId, c]))
       : undefined;
     
-    for (const workflow of sortedWorkflows) {
+    for (const workflow of metrics.workflowMetrics) {
       const workflowComparison = comparisonById?.get(workflow.workflowId);
       this.printWorkflowRow(workflow, workflowComparison);
       this.printFailureSummaries(workflow);
@@ -120,6 +124,7 @@ export class ConsoleReporter {
     
     console.log('  ' + '─'.repeat(78));
     console.log(`  Total: ${metrics.workflowMetrics.length} workflows`);
+    console.log('  * Self-healing only runs for workflows that failed one-shot');
   }
 
   private static printWorkflowRow(workflow: WorkflowMetrics, comparison?: WorkflowMetricsComparisonResult): void {
@@ -131,20 +136,17 @@ export class ConsoleReporter {
       : label;
     const paddedName = display.padEnd(NAME_WIDTH);
 
-    const any = workflow.hadAnySuccess ? '✅' : '❌';
     const oneShot = workflow.hadOneShotSuccess ? '✅' : (workflow.hasOneShotAttempts ? '❌' : '·');
     const heal = workflow.hadSelfHealingSuccess ? '✅' : (workflow.hasSelfHealingAttempts ? '❌' : '·');
 
     const arrow = (d: -1 | 0 | 1) => d > 0 ? '↗' : d < 0 ? '↘' : '';
-    const anyDelta = comparison && comparison.anySuccessChange !== 0 ? `(${arrow(comparison.anySuccessChange)})` : '';
-    const oneShotDelta = comparison && comparison.oneShotSuccessChange !== 0 ? `(${arrow(comparison.oneShotSuccessChange)})` : '';
-    const healDelta = comparison && comparison.selfHealingSuccessChange !== 0 ? `(${arrow(comparison.selfHealingSuccessChange)})` : '';
+    const oneShotDelta = comparison && comparison.oneShotSuccessChange !== 0 && workflow.hasOneShotAttempts ? `(${arrow(comparison.oneShotSuccessChange)})` : '';
+    const healDelta = comparison && comparison.selfHealingSuccessChange !== 0 && workflow.hasSelfHealingAttempts ? `(${arrow(comparison.selfHealingSuccessChange)})` : '';
 
-    const anyCol = `${any}${anyDelta}`.padEnd(COL_WIDTH);
     const oneShotCol = `${oneShot}${oneShotDelta}`.padEnd(COL_WIDTH);
     const healCol = `${heal}${healDelta}`.padEnd(COL_WIDTH);
 
-    console.log(`  ${paddedName} ${anyCol}${oneShotCol}${healCol}`);
+    console.log(`  ${paddedName} ${oneShotCol}${healCol}`);
   }
 
   private static printFailureSummaries(workflow: WorkflowMetrics): void {
@@ -181,8 +183,8 @@ export class ConsoleReporter {
   }
 
   private static formatTimeDiff(diffMs: number): string {
-    if (Math.abs(diffMs) < 10) return '';
+    if (Math.abs(diffMs) < 100) return '';
     const sign = diffMs > 0 ? '+' : '';
-    return ` (${sign}${diffMs.toFixed(0)}ms)`;
+    return ` (${sign}${(diffMs / 1000).toFixed(1)}s)`;
   }
 }

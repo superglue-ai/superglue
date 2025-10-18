@@ -43,7 +43,7 @@ export class IntegrationSetupService {
       logMessage("info", `${integrationConfig.name} has no documentation URL, skipping setup`, this.metadata);
 
       return {
-        ...existing,
+        ...(existing ?? integrationConfig),
         credentials: integrationConfig.credentials,
       };
     }
@@ -54,6 +54,7 @@ export class IntegrationSetupService {
         urlPath: integrationConfig.urlPath,
         documentationUrl: integrationConfig.documentationUrl,
         openApiUrl: integrationConfig.openApiUrl,
+        keywords: integrationConfig.keywords,
       },
       integrationConfig.credentials || {},
       this.metadata
@@ -93,7 +94,7 @@ export class IntegrationSetupService {
 
   private applyEnvirnonmentVariables(integrations: Integration[]): Integration[] {
     for (const integration of integrations) {
-      if (!integration.credentials) {
+      if (!integration.credentials || !integration.id ) {
         continue;
       }
 

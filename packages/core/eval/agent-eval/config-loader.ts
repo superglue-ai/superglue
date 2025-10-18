@@ -13,6 +13,7 @@ const IntegrationConfigSchema = z.object({
     openApiUrl: z.string().optional(),
     credentials: z.record(z.string()),
     description: z.string().optional(),
+    keywords: z.array(z.string()),
 });
 
 const WorkflowConfigSchema = z.object({
@@ -28,13 +29,13 @@ const WorkflowConfigSchema = z.object({
 const TestSuiteSettingsSchema = z.object({
     runOneShotMode: z.boolean(),
     runSelfHealingMode: z.boolean(),
-    attempts: z.number().min(1),
+    attemptsEachMode: z.number().min(1),
 });
 
 const AgentEvalConfigSchema = z.object({
     integrations: z.array(IntegrationConfigSchema).min(1),
     workflows: z.array(WorkflowConfigSchema).min(1),
-    enabledWorkflows: z.array(z.string()).min(1),
+    enabledWorkflows: z.union([z.literal('all'), z.array(z.string()).min(1)]),
     settings: TestSuiteSettingsSchema,
 });
 
@@ -81,6 +82,10 @@ function validateIntegrationIds(config: z.infer<typeof AgentEvalConfigSchema>): 
 }
 
 function validateEnabledWorkflows(config: AgentEvalConfig): void {
+    if (config.enabledWorkflows === 'all') {
+        return;
+    }
+    
     const enabledWorkflows = new Set(config.enabledWorkflows);
     const workflows = new Set(config.workflows.map(w => w.id));
 

@@ -6,18 +6,18 @@ export class MetricsCalculator {
         const workflowMetrics = this.determineWorkflowMetrics(groupedByWorkflowId);
 
         const workflowCount = workflowMetrics.length;
-        const successfulWorkflowCount = workflowMetrics.filter(w => w.hadAnySuccess).length;
+        const successfulWorkflowCount = workflowMetrics.filter(w => w.hadOneShotSuccess || w.hadSelfHealingSuccess).length;
 
-        const workflowsWithSH = workflowMetrics.filter(w => w.hasSelfHealingAttempts).length;
-        const workflowsWithOS = workflowMetrics.filter(w => w.hasOneShotAttempts).length;
+        const oneShotSuccessfulWorkflows = workflowMetrics.filter(w => w.hadOneShotSuccess).length;
+        const hasSuccessfulWorkflowsWithSelfHealing = workflowMetrics.filter(w => w.hadSelfHealingSuccess || w.hadOneShotSuccess).length;
 
-        const workflowSelfHealingSuccessRate = workflowsWithSH === 0
-            ? null
-            : workflowMetrics.filter(w => w.hadSelfHealingSuccess).length / workflowsWithSH;
+        const workflowOneShotSuccessRate = workflowCount === 0 
+            ? null 
+            : oneShotSuccessfulWorkflows / workflowCount;
 
-        const workflowOneShotSuccessRate = workflowsWithOS === 0
-            ? null
-            : workflowMetrics.filter(w => w.hadOneShotSuccess).length / workflowsWithOS;
+        const workflowSelfHealingSuccessRate = workflowCount === 0 
+            ? null 
+            : hasSuccessfulWorkflowsWithSelfHealing / workflowCount;
 
         return {
             workflowCount,
@@ -47,8 +47,6 @@ export class MetricsCalculator {
             const hasSelfHealingAttempts = workflowAttempts.some(a => a.selfHealingEnabled);
             const hadOneShotSuccess = workflowAttempts.some(a => !a.selfHealingEnabled && a.executionSuccess);
             const hadSelfHealingSuccess = workflowAttempts.some(a => a.selfHealingEnabled && a.executionSuccess);
-            const hadAnySuccess = hadOneShotSuccess || hadSelfHealingSuccess;
-
             const totalSuccessfulAttempts = workflowAttempts.filter(a => a.executionSuccess).length;
             const totalFailedAttempts = workflowAttempts.filter(a => !a.executionSuccess).length;
 
@@ -80,7 +78,6 @@ export class MetricsCalculator {
                 totalFailedAttempts,
                 hasOneShotAttempts,
                 hasSelfHealingAttempts,
-                hadAnySuccess,
                 hadOneShotSuccess,
                 hadSelfHealingSuccess,
                 oneShotFailuresByReason,

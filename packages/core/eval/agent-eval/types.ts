@@ -9,6 +9,7 @@ export interface IntegrationConfig {
     openApiUrl?: string;
     credentials: Record<string, string>;
     description?: string;
+    keywords: string[];
 }
 
 export interface WorkflowConfig {
@@ -24,13 +25,13 @@ export interface WorkflowConfig {
 export interface TestSuiteSettings {
     runOneShotMode: boolean;
     runSelfHealingMode: boolean;
-    attempts: number;
+    attemptsEachMode: number;
 }
 
 export interface AgentEvalConfig {
     integrations: IntegrationConfig[];
     workflows: WorkflowConfig[];
-    enabledWorkflows: string[];
+    enabledWorkflows: 'all' | string[];
     settings: TestSuiteSettings;
 }
 
@@ -81,7 +82,6 @@ export interface WorkflowMetrics {
     totalFailedAttempts: number;
     hasOneShotAttempts: boolean;
     hasSelfHealingAttempts: boolean;
-    hadAnySuccess: boolean;
     hadOneShotSuccess: boolean;
     hadSelfHealingSuccess: boolean;
     oneShotFailuresByReason: FailureCountsByReason;
@@ -100,7 +100,6 @@ export interface MetricsComparisonResult {
 export interface WorkflowMetricsComparisonResult {
     workflowId: string;
     workflowName: string;
-    anySuccessChange: -1 | 0 | 1;
     oneShotSuccessChange: -1 | 0 | 1;
     selfHealingSuccessChange: -1 | 0 | 1;
 }

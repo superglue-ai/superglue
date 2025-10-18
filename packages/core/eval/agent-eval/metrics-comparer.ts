@@ -12,7 +12,6 @@ export class MetricsComparer {
                 workflowMetrics: current.workflowMetrics.map(w => ({
                     workflowId: w.workflowId,
                     workflowName: w.workflowName,
-                    anySuccessChange: 0,
                     oneShotSuccessChange: 0,
                     selfHealingSuccessChange: 0,
                 })),
@@ -39,7 +38,6 @@ export class MetricsComparer {
             return {
                 workflowId: current.workflowId,
                 workflowName: current.workflowName,
-                anySuccessChange: 0,
                 oneShotSuccessChange: 0,
                 selfHealingSuccessChange: 0,
             };
@@ -53,7 +51,6 @@ export class MetricsComparer {
         return {
             workflowId: current.workflowId,
             workflowName: current.workflowName,
-            anySuccessChange: delta(current.hadAnySuccess, previous.hadAnySuccess),
             oneShotSuccessChange: delta(current.hadOneShotSuccess, previous.hadOneShotSuccess),
             selfHealingSuccessChange: delta(current.hadSelfHealingSuccess, previous.hadSelfHealingSuccess),
         };
