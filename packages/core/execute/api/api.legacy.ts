@@ -9,7 +9,7 @@ import { LanguageModel } from "../../llm/llm.js";
 import { SELF_HEALING_API_AGENT_PROMPT } from "../../llm/prompts.js";
 import { parseFile } from "../../utils/file.js";
 import { composeUrl, generateId, maskCredentials, replaceVariables, sample } from "../../utils/tools.js";
-import { searchDocumentationToolDefinition, submitToolDefinition } from "../../workflow/workflow-tools.js";
+import { searchDocumentationToolDefinition, submitToolDefinition } from "../../utils/workflow-tools.js";
 import { executeFTP } from "../ftp/ftp.js";
 import { callPostgres } from "../postgres/postgres.js";
 import { AbortError, ApiCallError, callAxios, checkResponseForErrors, handle2xxStatus, handle429Status, handleErrorStatus } from "./api.js";

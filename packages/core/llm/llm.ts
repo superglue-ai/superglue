@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { ToolCall, ToolCallResult, ToolDefinition } from "../tools/tools.js";
+import { ToolCall, ToolCallResult, ToolDefinition } from "../execute/tools.js";
 import { logMessage } from "../utils/logs.js";
 import { AnthropicModel } from "./anthropic-model.js";
 import { GeminiModel } from "./gemini-model.js";

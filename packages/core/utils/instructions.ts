@@ -1,8 +1,8 @@
 import type { Integration } from "@superglue/client";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
-import { LanguageModel } from "../llm/llm.js";
-import { BaseToolContext, ToolDefinition, ToolImplementation } from "../tools/tools.js";
 import { DocumentationSearch } from "../documentation/documentation-search.js";
+import { BaseToolContext, ToolDefinition, ToolImplementation } from "../execute/tools.js";
+import { LanguageModel } from "../llm/llm.js";
 import { parseJSON } from "./json-parser.js";
 
 // Extend context to include integrations

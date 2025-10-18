@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
-import { ToolCall, ToolCallResult, ToolDefinition } from "../tools/tools.js";
+import { ToolCall, ToolCallResult, ToolDefinition } from "../execute/tools.js";
 import { parseJSON } from "../utils/json-parser.js";
 import { LLM, LLMAgentResponse, LLMObjectResponse, LLMResponse } from "./llm.js";
 

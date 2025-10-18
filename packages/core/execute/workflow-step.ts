@@ -1,14 +1,14 @@
 import { type ApiConfig, type RequestOptions } from "@superglue/client";
 import OpenAI from "openai";
 import { server_defaults } from "../default.js";
-import { AbortError, ApiCallError } from "../execute/api/api.js";
-import { callEndpointLegacyImplementation, generateApiConfig } from "../execute/api/api.legacy.js";
 import { Metadata } from "../graphql/types.js";
 import { IntegrationManager } from "../integrations/integration-manager.js";
 import { LanguageModel } from "../llm/llm.js";
 import { logMessage } from "../utils/logs.js";
 import { telemetryClient } from "../utils/telemetry.js";
 import { isSelfHealingEnabled, maskCredentials, sample } from "../utils/tools.js";
+import { AbortError, ApiCallError } from "./api/api.js";
+import { callEndpointLegacyImplementation, generateApiConfig } from "./api/api.legacy.js";
 
 export async function evaluateStepResponse({
   data,

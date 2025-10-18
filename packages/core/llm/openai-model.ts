@@ -1,11 +1,11 @@
 import OpenAI from "openai";
 import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
 import { server_defaults } from "../default.js";
-import { ToolDefinition } from "../tools/tools.js";
+import { ToolDefinition } from "../execute/tools.js";
 import { parseJSON } from "../utils/json-parser.js";
+import { logMessage } from "../utils/logs.js";
 import { addNullableToOptional } from "../utils/tools.js";
 import { LLM, LLMObjectResponse, LLMResponse } from "./llm.js";
-import { logMessage } from "../utils/logs.js";
 
 type ReasoningEffort = "minimal" | "low" | "medium" | "high";
 type VerbosityLevel = "low" | "medium" | "high";

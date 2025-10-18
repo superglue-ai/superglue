@@ -6,7 +6,7 @@ import {
     searchDocumentationToolDefinition,
     searchDocumentationToolImplementation,
     submitToolDefinition
-} from "../workflow/workflow-tools.js";
+} from "../utils/workflow-tools.js";
 
 export interface ToolDefinition {
     name: string;
