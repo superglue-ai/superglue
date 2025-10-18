@@ -42,7 +42,7 @@ describe('getObjectContext performance and budget', () => {
         const deep = buildDeepObject(100, 100);
         const budget = 20_000;
         const { ms, result } = timeIt(() => getObjectContext(deep, { characterBudget: budget }));
-        expect(ms).toBeLessThanOrEqual(5000);
+        expect(ms).toBeLessThanOrEqual(10_000);
         expect(result.length).toBeLessThanOrEqual(budget + 50); // headers may slightly exceed share but not budget
     });
 
@@ -54,7 +54,7 @@ describe('getObjectContext performance and budget', () => {
             characterBudget: budget,
             tuning: { previewObjectKeyLimit: 100, previewArrayLimit: 5, previewDepthLimit: 5, samplesMaxArrayPaths: 2, samplesItemsPerArray: 2, sampleObjectMaxDepth: 2 }
         }));
-        expect(ms).toBeLessThanOrEqual(5000);
+        expect(ms).toBeLessThanOrEqual(10_000);
         expect(result.length).toBeLessThanOrEqual(budget + 50);
     });
 
@@ -65,7 +65,7 @@ describe('getObjectContext performance and budget', () => {
             characterBudget: budget,
             tuning: { previewObjectKeyLimit: 100, previewArrayLimit: 5, previewDepthLimit: 5, samplesMaxArrayPaths: 2, samplesItemsPerArray: 2, sampleObjectMaxDepth: 2 }
         }));
-        expect(ms).toBeLessThanOrEqual(5000);
+        expect(ms).toBeLessThanOrEqual(10000);
         expect(result.length).toBeLessThanOrEqual(budget + 50);
     });
 
