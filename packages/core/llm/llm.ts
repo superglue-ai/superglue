@@ -1,4 +1,3 @@
-import OpenAI from "openai";
 import type { SystemModelMessage, UserModelMessage, AssistantModelMessage, ToolModelMessage } from "ai";
 import { ToolCall, ToolCallResult, ToolDefinition } from "../tools/tools.js";
 import { VercelAIModel } from "./vercel-ai-model.js";

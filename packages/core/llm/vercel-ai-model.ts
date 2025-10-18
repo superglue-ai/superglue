@@ -1,15 +1,12 @@
-import { generateText, generateObject, jsonSchema } from "ai";
+import { generateText, jsonSchema, tool } from "ai";
+import { openai } from "@ai-sdk/openai";
+import { anthropic } from "@ai-sdk/anthropic";
+import { google } from "@ai-sdk/google";
 import { initializeAIModel, getModelContextLength } from "@superglue/shared/utils";
 import { server_defaults } from "../default.js";
 import { ToolDefinition } from "../tools/tools.js";
 import { LLM, LLMMessage, LLMObjectResponse, LLMResponse } from "./llm.js";
 import { logMessage } from "../utils/logs.js";
-
-type MessageParam = 
-  | { role: "system"; content: string }
-  | { role: "user"; content: string }
-  | { role: "assistant"; content: string }
-  | { role: "tool"; content: Array<{ type: "tool-result"; toolCallId: string; toolName: string; result: unknown }> };
 
 export class VercelAIModel implements LLM {
   public contextLength: number;
@@ -17,7 +14,7 @@ export class VercelAIModel implements LLM {
   private modelId: string;
 
   constructor(modelId?: string) {
-    this.modelId = modelId || this.getConfiguredModelId() || 'gpt-4.1';
+    this.modelId = modelId || 'claude-sonnet-4-5';
     this.model = initializeAIModel({
       providerEnvVar: 'LLM_PROVIDER',
       defaultModel: this.modelId
@@ -25,64 +22,114 @@ export class VercelAIModel implements LLM {
     this.contextLength = getModelContextLength(this.modelId);
   }
 
-  private getConfiguredModelId(): string | undefined {
-    const provider = process.env.LLM_PROVIDER?.toUpperCase();
-    switch (provider) {
-      case 'ANTHROPIC':
-        return process.env.ANTHROPIC_MODEL;
-      case 'OPENAI':
-      case 'OPENAI_LEGACY':
-        return process.env.OPENAI_MODEL;
-      case 'GEMINI':
-        return process.env.GEMINI_MODEL;
-      case 'AZURE':
-        return process.env.AZURE_MODEL;
-      default:
-        return undefined;
-    }
+  private getDateMessage(): LLMMessage {
+    return {
+      role: "system" as const,
+      content: "The current date and time is " + new Date().toISOString()
+    } as LLMMessage;
   }
 
-  private convertMessages(messages: LLMMessage[]): MessageParam[] {
-    return messages.map(msg => {
-      if (msg.role === "system" || msg.role === "user" || msg.role === "assistant") {
-        return {
-          role: msg.role,
-          content: typeof msg.content === "string" ? msg.content : String(msg.content)
-        };
+  private buildTools(
+    schemaObj: any,
+    customTools?: ToolDefinition[],
+    context?: any
+  ): Record<string, any> {
+    const tools: Record<string, any> = {
+      submit: tool({
+        description: "Submit the final result in the required format. Submit the result even if it's an error and keep submitting until we stop. Keep non-function messages short and concise because they are only for debugging.",
+        inputSchema: schemaObj,
+      }),
+      abort: tool({
+        description: "There is absolutely no way given the input to complete the request successfully, abort the request",
+        inputSchema: jsonSchema({
+          type: "object",
+          properties: {
+            reason: { type: "string", description: "The reason for aborting" }
+          },
+          required: ["reason"]
+        }),
+      }),
+    };
+
+    const provider = process.env.LLM_PROVIDER?.toLowerCase();
+    switch (provider) {
+      case 'openai':
+        tools["web_search"] = openai.tools.webSearch();
+        break;
+      case 'anthropic':
+        tools["web_search"] = anthropic.tools.webSearch_20250305({
+          maxUses: 5,
+        });
+        break;
+      case 'gemini':
+        tools["web_search"] = google.tools.googleSearch({});
+        break;
+      default:
+        break;
+    }
+
+    if (customTools && customTools.length > 0) {
+      for (const customTool of customTools) {
+        tools[customTool.name] = tool({
+          description: customTool.description,
+          inputSchema: jsonSchema(customTool.arguments),
+          execute: customTool.execute ? async (args) => {
+            return await customTool.execute!(args, context);
+          } : undefined,
+        });
       }
-      return msg as unknown as MessageParam;
-    });
+    }
+
+    return tools;
+  }
+
+  private cleanSchema(schema: any): any {
+    if (!schema || typeof schema !== 'object') return schema;
+
+    const cleaned = { ...schema };
+
+    if (cleaned.type === 'object' || cleaned.type === 'array') {
+      cleaned.additionalProperties = false;
+      cleaned.strict = true;
+      
+      delete cleaned.patternProperties;
+      
+      if (cleaned.properties) {
+        for (const key in cleaned.properties) {
+          cleaned.properties[key] = this.cleanSchema(cleaned.properties[key]);
+        }
+      }
+      
+      if (cleaned.items) {
+        cleaned.items = this.cleanSchema(cleaned.items);
+        delete cleaned.minItems;
+        delete cleaned.maxItems;
+      }
+    }
+
+    return cleaned;
   }
 
   async generateText(messages: LLMMessage[], temperature: number = 0): Promise<LLMResponse> {
-    const dateMessage = {
-      role: "system" as const,
-      content: "The current date and time is " + new Date().toISOString()
+    const dateMessage = this.getDateMessage();
+    messages = [dateMessage, ...messages] as LLMMessage[];
+
+    const result = await generateText({
+      model: this.model,
+      messages: messages,
+      temperature,
+      maxRetries: server_defaults.LLM.MAX_INTERNAL_RETRIES,
+    });
+
+    const updatedMessages = [...messages, {
+      role: "assistant" as const,
+      content: result.text
+    } as LLMMessage];
+
+    return {
+      response: result.text,
+      messages: updatedMessages
     };
-
-    const convertedMessages = this.convertMessages([dateMessage, ...messages]);
-
-    try {
-      const result = await generateText({
-        model: this.model,
-        messages: convertedMessages as any,
-        temperature,
-        maxRetries: server_defaults.LLM.MAX_INTERNAL_RETRIES,
-      });
-
-      const updatedMessages = [...messages, {
-        role: "assistant" as const,
-        content: result.text
-      }];
-
-      return {
-        response: result.text,
-        messages: updatedMessages
-      };
-    } catch (error) {
-      logMessage('error', 'Error in Vercel AI generateText:', error);
-      throw error;
-    }
   }
 
   async generateObject(
@@ -90,48 +137,98 @@ export class VercelAIModel implements LLM {
     schema: any,
     temperature: number = 0,
     customTools?: ToolDefinition[],
-    context?: any
+    context?: any,
+    toolChoice?: 'auto' | 'required' | 'none' | { type: 'tool'; toolName: string }
   ): Promise<LLMObjectResponse> {
-    const dateMessage = {
-      role: "system" as const,
-      content: "The current date and time is " + new Date().toISOString()
-    };
+    const dateMessage = this.getDateMessage();
 
-    const convertedMessages = this.convertMessages(
-      String(messages[0]?.content)?.startsWith("The current date and time is") ? messages : [dateMessage, ...messages]
-    );
-
-    if (customTools && customTools.length > 0) {
-      logMessage('warn', 'VercelAIModel does not support custom tools with generateObject. Tools will be ignored.');
+    // Clean schema: remove patternProperties, minItems/maxItems, set strict/additionalProperties
+    schema = this.cleanSchema(schema);
+    
+    // Handle O-model temperature
+    let temperatureToUse: number | undefined = temperature;
+    if (this.modelId.startsWith('o')) {
+      temperatureToUse = undefined;
     }
 
+    const schemaObj = jsonSchema(schema);
+    const tools = this.buildTools(schemaObj, customTools, context);
+
     try {
-      const isArray = schema.type === 'array';
-      const schemaObj = jsonSchema(isArray ? schema.items : schema);
+      let finalResult: any = null;
+      let conversationMessages: LLMMessage[] = String(messages[0]?.content)?.startsWith("The current date and time is") 
+        ? messages 
+        : [dateMessage, ...messages];
 
-      const result = await generateObject({
-        model: this.model,
-        messages: convertedMessages as any,
-        ...(isArray && { output: 'array' as const }),
-        schema: schemaObj,
-        temperature,
-        maxRetries: server_defaults.LLM.MAX_INTERNAL_RETRIES,
-      });
+      while (finalResult === null) {
 
-      const updatedMessages = [...messages, {
+        const result = await generateText({
+          model: this.model,
+          messages: conversationMessages,
+          tools,
+          toolChoice: toolChoice || 'required',
+          temperature: temperatureToUse,
+          maxRetries: server_defaults.LLM.MAX_INTERNAL_RETRIES,
+        });
+
+        // Check for submit/abort in tool calls
+        for (const toolCall of result.toolCalls) {
+          if (toolCall.toolName === 'submit') {
+            finalResult = toolCall.input;
+            break;
+          }
+          if (toolCall.toolName === 'abort') {
+            finalResult = { error: (toolCall.input as any)?.reason || "Unknown error" };
+            break;
+          }
+        }
+
+        // Add assistant message with tool calls to conversation
+        if (result.toolCalls.length > 0 || result.text) {
+          conversationMessages.push({
+            role: "assistant" as const,
+            content: result.text || "",
+            tool_calls: result.toolCalls.length > 0 ? result.toolCalls.map(tc => ({
+              id: tc.toolCallId,
+              type: "function" as const,
+              function: {
+                name: tc.toolName,
+                arguments: JSON.stringify(tc.input)
+              }
+            })) : undefined
+          } as any);
+        }
+
+        // Add tool results to conversation
+        if (result.toolResults.length > 0) {
+          for (const toolResult of result.toolResults) {
+            conversationMessages.push({
+              role: "tool" as const,
+              tool_call_id: toolResult.toolCallId,
+              content: JSON.stringify((toolResult as any).result || toolResult)
+            } as any);
+          }
+        }
+
+        if (!finalResult && result.toolCalls.length === 0) {
+          throw new Error("No tool calls received from the model");
+        }
+      }
+
+      const updatedMessages = [...conversationMessages, {
         role: "assistant" as const,
-        content: JSON.stringify(result.object)
+        content: JSON.stringify(finalResult)
       }];
 
       return {
-        response: result.object,
+        response: finalResult,
         messages: updatedMessages
       };
     } catch (error) {
       logMessage('error', 'Error in Vercel AI generateObject:', error);
       const updatedMessages = [...messages, {
         role: "assistant" as const,
-        content: "Error: Vercel AI API Error: " + error.message
+        content: "Error: Vercel AI API Error: " + (error as any)?.message
       }];
 
       return {
