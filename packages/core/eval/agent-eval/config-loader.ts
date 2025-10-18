@@ -28,6 +28,7 @@ const WorkflowConfigSchema = z.object({
 const TestSuiteSettingsSchema = z.object({
     runOneShotMode: z.boolean(),
     runSelfHealingMode: z.boolean(),
+    attempts: z.number().min(1),
 });
 
 const AgentEvalConfigSchema = z.object({

@@ -56,6 +56,40 @@
         "personal_access_token": ""
       },
       "description": "Typeform API"
+    },
+    {
+      "id": "confluence",
+      "name": "Confluence",
+      "urlHost": "https://superglue-evals.atlassian.net",
+      "urlPath": "/wiki/rest/api",
+      "documentationUrl": "https://docs.atlassian.com/atlassian-confluence/REST/6.6.0/",
+      "credentials": {
+        "email": "",
+        "api_token": ""
+      },
+      "description": "Confluence API"
+    },
+    {
+      "id": "github",
+      "name": "GitHub",
+      "urlHost": "https://api.github.com",
+      "urlPath": "",
+      "documentationUrl": "https://docs.github.com/en/rest",
+      "credentials": {
+        "api_token": ""
+      },
+      "description": "Github API"
+    },
+    {
+      "id": "linear",
+      "name": "Linear",
+      "urlHost": "https://api.linear.app/graphql",
+      "urlPath": "",
+      "documentationUrl": "https://linear.app/developers",
+      "credentials": {
+        "access_token": ""
+      },
+      "description": "Linear API"
     }
   ],
   "workflows": [
@@ -304,6 +338,219 @@
         ],
         "total": 2
       }
+    },
+    {
+      "id": "typeform-get-form-by-id",
+      "name": "Typeform Get Form By Id",
+      "type": "retrieval",
+      "instruction": "Get the form with the given id. I want the final output to be a JSON object with the following structure: {id: string, name: string, responses: Array<{id: string, answers: Array<{question: string, answer: string}>, submittedAt: number // unix timestamp}>, createdAt: number // unix timestamp }. Please make sure to include the questions and answers for each response.",
+      "integrationIds": ["typeform"],
+      "payload": {
+        "formId": "lyyDJUcC"
+      },
+      "expectedData": {
+        "id": "lyyDJUcC",
+        "name": "Coffee Shop Applications",
+        "responses": [
+          {
+            "id": "zrf8owa8sa9aq94pd6rmdzrf8ow4jewu",
+            "answers": [
+              {
+                "question": "What is your full name?",
+                "answer": "Peter Mustermann"
+              },
+              {
+                "question": "Which position are you applying for?",
+                "answer": "Cashier"
+              },
+              {
+                "question": "Please share a brief overview of your work experience.",
+                "answer": "Peter's text"
+              },
+              {
+                "question": "Why would you like to work at our coffee shop?",
+                "answer": "Random text"
+              }
+            ],
+            "submittedAt": 1760610533
+          }
+        ],
+        "createdAt": 1760610392
+      }
+    },
+    {
+      "id": "typeform-get-all-workspaces",
+      "name": "Typeform Get All Workspaces",
+      "type": "retrieval",
+      "instruction": "Get all workspaces for the authenticated user. I want the final output to be a JSON object with the following structure: { workspaces: [{id: string, name: string, numberOfForms: number}] }.",
+      "integrationIds": ["typeform"],
+      "payload": {},
+      "expectedData": {
+        "workspaces": [
+          {
+            "id": "QDctaF",
+            "name": "My workspace",
+            "numberOfForms": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "confluence-get-all-spaces",
+      "name": "Confluence Get All Spaces",
+      "type": "retrieval",
+      "instruction": "Get all spaces for the authenticated user. I want the final output to be a JSON object with the following structure: { spaces: [{id: number, type: string, name: string, archived: boolean}] }. Please use /wiki/rest/api/... not  rest/api/v2/...",
+      "integrationIds": ["confluence"],
+      "payload": {},
+      "expectedData": {
+        "spaces": [
+          {
+            "id": 294916,
+            "type": "knowledge_base",
+            "name": "Docs",
+            "archived": false
+          },
+          {
+            "id": 196611,
+            "type": "personal",
+            "name": "Max Mustermann",
+            "archived": false
+          },
+          {
+            "id": 98312,
+            "type": "onboarding",
+            "name": "Projektmanagement",
+            "archived": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "confluence-get-page-content",
+      "name": "Confluence Get Page Content",
+      "type": "retrieval",
+      "instruction": "Get the content of the page with the given id. I want the final output to be a JSON object with the following structure: { content: string }. ",
+      "integrationIds": ["confluence"],
+      "payload": {
+        "pageId": "163855"
+      },
+      "expectedData": {
+        "content": "<p>Intern Onboarding …</p>"
+      }
+    },
+    {
+      "id": "confluence-get-all-pages-of-space",
+      "name": "Confluence Get All Pages Of Space",
+      "type": "retrieval",
+      "instruction": "Get all pages for the given space id. I want the final output to be a JSON object with the following structure: { pages: [{id: string, title: string, content: string}] }. ",
+      "integrationIds": ["confluence"],
+      "payload": {
+        "spaceId": "294916"
+      },
+      "expectedData": {
+        "pages": [
+          {
+            "id": "163848",
+            "title": "Company Guidelines",
+            "content": "<p>Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut</p>"
+          },
+          {
+            "id": "295032",
+            "title": "Docs",
+            "content": "<p>Overview Page</p>"
+          },
+          {
+            "id": "163855",
+            "title": "Interns",
+            "content": "<p>Intern Onboarding …</p>"
+          },
+          {
+            "id": "295094",
+            "title": "IT Service Desk",
+            "content": "<p>Text about the IT Service Desk</p>"
+          }
+        ]
+      }
+    },
+    {
+      "id": "github-list-repos",
+      "name": "GitHub List Repositories",
+      "type": "retrieval",
+      "instruction": "List all repositories for the authenticated user. I want the final output to be a JSON object with the following structure: { repositories: [{id: number, name: string, isPublic: boolean}] }. ",
+      "integrationIds": ["github"],
+      "payload": {},
+      "expectedData": {
+        "repositories": [
+          {
+            "id": 1074517465,
+            "name": "congenial-tribble",
+            "isPublic": false
+          },
+          {
+            "id": 1074517568,
+            "name": "expert-octo-doodle",
+            "isPublic": false
+          },
+          {
+            "id": 1074520812,
+            "name": "strapi-cloud-template-blog-4b5423dbba",
+            "isPublic": true
+          },
+          {
+            "id": 1074517305,
+            "name": "Test1",
+            "isPublic": false
+          },
+          {
+            "id": 1074517689,
+            "name": "vigilant-octo-lamp",
+            "isPublic": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "github-get-user",
+      "name": "GitHub Get User",
+      "type": "retrieval",
+      "instruction": "Get the user information for the authenticated user. I want the final output to be a JSON object with the following structure: { user: {id: number, username: string, profilePictureUrl: string | null, url: string, createdAt: string } }. ",
+      "integrationIds": ["github"],
+      "payload": {},
+      "expectedData": {
+        "user": {
+          "id": 237506962,
+          "username": "Evals304",
+          "profilePictureUrl": "https://avatars.githubusercontent.com/u/237506962?v=4",
+          "url": "https://github.com/Evals304",
+          "createdAt": "2025-10-12T00:13:19Z"
+        }
+      }
+    },
+    {
+      "id": "github-get-user-pull-requests",
+      "name": "GitHub Get User's Pull Requests",
+      "type": "retrieval",
+      "instruction": "Get all pull requests for the authenticated user. I want the final output to be a JSON object with the following structure: { pullRequests: [{id: number, title: string, url: string, updatedAt: string, createdAt: string }] }. ",
+      "integrationIds": ["github"],
+      "payload": {},
+      "expectedData": {
+        "pullRequests": [
+          {
+            "id": 3527944071,
+            "title": "Test something",
+            "url": "https://github.com/Evals304/congenial-tribble/pull/1",
+            "updatedAt": "2025-10-18T01:46:27Z",
+            "createdAt": "2025-10-18T01:46:27Z"
+          },
+          {
+            "id": 3527943775,
+            "title": "Update README.md",
+            "url": "https://github.com/Evals304/vigilant-octo-lamp/pull/1",
+            "updatedAt": "2025-10-18T01:45:59Z",
+            "createdAt": "2025-10-18T01:45:59Z"
+          }
+        ]
+      }
     }
   ],
   "enabledWorkflows": [
@@ -313,10 +560,19 @@
     "clockify-time-entries",
     "clockify-projects",
     "clockify-projects-all-workspaces",
-    "typeform-get-all-forms"
+    "typeform-get-all-forms",
+    "typeform-get-form-by-id",
+    "typeform-get-all-workspaces",
+    "confluence-get-all-spaces",
+    "confluence-get-page-content",
+    "confluence-get-all-pages-of-space",
+    "github-list-repos",
+    "github-get-user",
+    "github-get-user-pull-requests"
   ],
   "settings": {
     "runOneShotMode": true,
-    "runSelfHealingMode": true
+    "runSelfHealingMode": true,
+    "attempts": 1
   }
 }

@@ -1,124 +1,92 @@
-import { Metrics, WorkflowAttempt, WorkflowFailureReason, WorkflowMetrics } from "./types.js";
+import { Metrics, WorkflowAttempt, WorkflowMetrics, WorkflowFailureReason, FailureCountsByReason } from "./types.js";
 
-
-export class MetricsCalculatorService {
+export class MetricsCalculator {
     public calculateMetrics(workflowAttempts: WorkflowAttempt[]): Metrics {
         const groupedByWorkflowId = this.groupByWorkflowId(workflowAttempts);
         const workflowMetrics = this.determineWorkflowMetrics(groupedByWorkflowId);
-        const { strictValidationFailureRate, buildFailureRate, executionFailureRate } = this.calculateWorkflowFailureRates(workflowMetrics);
+
+        const workflowCount = workflowMetrics.length;
+        const successfulWorkflowCount = workflowMetrics.filter(w => w.hadAnySuccess).length;
+
+        const workflowsWithSH = workflowMetrics.filter(w => w.hasSelfHealingAttempts).length;
+        const workflowsWithOS = workflowMetrics.filter(w => w.hasOneShotAttempts).length;
+
+        const workflowSelfHealingSuccessRate = workflowsWithSH === 0
+            ? null
+            : workflowMetrics.filter(w => w.hadSelfHealingSuccess).length / workflowsWithSH;
+
+        const workflowOneShotSuccessRate = workflowsWithOS === 0
+            ? null
+            : workflowMetrics.filter(w => w.hadOneShotSuccess).length / workflowsWithOS;
 
         return {
-            totalAttempts: workflowAttempts.length,
-            totalSuccessfulAttempts: this.calculateSuccessfulAttempts(workflowAttempts),
-            totalFailedAttempts: this.calculateFailedAttempts(workflowAttempts),
+            workflowCount,
+            successfulWorkflowCount,
+            workflowSuccessRate: workflowCount === 0 ? Number.NaN : successfulWorkflowCount / workflowCount,
+            workflowSelfHealingSuccessRate,
+            workflowOneShotSuccessRate,
             overallAverageBuildTimeMs: this.calculateAverageBuildTime(workflowAttempts),
             overallAverageExecutionTimeMs: this.calculateAverageExecutionTime(workflowAttempts),
-            overallSuccessRate: this.calculateOverallSuccessRate(workflowAttempts),
-            overallSelfHealingSuccessRate: this.calculateSelfHealingSuccessRate(workflowAttempts),
-            overallOneShotSuccessRate: this.calculateOneShotSuccessRate(workflowAttempts),
-            workflowSuccessRate: this.calculateWorkflowSuccessRate(groupedByWorkflowId),
-            workflowStrictValidationFailureRate: strictValidationFailureRate,
-            workflowBuildFailureRate: buildFailureRate,
-            workflowExecutionFailureRate: executionFailureRate,
             workflowMetrics: workflowMetrics,
         };
     }
 
-    private calculateSuccessfulAttempts(workflowAttempts: WorkflowAttempt[]): number {
-        return workflowAttempts.filter(attempt => attempt.executionSuccess).length;
-    }
-
-    private calculateFailedAttempts(workflowAttempts: WorkflowAttempt[]): number {
-        return workflowAttempts.filter(attempt => !attempt.executionSuccess).length;
-    }
-
     private calculateAverageBuildTime(workflowAttempts: WorkflowAttempt[]): number {
+        if (workflowAttempts.length === 0) return 0;
         return workflowAttempts.reduce((acc, attempt) => acc + attempt.buildTime, 0) / workflowAttempts.length;
     }
 
     private calculateAverageExecutionTime(workflowAttempts: WorkflowAttempt[]): number {
+        if (workflowAttempts.length === 0) return 0;
         return workflowAttempts.reduce((acc, attempt) => acc + attempt.executionTime, 0) / workflowAttempts.length;
     }
 
-    private calculateOverallSuccessRate(workflowAttempts: WorkflowAttempt[]): number {
-        return workflowAttempts.filter(attempt => attempt.executionSuccess).length / workflowAttempts.length;
-    }
-
-    private calculateSelfHealingSuccessRate(workflowAttempts: WorkflowAttempt[]): number {
-        const selfHealingAttempts = workflowAttempts.filter(attempt => attempt.selfHealingEnabled);
-        if (selfHealingAttempts.length === 0) return NaN;
-        
-        const successfulSelfhealingAttempts = selfHealingAttempts.filter(attempt => attempt.executionSuccess).length;
-        return successfulSelfhealingAttempts / selfHealingAttempts.length;
-    }
-
-    private calculateOneShotSuccessRate(workflowAttempts: WorkflowAttempt[]): number {
-        const oneShotAttempts = workflowAttempts.filter(attempt => !attempt.selfHealingEnabled);
-        if (oneShotAttempts.length === 0) return NaN;
-        
-        const successfulOneShotAttempts = oneShotAttempts.filter(attempt => attempt.executionSuccess).length;
-        return successfulOneShotAttempts / oneShotAttempts.length;
-    }
-
-    // WORKFLOW METRICS
-    private calculateWorkflowSuccessRate(workflowAttemptsById: Record<string, WorkflowAttempt[]>): number {
-        let successfulWorkflowCount = 0;
-        Object.values(workflowAttemptsById).forEach((workflowAttempts) => {
-            const successfulAttempts = workflowAttempts.filter(attempt => attempt.executionSuccess).length;
-            if (successfulAttempts > 0) {
-                successfulWorkflowCount++;
-            }
-        });
-
-        return successfulWorkflowCount / Object.keys(workflowAttemptsById).length;
-    }
-
     private determineWorkflowMetrics(workflowAttemptsByWorkflowId: Record<string, WorkflowAttempt[]>): WorkflowMetrics[] {
-        return Object.values(workflowAttemptsByWorkflowId).map(workflowAttempts => ({
-            workflowConfig: workflowAttempts[0].workflowConfig,
-            totalAttempts: workflowAttempts.length,
-            totalSuccessfulAttempts: this.calculateSuccessfulAttempts(workflowAttempts),
-            totalFailedAttempts: this.calculateFailedAttempts(workflowAttempts),
-            selfHealingSuccessRate: this.calculateSelfHealingSuccessRate(workflowAttempts),
-            oneShotSuccessRate: this.calculateOneShotSuccessRate(workflowAttempts),
-            latestFailureReason: this.findNewestFailureReason(workflowAttempts),
-        }));
-    }
+        return Object.values(workflowAttemptsByWorkflowId).map(workflowAttempts => {
+            const hasOneShotAttempts = workflowAttempts.some(a => !a.selfHealingEnabled);
+            const hasSelfHealingAttempts = workflowAttempts.some(a => a.selfHealingEnabled);
+            const hadOneShotSuccess = workflowAttempts.some(a => !a.selfHealingEnabled && a.executionSuccess);
+            const hadSelfHealingSuccess = workflowAttempts.some(a => a.selfHealingEnabled && a.executionSuccess);
+            const hadAnySuccess = hadOneShotSuccess || hadSelfHealingSuccess;
 
-    private calculateWorkflowFailureRates(workflowMetrics: WorkflowMetrics[]): {
-        strictValidationFailureRate: number;
-        buildFailureRate: number;
-        executionFailureRate: number;
-    } {
-        let totalFailedWorkflows = 0;
-        let strictValidationFailures = 0;
-        let buildFailures = 0;
-        let executionFailures = 0;
+            const totalSuccessfulAttempts = workflowAttempts.filter(a => a.executionSuccess).length;
+            const totalFailedAttempts = workflowAttempts.filter(a => !a.executionSuccess).length;
 
-        workflowMetrics.forEach(metric => {
-            if (metric.totalFailedAttempts <= 0) {
-                return;
+            const initCounts: FailureCountsByReason = {
+                [WorkflowFailureReason.BUILD]: 0,
+                [WorkflowFailureReason.EXECUTION]: 0,
+                [WorkflowFailureReason.STRICT_VALIDATION]: 0,
+            };
+            const oneShotFailuresByReason: FailureCountsByReason = { ...initCounts };
+            const selfHealingFailuresByReason: FailureCountsByReason = { ...initCounts };
+
+            for (const attempt of workflowAttempts) {
+                if (!attempt.failureReason) continue;
+                if (attempt.selfHealingEnabled) {
+                    selfHealingFailuresByReason[attempt.failureReason]++;
+                } else {
+                    oneShotFailuresByReason[attempt.failureReason]++;
+                }
             }
 
-            totalFailedWorkflows++;
-            if (metric.latestFailureReason === WorkflowFailureReason.STRICT_VALIDATION) strictValidationFailures++;
-            if (metric.latestFailureReason === WorkflowFailureReason.BUILD) buildFailures++;
-            if (metric.latestFailureReason === WorkflowFailureReason.EXECUTION) executionFailures++;
+            const workflowId = workflowAttempts[0].workflowConfig.id;
+            const workflowName = workflowAttempts[0].workflowConfig.name;
+
+            return {
+                workflowId,
+                workflowName,
+                totalAttempts: workflowAttempts.length,
+                totalSuccessfulAttempts,
+                totalFailedAttempts,
+                hasOneShotAttempts,
+                hasSelfHealingAttempts,
+                hadAnySuccess,
+                hadOneShotSuccess,
+                hadSelfHealingSuccess,
+                oneShotFailuresByReason,
+                selfHealingFailuresByReason,
+            };
         });
-
-        return {
-            strictValidationFailureRate: strictValidationFailures / totalFailedWorkflows,
-            buildFailureRate: buildFailures / totalFailedWorkflows,
-            executionFailureRate: executionFailures / totalFailedWorkflows,
-        };
-    }
-
-    private findNewestFailureReason(workflowAttempts: WorkflowAttempt[]): WorkflowFailureReason | undefined {
-        const failedAttempts = workflowAttempts
-            .filter(attempt => !attempt.executionSuccess)
-            .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-
-        return failedAttempts[0]?.failureReason;
     }
 
     private groupByWorkflowId(workflowAttempts: WorkflowAttempt[]): Record<string, WorkflowAttempt[]> {

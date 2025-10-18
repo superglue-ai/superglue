@@ -1,14 +1,12 @@
-import { Metrics, WorkflowMetrics } from "./types.js";
-import { WorkflowFailureReason } from "./types.js";
+import type { Metrics, WorkflowMetrics, MetricsComparisonResult, WorkflowMetricsComparisonResult, WorkflowAttempt } from "./types.js";
 
 export class ConsoleReporter {
-  static report(metrics: Metrics): void {
+  static report(metrics: Metrics, metricsComparison?: MetricsComparisonResult, attempts?: WorkflowAttempt[]): void {
     this.printHeader();
-    this.printOverallMetrics(metrics);
-    this.printPerformanceMetrics(metrics);
-    this.printFailureAnalysis(metrics);
-    this.printDetailedMetrics(metrics);
-    this.printWorkflowBreakdown(metrics);
+    this.printOverallMetrics(metrics, metricsComparison);
+    this.printWorkflowBreakdown(metrics, metricsComparison);
+    this.printAttemptsSection(metrics, attempts ?? []);
+    this.printPerformanceMetrics(metrics, metricsComparison);
     this.printFooter();
   }
 
@@ -22,131 +20,86 @@ export class ConsoleReporter {
     console.log('═'.repeat(80) + '\n');
   }
 
-  private static printOverallMetrics(metrics: Metrics): void {
-    const overallRate = metrics.overallSuccessRate * 100;
+  private static printOverallMetrics(metrics: Metrics, comparison?: MetricsComparisonResult): void {
     const workflowRate = metrics.workflowSuccessRate * 100;
-    const selfHealingRate = metrics.overallSelfHealingSuccessRate * 100;
-    const oneShotRate = metrics.overallOneShotSuccessRate * 100;
+    const selfHealingRate = metrics.workflowSelfHealingSuccessRate !== null ? metrics.workflowSelfHealingSuccessRate * 100 : null;
+    const oneShotRate = metrics.workflowOneShotSuccessRate !== null ? metrics.workflowOneShotSuccessRate * 100 : null;
     
-    const icon = overallRate >= 80 ? '✅' : overallRate >= 50 ? '⚠️' : '❌';
+    const statusIcon = workflowRate >= 80 ? '✅' : workflowRate >= 50 ? '⚠️' : '❌';
     
-    console.log('\n🎯 SUCCESS METRICS');
+    console.log('\n📈 OVERALL METRICS');
     console.log('─'.repeat(80));
-    console.log(`  ${icon} Overall Success Rate:          ${overallRate.toFixed(1)}% (${metrics.totalSuccessfulAttempts}/${metrics.totalAttempts} attempts)`);
-    console.log(`  ${icon} Workflow-Level Success Rate:   ${workflowRate.toFixed(1)}% (workflows with ≥1 success)`);
     
-    if (!isNaN(selfHealingRate) && !isNaN(oneShotRate)) {
-      console.log(`\n  🔄 Self-Healing Mode:             ${selfHealingRate.toFixed(1)}%`);
-      console.log(`  🎯 One-Shot Mode:                 ${oneShotRate.toFixed(1)}%`);
-      
-      const improvement = selfHealingRate - oneShotRate;
-      if (improvement > 0) {
-        console.log(`  📈 Self-Healing Improvement:      +${improvement.toFixed(1)}%`);
-      } else if (improvement < 0) {
-        console.log(`  📉 Self-Healing Regression:       ${improvement.toFixed(1)}%`);
-      }
+    const workflowDiff = comparison ? this.formatDiff(comparison.workflowSuccessRateDifference * 100) : '';
+
+    const workflowCountDisplay = `(${metrics.successfulWorkflowCount}/${metrics.workflowCount})`;
+    console.log(`  ${statusIcon} Workflow Success Rate:        ${workflowRate.toFixed(1)}%${workflowDiff} ${workflowCountDisplay}`);
+
+    if (selfHealingRate !== null) {
+      const selfHealingDiff = comparison ? this.formatDiff(comparison.workflowSelfHealingSuccessRateDifference * 100) : '';
+      console.log(`  🔄 Self-Healing Workflows:        ${selfHealingRate.toFixed(1)}%${selfHealingDiff}`);
+    }
+    if (oneShotRate !== null) {
+      const oneShotDiff = comparison ? this.formatDiff(comparison.workflowOneShotSuccessRateDifference * 100) : '';
+      console.log(`  🎯 One-Shot Workflows:            ${oneShotRate.toFixed(1)}%${oneShotDiff}`);
     }
   }
 
-  private static printPerformanceMetrics(metrics: Metrics): void {
-    const buildTime = metrics.overallAverageBuildTimeMs;
-    const execTime = metrics.overallAverageExecutionTimeMs;
-    const totalTime = buildTime + execTime;
-    const buildPercent = (buildTime / totalTime) * 100;
-    const execPercent = (execTime / totalTime) * 100;
-    
-    console.log('\n⚡ PERFORMANCE METRICS');
+  private static printAttemptsSection(metrics: Metrics, attempts: WorkflowAttempt[]): void {
+    console.log('\n🧪 ATTEMPTS');
     console.log('─'.repeat(80));
-    console.log(`  🏗️  Average Build Time:            ${buildTime.toFixed(0)}ms`);
-    console.log(`  🚀 Average Execution Time:        ${execTime.toFixed(0)}ms`);
-    console.log(`  ⏱️  Total Average Time:            ${totalTime.toFixed(0)}ms`);
-    
-    console.log('\n  Time Distribution:');
-    const buildBars = Math.round(buildPercent / 2.5);
-    const execBars = Math.round(execPercent / 2.5);
-    console.log(`    Build:     [${'█'.repeat(buildBars)}${' '.repeat(40 - buildBars)}] ${buildPercent.toFixed(1)}%`);
-    console.log(`    Execution: [${'█'.repeat(execBars)}${' '.repeat(40 - execBars)}] ${execPercent.toFixed(1)}%`);
-  }
-
-  private static printFailureAnalysis(metrics: Metrics): void {
-    if (metrics.totalFailedAttempts === 0) {
-      console.log('\n🎉 FAILURE ANALYSIS');
-      console.log('─'.repeat(80));
-      console.log('  ✨ No failures! All attempts succeeded.');
+    if (attempts.length === 0) {
+      console.log('  No attempts.');
       return;
     }
 
-    const strictValidationRate = metrics.workflowStrictValidationFailureRate * 100;
-    const buildFailureRate = metrics.workflowBuildFailureRate * 100;
-    const execFailureRate = metrics.workflowExecutionFailureRate * 100;
-    
-    console.log('\n🔍 FAILURE ANALYSIS');
-    console.log('─'.repeat(80));
-    console.log(`  Total Failed Attempts: ${metrics.totalFailedAttempts}/${metrics.totalAttempts}`);
-    console.log('\n  Failure Breakdown (of failed attempts):');
-    
-    if (strictValidationRate > 0) {
-      console.log(`    🔒 Strict Validation:  ${strictValidationRate.toFixed(1)}%`);
+    const byWorkflow = new Map<string, WorkflowAttempt[]>();
+    for (const a of attempts) {
+      const id = a.workflowConfig.id;
+      if (!byWorkflow.has(id)) byWorkflow.set(id, []);
+      byWorkflow.get(id)!.push(a);
     }
-    if (buildFailureRate > 0) {
-      console.log(`    🏗️  Build Failures:     ${buildFailureRate.toFixed(1)}%`);
-    }
-    if (execFailureRate > 0) {
-      console.log(`    ⚠️  Execution Failures: ${execFailureRate.toFixed(1)}%`);
-    }
-    
-    const maxRate = Math.max(strictValidationRate, buildFailureRate, execFailureRate);
-    if (maxRate === strictValidationRate && strictValidationRate > 0) {
-      console.log('\n  💡 Primary Issue: Data validation - expected data doesn\'t match actual results');
-    } else if (maxRate === buildFailureRate && buildFailureRate > 0) {
-      console.log('\n  💡 Primary Issue: Workflow building - agent struggles to create valid plans');
-    } else if (maxRate === execFailureRate && execFailureRate > 0) {
-      console.log('\n  💡 Primary Issue: Workflow execution - plans fail during runtime');
+
+    for (const metricsRow of metrics.workflowMetrics) {
+      const id = metricsRow.workflowId;
+      const items = byWorkflow.get(id) ?? [];
+      const sh = items.filter(x => x.selfHealingEnabled);
+      const os = items.filter(x => !x.selfHealingEnabled);
+      const shSucc = sh.filter(x => x.executionSuccess).length;
+      const shFail = sh.filter(x => !x.executionSuccess).length;
+      const osSucc = os.filter(x => x.executionSuccess).length;
+      const osFail = os.filter(x => !x.executionSuccess).length;
+      const shVar = shSucc > 0 && shFail > 0 ? ' (non-deterministic)' : '';
+      const osVar = osSucc > 0 && osFail > 0 ? ' (non-deterministic)' : '';
+
+      console.log(`  ${id}`);
+      if (sh.length > 0) console.log(`    SH: success ${shSucc}, fail ${shFail}${shVar}`);
+      if (os.length > 0) console.log(`    OS: success ${osSucc}, fail ${osFail}${osVar}`);
     }
   }
 
-  private static printDetailedMetrics(metrics: Metrics): void {
-    console.log('\n📊 DETAILED METRICS');
+  private static printPerformanceMetrics(metrics: Metrics, comparison?: MetricsComparisonResult): void {
+    const buildTime = metrics.overallAverageBuildTimeMs;
+    const execTime = metrics.overallAverageExecutionTimeMs;
+    
+    const buildDiff = comparison ? this.formatTimeDiff(comparison.overallAverageBuildTimeMsDifference) : '';
+    const execDiff = comparison ? this.formatTimeDiff(comparison.overallAverageExecutionTimeMsDifference) : '';
+    
+    console.log('\n⚡ PERFORMANCE METRICS');
     console.log('─'.repeat(80));
-    
-    console.log('  Attempt-Level Statistics:');
-    console.log(`    Total Attempts:           ${metrics.totalAttempts}`);
-    console.log(`    Successful Attempts:      ${metrics.totalSuccessfulAttempts}`);
-    console.log(`    Failed Attempts:          ${metrics.totalFailedAttempts}`);
-    console.log(`    Success Rate:             ${(metrics.overallSuccessRate * 100).toFixed(1)}%`);
-    
-    if (!isNaN(metrics.overallSelfHealingSuccessRate)) {
-      console.log(`    Self-Healing Success:     ${(metrics.overallSelfHealingSuccessRate * 100).toFixed(1)}%`);
-    }
-    if (!isNaN(metrics.overallOneShotSuccessRate)) {
-      console.log(`    One-Shot Success:         ${(metrics.overallOneShotSuccessRate * 100).toFixed(1)}%`);
-    }
-    
-    console.log('\n  Workflow-Level Statistics:');
-    console.log(`    Total Workflows:          ${metrics.workflowMetrics.length}`);
-    const successfulWorkflows = metrics.workflowMetrics.filter(w => w.totalSuccessfulAttempts > 0).length;
-    console.log(`    Successful Workflows:     ${successfulWorkflows}/${metrics.workflowMetrics.length}`);
-    console.log(`    Workflow Success Rate:    ${(metrics.workflowSuccessRate * 100).toFixed(1)}%`);
-    
-    const failedWorkflows = metrics.workflowMetrics.filter(w => w.totalSuccessfulAttempts === 0).length;
-    if (failedWorkflows > 0) {
-      console.log(`    Failed Workflows:         ${failedWorkflows}/${metrics.workflowMetrics.length}`);
-      
-      const validationFailures = metrics.workflowMetrics.filter(w => w.latestFailureReason === WorkflowFailureReason.STRICT_VALIDATION).length;
-      const buildFailures = metrics.workflowMetrics.filter(w => w.latestFailureReason === WorkflowFailureReason.BUILD).length;
-      const execFailures = metrics.workflowMetrics.filter(w => w.latestFailureReason === WorkflowFailureReason.EXECUTION).length;
-      
-      console.log('\n  Workflow Failure Breakdown:');
-      if (validationFailures > 0) console.log(`    🔒 Validation Failures:    ${validationFailures}`);
-      if (buildFailures > 0) console.log(`    🏗️  Build Failures:         ${buildFailures}`);
-      if (execFailures > 0) console.log(`    ⚠️  Execution Failures:     ${execFailures}`);
-    }
+    console.log(`  🏗️  Average Build Time:            ${buildTime.toFixed(0)}ms${buildDiff}`);
+    console.log(`  🚀 Average Execution Time:        ${execTime.toFixed(0)}ms${execDiff}`);
   }
 
-  private static printWorkflowBreakdown(metrics: Metrics): void {
+  // removed failure analysis and detailed metrics for simplicity
+
+  private static printWorkflowBreakdown(metrics: Metrics, comparison?: MetricsComparisonResult): void {
     console.log('\n📋 WORKFLOW BREAKDOWN');
     console.log('─'.repeat(80));
-    console.log('  Workflow                          Status  Success  1-Shot   Heal  Failure');
+    const NAME_WIDTH = 40;
+    const COL_WIDTH = 10;
+    const header = `  ${'Workflow'.padEnd(NAME_WIDTH)} ${'Any'.padEnd(COL_WIDTH)}${'1-Shot'.padEnd(COL_WIDTH)}${'Heal'.padEnd(COL_WIDTH)}`;
+    console.log(header);
     console.log('  ' + '─'.repeat(78));
     
     const sortedWorkflows = [...metrics.workflowMetrics].sort((a, b) => {
@@ -155,57 +108,81 @@ export class ConsoleReporter {
       return rateB - rateA;
     });
     
+    const comparisonById = comparison 
+      ? new Map(comparison.workflowMetrics.map(c => [c.workflowId, c]))
+      : undefined;
+    
     for (const workflow of sortedWorkflows) {
-      this.printWorkflowRow(workflow);
+      const workflowComparison = comparisonById?.get(workflow.workflowId);
+      this.printWorkflowRow(workflow, workflowComparison);
+      this.printFailureSummaries(workflow);
     }
     
     console.log('  ' + '─'.repeat(78));
     console.log(`  Total: ${metrics.workflowMetrics.length} workflows`);
   }
 
-  private static printWorkflowRow(workflow: WorkflowMetrics): void {
-    const successRate = workflow.totalAttempts > 0 
-      ? (workflow.totalSuccessfulAttempts / workflow.totalAttempts) * 100
-      : 0;
-    
-    const oneShotRate = !isNaN(workflow.oneShotSuccessRate) 
-      ? workflow.oneShotSuccessRate * 100
-      : null;
-    
-    const selfHealingRate = !isNaN(workflow.selfHealingSuccessRate) 
-      ? workflow.selfHealingSuccessRate * 100
-      : null;
-    
-    const status = workflow.totalSuccessfulAttempts > 0 ? '✅' : '❌';
-    
-    // Truncate name to 32 chars
-    const name = workflow.workflowConfig.name.length > 32 
-      ? workflow.workflowConfig.name.substring(0, 29) + '...'
-      : workflow.workflowConfig.name;
-    const paddedName = name.padEnd(32);
-    
-    const successDisplay = `${successRate.toFixed(0)}%`.padStart(7);
-    const oneShotDisplay = oneShotRate !== null ? `${oneShotRate.toFixed(0)}%`.padStart(7) : '   -   ';
-    const healDisplay = selfHealingRate !== null ? `${selfHealingRate.toFixed(0)}%`.padStart(6) : '  -   ';
-    
-    let failureDisplay = '';
-    if (workflow.latestFailureReason) {
-      failureDisplay = this.formatFailureReason(workflow.latestFailureReason);
-    }
-    
-    console.log(`  ${paddedName} ${status}    ${successDisplay} ${oneShotDisplay} ${healDisplay} ${failureDisplay}`);
+  private static printWorkflowRow(workflow: WorkflowMetrics, comparison?: WorkflowMetricsComparisonResult): void {
+    const NAME_WIDTH = 40;
+    const COL_WIDTH = 10;
+    const label = `${workflow.workflowId}`;
+    const display = label.length > NAME_WIDTH 
+      ? label.substring(0, NAME_WIDTH - 3) + '...'
+      : label;
+    const paddedName = display.padEnd(NAME_WIDTH);
+
+    const any = workflow.hadAnySuccess ? '✅' : '❌';
+    const oneShot = workflow.hadOneShotSuccess ? '✅' : (workflow.hasOneShotAttempts ? '❌' : '·');
+    const heal = workflow.hadSelfHealingSuccess ? '✅' : (workflow.hasSelfHealingAttempts ? '❌' : '·');
+
+    const arrow = (d: -1 | 0 | 1) => d > 0 ? '↗' : d < 0 ? '↘' : '';
+    const anyDelta = comparison && comparison.anySuccessChange !== 0 ? `(${arrow(comparison.anySuccessChange)})` : '';
+    const oneShotDelta = comparison && comparison.oneShotSuccessChange !== 0 ? `(${arrow(comparison.oneShotSuccessChange)})` : '';
+    const healDelta = comparison && comparison.selfHealingSuccessChange !== 0 ? `(${arrow(comparison.selfHealingSuccessChange)})` : '';
+
+    const anyCol = `${any}${anyDelta}`.padEnd(COL_WIDTH);
+    const oneShotCol = `${oneShot}${oneShotDelta}`.padEnd(COL_WIDTH);
+    const healCol = `${heal}${healDelta}`.padEnd(COL_WIDTH);
+
+    console.log(`  ${paddedName} ${anyCol}${oneShotCol}${healCol}`);
   }
 
-  private static formatFailureReason(reason: WorkflowFailureReason): string {
-    switch (reason) {
-      case WorkflowFailureReason.STRICT_VALIDATION:
-        return '🔒 Validation';
-      case WorkflowFailureReason.BUILD:
-        return '🏗️  Build';
-      case WorkflowFailureReason.EXECUTION:
-        return '⚠️  Execution';
-      default:
-        return '';
-    }
+  private static printFailureSummaries(workflow: WorkflowMetrics): void {
+    const os = workflow.oneShotFailuresByReason;
+    const sh = workflow.selfHealingFailuresByReason;
+
+    const format = (label: string, counts?: { build?: number; execution?: number; strict_validation?: number }): string | undefined => {
+      if (!counts) return undefined;
+      const b = counts.build ?? 0;
+      const e = counts.execution ?? 0;
+      const v = counts.strict_validation ?? 0;
+      const total = b + e + v;
+      if (total === 0) return undefined;
+      const parts: string[] = [];
+      if (b > 0) parts.push(`Build:${b}`);
+      if (e > 0) parts.push(`Execution:${e}`);
+      if (v > 0) parts.push(`Strict Validation:${v}`);
+      if (parts.length === 1) {
+        return `    ${label} ${parts[0]}`;
+      }
+      return `    ${label}: ${parts.join(', ')}`;
+    };
+
+    const osLine = format('Failed One-Shot', os as any);
+    const shLine = format('Failed Healing', sh as any);
+    if (osLine) console.log(osLine);
+    if (shLine) console.log(shLine);
+  }
+
+  private static formatDiff(diff: number): string {
+    if (Math.abs(diff) < 0.1) return '';
+    const sign = diff > 0 ? '+' : '';
+    return ` (${sign}${diff.toFixed(1)}%)`;
+  }
+
+  private static formatTimeDiff(diffMs: number): string {
+    if (Math.abs(diffMs) < 10) return '';
+    const sign = diffMs > 0 ? '+' : '';
+    return ` (${sign}${diffMs.toFixed(0)}ms)`;
   }
 }
