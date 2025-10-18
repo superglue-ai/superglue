@@ -113,7 +113,7 @@ export const InstructionDisplay = ({ instruction, onEdit, showEditButton = true 
                     <Card className="max-w-3xl w-full max-h-[80vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
                         <div className="p-6 relative">
                             <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-lg font-semibold">Workflow Instruction</h3>
+                                <h3 className="text-lg font-semibold">Tool Instruction</h3>
                                 <div className="flex items-center gap-2">
                                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { navigator.clipboard.writeText(instruction); setCopied(true); setTimeout(() => setCopied(false), 1500); }} title="Copy">
                                         {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
@@ -147,7 +147,7 @@ export const FinalResultsCard = ({ result }: { result: any }) => {
         setTimeout(() => setCopied(false), 1500);
     };
     const handleDownload = () => {
-        downloadJson(result, 'workflow_final_result.json');
+        downloadJson(result, 'tool_final_result.json');
     };
     return (
         <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50">
@@ -190,7 +190,7 @@ export const FinalResultsCard = ({ result }: { result: any }) => {
                         <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                             <Package className="h-8 w-8 mb-2 opacity-50" />
                             <p className="text-sm">No results yet</p>
-                            <p className="text-xs mt-1">Run the workflow or test the transform to see results</p>
+                            <p className="text-xs mt-1">Run the tool or test the transform to see results</p>
                         </div>
                     ) : (
                         <>
@@ -522,7 +522,7 @@ export const PayloadSpotlight = ({
                                 </Button>
                                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                     <span>{formatBytes(totalFileSize)} / {formatBytes(MAX_TOTAL_FILE_SIZE)}</span>
-                                    <HelpTooltip text="Upload CSV, JSON, XML, or Excel files. Files will be automatically parsed to JSON and merged with the manual payload when the workflow executes." />
+                                    <HelpTooltip text="Upload CSV, JSON, XML, or Excel files. Files will be automatically parsed to JSON and merged with the manual payload when the tool executes." />
                                 </div>
                             </div>
                         </div>
@@ -576,7 +576,7 @@ export const PayloadMiniStepCard = ({
                         <h3 className="text-base font-semibold">Initial Payload</h3>
                     </div>
                     <div className="mt-1 text-muted-foreground">
-                        <HelpTooltip text="Payload is the JSON input to workflow execution. Editing here does NOT save values to the workflow; it only affects this session/run. Use Input Schema to optionally describe the expected structure for validation and tooling." />
+                        <HelpTooltip text="Payload is the JSON input to tool execution. Editing here does NOT save values to the tool; it only affects this session/run. Use Input Schema to optionally describe the expected structure for validation and tooling." />
                     </div>
                 </div>
                 <PayloadSpotlight
@@ -741,7 +741,7 @@ export const MiniStepCard = ({ step, index, isActive, onClick, stepId, isPayload
                 <Card className={cn(isActive ? "p-4 w-[228px] h-[130px]" : "p-4 w-[228px] h-[120px]", "flex-shrink-0", isActive && "ring-2 ring-primary shadow-lg")}>
                     <div className="flex flex-col items-center justify-center h-full leading-tight">
                         <FileJson className="h-5 w-5 text-muted-foreground" />
-                        <span className="text-[11px] font-medium mt-0.5">Workflow Result</span>
+                        <span className="text-[11px] font-medium mt-0.5">Tool Result</span>
                         <span className="text-[10px] text-muted-foreground -mt-0.5">JSON</span>
                     </div>
                 </Card>

@@ -1,22 +1,22 @@
-import { useConfig } from '@/src/app/config-context'
-import { getSDKCode } from '@superglue/shared/templates'
-import { Check, Copy } from 'lucide-react'
-import { useState } from 'react'
-import { Button } from '../ui/button'
+import { useConfig } from '@/src/app/config-context';
+import { getSDKCode } from '@superglue/shared/templates';
+import { Check, Copy } from 'lucide-react';
+import { useState } from 'react';
+import { Button } from '../ui/button';
 
-type Workflow = any // Replace with your actual Workflow type
+type Tool = any // Replace with your actual Tool type
 
-interface WorkflowCreateSuccessProps {
-  currentWorkflow: Workflow
+interface ToolCreateSuccessProps {
+  currentTool: Tool
   payload: Record<string, any>
   credentials?: Record<string, string>
 }
 
-export function WorkflowCreateSuccess({
-  currentWorkflow,
+export function ToolCreateSuccess({
+  currentTool,
   payload,
   credentials
-}: WorkflowCreateSuccessProps) {
+}: ToolCreateSuccessProps) {
   const superglueConfig = useConfig();
   const [sdkCopied, setSdkCopied] = useState(false)
   const [curlCopied, setCurlCopied] = useState(false)
@@ -24,7 +24,7 @@ export function WorkflowCreateSuccess({
   const sdkCode = getSDKCode({
     apiKey: superglueConfig.superglueApiKey,
     endpoint: superglueConfig.superglueEndpoint,
-    workflowId: currentWorkflow.id,
+    workflowId: currentTool.id,
     payload,
     credentials: credentials || {},
   })
@@ -33,8 +33,8 @@ export function WorkflowCreateSuccess({
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer <YOUR_SUPERGLUE_API_KEY>" \\
   -d '${JSON.stringify({
-    query: `mutation ExecuteWorkflow($input: WorkflowInputRequest!, $payload: JSON) { 
-  executeWorkflow(input: $input, payload: $payload) { 
+    query: `mutation ExecuteTool($input: ToolInputRequest!, $payload: JSON) { 
+  executeTool(input: $input, payload: $payload) { 
     data 
     error 
     success 
@@ -42,7 +42,7 @@ export function WorkflowCreateSuccess({
 }`,
     variables: {
       input: {
-        id: currentWorkflow.id,
+        id: currentTool.id,
       },
       payload: payload,
     },

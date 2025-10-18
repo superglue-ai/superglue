@@ -17,9 +17,9 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { HelpTooltip } from '../utils/HelpTooltip';
-import { CopyButton, JavaScriptCodeEditor, JsonCodeEditor } from './WorkflowMiniStepCards';
+import { CopyButton, JavaScriptCodeEditor, JsonCodeEditor } from './ToolMiniStepCards';
 
-interface WorkflowStepConfiguratorProps {
+interface ToolStepConfiguratorProps {
     step: any;
     isLast: boolean;
     onEdit: (stepId: string, updatedStep: any, isUserInitiated?: boolean) => void;
@@ -31,7 +31,7 @@ interface WorkflowStepConfiguratorProps {
     stepInput?: any;
 }
 
-export function WorkflowStepConfigurator({ step, isLast, onEdit, onRemove, integrations: propIntegrations, onCreateIntegration, onEditingChange, disabled = false, stepInput }: WorkflowStepConfiguratorProps) {
+export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrations: propIntegrations, onCreateIntegration, onEditingChange, disabled = false, stepInput }: ToolStepConfiguratorProps) {
     const [didFormatLoopSelector, setDidFormatLoopSelector] = useState(false);
     const [showJson, setShowJson] = useState(false);
     const [localIntegrations, setLocalIntegrations] = useState<Integration[]>([]);

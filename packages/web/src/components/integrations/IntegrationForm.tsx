@@ -673,7 +673,7 @@ export function IntegrationForm({
                 {!isEditing && (
                             <div>
                                 <Label htmlFor="integrationId">Integration ID*</Label>
-                                <HelpTooltip text="A unique identifier for this integration within the workflow. You cannot change this after saving." />
+                                <HelpTooltip text="A unique identifier for this integration within the tool. You cannot change this after saving." />
                                 <Input
                                     id="integrationId"
                                     value={id || ''}

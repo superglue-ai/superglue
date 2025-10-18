@@ -1,10 +1,10 @@
 "use client";
 import { useConfig } from "@/src/app/config-context";
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
-import { executeFinalTransform, executeSingleStep, executeWorkflowStepByStep, generateUUID, type StepExecutionResult } from "@/src/lib/client-utils";
+import { executeFinalTransform, executeSingleStep, executeToolStepByStep, generateUUID, type StepExecutionResult } from "@/src/lib/client-utils";
 import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { computeStepOutput } from "@/src/lib/utils";
-import { ExecutionStep, Integration, SuperglueClient, Workflow, WorkflowResult } from "@superglue/client";
+import { ExecutionStep, Integration, SuperglueClient, Workflow as Tool, WorkflowResult as ToolResult } from "@superglue/client";
 import { Loader2, X } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
@@ -12,17 +12,17 @@ import { useToast } from "../../hooks/use-toast";
 import { Button } from "../ui/button";
 import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
-import { WorkflowStepGallery } from "./WorkflowStepGallery";
+import { ToolStepGallery } from "./ToolStepGallery";
 
-export interface WorkflowPlaygroundProps {
+export interface ToolPlaygroundProps {
   id?: string;
   embedded?: boolean;
-  initialWorkflow?: Workflow;
+  initialTool?: Tool;
   initialPayload?: string;
   initialInstruction?: string;
   integrations?: Integration[];
-  onSave?: (workflow: Workflow) => Promise<void>;
-  onExecute?: (workflow: Workflow, result: WorkflowResult) => void;
+  onSave?: (tool: Tool) => Promise<void>;
+  onExecute?: (tool: Tool, result: ToolResult) => void;
   onInstructionEdit?: () => void;
   headerActions?: React.ReactNode;
   hideHeader?: boolean;
@@ -39,16 +39,16 @@ export interface WorkflowPlaygroundProps {
   filePayloads?: Record<string, any>;
 }
 
-export interface WorkflowPlaygroundHandle {
-  executeWorkflow: (opts?: { selfHealing?: boolean }) => Promise<void>;
-  saveWorkflow: () => Promise<void>;
-  getCurrentWorkflow: () => Workflow;
+export interface ToolPlaygroundHandle {
+  executeTool: (opts?: { selfHealing?: boolean }) => Promise<void>;
+  saveTool: () => Promise<void>;
+  getCurrentTool: () => Tool;
 }
 
-const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygroundProps>(({
+const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   id,
   embedded = false,
-  initialWorkflow,
+  initialTool,
   initialPayload,
   initialInstruction,
   integrations: providedIntegrations,
@@ -72,19 +72,19 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
   const router = useRouter();
   const { toast } = useToast();
   const config = useConfig();
-  const [workflowId, setWorkflowId] = useState(initialWorkflow?.id || "");
-  const [steps, setSteps] = useState<any[]>(initialWorkflow?.steps || []);
-  const [finalTransform, setFinalTransform] = useState(initialWorkflow?.finalTransform || `(sourceData) => {
+  const [toolId, setToolId] = useState(initialTool?.id || "");
+  const [steps, setSteps] = useState<any[]>(initialTool?.steps || []);
+  const [finalTransform, setFinalTransform] = useState(initialTool?.finalTransform || `(sourceData) => {
   return {
     result: sourceData
   }
 }`);
   const [responseSchema, setResponseSchema] = useState<string>(
-    initialWorkflow?.responseSchema ? JSON.stringify(initialWorkflow.responseSchema, null, 2) : ''
+    initialTool?.responseSchema ? JSON.stringify(initialTool.responseSchema, null, 2) : ''
   );
   const [inputSchema, setInputSchema] = useState<string | null>(
-    initialWorkflow?.inputSchema
-      ? JSON.stringify(initialWorkflow.inputSchema, null, 2)
+    initialTool?.inputSchema
+      ? JSON.stringify(initialTool.inputSchema, null, 2)
       : null
   );
   const [payload, setPayload] = useState<string>(initialPayload || '{}');
@@ -108,7 +108,7 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
   }, [initialPayload]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [result, setResult] = useState<WorkflowResult | null>(null);
+  const [result, setResult] = useState<ToolResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
   const [failedSteps, setFailedSteps] = useState<string[]>([]);
@@ -166,17 +166,17 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
       stopSignalRef.current = true;
       setIsStopping(true);
       toast({
-        title: "Stopping workflow",
-        description: "Workflow will stop after the current step completes",
+        title: "Stopping tool",
+        description: "Tool will stop after the current step completes",
       });
     }
   };
 
   useImperativeHandle(ref, () => ({
-    executeWorkflow,
-    saveWorkflow,
-    getCurrentWorkflow: () => ({
-      id: workflowId,
+    executeTool,
+    saveTool,
+    getCurrentTool: () => ({
+      id: toolId,
       steps: steps.map((step: ExecutionStep) => ({
         ...step,
         apiConfig: {
@@ -190,7 +190,7 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
       finalTransform,
       instruction: instructions
     })
-  }), [workflowId, steps, responseSchema, inputSchema, finalTransform, instructions]);
+  }), [toolId, steps, responseSchema, inputSchema, finalTransform, instructions]);
 
   const client = useMemo(() => new SuperglueClient({
     endpoint: config.superglueEndpoint,
@@ -314,32 +314,32 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
     }
   };
 
-  const loadWorkflow = async (idToLoad: string) => {
+  const loadTool = async (idToLoad: string) => {
     try {
       if (!idToLoad) return;
       setLoading(true);
       setResult(null);
-      const workflow = await client.getWorkflow(idToLoad);
-      if (!workflow) {
-        throw new Error(`Workflow with ID "${idToLoad}" not found.`);
+      const tool = await client.getWorkflow(idToLoad);
+      if (!tool) {
+        throw new Error(`Tool with ID "${idToLoad}" not found.`);
       }
-      setWorkflowId(workflow.id || '');
-      setSteps(workflow?.steps?.map(step => ({ ...step, apiConfig: { ...step.apiConfig, id: step.apiConfig.id || step.id } })) || []);
-      setFinalTransform(workflow.finalTransform || `(sourceData) => {
+      setToolId(tool.id || '');
+      setSteps(tool?.steps?.map(step => ({ ...step, apiConfig: { ...step.apiConfig, id: step.apiConfig.id || step.id } })) || []);
+      setFinalTransform(tool.finalTransform || `(sourceData) => {
         return {
           result: sourceData
         }
       }`);
 
-      setInstructions(workflow.instruction || '');
-      setResponseSchema(workflow.responseSchema ? JSON.stringify(workflow.responseSchema, null, 2) : '');
+      setInstructions(tool.instruction || '');
+      setResponseSchema(tool.responseSchema ? JSON.stringify(tool.responseSchema, null, 2) : '');
 
-      setInputSchema(workflow.inputSchema ? JSON.stringify(workflow.inputSchema, null, 2) : null);
-      // Don't modify payload when loading a workflow - keep existing or use empty object
+      setInputSchema(tool.inputSchema ? JSON.stringify(tool.inputSchema, null, 2) : null);
+      // Don't modify payload when loading a tool - keep existing or use empty object
     } catch (error: any) {
-      console.error("Error loading workflow:", error);
+      console.error("Error loading tool:", error);
       toast({
-        title: "Error loading workflow",
+        title: "Error loading tool",
         description: error.message,
         variant: "destructive",
       });
@@ -361,33 +361,33 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
     }
   }, [providedIntegrations]);
 
-  const [lastWorkflowId, setLastWorkflowId] = useState<string | undefined>(initialWorkflow?.id);
+  const [lastToolId, setLastToolId] = useState<string | undefined>(initialTool?.id);
 
   useEffect(() => {
-    if (initialWorkflow && initialWorkflow.id !== lastWorkflowId) {
-      setWorkflowId(initialWorkflow.id || '');
-      setSteps(initialWorkflow.steps?.map(step => ({
+    if (initialTool && initialTool.id !== lastToolId) {
+      setToolId(initialTool.id || '');
+      setSteps(initialTool.steps?.map(step => ({
         ...step,
         apiConfig: { ...step.apiConfig, id: step.apiConfig.id || step.id }
       })) || []);
-      setFinalTransform(initialWorkflow.finalTransform || `(sourceData) => {
+      setFinalTransform(initialTool.finalTransform || `(sourceData) => {
   return {
     result: sourceData
   }
 }`);
-      const schemaString = initialWorkflow.responseSchema ? JSON.stringify(initialWorkflow.responseSchema, null, 2) : '';
+      const schemaString = initialTool.responseSchema ? JSON.stringify(initialTool.responseSchema, null, 2) : '';
       setResponseSchema(schemaString);
-      setInputSchema(initialWorkflow.inputSchema ? JSON.stringify(initialWorkflow.inputSchema, null, 2) : null);
-      setInstructions(initialInstruction || initialWorkflow.instruction || '');
-      setLastWorkflowId(initialWorkflow.id);
+      setInputSchema(initialTool.inputSchema ? JSON.stringify(initialTool.inputSchema, null, 2) : null);
+      setInstructions(initialInstruction || initialTool.instruction || '');
+      setLastToolId(initialTool.id);
     }
-  }, [initialWorkflow, embedded, lastWorkflowId, initialInstruction]);
+  }, [initialTool, embedded, lastToolId, initialInstruction]);
 
   useEffect(() => {
     if (!embedded && id) {
-      loadWorkflow(id);
-    } else if (!embedded && !id && !initialWorkflow) {
-      setWorkflowId("");
+      loadTool(id);
+    } else if (!embedded && !id && !initialTool) {
+      setToolId("");
       setSteps([]);
       setInstructions("");
       setFinalTransform(`(sourceData) => {
@@ -401,10 +401,10 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
       setResult(null);
       setFinalPreviewResult(null);
     }
-  }, [id, embedded, initialWorkflow]);
+  }, [id, embedded, initialTool]);
 
 
-  const saveWorkflow = async () => {
+  const saveTool = async () => {
     try {
       try {
         JSON.parse(responseSchema || '{}');
@@ -417,16 +417,16 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
         throw new Error("Invalid input schema JSON");
       }
 
-      if (!workflowId.trim()) {
-        setWorkflowId(`wf-${Date.now()}`);
+      if (!toolId.trim()) {
+        setToolId(`wf-${Date.now()}`);
       }
       setSaving(true);
 
       // Always use the current steps (which include any self-healed updates)
       const stepsToSave = steps;
 
-      const workflowToSave: Workflow = {
-        id: workflowId,
+      const toolToSave: Tool = {
+        id: toolId,
         // Save the self-healed steps if they exist (from a successful run with self-healing enabled)
         steps: stepsToSave.map((step: ExecutionStep) => ({
           ...step,
@@ -445,25 +445,25 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
 
       // In embedded mode, use the provided onSave callback
       if (embedded && onSave) {
-        await onSave(workflowToSave);
+        await onSave(toolToSave);
       } else {
         // In standalone mode, save to backend
-        const savedWorkflow = await client.upsertWorkflow(workflowId, workflowToSave as any);
+        const savedTool = await client.upsertWorkflow(toolId, toolToSave as any);
 
-        if (!savedWorkflow) {
-          throw new Error("Failed to save workflow");
+        if (!savedTool) {
+          throw new Error("Failed to save tool");
         }
-        setWorkflowId(savedWorkflow.id);
+        setToolId(savedTool.id);
 
         toast({
-          title: "Workflow saved",
-          description: `"${savedWorkflow.id}" saved successfully`,
+          title: "Tool saved",
+          description: `"${savedTool.id}" saved successfully`,
         });
       }
     } catch (error: any) {
-      console.error("Error saving workflow:", error);
+      console.error("Error saving tool:", error);
       toast({
-        title: "Error saving workflow",
+        title: "Error saving tool",
         description: error.message,
         variant: "destructive",
       });
@@ -472,7 +472,7 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
     }
   };
 
-  const executeWorkflow = async (opts?: { selfHealing?: boolean }) => {
+  const executeTool = async (opts?: { selfHealing?: boolean }) => {
     setLoading(true);
     // Fully clear any stale stop signals from a previous run (both modes)
     stopSignalRef.current = false;
@@ -494,8 +494,8 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
       const currentResponseSchema = responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null;
       const effectiveSelfHealing = opts?.selfHealing ?? selfHealingEnabled;
 
-      const workflow = {
-        id: workflowId,
+      const tool = {
+        id: toolId,
         steps: executionSteps,
         finalTransform,
         responseSchema: currentResponseSchema,
@@ -510,15 +510,15 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
       const payloadObj = { ...manualPayload, ...filePayloads };
       setCurrentExecutingStepIndex(0);
 
-      const state = await executeWorkflowStepByStep(
+      const state = await executeToolStepByStep(
         client,
-        workflow,
+        tool,
         payloadObj,
         (i: number, res: StepExecutionResult) => {
-          if (i < workflow.steps.length - 1) {
+          if (i < tool.steps.length - 1) {
             setCurrentExecutingStepIndex(i + 1);
           } else {
-            setCurrentExecutingStepIndex(workflow.steps.length);
+            setCurrentExecutingStepIndex(tool.steps.length);
           }
 
           if (res.success) {
@@ -537,21 +537,21 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
 
       if (state.interrupted) {
         toast({
-          title: "Workflow interrupted",
-          description: `Stopped at step ${Math.min(state.currentStepIndex + 1, workflow.steps.length)} (${workflow.steps[state.currentStepIndex]?.id || 'n/a'})`,
+          title: "Tool interrupted",
+          description: `Stopped at step ${Math.min(state.currentStepIndex + 1, tool.steps.length)} (${tool.steps[state.currentStepIndex]?.id || 'n/a'})`,
         });
       }
 
       // Always update steps with returned configuration (API may normalize/update even without self-healing)
-      if (state.currentWorkflow.steps) {
-        const returnedStepsJson = JSON.stringify(state.currentWorkflow.steps);
+      if (state.currentTool.steps) {
+        const returnedStepsJson = JSON.stringify(state.currentTool.steps);
         if (originalStepsJson !== returnedStepsJson) {
-          setSteps(state.currentWorkflow.steps);
+          setSteps(state.currentTool.steps);
           // Only show toast if self-healing was enabled (otherwise it's likely just normalization)
           if (effectiveSelfHealing) {
             toast({
-              title: "Workflow configuration updated",
-              description: "Self-healing has modified the workflow configuration to fix issues.",
+              title: "Tool configuration updated",
+              description: "Self-healing has modified the tool configuration to fix issues.",
             });
           }
         }
@@ -567,7 +567,7 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
       const finalData = state.stepResults['__final_transform__']?.data;
       setFinalPreviewResult(finalData);
       
-      const wr: WorkflowResult = {
+      const wr: ToolResult = {
         id: generateUUID(),
         success: state.failedSteps.length === 0,
         data: finalData,
@@ -576,23 +576,23 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
         completedAt: new Date(),
         stepResults: Object.entries(state.stepResults)
           .filter(([key]) => key !== '__final_transform__')
-          .map(([stepId, result]) => ({
+          .map(([stepId, result]: [string, StepExecutionResult]) => ({
             stepId,
             success: result.success || !result.error,
             data: result.data || result,
             error: result.error
           })),
         config: {
-          id: workflowId,
-          steps: state.currentWorkflow.steps,
-          finalTransform: state.currentWorkflow.finalTransform || finalTransform,
+          id: toolId,
+          steps: state.currentTool.steps,
+          finalTransform:   state.currentTool.finalTransform || finalTransform,
         } as any
       };
       setResult(wr);
 
       // Update finalTransform with the self-healed version if it was modified
-      if (state.currentWorkflow.finalTransform && effectiveSelfHealing) {
-        setFinalTransform(state.currentWorkflow.finalTransform);
+      if (state.currentTool.finalTransform && effectiveSelfHealing) {
+        setFinalTransform(state.currentTool.finalTransform);
       }
       setCompletedSteps(state.completedSteps);
       setFailedSteps(state.failedSteps);
@@ -614,20 +614,20 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
       }
 
       if (onExecute) {
-        const executedWorkflow = {
-          id: workflowId,
+        const executedTool = {
+          id: toolId,
           steps: executionSteps,
-          finalTransform: state.currentWorkflow.finalTransform || finalTransform,
+          finalTransform: state.currentTool.finalTransform || finalTransform,
           responseSchema: currentResponseSchema,
           inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
           instruction: instructions
-        } as Workflow;
-        onExecute(executedWorkflow, wr);
+        } as Tool;
+        onExecute(executedTool, wr);
       }
     } catch (error: any) {
-      console.error("Error executing workflow:", error);
+      console.error("Error executing tool:", error);
       toast({
-        title: "Error executing workflow",
+        title: "Error executing tool",
         description: error.message,
         variant: "destructive",
       });
@@ -723,7 +723,7 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
       const single = await executeSingleStep(
         client,
         {
-          id: workflowId,
+          id: toolId,
           steps
         } as any,
         idx,
@@ -781,7 +781,7 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
 
       const result = await executeFinalTransform(
         client,
-        workflowId || 'test',
+        toolId || 'test',
         transformStr || finalTransform,
         parsedResponseSchema,
         inputSchema ? JSON.parse(inputSchema) : null,
@@ -829,7 +829,7 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
         <div className="flex items-center">
           <Switch className="custom-switch" id="selfHealing-top" checked={selfHealingEnabled} onCheckedChange={handleSelfHealingChange} />
           <div className="ml-1 flex items-center">
-            <HelpTooltip text="Enable self-healing during execution. Slower, but can auto-fix failures in workflow steps and transformation code." />
+            <HelpTooltip text="Enable self-healing during execution. Slower, but can auto-fix failures in tool steps and transformation code." />
           </div>
         </div>
       </div>
@@ -845,20 +845,20 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
       ) : (
         <Button
           variant="success"
-          onClick={() => executeWorkflow()}
+          onClick={() => executeTool()}
           disabled={loading || saving || (isExecutingStep !== undefined) || isExecutingTransform}
           className="h-9 px-4"
         >
-          Test Workflow
+          Test Tool
         </Button>
       )}
       <Button
         variant="default"
-        onClick={saveWorkflow}
+        onClick={saveTool}
         disabled={saving || loading}
         className="h-9 px-5 shadow-md border border-primary/40"
       >
-        {saving ? "Saving Workflow..." : "Save Workflow"}
+        {saving ? "Saving Tool..." : "Save Tool"}
       </Button>
     </div>
   );
@@ -878,11 +878,11 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
               <X className="h-4 w-4" />
             </Button>
           </div>
-          <h1 className="text-2xl font-bold mb-3 flex-shrink-0">Workflows</h1>
+          <h1 className="text-2xl font-bold mb-3 flex-shrink-0">Run and Edit Tool</h1>
         </>
       )}
 
-      <div className="w-full overflow-y-auto pr-4" style={{ maxHeight: 'calc(100vh - 140px)', scrollbarGutter: 'stable both-edges' }}>
+      <div className="w-full overflow-y-auto pr-4" style={{ maxHeight: 'calc(100vh - 140px)' }}>
         <div className="w-full">
           <div className="space-y-4">
             <div className={embedded ? "" : "mb-4"}>
@@ -893,14 +893,14 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
                   </div>
                 </div>
               ) : (
-                <WorkflowStepGallery
+                <ToolStepGallery
                   steps={steps}
                   stepResults={stepResultsMap}
                   finalTransform={finalTransform}
                   finalResult={result?.data}
                   transformResult={finalPreviewResult}
                   responseSchema={responseSchema}
-                  workflowId={workflowId}
+                  toolId={toolId}
                   instruction={instructions}
                   onStepsChange={handleStepsChange}
                   onStepEdit={handleStepEdit}
@@ -909,7 +909,7 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
                   onFinalTransformChange={setFinalTransform}
                   onResponseSchemaChange={setResponseSchema}
                   onPayloadChange={setPayload}
-                  onWorkflowIdChange={setWorkflowId}
+                  onToolIdChange={setToolId}
                   onInstructionEdit={embedded ? onInstructionEdit : undefined}
                   integrations={integrations}
                   isExecuting={loading}
@@ -942,6 +942,6 @@ const WorkflowPlayground = forwardRef<WorkflowPlaygroundHandle, WorkflowPlaygrou
   );
 });
 
-WorkflowPlayground.displayName = 'WorkflowPlayground';
+ToolPlayground.displayName = 'ToolPlayground';
 
-export default WorkflowPlayground;
+export default ToolPlayground;

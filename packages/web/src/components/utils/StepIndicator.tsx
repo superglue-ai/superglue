@@ -2,10 +2,10 @@ import { cn } from '@/src/lib/utils';
 import { Check } from 'lucide-react';
 
 export type StepperStep = 'basic' | 'try_and_output' | 'success'
-export type WorkflowCreateStep = 'integrations' | 'prompt' | 'review' | 'success';
+export type ToolCreateStep = 'integrations' | 'prompt' | 'review' | 'success';
 
 interface StepConfig {
-  id: StepperStep | WorkflowCreateStep
+  id: StepperStep | ToolCreateStep
   title: string
 }
 
@@ -24,7 +24,7 @@ export const API_CREATE_STEPS: StepConfig[] = [
   }
 ]
 
-export const WORKFLOW_CREATE_STEPS: StepConfig[] = [
+export const TOOL_CREATE_STEPS: StepConfig[] = [
   {
     id: 'integrations',
     title: 'Integrations'
@@ -44,7 +44,7 @@ export const WORKFLOW_CREATE_STEPS: StepConfig[] = [
 ]
 
 interface StepIndicatorProps {
-  currentStep: StepperStep | WorkflowCreateStep
+  currentStep: StepperStep | ToolCreateStep
   steps: StepConfig[]
 }
 

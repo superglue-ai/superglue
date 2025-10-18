@@ -11,7 +11,7 @@ import {
 import { Input } from '@/src/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { cn } from '@/src/lib/utils';
-import { ExecutionStep, SuperglueClient, Workflow } from '@superglue/client';
+import { ExecutionStep, SuperglueClient, Workflow as Tool } from '@superglue/client';
 import { Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -19,7 +19,7 @@ interface AddStepDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onConfirm: (stepId: string) => void;
-    onConfirmWorkflow?: (steps: ExecutionStep[]) => void;
+    onConfirmTool?: (steps: ExecutionStep[]) => void;
     existingStepIds: string[];
     defaultId?: string;
 }
@@ -28,16 +28,16 @@ export function AddStepDialog({
     open,
     onOpenChange,
     onConfirm,
-    onConfirmWorkflow,
+    onConfirmTool,
     existingStepIds,
     defaultId
 }: AddStepDialogProps) {
     const [stepId, setStepId] = useState(defaultId || '');
     const [error, setError] = useState('');
-    const [activeTab, setActiveTab] = useState<'scratch' | 'workflow'>('scratch');
-    const [workflows, setWorkflows] = useState<Workflow[]>([]);
-    const [loadingWorkflows, setLoadingWorkflows] = useState(false);
-    const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
+    const [activeTab, setActiveTab] = useState<'scratch' | 'tool'>('scratch');
+    const [tools, setTools] = useState<Tool[]>([]);
+    const [loadingTools, setLoadingTools] = useState(false);
+    const [selectedToolId, setSelectedToolId] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const config = useConfig();
     
@@ -54,40 +54,40 @@ export function AddStepDialog({
     }, [open, defaultId]);
 
     useEffect(() => {
-        if (open && activeTab === 'workflow' && workflows.length === 0) {
-            loadWorkflows();
+        if (open && activeTab === 'tool' && tools.length === 0) {
+            loadTools();
         }
     }, [open, activeTab]);
 
-    const loadWorkflows = async () => {
-        setLoadingWorkflows(true);
+    const loadTools = async () => {
+        setLoadingTools(true);
         try {
             const result = await client.listWorkflows(1000, 0);
-            setWorkflows(result.items?.filter(workflow => workflow.steps?.length > 0) || []);
+            setTools(result.items?.filter(tool => tool.steps?.length > 0) || []);
         } catch (error) {
-            console.error('Error loading workflows:', error);
-            setError('Failed to load workflows');
+            console.error('Error loading tools:', error);
+            setError('Failed to load tools');
         } finally {
-            setLoadingWorkflows(false);
+            setLoadingTools(false);
         }
     };
 
     const handleOpenChange = (newOpen: boolean) => {
         if (!newOpen) {
             setError('');
-            setSelectedWorkflowId(null);
+            setSelectedToolId(null);
             setActiveTab('scratch');
             setSearchQuery('');
         }
         onOpenChange(newOpen);
     };
 
-    const filteredWorkflows = workflows.filter(workflow => {
+    const filteredTools = tools.filter(tool => {
         if (!searchQuery.trim()) return true;
         const query = searchQuery.toLowerCase();
         return (
-            workflow.id?.toLowerCase().includes(query) ||
-            workflow.instruction?.toLowerCase().includes(query)
+            tool.id?.toLowerCase().includes(query) ||
+            tool.instruction?.toLowerCase().includes(query)
         );
     });
 
@@ -108,23 +108,23 @@ export function AddStepDialog({
         setError('');
     };
 
-    const handleConfirmWorkflow = () => {
-        if (!selectedWorkflowId) {
-            setError('Please select a workflow');
+    const handleConfirmTool = () => {
+        if (!selectedToolId) {
+            setError('Please select a tool');
             return;
         }
 
-        const selectedWorkflow = workflows.find(w => w.id === selectedWorkflowId);
-        if (!selectedWorkflow || !selectedWorkflow.steps) {
-            setError('Selected workflow has no steps');
+        const selectedTool = tools.find(t => t.id === selectedToolId);
+        if (!selectedTool || !selectedTool.steps) {
+            setError('Selected tool has no steps');
             return;
         }
 
-        if (onConfirmWorkflow) {
-            onConfirmWorkflow(selectedWorkflow.steps);
+        if (onConfirmTool) {
+            onConfirmTool(selectedTool.steps);
         }
         setError('');
-        setSelectedWorkflowId(null);
+        setSelectedToolId(null);
     };
 
     return (
@@ -133,14 +133,14 @@ export function AddStepDialog({
                 <DialogHeader>
                     <DialogTitle>Add</DialogTitle>
                     <DialogDescription>
-                        Create a new step from scratch or import steps from an existing workflow
+                        Create a new step from scratch or import steps from an existing tool
                     </DialogDescription>
                 </DialogHeader>
                 
-                <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'scratch' | 'workflow')} className="overflow-hidden w-full">
+                <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'scratch' | 'tool')} className="overflow-hidden w-full">
                     <TabsList className="grid w-full grid-cols-2">
                         <TabsTrigger value="scratch">Add new step</TabsTrigger>
-                        <TabsTrigger value="workflow">Import workflow</TabsTrigger>
+                        <TabsTrigger value="tool">Import tool</TabsTrigger>
                     </TabsList>
                     
                     <TabsContent value="scratch" className="space-y-4 py-4 overflow-hidden">
@@ -171,14 +171,14 @@ export function AddStepDialog({
                         </div>
                     </TabsContent>
                     
-                    <TabsContent value="workflow" className="space-y-4 py-4">
-                        {loadingWorkflows ? (
+                    <TabsContent value="tool" className="space-y-4 py-4">
+                        {loadingTools ? (
                             <div className="flex items-center justify-center py-8">
                                 <Loader2 className="h-6 w-6 animate-spin" />
                             </div>
-                        ) : workflows.length === 0 ? (
+                        ) : tools.length === 0 ? (
                             <div className="text-center py-8 text-muted-foreground">
-                                No workflows found
+                                No tools found
                             </div>
                         ) : (
                             <div className="space-y-3">
@@ -191,31 +191,31 @@ export function AddStepDialog({
                                     />
                                 </div>
                                 <div className="border rounded-lg max-h-[400px] overflow-y-auto overflow-x-hidden">
-                                    {filteredWorkflows.length === 0 ? (
+                                    {filteredTools.length === 0 ? (
                                         <div className="text-center py-8 text-muted-foreground">
-                                            No workflows match your search
+                                            No tools match your search
                                         </div>
                                     ) : (
-                                        filteredWorkflows.map((workflow) => (
+                                        filteredTools.map((tool) => (
                                             <button
-                                                key={workflow.id}
+                                                key={tool.id}
                                                 onClick={() => {
-                                                    setSelectedWorkflowId(workflow.id);
+                                                    setSelectedToolId(tool.id);
                                                     setError('');
                                                 }}
                                                 className={cn(
                                                     "w-full text-left px-4 py-3 border-b last:border-b-0 hover:bg-accent transition-colors overflow-hidden",
-                                                    selectedWorkflowId === workflow.id && "bg-accent"
+                                                    selectedToolId === tool.id && "bg-accent"
                                                 )}
                                             >
-                                                <div className="font-medium truncate">{workflow.id}</div>
-                                                {workflow.instruction && (
+                                                <div className="font-medium truncate">{tool.id}</div>
+                                                {tool.instruction && (
                                                     <div className="text-sm text-muted-foreground truncate mt-1">
-                                                        {workflow.instruction}
+                                                        {tool.instruction}
                                                     </div>
                                                 )}
                                                 <div className="text-xs text-muted-foreground mt-1">
-                                                    {workflow.steps?.length || 0} step{workflow.steps?.length !== 1 ? 's' : ''}
+                                                    {tool.steps?.length || 0} step{tool.steps?.length !== 1 ? 's' : ''}
                                                 </div>
                                             </button>
                                         ))
@@ -237,8 +237,8 @@ export function AddStepDialog({
                         Cancel
                     </Button>
                     <Button 
-                        onClick={activeTab === 'scratch' ? handleConfirmScratch : handleConfirmWorkflow}
-                        disabled={loadingWorkflows}
+                        onClick={activeTab === 'scratch' ? handleConfirmScratch : handleConfirmTool}
+                        disabled={loadingTools}
                     >
                         {activeTab === 'scratch' ? 'Add Step' : 'Import Steps'}
                     </Button>

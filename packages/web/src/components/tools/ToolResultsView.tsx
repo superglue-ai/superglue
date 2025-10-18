@@ -1,12 +1,12 @@
 import { Button } from '@/src/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Textarea } from '@/src/components/ui/textarea';
-import { Workflow, WorkflowResult } from '@superglue/client';
+import { Workflow as Tool, WorkflowResult as ToolResult } from '@superglue/client';
 import { Check, Copy, Loader2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { AutoSizer, List } from 'react-virtualized';
-import { WorkflowCreateSuccess } from './WorkflowCreateSuccess';
-import { truncateForDisplay } from './WorkflowMiniStepCards';
+import { ToolCreateSuccess } from './ToolCreateSuccess';
+import { truncateForDisplay } from './ToolMiniStepCards';
 
 const MAX_LINES = 10000;
 const getResponseLines = (response: any): { lines: string[], truncated: boolean } => {
@@ -19,22 +19,22 @@ const getResponseLines = (response: any): { lines: string[], truncated: boolean 
   return { lines, truncated: display.truncated };
 };
 
-interface WorkflowResultsViewProps {
+interface ToolResultsViewProps {
   activeTab: 'results' | 'transform' | 'final' | 'instructions';
   setActiveTab: (tab: 'results' | 'transform' | 'final' | 'instructions') => void;
-  executionResult: WorkflowResult | null;
+  executionResult: ToolResult | null;
   finalTransform: string;
   setFinalTransform: (transform: string) => void;
   finalResult: any;
   isExecuting: boolean;
   executionError: string | null;
   showInstructionsTab?: boolean;
-  currentWorkflow?: Workflow;
+  currentTool?: Tool;
   credentials?: Record<string, string>;
   payload?: Record<string, any>;
 }
 
-export function WorkflowResultsView({
+export function ToolResultsView({
   activeTab,
   setActiveTab,
   executionResult,
@@ -44,10 +44,10 @@ export function WorkflowResultsView({
   isExecuting,
   executionError,
   showInstructionsTab = false,
-  currentWorkflow,
+  currentTool,
   credentials,
   payload
-}: WorkflowResultsViewProps) {
+}: ToolResultsViewProps) {
   // Memoize the line processing to avoid recalculation on every render
   const rawResultsData = useMemo(() =>
     getResponseLines(executionResult?.stepResults),
@@ -203,7 +203,7 @@ export function WorkflowResultsView({
             <div className="h-full flex items-center justify-center p-4">
               <p className="text-gray-500 italic flex items-center gap-2">
                 {isExecuting && <Loader2 className="h-4 w-4 animate-spin" />}
-                {isExecuting ? 'Executing...' : 'No results yet. Test the workflow to see results here.'}
+                {isExecuting ? 'Executing...' : 'No results yet. Test the tool to see results here.'}
               </p>
             </div>
           )
@@ -219,8 +219,8 @@ export function WorkflowResultsView({
         ) : activeTab === 'instructions' ? (
           showInstructionsTab && (
             <div className="p-4">
-              <WorkflowCreateSuccess
-                currentWorkflow={currentWorkflow}
+              <ToolCreateSuccess
+                currentTool={currentTool}
                 payload={payload || {}}
                 credentials={credentials}
               />
@@ -278,7 +278,7 @@ export function WorkflowResultsView({
             <div className="h-full flex items-center justify-center p-4">
               <p className="text-gray-500 italic flex items-center gap-2">
                 {isExecuting && <Loader2 className="h-4 w-4 animate-spin" />}
-                {isExecuting ? 'Executing...' : 'No final results yet. Test the workflow to see results here.'}
+                {isExecuting ? 'Executing...' : 'No final results yet. Test the tool to see results here.'}
               </p>
             </div>
           )

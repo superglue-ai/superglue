@@ -2,14 +2,14 @@
 
 import { Button } from "@/src/components/ui/button";
 import { useTheme } from "@/src/hooks/useTheme";
-import { Book, Bot, Globe, History, Monitor, Moon, PlayCircle, Sun, GitBranch } from "lucide-react";
+import { Blocks, Book, Bot, Hammer, History, Monitor, Moon, PlayCircle, Sun } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 const navItems = [
-  { icon: GitBranch, label: "Workflows", href: "/" },
-  { icon: Globe, label: "Integrations", href: "/integrations" },
+  { icon: Hammer, label: "Tools", href: "/" },
+  { icon: Blocks, label: "Integrations", href: "/integrations" },
   { icon: History, label: "Runs", href: "/runs" },
   { icon: PlayCircle, label: "Playground", href: "/playground" },
   { icon: Bot, label: "MCP Setup", href: "https://docs.superglue.cloud/agent-builders/quickstart", target: "_blank" },
