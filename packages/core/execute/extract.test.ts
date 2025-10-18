@@ -1,11 +1,11 @@
 import { AuthType, DecompressionMethod, FileType, HttpMethod } from '@superglue/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { decompressData, parseFile } from '../utils/file.js';
+import { callAxios } from './api/api.js';
 import { callExtract, generateExtractConfig, processFile } from './extract.js';
-import { decompressData, parseFile } from './file.js';
-import { callAxios } from './tools.js';
 // Mock dependencies
-vi.mock('./documentation.js');
-vi.mock('./file.js');
+vi.mock('../utils/documentation.js');
+vi.mock('../utils/file.js');
 vi.mock('../llm/llm.js', () => {
   return {
     LanguageModel: {
@@ -21,8 +21,8 @@ vi.mock('../llm/llm.js', () => {
   };
 });
 
-vi.mock('./tools.js', async () => {
-  const actual = await vi.importActual('./tools.js');
+vi.mock('./api/api.js', async () => {
+  const actual = await vi.importActual('./api/api.js');
   return {
     ...actual,
     callAxios: vi.fn()

@@ -2,10 +2,10 @@ import type { ApiConfig, ExecutionStep, RequestOptions, WorkflowStepResult } fro
 import { Integration, Metadata } from "@superglue/shared";
 import { server_defaults } from "../default.js";
 import { IntegrationManager } from "../integrations/integration-manager.js";
-import { executeApiCall } from "../utils/api.js";
 import { logMessage } from "../utils/logs.js";
 import { applyJsonata, flattenObject, transformAndValidateSchema } from "../utils/tools.js";
 import { generateTransformCode } from "../utils/transform.js";
+import { executeStep } from "./workflow-step.js";
 
 export interface ExecutionStrategy {
   execute(
@@ -40,7 +40,7 @@ const directStrategy: ExecutionStrategy = {
       config: step.apiConfig
     }
     try {
-      const apiResponse = await executeApiCall({
+      const apiResponse = await executeStep({
         endpoint: step.apiConfig,
         payload,
         credentials,
@@ -137,7 +137,7 @@ The function should return an array of items that this step will iterate over.`;
         };
 
         try {
-          const apiResponse = await executeApiCall({
+          const apiResponse = await executeStep({
             endpoint: successfulConfig || step.apiConfig,
             payload: loopPayload,
             credentials,

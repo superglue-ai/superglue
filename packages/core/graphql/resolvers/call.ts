@@ -1,9 +1,9 @@
 import { ApiConfig, ApiInputRequest, CacheMode, RequestOptions, TransformConfig } from "@superglue/client";
 import { GraphQLResolveInfo } from "graphql";
-import { executeApiCall } from "../../utils/api.js";
 import { maskCredentials } from "../../utils/tools.js";
 import { executeTransform } from "../../utils/transform.js";
 import { notifyWebhook } from "../../utils/webhook.js";
+import { executeStep } from "../../workflow/workflow-step.js";
 import { Context, Metadata } from '../types.js';
 
 
@@ -48,7 +48,7 @@ export const callResolver = async (
     if ((endpoint?.responseSchema as any)?._def?.typeName === "ZodObject") {
       throw new Error("zod is not supported for response schema. Please use json schema instead. you can use the zod-to-json-schema package to convert zod to json schema.");
     }
-    const callResult = await executeApiCall({
+    const callResult = await executeStep({
       endpoint,
       payload,
       credentials,

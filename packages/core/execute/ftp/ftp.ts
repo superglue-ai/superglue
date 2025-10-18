@@ -1,15 +1,14 @@
-import { ApiConfig, RequestOptions } from "@superglue/client";
+import { RequestOptions } from "@superglue/client";
 import { Client as FTPClient } from "basic-ftp";
 import * as path from "path";
 import SFTPClient from "ssh2-sftp-client";
 import { URL } from "url";
-import { server_defaults } from "../default.js";
-import { parseJSON } from "./json-parser.js";
-import { composeUrl } from "./tools.js";
+import { server_defaults } from "../../default.js";
+import { parseJSON } from "../../utils/json-parser.js";
 
 const SUPPORTED_OPERATIONS = ['list', 'get', 'put', 'delete', 'rename', 'mkdir', 'rmdir', 'exists', 'stat'];
 
-interface FTPOperation {
+export interface FTPOperation {
   operation: 'list' | 'get' | 'put' | 'delete' | 'rename' | 'mkdir' | 'rmdir' | 'exists' | 'stat';
   path?: string;
   content?: string | Buffer;
@@ -274,22 +273,18 @@ async function executeSFTPOperation(client: SFTPClient, operation: FTPOperation)
   }
 }
 
-export async function callFTP({endpoint, credentials, options}: {endpoint: ApiConfig, credentials: Record<string, any>, options: RequestOptions}): Promise<any> {
-  let connectionString = composeUrl(endpoint.urlHost, endpoint.urlPath);
-  const connectionInfo = parseConnectionUrl(connectionString);
-  
-  // Parse operation from body
-  let operation: FTPOperation;
-  try {
-    operation = parseJSON(endpoint.body);
-  } catch (error) {
-    throw new Error(`Invalid JSON in body: ${error.message}. Body must be a JSON object with an 'operation' field. Supported operations: ${SUPPORTED_OPERATIONS.join(', ')}`);
+export async function executeFTP({operation, credentials, options}: {operation: FTPOperation | string, credentials: Record<string, any>, options: RequestOptions}): Promise<any> {
+  if (typeof operation === 'string') {
+    try {
+      operation = JSON.parse(operation) as FTPOperation;
+    } catch (error) {
+      throw new Error(`Invalid JSON in body: ${operation}. Error: ${error}`);
+    }
   }
-
   // Validate operation
   if (!operation.operation) {
     throw new Error(`Missing 'operation' field in request body. Supported operations are: ${SUPPORTED_OPERATIONS.join(', ')}`);
-  }
+  }  
   
   if (!SUPPORTED_OPERATIONS.includes(operation.operation)) {
     throw new Error(
@@ -297,6 +292,8 @@ export async function callFTP({endpoint, credentials, options}: {endpoint: ApiCo
       `Supported operations are: ${SUPPORTED_OPERATIONS.join(', ')}`
     );
   }
+  
+  const connectionInfo = parseConnectionUrl(operation.path);
 
   let attempts = 0;
   const maxRetries = options?.retries || server_defaults.FTP.DEFAULT_RETRIES;

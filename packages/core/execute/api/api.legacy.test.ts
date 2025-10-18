@@ -1,21 +1,22 @@
 import { ApiConfig, HttpMethod, PaginationType, SelfHealingMode } from '@superglue/client';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mocked } from 'vitest';
-import { callEndpoint } from './api.js';
-import * as tools from './tools.js';
+import { isSelfHealingEnabled } from '../../utils/tools.js';
+import * as api from './api.js';
+import { callEndpointLegacyImplementation as callEndpoint, convertBasicAuthToBase64 } from './api.legacy.js';
 
 vi.mock('axios');
 vi.mock('openai');
 vi.mock('../integrations/integration-manager.js');
 vi.mock('../llm/llm.js');
 vi.mock('./logs.js');
-vi.mock('./tools.js', async () => {
-  const actual = await vi.importActual('./tools.js');
+vi.mock('./api.js', async () => {
+  const actual = await vi.importActual('./api.js');
   return {
     ...(actual as Object),
     callAxios: vi.fn()
   };
 });
-const mockedTools = tools as Mocked<typeof tools>;
+const mockedTools = api as Mocked<typeof api>;
 
 describe('API Utilities', () => {
   beforeEach(() => {
@@ -424,7 +425,6 @@ describe('API Utilities', () => {
   describe('API Self-Healing Integration', () => {
     it('should test that isSelfHealingEnabled is used correctly for API calls', () => {
       // Import the function to test the logic directly
-      const { isSelfHealingEnabled } = tools;
 
       // Test API self-healing enabled scenarios
       expect(isSelfHealingEnabled({ selfHealing: SelfHealingMode.ENABLED }, 'api')).toBe(true);
@@ -447,3 +447,32 @@ describe('API Utilities', () => {
     });
   });
 }); 
+
+describe('Basic Auth Utilities', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.resetAllMocks();
+  });
+
+  describe('convertBasicAuthToBase64', () => {
+    it('should encode username:password format', () => {
+      expect(convertBasicAuthToBase64('Basic test:1234')).toBe('Basic dGVzdDoxMjM0');
+    });
+
+    it('should leave already encoded credentials unchanged', () => {
+      expect(convertBasicAuthToBase64('Basic dGVzdDoxMjM0')).toBe('Basic dGVzdDoxMjM0');
+    });
+
+    it('should leave non-Basic Auth headers unchanged', () => {
+      expect(convertBasicAuthToBase64('Bearer token123')).toBe('Bearer token123');
+    });
+
+    it('should handle undefined or null values', () => {
+      expect(convertBasicAuthToBase64(undefined)).toBeUndefined();
+      expect(convertBasicAuthToBase64(null)).toBeNull();
+    });
+  });
+});

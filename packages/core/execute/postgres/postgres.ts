@@ -1,8 +1,8 @@
 import { ApiConfig, RequestOptions } from "@superglue/client";
 import { Pool, PoolConfig } from 'pg';
-import { server_defaults } from "../default.js";
-import { parseJSON } from "./json-parser.js";
-import { composeUrl, replaceVariables } from "./tools.js";
+import { server_defaults } from "../../default.js";
+import { parseJSON } from "../../utils/json-parser.js";
+import { composeUrl, replaceVariables } from "../../utils/tools.js";
 
 
 // Pool cache management
@@ -105,7 +105,7 @@ function sanitizeDatabaseName(connectionString: string): string {
   return baseUrl + cleanDbName;
 }
 
-export async function callPostgres(endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions): Promise<any> {
+export async function callPostgres({endpoint, payload, credentials, options}: {endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions}): Promise<any> {
   const requestVars = { ...payload, ...credentials };
   let connectionString = await replaceVariables(composeUrl(endpoint.urlHost, endpoint.urlPath), requestVars);
   connectionString = sanitizeDatabaseName(connectionString);

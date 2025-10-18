@@ -6,8 +6,8 @@
 
 import { ApiConfig } from "@superglue/client";
 import { Metadata } from "@superglue/shared";
+import { callPostgres } from '../../execute/postgres/postgres.js';
 import { logMessage } from "../../utils/logs.js";
-import { callPostgres } from '../../utils/postgres.js';
 import { composeUrl } from "../../utils/tools.js";
 import { DocumentationProcessingStrategy } from '../types.js';
 
@@ -28,12 +28,10 @@ WHERE table_schema = 'public'
 ORDER BY table_name, ordinal_position;`
       };
 
-      const schemaResponse = await callPostgres({ ...config, body: JSON.stringify(schemaQuery) }, null, credentials, null);
+      const schemaResponse = await callPostgres({endpoint: { ...config, body: JSON.stringify(schemaQuery) }, payload: {}, credentials, options: null});
       logMessage('info', `PostgreSQL Documentation Fetch: Schema retrieved ${schemaResponse.length} rows`, metadata);
       if (!schemaResponse) return null;
       return `${content ? `<DOCUMENTATION>\n${content}\n</DOCUMENTATION>\n` : ""}<DB_SCHEMA>\n${JSON.stringify(schemaResponse, null, 2)}\n</DB_SCHEMA>`;
     }
-    return null;
   }
 }
-

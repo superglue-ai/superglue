@@ -1,7 +1,7 @@
 import { ApiConfig, RequestOptions } from '@superglue/client';
 import { Pool } from 'pg';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { server_defaults } from '../default.js';
+import { server_defaults } from '../../default.js';
 import { callPostgres, closeAllPools } from './postgres.js';
 
 // Create mock functions that we can reference
@@ -56,7 +56,7 @@ describe('PostgreSQL Utilities', () => {
       mockPoolQuery.mockResolvedValueOnce({ rows: mockRows });
 
       const options: RequestOptions = {};
-      const result = await callPostgres(mockEndpoint, mockPayload, mockCredentials, options);
+      const result = await callPostgres({ endpoint: mockEndpoint, payload: mockPayload, credentials: mockCredentials, options: options });
 
       expect(result).toEqual(mockRows);
       
@@ -82,7 +82,7 @@ describe('PostgreSQL Utilities', () => {
       mockPoolQuery.mockRejectedValueOnce(new Error(errorMessage));
 
       const options: RequestOptions = {};
-      await expect(callPostgres(mockEndpoint, mockPayload, mockCredentials, options))
+      await expect(callPostgres({ endpoint: mockEndpoint, payload: mockPayload, credentials: mockCredentials, options: options }))
         .rejects.toThrow(`PostgreSQL error: ${errorMessage} for query: SELECT * FROM users`);
 
       // Pool should NOT be ended (it's cached)
@@ -105,7 +105,7 @@ describe('PostgreSQL Utilities', () => {
       mockPoolQuery.mockRejectedValueOnce(new Error(errorMessage));
 
       const options: RequestOptions = {};
-      await expect(callPostgres(paramEndpoint, {}, mockCredentials, options))
+      await expect(callPostgres({ endpoint: paramEndpoint, payload: {}, credentials: mockCredentials, options: options }))
         .rejects.toThrow(`PostgreSQL error: ${errorMessage} for query: SELECT * FROM users WHERE id = $1 with params: [999]`);
     });
 
@@ -116,7 +116,7 @@ describe('PostgreSQL Utilities', () => {
 
       mockPoolQuery.mockResolvedValueOnce({ rows: [] });
         
-      await callPostgres(mockEndpoint, mockPayload, mockCredentials, options);
+      await callPostgres({ endpoint: mockEndpoint, payload: mockPayload, credentials: mockCredentials, options: options });
 
             expect(vi.mocked(Pool)).toHaveBeenCalledWith({
         connectionString: expect.any(String),
@@ -144,7 +144,7 @@ describe('PostgreSQL Utilities', () => {
       mockPoolQuery.mockResolvedValueOnce({ rows: mockRows });
 
       const options: RequestOptions = {};
-      const result = await callPostgres(paramEndpoint, {}, mockCredentials, options);
+      const result = await callPostgres({ endpoint: paramEndpoint, payload: {}, credentials: mockCredentials, options: options });
 
       expect(result).toEqual(mockRows);
       expect(mockPoolQuery).toHaveBeenCalledWith(
@@ -169,7 +169,7 @@ describe('PostgreSQL Utilities', () => {
       mockPoolQuery.mockResolvedValueOnce({ rows: mockRows });
 
       const options: RequestOptions = {};
-      const result = await callPostgres(paramEndpoint, {}, mockCredentials, options);
+      const result = await callPostgres({ endpoint: paramEndpoint, payload: {}, credentials: mockCredentials, options: options });
 
       expect(result).toEqual(mockRows);
       expect(mockPoolQuery).toHaveBeenCalledWith(
@@ -189,7 +189,7 @@ describe('PostgreSQL Utilities', () => {
         .mockRejectedValueOnce(new Error('Second failure'))
         .mockResolvedValueOnce({ rows: [{ success: true }] });
 
-      const result = await callPostgres(mockEndpoint, mockPayload, mockCredentials, options);
+      const result = await callPostgres({ endpoint: mockEndpoint, payload: mockPayload, credentials: mockCredentials, options: options });
 
       expect(result).toEqual([{ success: true }]);
       expect(mockPoolQuery).toHaveBeenCalledTimes(3);
@@ -205,7 +205,7 @@ describe('PostgreSQL Utilities', () => {
         .mockRejectedValueOnce(new Error('First failure'))
         .mockRejectedValueOnce(new Error('Second failure'));
 
-      await expect(callPostgres(mockEndpoint, mockPayload, mockCredentials, options))
+      await expect(callPostgres({ endpoint: mockEndpoint, payload: mockPayload, credentials: mockCredentials, options: options }))
         .rejects.toThrow(`PostgreSQL error: Second failure for query: SELECT * FROM users`);
 
       expect(mockPoolQuery).toHaveBeenCalledTimes(2);
@@ -228,7 +228,7 @@ describe('PostgreSQL Utilities', () => {
       const mockRows = [{ id: 123, name: 'test user' }];
       mockPoolQuery.mockResolvedValueOnce({ rows: mockRows });
         
-      const result = await callPostgres(customEndpoint, customPayload, mockCredentials, {});
+      const result = await callPostgres({ endpoint: customEndpoint, payload: customPayload, credentials: mockCredentials, options: {} });
 
       expect(result).toEqual(mockRows);
       expect(mockPoolQuery).toHaveBeenCalledWith('SELECT * FROM users WHERE id = 123');
@@ -239,10 +239,10 @@ describe('PostgreSQL Utilities', () => {
       mockPoolQuery.mockResolvedValue({ rows: mockRows });
 
       // First call
-      await callPostgres(mockEndpoint, mockPayload, mockCredentials, {});
+      await callPostgres({ endpoint: mockEndpoint, payload: mockPayload, credentials: mockCredentials, options: {} });
       
       // Second call with same connection string
-      await callPostgres(mockEndpoint, mockPayload, mockCredentials, {});
+      await callPostgres({ endpoint: mockEndpoint, payload: mockPayload, credentials: mockCredentials, options: {} });
 
       // Pool should only be created once
       expect(vi.mocked(Pool)).toHaveBeenCalledTimes(1);
@@ -261,7 +261,7 @@ describe('PostgreSQL Utilities', () => {
 
       mockPoolQuery.mockResolvedValueOnce({ rows: [{ result: 1 }] });
 
-      await callPostgres(endpointWithDirtyDb, {}, mockCredentials, {});
+      await callPostgres({ endpoint: endpointWithDirtyDb, payload: {}, credentials: mockCredentials, options: {} });
 
       // The connection string should have the database name sanitized (trailing slashes removed, $ and - are allowed)
       expect(vi.mocked(Pool)).toHaveBeenCalledWith(
@@ -276,7 +276,7 @@ describe('PostgreSQL Utilities', () => {
       
       // Create a pool first
       mockPoolQuery.mockResolvedValueOnce({ rows: [] });
-      await callPostgres(mockEndpoint, mockPayload, mockCredentials, {});
+      await callPostgres({ endpoint: mockEndpoint, payload: mockPayload, credentials: mockCredentials, options: {} });
 
       // Get the error handler that was registered
       const errorHandler = mockPoolOn.mock.calls.find(call => call[0] === 'error')?.[1];
@@ -297,10 +297,10 @@ describe('PostgreSQL Utilities', () => {
       // Create multiple pools
       mockPoolQuery.mockResolvedValue({ rows: [] });
       
-      await callPostgres(mockEndpoint, mockPayload, mockCredentials, {});
+      await callPostgres({ endpoint: mockEndpoint, payload: mockPayload, credentials: mockCredentials, options: {} });
       
       const endpoint2 = { ...mockEndpoint, urlHost: 'postgres://user2:pass2@host2/db2' };
-      await callPostgres(endpoint2, {}, { user: 'user2', password: 'pass2', host: 'host2', database: 'db2' }, {});
+      await callPostgres({ endpoint: endpoint2, payload: {}, credentials: { user: 'user2', password: 'pass2', host: 'host2', database: 'db2' }, options: {}   });
 
       // Should create 2 pools
       expect(vi.mocked(Pool)).toHaveBeenCalledTimes(2);
