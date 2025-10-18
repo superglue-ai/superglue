@@ -229,19 +229,20 @@ IMPORTANT: Modern APIs (HubSpot, Stripe, etc.) mostly expect authentication in h
 <LOOP_EXECUTION>
 When executionMode is "LOOP":
 1. The loopSelector extracts an array from available data: (sourceData) => sourceData.getContacts.results
-2. Each item in the array becomes available as currentItem in the loop context.
-3. CURRENTITEM ACCESS:
+2. IMPORTANT: The loopSelector should always return an array of flattened objects. No nested properties.
+3. Each item in the array becomes available as currentItem in the loop context.
+4. CURRENTITEM ACCESS:
    - For direct access to the whole item: use <<currentItem>>
    - For transformations or specific properties with operations: use <<(sourceData) => sourceData.currentItem.propertyName>>
-4. Example flow:
+5. Example flow:
    - loopSelector: (sourceData) => sourceData.getAllContacts.filter(c => c.status === 'active')
    - URL: /contacts/<<currentItem>>/update (if currentItem is an ID string)
    - Body: {"contact": <<currentItem>>, "updatedBy": "<<userId>>"}
    - Or with transformations: {"doubledValue": <<(sourceData) => sourceData.currentItem.value * 2>>, "upperName": <<(sourceData) => sourceData.currentItem.name.toUpperCase()>>}
-5. You can use JavaScript expressions to transform loop data:
+6. You can use JavaScript expressions to transform loop data:
    - Body with calculations: {"price": <<(sourceData) => sourceData.currentItem.price * 1.2>>, "currency": "<<currency>>"}
    - Body with complex logic: <<(sourceData) => JSON.stringify({ id: sourceData.currentItem.id, tags: sourceData.globalTags.concat([sourceData.currentItem.category]) })>>
-6. Response data from all iterations is collected into an array
+7. Response data from all iterations is collected into an array
 </LOOP_EXECUTION>
 
 <FINAL_TRANSFORMATION>
