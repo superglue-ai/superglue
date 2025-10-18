@@ -9,6 +9,7 @@ import { telemetryClient } from "../utils/telemetry.js";
 import { isSelfHealingEnabled, maskCredentials, sample } from "../utils/tools.js";
 import { AbortError, ApiCallError } from "./api/api.js";
 import { callEndpointLegacyImplementation, generateApiConfig } from "./api/api.legacy.js";
+import { getObjectContext } from "../utils/context.js";
 
 export async function evaluateStepResponse({
   data,
@@ -19,13 +20,7 @@ export async function evaluateStepResponse({
   endpoint: ApiConfig,
   documentation?: string
 }): Promise<{ success: boolean, refactorNeeded: boolean, shortReason: string; }> {
-  let content = JSON.stringify(data);
-  if (content.length > LanguageModel.contextLength / 2) {
-    content = JSON.stringify(sample(data, 10));
-  }
-  if (content.length > LanguageModel.contextLength / 2) {
-    content = content.slice(0, LanguageModel.contextLength / 2) + "\n\n...truncated...";
-  }
+  let dataDescription = getObjectContext(data, { include: { schema: true, preview: true, samples: true }, characterBudget: LanguageModel.contextLength / 2 });
 
   // Include documentation context if available
   const documentationContext = documentation
@@ -67,7 +62,7 @@ ${documentationContext}
     },
     {
       role: "user", content: `<request>${JSON.stringify(endpoint)}</request>
-<api_response>${content}</api_response>`
+<api_response>${dataDescription}</api_response>`
     }
   ] as OpenAI.Chat.ChatCompletionMessageParam[];
 

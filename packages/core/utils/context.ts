@@ -1,19 +1,28 @@
 import { inferJsonSchema } from '@superglue/shared';
+import { server_defaults } from '../default.js';
 
 export type ObjectContextOptions = {
     characterBudget: number;
     include?: { schema?: boolean; preview?: boolean; samples?: boolean };
+    tuning?: {
+        previewDepthLimit?: number;
+        previewArrayLimit?: number;
+        previewObjectKeyLimit?: number;
+        samplesMaxArrayPaths?: number;
+        samplesItemsPerArray?: number;
+        sampleObjectMaxDepth?: number;
+    };
 };
 
-const SMALL_JSON_THRESHOLD_DEFAULT = 10_000;
-const PREVIEW_DEPTH_LIMIT = 10;
-const PREVIEW_ARRAY_LIMIT = 10;
-const PREVIEW_OBJECT_KEY_LIMIT = 1000;
-const SAMPLES_MAX_ARRAY_PATHS = 5;
-const SAMPLES_ITEMS_PER_ARRAY = 5;
-const SAMPLE_OBJECT_MAX_DEPTH = 5;
 
 export function getObjectContext(obj: any, opts: ObjectContextOptions): string {
+
+    const previewDepthLimit = opts.tuning?.previewDepthLimit ?? server_defaults.CONTEXT.JSON_PREVIEW_DEPTH_LIMIT;
+    const previewArrayLimit = opts.tuning?.previewArrayLimit ?? server_defaults.CONTEXT.JSON_PREVIEW_ARRAY_LIMIT;
+    const previewObjectKeyLimit = opts.tuning?.previewObjectKeyLimit ?? server_defaults.CONTEXT.JSON_PREVIEW_OBJECT_KEY_LIMIT;
+    const samplesMaxArrayPaths = opts.tuning?.samplesMaxArrayPaths ?? server_defaults.CONTEXT.JSON_SAMPLES_MAX_ARRAY_PATHS;
+    const samplesItemsPerArray = opts.tuning?.samplesItemsPerArray ?? server_defaults.CONTEXT.JSON_SAMPLES_ITEMS_PER_ARRAY;
+    const sampleObjectMaxDepth = opts.tuning?.sampleObjectMaxDepth ?? server_defaults.CONTEXT.JSON_SAMPLE_OBJECT_MAX_DEPTH;
     const includeSchema = opts.include?.schema !== false;
     const includePreview = opts.include?.preview !== false;
     const includeSamples = opts.include?.samples !== false;
@@ -26,10 +35,34 @@ export function getObjectContext(obj: any, opts: ObjectContextOptions): string {
     const budget = Math.max(0, opts.characterBudget | 0);
     if (budget === 0) return '';
 
-    const perShare = Math.floor(budget / enabledParts.length);
+    let perShare = Math.floor(budget / enabledParts.length);
 
     let remainingCarry = 0;
     const sections: string[] = [];
+
+    const nonSchemaEnabled = includePreview || includeSamples;
+    const fullJson = nonSchemaEnabled ? stringifyWithLimits(obj, Infinity, Infinity, Infinity, false) : '';
+    if (nonSchemaEnabled) {
+        if (includeSchema) {
+            // 1/3 schema, 2/3 full JSON
+            const schemaShare = Math.floor(budget / 3);
+            const fullShare = budget - schemaShare; // 2/3
+            // Schema first
+            const schemaStr = buildSchemaSection(obj, schemaShare);
+            sections.push(schemaStr.text);
+            // Full object block
+            if (fullJson.length <= fullShare) {
+                sections.push(buildFullObjectSection(fullJson));
+                const combined = sections.filter(Boolean).join('\n\n');
+                return combined;
+            }
+        } else {
+            if (fullJson.length <= budget) {
+                sections.push(buildFullObjectSection(fullJson));
+                return sections[0];
+            }
+        }
+    }
 
     if (includeSchema) {
         const share = perShare + remainingCarry;
@@ -40,14 +73,14 @@ export function getObjectContext(obj: any, opts: ObjectContextOptions): string {
 
     if (includePreview) {
         const share = perShare + remainingCarry;
-        const previewStr = buildPreviewSection(obj, share);
+        const previewStr = buildPreviewSection(obj, share, previewDepthLimit, previewArrayLimit, previewObjectKeyLimit);
         sections.push(previewStr.text);
         remainingCarry = Math.max(0, share - previewStr.text.length);
     }
 
     if (includeSamples) {
         const share = perShare + remainingCarry;
-        const samplesStr = buildSamplesSection(obj, share);
+        const samplesStr = buildSamplesSection(obj, share, previewDepthLimit, previewArrayLimit, previewObjectKeyLimit, samplesMaxArrayPaths, samplesItemsPerArray, sampleObjectMaxDepth);
         sections.push(samplesStr.text);
         remainingCarry = Math.max(0, share - samplesStr.text.length);
     }
@@ -71,37 +104,41 @@ function buildSchemaSection(obj: any, share: number): { text: string } {
     }
 }
 
-function buildPreviewSection(obj: any, share: number): { text: string } {
+function buildPreviewSection(obj: any, share: number, depthLimit: number, arrayLimit: number, objectKeyLimit: number): { text: string } {
     if (share <= 0) return { text: '' };
-    const smallJsonThreshold = Math.min(SMALL_JSON_THRESHOLD_DEFAULT, share);
-
     const header = `## Object Preview (first ${share} characters shown)\n`;
-    const full = safeStringify(obj);
-    if (full.length <= smallJsonThreshold) {
-        const body = full.length <= Math.max(0, share - header.length - 1)
-            ? full
-            : full.slice(0, Math.max(0, share - header.length - 16)) + '... [truncated]';
-        return { text: header + body };
-    }
-
-    const limited = safeStringifyPreview(obj, PREVIEW_DEPTH_LIMIT, PREVIEW_ARRAY_LIMIT);
+    const limited = stringifyWithLimits(obj, depthLimit, arrayLimit, objectKeyLimit, true);
     const body = limited.length <= Math.max(0, share - header.length - 1)
         ? limited
         : limited.slice(0, Math.max(0, share - header.length - 16)) + '... [truncated]';
     return { text: header + body };
 }
 
-function buildSamplesSection(obj: any, share: number): { text: string } {
+function buildFullObjectSection(full: string): string {
+    const header = '## Full Object\n';
+    return header + full;
+}
+
+function buildSamplesSection(
+    obj: any,
+    share: number,
+    depthLimit: number,
+    arrayLimit: number,
+    objectKeyLimit: number,
+    maxArrayPaths: number,
+    itemsPerArray: number,
+    sampleDepth: number
+): { text: string } {
     if (share <= 0) return { text: '' };
 
     const blocks: string[] = [];
-    const header = `## Samples (root snapshot + up to ${SAMPLES_ITEMS_PER_ARRAY} items per array path)\n`;
+    const header = `## Samples (root snapshot + up to ${itemsPerArray} items per array path)\n`;
     let used = header.length;
 
     // Add a compact root snapshot first to anchor context
     if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
         const rootHeader = 'root:\n';
-        const rootLine = compactSampleItem(obj) + '\n';
+        const rootLine = compactSampleItem(obj, 0, sampleDepth) + '\n';
         if (used + rootHeader.length + rootLine.length <= share) {
             blocks.push(rootHeader, rootLine);
             used += rootHeader.length + rootLine.length;
@@ -115,9 +152,9 @@ function buildSamplesSection(obj: any, share: number): { text: string } {
 
     // Find up to N array paths by scanning DFS and selecting longest arrays first
     const paths: Array<{ path: string; value: any[] }> = [];
-    collectArrayPaths(obj, '$', 0, paths);
+    collectArrayPaths(obj, '$', 0, paths, depthLimit, arrayLimit, objectKeyLimit);
     paths.sort((a, b) => b.value.length - a.value.length);
-    const selected = paths.slice(0, SAMPLES_MAX_ARRAY_PATHS);
+    const selected = paths.slice(0, maxArrayPaths);
 
     for (const p of selected) {
         const header = `${p.path} (len=${p.value.length}):\n`;
@@ -125,9 +162,9 @@ function buildSamplesSection(obj: any, share: number): { text: string } {
         blocks.push(header);
         used += header.length;
 
-        const items = randomSampleHeadAware(p.value, SAMPLES_ITEMS_PER_ARRAY);
+        const items = randomSampleHeadAware(p.value, itemsPerArray);
         for (const it of items) {
-            const line = compactSampleItem(it) + '\n';
+            const line = compactSampleItem(it, 0, sampleDepth) + '\n';
             if (used + line.length > share) { blocks.push('... [truncated]'); used = share; break; }
             blocks.push(line); used += line.length;
         }
@@ -138,46 +175,31 @@ function buildSamplesSection(obj: any, share: number): { text: string } {
     return { text: header + blocks.join('') };
 }
 
-function safeStringify(value: any): string {
+function stringifyWithLimits(value: any, depthLimit: number, arrayLimit: number, objectKeyLimit: number, limit: boolean): string {
     const seen = new WeakSet<object>();
-    try {
-        return JSON.stringify(value, (k, v) => {
-            if (typeof v === 'object' && v !== null) {
-                if (seen.has(v)) return '[Circular]';
-                seen.add(v);
-            }
-            if (typeof v === 'bigint') return String(v);
-            if (v instanceof Date) return v.toISOString();
-            return v;
-        });
-    } catch {
-        return String(value ?? '');
-    }
-}
-
-// Depth/breadth limited stringify for preview
-function safeStringifyPreview(value: any, depthLimit: number, arrayLimit: number): string {
     function walk(v: any, depth: number): any {
+        if (typeof v === 'object' && v !== null) {
+            if (seen.has(v)) return '[Circular]';
+            seen.add(v);
+        }
         if (depth >= depthLimit) return ellipsisFor(v);
         if (Array.isArray(v)) {
-            if (v.length <= arrayLimit) return v.map(x => walk(x, depth + 1));
+            if (!limit || v.length <= arrayLimit) return v.map(x => walk(x, depth + 1));
             const slice = v.slice(0, arrayLimit).map(x => walk(x, depth + 1));
             return [...slice, `... (len=${v.length})`];
         }
         if (v && typeof v === 'object') {
             const out: Record<string, any> = {};
-            const keys = Object.keys(v).sort().slice(0, PREVIEW_OBJECT_KEY_LIMIT);
-            for (const k of keys) {
-                out[k] = walk(v[k], depth + 1);
-            }
+            const keys = Object.keys(v).sort();
+            const limitedKeys = limit ? keys.slice(0, objectKeyLimit) : keys;
+            for (const k of limitedKeys) out[k] = walk(v[k], depth + 1);
             return out;
         }
         if (typeof v === 'bigint') return String(v);
         if (v instanceof Date) return v.toISOString();
         return v;
     }
-    const limited = walk(value, 0);
-    return JSON.stringify(limited);
+    try { return JSON.stringify(walk(value, 0)); } catch { return String(value ?? ''); }
 }
 
 function ellipsisFor(v: any): any {
@@ -186,18 +208,18 @@ function ellipsisFor(v: any): any {
     return '…';
 }
 
-function collectArrayPaths(v: any, path: string, depth: number, acc: Array<{ path: string; value: any[] }>): void {
-    if (depth > PREVIEW_DEPTH_LIMIT) return;
+function collectArrayPaths(v: any, path: string, depth: number, acc: Array<{ path: string; value: any[] }>, depthLimit: number, arrayLimit: number, objectKeyLimit: number): void {
+    if (depth > depthLimit) return;
     if (Array.isArray(v)) {
         acc.push({ path, value: v });
-        for (let i = 0; i < Math.min(v.length, PREVIEW_ARRAY_LIMIT); i++) {
-            collectArrayPaths(v[i], `${path}[${i}]`, depth + 1, acc);
+        for (let i = 0; i < Math.min(v.length, arrayLimit); i++) {
+            collectArrayPaths(v[i], `${path}[${i}]`, depth + 1, acc, depthLimit, arrayLimit, objectKeyLimit);
         }
         return;
     }
     if (v && typeof v === 'object') {
-        const keys = Object.keys(v).sort().slice(0, PREVIEW_OBJECT_KEY_LIMIT);
-        for (const k of keys) collectArrayPaths(v[k], `${path}.${k}`, depth + 1, acc);
+        const keys = Object.keys(v).sort().slice(0, objectKeyLimit);
+        for (const k of keys) collectArrayPaths(v[k], `${path}.${k}`, depth + 1, acc, depthLimit, arrayLimit, objectKeyLimit);
     }
 }
 
@@ -212,15 +234,15 @@ function randomSampleHeadAware(arr: any[], count: number): any[] {
     return Array.from(picks.values()).map(i => arr[i]);
 }
 
-function compactSampleItem(v: any, depth: number = 0): string {
+function compactSampleItem(v: any, depth: number = 0, maxDepth: number = 5): string {
     if (v === null || typeof v !== 'object') return JSON.stringify(v);
     if (Array.isArray(v)) {
         const MAX_ITEMS = 3;
         if (v.length === 0) return JSON.stringify([]);
-        if (depth >= SAMPLE_OBJECT_MAX_DEPTH) return JSON.stringify(`array(len=${v.length})`);
+        if (depth >= maxDepth) return JSON.stringify(`array(len=${v.length})`);
         const items = v.slice(0, MAX_ITEMS).map(x => {
             if (x && typeof x === 'object') {
-                return JSON.parse(compactSampleItem(x, depth + 1));
+                return JSON.parse(compactSampleItem(x, depth + 1, maxDepth));
             }
             return x;
         });
@@ -234,19 +256,19 @@ function compactSampleItem(v: any, depth: number = 0): string {
         const k = keys[i];
         const val = v[k];
         if (Array.isArray(val)) {
-            if (depth < SAMPLE_OBJECT_MAX_DEPTH) {
+            if (depth < maxDepth) {
                 // include small nested array preview
                 const arr = val as any[];
                 const MAX_ITEMS = 2;
-                const items = arr.slice(0, MAX_ITEMS).map(x => (x && typeof x === 'object') ? JSON.parse(compactSampleItem(x, depth + 1)) : x);
+                const items = arr.slice(0, MAX_ITEMS).map(x => (x && typeof x === 'object') ? JSON.parse(compactSampleItem(x, depth + 1, maxDepth)) : x);
                 if (arr.length > MAX_ITEMS) items.push(`... (len=${arr.length})`);
                 out[k] = items;
             } else {
                 out[k] = `array(len=${val.length})`;
             }
         } else if (val && typeof val === 'object') {
-            if (depth < SAMPLE_OBJECT_MAX_DEPTH) {
-                out[k] = JSON.parse(compactSampleItem(val, depth + 1));
+            if (depth < maxDepth) {
+                out[k] = JSON.parse(compactSampleItem(val, depth + 1, maxDepth));
             } else {
                 out[k] = '{…}';
             }
