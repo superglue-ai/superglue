@@ -117,14 +117,14 @@ const RunsTable = ({ id }: { id?: string }) => {
   return (
     <div className="flex-1 overflow-auto">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Workflow Runs</h1>
+        <h1 className="text-2xl font-bold">Tool Runs</h1>
       </div>
 
       <div className="border rounded-lg">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Workflow Id</TableHead>
+              <TableHead>Tool Id</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Started At</TableHead>
               <TableHead>Completed At</TableHead>
@@ -278,10 +278,10 @@ const RunDetails = ({ run }: { run: any }) => {
         </div>
       )}
 
-      {/* Step Results (for workflows) */}
+      {/* Step Results (for tools) */}
       {run?.stepResults && run.stepResults.length > 0 && (
         <div className="space-y-2">
-          <h4 className="text-sm font-medium text-muted-foreground">Workflow Steps</h4>
+          <h4 className="text-sm font-medium text-muted-foreground">Tool Steps</h4>
           <div className="space-y-2">
             {run.stepResults.map((step: any, index: number) => (
               <div 

@@ -416,7 +416,7 @@ export default function IntegrationsPage() {
                         <div className="flex flex-col items-center justify-center flex-1 py-24">
                             <Globe className="h-12 w-12 text-muted-foreground mb-4" />
                             <p className="text-lg text-muted-foreground mb-2">No integrations added yet.</p>
-                            <p className="text-sm text-muted-foreground mb-6">Integrations let you connect to APIs and data sources for your workflows.</p>
+                            <p className="text-sm text-muted-foreground mb-6">Integrations let you connect to APIs and data sources for your tools.</p>
                             <Button variant="outline" size="sm" onClick={handleAdd}>
                                 <Plus className="mr-2 h-4 w-4" /> Add Integration
                             </Button>
@@ -489,8 +489,8 @@ export default function IntegrationsPage() {
                                                         variant="outline"
                                                         size="sm"
                                                         className="text-muted-foreground hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                                                        onClick={() => badge.type === 'oauth-incomplete' ? handleCompleteOAuth(integration) : router.push(`/workflows?integration=${integration.id}`)}
-                                                        title={badge.type === 'oauth-incomplete' ? "Start OAuth flow to complete configuration" : "Build workflow with this integration"}
+                                                        onClick={() => badge.type === 'oauth-incomplete' ? handleCompleteOAuth(integration) : router.push(`/tools?integration=${integration.id}`)}
+                                                        title={badge.type === 'oauth-incomplete' ? "Start OAuth flow to complete configuration" : "Build a tool with this integration"}
                                                         disabled={false}
                                                     >
                                                         {badge.type === 'oauth-incomplete' ? (
@@ -501,23 +501,14 @@ export default function IntegrationsPage() {
                                                         ) : (
                                                             <>
                                                                 <Sparkles className="h-4 w-4 mr-2" />
-                                                                Build Workflow
+                                                                Build Tool
                                                             </>
                                                         )}
                                                     </Button>
                                                     <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-8 w-8 text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
-                                                        onClick={() => handleEdit(integration)}
-                                                        title="Edit integration"
-                                                    >
-                                                        <Pencil className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-8 w-8 text-muted-foreground hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="text-muted-foreground hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
                                                         onClick={() => handleRefreshDocs(integration.id)}
                                                         disabled={
                                                             !integration.documentationUrl ||
@@ -535,7 +526,16 @@ export default function IntegrationsPage() {
                                                                         : "Refresh documentation from URL"
                                                         }
                                                     >
-                                                        <FileDown className="h-4 w-4" />
+                                                        <FileDown className="h-4 w-4 mr-2" />
+                                                        Refresh Docs
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        onClick={() => handleEdit(integration)}
+                                                    >
+                                                        <Pencil className="h-4 w-4" />
                                                     </Button>
                                                     <Button
                                                         variant="ghost"

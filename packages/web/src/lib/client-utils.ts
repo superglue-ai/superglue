@@ -1,4 +1,4 @@
-import { Integration, SelfHealingMode, SuperglueClient, Workflow } from "@superglue/client";
+import { Integration, SelfHealingMode, SuperglueClient, Workflow as Tool } from "@superglue/client";
 
 export interface StepExecutionResult {
   stepId: string;
@@ -16,9 +16,9 @@ export interface FinalTransformExecutionResult {
   updatedResponseSchema?: any;
 }
 
-export interface WorkflowExecutionState {
-  originalWorkflow: Workflow;
-  currentWorkflow: Workflow;
+export interface ToolExecutionState {
+  originalTool: Tool;
+  currentTool: Tool;
   stepResults: Record<string, StepExecutionResult>;
   completedSteps: string[];
   failedSteps: string[];
@@ -27,38 +27,38 @@ export interface WorkflowExecutionState {
   interrupted?: boolean;
 }
 
-export function createSingleStepWorkflow(
-  workflow: Workflow,
+export function createSingleStepTool(
+  tool: Tool,
   stepIndex: number,
   previousResults: Record<string, any> = {}
-): Workflow {
-  if (stepIndex < 0 || stepIndex >= workflow.steps.length) {
+): Tool {
+  if (stepIndex < 0 || stepIndex >= tool.steps.length) {
     throw new Error(`Invalid step index: ${stepIndex}`);
   }
 
-  const step = workflow.steps[stepIndex];
+  const step = tool.steps[stepIndex];
 
-  const singleStepWorkflow: any = {
-    id: `${workflow.id}_step_${stepIndex}`,
+  const singleStepTool: any = {
+    id: `${tool.id}_step_${stepIndex}`,
     steps: [step],
     finalTransform: '(sourceData) => sourceData'
   };
 
-  return singleStepWorkflow;
+  return singleStepTool;
 }
 
 export async function executeSingleStep(
   client: SuperglueClient,
-  workflow: Workflow,
+  tool: Tool,
   stepIndex: number,
   payload: any,
   previousResults: Record<string, any> = {},
   selfHealing: boolean = true
 ): Promise<StepExecutionResult> {
-  const step = workflow.steps[stepIndex];
+  const step = tool.steps[stepIndex];
 
   try {
-    const singleStepWorkflow = createSingleStepWorkflow(workflow, stepIndex, previousResults);
+    const singleStepTool = createSingleStepTool(tool, stepIndex, previousResults);
 
     const executionPayload = {
       ...payload,
@@ -69,7 +69,7 @@ export async function executeSingleStep(
     };
 
     const result = await client.executeWorkflow({
-      workflow: singleStepWorkflow,
+      workflow: singleStepTool,
       payload: executionPayload,
       options: {
         testMode: false,
@@ -98,17 +98,17 @@ export async function executeSingleStep(
   }
 }
 
-export async function executeWorkflowStepByStep(
+export async function executeToolStepByStep(
   client: SuperglueClient,
-  workflow: Workflow,
+  tool: Tool,
   payload: any,
   onStepComplete?: (stepIndex: number, result: StepExecutionResult) => void,
   selfHealing: boolean = true,
   shouldStop?: () => boolean
-): Promise<WorkflowExecutionState> {
-  const state: WorkflowExecutionState = {
-    originalWorkflow: workflow,
-    currentWorkflow: { ...workflow },
+): Promise<ToolExecutionState> {
+  const state: ToolExecutionState = {
+    originalTool: tool,
+    currentTool: { ...tool },
     stepResults: {},
     completedSteps: [],
     failedSteps: [],
@@ -119,7 +119,7 @@ export async function executeWorkflowStepByStep(
 
   const previousResults: Record<string, any> = {};
 
-  for (let i = 0; i < workflow.steps.length; i++) {
+  for (let i = 0; i < tool.steps.length; i++) {
     if (shouldStop && shouldStop()) {
       state.isExecuting = false;
       state.interrupted = true;
@@ -127,11 +127,11 @@ export async function executeWorkflowStepByStep(
     }
 
     state.currentStepIndex = i;
-    const step = workflow.steps[i];
+    const step = tool.steps[i];
 
     const result = await executeSingleStep(
       client,
-      state.currentWorkflow,
+      state.currentTool,
       i,
       payload,
       previousResults,
@@ -144,11 +144,11 @@ export async function executeWorkflowStepByStep(
       state.completedSteps.push(step.id);
       previousResults[step.id] = result.data;
 
-      // Update the workflow with any returned step configuration (normalization, self-healing, etc.)
+      // Update the tool with any returned step configuration (normalization, self-healing, etc.)
       if (result.updatedStep) {
-        state.currentWorkflow = {
-          ...state.currentWorkflow,
-          steps: state.currentWorkflow.steps.map((s, idx) =>
+        state.currentTool = {
+          ...state.currentTool,
+          steps: state.currentTool.steps.map((s, idx) =>
             idx === i ? result.updatedStep : s
           )
         };
@@ -174,7 +174,7 @@ export async function executeWorkflowStepByStep(
     }
   }
 
-  if (workflow.finalTransform && state.failedSteps.length === 0) {
+  if (tool.finalTransform && state.failedSteps.length === 0) {
     // Final guard before executing transform
     if (shouldStop && shouldStop()) {
       state.isExecuting = false;
@@ -183,10 +183,10 @@ export async function executeWorkflowStepByStep(
     }
     const finalResult = await executeFinalTransform(
       client,
-      workflow.id || 'workflow',
-      state.currentWorkflow.finalTransform || workflow.finalTransform,
-      workflow.responseSchema,
-      workflow.inputSchema,
+      tool.id || 'tool',
+      state.currentTool.finalTransform || tool.finalTransform,
+      tool.responseSchema,
+      tool.inputSchema,
       payload,
       previousResults,
       selfHealing
@@ -203,8 +203,8 @@ export async function executeWorkflowStepByStep(
       state.completedSteps.push('__final_transform__');
 
       if (finalResult.updatedTransform && selfHealing) {
-        state.currentWorkflow = {
-          ...state.currentWorkflow,
+        state.currentTool = {
+          ...state.currentTool,
           finalTransform: finalResult.updatedTransform
         };
       }
@@ -219,7 +219,7 @@ export async function executeWorkflowStepByStep(
 
 export async function executeFinalTransform(
   client: SuperglueClient,
-  workflowId: string,
+  toolId: string,
   finalTransform: string,
   responseSchema: any,
   inputSchema: any,
@@ -235,7 +235,7 @@ export async function executeFinalTransform(
 
     const result = await client.executeWorkflow({
       workflow: {
-        id: `${workflowId}_final_transform`,
+        id: `${toolId}_final_transform`,
         steps: [],
         finalTransform,
         // Only include responseSchema if it's actually defined (not null/undefined)
@@ -267,7 +267,7 @@ export async function executeFinalTransform(
 export function canExecuteStep(
   stepIndex: number,
   completedSteps: string[],
-  workflow: Workflow,
+  tool: Tool,
   stepResults?: Record<string, any>
 ): boolean {
   if (stepIndex === 0) {
@@ -276,7 +276,7 @@ export function canExecuteStep(
 
   // Check that all previous steps are completed and have results
   for (let i = 0; i < stepIndex; i++) {
-    const stepId = workflow.steps[i].id;
+    const stepId = tool.steps[i].id;
     if (!completedSteps.includes(stepId)) {
       return false;
     }

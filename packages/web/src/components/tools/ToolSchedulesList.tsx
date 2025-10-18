@@ -14,21 +14,21 @@ import {
   TableHeader,
   TableRow,
 } from "@/src/components/ui/table";
-import { SuperglueClient, WorkflowSchedule } from '@superglue/client';
+import { SuperglueClient, WorkflowSchedule as ToolSchedule } from '@superglue/client';
 import cronstrue from 'cronstrue';
-import WorkflowScheduleModal from './WorkflowScheduleModal';
+import ToolScheduleModal from './ToolScheduleModal';
 
 
-const WorkflowSchedulesList = ({ workflowId }: { workflowId: string }) => {
+const ToolSchedulesList = ({ toolId }: { toolId: string }) => {
   const config = useConfig();
-  const [workflowSchedules, setWorkflowSchedules] = React.useState<WorkflowSchedule[]>([]);
+  const [toolSchedules, setToolSchedules] = React.useState<ToolSchedule[]>([]);
   const [loadingSchedules, setLoadingSchedules] = React.useState(false);
   const [modalOpen, setModalOpen] = React.useState(false);
-  const [modalSchedule, setModalSchedule] = React.useState<WorkflowSchedule | null>(null);
+  const [modalSchedule, setModalSchedule] = React.useState<ToolSchedule | null>(null);
 
   React.useEffect(() => {
     loadSchedules();
-  }, [workflowId]);
+  }, [toolId]);
 
   const loadSchedules = async (showLoading = true) => {
     if (showLoading) {
@@ -40,9 +40,9 @@ const WorkflowSchedulesList = ({ workflowId }: { workflowId: string }) => {
       apiKey: config.superglueApiKey
     });
 
-    const schedules = await superglueClient.listWorkflowSchedules(workflowId);
+    const schedules = await superglueClient.listWorkflowSchedules(toolId);
 
-    setWorkflowSchedules(schedules);
+    setToolSchedules(schedules);
     setLoadingSchedules(false);
   };
 
@@ -50,7 +50,7 @@ const WorkflowSchedulesList = ({ workflowId }: { workflowId: string }) => {
     e.stopPropagation();
 
     // optimistic update
-    setWorkflowSchedules(prevSchedules =>
+    setToolSchedules(prevSchedules =>
       prevSchedules.filter(schedule => schedule.id !== scheduleId)
     );
 
@@ -67,7 +67,7 @@ const WorkflowSchedulesList = ({ workflowId }: { workflowId: string }) => {
 
   const handleScheduleStateToggle = async (newState: boolean, scheduleId: string) => {
     // optimistic update
-    setWorkflowSchedules(prevSchedules =>
+    setToolSchedules(prevSchedules =>
       prevSchedules.map(schedule =>
         schedule.id === scheduleId
           ? { ...schedule, enabled: newState }
@@ -89,7 +89,7 @@ const WorkflowSchedulesList = ({ workflowId }: { workflowId: string }) => {
     loadSchedules(false);
   };
 
-  const handleModalOpen = (schedule?: WorkflowSchedule) => {
+  const handleModalOpen = (schedule?: ToolSchedule) => {
     setModalSchedule(schedule);
     setModalOpen(true);
   };
@@ -112,10 +112,10 @@ const WorkflowSchedulesList = ({ workflowId }: { workflowId: string }) => {
           Add Schedule
         </Button>
       </div>
-      {workflowSchedules.length === 0 ? (
+      {toolSchedules.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <div className="text-muted-foreground text-sm mb-4">
-            No schedules configured for this workflow
+            No schedules configured for this tool
           </div>
         </div>
       ) : (
@@ -141,7 +141,7 @@ const WorkflowSchedulesList = ({ workflowId }: { workflowId: string }) => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {workflowSchedules.map((schedule) => (
+            {toolSchedules.map((schedule) => (
               <TableRow key={schedule.id}>
                 <TableCell className="w-[200px] pl-0">
                   <Switch
@@ -175,9 +175,9 @@ const WorkflowSchedulesList = ({ workflowId }: { workflowId: string }) => {
           </TableBody>
         </Table>
       )}
-      <WorkflowScheduleModal isOpen={modalOpen} workflowId={workflowId} schedule={modalSchedule} onClose={handleModalClose} onSave={loadSchedules} />
+      <ToolScheduleModal isOpen={modalOpen} toolId={toolId} schedule={modalSchedule} onClose={handleModalClose} onSave={loadSchedules} />
     </div>
   ));
 };
 
-export default WorkflowSchedulesList;
+export default ToolSchedulesList;

@@ -12,23 +12,23 @@ import { inferJsonSchema } from '@superglue/shared';
 import { ChevronLeft, ChevronRight, Database, Download, FileJson, Package, Play, Plus, Settings, Trash2 } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { AddStepDialog } from './AddStepDialog';
-import { CopyButton, FinalResultsCard, FinalTransformMiniStepCard, InstructionDisplay, JsonCodeEditor, MiniStepCard, PayloadMiniStepCard } from './WorkflowMiniStepCards';
-import { WorkflowStepConfigurator } from './WorkflowStepConfigurator';
+import { CopyButton, FinalResultsCard, FinalTransformMiniStepCard, InstructionDisplay, JsonCodeEditor, MiniStepCard, PayloadMiniStepCard } from './ToolMiniStepCards';
+import { ToolStepConfigurator } from './ToolStepConfigurator';
 
-interface WorkflowStepGalleryProps {
+interface ToolStepGalleryProps {
     steps: any[];
     stepResults?: Record<string, any>;
     finalTransform?: string;
     finalResult?: any;
     responseSchema?: string;
-    workflowId?: string;
+    toolId?: string;
     instruction?: string;
     onStepsChange?: (steps: any[]) => void;
     onStepEdit?: (stepId: string, updatedStep: any, isUserInitiated?: boolean) => void;
     onFinalTransformChange?: (transform: string) => void;
     onResponseSchemaChange?: (schema: string) => void;
     onPayloadChange?: (payload: string) => void;
-    onWorkflowIdChange?: (id: string) => void;
+    onToolIdChange?: (id: string) => void;
     onInstructionEdit?: () => void;
     onExecuteStep?: (stepIndex: number) => Promise<void>;
     onExecuteAllSteps?: () => Promise<void>;
@@ -240,7 +240,7 @@ const SpotlightStepCard = ({
 
                         {activePanel === 'config' && (
                             <div className="mt-1">
-                                <WorkflowStepConfigurator
+                                <ToolStepConfigurator
                                     step={step}
                                     isLast={true}
                                     onEdit={onEdit}
@@ -376,20 +376,20 @@ const SpotlightStepCard = ({
 
 
 
-export function WorkflowStepGallery({
+export function ToolStepGallery({
     steps,
     stepResults = {},
     finalTransform,
     finalResult,
     responseSchema,
-    workflowId,
+    toolId,
     instruction,
     onStepsChange,
     onStepEdit: originalOnStepEdit,
     onFinalTransformChange,
     onResponseSchemaChange,
     onPayloadChange,
-    onWorkflowIdChange,
+    onToolIdChange,
     onInstructionEdit,
     onExecuteStep,
     onExecuteAllSteps,
@@ -416,8 +416,8 @@ export function WorkflowStepGallery({
     isProcessingFiles,
     totalFileSize,
     filePayloads
-}: WorkflowStepGalleryProps) {
-    const [activeIndex, setActiveIndex] = useState(1); // Default to first workflow step, not payload
+}: ToolStepGalleryProps) {
+    const [activeIndex, setActiveIndex] = useState(1); // Default to first tool step, not payload
     const [windowWidth, setWindowWidth] = useState(1200);
     const [containerWidth, setContainerWidth] = useState<number>(1200);
     const [isHydrated, setIsHydrated] = useState(false);
@@ -454,23 +454,23 @@ export function WorkflowStepGallery({
         }, NAV_DELAY_MS);
     };
 
-    // Local workflowId editor state to reduce re-renders
-    const [localWorkflowId, setLocalWorkflowId] = useState<string>(workflowId ?? '');
-    const [isEditingWorkflowId, setIsEditingWorkflowId] = useState<boolean>(false);
-    const workflowIdInputRef = useRef<HTMLInputElement | null>(null);
-    const liveWorkflowIdRef = useRef<string>(workflowId ?? '');
+    // Local toolId editor state to reduce re-renders
+    const [localToolId, setLocalToolId] = useState<string>(toolId ?? '');
+    const [isEditingToolId, setIsEditingToolId] = useState<boolean>(false);
+    const toolIdInputRef = useRef<HTMLInputElement | null>(null);
+    const liveToolIdRef = useRef<string>(toolId ?? '');
     useEffect(() => {
-        if (!isEditingWorkflowId) {
-            setLocalWorkflowId(workflowId ?? '');
+        if (!isEditingToolId) {
+            setLocalToolId(toolId ?? '');
         }
-    }, [workflowId, isEditingWorkflowId]);
-    const commitWorkflowIdIfChanged = () => {
-        const nextVal = liveWorkflowIdRef.current ?? localWorkflowId;
-        if (onWorkflowIdChange && nextVal !== (workflowId ?? '')) {
-            onWorkflowIdChange(nextVal);
-            setLocalWorkflowId(nextVal);
+    }, [toolId, isEditingToolId]);
+    const commitToolIdIfChanged = () => {
+        const nextVal = liveToolIdRef.current ?? localToolId;
+        if (onToolIdChange && nextVal !== (toolId ?? '')) {
+            onToolIdChange(nextVal);
+            setLocalToolId(nextVal);
         }
-        setIsEditingWorkflowId(false);
+        setIsEditingToolId(false);
     };
 
     // Hydration effect
@@ -569,7 +569,7 @@ export function WorkflowStepGallery({
         }, {})
         : stepResults;
 
-    const workflowItems = [
+    const toolItems = [
         {
             type: 'payload',
             data: { payloadText: rawPayloadText, inputSchema },
@@ -596,14 +596,14 @@ export function WorkflowStepGallery({
         }
     ];
 
-    const currentItem = workflowItems[activeIndex];
-    const indicatorIndices = workflowItems.map((_, idx) => idx);
+    const currentItem = toolItems[activeIndex];
+    const indicatorIndices = toolItems.map((_, idx) => idx);
 
     const handleNavigation = (direction: 'prev' | 'next') => {
         if (isConfiguratorEditing) return;
         const newIndex = direction === 'prev'
             ? Math.max(0, activeIndex - 1)
-            : Math.min(workflowItems.length - 1, activeIndex + 1);
+            : Math.min(toolItems.length - 1, activeIndex + 1);
         if (newIndex === activeIndex) return;
         navigateToIndex(newIndex);
     };
@@ -618,7 +618,7 @@ export function WorkflowStepGallery({
         const newSteps = steps.filter(step => step.id !== stepId);
         onStepsChange(newSteps);
         // Adjust active index if needed
-        if (activeIndex >= workflowItems.length - 1) {
+        if (activeIndex >= toolItems.length - 1) {
             setActiveIndex(Math.max(0, activeIndex - 1));
         }
     };
@@ -664,11 +664,11 @@ export function WorkflowStepGallery({
         setTimeout(() => navigateToIndex(insertedIndex + 1), 100);
     };
 
-    const handleConfirmInsertWorkflow = (workflowSteps: any[]) => {
+    const handleConfirmInsertTool = (toolSteps: any[]) => {
         if (pendingInsertIndex === null || !onStepsChange) return;
 
         const newSteps = [...steps];
-        newSteps.splice(pendingInsertIndex, 0, ...workflowSteps);
+        newSteps.splice(pendingInsertIndex, 0, ...toolSteps);
         onStepsChange(newSteps);
 
         const insertedIndex = pendingInsertIndex;
@@ -696,7 +696,7 @@ export function WorkflowStepGallery({
 
     useEffect(() => {
         if (navigateToFinalSignal) {
-            navigateToIndex(workflowItems.length - 1);
+            navigateToIndex(toolItems.length - 1);
         }
     }, [navigateToFinalSignal]);
 
@@ -714,32 +714,32 @@ export function WorkflowStepGallery({
             <div className="space-y-3">
                 <div className="flex items-center justify-center gap-3 flex-wrap">
                     <div className="flex items-center gap-3 min-w-0 w-full">
-                        {(onWorkflowIdChange || typeof workflowId !== 'undefined') && (
+                        {(onToolIdChange || typeof toolId !== 'undefined') && (
                             <div className="flex w-full items-center justify-between gap-3">
                                 <div className="flex items-center gap-3 px-3 py-1.5 bg-muted/50 rounded-md border h-[36px]">
-                                    <span className="text-sm text-muted-foreground">Workflow ID:</span>
+                                    <span className="text-sm text-muted-foreground">Tool ID:</span>
                                     <Input
-                                        key={isEditingWorkflowId ? 'editing' : localWorkflowId}
-                                        ref={workflowIdInputRef}
-                                        defaultValue={localWorkflowId}
-                                        onFocus={() => { setIsEditingWorkflowId(true); liveWorkflowIdRef.current = workflowIdInputRef.current?.value ?? localWorkflowId; }}
-                                        onChange={(e) => { liveWorkflowIdRef.current = e.target.value; }}
-                                        onBlur={commitWorkflowIdIfChanged}
+                                        key={isEditingToolId ? 'editing' : localToolId}
+                                        ref={toolIdInputRef}
+                                        defaultValue={localToolId}
+                                        onFocus={() => { setIsEditingToolId(true); liveToolIdRef.current = toolIdInputRef.current?.value ?? localToolId; }}
+                                        onChange={(e) => { liveToolIdRef.current = e.target.value; }}
+                                        onBlur={commitToolIdIfChanged}
                                         onKeyDown={(e) => {
                                             if (e.key === 'Enter') {
                                                 e.preventDefault();
-                                                commitWorkflowIdIfChanged();
+                                                commitToolIdIfChanged();
                                             } else if (e.key === 'Escape') {
-                                                if (workflowIdInputRef.current) {
-                                                    workflowIdInputRef.current.value = workflowId ?? '';
+                                                if (toolIdInputRef.current) {
+                                                    toolIdInputRef.current.value = toolId ?? '';
                                                 }
-                                                liveWorkflowIdRef.current = workflowId ?? '';
-                                                setLocalWorkflowId(workflowId ?? '');
-                                                setIsEditingWorkflowId(false);
+                                                liveToolIdRef.current = toolId ?? '';
+                                                setLocalToolId(toolId ?? '');
+                                                setIsEditingToolId(false);
                                             }
                                         }}
                                         className="h-5 font-mono text-sm w-[200px] md:w-[280px] border-0 bg-transparent p-0 focus:ring-0"
-                                        readOnly={readOnly || !onWorkflowIdChange}
+                                        readOnly={readOnly || !onToolIdChange}
                                     />
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -784,7 +784,7 @@ export function WorkflowStepGallery({
                                         <div className="w-48 h-24 bg-muted/20 rounded-md animate-pulse" />
                                     </div>
                                 ) : (() => {
-                                    const totalCards = workflowItems.length;
+                                    const totalCards = toolItems.length;
                                     let startIdx = 0;
                                     let endIdx = totalCards;
                                     const CARD_WIDTH = 228; // px (matches card classes above)
@@ -793,7 +793,7 @@ export function WorkflowStepGallery({
                                     const SAFE_MARGIN = 12; // px extra space to avoid clipping
                                     const available = Math.max(0, (containerWidth || windowWidth) - SAFE_MARGIN);
                                     let cardsToShow = 1;
-                                    const maxCandidates = Math.min(workflowItems.length, 12);
+                                    const maxCandidates = Math.min(toolItems.length, 12);
                                     for (let c = 1; c <= maxCandidates; c++) {
                                         const needed = (c * CARD_WIDTH) + ((c - 1) * (ARROW_WIDTH + GUTTER));
                                         if (needed <= available) {
@@ -816,7 +816,7 @@ export function WorkflowStepGallery({
                                         endIdx = startIdx + cardsToShow;
                                     }
 
-                                    const visibleItems = workflowItems.slice(startIdx, endIdx);
+                                    const visibleItems = toolItems.slice(startIdx, endIdx);
                                     const visibleIndices = visibleItems.map((_, i) => startIdx + i);
                                     const hasHiddenLeft = startIdx > 0;
                                     const hasHiddenRight = endIdx < totalCards;
@@ -905,7 +905,7 @@ export function WorkflowStepGallery({
                         variant="outline"
                         size="icon"
                         onClick={() => handleNavigation('next')}
-                        disabled={activeIndex === workflowItems.length - 1}
+                        disabled={activeIndex === toolItems.length - 1}
                         className="shrink-0 h-9 w-9"
                         title="Next"
                     >
@@ -990,7 +990,7 @@ export function WorkflowStepGallery({
                 open={isAddStepDialogOpen}
                 onOpenChange={setIsAddStepDialogOpen}
                 onConfirm={handleConfirmInsertStep}
-                onConfirmWorkflow={handleConfirmInsertWorkflow}
+                onConfirmTool={handleConfirmInsertTool}
                 existingStepIds={steps.map((s: any) => s.id)}
                 defaultId={defaultStepId}
             />
