@@ -2,6 +2,8 @@ import type { ApiConfig, ExecutionStep, RequestOptions, WorkflowStepResult } fro
 import { Integration, Metadata } from "@superglue/shared";
 import { server_defaults } from "../default.js";
 import { IntegrationManager } from "../integrations/integration-manager.js";
+import { LanguageModel } from "../llm/llm.js";
+import { getObjectContext } from "../utils/context.js";
 import { logMessage } from "../utils/logs.js";
 import { applyJsonata, flattenObject, transformAndValidateSchema } from "../utils/tools.js";
 import { generateTransformCode } from "../utils/transform.js";
@@ -88,7 +90,6 @@ const loopStrategy: ExecutionStrategy = {
       const loopSelectorResult = await transformAndValidateSchema(payload, step.loopSelector || "$", null);
       loopItems = loopSelectorResult.data;
 
-      // Regenerate selector if no items found - always generate JS going forward
       if (!loopSelectorResult.success || !Array.isArray(loopItems)) {
         logMessage("error", `No input data found for '${step.id}' - regenerating data selector`, metadata);
 
@@ -100,12 +101,8 @@ The function should:
 1. Extract an array of ACTUAL DATA ITEMS (not metadata or property definitions)
 2. Apply any filtering based on the step's instruction
 
-Available data in sourceData:
-${Object.keys(payload).map(key => {
-          const value = payload[key];
-          const type = Array.isArray(value) ? `array[${value.length}]` : typeof value;
-          return `- ${key}: ${type}`;
-        }).join('\n')}
+This is the available data in sourceData:
+${getObjectContext(payload, { include: { schema: true, preview: true, samples: false }, characterBudget: LanguageModel.contextLength / 10 })}
 
 The function should return an array of items that this step will iterate over.`;
 
@@ -149,7 +146,6 @@ The function should return an array of items that this step will iterate over.`;
             metadata
           });
 
-          // Store/update the successful configuration
           if (apiResponse.endpoint) {
             successfulConfig = apiResponse.endpoint;
             if (successfulConfig !== step.apiConfig) {

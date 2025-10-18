@@ -9,6 +9,7 @@ import { telemetryClient } from "../utils/telemetry.js";
 import { isSelfHealingEnabled, maskCredentials, sample } from "../utils/tools.js";
 import { AbortError, ApiCallError } from "./api/api.js";
 import { callEndpointLegacyImplementation, generateApiConfig } from "./api/api.legacy.js";
+import { getObjectContext } from "../utils/context.js";
 
 export async function evaluateStepResponse({
   data,
@@ -19,13 +20,7 @@ export async function evaluateStepResponse({
   endpoint: ApiConfig,
   documentation?: string
 }): Promise<{ success: boolean, refactorNeeded: boolean, shortReason: string; }> {
-  let content = JSON.stringify(data);
-  if (content.length > LanguageModel.contextLength / 2) {
-    content = JSON.stringify(sample(data, 10));
-  }
-  if (content.length > LanguageModel.contextLength / 2) {
-    content = content.slice(0, LanguageModel.contextLength / 2) + "\n\n...truncated...";
-  }
+  let dataDescription = getObjectContext(data, { include: { schema: true, preview: true, samples: true }, characterBudget: LanguageModel.contextLength / 2 });
 
   // Include documentation context if available
   const documentationContext = documentation
@@ -36,8 +31,9 @@ export async function evaluateStepResponse({
     {
       role: "system",
       content: `You are an API response validator. 
-Validate the following api response and return { success: true, shortReason: "", refactorNeeded: false } if the response aligns with the instruction. 
-If the response does not align with the instruction, return { success: false, shortReason: "reason why it does not align", refactorNeeded: false }.
+Validate the data returned by the step and return { success: true, shortReason: "", refactorNeeded: false } if the data aligns with the instruction. 
+If the data does not align with the instruction, return { success: false, shortReason: "reason why it does not align", refactorNeeded: false }.
+You will be shown the JSON schema of the response data, a preview of the data and some (NOT ALL) samples from the data. This is to help you understand the data and validate if it aligns with the instruction.
 
 IMPORTANT CONSIDERATIONS:
 - For operations that create, update, delete, or send data (non-retrieval operations), minimal or empty responses with 2xx status codes often indicate success
@@ -67,7 +63,7 @@ ${documentationContext}
     },
     {
       role: "user", content: `<request>${JSON.stringify(endpoint)}</request>
-<api_response>${content}</api_response>`
+<api_response>${dataDescription}</api_response>`
     }
   ] as OpenAI.Chat.ChatCompletionMessageParam[];
 

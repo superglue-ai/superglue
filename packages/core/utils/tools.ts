@@ -8,12 +8,6 @@ import { HttpMethodEnum } from "../mcp/mcp-server.js";
 import { parseJSON } from "./json-parser.js";
 import { injectVMHelpersIndividually } from "./vm-helpers.js";
 
-export function isRequested(field: string, info: GraphQLResolveInfo) {
-  return info.fieldNodes.some(
-    (node) => node.selectionSet && node.selectionSet.selections.some((selection) => selection.kind === 'Field' && selection.name.value === field)
-  );
-}
-
 export interface TransformResult {
   success: boolean;
   data?: any;
