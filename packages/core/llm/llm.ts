@@ -5,6 +5,7 @@ import { AnthropicModel } from "./anthropic-model.js";
 import { GeminiModel } from "./gemini-model.js";
 import { OpenAILegacyModel } from "./openai-legacy-model.js";
 import { OpenAIModel } from "./openai-model.js";
+import { VercelAIModel } from "./vercel-ai-model.js";
 
 export interface LLM {
     contextLength: number;
@@ -73,22 +74,23 @@ export const LanguageModel = {
 };
 
 function selectLanguageModel(): LLM {
-    switch (String(process.env.LLM_PROVIDER).toUpperCase()) {
-        case "OPENAI":
-            logMessage("info", "Using OpenAI model: " + process.env.OPENAI_MODEL);
-            return new OpenAIModel();
-        case "OPENAI_LEGACY":
-            logMessage("info", "Using OpenAI model with legacy chat completions API: " + process.env.OPENAI_MODEL);
-            return new OpenAILegacyModel();
-        case "GEMINI":
-            logMessage("info", "Using Gemini model: " + process.env.GEMINI_MODEL);
-            return new GeminiModel();
-        case "ANTHROPIC":
-            logMessage("info", "Using Anthropic model: " + process.env.ANTHROPIC_MODEL);
-            return new AnthropicModel();
-        default:
-            const defaultModel = new OpenAIModel();
-            logMessage("info", "Using default model: " + defaultModel.model);
-            return defaultModel;
-    }
+    // switch (String(process.env.LLM_PROVIDER).toLowerCase()) {
+    //     case "openai":
+    //         logMessage("info", "Using OpenAI model: " + process.env.OPENAI_MODEL);
+    //         return new OpenAIModel();
+    //     case "openai_legacy":
+    //         logMessage("info", "Using OpenAI model with legacy chat completions API: " + process.env.OPENAI_MODEL);
+    //         return new OpenAILegacyModel();
+    //     case "gemini":
+    //         logMessage("info", "Using Gemini model: " + process.env.GEMINI_MODEL);
+    //         return new GeminiModel();
+    //     case "anthropic":
+    //         logMessage("info", "Using Anthropic model: " + process.env.ANTHROPIC_MODEL);
+    //         return new AnthropicModel();
+    //     default:
+    //         const defaultModel = new OpenAIModel();
+    //         logMessage("info", "Using default model: " + defaultModel.model);
+    //         return defaultModel;
+    // }
+    return new VercelAIModel();
 }
