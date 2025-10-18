@@ -5,7 +5,7 @@ import { IntegrationManager } from "../integrations/integration-manager.js";
 import { LanguageModel } from "../llm/language-model.js";
 import { getObjectContext } from "../utils/context.js";
 import { logMessage } from "../utils/logs.js";
-import { applyJsonata, flattenObject, transformAndValidateSchema } from "../utils/tools.js";
+import { applyJsonata, flattenObject, isSelfHealingEnabled, transformAndValidateSchema } from "../utils/tools.js";
 import { generateTransformCode } from "../utils/transform.js";
 import { executeStep } from "./workflow-step.js";
 
@@ -91,8 +91,10 @@ const loopStrategy: ExecutionStrategy = {
       loopItems = loopSelectorResult.data;
 
       if (!loopSelectorResult.success || !Array.isArray(loopItems)) {
-        logMessage("error", `No input data found for '${step.id}' - regenerating data selector`, metadata);
-
+        if (!isSelfHealingEnabled(options, "api")) {
+          throw new Error(`Loop selector for '${step.id}' did not return an array of items. Check the loop selector code or enable self-healing and re-execute to regenerate automatically.`);
+        }
+        logMessage("error", `Loop selector for '${step.id}' did not return an array of items. Regenerating loop selector.`, metadata);
         const instruction = `Create a JavaScript function that extracts the array of items to loop over for step: ${step.id}. 
           
 Step instruction: ${step.apiConfig.instruction}
