@@ -92,9 +92,9 @@ const loopStrategy: ExecutionStrategy = {
 
       if (!loopSelectorResult.success || !Array.isArray(loopItems)) {
         if (!isSelfHealingEnabled(options, "api")) {
-          throw new Error(`Loop selector for '${step.id}' did not return an array of items. Check the loop selector code or enable self-healing and re-execute to regenerate automatically.`);
+          throw new Error(`Loop selector for '${step.id}' did not return an array. Check the loop selector code or enable self-healing and re-execute to regenerate automatically.`);
         }
-        logMessage("error", `Loop selector for '${step.id}' did not return an array of items. Regenerating loop selector.`, metadata);
+        logMessage("error", `Loop selector for '${step.id}' did not return an array. Regenerating loop selector.`, metadata);
         const instruction = `Create a JavaScript function that extracts the array of items to loop over for step: ${step.id}. 
           
 Step instruction: ${step.apiConfig.instruction}
