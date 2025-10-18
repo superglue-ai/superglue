@@ -1,9 +1,8 @@
-import { createDataStore } from './datastore/datastore.js';
 import { startApiServer } from './api/api-server.js';
+import { createDataStore } from './datastore/datastore.js';
 import { startGraphqlServer } from './graphql/graphql-server.js';
+import { WorkflowSchedulerWorker } from './scheduler/scheduler-worker.js';
 import { validateEnvironment } from './shared/environment.js';
-import { WorkflowScheduler } from './workflow/workflow-scheduler.js';
-
 async function startServer() {
   validateEnvironment();
 
@@ -13,7 +12,7 @@ async function startServer() {
   });
 
   if (process.env.START_SCHEDULER_SERVER === 'true') {
-    const workflowScheduler = new WorkflowScheduler(datastore);
+    const workflowScheduler = new WorkflowSchedulerWorker(datastore);
     workflowScheduler.start();
   }
 

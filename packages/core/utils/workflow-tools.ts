@@ -2,10 +2,10 @@ import { HttpMethod } from "@superglue/client";
 import type { ChatCompletionMessageParam } from "openai/resources/index.mjs";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { LanguageModel } from "../llm/llm.js";
-import { ToolDefinition, ToolImplementation, WorkflowBuildContext, WorkflowExecutionContext } from "../tools/tools.js";
 import { DocumentationSearch } from "../documentation/documentation-search.js";
-import { logMessage } from "../utils/logs.js";
+import { ToolDefinition, ToolImplementation, WorkflowBuildContext, WorkflowExecutionContext } from "../execute/tools.js";
+import { LanguageModel } from "../llm/llm.js";
+import { logMessage } from "./logs.js";
 
 export const searchDocumentationToolImplementation: ToolImplementation<WorkflowExecutionContext> = async (args, context) => {
     const { query } = args;

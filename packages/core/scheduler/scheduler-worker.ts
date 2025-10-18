@@ -1,10 +1,10 @@
+import { calculateNextRun } from "@superglue/shared";
+import { GraphQLResolveInfo } from "graphql";
 import { DataStore } from "../datastore/types.js";
 import { executeWorkflowResolver } from "../graphql/resolvers/workflow.js";
-import { calculateNextRun } from "@superglue/shared";
 import { logMessage } from "../utils/logs.js";
-import { GraphQLResolveInfo } from "graphql";
 
-export class WorkflowScheduler {
+export class WorkflowSchedulerWorker {
     private datastore: DataStore;
     private intervalId: NodeJS.Timeout;
     private intervalMs: number;

@@ -1,8 +1,7 @@
+import { calculateNextRun, validateCronExpression } from "@superglue/shared";
 import crypto from "crypto";
 import { DataStore, WorkflowScheduleInternal } from "../datastore/types.js";
-import { calculateNextRun, validateCronExpression } from "@superglue/shared";
 import { isValidTimezone } from "../utils/timezone.js";
-import { logMessage } from "../utils/logs.js";
 
 export class WorkflowScheduler {
     private datastore: DataStore;

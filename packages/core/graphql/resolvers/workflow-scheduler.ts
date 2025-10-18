@@ -1,9 +1,9 @@
-import { GraphQLResolveInfo } from "graphql";
-import { Context } from "../types.js";
-import { logMessage } from "../../utils/logs.js";
-import { WorkflowScheduleInternal } from "../../datastore/types.js";
 import { WorkflowSchedule } from "@superglue/client";
-import { WorkflowScheduler } from "../../services/workflow-scheduler.js";
+import { GraphQLResolveInfo } from "graphql";
+import { WorkflowScheduleInternal } from "../../datastore/types.js";
+import { WorkflowScheduler } from "../../scheduler/scheduler-service.js";
+import { logMessage } from "../../utils/logs.js";
+import { Context } from "../types.js";
 
 function toPublicSchedule(internal: WorkflowScheduleInternal): WorkflowSchedule {
     return {

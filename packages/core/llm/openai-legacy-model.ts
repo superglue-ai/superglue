@@ -1,7 +1,7 @@
 import OpenAI, { AzureOpenAI } from "openai";
 import type { ChatCompletionMessageParam } from "openai/resources/index.mjs";
 import { server_defaults } from "../default.js";
-import type { ToolDefinition } from "../tools/tools.js";
+import type { ToolDefinition } from "../execute/tools.js";
 import { parseJSON } from "../utils/json-parser.js";
 import { logMessage } from "../utils/logs.js";
 import { addNullableToOptional } from "../utils/tools.js";

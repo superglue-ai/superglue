@@ -385,9 +385,9 @@ Always wrap your code in <<CODE>> and <</CODE>> tags (note the closing tag has a
     ): Promise<{ success: boolean; reason?: string }> {
         try {
             // Load evaluateResponse dynamically
-            const { evaluateResponse } = await import('../../utils/api.js');
+            const { evaluateStepResponse } = await import('../../execute/workflow-step.js');
             const documentation = integrations[0]?.documentation || '';
-            const evaluation = await evaluateResponse({
+            const evaluation = await evaluateStepResponse({
                 data: result,
                 endpoint: {instruction} as any,
                 documentation

@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
-import { ToolCall, ToolCallResult, ToolDefinition } from "../tools/tools.js";
+import { ToolCall, ToolCallResult, ToolDefinition } from "../execute/tools.js";
 import { LLM, LLMAgentResponse, LLMObjectResponse, LLMResponse, LLMToolResponse } from "./llm.js";
 
 export class GeminiModel implements LLM {
