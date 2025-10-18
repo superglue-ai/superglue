@@ -31,8 +31,9 @@ export async function evaluateStepResponse({
     {
       role: "system",
       content: `You are an API response validator. 
-Validate the following api response and return { success: true, shortReason: "", refactorNeeded: false } if the response aligns with the instruction. 
-If the response does not align with the instruction, return { success: false, shortReason: "reason why it does not align", refactorNeeded: false }.
+Validate the data returned by the step and return { success: true, shortReason: "", refactorNeeded: false } if the data aligns with the instruction. 
+If the data does not align with the instruction, return { success: false, shortReason: "reason why it does not align", refactorNeeded: false }.
+You will be shown the JSON schema of the response data, a preview of the data and some (NOT ALL) samples from the data. This is to help you understand the data and validate if it aligns with the instruction.
 
 IMPORTANT CONSIDERATIONS:
 - For operations that create, update, delete, or send data (non-retrieval operations), minimal or empty responses with 2xx status codes often indicate success
