@@ -51,7 +51,7 @@ type OAuthFields = {
     grant_type: 'authorization_code' | 'client_credentials';
 };
 
-type OAuthState = {
+export type OAuthState = {
     integrationId: string;
     timestamp: number;
     apiKey: string;
@@ -60,6 +60,7 @@ type OAuthState = {
     templateId?: string;
     clientId?: string;
     client_credentials_uid?: string;
+    suppressErrorUI?: boolean;
 };
 
 type OAuthCallbacks = {
@@ -80,6 +81,7 @@ const buildOAuthState = (params: {
     templateId?: string;
     clientId?: string;
     clientCredentialsUid?: string;
+    suppressErrorUI?: boolean;
 }): OAuthState => {
     return {
         integrationId: params.integrationId,
@@ -90,6 +92,7 @@ const buildOAuthState = (params: {
         ...(params.templateId && { templateId: params.templateId }),
         ...(params.clientId && { clientId: params.clientId }),
         ...(params.clientCredentialsUid && { client_credentials_uid: params.clientCredentialsUid }),
+        ...(params.suppressErrorUI && { suppressErrorUI: params.suppressErrorUI }),
     };
 };
 
@@ -128,33 +131,6 @@ const openOAuthPopup = (url: string): Window | null => {
     );
 };
 
-const monitorOAuthPopup = (popup: Window, onCancelled: () => void): (() => void) => {
-    let isCompleted = false;
-
-    const intervalId = setInterval(() => {
-        if (popup.closed) {
-            clearInterval(intervalId);
-            if (!isCompleted) {
-                onCancelled();
-            }
-        }
-    }, 1000);
-
-    const handleMessage = (event: MessageEvent) => {
-        if (event.origin === window.location.origin && event.data.type === 'oauth-success') {
-            isCompleted = true;
-            clearInterval(intervalId);
-            window.removeEventListener('message', handleMessage);
-        }
-    };
-
-    window.addEventListener('message', handleMessage);
-
-    return () => {
-        clearInterval(intervalId);
-        window.removeEventListener('message', handleMessage);
-    };
-};
 
 const executeClientCredentialsFlow = async (params: {
     state: OAuthState;
@@ -174,13 +150,17 @@ const executeClientCredentialsFlow = async (params: {
                 const data = await response.json();
                 if (data.tokens) {
                     onSuccess?.(data.tokens);
+                } else {
+                    onError?.('[OAUTH_STAGE:CLIENT_CREDENTIALS] Callback succeeded but no tokens were returned. This is likely a backend issue.');
                 }
             } else {
                 const errorData = await response.json().catch(() => ({}));
-                onError?.(errorData.message || 'OAuth authentication failed');
+                const errorMsg = errorData.message || 'OAuth authentication failed for client credentials flow';
+                onError?.(errorMsg);
             }
         } catch (error) {
-            onError?.('Failed to complete client credentials OAuth flow');
+            const errMsg = error instanceof Error ? error.message : 'Unknown error';
+            onError?.(`[OAUTH_STAGE:CLIENT_CREDENTIALS] Network error during client credentials flow: ${errMsg}`);
         }
     };
 
@@ -189,7 +169,8 @@ const executeClientCredentialsFlow = async (params: {
             await cachePromise;
             await makeRequest();
         } catch (error) {
-            onError?.('Could not stage OAuth client secret. Please retry.');
+            const errMsg = error instanceof Error ? error.message : 'Unknown error';
+            onError?.(`[OAUTH_STAGE:CREDENTIAL_CACHING] Failed to cache OAuth client credentials on backend: ${errMsg}. Please retry.`);
         }
     } else {
         await makeRequest();
@@ -206,7 +187,7 @@ const executeAuthorizationCodeFlow = (params: {
     const { onSuccess, onError } = callbacks;
 
     if (!oauthFields.auth_url) {
-        onError?.('Missing OAuth authorization URL');
+        onError?.('[OAUTH_STAGE:INITIALIZATION] Missing OAuth authorization URL (auth_url). Please configure the auth_url field in your integration credentials.');
         return null;
     }
 
@@ -219,28 +200,48 @@ const executeAuthorizationCodeFlow = (params: {
 
     const popup = openOAuthPopup(authUrl);
     if (!popup) {
-        onError?.('Failed to open OAuth popup window');
+        onError?.('[OAUTH_STAGE:POPUP] Failed to open OAuth popup window. Please check if popups are blocked by your browser.');
         return null;
     }
 
+    // Track if OAuth flow completed (success or error) to prevent "cancelled" error
+    let isCompleted = false;
+
+    // Monitor popup for closure
+    const intervalId = setInterval(() => {
+        if (popup.closed) {
+            clearInterval(intervalId);
+            window.removeEventListener('message', handleMessage);
+            if (!isCompleted) {
+                onError?.('[OAUTH_STAGE:USER_CANCELLED] OAuth flow was cancelled - the popup window was closed before completing authentication.');
+            }
+        }
+    }, 1000);
+
+    // Handle messages from popup
     const handleMessage = (event: MessageEvent) => {
         if (event.origin !== window.location.origin) return;
 
         if (event.data?.type === 'oauth-success' && event.data?.integrationId === integrationId) {
+            isCompleted = true;
+            clearInterval(intervalId);
             window.removeEventListener('message', handleMessage);
             onSuccess?.(event.data.tokens);
         } else if (event.data?.type === 'oauth-error' && event.data?.integrationId === integrationId) {
+            isCompleted = true;
+            clearInterval(intervalId);
             window.removeEventListener('message', handleMessage);
-            onError?.(event.data.message || 'OAuth authentication failed');
+            onError?.(event.data.message || '[OAUTH_STAGE:UNKNOWN] OAuth authentication failed with no error details');
         }
     };
 
     window.addEventListener('message', handleMessage);
 
-    return monitorOAuthPopup(popup, () => {
+    // Return cleanup function
+    return () => {
+        clearInterval(intervalId);
         window.removeEventListener('message', handleMessage);
-        onError?.('OAuth flow was cancelled or the popup was closed.');
-    });
+    };
 };
 
 export const triggerOAuthFlow = (
@@ -262,7 +263,8 @@ export const triggerOAuthFlow = (
     forceOAuth?: boolean,
     templateInfo?: { templateId?: string; clientId?: string },
     onSuccess?: (tokens: any) => void,
-    endpoint?: string
+    endpoint?: string,
+    suppressErrorUI?: boolean
 ): (() => void) | null => {
     if (authType !== 'oauth') return null;
 
@@ -294,6 +296,7 @@ export const triggerOAuthFlow = (
         templateId: templateInfo?.templateId,
         clientId: templateInfo?.clientId || oauthFields.client_id,
         clientCredentialsUid,
+        suppressErrorUI,
     });
 
     if (grantType === 'client_credentials') {
@@ -330,81 +333,115 @@ export const createOAuthErrorHandler = (
 export const parseOAuthError = (error: string, integrationId: string): { title: string; description: string; action?: string } => {
     const errorLower = error.toLowerCase();
 
+    // Extract stage information if present
+    const stageMatch = error.match(/\[OAUTH_STAGE:([A-Z_]+)\]/);
+    const stage = stageMatch ? stageMatch[1] : null;
+    const stageDisplay = stage ? ` (Stage: ${stage})` : '';
+
+    // Handle JSON parse errors specifically
+    if (errorLower.includes('invalid json') || errorLower.includes('json response')) {
+        return {
+            title: `OAuth Token Exchange Error${stageDisplay}`,
+            description: error,
+            action: 'Check that the token_url is correct and points to a valid OAuth token endpoint. The endpoint should return a JSON response with an access_token field.'
+        };
+    }
+
+    // Handle token exchange failures
+    if (errorLower.includes('token exchange') || errorLower.includes('token_exchange')) {
+        return {
+            title: `OAuth Token Exchange Failed${stageDisplay}`,
+            description: error,
+            action: 'Verify that your OAuth credentials (client_id, client_secret) are correct and that the token_url is properly configured.'
+        };
+    }
+
+    // Handle credential resolution failures
+    if (errorLower.includes('credential_resolution') || errorLower.includes('credentials could not be resolved')) {
+        return {
+            title: `OAuth Credential Resolution Error${stageDisplay}`,
+            description: error,
+            action: 'The OAuth credentials could not be retrieved from the backend. Try re-entering your client_id and client_secret.'
+        };
+    }
+
+    // Handle invalid client errors
     if (errorLower.includes('invalid_client') || errorLower.includes('unauthorized_client')) {
         return {
-            title: 'Invalid OAuth Client Configuration',
-            description: 'Your OAuth client ID or secret is incorrect.',
-            action: 'Check your OAuth app settings and ensure the client ID and secret are correct.'
+            title: `Invalid OAuth Client Configuration${stageDisplay}`,
+            description: error,
+            action: 'Check your OAuth app settings and ensure the client_id and client_secret are correct.'
         };
     }
 
     if (errorLower.includes('invalid_request') || errorLower.includes('malformed')) {
         return {
-            title: 'Invalid OAuth Request',
-            description: 'The OAuth request is malformed or missing required parameters.',
-            action: 'Please check your OAuth configuration and try again.'
+            title: `Invalid OAuth Request${stageDisplay}`,
+            description: error,
+            action: 'The OAuth request is malformed. Check your OAuth configuration (auth_url, token_url, scopes) and try again.'
         };
     }
 
     if (errorLower.includes('access_denied') || errorLower.includes('user_denied')) {
         return {
-            title: 'OAuth Authorization Denied',
-            description: 'You denied access to the OAuth application.',
+            title: `OAuth Authorization Denied${stageDisplay}`,
+            description: 'You denied access to the OAuth application during the authorization step.',
             action: 'Please try again and grant the necessary permissions when prompted.'
         };
     }
 
     if (errorLower.includes('invalid_scope')) {
         return {
-            title: 'Invalid OAuth Scope',
-            description: 'The requested OAuth scope is invalid or not supported.',
-            action: 'Please check the OAuth scopes configured for this integration.'
+            title: `Invalid OAuth Scope${stageDisplay}`,
+            description: error,
+            action: 'Please check the OAuth scopes configured for this integration. The requested scope may not be supported by the provider.'
         };
     }
 
     if (errorLower.includes('server_error') || errorLower.includes('temporarily_unavailable')) {
         return {
-            title: 'OAuth Provider Error',
-            description: 'The OAuth provider is experiencing issues.',
-            action: 'Please wait a few minutes and try again.'
+            title: `OAuth Provider Error${stageDisplay}`,
+            description: 'The OAuth provider is experiencing issues or is temporarily unavailable.',
+            action: 'Please wait a few minutes and try again. If the issue persists, check the OAuth provider\'s status.'
         };
     }
 
     if (errorLower.includes('redirect_uri_mismatch')) {
         return {
-            title: 'Redirect URI Mismatch',
-            description: 'The redirect URI in your OAuth app doesn\'t match the expected callback URL.',
+            title: `Redirect URI Mismatch${stageDisplay}`,
+            description: error,
             action: `Add this URL to your OAuth app's allowed redirect URIs: ${getOAuthCallbackUrl()}`
         };
     }
 
-    if (errorLower.includes('client_id') || errorLower.includes('client secret')) {
+    if (errorLower.includes('popup') || errorLower.includes('blocked')) {
         return {
-            title: 'OAuth Credentials Issue',
-            description: 'There\'s an issue with your OAuth client credentials.',
-            action: 'Please verify your OAuth app\'s client ID and secret are correct.'
+            title: `OAuth Popup Blocked${stageDisplay}`,
+            description: error,
+            action: 'Please allow popups for this site in your browser settings and try again.'
         };
     }
 
-    if (errorLower.includes('not found') || errorLower.includes('404')) {
+    if (errorLower.includes('cancelled') || errorLower.includes('closed') || errorLower.includes('user_cancelled')) {
         return {
-            title: 'OAuth Configuration Error',
-            description: 'The OAuth authorization URL could not be found.',
-            action: 'Please check your OAuth app settings and ensure the authorization URL is correct.'
+            title: `OAuth Flow Cancelled${stageDisplay}`,
+            description: 'The OAuth flow was cancelled or the popup window was closed before authentication completed.',
+            action: 'Please try again and complete the OAuth authorization process without closing the popup.'
         };
     }
 
-    if (errorLower.includes('cancelled') || errorLower.includes('closed')) {
+    if (errorLower.includes('expired')) {
         return {
-            title: 'OAuth Flow Cancelled',
-            description: 'The OAuth flow was cancelled or the popup window was closed.',
-            action: 'Please try again and complete the OAuth authorization process.'
+            title: `OAuth Session Expired${stageDisplay}`,
+            description: error,
+            action: 'The OAuth session expired. Please start the OAuth flow again.'
         };
     }
 
+    // Default case - include full error message
     return {
-        title: 'OAuth Connection Failed',
-        description: `Failed to complete OAuth connection for ${integrationId}. ${error}`,
-        action: 'Please check your OAuth configuration and try again.'
+        title: `OAuth Connection Failed${stageDisplay}`,
+        description: error,
+        action: 'Please check your OAuth configuration (auth_url, token_url, client_id, client_secret, scopes) and try again.'
     };
 };

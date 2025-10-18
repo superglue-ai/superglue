@@ -1,17 +1,7 @@
-import { ExtendedSuperglueClient } from '@/src/lib/oauth-utils';
+import { ExtendedSuperglueClient, OAuthState } from '@/src/lib/oauth-utils';
 import { NextRequest, NextResponse } from 'next/server';
 
 const OAUTH_STATE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
-
-interface OAuthState {
-    apiKey: string;
-    timestamp: number;
-    integrationId: string;
-    redirectUri?: string;
-    templateId?: string;
-    clientId?: string;
-    client_credentials_uid?: string;
-}
 
 interface OAuthTokenResponse {
     access_token: string;
@@ -30,30 +20,42 @@ async function exchangeCodeForToken(
     state?: string
 ): Promise<OAuthTokenResponse> {
     if (!clientId || !clientSecret) {
-        throw new Error('OAuth client credentials not configured');
+        throw new Error('[OAUTH_STAGE:TOKEN_EXCHANGE] OAuth client credentials not configured for authorization code flow');
     }
-    const response = await fetch(tokenUrl, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Accept': 'application/json',
-        },
-        body: new URLSearchParams({
-            grant_type: 'authorization_code',
-            code,
-            client_id: clientId,
-            client_secret: clientSecret,
-            redirect_uri: redirectUri,
-            ...(state ? { state } : {}),
-        }),
-    });
+    
+    let response: Response;
+    try {
+        response = await fetch(tokenUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Accept': 'application/json',
+            },
+            body: new URLSearchParams({
+                grant_type: 'authorization_code',
+                code,
+                client_id: clientId,
+                client_secret: clientSecret,
+                redirect_uri: redirectUri,
+                ...(state ? { state } : {}),
+            }),
+        });
+    } catch (error) {
+        const errMsg = error instanceof Error ? error.message : 'Network error';
+        throw new Error(`[OAUTH_STAGE:TOKEN_EXCHANGE] Failed to reach OAuth provider token endpoint at ${tokenUrl}: ${errMsg}`);
+    }
 
     if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Token exchange failed: ${errorText}`);
+        throw new Error(`[OAUTH_STAGE:TOKEN_EXCHANGE] OAuth provider rejected token exchange (HTTP ${response.status}). Provider response: ${errorText.slice(0, 500)}`);
     }
 
-    return response.json();
+    try {
+        return response.json();
+    } catch (error) {
+        const responseText = await response.text();
+        throw new Error(`[OAUTH_STAGE:TOKEN_EXCHANGE] OAuth provider returned invalid JSON response. Expected JSON with access_token, but received: ${responseText.slice(0, 500)}. This usually means the token_url is incorrect or the provider is not returning a proper OAuth token response.`);
+    }
 }
 
 async function exchangeClientCredentialsForToken(
@@ -62,27 +64,39 @@ async function exchangeClientCredentialsForToken(
     clientSecret: string
 ): Promise<OAuthTokenResponse> {
     if (!clientId || !clientSecret) {
-        throw new Error('OAuth client credentials not configured');
+        throw new Error('[OAUTH_STAGE:TOKEN_EXCHANGE] OAuth client credentials not configured for client credentials flow');
     }
-    const response = await fetch(tokenUrl, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Accept': 'application/json',
-        },
-        body: new URLSearchParams({
-            grant_type: 'client_credentials',
-            client_id: clientId,
-            client_secret: clientSecret,
-        }),
-    });
+    
+    let response: Response;
+    try {
+        response = await fetch(tokenUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Accept': 'application/json',
+            },
+            body: new URLSearchParams({
+                grant_type: 'client_credentials',
+                client_id: clientId,
+                client_secret: clientSecret,
+            }),
+        });
+    } catch (error) {
+        const errMsg = error instanceof Error ? error.message : 'Network error';
+        throw new Error(`[OAUTH_STAGE:TOKEN_EXCHANGE] Failed to reach OAuth provider token endpoint at ${tokenUrl}: ${errMsg}`);
+    }
 
     if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Token exchange failed: ${errorText}`);
+        throw new Error(`[OAUTH_STAGE:TOKEN_EXCHANGE] OAuth provider rejected token exchange for client credentials flow (HTTP ${response.status}). Provider response: ${errorText.slice(0, 500)}`);
     }
 
-    return response.json();
+    const responseText = await response.text();
+    try {
+        return JSON.parse(responseText);
+    } catch (error) {
+        throw new Error(`[OAUTH_STAGE:TOKEN_EXCHANGE] OAuth provider returned invalid JSON response. Expected JSON with access_token, but received: ${responseText.slice(0, 500)}. This usually means the token_url is incorrect or the provider is not returning a proper OAuth token response.`);
+    }
 }
 
 function buildRedirectUrl(origin: string, path: string, params: Record<string, string>): string {
@@ -99,15 +113,21 @@ function createOAuthCallbackHTML(
     message: string,
     integrationId: string,
     origin: string,
-    tokens?: any
+    tokens?: any,
+    suppressErrorUI?: boolean
 ): string {
     const isError = type === 'error';
     const title = isError ? 'OAuth Connection Failed' : 'OAuth Connection Successful!';
     const color = isError ? '#dc2626' : '#16a34a';
     const actionText = isError ? 'You can close this window and try again.' : 'You can close this window now.';
 
-    // Properly escape message for JavaScript
-    const escapedMessage = message.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
+    // Properly escape message for JavaScript (including newlines which break string literals)
+    const escapedMessage = message
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/"/g, '\\"')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r');
 
     return `
         <!DOCTYPE html>
@@ -133,9 +153,11 @@ function createOAuthCallbackHTML(
                     } catch (e) {
                         console.error('Failed to notify parent window:', e);
                     }
-                    setTimeout(() => window.close(), 100);
+                    if (!${isError} || ${suppressErrorUI}) {
+                        setTimeout(() => window.close(), 100);
+                    }
                 } else {
-                    window.location.href = '${origin}/integrations?${isError ? 'error' : 'success'}=oauth_${type}&integration=${integrationId}&message=' + encodeURIComponent('${message}');
+                    window.location.href = '${origin}/integrations?${isError ? 'error' : 'success'}=oauth_${type}&integration=${integrationId}&message=' + encodeURIComponent('${escapedMessage}');
                 }
             </script>
         </body>
@@ -178,40 +200,47 @@ export async function GET(request: NextRequest) {
 
     // Handle OAuth provider errors
     if (error) {
-        const errorMsg = errorDescription || error;
+        const errorMsg = `[OAUTH_STAGE:AUTHORIZATION] OAuth provider returned error during user authorization: ${error}${errorDescription ? ` - ${errorDescription}` : ''}. This error occurred before the token exchange step.`;
         let integrationId = 'unknown';
+        let suppressErrorUI = false;
         try {
             if (state) {
                 const stateData = JSON.parse(atob(state)) as OAuthState;
                 integrationId = stateData.integrationId || 'unknown';
+                suppressErrorUI = stateData.suppressErrorUI || false;
             }
         } catch { }
 
-        const html = createOAuthCallbackHTML('error', errorMsg, integrationId, origin);
+        const html = createOAuthCallbackHTML('error', errorMsg, integrationId, origin, undefined, suppressErrorUI);
         return new NextResponse(html, { headers: { 'Content-Type': 'text/html' } });
     }
 
     if ((!code && grantTypeParam !== 'client_credentials') || !state) {
+        const errorMsg = !code 
+            ? '[OAUTH_STAGE:CALLBACK] No authorization code received from OAuth provider. The user may have denied access or the OAuth provider did not redirect properly.'
+            : '[OAUTH_STAGE:CALLBACK] No state parameter received from OAuth provider. This indicates a malformed OAuth callback.';
+        
         return NextResponse.redirect(
             buildRedirectUrl(origin, '/integrations', {
-                error: !code ? 'no_code' : 'no_state'
+                error: !code ? 'no_code' : 'no_state',
+                message: errorMsg
             })
         );
     }
 
     try {
         const stateData = JSON.parse(atob(state)) as OAuthState & { token_url?: string };
-        const { integrationId, apiKey, timestamp, client_credentials_uid, templateId, clientId, token_url } = stateData;
+        const { integrationId, apiKey, timestamp, client_credentials_uid, templateId, clientId, token_url, suppressErrorUI } = stateData;
 
         if (Date.now() - timestamp >= OAUTH_STATE_EXPIRY_MS) {
-            throw new Error('OAuth state expired. Please try again.');
+            throw new Error('[OAUTH_STAGE:VALIDATION] OAuth state expired (older than 5 minutes). Please start the OAuth flow again.');
         }
 
         const endpoint = process.env.GRAPHQL_ENDPOINT;
         const client = new ExtendedSuperglueClient({ endpoint, apiKey });
         const resolved = await client.getOAuthClientCredentials({ templateId, clientCredentialsUid: client_credentials_uid });
         if (!resolved?.client_secret || !resolved?.client_id) {
-            throw new Error('OAuth client credentials could not be resolved');
+            throw new Error('[OAUTH_STAGE:CREDENTIAL_RESOLUTION] OAuth client credentials could not be resolved from backend. The client_id or client_secret may not have been properly stored.');
         }
 
         let tokenData: OAuthTokenResponse;
@@ -223,13 +252,13 @@ export async function GET(request: NextRequest) {
         }
 
         if (!tokenData || typeof tokenData !== 'object') {
-            throw new Error('Invalid token response from OAuth provider');
+            throw new Error('[OAUTH_STAGE:TOKEN_VALIDATION] Invalid token response from OAuth provider - expected object with access_token field');
         }
 
         const { access_token, refresh_token, ...additionalFields } = tokenData;
 
         if (!access_token) {
-            throw new Error('No access token received from OAuth provider. Please try again.');
+            throw new Error('[OAUTH_STAGE:TOKEN_VALIDATION] No access_token field in OAuth provider response. The provider may require different OAuth configuration or the token_url may be incorrect.');
         }
 
         // Package the tokens for the frontend to handle
@@ -248,7 +277,7 @@ export async function GET(request: NextRequest) {
                 tokens
             });
         } else {
-            const html = createOAuthCallbackHTML('success', 'OAuth connection completed successfully!', integrationId, origin, tokens);
+            const html = createOAuthCallbackHTML('success', 'OAuth connection completed successfully!', integrationId, origin, tokens, suppressErrorUI);
             return new NextResponse(html, { headers: { 'Content-Type': 'text/html' } });
         }
     } catch (error) {
@@ -258,10 +287,12 @@ export async function GET(request: NextRequest) {
         // Try to extract integration ID from state if available
         let integrationId = 'unknown';
         let isClientCredentials = false;
+        let suppressErrorUI = false;
         try {
             if (state) {
                 const stateData = JSON.parse(atob(state)) as OAuthState;
                 integrationId = stateData.integrationId || 'unknown';
+                suppressErrorUI = stateData.suppressErrorUI || false;
             }
             isClientCredentials = grantTypeParam === 'client_credentials';
         } catch {
@@ -275,7 +306,7 @@ export async function GET(request: NextRequest) {
                 message: errorMessage
             }, { status: 400 });
         } else {
-            const html = createOAuthCallbackHTML('error', errorMessage, integrationId, origin);
+            const html = createOAuthCallbackHTML('error', errorMessage, integrationId, origin, undefined, suppressErrorUI);
             return new NextResponse(html, { headers: { 'Content-Type': 'text/html' } });
         }
     }
