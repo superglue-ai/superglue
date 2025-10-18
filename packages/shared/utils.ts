@@ -4,6 +4,12 @@ import { toJsonSchema } from './json-schema.js';
 // Re-export cron utilities
 export * from './utils/cron.js';
 
+// Re-export AI model initialization utilities
+export * from './utils/ai-model-init.js';
+
+// Re-export model context length utilities
+export * from './utils/model-context-length.js';
+
 // ---- Schema inference configuration (tunable) ----
 const SMALL_ARRAY_THRESHOLD = 100; // Arrays smaller than this analyze all items
 const SAMPLE_SIZE = 50; // Total samples for large arrays
