@@ -1,7 +1,7 @@
 import { Integration, Workflow } from "@superglue/client";
 import { Metadata, toJsonSchema } from "@superglue/shared";
-import { type OpenAI } from "openai";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
+import { LLMMessage } from "../llm/llm.js";
 import { DocumentationSearch } from "../documentation/documentation-search.js";
 import { executeTool } from "../execute/tools.js";
 import { BUILD_WORKFLOW_SYSTEM_PROMPT } from "../llm/prompts.js";
@@ -9,7 +9,7 @@ import { getObjectContext } from "../utils/context.js";
 import { logMessage } from "../utils/logs.js";
 import { composeUrl } from "../utils/tools.js";
 
-type ChatMessage = OpenAI.Chat.ChatCompletionMessageParam;
+type ChatMessage = LLMMessage;
 
 export class WorkflowBuilder {
   private integrations: Record<string, Integration>;

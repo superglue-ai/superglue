@@ -334,7 +334,7 @@ describe('VercelAIModel', () => {
         name: 'custom_tool',
         description: 'A custom tool',
         arguments: {
-          type: 'object',
+          type: 'object' as const,
           properties: {
             param: { type: 'string' }
           }
