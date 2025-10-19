@@ -649,7 +649,7 @@ export const toolDefinitions: Record<string, any> = {
           save: false
         });
 
-        logMessage('info', `MCP_UPDATE:build_and_run:WORKFLOW_BUILD_SUCCESS:${JSON.stringify(builtTool)}`, { orgId: orgId });
+        logMessage('info', `MCP_UPDATE:build_and_run:TOOL_BUILD_SUCCESS:${JSON.stringify(builtTool)}`, { orgId: orgId });
 
         const result = await client.executeWorkflow({
           workflow: builtTool,
@@ -1002,7 +1002,7 @@ export const createMcpServer = async (apiKey: string) => {
     description: `
 superglue: Universal API Integration Platform
 
-AGENT WORKFLOW:
+AGENT TOOL:
 1. DISCOVER: Use 'superglue_find_relevant_integrations' to find available integrations for your task.
 2. [Optional] CREATE: Use 'superglue_create_integration' to create a new integration. ALWAYS ask user permission before creating a new integration.
 2. BUILD & TEST: Use 'superglue_build_and_run' with instruction and integrations. Iterate until successful. If no credentials are saved with the integration, add them to the build_and_run request.
@@ -1010,7 +1010,7 @@ AGENT WORKFLOW:
 4. EXECUTE: Use 'superglue_execute_tool' for saved tools.
 5. SCHEDULE (Optional): Use 'superglue_create_tool_schedule' to scheduled executions of saved tools to run automatically.
 
-WORKFLOW SCHEDULING:
+TOOL SCHEDULING:
 - Use 'superglue_list_tool_schedules' to see existing scheduled executions for a tool
 - Use 'superglue_create_tool_schedule' to create new scheduled executions of saved tools using cron expressions
 - Use 'superglue_update_tool_schedule' to modify existing schedules (enable/disable, change timing, change timezone, change payload)
