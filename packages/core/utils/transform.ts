@@ -169,8 +169,6 @@ export async function evaluateMapping(
 
 ${instruction ? `The user's instruction: "${instruction}"` : 'No specific instruction provided; focus on mapping source to target schema.'}
 
-CRITICAL: You are viewing ONLY 5 random samples from potentially thousands of records. The mapping code operates on the FULL dataset.
-
 ONLY fail the evaluation if you find:
 1. Syntax errors or code that would crash
 2. Clear logic errors (e.g., using wrong operators, accessing non-existent properties that would cause runtime errors)
@@ -196,17 +194,17 @@ Return { success: true, reason: "Mapping follows instruction and appears logical
 ${JSON.stringify(targetSchema, null, 2)}
 </Target Schema>
 
-<Source Payload Sample> // Random sample of 5 items per array, actual datasets may be much larger
-${JSON.stringify(sample(sourcePayload, 5), null, 2).slice(0, 50000)}
-</Source Payload Sample>
+<Transform Input Data> 
+${getObjectContext(sourcePayload, { include: { schema: true, preview: true, samples: true }, characterBudget: 50000 })}
+</Transform Input Data>
 
-<Transformed Data Sample> // Random sample of 5 items per array, actual datasets may be much larger
-${JSON.stringify(sample(transformedData, 5), null, 2).slice(0, 50000)}
-</Transformed Data Sample>
+<Transformed Output Data> 
+${getObjectContext(transformedData, { include: { schema: true, preview: true, samples: true }, characterBudget: 50000 })}
+</Transformed Output Data>
 
-<Mapping Code> // The actual transformation logic applied to the full dataset
+<Transform Code> 
 ${mappingCode}
-</Mapping Code>
+</Transform Code>
 
 Please evaluate the transformation based on the criteria in the system prompt, considering that samples may not show all data values present in the full dataset.`;
 
