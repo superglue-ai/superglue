@@ -80,7 +80,7 @@ THE FUNCTION MUST BE VALID JAVASCRIPT that can be executed with eval().
 `;
 
 
-export const GENERATE_SCHEMA_PROMPT = `You are a json schema generator assistant. Generate a JSON schema based on instructions.
+export const GENERATE_SCHEMA_SYSTEM_PROMPT = `You are a json schema generator assistant. Generate a JSON schema based on instructions.
 If the response data is an array, make the schema an array of objects. If no response data is provided, still generate a schema based on the instruction..
 
 Make the schema as simple as possible. No need to include every possible field, just the ones relevant to the query.
@@ -441,7 +441,7 @@ For SOAP requests:
 `;
 
 
-export const SELECTION_PROMPT = `
+export const FIND_RELEVANT_INTEGRATIONS_SYSTEM_PROMPT = `
 You are an expert AI assistant responsible for selecting the correct integrations to use based on a user's instruction and documentation provided for each integration. Your goal is to analyze the user's request and choose the most relevant integrations from a given list.
 
 <CONTEXT>
@@ -495,7 +495,7 @@ CRM platform for managing contacts, deals, and companies. Endpoints: GET /crm/v3
 }
 </EXAMPLE_OUTPUT>`;
 
-export const SELF_HEALING_API_AGENT_PROMPT = `You are an API configuration and execution agent. Your task is to successfully execute an API call by generating and refining API configurations based on the provided context and any errors encountered. Generate tool calls and their arguments only, do not include any other text unless explictly instructed to.
+export const SELF_HEALING_SYSTEM_PROMPT = `You are an API configuration and execution agent. Your task is to successfully execute an API call by generating and refining API configurations based on the provided context and any errors encountered. Generate tool calls and their arguments only, do not include any other text unless explictly instructed to.
 
 You have access to two tools:
 1. submit_tool - Submit an API configuration to execute the call and validate the response
