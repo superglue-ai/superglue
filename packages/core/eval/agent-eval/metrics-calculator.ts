@@ -31,25 +31,37 @@ export class MetricsCalculator {
     }
 
     private calculateAverageBuildTime(workflowAttempts: WorkflowAttempt[]): number {
-        if (workflowAttempts.length === 0) return 0;
-        return workflowAttempts.reduce((acc, attempt) => acc + attempt.buildTime, 0) / workflowAttempts.length;
+        const validTimes = workflowAttempts
+            .map(a => a.buildTime)
+            .filter((t): t is number => t !== null);
+        if (validTimes.length === 0) return 0;
+        return validTimes.reduce((acc, t) => acc + t, 0) / validTimes.length;
     }
 
     private calculateAverageExecutionTime(workflowAttempts: WorkflowAttempt[]): number {
-        if (workflowAttempts.length === 0) return 0;
-        return workflowAttempts.reduce((acc, attempt) => acc + attempt.executionTime, 0) / workflowAttempts.length;
+        const validTimes = workflowAttempts
+            .map(a => a.executionTime)
+            .filter((t): t is number => t !== null);
+        if (validTimes.length === 0) return 0;
+        return validTimes.reduce((acc, t) => acc + t, 0) / validTimes.length;
     }
 
     private calculateOneShotAverageExecutionTime(workflowAttempts: WorkflowAttempt[]): number | null {
-        const oneShotAttempts = workflowAttempts.filter(a => !a.selfHealingEnabled);
-        if (oneShotAttempts.length === 0) return null;
-        return oneShotAttempts.reduce((acc, attempt) => acc + attempt.executionTime, 0) / oneShotAttempts.length;
+        const validTimes = workflowAttempts
+            .filter(a => !a.selfHealingEnabled)
+            .map(a => a.executionTime)
+            .filter((t): t is number => t !== null);
+        if (validTimes.length === 0) return null;
+        return validTimes.reduce((acc, t) => acc + t, 0) / validTimes.length;
     }
 
     private calculateSelfHealingAverageExecutionTime(workflowAttempts: WorkflowAttempt[]): number | null {
-        const selfHealingAttempts = workflowAttempts.filter(a => a.selfHealingEnabled);
-        if (selfHealingAttempts.length === 0) return null;
-        return selfHealingAttempts.reduce((acc, attempt) => acc + attempt.executionTime, 0) / selfHealingAttempts.length;
+        const validTimes = workflowAttempts
+            .filter(a => a.selfHealingEnabled)
+            .map(a => a.executionTime)
+            .filter((t): t is number => t !== null);
+        if (validTimes.length === 0) return null;
+        return validTimes.reduce((acc, t) => acc + t, 0) / validTimes.length;
     }
 
     private determineWorkflowMetrics(workflowAttemptsByWorkflowId: Record<string, WorkflowAttempt[]>): WorkflowMetrics[] {
@@ -84,14 +96,25 @@ export class MetricsCalculator {
             const oneShotAttempts = workflowAttempts.filter(a => !a.selfHealingEnabled);
             const selfHealingAttempts = workflowAttempts.filter(a => a.selfHealingEnabled);
 
-            const averageBuildTimeMs = workflowAttempts.length > 0
-                ? workflowAttempts.reduce((acc, a) => acc + a.buildTime, 0) / workflowAttempts.length
+            const validBuildTimes = workflowAttempts
+                .map(a => a.buildTime)
+                .filter((t): t is number => t !== null);
+            const averageBuildTimeMs = validBuildTimes.length > 0
+                ? validBuildTimes.reduce((acc, t) => acc + t, 0) / validBuildTimes.length
                 : null;
-            const oneShotAverageExecutionTimeMs = oneShotAttempts.length > 0
-                ? oneShotAttempts.reduce((acc, a) => acc + a.executionTime, 0) / oneShotAttempts.length
+            
+            const validOneShotExecTimes = oneShotAttempts
+                .map(a => a.executionTime)
+                .filter((t): t is number => t !== null);
+            const oneShotAverageExecutionTimeMs = validOneShotExecTimes.length > 0
+                ? validOneShotExecTimes.reduce((acc, t) => acc + t, 0) / validOneShotExecTimes.length
                 : null;
-            const selfHealingAverageExecutionTimeMs = selfHealingAttempts.length > 0
-                ? selfHealingAttempts.reduce((acc, a) => acc + a.executionTime, 0) / selfHealingAttempts.length
+            
+            const validSelfHealingExecTimes = selfHealingAttempts
+                .map(a => a.executionTime)
+                .filter((t): t is number => t !== null);
+            const selfHealingAverageExecutionTimeMs = validSelfHealingExecTimes.length > 0
+                ? validSelfHealingExecTimes.reduce((acc, t) => acc + t, 0) / validSelfHealingExecTimes.length
                 : null;
 
             return {

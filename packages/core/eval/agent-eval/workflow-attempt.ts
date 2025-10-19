@@ -23,9 +23,9 @@ export class SuperglueWorkflowAttemptService {
         const attempt: WorkflowAttempt = {
             workflowConfig,
             selfHealingEnabled: selfHealingEnabled,
-            buildTime: 0,
+            buildTime: null,
             buildSuccess: false,
-            executionTime: 0,
+            executionTime: null,
             executionSuccess: false,
             createdAt: new Date(),
         };

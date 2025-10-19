@@ -47,11 +47,11 @@ export interface WorkflowAttempt {
     workflowConfig: WorkflowConfig;
     selfHealingEnabled: boolean;
 
-    buildTime: number;
+    buildTime: number | null;
     buildSuccess: boolean;
     buildError?: string;
 
-    executionTime: number;
+    executionTime: number | null;
     executionSuccess: boolean;
     executionError?: string;
 
