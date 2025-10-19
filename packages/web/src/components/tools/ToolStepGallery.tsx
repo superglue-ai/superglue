@@ -632,7 +632,7 @@ export function ToolStepGallery({
         setIsAddStepDialogOpen(true);
     };
 
-    const handleConfirmInsertStep = (stepId: string) => {
+    const handleConfirmInsertStep = (stepId: string, instruction: string) => {
         if (pendingInsertIndex === null || !onStepsChange) return;
 
         const newStep = {
@@ -640,7 +640,7 @@ export function ToolStepGallery({
             name: '',
             apiConfig: {
                 id: stepId,
-                instruction: '',
+                instruction: instruction,
                 urlHost: '',
                 urlPath: '',
                 method: 'GET',
