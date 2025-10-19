@@ -89,7 +89,7 @@ export async function generateExtractConfig(extractConfig: Partial<ExtractConfig
     decompressionMethod: z.enum(Object.values(DecompressionMethod) as [string, ...string[]]).optional(),
     fileType: z.enum(Object.values(FileType) as [string, ...string[]]).optional(),
   }));
-  const extractContext = getExtractContext({ extractConfig: extractConfig as ExtractConfig, documentation, payload, credentials, lastError: lastError }, { characterBudget: 100000 });
+  const extractPrompt = getExtractContext({ extractConfig: extractConfig as ExtractConfig, documentation, payload, credentials, lastError: lastError }, { characterBudget: LanguageModel.contextLength / 10 });
   const messages: LLMMessage[] = [
     {
       role: "system",
@@ -97,7 +97,7 @@ export async function generateExtractConfig(extractConfig: Partial<ExtractConfig
     },
     {
       role: "user",
-      content: extractContext
+      content: extractPrompt
     }
   ];
   const { response: generatedConfig } = await LanguageModel.generateObject(messages, schema);
