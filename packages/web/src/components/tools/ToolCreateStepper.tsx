@@ -6,7 +6,7 @@ import { useToast } from '@/src/hooks/use-toast';
 import { needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
 import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { cn, composeUrl, getIntegrationIcon as getIntegrationIconName, getSimpleIcon, inputErrorStyles } from '@/src/lib/utils';
-import { Integration, IntegrationInput, SuperglueClient, UpsertMode, Workflow } from '@superglue/client';
+import { Integration, IntegrationInput, SuperglueClient, Workflow as Tool, UpsertMode } from '@superglue/client';
 import { integrationOptions } from "@superglue/shared";
 import { waitForIntegrationProcessing } from '@superglue/shared/utils';
 import { ArrowRight, Check, Clock, Globe, Key, Loader2, Pencil, Plus, X } from 'lucide-react';
@@ -21,14 +21,14 @@ import { Switch } from '../ui/switch';
 import { Textarea } from '../ui/textarea';
 import { DocStatus } from '../utils/DocStatusSpinner';
 import { HelpTooltip } from '../utils/HelpTooltip';
-import { StepIndicator, WORKFLOW_CREATE_STEPS } from '../utils/StepIndicator';
-import { WorkflowCreateSuccess } from './WorkflowCreateSuccess';
-import { PayloadSpotlight } from './WorkflowMiniStepCards';
-import WorkflowPlayground, { WorkflowPlaygroundHandle } from './WorkflowPlayground';
+import { StepIndicator, TOOL_CREATE_STEPS } from '../utils/StepIndicator';
+import { ToolCreateSuccess } from './ToolCreateSuccess';
+import { PayloadSpotlight } from './ToolMiniStepCards';
+import ToolPlayground, { ToolPlaygroundHandle } from './ToolPlayground';
 
-type WorkflowCreateStep = 'integrations' | 'prompt' | 'review' | 'success';
+type ToolCreateStep = 'integrations' | 'prompt' | 'review' | 'success';
 
-interface WorkflowCreateStepperProps {
+interface ToolCreateStepperProps {
   onComplete?: () => void;
 }
 
@@ -60,8 +60,8 @@ class ExtendedSuperglueClient extends SuperglueClient {
   }
 }
 
-export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps) {
-  const [step, setStep] = useState<WorkflowCreateStep>('integrations');
+export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
+  const [step, setStep] = useState<ToolCreateStep>('integrations');
   const [isBuilding, setIsBuilding] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
@@ -70,13 +70,13 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   const router = useRouter();
   const searchParams = useSearchParams();
   const superglueConfig = useConfig();
-  const playgroundRef = useRef<WorkflowPlaygroundHandle>(null);
+  const playgroundRef = useRef<ToolPlaygroundHandle>(null);
 
   const { integrations, pendingDocIds, loading, setPendingDocIds, refreshIntegrations } = useIntegrations();
   const preselectedIntegrationId = searchParams.get('integration');
   const [instruction, setInstruction] = useState('');
   const [payload, setPayload] = useState('{}');
-  const [currentWorkflow, setCurrentWorkflow] = useState<Workflow | null>(null);
+  const [currentTool, setCurrentTool] = useState<Tool | null>(null);
 
   const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -127,7 +127,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
 
   useEffect(() => {
     if (step === 'prompt') {
-      setCurrentWorkflow(null);
+      setCurrentTool(null);
     }
 
     if (step !== 'prompt') {
@@ -188,25 +188,25 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     setIntegrationFormEdit(null);
   };
 
-  const handleSaveWorkflow = async (workflow: Workflow) => {
+  const handleSaveTool = async (tool: Tool) => {
     try {
       setIsSaving(true);
-      const currentWorkflowState = playgroundRef.current?.getCurrentWorkflow();
-      const workflowToSave = currentWorkflowState || workflow;
+      const currentToolState = playgroundRef.current?.getCurrentTool();
+      const toolToSave = currentToolState || tool;
 
-      const saved = await client.upsertWorkflow(workflowToSave.id, workflowToSave as any);
-      if (!saved) throw new Error('Failed to save workflow');
+      const saved = await client.upsertWorkflow(toolToSave.id, toolToSave as any);
+      if (!saved) throw new Error('Failed to save tool');
 
       toast({
-        title: 'Workflow saved',
+        title: 'Tool saved',
         description: `"${saved.id}" saved successfully`
       });
 
-      setCurrentWorkflow(saved);
+      setCurrentTool(saved);
       setStep('success');
     } catch (e: any) {
       toast({
-        title: 'Error saving workflow',
+        title: 'Error saving tool',
         description: e.message || 'Unknown error',
         variant: 'destructive'
       });
@@ -216,12 +216,12 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     }
   };
 
-  const handleExecuteWorkflow = async () => {
+  const handleExecuteTool = async () => {
     try {
       setIsExecuting(true);
       setShouldStopExecution(false);
       setIsStopping(false);
-      await playgroundRef.current?.executeWorkflow({ selfHealing: selfHealingEnabled });
+      await playgroundRef.current?.executeTool({ selfHealing: selfHealingEnabled });
     } finally {
       setIsExecuting(false);
       setIsStopping(false);
@@ -232,13 +232,13 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
     setShouldStopExecution(true);
     setIsStopping(true);
     toast({
-      title: "Stopping workflow",
-      description: "Workflow will stop after the current step completes",
+      title: "Stopping tool",
+      description: "Tool will stop after the current step completes",
     });
   };
 
   const handleNext = async () => {
-    const steps: WorkflowCreateStep[] = ['integrations', 'prompt', 'review', 'success'];
+    const steps: ToolCreateStep[] = ['integrations', 'prompt', 'review', 'success'];
     const currentIndex = steps.indexOf(step);
 
     if (step === 'integrations') {
@@ -282,14 +282,14 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
           save: false
         });
         if (!response) {
-          throw new Error('Failed to build workflow');
+          throw new Error('Failed to build tool');
         }
-        setCurrentWorkflow(response);
+        setCurrentTool(response);
         setStep(steps[currentIndex + 1]);
       } catch (error: any) {
-        console.error('Error building workflow:', error);
+        console.error('Error building tool:', error);
         toast({
-          title: 'Error Building Workflow',
+          title: 'Error Building Tool',
           description: error.message,
           variant: 'destructive',
         });
@@ -306,7 +306,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
   };
 
   const handleBack = () => {
-    const steps: WorkflowCreateStep[] = ['integrations', 'prompt', 'review', 'success'];
+    const steps: ToolCreateStep[] = ['integrations', 'prompt', 'review', 'success'];
     const currentIndex = steps.indexOf(step);
     if (step === 'integrations') {
       router.push('/configs');
@@ -464,7 +464,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
       <div className="flex-none mb-4">
         <div className="flex flex-col lg:flex-row items-center justify-between gap-4 mb-4">
           <h1 className="text-2xl font-semibold">
-            {step === 'success' ? 'Workflow Created!' : 'Create New Workflow'}
+            {step === 'success' ? 'Tool Created!' : 'Create New Tool'}
           </h1>
           <div className="flex items-center gap-2">
             <Button
@@ -479,7 +479,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
             </Button>
           </div>
         </div>
-        <StepIndicator currentStep={step} steps={WORKFLOW_CREATE_STEPS} />
+        <StepIndicator currentStep={step} steps={TOOL_CREATE_STEPS} />
       </div>
 
       <div className="flex-1 overflow-hidden flex flex-col">
@@ -488,7 +488,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
             <div className="space-y-4">
               <div className="mb-4 flex items-center justify-between gap-4">
                 <h3 className="font-medium">
-                  Select one or more integrations to use in your workflow. You can add new integrations as needed.
+                  Select one or more integrations to use in your tool. You can add new integrations as needed.
                 </h3>
                 <Button variant="outline" size="sm" className="h-9 shrink-0" onClick={() => setShowIntegrationForm(true)}>
                   <Plus className="mr-2 h-4 w-4" /> Add Integration
@@ -500,7 +500,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                 ) : integrations.length === 0 ? (
                   <div className="h-[320px] flex items-center justify-center bg-background">
                     <p className="text-sm text-muted-foreground italic">
-                      No integrations added yet. Define the APIs or data sources your workflow will use.
+                      No integrations added yet. Define the APIs or data sources your tool will use.
                     </p>
                   </div>
                 ) : (
@@ -599,7 +599,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                             <path d="M12 16v-4" />
                             <path d="M12 8h.01" />
                           </svg>
-                          No integrations selected - you can create transform-only workflows or add integrations for API calls
+                          No integrations selected - you can create transform-only tools or add integrations for API calls
                         </div>
                       </div>
                     )}
@@ -778,8 +778,8 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
           {step === 'prompt' && (
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="instruction">Workflow Instruction*</Label>
-                <HelpTooltip text="Describe what you want this workflow to achieve using the integrations you defined. Be specific!" />
+                <Label htmlFor="instruction">Tool Instruction*</Label>
+                <HelpTooltip text="Describe what you want this tool to achieve using the integrations you defined. Be specific!" />
                 <div className="relative">
                   <Textarea
                     id="instruction"
@@ -812,7 +812,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                   )}
                 </div>
                 {validationErrors.instruction && (
-                  <p className="text-sm text-destructive mt-1">Workflow instruction is required</p>
+                  <p className="text-sm text-destructive mt-1">Tool instruction is required</p>
                 )}
               </div>
 
@@ -824,7 +824,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
 
               <div className="space-y-1">
                 <Label htmlFor="payload">Initial Payload (Optional)</Label>
-                <HelpTooltip text="Provide the initial payload for the workflow. Uploaded files (CSV, JSON, XML, Excel) will be automatically parsed and merged with the manual payload when the workflow executes." />
+                <HelpTooltip text="Provide the initial payload for the tool. Uploaded files (CSV, JSON, XML, Excel) will be automatically parsed and merged with the manual payload when the tool executes." />
                 <div className={cn(
                   validationErrors.payload && "ring-2 ring-destructive ring-offset-2"
                 )}>
@@ -855,16 +855,16 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
               </div>
             </div>
           )}
-          {step === 'review' && currentWorkflow && (
+          {step === 'review' && currentTool && (
             <div className="w-full">
-              <WorkflowPlayground
+              <ToolPlayground
                 ref={playgroundRef}
                 embedded={true}
-                initialWorkflow={currentWorkflow}
+                initialTool={currentTool}
                 initialPayload={payload}
                 initialInstruction={instruction}
                 integrations={integrations}
-                onSave={handleSaveWorkflow}
+                onSave={handleSaveTool}
                 onInstructionEdit={() => setStep('prompt')}
                 selfHealingEnabled={selfHealingEnabled}
                 onSelfHealingChange={setSelfHealingEnabled}
@@ -890,7 +890,7 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                           onCheckedChange={setSelfHealingEnabled}
                         />
                         <div className="ml-1 flex items-center">
-                          <HelpTooltip text="Enable self-healing during execution. Slower, but can auto-fix failures in workflow steps and transformation code." />
+                          <HelpTooltip text="Enable self-healing during execution. Slower, but can auto-fix failures in tool steps and transformation code." />
                         </div>
                       </div>
                     </div>
@@ -906,16 +906,16 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                     ) : (
                       <Button
                         variant="success"
-                        onClick={handleExecuteWorkflow}
+                        onClick={handleExecuteTool}
                         disabled={isSaving || isExecuting}
                         className="h-9 px-4"
                       >
-                        Test Workflow
+                        Test Tool
                       </Button>
                     )}
                     <Button
                       variant="default"
-                      onClick={() => playgroundRef.current?.saveWorkflow()}
+                      onClick={() => playgroundRef.current?.saveTool()}
                       disabled={isSaving}
                       className="h-9 px-5 shadow-md border border-primary/40"
                     >
@@ -926,20 +926,20 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
               />
             </div>
           )}
-          {step === 'success' && currentWorkflow && (
+          {step === 'success' && currentTool && (
             <div className="space-y-4">
               <p className="text-lg font-medium">
-                Workflow{' '}
+                Tool{' '}
                 <span className="font-mono text-base bg-muted px-2 py-0.5 rounded">
-                  {currentWorkflow.id}
+                  {currentTool.id}
                 </span>{' '}
                 created successfully!
               </p>
               <p>
-                You can now use this workflow ID in the "Workflows" page or call it via the API/SDK.
+                You can now use this tool ID in the "Tools" page or call it via the API/SDK.
               </p>
-              <WorkflowCreateSuccess
-                currentWorkflow={currentWorkflow}
+              <ToolCreateSuccess
+                currentTool={currentTool}
                 credentials={
                   Object.values(integrations).reduce((acc, sys: any) => {
                     return {
@@ -960,11 +960,11 @@ export function WorkflowCreateStepper({ onComplete }: WorkflowCreateStepperProps
                 })()}
               />
               <div className="flex gap-2 mt-6">
-                <Button variant="outline" onClick={() => router.push(`/workflows/${currentWorkflow.id}`)}>
-                  Go to Workflow
+                <Button variant="outline" onClick={() => router.push(`/tools/${currentTool.id}`)}>
+                  Go to Tool
                 </Button>
                 <Button variant="outline" onClick={() => router.push('/')}>
-                  View All Workflows
+                  View All Tools
                 </Button>
               </div>
             </div>

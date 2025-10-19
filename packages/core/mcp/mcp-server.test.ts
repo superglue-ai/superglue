@@ -2,11 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { toolDefinitions } from './mcp-server.js';
 
 const buildAndRun = toolDefinitions.superglue_build_and_run.execute;
-const executeWorkflow = toolDefinitions.superglue_execute_workflow.execute;
-const getIntegrationCode = toolDefinitions.superglue_get_workflow_integration_code.execute;
-const listWorkflows = toolDefinitions.superglue_list_available_workflows.execute;
+const executeWorkflow = toolDefinitions.superglue_execute_tool.execute;
+const getIntegrationCode = toolDefinitions.superglue_get_tool_integration_code.execute;
+const listWorkflows = toolDefinitions.superglue_list_available_tools.execute;
 const findIntegrations = toolDefinitions.superglue_find_relevant_integrations.execute;
-const saveWorkflow = toolDefinitions.superglue_save_workflow.execute;
+const saveTool = toolDefinitions.superglue_save_tool.execute;
 const createIntegration = toolDefinitions.superglue_create_integration.execute;
 const modifyIntegration = toolDefinitions.superglue_modify_integration.execute;
 
@@ -22,11 +22,11 @@ function getValidBuildArgs(overrides = {}) {
     integrationIds: ['test-integration-id'],
     payload: { userId: 123 },
     client: {
-      buildWorkflow: vi.fn().mockResolvedValue({ id: 'workflow-1', steps: [] }),
+      buildWorkflow: vi.fn().mockResolvedValue({ id: 'tool-1', steps: [] }),
       executeWorkflow: vi.fn().mockResolvedValue({
         success: true,
         data: { result: 'success' },
-        config: { id: 'workflow-1', steps: [], integrationIds: ['test-integration-id'], instruction: 'test' },
+        config: { id: 'tool-1', steps: [], integrationIds: ['test-integration-id'], instruction: 'test' },
         stepResults: []
       }),
     },
@@ -36,13 +36,13 @@ function getValidBuildArgs(overrides = {}) {
 
 function getValidExecuteArgs(overrides = {}) {
   return {
-    id: 'workflow-1',
+    id: 'tool-1',
     payload: { test: 'data' },
     client: {
       executeWorkflow: vi.fn().mockResolvedValue({
         success: true,
         data: { result: 'success' },
-        config: { id: 'workflow-1' },
+        config: { id: 'tool-1' },
         stepResults: []
       }),
     },
@@ -91,11 +91,11 @@ describe('superglue_build_and_run', () => {
 
   it('accepts array of integration ID strings', async () => {
     const client = {
-      buildWorkflow: vi.fn().mockResolvedValue({ id: 'workflow-1', steps: [] }),
+      buildWorkflow: vi.fn().mockResolvedValue({ id: 'tool-1', steps: [] }),
       executeWorkflow: vi.fn().mockResolvedValue({
         success: true,
         data: { result: 'success' },
-        config: { id: 'workflow-1', steps: [], integrationIds: ['integration-1', 'integration-2'] },
+        config: { id: 'tool-1', steps: [], integrationIds: ['integration-1', 'integration-2'] },
         stepResults: []
       }),
     };
@@ -124,17 +124,17 @@ describe('superglue_build_and_run', () => {
     expect(result.error).toMatch(/fail build/);
   });
 
-  it('returns workflow_ready_to_save on successful execution', async () => {
+  it('returns tool_ready_to_save on successful execution', async () => {
     const client = {
-      buildWorkflow: vi.fn().mockResolvedValue({ id: 'workflow-1', steps: [] }),
+      buildWorkflow: vi.fn().mockResolvedValue({ id: 'tool-1', steps: [] }),
       executeWorkflow: vi.fn().mockResolvedValue({
         success: true,
         data: { result: 'success' },
         config: {
-          id: 'workflow-1',
+          id: 'tool-1',
           steps: [],
           integrationIds: ['test-integration-id'],
-          instruction: 'test workflow'
+          instruction: 'test tool'
         },
         stepResults: []
       }),
@@ -144,16 +144,16 @@ describe('superglue_build_and_run', () => {
     expect(result.success).toBe(true);
     expect(result.config).toBeDefined();
     expect(result.integrationIds).toBeDefined();
-    expect(result.note).toContain('superglue_save_workflow');
+    expect(result.note).toContain('superglue_save_tool');
   });
 
   it('calls executeWorkflow with credentials parameter', async () => {
     const client = {
-      buildWorkflow: vi.fn().mockResolvedValue({ id: 'workflow-1', steps: [] }),
+      buildWorkflow: vi.fn().mockResolvedValue({ id: 'tool-1', steps: [] }),
       executeWorkflow: vi.fn().mockResolvedValue({
         success: true,
         data: { result: 'success' },
-        config: { id: 'workflow-1', steps: [] },
+        config: { id: 'tool-1', steps: [] },
         stepResults: []
       }),
     };
@@ -165,7 +165,7 @@ describe('superglue_build_and_run', () => {
     const result = await buildAndRun(args, {});
     expect(result.success).toBe(true);
     expect(client.executeWorkflow).toHaveBeenCalledWith({
-      workflow: { id: 'workflow-1', steps: [] },
+      workflow: { id: 'tool-1', steps: [] },
       payload: args.payload,
       credentials: { apiKey: 'test-key' },
       options: {
@@ -177,19 +177,19 @@ describe('superglue_build_and_run', () => {
 
 });
 
-describe('superglue_execute_workflow', () => {
+describe('superglue_execute_tool', () => {
   it('calls executeWorkflow with minimal valid input (id only)', async () => {
     const client = {
       executeWorkflow: vi.fn().mockResolvedValue({
         success: true,
         data: { ok: true },
-        config: { id: 'workflow-minimal' },
+        config: { id: 'tool-minimal' },
         stepResults: []
       }),
     };
-    const args = { id: 'workflow-minimal', client };
+    const args = { id: 'tool-minimal', client };
     const result = await executeWorkflow(args, {});
-    expect(client.executeWorkflow).toHaveBeenCalledWith(expect.objectContaining({ id: 'workflow-minimal' }));
+    expect(client.executeWorkflow).toHaveBeenCalledWith(expect.objectContaining({ id: 'tool-minimal' }));
     expect(result.success).toBe(true);
     expect(result.data).toEqual({ ok: true });
   });
@@ -203,10 +203,10 @@ describe('superglue_execute_workflow', () => {
         stepResults: []
       }),
     };
-    const args = { id: 'workflow-payload', payload: { foo: 'bar' }, client };
+    const args = { id: 'tool-payload', payload: { foo: 'bar' }, client };
     const result = await executeWorkflow(args, {});
     expect(client.executeWorkflow).toHaveBeenCalledWith(expect.objectContaining({
-      id: 'workflow-payload',
+      id: 'tool-payload',
       payload: { foo: 'bar' }
     }));
     expect(result.success).toBe(true);
@@ -223,7 +223,7 @@ describe('superglue_execute_workflow', () => {
       }),
     };
     const args = {
-      id: 'workflow-all',
+      id: 'tool-all',
       payload: { foo: 1 },
       credentials: { apiKey: 'test' },
       options: { retries: 2 },
@@ -231,7 +231,7 @@ describe('superglue_execute_workflow', () => {
     };
     const result = await executeWorkflow(args, {});
     expect(client.executeWorkflow).toHaveBeenCalledWith(expect.objectContaining({
-      id: 'workflow-all',
+      id: 'tool-all',
       payload: { foo: 1 },
       credentials: { apiKey: 'test' },
       options: { retries: 2 }
@@ -244,26 +244,26 @@ describe('superglue_execute_workflow', () => {
       executeWorkflow: vi.fn(),
     };
     const args = { client };
-    await expect(executeWorkflow(args, {})).rejects.toThrow(/Workflow ID is required/);
+    await expect(executeWorkflow(args, {})).rejects.toThrow(/Tool ID is required/);
   });
 
   it('returns error response when client throws', async () => {
     const client = {
-      executeWorkflow: vi.fn().mockRejectedValue(new Error('Workflow not found'))
+      executeWorkflow: vi.fn().mockRejectedValue(new Error('Tool not found'))
     };
-    const args = { id: 'missing-workflow', client };
+    const args = { id: 'missing-tool', client };
     const result = await executeWorkflow(args, {});
     expect(result.success).toBe(false);
-    expect(result.error).toBe('Workflow not found');
-    expect(result.suggestion).toContain('Check that the workflow ID exists');
+    expect(result.error).toBe('Tool not found');
+    expect(result.suggestion).toContain('Check that the tool ID exists');
   });
 });
 
-describe('superglue_get_workflow_integration_code', () => {
-  it('returns code for valid workflowId and language', async () => {
+describe('superglue_get_tool_integration_code', () => {
+  it('returns code for valid toolId and language', async () => {
     const client = {
       getWorkflow: vi.fn().mockResolvedValue({
-        id: 'workflow-1',
+        id: 'tool-1',
         inputSchema: {
           properties: {
             payload: { properties: { test: { type: 'string' } } },
@@ -272,33 +272,33 @@ describe('superglue_get_workflow_integration_code', () => {
         }
       })
     };
-    const args = { client, workflowId: 'workflow-1', language: 'typescript' };
+    const args = { client, toolId: 'tool-1', language: 'typescript' };
     const result = await getIntegrationCode(args, {});
     expect(result.success).toBe(true);
-    expect(result.workflowId).toBe('workflow-1');
+    expect(result.toolId).toBe('tool-1');
     expect(result.language).toBe('typescript');
     expect(result.code).toContain('SuperglueClient');
   });
 
-  it('fails if workflowId does not exist', async () => {
+  it('fails if toolId does not exist', async () => {
     const client = {
-      getWorkflow: vi.fn().mockRejectedValue(new Error('Workflow not found'))
+      getWorkflow: vi.fn().mockRejectedValue(new Error('Tool not found'))
     };
-    const args = { client, workflowId: 'bad-id', language: 'typescript' };
+    const args = { client, toolId: 'bad-id', language: 'typescript' };
     const result = await getIntegrationCode(args, {});
     expect(result.success).toBe(false);
-    expect(result.error).toContain('Failed to generate code for workflow bad-id');
+    expect(result.error).toContain('Failed to generate code for tool bad-id');
   });
 
   it('returns code for all supported languages', async () => {
     const client = {
       getWorkflow: vi.fn().mockResolvedValue({
-        id: 'workflow-1',
+        id: 'tool-1',
         inputSchema: { properties: {} }
       })
     };
     for (const language of ['typescript', 'python', 'go']) {
-      const args = { client, workflowId: 'workflow-1', language };
+      const args = { client, toolId: 'tool-1', language };
       const result = await getIntegrationCode(args, {});
       expect(result.success).toBe(true);
       expect(result.language).toBe(language);
@@ -309,11 +309,11 @@ describe('superglue_get_workflow_integration_code', () => {
   it('handles invalid language', async () => {
     const client = {
       getWorkflow: vi.fn().mockResolvedValue({
-        id: 'workflow-1',
+        id: 'tool-1',
         inputSchema: { properties: {} }
       })
     };
-    const args = { client, workflowId: 'workflow-1', language: 'invalid-language' };
+    const args = { client, toolId: 'tool-1', language: 'invalid-language' };
     const result = await getIntegrationCode(args, {});
     expect(result.success).toBe(false);
     expect(result.error).toContain('invalid-language');
@@ -321,19 +321,19 @@ describe('superglue_get_workflow_integration_code', () => {
   });
 });
 
-describe('superglue_list_available_workflows', () => {
-  it('returns workflows with default limit and offset', async () => {
+describe('superglue_list_available_tools', () => {
+  it('returns tools with default limit and offset', async () => {
     const mockItems = [
       {
-        id: 'workflow-1',
-        name: 'Test Workflow 1',
-        instruction: 'First test workflow',
+        id: 'tool-1',
+        name: 'Test Tool 1',
+        instruction: 'First test tool',
         createdAt: '2024-01-01T00:00:00Z',
         updatedAt: '2024-01-01T00:00:00Z'
       },
       {
-        id: 'workflow-2',
-        instruction: 'Second test workflow',
+        id: 'tool-2',
+        instruction: 'Second test tool',
         createdAt: '2024-01-02T00:00:00Z',
         updatedAt: '2024-01-02T00:00:00Z'
       }
@@ -353,11 +353,11 @@ describe('superglue_list_available_workflows', () => {
 
     expect(client.listWorkflows).toHaveBeenCalledWith(100, 0);
     expect(result.success).toBe(true);
-    expect(result.workflows).toBeDefined();
-    expect(result.total).toBeGreaterThan(0); // Includes static workflows + user workflows
+    expect(result.tools).toBeDefined();
+    expect(result.total).toBeGreaterThan(0); // Includes static tools + user tools
     expect(result.limit).toBe(100);
     expect(result.offset).toBe(0);
-    expect(result.usage_tip).toBe("Use workflow IDs with superglue_execute_workflow to run specific workflows");
+    expect(result.usage_tip).toBe("Use tool IDs with superglue_execute_tool to run specific tools");
   });
 
   it('uses custom limit and offset', async () => {
@@ -464,88 +464,88 @@ describe('superglue_find_relevant_integrations', () => {
   });
 });
 
-describe('superglue_save_workflow', () => {
-  it('saves workflow successfully', async () => {
+describe('superglue_save_tool', () => {
+  it('saves tool successfully', async () => {
     const client = {
       upsertWorkflow: vi.fn().mockResolvedValue({
-        id: 'saved-workflow',
-        name: 'Test Workflow'
+        id: 'saved-tool',
+        name: 'Test Tool'
       }),
     };
-    const workflow = {
+    const tool = {
       steps: [{ id: 'step1', apiConfig: { id: 'step1', instruction: 'test' } }],
       integrationIds: ['integration-1'],
-      instruction: 'Test workflow',
+      instruction: 'Test tool',
       finalTransform: '$'
     };
-    const args = { client, id: 'test-workflow', workflow };
-    const result = await saveWorkflow(args, {});
+    const args = { client, id: 'test-tool', tool };
+    const result = await saveTool(args, {});
 
     expect(result.success).toBe(true);
-    expect(result.saved_workflow).toBeDefined();
+    expect(result.saved_tool).toBeDefined();
     expect(result.note).toContain('saved successfully');
-    expect(client.upsertWorkflow).toHaveBeenCalledWith('test-workflow', expect.objectContaining({
-      steps: workflow.steps,
-      integrationIds: workflow.integrationIds,
-      instruction: workflow.instruction,
-      finalTransform: workflow.finalTransform
+    expect(client.upsertWorkflow).toHaveBeenCalledWith('test-tool', expect.objectContaining({
+      steps: tool.steps,
+      integrationIds: tool.integrationIds,
+      instruction: tool.instruction,
+      finalTransform: tool.finalTransform
     }));
   });
 
-  it('cleans workflow data before saving', async () => {
+  it('cleans tool data before saving', async () => {
     const client = {
-      upsertWorkflow: vi.fn().mockResolvedValue({ id: 'saved-workflow' }),
+      upsertWorkflow: vi.fn().mockResolvedValue({ id: 'saved-tool' }),
     };
-    const workflow = {
+    const tool = {
       steps: [],
       integrationIds: null, // Will be cleaned to []
       instruction: null, // Will be cleaned to ""
       finalTransform: null, // Will be cleaned to "$"
       someNullField: null // Will be removed
     };
-    const args = { client, id: 'test-workflow', workflow };
-    const result = await saveWorkflow(args, {});
+    const args = { client, id: 'test-tool', tool };
+    const result = await saveTool(args, {});
 
     expect(result.success).toBe(true);
-    expect(client.upsertWorkflow).toHaveBeenCalledWith('test-workflow', expect.objectContaining({
+    expect(client.upsertWorkflow).toHaveBeenCalledWith('test-tool', expect.objectContaining({
       steps: [],
       integrationIds: [],
       instruction: '',
       finalTransform: '$'
     }));
     // Check that null field was removed
-    const savedWorkflow = client.upsertWorkflow.mock.calls[0][1];
-    expect(savedWorkflow).not.toHaveProperty('someNullField');
+    const savedTool = client.upsertWorkflow.mock.calls[0][1];
+    expect(savedTool).not.toHaveProperty('someNullField');
   });
 
-  it('returns error if workflow is missing', async () => {
+  it('returns error if tool is missing', async () => {
     const client = { upsertWorkflow: vi.fn() };
-    const args = { client, id: 'test-workflow' };
-    const result = await saveWorkflow(args, {});
+    const args = { client, id: 'test-tool' };
+    const result = await saveTool(args, {});
     expect(result.success).toBe(false);
-    expect(result.error).toContain('Workflow object is required');
+    expect(result.error).toContain('Tool object is required');
   });
 
   it('returns error if id is missing', async () => {
     const client = { upsertWorkflow: vi.fn() };
-    const workflow = { steps: [] };
-    const args = { client, workflow };
-    const result = await saveWorkflow(args, {});
+    const tool = { steps: [] };
+    const args = { client, tool };
+    const result = await saveTool(args, {});
     expect(result.success).toBe(false);
-    expect(result.error).toContain('Workflow ID is required');
+    expect(result.error).toContain('Tool ID is required');
   });
 
   it('handles upsert failures gracefully', async () => {
     const client = {
       upsertWorkflow: vi.fn().mockRejectedValue(new Error('Save failed'))
     };
-    const workflow = { steps: [], integrationIds: [], instruction: 'test' };
-    const args = { client, id: 'test-workflow', workflow };
-    const result = await saveWorkflow(args, {});
+    const tool = { steps: [], integrationIds: [], instruction: 'test' };
+    const args = { client, id: 'test-tool', tool };
+    const result = await saveTool(args, {});
 
     expect(result.success).toBe(false);
     expect(result.error).toBe('Save failed');
-    expect(result.suggestion).toContain('Failed to save workflow');
+    expect(result.suggestion).toContain('Failed to save tool');
     expect(result.debug_info).toBeDefined();
   });
 });

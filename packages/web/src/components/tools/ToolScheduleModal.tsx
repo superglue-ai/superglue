@@ -2,7 +2,7 @@ import { useConfig } from '@/src/app/config-context';
 import { Switch } from "@/src/components/ui/switch";
 import { useToast } from '@/src/hooks/use-toast';
 import { cn, getGroupedTimezones } from '@/src/lib/utils';
-import { SuperglueClient, WorkflowSchedule } from '@superglue/client';
+import { SuperglueClient, WorkflowSchedule as ToolSchedule } from '@superglue/client';
 import { validateCronExpression } from '@superglue/shared';
 import { Check, CheckCircle, ChevronsUpDown, Loader2, XCircle } from 'lucide-react';
 import Prism from 'prismjs';
@@ -27,15 +27,15 @@ const DEFAULT_SCHEDULES = [
   { value: '0 0 1 * *', label: 'Monthly on the 1st' },
 ];
 
-interface WorkflowScheduleModalProps {
-  workflowId: string;
+interface ToolScheduleModalProps {
+  toolId: string;
   isOpen: boolean;
-  schedule?: WorkflowSchedule;
+  schedule?: ToolSchedule;
   onClose: () => void;
   onSave?: () => void;
 }
 
-const WorkflowScheduleModal = ({ workflowId, isOpen, schedule, onClose, onSave }: WorkflowScheduleModalProps) => {
+const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolScheduleModalProps) => {
   const [enabled, setEnabled] = useState(true);
   const [scheduleSelectedItem, setScheduleSelectedItem] = React.useState<string>('0 0 * * *'); // default to daily
   const [customCronExpression, setCustomCronExpression] = React.useState<string>('');
@@ -123,7 +123,7 @@ const WorkflowScheduleModal = ({ workflowId, isOpen, schedule, onClose, onSave }
 
       await superglueClient.upsertWorkflowSchedule({
         id: schedule?.id,
-        workflowId,
+        workflowId: toolId,
         cronExpression,
         timezone: selectedTimezone.value,
         enabled,
@@ -180,7 +180,7 @@ const WorkflowScheduleModal = ({ workflowId, isOpen, schedule, onClose, onSave }
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">
-                Add Schedule for Workflow: {workflowId}
+                Add Schedule for Tool: {toolId}
               </CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-6">
@@ -347,4 +347,4 @@ const WorkflowScheduleModal = ({ workflowId, isOpen, schedule, onClose, onSave }
   );
 };
 
-export default WorkflowScheduleModal;
+export default ToolScheduleModal;

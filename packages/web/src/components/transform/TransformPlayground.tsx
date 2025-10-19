@@ -1,8 +1,8 @@
 "use client";
 
 import { useConfig } from "@/src/app/config-context";
+import { ToolResultsView as WorkflowResultsView } from "@/src/components/tools/ToolResultsView";
 import JsonSchemaEditor from "@/src/components/utils/JsonSchemaEditor";
-import { WorkflowResultsView } from "@/src/components/workflow/WorkflowResultsView";
 import { CacheMode, SuperglueClient, TransformResult, WorkflowResult } from "@superglue/client";
 import { X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
