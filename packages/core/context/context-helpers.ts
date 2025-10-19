@@ -1,95 +1,10 @@
 import { inferJsonSchema } from '@superglue/shared';
-import { server_defaults } from '../default.js';
 
-export type ObjectContextOptions = {
-    characterBudget: number;
-    include?: { schema?: boolean; preview?: boolean; samples?: boolean };
-    tuning?: {
-        previewDepthLimit?: number;
-        previewArrayLimit?: number;
-        previewObjectKeyLimit?: number;
-        samplesMaxArrayPaths?: number;
-        samplesItemsPerArray?: number;
-        sampleObjectMaxDepth?: number;
-    };
-};
-
-
-export function getObjectContext(obj: any, opts: ObjectContextOptions): string {
-
-    const previewDepthLimit = opts.tuning?.previewDepthLimit ?? server_defaults.CONTEXT.JSON_PREVIEW_DEPTH_LIMIT;
-    const previewArrayLimit = opts.tuning?.previewArrayLimit ?? server_defaults.CONTEXT.JSON_PREVIEW_ARRAY_LIMIT;
-    const previewObjectKeyLimit = opts.tuning?.previewObjectKeyLimit ?? server_defaults.CONTEXT.JSON_PREVIEW_OBJECT_KEY_LIMIT;
-    const samplesMaxArrayPaths = opts.tuning?.samplesMaxArrayPaths ?? server_defaults.CONTEXT.JSON_SAMPLES_MAX_ARRAY_PATHS;
-    const samplesItemsPerArray = opts.tuning?.samplesItemsPerArray ?? server_defaults.CONTEXT.JSON_SAMPLES_ITEMS_PER_ARRAY;
-    const sampleObjectMaxDepth = opts.tuning?.sampleObjectMaxDepth ?? server_defaults.CONTEXT.JSON_SAMPLE_OBJECT_MAX_DEPTH;
-    const includeSchema = opts.include?.schema !== false;
-    const includePreview = opts.include?.preview !== false;
-    const includeSamples = opts.include?.samples !== false;
-    const enabledParts: Array<'schema' | 'preview' | 'samples'> = [];
-    if (includeSchema) enabledParts.push('schema');
-    if (includePreview) enabledParts.push('preview');
-    if (includeSamples) enabledParts.push('samples');
-    if (enabledParts.length === 0) return '';
-
-    const budget = Math.max(0, opts.characterBudget | 0);
-    if (budget === 0) return '';
-
-    let perShare = Math.floor(budget / enabledParts.length);
-
-    let remainingCarry = 0;
-    const sections: string[] = [];
-
-    const nonSchemaEnabled = includePreview || includeSamples;
-    const fullJson = nonSchemaEnabled ? stringifyWithLimits(obj, Infinity, Infinity, Infinity, false) : '';
-    if (nonSchemaEnabled) {
-        if (includeSchema) {
-            // 1/3 schema, 2/3 full JSON
-            const schemaShare = Math.floor(budget / 3);
-            const fullShare = budget - schemaShare; // 2/3
-            // Schema first
-            const schemaStr = buildSchemaSection(obj, schemaShare);
-            sections.push(schemaStr.text);
-            // Full object block
-            if (fullJson.length <= fullShare) {
-                sections.push(buildFullObjectSection(fullJson));
-                const combined = sections.filter(Boolean).join('\n\n');
-                return combined;
-            }
-        } else {
-            if (fullJson.length <= budget) {
-                sections.push(buildFullObjectSection(fullJson));
-                return sections[0];
-            }
-        }
-    }
-
-    if (includeSchema) {
-        const share = perShare + remainingCarry;
-        const schemaStr = buildSchemaSection(obj, share);
-        sections.push(schemaStr.text);
-        remainingCarry = Math.max(0, share - schemaStr.text.length);
-    }
-
-    if (includePreview) {
-        const share = perShare + remainingCarry;
-        const previewStr = buildPreviewSection(obj, share, previewDepthLimit, previewArrayLimit, previewObjectKeyLimit);
-        sections.push(previewStr.text);
-        remainingCarry = Math.max(0, share - previewStr.text.length);
-    }
-
-    if (includeSamples) {
-        const share = perShare + remainingCarry;
-        const samplesStr = buildSamplesSection(obj, share, previewDepthLimit, previewArrayLimit, previewObjectKeyLimit, samplesMaxArrayPaths, samplesItemsPerArray, sampleObjectMaxDepth);
-        sections.push(samplesStr.text);
-        remainingCarry = Math.max(0, share - samplesStr.text.length);
-    }
-
-    const combined = sections.filter(Boolean).join('\n\n');
-    return combined;
+export function mergeSectionsWithNewlines(sections: string[]): string {
+    return sections.join('\n\n');
 }
 
-function buildSchemaSection(obj: any, share: number): { text: string } {
+export function buildSchemaSection(obj: any, share: number): { text: string } {
     if (share <= 0) return { text: '' };
     try {
         const schemaObj = inferJsonSchema(obj);
@@ -104,7 +19,7 @@ function buildSchemaSection(obj: any, share: number): { text: string } {
     }
 }
 
-function buildPreviewSection(obj: any, share: number, depthLimit: number, arrayLimit: number, objectKeyLimit: number): { text: string } {
+export function buildPreviewSection(obj: any, share: number, depthLimit: number, arrayLimit: number, objectKeyLimit: number): { text: string } {
     if (share <= 0) return { text: '' };
     const header = `## Object Preview (first ${share} characters shown)\n`;
     const limited = stringifyWithLimits(obj, depthLimit, arrayLimit, objectKeyLimit, true);
@@ -114,12 +29,12 @@ function buildPreviewSection(obj: any, share: number, depthLimit: number, arrayL
     return { text: header + body };
 }
 
-function buildFullObjectSection(full: string): string {
+export function buildFullObjectSection(full: string): string {
     const header = '## Full Object\n';
     return header + full;
 }
 
-function buildSamplesSection(
+export function buildSamplesSection(
     obj: any,
     share: number,
     depthLimit: number,
@@ -175,7 +90,8 @@ function buildSamplesSection(
     return { text: header + blocks.join('') };
 }
 
-function stringifyWithLimits(value: any, depthLimit: number, arrayLimit: number, objectKeyLimit: number, limit: boolean): string {
+
+export function stringifyWithLimits(value: any, depthLimit: number, arrayLimit: number, objectKeyLimit: number, limit: boolean): string {
     const seen = new WeakSet<object>();
     function walk(v: any, depth: number): any {
         if (typeof v === 'object' && v !== null) {
@@ -202,13 +118,13 @@ function stringifyWithLimits(value: any, depthLimit: number, arrayLimit: number,
     try { return JSON.stringify(walk(value, 0)); } catch { return String(value ?? ''); }
 }
 
-function ellipsisFor(v: any): any {
+export function ellipsisFor(v: any): any {
     if (Array.isArray(v)) return `array(len=${v.length})`;
     if (v && typeof v === 'object') return '{…}';
     return '…';
 }
 
-function collectArrayPaths(v: any, path: string, depth: number, acc: Array<{ path: string; value: any[] }>, depthLimit: number, arrayLimit: number, objectKeyLimit: number): void {
+export function collectArrayPaths(v: any, path: string, depth: number, acc: Array<{ path: string; value: any[] }>, depthLimit: number, arrayLimit: number, objectKeyLimit: number): void {
     if (depth > depthLimit) return;
     if (Array.isArray(v)) {
         acc.push({ path, value: v });
@@ -223,7 +139,7 @@ function collectArrayPaths(v: any, path: string, depth: number, acc: Array<{ pat
     }
 }
 
-function randomSampleHeadAware(arr: any[], count: number): any[] {
+export function randomSampleHeadAware(arr: any[], count: number): any[] {
     if (arr.length <= count) return arr.slice();
     // Pick one from head (index 0) if possible, rest random unique picks
     const picks = new Set<number>();
@@ -234,7 +150,7 @@ function randomSampleHeadAware(arr: any[], count: number): any[] {
     return Array.from(picks.values()).map(i => arr[i]);
 }
 
-function compactSampleItem(v: any, depth: number = 0, maxDepth: number = 5): string {
+export function compactSampleItem(v: any, depth: number = 0, maxDepth: number = 5): string {
     if (v === null || typeof v !== 'object') return JSON.stringify(v);
     if (Array.isArray(v)) {
         const MAX_ITEMS = 3;
@@ -284,5 +200,3 @@ function compactSampleItem(v: any, depth: number = 0, maxDepth: number = 5): str
     }
     return JSON.stringify(out);
 }
-
-

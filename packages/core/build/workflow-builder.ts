@@ -2,12 +2,10 @@ import { Integration, Workflow } from "@superglue/client";
 import { Metadata, toJsonSchema } from "@superglue/shared";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { LLMMessage } from "../llm/language-model.js";
-import { DocumentationSearch } from "../documentation/documentation-search.js";
 import { executeTool } from "../execute/tools.js";
 import { BUILD_WORKFLOW_SYSTEM_PROMPT } from "../llm/prompts.js";
-import { getObjectContext } from "../utils/context.js";
 import { logMessage } from "../utils/logs.js";
-import { composeUrl } from "../utils/tools.js";
+import { getWorkflowBuilderContext } from "../context/context-builders.js";
 
 type ChatMessage = LLMMessage;
 
@@ -51,109 +49,17 @@ export class WorkflowBuilder {
     }
   }
 
-  private generateIntegrationDescriptions(maxChars: number = 100000): string {
-    const documentationSearch = new DocumentationSearch(this.metadata);
-    const descriptions = Object.values(this.integrations).map(int => {
-      if (!int.documentation) {
-        return `<${int.id}>
-  Base URL: ${composeUrl(int.urlHost, int.urlPath)}
-  <specific_instructions>
-  ${int.specificInstructions?.length > 0 ? int.specificInstructions : "No specific instructions provided."}
-  </specific_instructions>
-</${int.id}>`;
-      }
-      const authSection = documentationSearch.extractRelevantSections(
-        int.documentation,
-        "authentication authorization api key token bearer basic oauth credentials access private app secret",
-        3,  // fewer sections needed for auth
-        2000, // should be detailed though
-        int.openApiSchema
-      );
-
-      const paginationSection = documentationSearch.extractRelevantSections(
-        int.documentation,
-        "pagination page offset cursor limit per_page pageSize after next previous paging paginated results list",
-        3,  // max 3 sections
-        2000, // same logic applies here
-        int.openApiSchema
-      );
-      const generalSection = documentationSearch.extractRelevantSections(
-        int.documentation,
-        this.instruction + "reference object endpoints methods properties values fields enums search query filter list create update delete get put post patch",
-        20,  // max 20 sections
-        1000, // should cover examples, endpoints etc.
-        int.openApiSchema
-      );
-
-      return `<${int.id}>
-  Base URL: ${composeUrl(int.urlHost, int.urlPath)}
-  <specific_instructions>
-  ${int.specificInstructions?.length > 0 ? int.specificInstructions : "No specific instructions provided."}
-  </specific_instructions>
-  <documentation>
-${authSection ? `<authentication>
-${authSection}
-</authentication>` : ''}
-    
-    ${paginationSection && paginationSection != authSection ? `<pagination>
-    ${paginationSection}
-    </pagination>` : ''}
-    
-    <context_relevant_to_user_instruction>
-    ${generalSection && generalSection != authSection && generalSection != paginationSection ? generalSection : 'No general documentation found.'}
-    </context_relevant_to_user_instruction>
-  </documentation>
-</${int.id}>`;
-    }).join("\n");
-
-    if (descriptions.length > maxChars) {
-      return descriptions.slice(0, maxChars) + "\n... [integrations documentation truncated]";
-    }
-    return descriptions;
-  }
-
-  private generatePayloadDescription(maxChars: number = 100000): string {
-    if (!this.initialPayload || Object.keys(this.initialPayload).length === 0) {
-      return 'No initial payload provided';
-    }
-    const payloadContext = getObjectContext(this.initialPayload, { include: { schema: true, preview: false, samples: true }, characterBudget: maxChars });
-    return payloadContext;
-  }
-
   private prepareBuildingContext(): ChatMessage[] {
-    const integrationDescriptions = this.generateIntegrationDescriptions();
-    const initialPayloadDescription = this.generatePayloadDescription();
-
-    const availableVariables = [
-      ...Object.values(this.integrations).flatMap(int => Object.keys(int.credentials || {}).map(k => `<<${int.id}_${k}>>`)),
-      ...Object.keys(this.initialPayload || {}).map(k => `<<${k}>>`)
-    ].join(", ");
-
-    const hasIntegrations = Object.keys(this.integrations).length > 0;
-
-    const buildingPromptForAgent = `
-Build a complete workflow to fulfill the user's request.
-
-<user_instruction>
-${this.instruction}
-</user_instruction>
-
-${hasIntegrations ? `<available_integrations_and_documentation>
-${integrationDescriptions}
-</available_integrations_and_documentation>` : '<no_integrations_available>No integrations provided. Build a transform-only workflow using finalTransform to process the payload data.</no_integrations_available>'}
-
-<available_variables>
-${availableVariables || 'No variables available'}
-</available_variables>
-
-<input_payload>
-${initialPayloadDescription}
-</input_payload>
-
-${hasIntegrations
-        ? 'Ensure that the final output matches the instruction and you use ONLY the available integration ids.'
-        : 'Since no integrations are available, create a transform-only workflow with no steps, using only the finalTransform to process the payload data.'}`;
-
+    const buildingPromptForAgent = getWorkflowBuilderContext({
+      integrations: Object.values(this.integrations),
+      payload: this.initialPayload,
+      userInstruction: this.instruction,
+      responseSchema: this.responseSchema
+    }, {
+      characterBudget: 100000,
+      include: { integrationContext: true, availableVariablesContext: true, payloadContext: true, userInstruction: true }
+    });
+  
     return [
       { role: "system", content: BUILD_WORKFLOW_SYSTEM_PROMPT },
       { role: "user", content: buildingPromptForAgent }

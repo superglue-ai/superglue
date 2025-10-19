@@ -1,0 +1,184 @@
+import { ExtractConfig, ExecutionStep, Integration, JSONSchema, ApiConfig } from '@superglue/client';
+import { server_defaults } from '../default.js';
+import { DocumentationSearch } from '../documentation/documentation-search.js';
+import { composeUrl } from '../utils/tools.js';
+import { buildFullObjectSection, buildPreviewSection, buildSamplesSection, buildSchemaSection, stringifyWithLimits } from './context-helpers.js';
+
+export function getObjectContext(obj: any, opts: ObjectContextOptions): string {
+
+    const previewDepthLimit = opts.tuning?.previewDepthLimit ?? server_defaults.CONTEXT.JSON_PREVIEW_DEPTH_LIMIT;
+    const previewArrayLimit = opts.tuning?.previewArrayLimit ?? server_defaults.CONTEXT.JSON_PREVIEW_ARRAY_LIMIT;
+    const previewObjectKeyLimit = opts.tuning?.previewObjectKeyLimit ?? server_defaults.CONTEXT.JSON_PREVIEW_OBJECT_KEY_LIMIT;
+    const samplesMaxArrayPaths = opts.tuning?.samplesMaxArrayPaths ?? server_defaults.CONTEXT.JSON_SAMPLES_MAX_ARRAY_PATHS;
+    const samplesItemsPerArray = opts.tuning?.samplesItemsPerArray ?? server_defaults.CONTEXT.JSON_SAMPLES_ITEMS_PER_ARRAY;
+    const sampleObjectMaxDepth = opts.tuning?.sampleObjectMaxDepth ?? server_defaults.CONTEXT.JSON_SAMPLE_OBJECT_MAX_DEPTH;
+    const includeSchema = opts.include?.schema !== false;
+    const includePreview = opts.include?.preview !== false;
+    const includeSamples = opts.include?.samples !== false;
+    const enabledParts: Array<'schema' | 'preview' | 'samples'> = [];
+    if (includeSchema) enabledParts.push('schema');
+    if (includePreview) enabledParts.push('preview');
+    if (includeSamples) enabledParts.push('samples');
+    if (enabledParts.length === 0) return '';
+
+    const budget = Math.max(0, opts.characterBudget | 0);
+    if (budget === 0) return '';
+
+    let perShare = Math.floor(budget / enabledParts.length);
+    let remainingCarry = 0;
+    const sections: string[] = [];
+
+    const nonSchemaEnabled = includePreview || includeSamples;
+    const fullJson = nonSchemaEnabled ? stringifyWithLimits(obj, Infinity, Infinity, Infinity, false) : '';
+    if (nonSchemaEnabled) {
+        if (includeSchema) {
+            // 1/3 schema, 2/3 full JSON
+            const schemaShare = Math.floor(budget / 3);
+            const fullShare = budget - schemaShare; // 2/3
+            // Schema first
+            const schemaStr = buildSchemaSection(obj, schemaShare);
+            sections.push(schemaStr.text);
+            // Full object block
+            if (fullJson.length <= fullShare) {
+                sections.push(buildFullObjectSection(fullJson));
+                const combined = sections.filter(Boolean).join('\n\n');
+                return combined;
+            }
+        } else {
+            if (fullJson.length <= budget) {
+                sections.push(buildFullObjectSection(fullJson));
+                return sections[0];
+            }
+        }
+    }
+
+    if (includeSchema) {
+        const share = perShare + remainingCarry;
+        const schemaStr = buildSchemaSection(obj, share);
+        sections.push(schemaStr.text);
+        remainingCarry = Math.max(0, share - schemaStr.text.length);
+    }
+
+    if (includePreview) {
+        const share = perShare + remainingCarry;
+        const previewStr = buildPreviewSection(obj, share, previewDepthLimit, previewArrayLimit, previewObjectKeyLimit);
+        sections.push(previewStr.text);
+        remainingCarry = Math.max(0, share - previewStr.text.length);
+    }
+
+    if (includeSamples) {
+        const share = perShare + remainingCarry;
+        const samplesStr = buildSamplesSection(obj, share, previewDepthLimit, previewArrayLimit, previewObjectKeyLimit, samplesMaxArrayPaths, samplesItemsPerArray, sampleObjectMaxDepth);
+        sections.push(samplesStr.text);
+        remainingCarry = Math.max(0, share - samplesStr.text.length);
+    }
+
+    const combined = sections.filter(Boolean).join('\n\n');
+    return combined;
+}
+
+function buildIntegrationContext(integration: Integration, opts: IntegrationContextOptions): string {
+    const budget = Math.max(0, opts.characterBudget | 0);
+    if (budget === 0) return '';
+
+    const INT = server_defaults.CONTEXT.INTEGRATIONS;
+    const authMaxSections = opts.tuning?.documentationMaxSections ?? INT.AUTH_MAX_SECTIONS;
+    const authSectionSize = opts.tuning?.documentationMaxChars ?? INT.AUTH_SECTION_SIZE_CHARS;
+    const paginationMaxSections = opts.tuning?.documentationMaxSections ?? INT.PAGINATION_MAX_SECTIONS;
+    const paginationSectionSize = opts.tuning?.documentationMaxChars ?? INT.PAGINATION_SECTION_SIZE_CHARS;
+    const generalMaxSections = opts.tuning?.documentationMaxSections ?? INT.GENERAL_MAX_SECTIONS;
+    const generalSectionSize = opts.tuning?.documentationMaxChars ?? INT.GENERAL_SECTION_SIZE_CHARS;
+
+    const docSearch = new DocumentationSearch((undefined as any));
+    const authSection = docSearch.extractRelevantSections(
+        integration.documentation,
+        "authentication authorization key token bearer basic oauth credentials",
+        authMaxSections,
+        authSectionSize,
+        integration.openApiSchema
+    );
+
+    const paginationSection = docSearch.extractRelevantSections(
+        integration.documentation,
+        "pagination page offset cursor limit per_page pageSize after next previous paging paginated results list",
+        paginationMaxSections,
+        paginationSectionSize,
+        integration.openApiSchema
+    );
+    const generalDocSection = docSearch.extractRelevantSections(
+        integration.documentation,
+        "reference object endpoints methods properties values fields enums search query filter list create update delete get put post patch",
+        generalMaxSections,
+        generalSectionSize,
+        integration.openApiSchema
+    );
+
+    const urlSection = '<Base URL>: ' + composeUrl(integration.urlHost, integration.urlPath) + '</Base URL>';
+    const specificInstructionsSection = '<specific_instructions>: ' + (integration.specificInstructions?.length > 0 ? integration.specificInstructions : "No specific instructions provided.") + '</specific_instructions>';
+    const xml_opening_tag = `<${integration.id}>`;
+    const xml_closing_tag = `</${integration.id}>`;
+    return xml_opening_tag + '\n' + [urlSection, specificInstructionsSection, authSection, paginationSection, generalDocSection].filter(Boolean).join('\n').slice(0, budget - xml_opening_tag.length - xml_closing_tag.length) + '\n' + xml_closing_tag;
+}
+
+function buildAvailableVariableContext(payload: any, integrations: Integration[]): string {
+    const availableVariables = [
+        ...integrations.flatMap(int => Object.keys(int.credentials || {}).map(k => `<<${int.id}_${k}>>`)),
+        ...Object.keys(payload || {}).map(k => `<<${k}>>`)
+      ].join(", ");
+
+    return availableVariables || 'No variables available'
+}
+
+export function getWorkflowBuilderContext(input: WorkflowBuilderContextInput, options: WorkflowBuilderContextOptions): string {
+    const budget = Math.max(0, options.characterBudget | 0);
+    if (budget === 0) return '';
+    const hasIntegrations = input.integrations.length > 0;
+
+    const prompt_start = `Build a complete workflow to fulfill the user's request.`;
+    const userInstructionContext = options.include.userInstruction ? `<user_instruction>${input.userInstruction}</user_instruction>` : '';
+    const availableVariablesContext = options.include?.availableVariablesContext ? `<available_variables>${buildAvailableVariableContext(input.payload, input.integrations)}</available_variables>` : '';
+    const payloadContext = options.include?.payloadContext ? `<input_payload>${getObjectContext(input.payload, { include: { schema: true, preview: false, samples: true }, characterBudget: budget * 0.5 })}</input_payload>` : '';
+    const integrationContext = options.include?.integrationContext ? `<available_integrations_and_documentation>${hasIntegrations ? input.integrations.map(int => buildIntegrationContext(int, { characterBudget: budget })).join('\n') : 'No integrations provided. Build a transform-only workflow using finalTransform to process the payload data.'}</available_integrations_and_documentation>` : '';
+    const prompt_end = hasIntegrations ? 'Ensure that the final output matches the instruction and you use ONLY the available integration ids.' : 'Since no integrations are available, create a transform-only workflow with no steps, using only the finalTransform to process the payload data.';
+    const prompt = prompt_start + '\n' + ([userInstructionContext, integrationContext, availableVariablesContext, payloadContext].filter(Boolean).join('\n')).slice(0, budget - prompt_start.length - prompt_end.length) + '\n' + prompt_end;
+    return prompt;
+}
+
+export function getExtractContext(input: ExtractContextInput, options: ExtractContextOptions): string {
+    const budget = Math.max(0, options.characterBudget | 0);
+    if (budget === 0) return '';
+
+    const prompt_start = `Generate API configuration for the following:`;
+    const instructionContext = `<instruction>${input.extractConfig.instruction}</instruction>`;
+    const baseUrlContext = `<base_url>${composeUrl(input.extractConfig.urlHost, input.extractConfig.urlPath)}</base_url>`;
+    const documentationContext = `<documentation>${input.documentation}</documentation>`;
+    const credentialsContext = `<credentials>${Object.keys(input.credentials || {}).join(", ")}</credentials>`;
+    const payloadContext = `<payload>${getObjectContext(input.payload, { include: { schema: true, preview: false, samples: true }, characterBudget: budget * 0.5 })}</payload>`;
+    const lastErrorContext = input.lastError ? `<last_error>${input.lastError}</last_error>` : '';
+    const prompt = prompt_start + '\n' + ([instructionContext, baseUrlContext, documentationContext, credentialsContext, payloadContext, lastErrorContext].filter(Boolean).join('\n')).slice(0, budget - prompt_start.length);
+    return prompt;
+}
+
+export function getLoopSelectorContext(input: LoopSelectorContextInput, options: LoopSelectorContextOptions): string {
+    const budget = Math.max(0, options.characterBudget | 0);
+    if (budget === 0) return '';
+
+    const prompt_start = `Create a JavaScript function that extracts the array of items to loop over for step: ${input.step.id} from the payload (sourceData). The function should: 1. Extract an array of ACTUAL DATA ITEMS (not metadata or property definitions) 2. Apply any filtering based on the step's instruction`;
+    const instructionContext = `<step_instruction>${input.step.apiConfig.instruction}</step_instruction>`;
+    const payloadContext = `<input_payload>${getObjectContext(input.payload, { include: { schema: true, preview: true, samples: false }, characterBudget: budget * 0.9 })}</input_payload>`;
+    const prompt_end = `The function should return an array of items that this step will iterate over.`;
+    const prompt = prompt_start + '\n' + ([instructionContext, payloadContext].filter(Boolean).join('\n')).slice(0, budget - prompt_start.length - prompt_end.length) + '\n' + prompt_end;
+    return prompt;
+}
+
+export function getEvaluateStepResponseContext(input: EvaluateStepResponseContextInput, options: EvaluateStepResponseContextOptions): string {
+    const budget = Math.max(0, options.characterBudget | 0);
+    if (budget === 0) return '';
+
+    const prompt_start = `Evaluate the data returned by the step and return { success: true, shortReason: "", refactorNeeded: false } if the data aligns with the instruction. If the data does not align with the instruction, return { success: false, shortReason: "reason why it does not align", refactorNeeded: false }.`;
+    const dataContext = `<data>${getObjectContext(input.data, { include: { schema: true, preview: true, samples: false }, characterBudget: budget * 0.9 })}</data>`;
+    const endpointContext = `<step_config>${JSON.stringify(input.endpoint)}</step_config>`;
+    const docSearchResultsForStepInstructionContext = `<doc_search_results_for_step_instruction>${input.docSearchResultsForStepInstruction}</doc_search_results_for_step_instruction>`;
+    const prompt = prompt_start + '\n' + ([dataContext, endpointContext, docSearchResultsForStepInstructionContext].filter(Boolean).join('\n')).slice(0, budget - prompt_start.length);
+    return prompt;
+}

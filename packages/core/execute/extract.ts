@@ -9,6 +9,7 @@ import { decompressData, parseFile } from "../utils/file.js";
 import { logMessage } from "../utils/logs.js";
 import { composeUrl, replaceVariables } from "../utils/tools.js";
 import { callAxios } from "./api/api.js";
+import { ExtractContextInput, ExtractContextOptions, getExtractContext } from "../context/context-builders.js";
 
 
 export async function callExtract(extract: ExtractConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions, metadata?: Metadata): Promise<any> {
@@ -88,6 +89,7 @@ export async function generateExtractConfig(extractConfig: Partial<ExtractConfig
     decompressionMethod: z.enum(Object.values(DecompressionMethod) as [string, ...string[]]).optional(),
     fileType: z.enum(Object.values(FileType) as [string, ...string[]]).optional(),
   }));
+  const extractContext = getExtractContext({ extractConfig: extractConfig as ExtractConfig, documentation, payload, credentials, lastError: lastError }, { characterBudget: 100000 });
   const messages: LLMMessage[] = [
     {
       role: "system",
@@ -95,21 +97,7 @@ export async function generateExtractConfig(extractConfig: Partial<ExtractConfig
     },
     {
       role: "user",
-      content:
-        `Generate API configuration for the following:
-
-Instructions: ${extractConfig.instruction}
-
-Base URL: ${composeUrl(extractConfig.urlHost, extractConfig.urlPath)}
-
-Documentation: ${documentation}
-
-Available credential variables: ${Object.keys(credentials || {}).join(", ")}
-Available payload variables: ${Object.keys(payload || {}).join(", ")}
-Example payload: ${JSON.stringify(payload || {})}
-
-${lastError ? `We tried to call the API but it failed with the following error:
-${lastError}` : ''}`
+      content: extractContext
     }
   ];
   const { response: generatedConfig } = await LanguageModel.generateObject(messages, schema);

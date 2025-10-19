@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getObjectContext } from './context.js';
+import { getObjectContext } from './context-builders.js';
 
 function timeIt<T>(fn: () => T): { ms: number; result: T } {
     const start = Date.now();
