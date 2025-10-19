@@ -729,7 +729,7 @@ export const toolDefinitions: Record<string, any> = {
 
         tool = cleanedTool;
 
-        const savedTool = await client.upsertTool(id, tool);
+        const savedTool = await client.upsertWorkflow(id, tool);
 
         return {
           note: `Tool ${savedTool.id} has been saved successfully.`,
@@ -905,7 +905,7 @@ export const toolDefinitions: Record<string, any> = {
       const { client, toolId, cronExpression, timezone, enabled = true, payload } = args;
 
       try {
-        const schedule = await client.upsertToolSchedule({
+        const schedule = await client.upsertWorkflowSchedule({
           toolId,
           cronExpression,
           timezone,
@@ -965,7 +965,7 @@ export const toolDefinitions: Record<string, any> = {
         if (enabled !== undefined) updateData.enabled = enabled;
         if (payload !== undefined) updateData.payload = payload;
 
-        const schedule = await client.upsertToolSchedule(updateData);
+        const schedule = await client.upsertWorkflowSchedule(updateData);
 
         return {
           success: true,
