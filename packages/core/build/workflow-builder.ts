@@ -3,7 +3,7 @@ import { Metadata, toJsonSchema } from "@superglue/shared";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { LLMMessage } from "../llm/language-model.js";
 import { executeTool } from "../execute/tools.js";
-import { BUILD_WORKFLOW_SYSTEM_PROMPT } from "../llm/prompts.js";
+import { BUILD_WORKFLOW_SYSTEM_PROMPT } from "../context/context-prompts.js";
 import { logMessage } from "../utils/logs.js";
 import { getWorkflowBuilderContext } from "../context/context-builders.js";
 

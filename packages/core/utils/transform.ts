@@ -2,12 +2,11 @@ import { RequestOptions, TransformConfig, TransformInputRequest } from "@supergl
 import type { DataStore, Metadata } from "@superglue/shared";
 import prettier from "prettier";
 import { getEvaluateTransformContext, getTransformContext } from "../context/context-builders.js";
+import { EVALUATE_TRANSFORM_SYSTEM_PROMPT, GENERATE_TRANSFORM_SYSTEM_PROMPT } from "../context/context-prompts.js";
 import { server_defaults } from "../default.js";
 import { LanguageModel, LLMMessage } from "../llm/language-model.js";
-import { PROMPT_JS_TRANSFORM } from "../llm/prompts.js";
 import { logMessage } from "./logs.js";
 import { isSelfHealingEnabled, transformAndValidateSchema } from "./tools.js";
-import { EVALUATE_TRANSFORM_SYSTEM_PROMPT } from "../context/context-prompts.js";
 
 export async function executeTransform(args: {
   datastore: DataStore,
@@ -102,7 +101,7 @@ export async function generateTransformCode(
     if (!messages || messages?.length === 0) {
       const userPrompt = getTransformContext({ instruction, targetSchema: schema, sourceData: payload }, { characterBudget: LanguageModel.contextLength / 10 });
       messages = [
-        { role: "system", content: PROMPT_JS_TRANSFORM },
+        { role: "system", content: GENERATE_TRANSFORM_SYSTEM_PROMPT },
         { role: "user", content: userPrompt }
       ];
     }

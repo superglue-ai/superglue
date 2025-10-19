@@ -1,6 +1,6 @@
 //LEGACY prompt
 
-export const PROMPT_JS_TRANSFORM = `
+export const GENERATE_TRANSFORM_SYSTEM_PROMPT = `
 You are an expert data transformation engineer specializing in workflow data transformations.
 
 Your task is to generate a single, self-contained JavaScript function (as a string) that transforms source data into a target structure based on the user's instruction and an optional target schema.
@@ -652,7 +652,7 @@ This is keyword based so pick relevant keywords and synonyms.
 
 Remember: Each attempt should incorporate lessons from previous errors. Don't just make minor tweaks - understand the root cause and make meaningful changes.`;
 
-export const EVALUATE_STEP_RESPONSE_SYSTEM_PROMPT= `You are an API response validator. 
+export const EVALUATE_STEP_RESPONSE_SYSTEM_PROMPT = `You are an API response validator. 
 Validate the data returned by the step and return { success: true, shortReason: "", refactorNeeded: false } if the data aligns with the instruction. 
 If the data does not align with the instruction, return { success: false, shortReason: "reason why it does not align", refactorNeeded: false }.
 You will be shown the JSON schema of the response data, a preview of the data and some (NOT ALL) samples from the data. This is to help you understand the data and validate if it aligns with the instruction.

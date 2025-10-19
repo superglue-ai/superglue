@@ -5,7 +5,7 @@ import ivm from "isolated-vm";
 import { server_defaults } from "../../default.js";
 import { IntegrationManager } from "../../integrations/integration-manager.js";
 import { LanguageModel, LLMMessage } from "../../llm/language-model.js";
-import { SELF_HEALING_API_AGENT_PROMPT } from "../../llm/prompts.js";
+import { SELF_HEALING_API_AGENT_PROMPT } from "../../context/context-prompts.js";
 import { parseFile } from "../../utils/file.js";
 import { composeUrl, generateId, maskCredentials, replaceVariables, sample } from "../../utils/tools.js";
 import { searchDocumentationToolDefinition, submitToolDefinition } from "../../utils/workflow-tools.js";

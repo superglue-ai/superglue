@@ -1,7 +1,7 @@
 import { Metadata } from "@playwright/test";
 import { Validator } from "jsonschema";
 import { LanguageModel, LLMMessage } from "../llm/language-model.js";
-import { GENERATE_SCHEMA_PROMPT } from "../llm/prompts.js";
+import { GENERATE_SCHEMA_PROMPT } from "../context/context-prompts.js";
 import { logMessage } from "./logs.js";
 
 export async function generateSchema(instruction: string, responseData: string, metadata: Metadata): Promise<string> {
