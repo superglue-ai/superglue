@@ -22,17 +22,7 @@ export async function evaluateStepResponse({
   docSearchResultsForStepInstruction?: string
 }): Promise<{ success: boolean, refactorNeeded: boolean, shortReason: string; }> {
 
-  const evaluateStepResponseContextInput: EvaluateStepResponseContextInput = {
-    data: data,
-    endpoint: endpoint,
-    docSearchResultsForStepInstruction: docSearchResultsForStepInstruction
-  };
-
-  const evaluateStepResponseContextOptions: EvaluateStepResponseContextOptions = {
-    characterBudget: LanguageModel.contextLength / 10
-  };
-
-  const evaluateStepResponsePrompt = getEvaluateStepResponseContext(evaluateStepResponseContextInput, evaluateStepResponseContextOptions);
+  const evaluateStepResponsePrompt = getEvaluateStepResponseContext({ data, endpoint, docSearchResultsForStepInstruction }, { characterBudget: LanguageModel.contextLength / 10 });
 
   const request = [
     {

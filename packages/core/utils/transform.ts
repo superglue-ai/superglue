@@ -1,7 +1,7 @@
 import { RequestOptions, TransformConfig, TransformInputRequest } from "@superglue/client";
 import type { DataStore, Metadata } from "@superglue/shared";
 import prettier from "prettier";
-import { getEvaluateTransformContext, getObjectContext, getTransformContext } from "../context/context-builders.js";
+import { getEvaluateTransformContext, getTransformContext } from "../context/context-builders.js";
 import { server_defaults } from "../default.js";
 import { LanguageModel, LLMMessage } from "../llm/language-model.js";
 import { PROMPT_JS_TRANSFORM } from "../llm/prompts.js";

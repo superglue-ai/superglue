@@ -2,8 +2,8 @@ import { Integration } from '@superglue/client';
 import { server_defaults } from '../default.js';
 import { DocumentationSearch } from '../documentation/documentation-search.js';
 import { composeUrl } from '../utils/tools.js';
-import { buildFullObjectSection, buildPreviewSection, buildSamplesSection, buildSchemaSection, stringifyWithLimits } from './context-helpers.js';       
-import { IntegrationContextOptions, ObjectContextOptions, WorkflowBuilderContextInput, WorkflowBuilderContextOptions, ExtractContextInput, ExtractContextOptions, LoopSelectorContextInput, LoopSelectorContextOptions, EvaluateStepResponseContextInput, EvaluateStepResponseContextOptions, TransformContextInput, TransformContextOptions, EvaluateTransformContextInput, EvaluateTransformContextOptions } from './context-types.js';
+import { buildFullObjectSection, buildPreviewSection, buildSamplesSection, buildSchemaSection, stringifyWithLimits } from './context-helpers.js';
+import { EvaluateStepResponseContextInput, EvaluateStepResponseContextOptions, EvaluateTransformContextInput, EvaluateTransformContextOptions, ExtractContextInput, ExtractContextOptions, IntegrationContextOptions, LoopSelectorContextInput, LoopSelectorContextOptions, ObjectContextOptions, TransformContextInput, TransformContextOptions, WorkflowBuilderContextInput, WorkflowBuilderContextOptions } from './context-types.js';
 
 export function getObjectContext(obj: any, opts: ObjectContextOptions): string {
 
@@ -43,12 +43,12 @@ export function getObjectContext(obj: any, opts: ObjectContextOptions): string {
             if (fullJson.length <= fullShare) {
                 sections.push(buildFullObjectSection(fullJson));
                 const combined = sections.filter(Boolean).join('\n\n');
-                return combined;
+                return combined.slice(0, budget);
             }
         } else {
             if (fullJson.length <= budget) {
                 sections.push(buildFullObjectSection(fullJson));
-                return sections[0];
+                return sections[0].slice(0, budget);
             }
         }
     }
@@ -75,7 +75,7 @@ export function getObjectContext(obj: any, opts: ObjectContextOptions): string {
     }
 
     const combined = sections.filter(Boolean).join('\n\n');
-    return combined;
+    return combined.slice(0, budget);
 }
 
 function buildIntegrationContext(integration: Integration, opts: IntegrationContextOptions): string {
@@ -114,9 +114,9 @@ function buildIntegrationContext(integration: Integration, opts: IntegrationCont
         integration.openApiSchema
     );
 
+    const xml_opening_tag = `<${integration.id}>`;
     const urlSection = '<Base URL>: ' + composeUrl(integration.urlHost, integration.urlPath) + '</Base URL>';
     const specificInstructionsSection = '<specific_instructions>: ' + (integration.specificInstructions?.length > 0 ? integration.specificInstructions : "No specific instructions provided.") + '</specific_instructions>';
-    const xml_opening_tag = `<${integration.id}>`;
     const xml_closing_tag = `</${integration.id}>`;
     return xml_opening_tag + '\n' + [urlSection, specificInstructionsSection, authSection, paginationSection, generalDocSection].filter(Boolean).join('\n').slice(0, budget - xml_opening_tag.length - xml_closing_tag.length) + '\n' + xml_closing_tag;
 }
@@ -125,7 +125,7 @@ function buildAvailableVariableContext(payload: any, integrations: Integration[]
     const availableVariables = [
         ...integrations.flatMap(int => Object.keys(int.credentials || {}).map(k => `<<${int.id}_${k}>>`)),
         ...Object.keys(payload || {}).map(k => `<<${k}>>`)
-      ].join(", ");
+    ].join(", ");
 
     return availableVariables || 'No variables available'
 }
@@ -136,7 +136,7 @@ export function getWorkflowBuilderContext(input: WorkflowBuilderContextInput, op
     const hasIntegrations = input.integrations.length > 0;
 
     const prompt_start = `Build a complete workflow to fulfill the user's request.`;
-    const userInstructionContext = options.include.userInstruction ? `<user_instruction>${input.userInstruction}</user_instruction>` : '';
+    const userInstructionContext = options.include.userInstruction ? `<instruction>${input.userInstruction}</instruction>` : '';
     const availableVariablesContext = options.include?.availableVariablesContext ? `<available_variables>${buildAvailableVariableContext(input.payload, input.integrations)}</available_variables>` : '';
     const payloadContext = options.include?.payloadContext ? `<input_payload>${getObjectContext(input.payload, { include: { schema: true, preview: false, samples: true }, characterBudget: budget * 0.5 })}</input_payload>` : '';
     const integrationContext = options.include?.integrationContext ? `<available_integrations_and_documentation>${hasIntegrations ? input.integrations.map(int => buildIntegrationContext(int, { characterBudget: budget })).join('\n') : 'No integrations provided. Build a transform-only workflow using finalTransform to process the payload data.'}</available_integrations_and_documentation>` : '';
@@ -208,5 +208,6 @@ export function getEvaluateTransformContext(input: EvaluateTransformContextInput
     const promptEnd = `Please evaluate the transformation based on the criteria in the system prompt, considering that samples may not show all data values present in the full dataset.`;
     const prompt = promptStart + '\n' + ([targetSchemaContext, sourceDataContext, transformedDataContext, transformCodeContext].filter(Boolean).join('\n')).slice(0, budget - promptStart.length - promptEnd.length) + '\n' + promptEnd;
     return prompt;
+}
 
 

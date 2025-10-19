@@ -9,11 +9,11 @@ export function buildSchemaSection(obj: any, share: number): { text: string } {
     try {
         const schemaObj = inferJsonSchema(obj);
         const schemaStr = JSON.stringify(schemaObj);
-        const header = `## Schema (first ${share} characters shown)\n`;
+        const header = `<schema> (first ${share} characters shown)\n`;
         const body = schemaStr.length <= Math.max(0, share - header.length - 1)
             ? schemaStr
             : schemaStr.slice(0, Math.max(0, share - header.length - 16)) + '... [truncated]';
-        return { text: header + body };
+        return { text: header + body + '</schema>' };
     } catch {
         return { text: '' };
     }
@@ -21,17 +21,17 @@ export function buildSchemaSection(obj: any, share: number): { text: string } {
 
 export function buildPreviewSection(obj: any, share: number, depthLimit: number, arrayLimit: number, objectKeyLimit: number): { text: string } {
     if (share <= 0) return { text: '' };
-    const header = `## Object Preview (first ${share} characters shown)\n`;
+    const header = `<object_preview> (first ${share} characters shown)\n`;
     const limited = stringifyWithLimits(obj, depthLimit, arrayLimit, objectKeyLimit, true);
     const body = limited.length <= Math.max(0, share - header.length - 1)
         ? limited
         : limited.slice(0, Math.max(0, share - header.length - 16)) + '... [truncated]';
-    return { text: header + body };
+    return { text: header + body + '</object_preview>' };
 }
 
 export function buildFullObjectSection(full: string): string {
-    const header = '## Full Object\n';
-    return header + full;
+    const header = '<full_object>\n';
+    return header + full + '</full_object>';
 }
 
 export function buildSamplesSection(
@@ -87,7 +87,7 @@ export function buildSamplesSection(
     }
 
     if (blocks.length === 0) return { text: header };
-    return { text: header + blocks.join('') };
+    return { text: header + blocks.join('') + '</samples>' };
 }
 
 
