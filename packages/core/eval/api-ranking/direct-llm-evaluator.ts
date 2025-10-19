@@ -376,23 +376,23 @@
 //         }
 //     }
 
-//     /**
-//      * Evaluate if the result matches the instruction
-//      */
-//     private async evaluateResult(
-//         result: any,
-//         instruction: string,
-//         integrations: Integration[]
-//     ): Promise<{ success: boolean; reason?: string }> {
-//         try {
-//             // Load evaluateResponse dynamically
-//             const { evaluateResponse } = await import('../../utils/api.js');
-//             const documentation = integrations[0]?.documentation || '';
-//             const evaluation = await evaluateResponse({
-//                 data: result,
-//                 endpoint: {instruction} as any,
-//                 documentation
-//             });
+    // /**
+    //  * Evaluate if the result matches the instruction
+    //  */
+    // private async evaluateResult(
+    //     result: any,
+    //     instruction: string,
+    //     integrations: Integration[]
+    // ): Promise<{ success: boolean; reason?: string }> {
+    //     try {
+    //         // Load evaluateResponse dynamically
+    //         const { evaluateStepResponse } = await import('../../execute/workflow-step.js');
+    //         const documentation = integrations[0]?.documentation || '';
+    //         const evaluation = await evaluateStepResponse({
+    //             data: result,
+    //             endpoint: {instruction} as any,
+    //             documentation
+    //         });
 
 //             return {
 //                 success: evaluation.success,

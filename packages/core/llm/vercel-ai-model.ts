@@ -4,7 +4,7 @@ import { anthropic } from "@ai-sdk/anthropic";
 import { google } from "@ai-sdk/google";
 import { initializeAIModel, getModelContextLength } from "@superglue/shared/utils";
 import { server_defaults } from "../default.js";
-import { ToolDefinition } from "../tools/tools.js";
+import { ToolDefinition } from "../execute/tools.js";
 import { LLM, LLMMessage, LLMObjectResponse, LLMResponse } from "./llm.js";
 import { logMessage } from "../utils/logs.js";
 

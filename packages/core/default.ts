@@ -13,6 +13,14 @@ export const server_defaults = {
     AXIOS_QUICK_RETRY_THRESHOLD_MS: 10000,
     AXIOS_DEFAULT_RETRY_DELAY_MS: 1000,
     AXIOS_MAX_RATE_LIMIT_WAIT_MS: 60 * 60 * 1000 * 24, // 24 hours is the max wait time for rate limit retries, hardcoded
+    CONTEXT: {
+        JSON_PREVIEW_DEPTH_LIMIT: 5,
+        JSON_PREVIEW_ARRAY_LIMIT: 5,
+        JSON_PREVIEW_OBJECT_KEY_LIMIT: 1000,
+        JSON_SAMPLES_MAX_ARRAY_PATHS: 10,
+        JSON_SAMPLES_ITEMS_PER_ARRAY: 5,
+        JSON_SAMPLE_OBJECT_MAX_DEPTH: 5
+    },
     DOCUMENTATION: {
         MIN_SEARCH_TERM_LENGTH: 4,
         MAX_LENGTH_OFFSET: 50000,

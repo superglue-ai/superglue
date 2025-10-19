@@ -1,23 +1,12 @@
 import { HttpMethod, RequestOptions, SelfHealingMode } from "@superglue/client";
 import { inferJsonSchema } from '@superglue/shared';
-import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
 import { GraphQLResolveInfo } from "graphql";
-import https from 'https';
 import ivm from 'isolated-vm';
 import jsonata from "jsonata";
 import { Validator } from "jsonschema";
-import { server_defaults } from "../default.js";
 import { HttpMethodEnum } from "../mcp/mcp-server.js";
-import { ApiCallError } from "./api.js";
 import { parseJSON } from "./json-parser.js";
-import { logMessage } from "./logs.js";
 import { injectVMHelpersIndividually } from "./vm-helpers.js";
-
-export function isRequested(field: string, info: GraphQLResolveInfo) {
-  return info.fieldNodes.some(
-    (node) => node.selectionSet && node.selectionSet.selections.some((selection) => selection.kind === 'Field' && selection.name.value === field)
-  );
-}
 
 export interface TransformResult {
   success: boolean;
@@ -209,120 +198,6 @@ export async function executeAndValidateMappingCode(input: any, mappingCode: str
       console.error("Error disposing isolate", error);
     }
   }
-}
-
-export interface CallAxiosResult {
-  response: AxiosResponse;
-  retriesAttempted: number;
-  lastFailureStatus?: number;
-}
-
-export async function callAxios(config: AxiosRequestConfig, options: RequestOptions): Promise<CallAxiosResult> {
-  let retryCount = 0;
-  const maxRetries = options?.retries ?? 1;
-  const delay = options?.retryDelay || server_defaults.AXIOS_DEFAULT_RETRY_DELAY_MS;
-  const maxRateLimitWaitMs = server_defaults.AXIOS_MAX_RATE_LIMIT_WAIT_MS;
-  let rateLimitRetryCount = 0;
-  let totalRateLimitWaitTime = 0;
-  let lastFailureStatus: number | undefined;
-
-  config.headers = {
-    "Accept": "*/*",
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
-    ...config.headers,
-  };
-
-  // Don't send body for GET, HEAD, DELETE, OPTIONS
-  if (["GET", "HEAD", "DELETE", "OPTIONS"].includes(config.method!)) {
-    config.data = undefined;
-  }
-  else if (config.data && config.data.trim().startsWith("{")) {
-    try {
-      config.data = parseJSON(config.data);
-    } catch (error) { }
-  }
-  else if (!config.data) {
-    config.data = undefined;
-  }
-
-  do {
-    let response: AxiosResponse | null = null;
-    try {
-      const startTs = Date.now();
-      response = await axios({
-        ...config,
-        responseType: 'arraybuffer', // ALWAYS use arraybuffer to preserve data integrity
-        validateStatus: null, // Don't throw on any status
-        maxContentLength: Infinity, // No limit on response size
-        maxBodyLength: Infinity, // No limit on response body size
-        decompress: true, // Ensure gzip/deflate responses are decompressed
-        httpsAgent: new https.Agent({
-          rejectUnauthorized: false
-        })
-      });
-      const durationMs = Date.now() - startTs;
-
-      if (response.status === 429) {
-
-        let waitTime = 0;
-        if (response.headers['retry-after']) {
-          // Retry-After can be a date or seconds
-          const retryAfter = response.headers['retry-after'];
-          if (/^\d+$/.test(retryAfter)) {
-            waitTime = parseInt(retryAfter, 10) * 1000;
-          } else {
-            const retryDate = new Date(retryAfter);
-            waitTime = retryDate.getTime() - Date.now();
-          }
-        } else {
-          // Exponential backoff with jitter - max wait time is 1 hour
-          waitTime = Math.min(Math.pow(10, rateLimitRetryCount) * 1000 + Math.random() * 100, 3600000);
-        }
-
-        // Check if we've exceeded the maximum wait time
-        if (totalRateLimitWaitTime + waitTime > maxRateLimitWaitMs) {
-          // Convert ArrayBuffer to Buffer even for error responses
-          if (response.data instanceof ArrayBuffer) {
-            response.data = Buffer.from(response.data);
-          }
-          return { response, retriesAttempted: retryCount, lastFailureStatus };
-        }
-
-        await new Promise(resolve => setTimeout(resolve, waitTime));
-
-        totalRateLimitWaitTime += waitTime;
-        rateLimitRetryCount++;
-        continue;
-      }
-      if (response.data instanceof ArrayBuffer) {
-        response.data = Buffer.from(response.data);
-      }
-      if (response.status < 200 || response.status >= 300) {
-        if (response.status !== 429 && retryCount < maxRetries && durationMs < server_defaults.AXIOS_QUICK_RETRY_THRESHOLD_MS) {
-          lastFailureStatus = response.status;
-          retryCount++;
-          await new Promise(resolve => setTimeout(resolve, delay));
-          continue;
-        }
-        return { response, retriesAttempted: retryCount, lastFailureStatus: lastFailureStatus ?? response.status };
-      }
-      if (retryCount > 0) {
-        const method = (config.method || "GET").toString().toUpperCase();
-        const url = (config as any).url || "";
-        logMessage("debug", `Automatic retry succeeded for ${method} ${url} after ${retryCount} retr${retryCount === 1 ? "y" : "ies"}${lastFailureStatus ? `; last failure status: ${lastFailureStatus}` : ""}`);
-      }
-      return { response, retriesAttempted: retryCount, lastFailureStatus };
-    } catch (error) {
-      if (retryCount >= maxRetries) {
-        const baseMessage = (error as any).message || "Network error";
-        const withRetryInfo = `${baseMessage} (retries attempted: ${retryCount}${lastFailureStatus ? `, last failure status: ${lastFailureStatus}` : ""})`;
-        throw new ApiCallError(withRetryInfo, response?.status);
-      }
-      lastFailureStatus = response?.status;
-      retryCount++;
-      await new Promise(resolve => setTimeout(resolve, delay * retryCount));
-    }
-  } while (retryCount <= maxRetries || rateLimitRetryCount > 0);  // separate max retries and rate limit retries
 }
 
 export function applyAuthFormat(format: string, credentials: Record<string, string>): string {
@@ -520,61 +395,6 @@ export function safeHttpMethod(method: any): HttpMethod {
   const upper = method?.toUpperCase?.();
   if (upper && validMethods.includes(upper)) return upper as HttpMethod;
   return "GET" as HttpMethod;
-}
-
-export async function evaluateStopCondition(
-  stopConditionCode: string,
-  response: AxiosResponse,
-  pageInfo: { page: number; offset: number; cursor: any; totalFetched: number }
-): Promise<{ shouldStop: boolean; error?: string }> {
-
-
-  const isolate = new ivm.Isolate({ memoryLimit: 128 });
-
-  try {
-    const context = await isolate.createContext();
-
-    // Inject the response and pageInfo as JSON strings
-    // legacy support for direct response data access
-    await context.global.set('responseJSON', JSON.stringify({ data: response.data, headers: response.headers, ...response.data }));
-    await context.global.set('pageInfoJSON', JSON.stringify(pageInfo));
-
-    // if the stop condition code starts with return or is not a function, we need to wrap it in a function
-    if (stopConditionCode.startsWith("return")) {
-      stopConditionCode = `(response, pageInfo) => { ${stopConditionCode} }`;
-    }
-    else if (!stopConditionCode.startsWith("(response")) {
-      stopConditionCode = `(response, pageInfo) => ${stopConditionCode}`;
-    }
-
-    // Create the evaluation script
-    const script = `
-          const response = JSON.parse(responseJSON);
-          const pageInfo = JSON.parse(pageInfoJSON);
-          const fn = ${stopConditionCode};
-          const result = fn(response, pageInfo);
-          // Return the boolean result
-          return Boolean(result);
-      `;
-
-    const shouldStop = await context.evalClosure(script, null, { timeout: 3000 });
-
-    return { shouldStop: Boolean(shouldStop) };
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    let helpfulError = `Stop condition evaluation failed: ${errorMessage}`;
-
-    return {
-      shouldStop: false, // Default to continue on error
-      error: helpfulError
-    };
-  } finally {
-    try {
-      isolate.dispose();
-    } catch (error) {
-      console.error("Error disposing isolate", error);
-    }
-  }
 }
 
 export function isSelfHealingEnabled(options: RequestOptions | undefined, type: "transform" | "api"): boolean {

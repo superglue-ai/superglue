@@ -1,16 +1,16 @@
 import { Integration, RequestOptions, Workflow, WorkflowResult } from "@superglue/client";
 import { flattenAndNamespaceWorkflowCredentials, generateUniqueId, waitForIntegrationProcessing } from "@superglue/shared/utils";
 import type { GraphQLResolveInfo } from "graphql";
-import { WorkflowExecutor } from "../../workflow/workflow-executor.js";
+import { WorkflowExecutor } from "../../execute/workflow-executor.js";
 import { Context, Metadata } from '../types.js';
 
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
+import { WorkflowBuilder } from "../../build/workflow-builder.js";
 import { IntegrationManager } from "../../integrations/integration-manager.js";
 import { parseJSON } from "../../utils/json-parser.js";
 import { logMessage } from "../../utils/logs.js";
 import { replaceVariables } from "../../utils/tools.js";
 import { notifyWebhook } from "../../utils/webhook.js";
-import { WorkflowBuilder } from "../../workflow/workflow-builder.js";
 
 function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined, defaultValue?: T): T | undefined {
   if (newValue === null) return undefined;

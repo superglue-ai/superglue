@@ -1,7 +1,7 @@
 import type { Integration } from "@superglue/client";
 import { LanguageModel, LLMMessage } from "../llm/llm.js";
-import { BaseToolContext, ToolDefinition, ToolImplementation } from "../tools/tools.js";
 import { DocumentationSearch } from "../documentation/documentation-search.js";
+import { BaseToolContext, ToolDefinition, ToolImplementation } from "../execute/tools.js";
 import { parseJSON } from "./json-parser.js";
 
 // Extend context to include integrations

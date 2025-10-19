@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { WorkflowScheduler } from './workflow-scheduler.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DataStore } from '../datastore/types.js';
+import { WorkflowSchedulerWorker } from './scheduler-worker.js';
 
 vi.mock('../graphql/resolvers/workflow.js', () => ({
     executeWorkflowResolver: vi.fn()
@@ -18,11 +18,11 @@ const mockDatastore = {
 } as unknown as DataStore;
 
 describe('WorkflowScheduler', () => {
-    let scheduler: WorkflowScheduler;
+    let scheduler: WorkflowSchedulerWorker;
     
     beforeEach(() => {
         vi.clearAllMocks();
-        scheduler = new WorkflowScheduler(mockDatastore, 100);
+        scheduler = new WorkflowSchedulerWorker(mockDatastore, 100);
     });
 
     it('should start and stop interval correctly', async () => {

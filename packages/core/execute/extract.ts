@@ -5,9 +5,10 @@ import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { LanguageModel, LLMMessage } from "../llm/llm.js";
 import { BUILD_WORKFLOW_SYSTEM_PROMPT } from "../llm/prompts.js";
-import { decompressData, parseFile } from "./file.js";
-import { logMessage } from "./logs.js";
-import { callAxios, composeUrl, replaceVariables } from "./tools.js";
+import { decompressData, parseFile } from "../utils/file.js";
+import { logMessage } from "../utils/logs.js";
+import { composeUrl, replaceVariables } from "../utils/tools.js";
+import { callAxios } from "./api/api.js";
 
 
 export async function callExtract(extract: ExtractConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions, metadata?: Metadata): Promise<any> {

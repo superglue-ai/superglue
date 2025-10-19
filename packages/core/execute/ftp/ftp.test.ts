@@ -1,14 +1,14 @@
 import { ApiConfig, HttpMethod, RequestOptions } from '@superglue/client';
 import { describe, expect, it, vi } from 'vitest';
 
-// Mock the modules before importing callFTP
+// Mock the modules before importing executeFTP
 vi.mock('basic-ftp');
 vi.mock('ssh2-sftp-client');
 
 // Now import after mocks are set up
-import { callFTP } from './ftp.js';
+import { executeFTP } from './ftp.js';
 
-describe('callFTP', () => {
+describe('executeFTP', () => {
   const mockEndpoint: ApiConfig = {
     id: 'test-ftp',
     urlHost: 'ftp://testuser:testpass@ftp.example.com',
@@ -25,8 +25,8 @@ describe('callFTP', () => {
   describe('Integration tests', () => {
     it('should validate FTP configuration', () => {
       // Just validate that the function exists and can be called
-      expect(callFTP).toBeDefined();
-      expect(typeof callFTP).toBe('function');
+      expect(executeFTP).toBeDefined();
+      expect(typeof executeFTP).toBe('function');
     });
   });
 
@@ -37,7 +37,7 @@ describe('callFTP', () => {
         body: 'invalid json'
       };
 
-      await expect(callFTP({endpoint, credentials: mockCredentials, options: mockOptions}))
+      await expect(executeFTP({operation: endpoint.body, credentials: mockCredentials, options: mockOptions}))
         .rejects.toThrow('Invalid JSON in body');
     });
 
@@ -47,7 +47,7 @@ describe('callFTP', () => {
         body: '{}'
       };
 
-      await expect(callFTP({endpoint, credentials: mockCredentials, options: mockOptions}))
+      await expect(executeFTP({operation: endpoint.body, credentials: mockCredentials, options: mockOptions}))
         .rejects.toThrow("Missing 'operation' field in request body");
     });
 
@@ -57,7 +57,7 @@ describe('callFTP', () => {
         body: '{"operation": "unsupported"}'
       };
 
-      await expect(callFTP({endpoint, credentials: mockCredentials, options: mockOptions}))
+      await expect(executeFTP({operation: endpoint.body, credentials: mockCredentials, options: mockOptions}))
         .rejects.toThrow('Unsupported operation: \'unsupported\'');
     });
   });
@@ -75,7 +75,7 @@ describe('callFTP', () => {
         // This will fail at connection, but won't fail at operation validation
         expect(async () => {
           try {
-            await callFTP({endpoint, credentials: mockCredentials, options: mockOptions});
+            await executeFTP({operation: endpoint.body, credentials: mockCredentials, options: mockOptions});
           } catch (e: any) {
             // Should not be an unsupported operation error
             expect(e.message).not.toContain('Unsupported operation');
@@ -93,7 +93,7 @@ describe('callFTP', () => {
           body: JSON.stringify({ operation: op })
         };
         
-        await expect(callFTP({endpoint, credentials: mockCredentials, options: mockOptions}))
+        await expect(executeFTP({operation: endpoint.body, credentials: mockCredentials, options: mockOptions}))
           .rejects.toThrow(`Unsupported operation: '${op}'`);
       }
     });

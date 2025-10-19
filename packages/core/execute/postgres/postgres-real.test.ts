@@ -16,12 +16,12 @@ describe('callPostgres', () => {
   };
 
   it.skipIf(shouldSkip)('should connect and execute a simple query', async () => {
-    const result = await callPostgres(
-      testConfig,
-      {}, // payload
-      {}, // credentials
-      { timeout: 5000, retries: 1 } // options
-    );
+    const result = await callPostgres({
+      endpoint: testConfig,
+      payload: {},
+      credentials: {},
+      options: { timeout: 5000, retries: 1 }
+    });
 
     expect(result).toBeDefined();
   });

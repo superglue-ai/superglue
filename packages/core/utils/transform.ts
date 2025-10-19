@@ -5,7 +5,8 @@ import { server_defaults } from "../default.js";
 import { LanguageModel, LLMMessage } from "../llm/llm.js";
 import { PROMPT_JS_TRANSFORM } from "../llm/prompts.js";
 import { logMessage } from "./logs.js";
-import { getSchemaFromData, isSelfHealingEnabled, sample, transformAndValidateSchema } from "./tools.js";
+import { getObjectContext } from "./context.js";
+import { isSelfHealingEnabled, sample, transformAndValidateSchema } from "./tools.js";
 
 export async function executeTransform(args: {
   datastore: DataStore,
@@ -99,11 +100,10 @@ export async function generateTransformCode(
 
     if (!messages || messages?.length === 0) {
       const userPrompt =
-        `Given a source data and structure, create a JavaScript function (as a string) that transforms the input data according to the instruction.
+        `Given a source data object, create a JavaScript function that transforms the input data according to the instruction.
 ${instruction ? `<user_instruction>${instruction}</user_instruction>` : ''}
 ${schema ? `<target_schema>${JSON.stringify(schema, null, 2)}</target_schema>` : ''}
-<source_data_structure>${getSchemaFromData(payload)}</source_data_structure>
-<source_data_sample>${JSON.stringify(sample(payload, 20), null, 2).slice(0, 50000)}</source_data_sample>
+<source_data>${getObjectContext(payload, { include: { schema: true, preview: true, samples: true }, characterBudget: 50000 })}</source_data>
 `;
       messages = [
         { role: "system", content: PROMPT_JS_TRANSFORM },

@@ -1,5 +1,5 @@
 import type { SystemModelMessage, UserModelMessage, AssistantModelMessage, ToolModelMessage } from "ai";
-import { ToolCall, ToolCallResult, ToolDefinition } from "../tools/tools.js";
+import { ToolCall, ToolCallResult, ToolDefinition } from "../execute/tools.js";
 import { VercelAIModel } from "./vercel-ai-model.js";
 
 export type LLMMessage = SystemModelMessage | UserModelMessage | AssistantModelMessage | ToolModelMessage;

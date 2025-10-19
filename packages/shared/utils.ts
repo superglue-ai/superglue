@@ -122,9 +122,6 @@ function enhanceSchemaWithData(value: any, schema: any): any {
     return schema;
 }
 
-// Accepts: Integration[]
-// Returns: { [namespacedKey: string]: string }
-// Used for credentials flattening and namespacing across frontend and backend
 export function flattenAndNamespaceWorkflowCredentials(
     integrations: Integration[]
 ): Record<string, string> {
@@ -165,7 +162,6 @@ export async function generateUniqueId({
     }
 }
 
-// Generic interface for anything that can fetch integrations
 interface IntegrationGetter {
     getIntegration(id: string): Promise<Integration | null>;
     getManyIntegrations?(ids: string[]): Promise<Integration[]>;

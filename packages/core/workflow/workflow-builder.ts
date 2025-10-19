@@ -2,7 +2,7 @@ import { ExecutionStep, Integration, Workflow } from "@superglue/client";
 import { inferJsonSchema, Metadata, toJsonSchema } from "@superglue/shared";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { BUILD_WORKFLOW_SYSTEM_PROMPT } from "../llm/prompts.js";
-import { executeTool } from "../tools/tools.js";
+import { executeTool } from "../execute/tools.js";
 import { DocumentationSearch } from "../documentation/documentation-search.js";
 import { parseJSON } from "../utils/json-parser.js";
 import { logMessage } from "../utils/logs.js";
