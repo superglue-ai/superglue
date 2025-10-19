@@ -8,7 +8,8 @@ import { telemetryClient } from "../utils/telemetry.js";
 import { isSelfHealingEnabled, maskCredentials, sample } from "../utils/tools.js";
 import { AbortError, ApiCallError } from "./api/api.js";
 import { callEndpointLegacyImplementation, generateApiConfig } from "./api/api.legacy.js";
-import { EvaluateStepResponseContextInput, EvaluateStepResponseContextOptions, getEvaluateStepResponseContext, getObjectContext } from "../context/context-builders.js";
+import { getEvaluateStepResponseContext } from "../context/context-builders.js";
+import { EvaluateStepResponseContextInput, EvaluateStepResponseContextOptions } from "../context/context-types.js";
 import { EVALUATE_STEP_RESPONSE_SYSTEM_PROMPT } from "../context/context-prompts.js";
 
 export async function evaluateStepResponse({

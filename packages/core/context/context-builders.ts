@@ -1,8 +1,9 @@
-import { ExtractConfig, ExecutionStep, Integration, JSONSchema, ApiConfig } from '@superglue/client';
+import { Integration } from '@superglue/client';
 import { server_defaults } from '../default.js';
 import { DocumentationSearch } from '../documentation/documentation-search.js';
 import { composeUrl } from '../utils/tools.js';
-import { buildFullObjectSection, buildPreviewSection, buildSamplesSection, buildSchemaSection, stringifyWithLimits } from './context-helpers.js';
+import { buildFullObjectSection, buildPreviewSection, buildSamplesSection, buildSchemaSection, stringifyWithLimits } from './context-helpers.js';       
+import { IntegrationContextOptions, ObjectContextOptions, WorkflowBuilderContextInput, WorkflowBuilderContextOptions, ExtractContextInput, ExtractContextOptions, LoopSelectorContextInput, LoopSelectorContextOptions, EvaluateStepResponseContextInput, EvaluateStepResponseContextOptions, TransformContextInput, TransformContextOptions, EvaluateTransformContextInput, EvaluateTransformContextOptions } from './context-types.js';
 
 export function getObjectContext(obj: any, opts: ObjectContextOptions): string {
 
@@ -182,3 +183,30 @@ export function getEvaluateStepResponseContext(input: EvaluateStepResponseContex
     const prompt = prompt_start + '\n' + ([dataContext, endpointContext, docSearchResultsForStepInstructionContext].filter(Boolean).join('\n')).slice(0, budget - prompt_start.length);
     return prompt;
 }
+
+export function getTransformContext(input: TransformContextInput, options: TransformContextOptions): string {
+    const budget = Math.max(0, options.characterBudget | 0);
+    if (budget === 0) return '';
+
+    const prompt_start = `Given a source data object, create a JavaScript function that transforms the input data according to the instruction.`;
+    const instructionContext = `<instruction>${input.instruction}</instruction>`;
+    const schemaContext = `<target_schema>${JSON.stringify(input.targetSchema)}</target_schema>`;
+    const dataContext = `<source_data>${getObjectContext(input.sourceData, { include: { schema: true, preview: true, samples: true }, characterBudget: budget * 0.9 })}</source_data>`;
+    const prompt = prompt_start + '\n' + ([instructionContext, schemaContext, dataContext].filter(Boolean).join('\n')).slice(0, budget - prompt_start.length);
+    return prompt;
+}
+
+export function getEvaluateTransformContext(input: EvaluateTransformContextInput, options: EvaluateTransformContextOptions): string {
+    const budget = Math.max(0, options.characterBudget | 0);
+    if (budget === 0) return '';
+
+    const promptStart = input.instruction ? `The user's instruction: "${input.instruction}"` : 'No specific instruction provided; focus on mapping the source data to the target schema as closely as possible.';
+    const targetSchemaContext = `<target_schema>${JSON.stringify(input.targetSchema)}</target_schema>`;
+    const sourceDataContext = `<source_data>${getObjectContext(input.sourceData, { include: { schema: true, preview: true, samples: true }, characterBudget: budget * 0.4 })}</source_data>`;
+    const transformedDataContext = `<transformed_data>${getObjectContext(input.transformedData, { include: { schema: true, preview: true, samples: true }, characterBudget: budget * 0.4 })}</transformed_data>`;
+    const transformCodeContext = `<transform_code>${input.transformCode}</transform_code>`;
+    const promptEnd = `Please evaluate the transformation based on the criteria in the system prompt, considering that samples may not show all data values present in the full dataset.`;
+    const prompt = promptStart + '\n' + ([targetSchemaContext, sourceDataContext, transformedDataContext, transformCodeContext].filter(Boolean).join('\n')).slice(0, budget - promptStart.length - promptEnd.length) + '\n' + promptEnd;
+    return prompt;
+
+

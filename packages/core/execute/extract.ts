@@ -9,7 +9,8 @@ import { decompressData, parseFile } from "../utils/file.js";
 import { logMessage } from "../utils/logs.js";
 import { composeUrl, replaceVariables } from "../utils/tools.js";
 import { callAxios } from "./api/api.js";
-import { ExtractContextInput, ExtractContextOptions, getExtractContext } from "../context/context-builders.js";
+import { getExtractContext } from "../context/context-builders.js";
+import { ExtractContextInput, ExtractContextOptions } from "../context/context-types.js";
 
 
 export async function callExtract(extract: ExtractConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions, metadata?: Metadata): Promise<any> {

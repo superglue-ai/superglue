@@ -32,7 +32,7 @@ export type WorkflowBuilderContextOptions = {
 
 export type WorkflowBuilderContextInput = {
     integrations: Integration[];
-    payload: Record<string, unknown>;
+    payload: any;
     userInstruction: string;
     responseSchema?: JSONSchema;
 };
@@ -40,7 +40,7 @@ export type WorkflowBuilderContextInput = {
 export type ExtractContextInput = {
     extractConfig: ExtractConfig;
     documentation: string;
-    payload: Record<string, unknown>;
+    payload: any;
     credentials: Record<string, string>;
     lastError: string | null;
 };
@@ -52,7 +52,7 @@ export type ExtractContextOptions = {
 
 export type LoopSelectorContextInput = {
     step: ExecutionStep;
-    payload: Record<string, unknown>;
+    payload: any;
     instruction: string;
 };
 
@@ -61,11 +61,33 @@ export type LoopSelectorContextOptions = {
 };
 
 export type EvaluateStepResponseContextInput = {
-    data: Record<string, unknown>;
+    data: any;
     endpoint: ApiConfig;
     docSearchResultsForStepInstruction: string;
 };
 
 export type EvaluateStepResponseContextOptions = {
+    characterBudget: number;
+};
+
+export type TransformContextInput = {
+    instruction: string;
+    targetSchema: JSONSchema;
+    sourceData: any;
+};
+
+export type TransformContextOptions = {
+    characterBudget: number;
+};
+
+export type EvaluateTransformContextInput = {
+    instruction: string;
+    targetSchema: JSONSchema;
+    sourceData: any;
+    transformedData: any;
+    transformCode: string;
+};
+
+export type EvaluateTransformContextOptions = {
     characterBudget: number;
 };

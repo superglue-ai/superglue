@@ -12,7 +12,7 @@ export async function generateSchema(instruction: string, responseData: string, 
     },
     {
       role: "user",
-      content: `Instruction: ${instruction}${responseData ? `\n\nResponse Data: ${responseData}` : ""}`
+      content: `<instruction>${instruction}</instruction>${responseData ? `<response_data>${responseData}</response_data>` : ""}`
     }
   ];
   const MAX_RETRIES = 3;

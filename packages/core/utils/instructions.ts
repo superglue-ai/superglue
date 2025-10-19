@@ -3,6 +3,7 @@ import { LanguageModel, LLMMessage } from "../llm/language-model.js";
 import { DocumentationSearch } from "../documentation/documentation-search.js";
 import { BaseToolContext, ToolDefinition, ToolImplementation } from "../execute/tools.js";
 import { parseJSON } from "./json-parser.js";
+import { GENERATE_INSTRUCTIONS_SYSTEM_PROMPT } from "../context/context-prompts.js";
 
 // Extend context to include integrations
 export interface InstructionGenerationContext extends BaseToolContext {
@@ -57,31 +58,11 @@ export const generateInstructionsImplementation: ToolImplementation<InstructionG
   const messages: LLMMessage[] = [
     {
       role: "system",
-      content: `You are helping users discover what they can build with their connected data sources and APIs. Your job is to generate creative, practical example workflows or API calls they could implement.
-
-**Context:** Users have connected various integrations (APIs, databases, services, etc.). You need to suggest specific workflow examples they could build using these integrations.
-
-**Your task:**
-- Generate 2-4 specific, actionable workflow or API call examples in natural language
-- Focus on common use cases: data retrieval, filtering, syncing, automation
-- Be specific with field names, conditions, and actions when possible
-- If multiple integrations: suggest both single-integration and cross-integration workflows
-
-**Output requirements:**
-- Return ONLY a JSON array of strings
-- Each string is one complete workflow instruction
-- No markdown, headers, bullet points, or explanations
-- Maximum 5 workflows total
-
-**Examples:**
-Single integration: "Retrieve all hubspot customers created in the last 30 days with status='active'"
-Cross-integration: "Sync new Stripe customers to CRM and send welcome email via SendGrid"
-
-**Important:** Always generate suggestions based on common patterns for the type of service provided. Use your knowledge of typical API structures and common use cases. Never abort - be creative and helpful.`
+      content: GENERATE_INSTRUCTIONS_SYSTEM_PROMPT
     },
     {
       role: "user",
-      content: `integrations: ${JSON.stringify(integrationSummaries, null, 2)}`
+      content: `<integrations>${JSON.stringify(integrationSummaries, null, 2)}</integrations>`
     }
   ];
 
