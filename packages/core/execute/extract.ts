@@ -3,14 +3,13 @@ import { Metadata } from "@superglue/shared";
 import { AxiosRequestConfig } from "axios";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
+import { getExtractContext } from "../context/context-builders.js";
+import { BUILD_WORKFLOW_SYSTEM_PROMPT } from "../context/context-prompts.js";
 import { LanguageModel, LLMMessage } from "../llm/language-model.js";
-import { BUILD_WORKFLOW_SYSTEM_PROMPT } from "../llm/prompts.js";
 import { decompressData, parseFile } from "../utils/file.js";
 import { logMessage } from "../utils/logs.js";
 import { composeUrl, replaceVariables } from "../utils/tools.js";
 import { callAxios } from "./api/api.js";
-import { getExtractContext } from "../context/context-builders.js";
-import { ExtractContextInput, ExtractContextOptions } from "../context/context-types.js";
 
 
 export async function callExtract(extract: ExtractConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions, metadata?: Metadata): Promise<any> {

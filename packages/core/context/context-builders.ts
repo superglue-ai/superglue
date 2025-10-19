@@ -7,6 +7,8 @@ import { EvaluateStepResponseContextInput, EvaluateStepResponseContextOptions, E
 
 export function getObjectContext(obj: any, opts: ObjectContextOptions): string {
 
+    if (opts.include?.schema === false && opts.include?.preview === false && opts.include?.samples === false) return '';
+
     const previewDepthLimit = opts.tuning?.previewDepthLimit ?? server_defaults.CONTEXT.JSON_PREVIEW_DEPTH_LIMIT;
     const previewArrayLimit = opts.tuning?.previewArrayLimit ?? server_defaults.CONTEXT.JSON_PREVIEW_ARRAY_LIMIT;
     const previewObjectKeyLimit = opts.tuning?.previewObjectKeyLimit ?? server_defaults.CONTEXT.JSON_PREVIEW_OBJECT_KEY_LIMIT;
@@ -82,13 +84,12 @@ function buildIntegrationContext(integration: Integration, opts: IntegrationCont
     const budget = Math.max(0, opts.characterBudget | 0);
     if (budget === 0) return '';
 
-    const INT = server_defaults.CONTEXT.INTEGRATIONS;
-    const authMaxSections = opts.tuning?.documentationMaxSections ?? INT.AUTH_MAX_SECTIONS;
-    const authSectionSize = opts.tuning?.documentationMaxChars ?? INT.AUTH_SECTION_SIZE_CHARS;
-    const paginationMaxSections = opts.tuning?.documentationMaxSections ?? INT.PAGINATION_MAX_SECTIONS;
-    const paginationSectionSize = opts.tuning?.documentationMaxChars ?? INT.PAGINATION_SECTION_SIZE_CHARS;
-    const generalMaxSections = opts.tuning?.documentationMaxSections ?? INT.GENERAL_MAX_SECTIONS;
-    const generalSectionSize = opts.tuning?.documentationMaxChars ?? INT.GENERAL_SECTION_SIZE_CHARS;
+    const authMaxSections = opts.tuning?.documentationMaxSections ?? server_defaults.CONTEXT.INTEGRATIONS.AUTH_MAX_SECTIONS;
+    const authSectionSize = opts.tuning?.documentationMaxChars ?? server_defaults.CONTEXT.INTEGRATIONS.AUTH_SECTION_SIZE_CHARS;
+    const paginationMaxSections = opts.tuning?.documentationMaxSections ?? server_defaults.CONTEXT.INTEGRATIONS.PAGINATION_MAX_SECTIONS;
+    const paginationSectionSize = opts.tuning?.documentationMaxChars ?? server_defaults.CONTEXT.INTEGRATIONS.PAGINATION_SECTION_SIZE_CHARS;
+    const generalMaxSections = opts.tuning?.documentationMaxSections ?? server_defaults.CONTEXT.INTEGRATIONS.GENERAL_MAX_SECTIONS;
+    const generalSectionSize = opts.tuning?.documentationMaxChars ?? server_defaults.CONTEXT.INTEGRATIONS.GENERAL_SECTION_SIZE_CHARS;
 
     const docSearch = new DocumentationSearch((undefined as any));
     const authSection = docSearch.extractRelevantSections(
