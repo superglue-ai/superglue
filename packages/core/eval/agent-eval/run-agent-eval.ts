@@ -10,10 +10,10 @@ import path from "node:path";
 import { config } from "dotenv";
 import { MetricsCalculator } from "./metrics-calculator.js";
 import { CsvReporter } from "./csv-reporter.js";
+import { MarkdownReporter } from "./markdown-reporter.js";
 import { MetricsComparer } from "./metrics-comparer.js";
 import { ConsoleReporter } from "./console-reporter.js";
 import { closeAllPools } from "../../execute/postgres/postgres.js";
-import { writeFileSync } from "node:fs";
 
 const envPath = process.cwd().endsWith('packages/core')
   ? path.join(process.cwd(), '../../.env')
@@ -53,6 +53,9 @@ async function main(): Promise<void> {
 
     const csvReporter = new CsvReporter(baseDir, metadata);
     csvReporter.report(metrics);
+    
+    const markdownReporter = new MarkdownReporter(baseDir, metadata);
+    markdownReporter.report(metrics, metricsComparison, workflowAttempts);
     
     const duration = new Date().getTime() - startedAt.getTime();
     logMessage("info", `Agent Evaluation Completed in ${(duration / 1000).toFixed(1)}s`, metadata);
