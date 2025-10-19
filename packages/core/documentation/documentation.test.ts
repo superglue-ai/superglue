@@ -63,6 +63,9 @@ describe('Documentation Class', () => {
         mockedAxios.get.mockReset(); // Reset mocks specifically
         mockedAxios.post.mockReset();
 
+        // Set LLM_PROVIDER env var to prevent errors when accessing LanguageModel.contextLength
+        process.env.LLM_PROVIDER = 'ANTHROPIC';
+
         // Create standard mocks for Playwright
         ({ mockPage, mockContext, mockBrowser } = createPlaywrightMocks());
     });

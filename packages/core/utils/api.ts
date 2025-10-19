@@ -693,7 +693,7 @@ export async function executeApiCall({
   do {
     try {
       if (retryCount > 0 && isSelfHealing) {
-        logMessage('info', `Generating API config for ${endpoint?.urlHost}${retryCount > 0 ? ` (${retryCount})` : ""}`, metadata);
+        logMessage('info', `Failed to execute API Call. Self healing the step configuration... ${endpoint?.urlHost}${retryCount > 0 ? ` (${retryCount})` : ""}`, metadata);
         const computedApiCallConfig = await generateApiConfig({
           apiConfig: endpoint,
           payload,
@@ -735,7 +735,7 @@ export async function executeApiCall({
       lastError = maskCredentials(rawErrorString, credentials).slice(0, 2000);
       if (retryCount > 0) {
         messages.push({ role: "user", content: `There was an error with the configuration, please fix: ${rawErrorString.slice(0, 4000)}` });
-        logMessage('warn', `API call failed. ${lastError}`, metadata);
+        logMessage('info', `Failed to call API. Last error: ${lastError}`, metadata);
       }
 
       // hack to get the status code from the error

@@ -58,36 +58,14 @@ export const LanguageModel = {
         return this._getInstance().generateText(messages, temperature);
     },
 
-    generateObject(messages: LLMMessage[], schema: any, temperature?: number, customTools?: ToolDefinition[], context?: any): Promise<LLMObjectResponse> {
-        return this._getInstance().generateObject(messages, schema, temperature, customTools, context);
+    generateObject(messages: LLMMessage[], schema: any, temperature?: number, customTools?: ToolDefinition[], toolContext?: any): Promise<LLMObjectResponse> {
+        return this._getInstance().generateObject(messages, schema, temperature, customTools, toolContext);
     },
 
     _getInstance(): LLM {
         if (!_languageModel) {
-            _languageModel = selectLanguageModel();
+            _languageModel = new VercelAIModel();
         }
         return _languageModel;
     }
 };
-
-function selectLanguageModel(): LLM {
-    // switch (String(process.env.LLM_PROVIDER).toLowerCase()) {
-    //     case "openai":
-    //         logMessage("info", "Using OpenAI model: " + process.env.OPENAI_MODEL);
-    //         return new OpenAIModel();
-    //     case "openai_legacy":
-    //         logMessage("info", "Using OpenAI model with legacy chat completions API: " + process.env.OPENAI_MODEL);
-    //         return new OpenAILegacyModel();
-    //     case "gemini":
-    //         logMessage("info", "Using Gemini model: " + process.env.GEMINI_MODEL);
-    //         return new GeminiModel();
-    //     case "anthropic":
-    //         logMessage("info", "Using Anthropic model: " + process.env.ANTHROPIC_MODEL);
-    //         return new AnthropicModel();
-    //     default:
-    //         const defaultModel = new OpenAIModel();
-    //         logMessage("info", "Using default model: " + defaultModel.model);
-    //         return defaultModel;
-    // }
-    return new VercelAIModel();
-}

@@ -32,7 +32,7 @@ export class VercelAIModel implements LLM {
   private buildTools(
     schemaObj: any,
     customTools?: ToolDefinition[],
-    context?: any
+    toolContext?: any
   ): Record<string, any> {
     const tools: Record<string, any> = {
       submit: tool({
@@ -74,7 +74,7 @@ export class VercelAIModel implements LLM {
           description: customTool.description,
           inputSchema: jsonSchema(customTool.arguments),
           execute: customTool.execute ? async (args) => {
-            return await customTool.execute!(args, context);
+            return await customTool.execute!(args, toolContext);
           } : undefined,
         });
       }
@@ -83,28 +83,44 @@ export class VercelAIModel implements LLM {
     return tools;
   }
 
-  private cleanSchema(schema: any): any {
+  private cleanSchema(schema: any, isRoot: boolean = true): any {
     if (!schema || typeof schema !== 'object') return schema;
 
     const cleaned = { ...schema };
 
+    // Normalize object/array schemas
     if (cleaned.type === 'object' || cleaned.type === 'array') {
       cleaned.additionalProperties = false;
       cleaned.strict = true;
-      
+
       delete cleaned.patternProperties;
-      
+
       if (cleaned.properties) {
         for (const key in cleaned.properties) {
-          cleaned.properties[key] = this.cleanSchema(cleaned.properties[key]);
+          cleaned.properties[key] = this.cleanSchema(cleaned.properties[key], false);
         }
       }
-      
+
       if (cleaned.items) {
-        cleaned.items = this.cleanSchema(cleaned.items);
+        cleaned.items = this.cleanSchema(cleaned.items, false);
         delete cleaned.minItems;
         delete cleaned.maxItems;
       }
+    }
+
+    // Anthropic tool input must be an object at the root. If the root
+    // schema is an array, wrap it into an object under `result`.
+    if (isRoot && cleaned.type === 'array') {
+      const arraySchema = this.cleanSchema(cleaned, false);
+      return {
+        type: 'object',
+        properties: {
+          result: arraySchema,
+        },
+        required: ['result'],
+        additionalProperties: false,
+        strict: true,
+      };
     }
 
     return cleaned;
@@ -132,12 +148,19 @@ export class VercelAIModel implements LLM {
     };
   }
 
+  /**
+   This function is used to generate an object response from the language model.
+   This is done by calling the generateText function together with a submit tool that has the input schema of our desired output object.
+   We set the tool choice to required so that the LLM is forced to call a tool.
+   When the LLM returns, we check for the submit tool call and return the result.
+   If the LLM does not return a submit tool call, we try again.
+   */
   async generateObject(
     messages: LLMMessage[],
     schema: any,
     temperature: number = 0,
     customTools?: ToolDefinition[],
-    context?: any,
+    toolContext?: any,
     toolChoice?: 'auto' | 'required' | 'none' | { type: 'tool'; toolName: string }
   ): Promise<LLMObjectResponse> {
     const dateMessage = this.getDateMessage();
@@ -152,7 +175,7 @@ export class VercelAIModel implements LLM {
     }
 
     const schemaObj = jsonSchema(schema);
-    const tools = this.buildTools(schemaObj, customTools, context);
+    const tools = this.buildTools(schemaObj, customTools, toolContext);
 
     try {
       let finalResult: any = null;
@@ -174,7 +197,7 @@ export class VercelAIModel implements LLM {
         // Check for submit/abort in tool calls
         for (const toolCall of result.toolCalls) {
           if (toolCall.toolName === 'submit') {
-            finalResult = toolCall.input;
+            finalResult = (toolCall.input as any)?.result ?? toolCall.input;
             break;
           }
           if (toolCall.toolName === 'abort') {
